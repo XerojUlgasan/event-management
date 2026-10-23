@@ -1,0 +1,49 @@
+@theme {
+  --color-clemora-surface: #e9e7f0;
+  --color-clemora-ink: #111114;
+  --color-clemora-slate: #777b8b;
+  --color-clemora-coral: #c5543f;
+  --color-clemora-panel: #242329;
+  --color-clemora-line: #c8c7d2;
+  --font-clemora: "Inter", "Helvetica Neue", sans-serif;
+
+  /* The prototype retains these tokens until its other screens are redesigned. */
+  --color-wine: #790d16;
+  --color-wine-dark: #58070d;
+  --color-cream: #e5d3af;
+  --color-cream-soft: #f5eddf;
+  --color-ink: #211b1b;
+  --color-muted: #6f6868;
+  --color-line: #e9e4df;
+  --color-canvas: #f7f6f4;
+  --font-sans: "DM Sans", sans-serif;
+  --font-serif: "Playfair Display", serif;
+}
+
+:root {
+  --cl-surface: #e9e7f0;
+  --cl-ink: #111114;
+  --cl-slate: #777b8b;
+  --cl-coral: #c5543f;
+  --cl-panel: #242329;
+  --cl-line: #c8c7d2;
+  --cl-font: "Inter", "Helvetica Neue", Arial, sans-serif;
+
+  --wine: #790d16;
+  --wine-dark: #58070d;
+  --cream: #e5d3af;
+  --cream-soft: #f5eddf;
+  --ink: #211b1b;
+  --muted: #6f6868;
+  --line: #e9e4df;
+  --canvas: #f7f6f4;
+  --green: #26735b;
+  --green-soft: #e7f3ed;
+  --amber: #a46511;
+  --amber-soft: #fff3d9;
+  --red-soft: #fbe8e8;
+  --blue: #345d79;
+  --blue-soft: #e9f2f7;
+  --shadow: 0 16px 50px rgba(57, 31, 32, .1);
+}
+

@@ -1,0 +1,12 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap");
+@import "tailwindcss";
+@import "@event-management/theme/theme.css";
+@import "../src/styles.css";
+
+@layer base {
+  body {
+    color: var(--ink);
+    font-family: var(--font-sans);
+    background: white;
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "event-management",
+  "private": true,
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @event-management/web dev",
+    "dev:api": "pnpm --filter @event-management/api dev",
+    "storybook": "pnpm --filter @event-management/ui storybook",
+    "sstorybook": "pnpm storybook",
+    "build:storybook": "pnpm --filter @event-management/ui build:storybook",
+    "build": "pnpm --filter @event-management/web build && pnpm --filter @event-management/api build",
+    "check": "pnpm --filter @event-management/web check && pnpm --filter @event-management/api check && pnpm --filter @event-management/ui check",
+    "db:up": "docker compose -f compose.yaml up -d db",
+    "db:down": "docker compose -f compose.yaml down",
+    "db:validate": "pnpm --filter @event-management/api db:validate",
+    "db:migrate": "pnpm --filter @event-management/api db:migrate",
+    "db:deploy": "pnpm --filter @event-management/api db:deploy",
+    "db:generate": "pnpm --filter @event-management/api db:generate",
+    "db:check": "pnpm --filter @event-management/api db:check"
+  }
+}

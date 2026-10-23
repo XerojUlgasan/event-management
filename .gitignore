@@ -1,0 +1,9 @@
+node_modules/
+.astro/
+dist/
+storybook-static/
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo
+.DS_Store

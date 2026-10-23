@@ -1,0 +1,63 @@
+# Clemora feature scope
+
+Updated: 2026-10-22
+
+## Current business workflow
+
+Customers start with event type, preferred date, and estimated guest count. The business offers all-inclusive packages for **30 to 100 guests**. Each package includes exclusive venue use, buffet and venue setup, full catering, and sound and lights. A reservation fee secures a date and is **credited toward the total package price**.
+
+This workflow is the product baseline. The earlier proposal explores a broader event and resource platform; its features are options to evaluate rather than fixed requirements.
+
+## Booking journey
+
+1. Customer views package details and submits an inquiry with event type, preferred date, estimated guests, contact details, and special requests.
+2. The system shows venue availability and flags counts outside the offered range for staff review.
+3. Customer chooses a package and requests optional add-ons. Staff check availability and send an itemized quote.
+4. Customer accepts the quote and pays the reservation fee under the business's terms. Staff verify payment; the fee reduces the outstanding balance.
+5. The booking becomes confirmed, and staff prepare from the approved event plan.
+6. Changes to date, guests, package, or add-ons are recorded and reapproved when they affect price or delivery.
+
+## Features for the first release
+
+| Area | Needed behavior |
+| --- | --- |
+| Package catalog | Show guest range, price or price rule, included services, venue details, exclusions, and terms. Staff maintain package versions. |
+| Amenities and add-ons | Separate included amenities from optional paid add-ons. Examples to validate with the business include a photo booth, upgraded decorations, a projector, and extra venue hours. Store each add-on's price, quantity or duration, availability, and setup needs. |
+| Inquiry | Collect the minimum event requirements and give the customer a reference and status. Allow free-text requests for staff review. |
+| Availability | Calendar for available, temporarily held, and confirmed venue periods. Account for exclusive use and setup/cleanup buffers. Check limited add-ons or external providers where relevant. |
+| Quotation | Itemize package and add-ons, calculate total and fee/balance, record validity and terms, and retain sent and revised versions. Staff approve nonstandard requests. |
+| Reservation and payment | Track fee due, payment reference or proof, staff verification, payment history, remaining balance, and due date. Credit the fee exactly once. A payment gateway is optional initially. |
+| Booking management | Track inquiry, quoted, awaiting fee, confirmed, preparing, completed, and cancelled states. Record rescheduling, cancellations, approvals, and important changes. |
+| Event plan | One approved record for date and times, guests, menu, venue layout, catering, sound and lights, add-ons, contacts, and special instructions. |
+| Preparation | Assign and track checklists for catering, venue setup, sound and lights, and add-on fulfillment. Notify affected staff of approved changes. |
+| Communication | Send and retain quote, fee, confirmation, change, and balance notices. Keep customer-to-staff messages tied to the event. |
+| Access | Customer view of their inquiry/booking and authorized staff views for catalog, quotes, payments, calendar, and preparation. Enforce permissions on the server. |
+
+## Main agentic AI integration
+
+The **Clemora Event Planning Assistant** carries a customer inquiry from the first message to a staff-ready booking request. It uses the system's approved package, pricing, add-on, availability, and booking records rather than inventing answers.
+
+1. **Gather requirements:** Ask for event type, preferred date, estimated guests, and preferences. Ask follow-up questions when details are missing or unclear.
+2. **Check live information:** Look up eligible packages, included amenities, optional add-ons, approved prices, and venue or add-on availability.
+3. **Recommend an arrangement:** Suggest a suitable package and relevant add-ons, explain why they fit, and distinguish inclusions from extra charges.
+4. **Prepare the request:** Save the conversation as a structured inquiry and draft an itemized quote for staff review.
+5. **Guide the next step:** Explain the approved quote, reservation fee, and current booking status. Follow up when the customer needs to provide information or take action.
+6. **Hand off to staff:** Escalate custom requests, uncertain answers, pricing exceptions, and booking decisions with a concise summary of the details collected.
+
+The assistant may prepare and explain decisions, but authorized staff approve custom prices and booking commitments. Payment verification and date-conflict enforcement belong to the booking system; the assistant cannot mark a fee paid or promise an unconfirmed date.
+
+## Next features
+
+- **Simple reports:** inquiries, quote conversion, upcoming and completed events, outstanding balances, and package/add-on demand, calculated from real records.
+- **Past events and feedback:** publish selected event examples and collect customer feedback after completion.
+
+## Decisions to confirm with the business
+
+- Is the venue exclusive for a whole date, or can different events use different time slots? What setup and cleanup time is required?
+- What are the exact package tiers and pricing rules for guest counts from 30 to 100?
+- Which amenities are included in each package, and which add-ons can actually be sold? Can an add-on be booked for more than one event at a time?
+- How much is the reservation fee, when is it due, and does a date have a temporary hold before payment?
+- What are the rules for fee refunds, cancellation, rescheduling, balance payment, and guest-count changes?
+- Does a booking require staff approval after payment verification?
+
+Until these are confirmed, use configurable terms and staff review rather than imply a fixed policy.
