@@ -1,13 +1,6 @@
 ---
-import LandingScene from "../components/LandingScene";
-import { ActionLink, InclusionStrip, SectionCounter, SiteHeader } from "@event-management/ui";
-import "../styles/global.css";
-
-const navigation = [
-  { label: "Experience", href: "#top" },
-  { label: "Included", href: "#packages" },
-  { label: "Planning", href: "#planning" },
-];
+import App from "../components/app/App";
+import "../styles/app.css";
 ---
 
 <!doctype html>
@@ -15,97 +8,14 @@ const navigation = [
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Clemora brings your event together in one place. Explore all-inclusive venue and catering packages for 30 to 100 guests." />
+    <meta
+      name="description"
+      content="Clemora connects event planning, customer bookings, and catering operations in one workspace."
+    />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <title>Clemora | A space for your event</title>
+    <title>Clemora | Event management</title>
   </head>
   <body>
-    <main id="top">
-      <section class="landing-journey" aria-label="Clemora event experience">
-        <div class="landing-stage">
-          <SiteHeader links={navigation} />
-
-          <div class="landing-scene-wrap">
-            <LandingScene client:only="react" />
-          </div>
-
-          <div class="landing-copy landing-copy--intro">
-            <p class="landing-eyebrow">EVENTS, MADE PERSONAL</p>
-            <h1>A space for<br />your <em>event.</em></h1>
-            <p class="landing-subcopy">All-inclusive celebrations<br />for 30–100 guests.</p>
-            <ActionLink href="#packages">Explore the experience</ActionLink>
-          </div>
-
-          <div class="landing-copy landing-copy--second" aria-hidden="true" inert>
-            <p class="landing-eyebrow">ALL IN ONE PLACE</p>
-            <h2>See it come<br /><em>together.</em></h2>
-            <p class="landing-subcopy">The venue, the table, the details.<br />Beautifully brought together.</p>
-            <ActionLink href="#packages">What is included</ActionLink>
-          </div>
-
-          <div class="landing-side-note" aria-hidden="true">
-            <span>01 / 02</span>
-            <span class="landing-side-note__line"></span>
-            <span>DRAG TO EXPLORE</span>
-          </div>
-          <div class="landing-bottom-note"><span>SCROLL TO EXPLORE</span><span aria-hidden="true">↓</span></div>
-          <SectionCounter current={1} total={3} />
-        </div>
-        <span id="venue" class="landing-journey-anchor" aria-hidden="true"></span>
-      </section>
-
-      <section class="landing-included landing-section" id="packages" aria-labelledby="included-title">
-        <div class="landing-section-heading">
-          <p class="landing-eyebrow">01 / THE EXPERIENCE</p>
-          <h2 id="included-title">The essentials,<br /><em>together.</em></h2>
-        </div>
-        <div class="landing-package-panel">
-          <div class="landing-package-panel__top"><span>ALL-INCLUSIVE</span><span>30–100 GUESTS</span></div>
-          <div class="landing-package-panel__center">
-            <p>One venue.<br />One clear plan.</p>
-            <span>Your day, considered from the first detail to the last.</span>
-          </div>
-          <div class="landing-package-panel__bottom"><span>CLEMORA / EVENTS</span><span>01 — 04</span></div>
-        </div>
-        <InclusionStrip items={["Exclusive venue use", "Buffet & venue setup", "Full catering", "Sound & lights"]} />
-        <p class="landing-included__note">Choose the details that make it yours, including extras like a photo booth.</p>
-      </section>
-
-      <section class="landing-planning landing-section" id="planning" aria-labelledby="planning-title">
-        <p class="landing-eyebrow">02 / BEGIN WITH A PLAN</p>
-        <div class="landing-planning__content">
-          <h2 id="planning-title">Start with the<br /><em>essentials.</em></h2>
-          <div class="landing-planning__detail">
-            <p>Tell us the kind of event, your preferred date, and how many people you expect. We will help bring the rest into focus.</p>
-            <div class="landing-planning__fields" aria-label="Planning starts with">
-              <span>Event type</span><span>Preferred date</span><span>Estimated guests</span>
-            </div>
-            <p class="landing-planning__reservation">A reservation fee secures your date and counts toward your package total.</p>
-          </div>
-        </div>
-      </section>
-    </main>
-    <footer class="landing-footer"><a href="#top" aria-label="Clemora, back to top">Clemora</a><span>Thoughtful events, together.</span><span>© {new Date().getFullYear()} Clemora</span></footer>
-    <script>
-      const journey = document.querySelector<HTMLElement>(".landing-journey");
-      const intro = journey?.querySelector<HTMLElement>(".landing-copy--intro");
-      const second = journey?.querySelector<HTMLElement>(".landing-copy--second");
-      const updatePhase = () => {
-        if (!journey) return;
-        const travel = Math.max(1, journey.offsetHeight - window.innerHeight);
-        const progress = Math.min(1, Math.max(0, -journey.getBoundingClientRect().top / travel));
-        const secondActive = progress > 0.47;
-        journey.dataset.phase = secondActive ? "second" : "intro";
-        if (intro && second) {
-          intro.inert = secondActive;
-          second.inert = !secondActive;
-          intro.setAttribute("aria-hidden", String(secondActive));
-          second.setAttribute("aria-hidden", String(!secondActive));
-        }
-      };
-      updatePhase();
-      window.addEventListener("scroll", updatePhase, { passive: true });
-      window.addEventListener("resize", updatePhase);
-    </script>
+    <App client:only="react" />
   </body>
 </html>
