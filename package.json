@@ -3,10 +3,14 @@
   "private": true,
   "packageManager": "pnpm@11.21.0",
   "scripts": {
+    "dev": "pnpm all",
+    "all": "pnpm dev:prepare && concurrently --kill-others-on-fail --names api,web --prefix-colors blue,green \"pnpm dev:api\" \"cross-env ASTRO_DEV_BACKGROUND=0 pnpm dev:web\"",
+    "all:storybook": "pnpm dev:prepare && concurrently --kill-others-on-fail --names api,web,storybook --prefix-colors blue,green,magenta \"pnpm dev:api\" \"cross-env ASTRO_DEV_BACKGROUND=0 pnpm dev:web\" \"pnpm storybook\"",
+    "all:web": "pnpm dev:web",
+    "dev:prepare": "node scripts/dev-setup.mjs",
     "dev:web": "pnpm --filter @event-management/web dev",
     "dev:api": "pnpm --filter @event-management/api dev",
     "storybook": "pnpm --filter @event-management/ui storybook",
-    "sstorybook": "pnpm storybook",
     "build:storybook": "pnpm --filter @event-management/ui build:storybook",
     "build": "pnpm --filter @event-management/web build && pnpm --filter @event-management/api build",
     "check": "pnpm --filter @event-management/web check && pnpm --filter @event-management/api check && pnpm --filter @event-management/ui check",
@@ -17,5 +21,9 @@
     "db:deploy": "pnpm --filter @event-management/api db:deploy",
     "db:generate": "pnpm --filter @event-management/api db:generate",
     "db:check": "pnpm --filter @event-management/api db:check"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6",
+    "cross-env": "^10.1.0"
   }
 }
