@@ -1,5 +1,4 @@
 import { useState } from "react"
-import type { Dispatch, SetStateAction } from "react"
 import {
   ActivityList,
   Badge,
@@ -15,16 +14,12 @@ import {
   Toast,
 } from "@event-management/ui"
 
+import { usePackages } from "../AppContext"
 import { photos } from "../data"
 import type { EditablePackage } from "../data"
 
-export function PackagesPage({
-  packageRows,
-  setPackageRows,
-}: {
-  packageRows: EditablePackage[]
-  setPackageRows: Dispatch<SetStateAction<EditablePackage[]>>
-}) {
+export function PackagesPage() {
+  const { packageRows, removePackage, savePackage } = usePackages()
   const [tab, setTab] = useState<"Packages" | "Quotations" | "Menus">("Packages")
   const [quotation, setQuotation] = useState(false)
   const [toast, setToast] = useState("")
@@ -117,9 +112,7 @@ export function PackagesPage({
                   <button
                     aria-label={`Delete ${item.name}`}
                     onClick={() => {
-                      setPackageRows((rows) =>
-                        rows.filter((row) => row.name !== item.name),
-                      )
+                      removePackage(item.name)
                       showToast(`${item.name} deleted`)
                     }}
                   >
@@ -314,14 +307,7 @@ export function PackagesPage({
             <>
               <Button variant="secondary" onClick={() => setEditingPackage(null)}>Cancel</Button>
               <Button onClick={() => {
-                const existingIndex = packageRows.findIndex(
-                  (item) => item.name === editingPackageOriginal,
-                )
-                if (existingIndex >= 0) {
-                  setPackageRows((rows) => rows.map((item, index) => index === existingIndex ? editingPackage : item))
-                } else {
-                  setPackageRows((rows) => [...rows, editingPackage])
-                }
+                savePackage(editingPackage, editingPackageOriginal)
                 showToast(`${editingPackage.name || "Package"} saved`)
                 setEditingPackage(null)
               }}>Save package</Button>

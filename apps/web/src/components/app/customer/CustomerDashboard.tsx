@@ -11,8 +11,8 @@ import {
   Tabs,
 } from "@event-management/ui"
 
+import { usePackages, useView } from "../AppContext"
 import { photos } from "../data"
-import type { EditablePackage } from "../data"
 
 type CustomerTab =
   | "Home"
@@ -22,15 +22,9 @@ type CustomerTab =
   | "Messages"
   | "Profile"
 
-export function CustomerDashboard({
-  onPublic,
-  onTeamPortal,
-  packageRows,
-}: {
-  onPublic: () => void
-  onTeamPortal: () => void
-  packageRows: EditablePackage[]
-}) {
+export function CustomerDashboard() {
+  const { goToLogin, goToPublic } = useView()
+  const { packageRows } = usePackages()
   const [tab, setTab] = useState<CustomerTab>("Home")
   const [notifications, setNotifications] = useState(false)
   const [messageOpen, setMessageOpen] = useState(false)
@@ -58,7 +52,7 @@ export function CustomerDashboard({
   return (
     <div className="customer-shell">
       <header className="customer-header">
-        <button className="customer-brand-button" onClick={onPublic}>
+        <button className="customer-brand-button" onClick={goToPublic}>
           <Brand />
         </button>
         <nav className="customer-nav">
@@ -75,7 +69,7 @@ export function CustomerDashboard({
           ))}
         </nav>
         <div className="customer-header-actions">
-          <button className="team-portal-link" onClick={onTeamPortal}>
+          <button className="team-portal-link" onClick={goToLogin}>
             Owner login
           </button>
           <button

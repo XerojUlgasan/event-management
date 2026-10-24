@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react"
-import type { Dispatch, SetStateAction } from "react"
 import {
   Avatar,
   Badge,
@@ -7,8 +6,8 @@ import {
   WorkspaceLayout,
 } from "@event-management/ui"
 
-import type { EditablePackage } from "./data"
-import type { NavKey, Role } from "./types"
+import { useSession, useView } from "./AppContext"
+import type { NavKey } from "./types"
 import { BookingsPage } from "./pages/BookingsPage"
 import { CalendarPage } from "./pages/CalendarPage"
 import { CustomersPage } from "./pages/CustomersPage"
@@ -20,18 +19,9 @@ import { PackagesPage } from "./pages/PackagesPage"
 import { ReportsPage } from "./pages/ReportsPage"
 import { Sidebar } from "./Sidebar"
 
-export function AppShell({
-  onPublic,
-  initialRole,
-  packageRows,
-  setPackageRows,
-}: {
-  onPublic: () => void
-  initialRole: Role
-  packageRows: EditablePackage[]
-  setPackageRows: Dispatch<SetStateAction<EditablePackage[]>>
-}) {
-  const [role] = useState<Role>(initialRole)
+export function AppShell() {
+  const { role } = useSession()
+  const { goToPublic } = useView()
   const [active, setActive] = useState<NavKey>("Overview")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notifications, setNotifications] = useState(false)
@@ -42,18 +32,12 @@ export function AppShell({
     if (active === "Bookings") return <BookingsPage />
     if (active === "Customers") return <CustomersPage />
     if (active === "Calendar") return <CalendarPage />
-    if (active === "Packages")
-      return (
-        <PackagesPage
-          packageRows={packageRows}
-          setPackageRows={setPackageRows}
-        />
-      )
+    if (active === "Packages") return <PackagesPage />
     if (active === "Inventory") return <InventoryPage />
     if (active === "Operations") return <OperationsPage />
     if (active === "Reports") return <ReportsPage />
     return <GenericPage page={active} />
-  }, [active, role, packageRows, setPackageRows])
+  }, [active, role])
 
   return (
     <WorkspaceLayout
@@ -89,7 +73,7 @@ export function AppShell({
             <span>⌘ K</span>
           </div>
           <div className="app-header-actions">
-            <button className="back-site" onClick={onPublic}>
+            <button className="back-site" onClick={goToPublic}>
               Customer site
             </button>
             <Badge tone="cream">Owner workspace</Badge>
