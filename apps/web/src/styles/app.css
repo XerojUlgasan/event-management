@@ -781,6 +781,51 @@
 .customer-quote-table > div > span:last-child { text-align: right; }
 .customer-quote-total { padding: 18px 27px; display: flex; justify-content: flex-end; align-items: center; gap: 35px; border-top: 1px solid var(--line); background: #faf9f7; font-size: 10px; }
 .customer-quote-total strong { font-family: var(--font-serif); color: var(--wine); font-size: 22px; }
+.payment-due-banner { padding: 17px 19px; display: flex; align-items: center; gap: 13px; border: 1px solid #ebca8f; border-radius: 10px; background: linear-gradient(135deg, #fffaf0, #fdf3dd); }
+.payment-due-banner > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.payment-due-banner strong { font-size: 10px; }
+.payment-due-banner small { color: #7d5012; font-size: 9px; line-height: 1.45; }
+.payment-due-banner > div { display: flex; gap: 8px; }
+.payment-due-banner .attention-icon { color: var(--amber); background: var(--amber-soft); }
+.payment-modal { width: min(760px, 100%); }
+.payment-event-card { margin: 24px 0 18px; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border: 1px solid var(--line); border-radius: 10px; background: #faf9f7; }
+.payment-event-card > div { display: flex; flex-direction: column; gap: 4px; }
+.payment-event-card .eyebrow { margin-bottom: 0; font-size: 8px; }
+.payment-event-card strong { font-family: var(--font-serif); font-size: 20px; }
+.payment-event-card small { color: var(--muted); font-size: 9px; }
+.payment-quote { overflow: hidden; border: 1px solid var(--line); border-radius: 10px; }
+.payment-quote-head { padding: 14px 18px; display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; border-bottom: 1px solid var(--line); background: #faf9f7; }
+.payment-quote-head > span { display: flex; flex-direction: column; gap: 3px; }
+.payment-quote-head strong { font-size: 11px; }
+.payment-quote-head small, .payment-quote-head > span:last-child { color: var(--muted); font-size: 8px; }
+.payment-lines > div { padding: 11px 18px; display: flex; align-items: center; justify-content: space-between; gap: 15px; border-bottom: 1px solid #f0edeb; font-size: 9px; }
+.payment-lines > div > span { display: flex; flex-direction: column; gap: 3px; }
+.payment-lines strong { font-size: 10px; }
+.payment-lines small { color: var(--muted); font-size: 8px; }
+.payment-total { padding: 13px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); background: #faf9f7; font-size: 10px; font-weight: 700; }
+.payment-total strong { font-family: var(--font-serif); color: var(--wine); font-size: 21px; }
+.payment-fee { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 15px; border-bottom: 1px solid var(--line); background: var(--cream-soft); }
+.payment-fee > span { display: flex; flex-direction: column; gap: 2px; }
+.payment-fee strong { font-size: 11px; }
+.payment-fee small { color: var(--muted); font-size: 8px; }
+.payment-fee > strong { color: var(--wine); font-family: var(--font-serif); font-size: 22px; }
+.payment-balance { padding: 11px 18px; display: flex; justify-content: space-between; color: var(--muted); font-size: 9px; }
+.payment-balance strong { color: var(--ink); }
+.payment-method { margin-top: 20px; }
+.payment-method-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.payment-method-grid > button { min-height: 65px; padding: 11px 13px; display: flex; align-items: center; gap: 10px; text-align: left; border: 1px solid var(--line); border-radius: 9px; background: white; }
+.payment-method-grid > button.active { border-color: var(--wine); box-shadow: 0 0 0 3px rgba(121,13,22,.07); }
+.payment-method-icon { width: 34px; height: 34px; display: grid; place-items: center; color: var(--wine); border-radius: 7px; background: var(--cream-soft); flex: none; }
+.payment-method-grid > button > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.payment-method-grid strong { font-size: 10px; }
+.payment-method-grid small { color: var(--muted); font-size: 8px; }
+.payment-method-check { width: 20px; height: 20px; display: grid; place-items: center; color: white; border: 1px solid #dcd6d2; border-radius: 50%; }
+.payment-method-grid > button.active .payment-method-check { border-color: var(--wine); background: var(--wine); }
+.payment-modal .payment-note { margin: 13px 0 0; padding: 9px 11px; color: var(--muted); border-radius: 7px; background: var(--canvas); font-size: 8px; line-height: 1.5; }
+.payment-success { padding: 10px 0 0; }
+.payment-success-summary { width: min(100%, 420px); margin: 0 0 20px; padding: 12px 15px; display: flex; justify-content: space-between; gap: 20px; border: 1px solid var(--line); border-radius: 8px; background: #faf9f7; font-size: 9px; }
+.payment-success-summary span { display: flex; flex-direction: column; gap: 3px; color: var(--muted); }
+.payment-success-summary strong { color: var(--ink); font-size: 11px; }
 .customer-messages { min-height: 610px; padding: 0 !important; overflow: hidden; display: grid; grid-template-columns: 310px 1fr; }
 .customer-messages > aside { border-right: 1px solid var(--line); }
 .customer-messages > aside button { width: 100%; min-height: 75px; padding: 14px; display: flex; align-items: center; gap: 9px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: white; }
@@ -940,6 +985,11 @@
   .customer-quote-head { align-items: flex-start; flex-direction: column; }
   .customer-quote-head > span:last-child { align-items: flex-start; }
   .customer-quote-table > div { grid-template-columns: 1fr 40px 80px; padding: 0 15px; }
+  .payment-due-banner { align-items: flex-start; flex-direction: column; }
+  .payment-due-banner > div { width: 100%; }
+  .payment-due-banner > div .button { flex: 1; }
+  .payment-method-grid { grid-template-columns: 1fr; }
+  .payment-quote-head { flex-direction: column; }
   .customer-messages { min-height: 680px; grid-template-columns: 1fr; }
   .customer-messages > aside { display: none; }
   .message-thread { padding: 18px; }

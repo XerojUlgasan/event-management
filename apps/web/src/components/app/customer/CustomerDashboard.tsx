@@ -9,6 +9,7 @@ import {
   PageHeader,
   Panel,
   Tabs,
+  Toast,
 } from "@event-management/ui"
 
 import { photos } from "../data"
@@ -18,9 +19,193 @@ type CustomerTab =
   | "Home"
   | "My events"
   | "Packages"
-  | "Quotations"
   | "Messages"
   | "Profile"
+
+type CustomerBookingStatus =
+  | "Confirmed"
+  | "Awaiting payment"
+  | "Under review"
+  | "Cancelled"
+
+type QuoteLine = {
+  label: string
+  detail: string
+  amount: number
+}
+
+type CustomerQuote = {
+  id: string
+  revision: number
+  preparedBy: string
+  preparedOn: string
+  validUntil: string
+  approvedOn?: string
+  reservationFee: number
+  lines: QuoteLine[]
+}
+
+type CustomerBooking = {
+  id: number
+  event: string
+  packageName: string
+  eventType: string
+  date: string
+  venue: string
+  guests: number
+  status: CustomerBookingStatus
+  quote?: CustomerQuote
+}
+
+const money = (value: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(value)
+
+const quoteTotal = (quote: CustomerQuote) =>
+  quote.lines.reduce((total, line) => total + line.amount, 0)
+
+const statusPriority: Record<CustomerBookingStatus, number> = {
+  "Awaiting payment": 0,
+  "Under review": 1,
+  Confirmed: 2,
+  Cancelled: 3,
+}
+
+const weddingQuote: CustomerQuote = {
+  id: "Q-2048",
+  revision: 2,
+  preparedBy: "Amina Santos",
+  preparedOn: "June 2, 2025",
+  validUntil: "June 18, 2025",
+  approvedOn: "June 8, 2025",
+  reservationFee: 1500,
+  lines: [
+    {
+      label: "The Signature Table",
+      detail: "180 guests × $72",
+      amount: 12960,
+    },
+    {
+      label: "Classic linen & table styling",
+      detail: "18 tables",
+      amount: 1080,
+    },
+    {
+      label: "Wireless microphone set",
+      detail: "2 sets",
+      amount: 400,
+    },
+    {
+      label: "Dietary menu additions",
+      detail: "12 guests",
+      amount: 420,
+    },
+  ],
+}
+
+const anniversaryQuote: CustomerQuote = {
+  id: "Q-5924",
+  revision: 1,
+  preparedBy: "Amina Santos",
+  preparedOn: "June 14, 2025",
+  validUntil: "June 30, 2025",
+  reservationFee: 750,
+  lines: [
+    {
+      label: "Executive Dinner",
+      detail: "80 guests × $58",
+      amount: 4640,
+    },
+    {
+      label: "Beverage pairing",
+      detail: "80 guests",
+      amount: 640,
+    },
+    {
+      label: "Floral centerpieces",
+      detail: "8 tables",
+      amount: 520,
+    },
+  ],
+}
+
+function QuoteBreakdown({
+  booking,
+  quote,
+}: {
+  booking: CustomerBooking
+  quote: CustomerQuote
+}) {
+  const total = quoteTotal(quote)
+  const paymentDue = booking.status === "Awaiting payment"
+
+  return (
+    <>
+      <div className="payment-event-card">
+        <div>
+          <span className="eyebrow">Event</span>
+          <strong>{booking.event}</strong>
+          <small>
+            {booking.date} · {booking.guests} guests · {booking.venue}
+          </small>
+        </div>
+        <Badge tone={paymentDue ? "warning" : "success"}>
+          {paymentDue ? "Payment due" : "Approved"}
+        </Badge>
+      </div>
+
+      <div className="payment-quote">
+        <div className="payment-quote-head">
+          <span>
+            <strong>Quotation {quote.id}</strong>
+            <small>
+              Revision {quote.revision} · Prepared by {quote.preparedBy}
+            </small>
+          </span>
+          <span>
+            {paymentDue
+              ? `Valid until ${quote.validUntil}`
+              : `Approved ${quote.approvedOn ?? quote.preparedOn}`}
+          </span>
+        </div>
+        <div className="payment-lines">
+          {quote.lines.map((line) => (
+            <div key={line.label}>
+              <span>
+                <strong>{line.label}</strong>
+                <small>{line.detail}</small>
+              </span>
+              <strong>{money(line.amount)}</strong>
+            </div>
+          ))}
+        </div>
+        <div className="payment-total">
+          <span>Quotation total</span>
+          <strong>{money(total)}</strong>
+        </div>
+        <div className="payment-fee">
+          <span>
+            <strong>
+              {paymentDue ? "Reservation fee due" : "Reservation fee paid"}
+            </strong>
+            <small>
+              {paymentDue
+                ? `Due by ${quote.validUntil}`
+                : "Credited toward your quotation total"}
+            </small>
+          </span>
+          <strong>{money(quote.reservationFee)}</strong>
+        </div>
+        <div className="payment-balance">
+          <span>Balance after reservation fee</span>
+          <strong>{money(total - quote.reservationFee)}</strong>
+        </div>
+      </div>
+    </>
+  )
+}
 
 export function CustomerDashboard({
   onPublic,
@@ -36,9 +221,44 @@ export function CustomerDashboard({
   const [messageOpen, setMessageOpen] = useState(false)
   const [requestPackage, setRequestPackage] = useState<string | null>(null)
   const [editingRequest, setEditingRequest] = useState<number | null>(null)
-  const [customerBookings, setCustomerBookings] = useState([
-    { id: 2048, event: "Mendoza–Reyes Wedding", packageName: "The Signature Table", eventType: "Wedding", date: "Jun 22, 2025", venue: "The Glass Garden", guests: 180, status: "Confirmed" },
-    { id: 5821, event: "Mendoza Family Brunch", packageName: "Garden Social", eventType: "Family gathering", date: "Aug 10, 2025", venue: "Mendoza Residence", guests: 60, status: "Under review" },
+  const [quoteBookingId, setQuoteBookingId] = useState<number | null>(null)
+  const [paymentBookingId, setPaymentBookingId] = useState<number | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "bank">("card")
+  const [paymentReference, setPaymentReference] = useState<string | null>(null)
+  const [toast, setToast] = useState("")
+  const [customerBookings, setCustomerBookings] = useState<CustomerBooking[]>([
+    {
+      id: 2048,
+      event: "Mendoza–Reyes Wedding",
+      packageName: "The Signature Table",
+      eventType: "Wedding",
+      date: "Jun 22, 2025",
+      venue: "The Glass Garden",
+      guests: 180,
+      status: "Confirmed",
+      quote: weddingQuote,
+    },
+    {
+      id: 5821,
+      event: "Mendoza Family Brunch",
+      packageName: "Garden Social",
+      eventType: "Family gathering",
+      date: "Aug 10, 2025",
+      venue: "Mendoza Residence",
+      guests: 60,
+      status: "Under review",
+    },
+    {
+      id: 5924,
+      event: "Mendoza Anniversary Dinner",
+      packageName: "Executive Dinner",
+      eventType: "Anniversary",
+      date: "Sep 20, 2025",
+      venue: "The Glass Garden",
+      guests: 80,
+      status: "Awaiting payment",
+      quote: anniversaryQuote,
+    },
   ])
   const [profile, setProfile] = useState({
     name: "Elena Mendoza",
@@ -46,11 +266,61 @@ export function CustomerDashboard({
     phone: "+1 555 014 2830",
   })
 
+  const paymentDueBooking = customerBookings.find(
+    (booking) => booking.status === "Awaiting payment" && booking.quote,
+  )
+  const paymentBooking = customerBookings.find(
+    (booking) => booking.id === paymentBookingId,
+  )
+  const activePayment = paymentBooking?.quote
+    ? { booking: paymentBooking, quote: paymentBooking.quote }
+    : null
+  const quoteBooking = customerBookings.find(
+    (booking) => booking.id === quoteBookingId,
+  )
+  const activeQuote = quoteBooking?.quote
+    ? { booking: quoteBooking, quote: quoteBooking.quote }
+    : null
+
+  const notify = (message: string) => {
+    setToast(message)
+    window.setTimeout(() => setToast(""), 2600)
+  }
+
+  const openPayment = (bookingId: number) => {
+    setPaymentBookingId(bookingId)
+    setPaymentMethod("card")
+    setPaymentReference(null)
+  }
+
+  const closePayment = () => {
+    setPaymentBookingId(null)
+    setPaymentReference(null)
+  }
+
+  const payReservationFee = () => {
+    if (!paymentBooking) return
+    setCustomerBookings((items) =>
+      items.map((item) =>
+        item.id === paymentBooking.id ? { ...item, status: "Confirmed" } : item,
+      ),
+    )
+    setPaymentReference(`RF-${paymentBooking.id}`)
+  }
+
+  const statusTone = (status: CustomerBookingStatus) =>
+    status === "Confirmed"
+      ? "success"
+      : status === "Cancelled"
+        ? "danger"
+        : status === "Awaiting payment"
+          ? "info"
+          : "warning"
+
   const customerTabs: { label: CustomerTab; icon: string }[] = [
     { label: "Home", icon: "grid" },
     { label: "My events", icon: "calendar" },
     { label: "Packages", icon: "box" },
-    { label: "Quotations", icon: "clipboard" },
     { label: "Messages", icon: "users" },
     { label: "Profile", icon: "settings" },
   ]
@@ -252,6 +522,38 @@ export function CustomerDashboard({
               </Panel>
             </section>
 
+            {paymentDueBooking?.quote && (
+              <section className="payment-due-banner">
+                <span className="attention-icon warning">
+                  <Icon name="clipboard" />
+                </span>
+                <span>
+                  <strong>
+                    Reservation fee due for {paymentDueBooking.event}
+                  </strong>
+                  <small>
+                    Quotation {paymentDueBooking.quote.id} is ready. Pay{" "}
+                    {money(paymentDueBooking.quote.reservationFee)} by{" "}
+                    {paymentDueBooking.quote.validUntil} to secure your date.
+                  </small>
+                </span>
+                <div>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setQuoteBookingId(paymentDueBooking.id)}
+                  >
+                    View quotation
+                  </Button>
+                  <Button
+                    icon="check"
+                    onClick={() => openPayment(paymentDueBooking.id)}
+                  >
+                    Review & pay
+                  </Button>
+                </div>
+              </section>
+            )}
+
             <section className="customer-grid lower">
               <Panel
                 title="Next steps"
@@ -308,7 +610,7 @@ export function CustomerDashboard({
                 </div>
                 <button
                   className="inline-link"
-                  onClick={() => setTab("Quotations")}
+                  onClick={() => setQuoteBookingId(2048)}
                 >
                   View quotation details <Icon name="arrow" size={14} />
                 </button>
@@ -332,27 +634,24 @@ export function CustomerDashboard({
               active="upcoming"
               items={[
                 { value: "upcoming", label: "Upcoming", count: 1 },
-                { value: "requests", label: "Requests", count: 1 },
+                { value: "requests", label: "Requests", count: 2 },
                 { value: "completed", label: "Completed", count: 2 },
                 { value: "cancelled", label: "Cancelled" },
               ]}
             />
-            {customerBookings.map((booking) => (
+            {[...customerBookings]
+              .sort(
+                (first, second) =>
+                  statusPriority[first.status] - statusPriority[second.status],
+              )
+              .map((booking) => (
               <div
                 className={`customer-event-record panel ${booking.status === "Cancelled" ? "muted-record" : ""}`}
                 key={booking.id}
               >
                 <div className="event-record-top">
                   <div>
-                    <Badge
-                      tone={
-                        booking.status === "Confirmed"
-                          ? "success"
-                          : booking.status === "Cancelled"
-                            ? "danger"
-                            : "warning"
-                      }
-                    >
+                    <Badge tone={statusTone(booking.status)}>
                       {booking.status}
                     </Badge>
                     <div className="customer-event-title">{booking.event}</div>
@@ -376,8 +675,36 @@ export function CustomerDashboard({
                       ? "Your event is confirmed and in preparation."
                       : booking.status === "Cancelled"
                         ? "This request was cancelled."
-                        : "The owner is reviewing your booking request."}
+                        : booking.status === "Awaiting payment"
+                          ? "Your quotation is ready. Pay the reservation fee to confirm your date."
+                          : "The owner is reviewing your booking request."}
                   </span>
+                  {booking.status === "Awaiting payment" && booking.quote && (
+                    <div>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setQuoteBookingId(booking.id)}
+                      >
+                        View quotation
+                      </Button>
+                      <Button
+                        icon="check"
+                        onClick={() => openPayment(booking.id)}
+                      >
+                        Review & pay
+                      </Button>
+                    </div>
+                  )}
+                  {booking.status === "Confirmed" && booking.quote && (
+                    <div>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setQuoteBookingId(booking.id)}
+                      >
+                        View quotation
+                      </Button>
+                    </div>
+                  )}
                   {booking.status === "Under review" && (
                     <div>
                       <Button
@@ -450,43 +777,6 @@ export function CustomerDashboard({
                   </div>
                 </article>
                 ))}
-            </div>
-          </div>
-        )}
-
-        {tab === "Quotations" && (
-          <div className="customer-content">
-            <PageHeader
-              title="Quotations"
-              description="Review pricing, revisions, approvals, and expiration dates."
-              actions={<Button icon="clipboard">Request a quotation</Button>}
-            />
-            <div className="customer-quote panel">
-              <div className="customer-quote-head">
-                <span>
-                  <small>QUOTATION Q-2048 · REVISION 2</small>
-                  <strong>Mendoza–Reyes Wedding</strong>
-                  <p>Prepared by Amina Santos · Approved June 8, 2025</p>
-                </span>
-                <span>
-                  <Badge tone="success">Approved</Badge>
-                  <strong>$14,860.00</strong>
-                </span>
-              </div>
-              <div className="customer-quote-table">
-                <div><span>Item</span><span>Qty</span><span>Amount</span></div>
-                <div><strong>The Signature Table</strong><span>180</span><span>$12,960.00</span></div>
-                <div><strong>Classic linen & table styling</strong><span>18</span><span>$1,080.00</span></div>
-                <div><strong>Wireless microphone set</strong><span>2</span><span>$400.00</span></div>
-                <div><strong>Dietary menu additions</strong><span>12</span><span>$420.00</span></div>
-              </div>
-              <div className="customer-quote-total">
-                <span>Approved total</span><strong>$14,860.00</strong>
-              </div>
-              <div className="event-record-footer">
-                <span>Approved quotations remain visible in your event record.</span>
-                <div><Button variant="secondary">Download PDF</Button><Button>View full quotation</Button></div>
-              </div>
             </div>
           </div>
         )}
@@ -567,6 +857,57 @@ export function CustomerDashboard({
         )}
       </main>
 
+      {activeQuote && (
+        <Dialog
+          onClose={() => setQuoteBookingId(null)}
+          className="payment-modal"
+          eyebrow={`Quotation ${activeQuote.quote.id} · Revision ${activeQuote.quote.revision}`}
+          title={activeQuote.booking.event}
+          intro={`Prepared by ${activeQuote.quote.preparedBy} for ${activeQuote.booking.date}.`}
+          actions={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setQuoteBookingId(null)}
+              >
+                Close
+              </Button>
+              {activeQuote.booking.status === "Awaiting payment" ? (
+                <Button
+                  icon="check"
+                  onClick={() => {
+                    setQuoteBookingId(null)
+                    openPayment(activeQuote.booking.id)
+                  }}
+                >
+                  Review & pay
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    notify(
+                      `Receipt for ${activeQuote.quote.id} sent to your email.`,
+                    )
+                  }
+                >
+                  View receipt
+                </Button>
+              )}
+            </>
+          }
+        >
+          <QuoteBreakdown
+            booking={activeQuote.booking}
+            quote={activeQuote.quote}
+          />
+          <p className="payment-note">
+            Quotation {activeQuote.quote.id} is attached to booking CLM-
+            {activeQuote.booking.id}.
+          </p>
+        </Dialog>
+      )}
+
       {requestPackage && (
         <Dialog
           onClose={() => setRequestPackage(null)}
@@ -583,7 +924,7 @@ export function CustomerDashboard({
               onSubmit={(event) => {
                 event.preventDefault()
                 const data = new FormData(event.currentTarget)
-                const nextBooking = {
+                const nextBooking: CustomerBooking = {
                   id: editingRequest ?? Date.now(),
                   event: String(data.get("event")),
                   packageName: requestPackage,
@@ -607,7 +948,7 @@ export function CustomerDashboard({
             >
               <div className="form-grid">
                 <FormField label="Event name"><input name="event" required defaultValue={customerBookings.find((item) => item.id === editingRequest)?.event || ""} placeholder="e.g. Mendoza Anniversary" /></FormField>
-                <FormField label="Event type"><select name="type" required defaultValue={customerBookings.find((item) => item.id === editingRequest)?.eventType || "Wedding"}><option>Wedding</option><option>Birthday</option><option>Corporate event</option><option>Family gathering</option><option>Other</option></select></FormField>
+                <FormField label="Event type"><select name="type" required defaultValue={customerBookings.find((item) => item.id === editingRequest)?.eventType || "Wedding"}><option>Wedding</option><option>Anniversary</option><option>Birthday</option><option>Corporate event</option><option>Family gathering</option><option>Other</option></select></FormField>
                 <FormField label="Preferred date"><input name="date" required defaultValue={customerBookings.find((item) => item.id === editingRequest)?.date || ""} placeholder="e.g. Sep 20, 2025" /></FormField>
                 <FormField label="Estimated guests"><input name="guests" type="number" min="1" required defaultValue={customerBookings.find((item) => item.id === editingRequest)?.guests || 50} /></FormField>
                 <FormField className="full" label="Venue"><input name="venue" required defaultValue={customerBookings.find((item) => item.id === editingRequest)?.venue || ""} placeholder="Venue name or location" /></FormField>
@@ -617,6 +958,136 @@ export function CustomerDashboard({
                 <Button type="submit">{editingRequest ? "Save changes" : "Submit request"}</Button>
               </div>
             </form>
+        </Dialog>
+      )}
+
+      {activePayment && (
+        <Dialog
+          onClose={closePayment}
+          className="payment-modal"
+          eyebrow={
+            paymentReference
+              ? "Payment received"
+              : `Quotation ${activePayment.quote.id} · Revision ${activePayment.quote.revision}`
+          }
+          title={paymentReference ? undefined : "Review quotation & pay"}
+          intro={
+            paymentReference ? undefined : (
+              <>
+                Review the approved quotation for{" "}
+                <strong>{activePayment.booking.event}</strong>, then pay the
+                reservation fee to secure your date.
+              </>
+            )
+          }
+          actions={
+            paymentReference ? (
+              <Button
+                onClick={() => {
+                  closePayment()
+                  setTab("My events")
+                }}
+              >
+                View my booking
+              </Button>
+            ) : (
+              <>
+                <Button variant="secondary" onClick={closePayment}>
+                  Cancel
+                </Button>
+                <Button icon="check" onClick={payReservationFee}>
+                  Pay {money(activePayment.quote.reservationFee)} reservation fee
+                </Button>
+              </>
+            )
+          }
+        >
+          {paymentReference ? (
+            <div className="success-state payment-success">
+              <div className="success-icon">
+                <Icon name="check" size={30} />
+              </div>
+              <div className="modal-title">Reservation fee received</div>
+              <p>
+                Your date is secured. The{" "}
+                {money(activePayment.quote.reservationFee)} reservation fee has
+                been credited toward your quotation total.
+              </p>
+              <div className="reference">
+                Payment reference <strong>{paymentReference}</strong>
+              </div>
+              <div className="payment-success-summary">
+                <span>
+                  Remaining balance
+                  <strong>
+                    {money(
+                      quoteTotal(activePayment.quote) -
+                        activePayment.quote.reservationFee,
+                    )}
+                  </strong>
+                </span>
+                <span>
+                  Booking
+                  <strong>CLM-{activePayment.booking.id}</strong>
+                </span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <QuoteBreakdown
+                booking={activePayment.booking}
+                quote={activePayment.quote}
+              />
+
+              <div className="payment-method">
+                <div className="subheading">Payment method</div>
+                <div className="payment-method-grid">
+                  <button
+                    type="button"
+                    className={paymentMethod === "card" ? "active" : ""}
+                    aria-pressed={paymentMethod === "card"}
+                    onClick={() => setPaymentMethod("card")}
+                  >
+                    <span className="payment-method-icon">
+                      <Icon name="card" />
+                    </span>
+                    <span>
+                      <strong>Card</strong>
+                      <small>Visa ending in 4242</small>
+                    </span>
+                    <span className="payment-method-check">
+                      {paymentMethod === "card" && (
+                        <Icon name="check" size={14} />
+                      )}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={paymentMethod === "bank" ? "active" : ""}
+                    aria-pressed={paymentMethod === "bank"}
+                    onClick={() => setPaymentMethod("bank")}
+                  >
+                    <span className="payment-method-icon">
+                      <Icon name="bank" />
+                    </span>
+                    <span>
+                      <strong>Bank transfer</strong>
+                      <small>Use booking reference</small>
+                    </span>
+                    <span className="payment-method-check">
+                      {paymentMethod === "bank" && (
+                        <Icon name="check" size={14} />
+                      )}
+                    </span>
+                  </button>
+                </div>
+              </div>
+              <p className="payment-note">
+                Demo checkout — no card is charged and no transfer is
+                initiated.
+              </p>
+            </>
+          )}
         </Dialog>
       )}
 
@@ -647,6 +1118,7 @@ export function CustomerDashboard({
             </label>
         </Dialog>
       )}
+      {toast && <Toast>{toast}</Toast>}
     </div>
   )
 }

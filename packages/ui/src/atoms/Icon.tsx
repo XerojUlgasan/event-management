@@ -75,6 +75,18 @@ const iconPaths: Record<string, ReactNode> = {
       <path d="M12 9v4M12 17h.01" />
     </>
   ),
+  card: (
+    <>
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20M6 15h4" />
+    </>
+  ),
+  bank: (
+    <>
+      <path d="M3 21h18M4 21V10M20 21V10M3 10h18L12 3 3 10Z" />
+      <path d="M8 21v-7M12 21v-7M16 21v-7" />
+    </>
+  ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   close: <path d="m6 6 12 12M18 6 6 18" />,
 }
