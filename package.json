@@ -20,13 +20,11 @@
     "db:migrate": "pnpm --filter @event-management/api db:migrate",
     "db:deploy": "pnpm --filter @event-management/api db:deploy",
     "db:generate": "pnpm --filter @event-management/api db:generate",
-    "db:check": "pnpm --filter @event-management/api db:check"
+    "db:check": "pnpm --filter @event-management/api db:check",
+    "db:seed-admin": "pnpm --filter @event-management/api db:seed-admin"
   },
   "devDependencies": {
     "concurrently": "^10.0.6",
     "cross-env": "^10.1.0"
-  },
-  "dependencies": {
-    "firebase": "^12.19.0"
   }
 }

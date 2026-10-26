@@ -11,12 +11,14 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:generate": "kysely-codegen --out-file src/db/types.ts --exclude-pattern _prisma_migrations",
-    "db:check": "tsx src/db/check.ts"
+    "db:check": "tsx src/db/check.ts",
+    "db:seed-admin": "tsx src/db/seed-admin.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
     "@hono/zod-openapi": "^1.6.3",
     "dotenv": "^18.0.8",
+    "firebase-admin": "^14.5.0",
     "hono": "^4.13.13",
     "kysely": "^0.29.7",
     "pg": "^8.23.1",

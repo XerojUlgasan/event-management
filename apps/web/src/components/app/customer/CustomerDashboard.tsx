@@ -14,6 +14,7 @@ import {
 
 import { photos } from "../data"
 import type { EditablePackage } from "../data"
+import { initialsFromName } from "../../../lib/name"
 
 type CustomerTab =
   | "Home"
@@ -209,11 +210,15 @@ function QuoteBreakdown({
 
 export function CustomerDashboard({
   onPublic,
-  onTeamPortal,
+  userName,
+  userEmail,
+  onSignOut,
   packageRows,
 }: {
   onPublic: () => void
-  onTeamPortal: () => void
+  userName: string
+  userEmail: string
+  onSignOut: () => void
   packageRows: EditablePackage[]
 }) {
   const [tab, setTab] = useState<CustomerTab>("Home")
@@ -261,8 +266,8 @@ export function CustomerDashboard({
     },
   ])
   const [profile, setProfile] = useState({
-    name: "Elena Mendoza",
-    email: "customer@clemora.demo",
+    name: userName,
+    email: userEmail,
     phone: "+1 555 014 2830",
   })
 
@@ -345,8 +350,8 @@ export function CustomerDashboard({
           ))}
         </nav>
         <div className="customer-header-actions">
-          <button className="team-portal-link" onClick={onTeamPortal}>
-            Owner login
+          <button className="team-portal-link" onClick={onSignOut}>
+            Sign out
           </button>
           <button
             className="notification-button"
@@ -357,9 +362,9 @@ export function CustomerDashboard({
             <b>2</b>
           </button>
           <div className="customer-profile">
-            <span className="avatar">EM</span>
+            <span className="avatar">{initialsFromName(profile.name)}</span>
             <span>
-              <strong>Elena Mendoza</strong>
+              <strong>{profile.name}</strong>
               <small>Customer</small>
             </span>
             <Icon name="chevron" size={14} />
@@ -792,7 +797,7 @@ export function CustomerDashboard({
                 <span className="manager-avatar">EM</span>
                 <span>
                   <strong>{profile.name}</strong>
-                  <small>Customer demo account</small>
+                  <small>Customer account</small>
                 </span>
               </div>
               <div className="form-grid">
@@ -802,6 +807,7 @@ export function CustomerDashboard({
               </div>
               <div className="form-actions">
                 <Button onClick={() => setTab("Home")}>Save account details</Button>
+                <Button variant="secondary" onClick={onSignOut}>Sign out</Button>
               </div>
             </Panel>
           </div>
