@@ -67,7 +67,9 @@ To browse the shared UI components, run `pnpm all:storybook` for the full stack 
 
 ## Authentication
 
-Authentication uses Firebase Authentication. Customers sign up and sign in with email and password or Google. Admin accounts are never self-registered. The API verifies Firebase ID tokens, and the `users` table stores each profile and its `admin` or `customer` role. Passwords are never stored in PostgreSQL.
+Authentication uses Firebase Authentication for identity and PostgreSQL-backed sessions for API access. Customers sign up and sign in with email and password or Google. Admin accounts are never self-registered. The `users` table stores each profile and its `admin` or `customer` role; passwords are never stored in PostgreSQL.
+
+Firebase ID tokens are only accepted by `POST /v1/auth/sync`. That route verifies the token, upserts the profile, creates a server-side session, and sets an `HttpOnly` session cookie. Every other authenticated API request uses that cookie. Sessions are stored hashed in the `sessions` table, expire after `SESSION_TTL_DAYS` (default 7), and are deleted on logout.
 
 1. In the Firebase console, enable the **Email/Password** and **Google** sign-in providers.
 2. Add `localhost` to **Authentication → Settings → Authorized domains**.
@@ -117,7 +119,35 @@ update users set role = 'customer' where email = 'admin@example.com';
 
 Reload the app after changing a role so the client fetches the updated profile. The seed script is only a convenience.
 
-The auth API routes are `POST /v1/auth/sync`, which creates or refreshes the signed-in user's profile, and `GET /v1/me`. Both require `Authorization: Bearer <idToken>`. The client can never set its own role.
+### Session API
+
+The auth API routes are:
+
+| Route | Auth | Purpose |
+| --- | --- | --- |
+| `POST /v1/auth/sync` | `Authorization: Bearer <Firebase ID token>` | Verify identity, upsert the profile, start a session |
+| `GET /v1/me` | `em_session` cookie | Return the current profile |
+| `POST /v1/auth/logout` | `em_session` cookie | Delete the session and clear the cookie |
+
+Optional config in `apps/api/.env`:
+
+```sh
+SESSION_TTL_DAYS=7
+```
+
+With curl:
+
+```sh
+# Exchange a Firebase ID token for a session cookie
+curl -c cookies.txt -X POST http://localhost:3000/v1/auth/sync \
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN" \
+  -H "Content-Type: application/json" -d '{}'
+
+curl -b cookies.txt http://localhost:3000/v1/me
+curl -b cookies.txt -X POST http://localhost:3000/v1/auth/logout
+```
+
+The session cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` when `NODE_ENV=production`. The client can never set its own role.
 
 ## Database workflow
 
@@ -153,6 +183,10 @@ Useful queries:
 select id, email, display_name, role, created_at
 from users
 order by created_at;
+
+select id, user_id, expires_at, created_at
+from sessions
+order by created_at desc;
 
 update users set role = 'admin' where email = 'admin@example.com';
 ```

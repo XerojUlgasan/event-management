@@ -1,6 +1,13 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { getCookie } from "hono/cookie";
 import { sql } from "kysely";
 import type { AppRouteHandler } from "../../types/hono.js";
+import {
+  createSession,
+  hashSessionToken,
+  SESSION_COOKIE,
+  setSessionCookie,
+} from "../../lib/session.js";
 import { errorSchema, profileSchema, toProfile } from "./profile.js";
 
 const syncBodySchema = z.object({
@@ -11,7 +18,7 @@ export const syncProfileRoute = createRoute({
   method: "post",
   path: "/auth/sync",
   tags: ["Auth"],
-  summary: "Create or refresh the signed-in user's profile",
+  summary: "Verify a Firebase ID token, upsert the profile, and start a session",
   request: {
     body: {
       content: { "application/json": { schema: syncBodySchema } },
@@ -21,7 +28,7 @@ export const syncProfileRoute = createRoute({
   responses: {
     200: {
       content: { "application/json": { schema: profileSchema } },
-      description: "The user's profile",
+      description: "The user's profile and a session cookie",
     },
     400: {
       content: { "application/json": { schema: errorSchema } },
@@ -29,7 +36,7 @@ export const syncProfileRoute = createRoute({
     },
     401: {
       content: { "application/json": { schema: errorSchema } },
-      description: "Missing or invalid token",
+      description: "Missing or invalid Firebase ID token",
     },
     503: {
       content: { "application/json": { schema: errorSchema } },
@@ -39,33 +46,45 @@ export const syncProfileRoute = createRoute({
 });
 
 export const syncProfileHandler: AppRouteHandler<typeof syncProfileRoute> = async (c) => {
-  const auth = c.get("auth");
+  const firebase = c.get("firebase");
 
-  if (!auth.email) {
+  if (!firebase.email) {
     return c.json({ error: "The signed-in account does not have an email address" }, 400);
   }
 
   const { displayName } = c.req.valid("json");
-  const resolvedName = displayName ?? auth.name ?? auth.email.split("@")[0] ?? "Customer";
+  const resolvedName =
+    displayName ?? firebase.name ?? firebase.email.split("@")[0] ?? "Customer";
+  const db = c.get("db");
 
-  const row = await c
-    .get("db")
+  const row = await db
     .insertInto("users")
     .values({
-      firebase_uid: auth.uid,
-      email: auth.email,
+      firebase_uid: firebase.uid,
+      email: firebase.email,
       display_name: resolvedName,
       role: "customer",
     })
     .onConflict((conflict) =>
       conflict.column("firebase_uid").doUpdateSet({
-        email: auth.email,
+        email: firebase.email,
         display_name: sql`coalesce(excluded.display_name, users.display_name)`,
         updated_at: new Date(),
       }),
     )
     .returningAll()
     .executeTakeFirstOrThrow();
+
+  const previousToken = getCookie(c, SESSION_COOKIE);
+  if (previousToken) {
+    await db
+      .deleteFrom("sessions")
+      .where("token_hash", "=", hashSessionToken(previousToken))
+      .execute();
+  }
+
+  const { token, expiresAt } = await createSession(db, row.id);
+  setSessionCookie(c, token, expiresAt);
 
   return c.json(toProfile(row), 200);
 };

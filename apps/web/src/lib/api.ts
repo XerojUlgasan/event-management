@@ -19,9 +19,13 @@ async function readError(response: Response) {
   }
 }
 
-export async function syncProfile(idToken: string, displayName?: string): Promise<Profile> {
+export async function syncSession(
+  idToken: string,
+  displayName?: string,
+): Promise<Profile> {
   const response = await fetch(`${apiUrl}/auth/sync`, {
     method: "POST",
+    credentials: "include",
     headers: {
       Authorization: `Bearer ${idToken}`,
       "Content-Type": "application/json",
@@ -36,9 +40,9 @@ export async function syncProfile(idToken: string, displayName?: string): Promis
   return (await response.json()) as Profile;
 }
 
-export async function getMe(idToken: string): Promise<Profile> {
+export async function getMe(): Promise<Profile> {
   const response = await fetch(`${apiUrl}/me`, {
-    headers: { Authorization: `Bearer ${idToken}` },
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -46,4 +50,11 @@ export async function getMe(idToken: string): Promise<Profile> {
   }
 
   return (await response.json()) as Profile;
+}
+
+export async function endSession() {
+  await fetch(`${apiUrl}/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
 }

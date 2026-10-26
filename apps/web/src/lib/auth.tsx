@@ -17,7 +17,7 @@ import {
 } from "firebase/auth";
 import type { User } from "firebase/auth";
 
-import { syncProfile } from "./api";
+import { endSession, getMe, syncSession } from "./api";
 import type { Profile } from "./api";
 import { firebaseAuth, googleProvider } from "./firebase";
 
@@ -72,15 +72,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState("");
   const pending = useRef(false);
 
-  const completeSignIn = useCallback(async (user: User, displayName?: string) => {
-    const token = await user.getIdToken();
-    const nextProfile = await syncProfile(
-      token,
-      displayName ?? user.displayName ?? undefined,
-    );
-    setProfile(nextProfile);
-    setStatus("signed-in");
-  }, []);
+  const establishSession = useCallback(
+    async (user: User, options: { fresh?: boolean; displayName?: string } = {}) => {
+      if (!options.fresh) {
+        try {
+          const existing = await getMe();
+          if (existing.firebaseUid === user.uid) {
+            setProfile(existing);
+            setStatus("signed-in");
+            return;
+          }
+        } catch {
+          // No usable session cookie; create one from the Firebase identity.
+        }
+      }
+
+      const token = await user.getIdToken();
+      const nextProfile = await syncSession(
+        token,
+        options.displayName ?? user.displayName ?? undefined,
+      );
+      setProfile(nextProfile);
+      setStatus("signed-in");
+    },
+    [],
+  );
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
@@ -93,16 +109,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setStatus("loading");
-      void completeSignIn(user).catch(async (cause) => {
+      void establishSession(user).catch((cause) => {
         setError(messageFor(cause));
         setProfile(null);
         setStatus("signed-out");
-        await firebaseSignOut(firebaseAuth);
       });
     });
 
     return unsubscribe;
-  }, [completeSignIn]);
+  }, [establishSession]);
 
   const run = useCallback(async (task: () => Promise<void>) => {
     setError("");
@@ -114,6 +129,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(messageFor(cause));
       setProfile(null);
       setStatus("signed-out");
+      try {
+        await endSession();
+      } catch {
+        // Ignore; the Firebase session is still cleared below.
+      }
       if (firebaseAuth.currentUser) {
         await firebaseSignOut(firebaseAuth);
       }
@@ -127,9 +147,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (email: string, password: string) =>
       run(async () => {
         const credential = await signInWithEmailAndPassword(firebaseAuth, email, password);
-        await completeSignIn(credential.user);
+        await establishSession(credential.user, { fresh: true });
       }),
-    [completeSignIn, run],
+    [establishSession, run],
   );
 
   const signUp = useCallback(
@@ -141,22 +161,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password,
         );
         await updateProfile(credential.user, { displayName: name });
-        await completeSignIn(credential.user, name);
+        await establishSession(credential.user, { fresh: true, displayName: name });
       }),
-    [completeSignIn, run],
+    [establishSession, run],
   );
 
   const signInWithGoogle = useCallback(
     () =>
       run(async () => {
         const credential = await signInWithPopup(firebaseAuth, googleProvider);
-        await completeSignIn(credential.user);
+        await establishSession(credential.user, { fresh: true });
       }),
-    [completeSignIn, run],
+    [establishSession, run],
   );
 
   const signOut = useCallback(async () => {
     setError("");
+    try {
+      await endSession();
+    } catch {
+      // Even if the API is unreachable, clear the Firebase session locally.
+    }
     await firebaseSignOut(firebaseAuth);
     setProfile(null);
     setStatus("signed-out");
