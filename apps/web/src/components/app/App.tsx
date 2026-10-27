@@ -39,8 +39,12 @@ function AppContent() {
   }, [status, profile])
 
   const handleSignOut = async () => {
-    await signOut()
-    setView("login")
+    try {
+      await signOut()
+      setView("login")
+    } catch {
+      // Keep the current account visible until the API confirms logout.
+    }
   }
 
   if (status === "loading") {

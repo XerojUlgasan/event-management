@@ -20,6 +20,11 @@ function initialize() {
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n").trim();
 
+  if (process.env.FIREBASE_AUTH_EMULATOR_HOST && projectId) {
+    initializeApp({ projectId });
+    return;
+  }
+
   if (projectId && clientEmail && privateKey) {
     initializeApp({
       credential: cert({ projectId, clientEmail, privateKey }),

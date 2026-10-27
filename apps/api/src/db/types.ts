@@ -23,8 +23,9 @@ export interface Users {
   created_at: Generated<Timestamp>;
   display_name: string | null;
   email: string;
-  firebase_uid: string;
+  firebase_uid: string | null;
   id: Generated<string>;
+  password_hash: string | null;
   role: Generated<string>;
   updated_at: Generated<Timestamp>;
 }

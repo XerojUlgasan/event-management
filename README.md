@@ -20,7 +20,7 @@ packages/
 scripts/             Local development setup for `pnpm all`
 ```
 
-The root route renders the migrated Clemora frontend from `apps/web/src/components/app/`. The original Three.js landing page remains at `/landing`. Event, booking, and package screens still use local demo data. Authentication is connected to Firebase, and user profiles and roles are stored in PostgreSQL.
+The root route renders the migrated Clemora frontend from `apps/web/src/components/app/`. The original Three.js landing page remains at `/landing`. Event, booking, and package screens still use local demo data. Authentication supports local email/password accounts and Firebase sign-in, with shared profiles, roles, and sessions in PostgreSQL.
 
 ## Local development
 
@@ -44,7 +44,7 @@ Create the web environment file before the first run:
 cp apps/web/.env.example apps/web/.env
 ```
 
-Fill in the Firebase web app values in `apps/web/.env` and the Firebase Admin service-account values in `apps/api/.env`. See [Authentication](#authentication).
+Local email/password sign-in works without Firebase credentials. To enable Google and existing Firebase email/password sign-in, fill in the Firebase web app values in `apps/web/.env` and the Firebase Admin service-account values in `apps/api/.env`. See [Authentication](#authentication).
 
 The workspace is at `http://localhost:4321`, the landing page is at `http://localhost:4321/landing`, the API health route is at `http://localhost:3000/v1/health`, and the OpenAPI document is at `http://localhost:3000/openapi.json`.
 
@@ -79,11 +79,28 @@ Docker Compose uses these values for PostgreSQL, and the API, Prisma, and type g
 
 ## Authentication
 
-Authentication uses Firebase Authentication for identity and PostgreSQL-backed sessions for API access. Customers sign up and sign in with email and password or Google. Admin accounts are never self-registered. The `users` table stores each profile and its `admin` or `customer` role; passwords are never stored in PostgreSQL.
+New email/password accounts are created in PostgreSQL. Passwords are stored as salted Argon2id hashes (19 MiB memory, 2 iterations, 1 thread), never as readable passwords. New passwords must contain 15–128 characters. Google sign-in uses Firebase, and existing Firebase email/password accounts remain supported through **Use my existing Firebase email account** on the sign-in screen. New registrations always use the local account system.
 
-Firebase ID tokens are only accepted by `POST /v1/auth/sync`. That route verifies the token, upserts the profile, creates a server-side session, and sets an `HttpOnly` session cookie. Every other authenticated API request uses that cookie. Sessions are stored hashed in the `sessions` table, expire after `SESSION_TTL_DAYS` (default 7), and are deleted on logout.
+All methods use the same `users` table and server-side `em_session` cookie. A user can have a local `password_hash`, a unique `firebase_uid`, or both. Public registration always creates a customer; roles come from the database. Existing Firebase profiles and their roles are preserved by the migration.
 
-1. In the Firebase console, enable the **Email/Password** and **Google** sign-in providers.
+On page load, the frontend restores the account from `GET /v1/me`, independently of Firebase browser state. Firebase credentials are used temporarily to prove identity and are cleared after exchange. Sessions are stored hashed in the `sessions` table, expire after `SESSION_TTL_DAYS` (default 7), and are deleted on logout. Successful sign-in and linking rotate the current session. If logout fails, the UI keeps the current account visible and shows an error.
+
+### Connecting sign-in methods
+
+Customers can open **Profile → Sign-in methods**; admins use **Administration**.
+
+- A local account can connect Google or an existing Firebase email account by providing its current local password and signing in to Firebase. The Firebase email must be verified and the sign-in must be within the last five minutes.
+- A Firebase account can add a local password by freshly signing in with its already connected Firebase identity. Its verified Firebase email must match the account email. This adds a password; it cannot replace an existing password.
+- Matching emails never link accounts automatically. A Firebase sign-in whose email is already registered locally returns a conflict with instructions to sign in using the existing method and connect Firebase from settings. Two already-created database accounts cannot be merged through this screen.
+- Linking preserves the database user ID, profile, and role. Firebase login never overwrites the account email or role, including if the Firebase email later changes.
+
+The API verifies Firebase ID tokens with revocation/disabled-user checks before exchanging them or changing sign-in methods. Password endpoints limit attempts per account to 10 per 15 minutes, limit request bodies to 16 KiB, and reject browser POST requests from origins outside `WEB_ORIGIN`. The basic attempt limiter is in memory and resets on API restart; deployments with multiple API processes need a shared gateway/store limit. The database also enforces email uniqueness ignoring case and surrounding whitespace; the migration rejects existing ambiguous email records rather than merging them.
+
+Local password reset and email-verification delivery are not implemented. Firebase-only users must verify their email through Firebase before adding a local password. Do not remove an existing sign-in method as part of linking.
+
+### Optional Firebase setup
+
+1. In the Firebase console, enable **Google** and keep **Email/Password** enabled for existing Firebase accounts.
 2. Add `localhost` to **Authentication → Settings → Authorized domains**.
 3. Copy the web app config into `apps/web/.env`:
 
@@ -137,7 +154,11 @@ The auth API routes are:
 
 | Route | Auth | Purpose |
 | --- | --- | --- |
-| `POST /v1/auth/sync` | `Authorization: Bearer <Firebase ID token>` | Verify identity, upsert the profile, start a session |
+| `POST /v1/auth/register` | None | Create a local customer account (`displayName`, `email`, `password`) and session |
+| `POST /v1/auth/login` | None | Check local `email` and `password`, start a session |
+| `POST /v1/auth/sync` | `Authorization: Bearer <Firebase ID token>` | Find/create the Firebase profile by UID and start a session; never merge by email |
+| `POST /v1/auth/link/firebase` | Cookie + fresh Firebase token | Connect Firebase after checking `currentPassword` |
+| `POST /v1/auth/password` | Cookie + fresh connected Firebase token | Add a local `password` to a Firebase-only account |
 | `GET /v1/me` | `em_session` cookie | Return the current profile |
 | `POST /v1/auth/logout` | `em_session` cookie | Delete the session and clear the cookie |
 
@@ -150,7 +171,12 @@ SESSION_TTL_DAYS=7
 With curl:
 
 ```sh
-# Exchange a Firebase ID token for a session cookie
+# Create a local account; the password below is only an example for local testing
+curl -c cookies.txt -X POST http://localhost:3000/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"displayName":"Local Customer","email":"customer@example.com","password":"a long example passphrase"}'
+
+# Or exchange a Firebase ID token for a session cookie
 curl -c cookies.txt -X POST http://localhost:3000/v1/auth/sync \
   -H "Authorization: Bearer $FIREBASE_ID_TOKEN" \
   -H "Content-Type: application/json" -d '{}'
@@ -160,6 +186,20 @@ curl -b cookies.txt -X POST http://localhost:3000/v1/auth/logout
 ```
 
 The session cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` when `NODE_ENV=production`. The client can never set its own role.
+
+### Auth verification
+
+Run the workspace checks and integration suite:
+
+```sh
+pnpm check
+pnpm build
+pnpm --filter @event-management/api test:auth
+```
+
+The auth suite requires the Firebase CLI (`firebase-tools`) on PATH and a running local PostgreSQL instance configured in `apps/api/.env`. The database user needs permission to create a disposable test database. The command starts the Firebase Auth emulator using the `demo-event-management` project, creates a separate database, applies all committed migrations, tests the real routes and Firebase Admin verification, then drops only that test database and shuts down the emulator. It never creates real Firebase accounts or modifies the application database. Ports 9099, 4409, and 4509 must be free.
+
+Coverage includes local registration/login, password hashes, cookie/session persistence, expiry/logout, existing Firebase email accounts, emulated Google identities, conflicts, proof of both accounts for linking, password addition, concurrent linking, disabled Firebase users, validation, throttling, and OpenAPI routes. The emulator verifies the Firebase integration; it does not prove a production Google OAuth popup or production service-account configuration.
 
 ## Database workflow
 

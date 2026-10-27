@@ -26,11 +26,13 @@ export const requireFirebaseAuth = createMiddleware<HonoEnv>(async (c, next) => 
   }
 
   try {
-    const decoded = await auth.verifyIdToken(token);
+    const decoded = await auth.verifyIdToken(token, true);
     c.set("firebase", {
       uid: decoded.uid,
       email: decoded.email ?? "",
       name: decoded.name ?? null,
+      emailVerified: decoded.email_verified === true,
+      authTime: decoded.auth_time,
     });
   } catch {
     return c.json({ error: "Invalid or expired Firebase ID token" }, 401);

@@ -6,7 +6,8 @@ export const errorSchema = z.object({ error: z.string() });
 
 export const profileSchema = z.object({
   id: z.string().uuid(),
-  firebaseUid: z.string(),
+  firebaseUid: z.string().nullable(),
+  hasPassword: z.boolean(),
   email: z.string(),
   displayName: z.string().nullable(),
   role: z.enum(["admin", "customer"]),
@@ -20,6 +21,7 @@ export function toProfile(row: Selectable<Users>): Profile {
   return {
     id: row.id,
     firebaseUid: row.firebase_uid,
+    hasPassword: row.password_hash !== null,
     email: row.email,
     displayName: row.display_name,
     role: row.role === "admin" ? "admin" : "customer",

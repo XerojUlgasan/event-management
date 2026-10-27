@@ -15,6 +15,7 @@ import {
 import { photos } from "../data"
 import type { EditablePackage } from "../data"
 import { initialsFromName } from "../../../lib/name"
+import { SignInMethods } from "../SignInMethods"
 
 type CustomerTab =
   | "Home"
@@ -810,6 +811,7 @@ export function CustomerDashboard({
                 <Button variant="secondary" onClick={onSignOut}>Sign out</Button>
               </div>
             </Panel>
+            <SignInMethods />
           </div>
         )}
 

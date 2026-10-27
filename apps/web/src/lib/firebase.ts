@@ -1,8 +1,8 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import {
-  browserLocalPersistence,
   getAuth,
   GoogleAuthProvider,
+  inMemoryPersistence,
   setPersistence,
 } from "firebase/auth";
 
@@ -15,10 +15,9 @@ const firebaseConfig = {
   appId: import.meta.env.PUBLIC_FIREBASE_APP_ID,
 };
 
-export const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
+// Imported only when the user chooses a Firebase sign-in method.
+const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const firebaseAuth = getAuth(firebaseApp);
 export const googleProvider = new GoogleAuthProvider();
-
+export const firebaseReady = setPersistence(firebaseAuth, inMemoryPersistence);
 googleProvider.setCustomParameters({ prompt: "select_account" });
-
-void setPersistence(firebaseAuth, browserLocalPersistence);

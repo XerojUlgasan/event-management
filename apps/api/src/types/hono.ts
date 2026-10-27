@@ -8,6 +8,8 @@ export type FirebaseUser = {
   uid: string;
   email: string;
   name: string | null;
+  emailVerified: boolean;
+  authTime: number;
 };
 
 export type SessionContext = {

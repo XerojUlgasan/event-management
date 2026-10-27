@@ -20,6 +20,7 @@ import { Overview } from "./pages/Overview"
 import { PackagesPage } from "./pages/PackagesPage"
 import { ReportsPage } from "./pages/ReportsPage"
 import { Sidebar } from "./Sidebar"
+import { SignInMethods } from "./SignInMethods"
 
 export function AppShell({
   onPublic,
@@ -55,6 +56,7 @@ export function AppShell({
     if (active === "Inventory") return <InventoryPage />
     if (active === "Operations") return <OperationsPage />
     if (active === "Reports") return <ReportsPage />
+    if (active === "Administration") return <SignInMethods />
     return <GenericPage page={active} />
   }, [active, name, packageRows, setPackageRows])
 

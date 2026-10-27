@@ -1,5 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
+import { bodyLimit } from "hono/body-limit";
 import { db } from "./db/client.js";
 import authRoutes from "./routes/auth/index.js";
 import healthRoutes from "./routes/health/index.js";
@@ -24,9 +25,16 @@ app.use(
 );
 
 app.use("/v1/*", async (c, next) => {
+  const origin = c.req.header("origin");
+  if (c.req.method === "POST" && origin && !allowedOrigins.includes(origin)) {
+    return c.json({ error: "Origin is not allowed" }, 403);
+  }
+  c.header("Cache-Control", "no-store");
   c.set("db", db);
   await next();
 });
+
+app.use("/v1/auth/*", bodyLimit({ maxSize: 16 * 1024 }));
 
 app.route("/v1", healthRoutes);
 app.route("/v1", authRoutes);

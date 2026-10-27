@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Context } from "hono";
-import { deleteCookie, setCookie } from "hono/cookie";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { Kysely } from "kysely";
 import type { DB } from "../db/types.js";
 import type { HonoEnv } from "../types/hono.js";
@@ -53,4 +53,21 @@ export function setSessionCookie(
 
 export function clearSessionCookie(c: Context<HonoEnv>) {
   deleteCookie(c, SESSION_COOKIE, { path: "/" });
+}
+
+export async function startSession(c: Context<HonoEnv>, userId: string) {
+  const previousToken = getCookie(c, SESSION_COOKIE);
+  const session = await c
+    .get("db")
+    .transaction()
+    .execute(async (db) => {
+      if (previousToken) {
+        await db
+          .deleteFrom("sessions")
+          .where("token_hash", "=", hashSessionToken(previousToken))
+          .execute();
+      }
+      return createSession(db, userId);
+    });
+  setSessionCookie(c, session.token, session.expiresAt);
 }

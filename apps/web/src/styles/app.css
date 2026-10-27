@@ -811,6 +811,14 @@
 .payment-success-summary { width: min(100%, 420px); margin: 0 0 20px; padding: 12px 15px; display: flex; justify-content: space-between; gap: 20px; border: 1px solid var(--line); border-radius: 8px; background: #faf9f7; font-size: 9px; }
 .payment-success-summary span { display: flex; flex-direction: column; gap: 3px; color: var(--muted); }
 .payment-success-summary strong { color: var(--ink); font-size: 11px; }
+.auth-existing-account { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.auth-status-error { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 2000; width: min(90vw, 620px); display: flex; align-items: center; gap: 12px; padding: 14px; background: var(--cream-soft); color: var(--wine); border: 1px solid var(--wine); border-radius: 8px; }
+.auth-status-error button { margin-left: auto; }
+.sign-in-methods { max-width: 720px; padding: 28px; margin-top: 20px; }
+.sign-in-methods h2 { margin-top: 0; font-size: 20px; }
+.sign-in-methods p, .sign-in-methods li { font-size: 13px; line-height: 1.6; }
+.sign-in-methods fieldset { display: grid; gap: 16px; padding: 0; border: 0; }
+.sign-in-methods input, .sign-in-methods select { width: 100%; min-height: 42px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: white; }
 .customer-messages { min-height: 610px; padding: 0 !important; overflow: hidden; display: grid; grid-template-columns: 310px 1fr; }
 .customer-messages > aside { border-right: 1px solid var(--line); }
 .customer-messages > aside button { width: 100%; min-height: 75px; padding: 14px; display: flex; align-items: center; gap: 9px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: white; }

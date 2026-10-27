@@ -6,10 +6,12 @@ storybook-static/
 .env.local
 .env.*.local
 *.tsbuildinfo
+*-debug.log
 .DS_Store
 
 # Firebase service account keys (never commit)
 apps/api/.secrets/
+/.secrets/
 
 # Impeccable design skill: platform binaries are downloaded on demand.
 .agents/skills/impeccable/scripts/bin/
