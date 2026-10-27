@@ -7,10 +7,12 @@
     "build": "tsc --noEmit",
     "check": "tsc --noEmit",
     "start": "tsx src/index.ts",
+    "db:up": "docker compose --env-file .env -f compose.yaml up -d db",
+    "db:down": "docker compose --env-file .env -f compose.yaml down",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:generate": "kysely-codegen --out-file src/db/types.ts --exclude-pattern _prisma_migrations",
+    "db:generate": "tsx src/db/generate.ts",
     "db:check": "tsx src/db/check.ts",
     "db:seed-admin": "tsx src/db/seed-admin.ts"
   },

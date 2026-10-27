@@ -10,6 +10,7 @@ Product planning documents, including the current feature scope, roadmap, and re
 apps/
   web/               Astro app hosting the migrated Clemora workspace and the /landing 3D page
   api/               Hono routes, Prisma schema, and Kysely database access
+    compose.yaml     Local PostgreSQL service
 packages/
   theme/             Shared design tokens and CSS variables
   ui/src/atoms/      Small reusable React components
@@ -17,7 +18,6 @@ packages/
   ui/src/organisms/  Larger shared compositions
   ui/src/templates/  Page-level shared layouts
 scripts/             Local development setup for `pnpm all`
-compose.yaml         Local PostgreSQL service
 ```
 
 The root route renders the migrated Clemora frontend from `apps/web/src/components/app/`. The original Three.js landing page remains at `/landing`. Event, booking, and package screens still use local demo data. Authentication is connected to Firebase, and user profiles and roles are stored in PostgreSQL.
@@ -34,7 +34,7 @@ pnpm all
 `pnpm all` is the only command needed after installing dependencies. It:
 
 1. creates `apps/api/.env` from `apps/api/.env.example` if it does not exist,
-2. starts PostgreSQL with `docker compose up -d --wait db`,
+2. starts PostgreSQL using `apps/api/compose.yaml` and `apps/api/.env`, waiting for its healthcheck,
 3. applies any pending Prisma migrations with `pnpm db:deploy`,
 4. starts the API and web dev servers together with prefixed logs.
 
@@ -64,6 +64,18 @@ The frontend uses the shared component library from `@event-management/ui`, orga
 To browse the shared UI components, run `pnpm all:storybook` for the full stack plus Storybook, or `pnpm storybook` (also `pnpm sstorybook`) on its own, then open `http://localhost:6006`. Story files live beside components in `packages/ui/src`. Run `pnpm build:storybook` to verify the static Storybook build.
 
 `pnpm db:down` stops PostgreSQL but retains its named volume. The Compose username and password are local development defaults; use separate credentials outside local development.
+
+Database settings live in `apps/api/.env`:
+
+```dotenv
+DB_HOST="localhost"
+DB_PORT=5432
+DB_NAME="event_management"
+DB_USER="event_management"
+DB_PASSWORD="event_management"
+```
+
+Docker Compose uses these values for PostgreSQL, and the API, Prisma, and type generator build their connection URL from the same settings. You do not need to set `DATABASE_URL`. The Compose project name stays `event_management_v2` so the existing database volume is reused.
 
 ## Authentication
 
@@ -175,7 +187,7 @@ PostgreSQL runs in Docker and is published on `127.0.0.1:5432`. Start it with `p
 | Password | `event_management` |
 | SSL | Off (local) |
 
-These are the local defaults from `compose.yaml`. If DBeaver runs on the same machine as Docker, no extra setup is needed. If DBeaver itself runs in a container, use `host.docker.internal` instead of `localhost`.
+These are the local defaults from `apps/api/.env.example`; configure them in `apps/api/.env`. If DBeaver runs on the same machine as Docker, no extra setup is needed. If DBeaver itself runs in a container, use `host.docker.internal` instead of `localhost`.
 
 Useful queries:
 

@@ -56,7 +56,11 @@ if (docker.status !== 0) {
 }
 
 console.log("[setup] Starting PostgreSQL (docker compose)…");
-run("docker", ["compose", "up", "-d", "--wait", "db"], "Docker Compose");
+run(
+  "docker",
+  ["compose", "--env-file", "apps/api/.env", "-f", "apps/api/compose.yaml", "up", "-d", "--wait", "db"],
+  "Docker Compose",
+);
 
 console.log("[setup] Applying database migrations…");
 run("pnpm", ["db:deploy"], "Prisma migrate deploy");
