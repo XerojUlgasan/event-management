@@ -11,17 +11,37 @@ export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface Bookings {
+  coordinator: Generated<string>;
+  created_at: Generated<Timestamp>;
+  customer_id: string;
+  event_date: Timestamp;
+  event_name: string;
+  guest_count: number;
+  id: string;
+  package_id: string | null;
+  paid_amount_minor: Generated<number>;
+  paid_at: Timestamp | null;
+  payment_reference: string | null;
+  payment_status: Generated<string>;
+  reservation_fee_minor: Generated<number>;
+  special_notes: string | null;
+  status: Generated<string>;
+  total_price_minor: Generated<number>;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface PackageImages {
   content_type: string;
   created_at: Generated<Timestamp>;
   data: Buffer;
-  id: Generated<string>;
+  id: string;
 }
 
 export interface Packages {
   archived_at: Timestamp | null;
   created_at: Generated<Timestamp>;
-  id: Generated<string>;
+  id: string;
   updated_at: Generated<Timestamp>;
 }
 
@@ -32,7 +52,7 @@ export interface PackageVersions {
   exclusions: string[];
   guest_max: number;
   guest_min: number;
-  id: Generated<string>;
+  id: string;
   image_url: string | null;
   inclusions: string[];
   name: string;
@@ -49,7 +69,7 @@ export interface PackageVersions {
 export interface Sessions {
   created_at: Generated<Timestamp>;
   expires_at: Timestamp;
-  id: Generated<string>;
+  id: string;
   token_hash: string;
   user_id: string;
 }
@@ -59,13 +79,14 @@ export interface Users {
   display_name: string | null;
   email: string;
   firebase_uid: string | null;
-  id: Generated<string>;
+  id: string;
   password_hash: string | null;
   role: Generated<string>;
   updated_at: Generated<Timestamp>;
 }
 
 export interface DB {
+  bookings: Bookings;
   package_images: PackageImages;
   package_versions: PackageVersions;
   packages: Packages;

@@ -310,6 +310,7 @@ test("new Google identities and existing Firebase email/password identities use 
   const existing = await db
     .insertInto("users")
     .values({
+      id: randomUUID(),
       firebase_uid: legacy.uid,
       email: "LEGACY@example.com",
       display_name: "Existing Admin",
@@ -659,6 +660,7 @@ test("db:seed creates six usable accounts and resets them without duplicates or 
   const existingAdmin = await db
     .insertInto("users")
     .values({
+      id: randomUUID(),
       email: "ADMIN1@gmail.com",
       firebase_uid: "seed-existing-firebase",
       display_name: "Existing seed account",

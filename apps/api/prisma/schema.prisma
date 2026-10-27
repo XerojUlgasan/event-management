@@ -12,6 +12,7 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   sessions     Session[]
+  bookings     Booking[]
 
   @@map("users")
 }
@@ -29,11 +30,11 @@ model Session {
 }
 
 model Package {
-  id        String           @id @default(uuid()) @db.Uuid
-  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime         @default(now()) @map("updated_at") @db.Timestamptz(6)
-  archivedAt DateTime?       @map("archived_at") @db.Timestamptz(6)
-  versions  PackageVersion[]
+  id         String           @id @default(uuid()) @db.Uuid
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime         @default(now()) @map("updated_at") @db.Timestamptz(6)
+  archivedAt DateTime?        @map("archived_at") @db.Timestamptz(6)
+  versions   PackageVersion[]
 
   @@map("packages")
 }
@@ -48,26 +49,53 @@ model PackageImage {
 }
 
 model PackageVersion {
-  id           String    @id @default(uuid()) @db.Uuid
-  packageId    String    @map("package_id") @db.Uuid
-  version      Int
-  state        String
-  name         String
-  eventTypes   String[]  @map("event_types")
-  description  String
-  guestMin     Int       @map("guest_min")
-  guestMax     Int       @map("guest_max")
-  venueDetails String    @map("venue_details")
-  inclusions   String[]
-  exclusions   String[]
-  terms        String
-  imageUrl     String?   @map("image_url")
-  priceAmountMinor Int?  @map("price_amount_minor")
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
-  publishedAt  DateTime? @map("published_at") @db.Timestamptz(6)
-  package      Package   @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  id               String    @id @default(uuid()) @db.Uuid
+  packageId        String    @map("package_id") @db.Uuid
+  version          Int
+  state            String
+  name             String
+  eventTypes       String[]  @map("event_types")
+  description      String
+  guestMin         Int       @map("guest_min")
+  guestMax         Int       @map("guest_max")
+  venueDetails     String    @map("venue_details")
+  inclusions       String[]
+  exclusions       String[]
+  terms            String
+  imageUrl         String?   @map("image_url")
+  priceAmountMinor Int?      @map("price_amount_minor")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  publishedAt      DateTime? @map("published_at") @db.Timestamptz(6)
+  package          Package   @relation(fields: [packageId], references: [id], onDelete: Cascade)
 
   @@unique([packageId, version])
   @@map("package_versions")
+}
+
+model Booking {
+  id                  String    @id @default(uuid()) @db.Uuid
+  customerId          String    @map("customer_id") @db.Uuid
+  status              String    @default("under_review")
+  eventName           String    @map("event_name")
+  eventDate           DateTime  @map("event_date") @db.Timestamptz(6)
+  guestCount          Int       @map("guest_count")
+  specialNotes        String?   @map("special_notes")
+  coordinator         String    @default("Unassigned")
+  packageId           String?   @map("package_id") @db.Uuid
+  totalPriceMinor     Int       @default(0) @map("total_price_minor")
+  reservationFeeMinor Int       @default(0) @map("reservation_fee_minor")
+  paidAmountMinor     Int       @default(0) @map("paid_amount_minor")
+  paymentStatus       String    @default("pending") @map("payment_status")
+  paymentReference    String?   @map("payment_reference")
+  paidAt              DateTime? @map("paid_at") @db.Timestamptz(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customer            User      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([eventDate])
+  @@index([status])
+  @@map("bookings")
 }

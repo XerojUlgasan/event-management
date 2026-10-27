@@ -116,3 +116,93 @@ export function deleteUnreferencedPackageImage(imageUrl: string): Promise<void> 
   if (!id) throw new Error("Unable to identify the uploaded image for cleanup.")
   return request<void>(`/admin/package-images/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
 }
+
+// ── Booking types & API ──────────────────────────────────────────────────────
+
+export type BookingStatus =
+  | "under_review"
+  | "quotation_sent"
+  | "awaiting_confirmation"
+  | "confirmed"
+  | "in_preparation"
+  | "completed"
+  | "cancelled";
+
+export type Booking = {
+  id: string;
+  customerId: string;
+  customerName: string | null;
+  customerEmail: string;
+  status: BookingStatus;
+  eventName: string;
+  eventDate: string;
+  guestCount: number;
+  specialNotes: string | null;
+  coordinator: string;
+  packageId: string | null;
+  totalPriceMinor: number;
+  reservationFeeMinor: number;
+  paidAmountMinor: number;
+  paymentStatus: string;
+  paymentReference: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const listBookings = (filters?: { status?: string; customerId?: string }) =>
+  request<{ bookings: Booking[] }>(
+    `/admin/bookings${filters ? `?${new URLSearchParams(filters as Record<string, string>).toString()}` : ""}`,
+  );
+
+export const getBooking = (id: string) =>
+  request<Booking>(`/admin/bookings/${encodeURIComponent(id)}`);
+
+export const createBooking = (data: {
+  customerId: string;
+  eventName: string;
+  eventDate: string;
+  guestCount: number;
+  specialNotes?: string;
+  coordinator?: string;
+  packageId?: string;
+}) => request<Booking>("/admin/bookings", data);
+
+export const updateBooking = (
+  id: string,
+  data: {
+    eventName?: string;
+    eventDate?: string;
+    guestCount?: number;
+    specialNotes?: string | null;
+    coordinator?: string;
+    packageId?: string | null;
+    totalPriceMinor?: number;
+    reservationFeeMinor?: number;
+  },
+) =>
+  request<Booking>(
+    `/admin/bookings/${encodeURIComponent(id)}`,
+    data,
+    undefined,
+    "PATCH",
+  );
+
+export const updateBookingStatus = (id: string, status: BookingStatus) =>
+  request<Booking>(`/admin/bookings/${encodeURIComponent(id)}/status`, {
+    status,
+  });
+
+export const recordBookingPayment = (
+  id: string,
+  data: { amountMinor: number; paymentReference?: string },
+) =>
+  request<Booking>(`/admin/bookings/${encodeURIComponent(id)}/payment`, data);
+
+export const deleteBooking = (id: string) =>
+  request<void>(
+    `/admin/bookings/${encodeURIComponent(id)}`,
+    undefined,
+    undefined,
+    "DELETE",
+  );

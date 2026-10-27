@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { randomUUID } from "node:crypto";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { startSession } from "../../lib/session.js";
 import { errorSchema, profileSchema, toProfile } from "./profile.js";
@@ -67,6 +68,7 @@ export const syncProfileHandler: AppRouteHandler<
     row = await db
       .insertInto("users")
       .values({
+        id: randomUUID(),
         firebase_uid: firebase.uid,
         email: firebase.email.trim().toLowerCase(),
         display_name:

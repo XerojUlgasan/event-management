@@ -29,8 +29,8 @@ before(async () => {
   ({ db } = await import("../src/db/client.js"));
   async function session(role: string) {
     const token = randomUUID();
-    const user = await db.insertInto("users").values({ email: `${role}@example.test`, password_hash: "unused", role }).returning("id").executeTakeFirstOrThrow();
-    await db.insertInto("sessions").values({ user_id: user.id, token_hash: hashSessionToken(token), expires_at: new Date(Date.now() + 3600000) }).execute();
+    const user = await db.insertInto("users").values({ id: randomUUID(), email: `${role}@example.test`, password_hash: "unused", role }).returning("id").executeTakeFirstOrThrow();
+    await db.insertInto("sessions").values({ id: randomUUID(), user_id: user.id, token_hash: hashSessionToken(token), expires_at: new Date(Date.now() + 3600000) }).execute();
     return `em_session=${token}`;
   }
   adminCookie = await session("admin");

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { createRoute, z } from "@hono/zod-openapi";
 import { sql } from "kysely";
 import type { AppRouteHandler } from "../../types/hono.js";
@@ -75,6 +76,7 @@ export const registerHandler: AppRouteHandler<typeof registerRoute> = async (
     .get("db")
     .insertInto("users")
     .values({
+      id: randomUUID(),
       email,
       display_name: displayName,
       password_hash: await hashPassword(password),

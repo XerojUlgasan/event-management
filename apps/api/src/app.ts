@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { db } from "./db/client.js";
 import authRoutes from "./routes/auth/index.js";
+import bookingRoutes from "./routes/bookings/index.js";
 import packageRoutes from "./routes/packages/index.js";
 import healthRoutes from "./routes/health/index.js";
 import type { HonoEnv } from "./types/hono.js";
@@ -43,6 +44,7 @@ app.use("/v1/admin/package-images", bodyLimit({ maxSize: 5 * 1024 * 1024 + 64 * 
 
 app.route("/v1", healthRoutes);
 app.route("/v1", packageRoutes);
+app.route("/v1", bookingRoutes);
 app.route("/v1", authRoutes);
 
 app.doc("/openapi.json", {

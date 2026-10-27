@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { randomUUID } from "node:crypto";
 import { db } from "./client.js";
 import { getFirebaseAuth } from "../lib/firebase-admin.js";
 
@@ -39,6 +40,7 @@ try {
 const row = await db
   .insertInto("users")
   .values({
+    id: randomUUID(),
     firebase_uid: user.uid,
     email,
     display_name: user.displayName ?? fallbackName,

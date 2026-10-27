@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
 import { db } from "./client.js";
 import { hashPassword } from "../lib/password.js";
@@ -17,6 +18,7 @@ try {
     const rows = [];
     for (const account of accounts) {
       const values = {
+        id: randomUUID(),
         ...account,
         password_hash: await hashPassword("p@ssword01"),
       };
@@ -26,7 +28,12 @@ try {
         .onConflict((conflict) =>
           conflict
             .expression(sql`lower(trim(email))`)
-            .doUpdateSet({ ...values, updated_at: new Date() }),
+            .doUpdateSet({
+              display_name: account.display_name,
+              role: account.role,
+              password_hash: values.password_hash,
+              updated_at: new Date(),
+            }),
         )
         .returning(["id", "email", "role"])
         .executeTakeFirstOrThrow();

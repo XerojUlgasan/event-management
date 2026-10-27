@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { Kysely } from "kysely";
@@ -28,6 +28,7 @@ export async function createSession(db: Kysely<DB>, userId: string) {
   await db
     .insertInto("sessions")
     .values({
+      id: randomUUID(),
       user_id: userId,
       token_hash: hashSessionToken(token),
       expires_at: expiresAt,

@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import { createMiddleware } from "hono/factory";
 import { getCookie } from "hono/cookie";
 import { hashSessionToken, SESSION_COOKIE } from "../../lib/session.js";
 import { requireSession } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
-import { adminSchema, contentSchema, errorSchema, publicSchema } from "./schemas.js";
+import { body, commonErrors, json, requireAdmin, routeError } from "../../lib/api-helpers.js";
+import { adminSchema, contentSchema, publicSchema } from "./schemas.js";
 import { adminDto, columns, complete, imageExists, lockImages, lockPackage, nextUpdate, publicDto, publicRows, removeUnusedImage } from "./store.js";
 
 const routes = new OpenAPIHono<HonoEnv>({
@@ -13,22 +13,11 @@ const routes = new OpenAPIHono<HonoEnv>({
     if (!result.success) return c.json({ error: result.error.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join("; ") }, 400);
   },
 });
-const json = <T extends z.ZodType>(schema: T) => ({ "application/json": { schema } });
-const errors = {
-  400: { content: json(errorSchema), description: "Invalid package data" },
-  401: { content: json(errorSchema), description: "Not signed in" },
-  403: { content: json(errorSchema), description: "Admin access required" },
-  404: { content: json(errorSchema), description: "Package not found" },
-  409: { content: json(errorSchema), description: "Package state conflict" },
-};
+const errors = commonErrors("package");
 const idParams = z.object({ id: z.string().uuid() });
-const body = <T extends z.ZodType>(schema: T) => ({ required: true as const, content: json(schema) });
 const result = { content: json(adminSchema), description: "Package with versions" };
-const error = (message: string, status: 400 | 404 | 409) => ({ message, status });
-const admin = createMiddleware<HonoEnv>(async (c, next) => {
-  if (c.get("session").user.role !== "admin") return c.json({ error: "Admin access required" }, 403);
-  await next();
-});
+const error = routeError;
+const admin = requireAdmin;
 routes.use("/admin/packages", requireSession, admin);
 routes.use("/admin/packages/*", requireSession, admin);
 routes.use("/admin/package-images", requireSession, admin);
@@ -52,7 +41,7 @@ routes.openapi(uploadImage, async c => {
   if (!contentType || image.type !== contentType) {
     return c.json({ error: "Image content does not match its type" }, 400);
   }
-  const row = await c.get("db").insertInto("package_images").values({ content_type: contentType, data }).returning("id").executeTakeFirstOrThrow();
+  const row = await c.get("db").insertInto("package_images").values({ id: randomUUID(), content_type: contentType, data }).returning("id").executeTakeFirstOrThrow();
   return c.json({ imageUrl: `/v1/package-images/${row.id}` }, 201);
 });
 
@@ -126,7 +115,7 @@ routes.openapi(create, async c => {
     await lockImages(trx, [data.imageUrl]);
     if (!await imageExists(trx, data.imageUrl)) return error("Uploaded image not found", 400);
     const pkg = await trx.insertInto("packages").values({ id: randomUUID() }).returningAll().executeTakeFirstOrThrow();
-    await trx.insertInto("package_versions").values({ package_id: pkg.id, version: 1, state: "draft", ...columns(data) }).execute();
+    await trx.insertInto("package_versions").values({ id: randomUUID(), package_id: pkg.id, version: 1, state: "draft", ...columns(data) }).execute();
     return adminDto(trx, pkg);
   });
   if ("status" in value) return c.json({ error: value.message }, value.status);
@@ -147,7 +136,7 @@ routes.openapi(edit, async c => {
     if (!await imageExists(trx, data.imageUrl)) return error("Uploaded image not found", 400);
     const updatedAt = nextUpdate(current.updated_at);
     if (current.state === "draft") await trx.updateTable("package_versions").set({ ...columns(data), updated_at: updatedAt }).where("id", "=", current.id).execute();
-    else await trx.insertInto("package_versions").values({ package_id: pkg.id, version: current.version + 1, state: "draft", updated_at: updatedAt, ...columns(data) }).execute();
+    else await trx.insertInto("package_versions").values({ id: randomUUID(), package_id: pkg.id, version: current.version + 1, state: "draft", updated_at: updatedAt, ...columns(data) }).execute();
     if (current.state === "draft") await removeUnusedImage(trx, current.image_url);
     await trx.updateTable("packages").set({ updated_at: updatedAt }).where("id", "=", pkg.id).execute();
     return adminDto(trx, pkg);

@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+export { errorSchema } from "../../lib/api-helpers.js";
 
 const text = z.string().max(4000);
 export const priceSchema = z.object({
@@ -40,4 +41,3 @@ export const adminSchema = z.object({
   id: z.string().uuid(), archivedAt: z.string().nullable(),
   draft: versionSchema.nullable(), published: versionSchema.nullable(), versions: z.array(versionSchema),
 });
-export const errorSchema = z.object({ error: z.string() });
