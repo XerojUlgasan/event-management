@@ -13,7 +13,7 @@ import {
 } from "@event-management/ui"
 
 import { photos } from "../data"
-import type { EditablePackage } from "../data"
+import { PackageCatalog } from "../PackageCatalog"
 import { initialsFromName } from "../../../lib/name"
 import { SignInMethods } from "../SignInMethods"
 
@@ -60,9 +60,9 @@ type CustomerBooking = {
 }
 
 const money = (value: number) =>
-  new Intl.NumberFormat("en-US", {
+  new Intl.NumberFormat("en-PH", {
     style: "currency",
-    currency: "USD",
+    currency: "PHP",
   }).format(value)
 
 const quoteTotal = (quote: CustomerQuote) =>
@@ -86,7 +86,7 @@ const weddingQuote: CustomerQuote = {
   lines: [
     {
       label: "The Signature Table",
-      detail: "180 guests × $72",
+      detail: "Sample package total",
       amount: 12960,
     },
     {
@@ -117,7 +117,7 @@ const anniversaryQuote: CustomerQuote = {
   lines: [
     {
       label: "Executive Dinner",
-      detail: "80 guests × $58",
+      detail: "Sample package total",
       amount: 4640,
     },
     {
@@ -214,13 +214,11 @@ export function CustomerDashboard({
   userName,
   userEmail,
   onSignOut,
-  packageRows,
 }: {
   onPublic: () => void
   userName: string
   userEmail: string
   onSignOut: () => void
-  packageRows: EditablePackage[]
 }) {
   const [tab, setTab] = useState<CustomerTab>("Home")
   const [notifications, setNotifications] = useState(false)
@@ -401,6 +399,7 @@ export function CustomerDashboard({
       </header>
 
       <main className="customer-main">
+        {tab !== "Packages" && <p role="note">This screen uses sample data. Requests, quotes, and payments shown here are not submitted.</p>}
         {tab === "Home" && (
           <div className="customer-content">
             <section className="customer-welcome">
@@ -601,17 +600,17 @@ export function CustomerDashboard({
               >
                 <div className="quote-package">
                   <span>The Signature Table</span>
-                  <strong>$14,860.00</strong>
+                  <strong>₱14,860.00</strong>
                 </div>
                 <div className="quote-lines">
                   <span>
-                    Package · 180 guests <strong>$12,960</strong>
+                    Package · 180 guests <strong>₱12,960</strong>
                   </span>
                   <span>
-                    Styling & equipment <strong>$1,480</strong>
+                    Styling & equipment <strong>₱1,480</strong>
                   </span>
                   <span>
-                    Dietary menu additions <strong>$420</strong>
+                    Dietary menu additions <strong>₱420</strong>
                   </span>
                 </div>
                 <button
@@ -748,42 +747,10 @@ export function CustomerDashboard({
           <div className="customer-content">
             <PageHeader
               title="Explore packages"
-              description="Compare sample packages and choose a starting point for your event."
-              actions={<Button icon="spark">Get a recommendation</Button>}
+              description="Explore currently published packages."
+
             />
-            <div className="package-grid customer-package-grid">
-              {packageRows
-                .filter((item) => item.status === "Published")
-                .map((item) => (
-                <article className="package-card" key={item.name}>
-                  <div className="package-image">
-                    <img src={item.image} alt={item.kind} />
-                    <Badge tone="light">{item.tag}</Badge>
-                  </div>
-                  <div className="package-body">
-                    <div className="package-kind">{item.kind}</div>
-                    <div className="card-title">{item.name}</div>
-                    <p>{item.description}</p>
-                    <div className="package-inclusions">
-                      <strong>Includes</strong>
-                      <span>{item.inclusions}</span>
-                    </div>
-                    <div className="package-meta">
-                      <span>{item.price}</span><span>{item.guests}</span>
-                    </div>
-                    <Button
-                      className="full-button"
-                      onClick={() => {
-                        setEditingRequest(null)
-                        setRequestPackage(item.name)
-                      }}
-                    >
-                      Request this package
-                    </Button>
-                  </div>
-                </article>
-                ))}
-            </div>
+            <PackageCatalog />
           </div>
         )}
 
@@ -923,8 +890,7 @@ export function CustomerDashboard({
           title={editingRequest ? "Edit your request" : "Plan your event"}
           intro={
             <>
-              Package: <strong>{requestPackage}</strong>. This request remains
-              editable until it is confirmed.
+              This is a demo only. Changes are kept in this browser session and are not sent to Clemora.
             </>
           }
         >
@@ -963,7 +929,7 @@ export function CustomerDashboard({
               </div>
               <div className="form-actions">
                 <Button variant="secondary" onClick={() => setRequestPackage(null)}>Cancel</Button>
-                <Button type="submit">{editingRequest ? "Save changes" : "Submit request"}</Button>
+                <Button type="submit">{editingRequest ? "Save demo changes" : "Save demo"}</Button>
               </div>
             </form>
         </Dialog>

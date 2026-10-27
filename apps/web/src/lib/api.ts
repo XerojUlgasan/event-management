@@ -24,9 +24,10 @@ async function request<T>(
   path: string,
   body?: unknown,
   idToken?: string,
+  method?: "GET" | "POST" | "PATCH" | "DELETE",
 ): Promise<T> {
   const response = await fetch(`${apiUrl}${path}`, {
-    method: body === undefined ? "GET" : "POST",
+    method: method ?? (body === undefined ? "GET" : "POST"),
     credentials: "include",
     headers: {
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
@@ -36,13 +37,15 @@ async function request<T>(
   });
   if (!response.ok) {
     const result = (await response.json().catch(() => ({}))) as {
-      error?: string;
       success?: boolean;
+      error?: string | { issues?: { path?: (string | number)[]; message?: string }[] };
     };
     throw new ApiError(
       typeof result.error === "string"
         ? result.error
-        : "Please check the form and try again.",
+        : typeof result.error === "object" && result.error?.issues?.length
+          ? result.error.issues.map(issue => `${issue.path?.join(".") || "Field"}: ${issue.message || "invalid value"}`).join("; ")
+          : "Please check the form and try again.",
       response.status,
     );
   }
@@ -66,3 +69,50 @@ export const linkFirebase = (idToken: string, currentPassword: string) =>
   request<Profile>("/auth/link/firebase", { currentPassword }, idToken);
 export const addPassword = (idToken: string, password: string) =>
   request<Profile>("/auth/password", { password }, idToken);
+
+export type PackagePrice = { kind: "fixed"; currency: "PHP"; amountMinor: number }
+export type PackageContent = {
+  name: string; eventTypes: string[]; description: string; guestMin: number; guestMax: number;
+  venueDetails: string; inclusions: string[]; exclusions: string[]; terms: string;
+  imageUrl: string | null; price: PackagePrice | null
+}
+export type PackageVersion = PackageContent & {
+  id: string; packageId: string; version: number; state: "draft" | "published" | "superseded";
+  updatedAt: string; publishedAt: string | null
+}
+export type PublicPackage = PackageContent & { id: string; versionId: string; version: number; publishedAt: string }
+export type AdminPackage = { id: string; archivedAt: string | null; draft: PackageVersion | null; published: PackageVersion | null; versions?: PackageVersion[] }
+
+export const getPackages = () => request<{ packages: PublicPackage[] }>("/packages")
+export const getPackage = (id: string) => request<PublicPackage>(`/packages/${encodeURIComponent(id)}`)
+export const getAdminPackages = () => request<{ packages: AdminPackage[] }>("/admin/packages")
+export const getAdminPackage = (id: string) => request<AdminPackage>(`/admin/packages/${encodeURIComponent(id)}`)
+export const createPackage = (content: PackageContent) => request<AdminPackage>("/admin/packages", content)
+export const updatePackageDraft = (id: string, content: PackageContent, expectedUpdatedAt: string) =>
+  request<AdminPackage>(`/admin/packages/${encodeURIComponent(id)}/draft`, { ...content, expectedUpdatedAt }, undefined, "PATCH")
+export const publishPackage = (id: string, expectedUpdatedAt: string) => request<AdminPackage>(`/admin/packages/${encodeURIComponent(id)}/publish`, { expectedUpdatedAt })
+export const archivePackage = (id: string) => request<AdminPackage>(`/admin/packages/${encodeURIComponent(id)}/archive`, {})
+export const deletePackage = (id: string) => request<void>(`/admin/packages/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
+
+// Uploaded images use API-relative paths; resolve them against the API origin.
+export function packageImageSrc(imageUrl: string | null): string | undefined {
+  if (!imageUrl) return undefined
+  return imageUrl.startsWith("/v1/package-images/") ? new URL(imageUrl, new URL(apiUrl, window.location.origin)).href : imageUrl
+}
+
+export async function uploadPackageImage(file: File): Promise<string> {
+  const body = new FormData()
+  body.append("image", file)
+  const response = await fetch(`${apiUrl}/admin/package-images`, { method: "POST", credentials: "include", body })
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({})) as { error?: string }
+    throw new ApiError(typeof result.error === "string" ? result.error : "Unable to upload image. Please try again.", response.status)
+  }
+  return ((await response.json()) as { imageUrl: string }).imageUrl
+}
+
+export function deleteUnreferencedPackageImage(imageUrl: string): Promise<void> {
+  const id = imageUrl.match(/^\/v1\/package-images\/([0-9a-f-]+)$/i)?.[1]
+  if (!id) throw new Error("Unable to identify the uploaded image for cleanup.")
+  return request<void>(`/admin/package-images/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
+}

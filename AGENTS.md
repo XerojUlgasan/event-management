@@ -9,6 +9,7 @@ This is the Clemora event-management pnpm workspace. Inspect the files involved 
 | HTTP routes, authentication, sessions, PostgreSQL schema or queries | `apps/api/` | [API skill](context-factory/api/SKILL.md) |
 | Astro pages, React application screens, client auth or API calls | `apps/web/` | [Frontend skill](context-factory/frontend/SKILL.md) |
 | Shared React components, Storybook, design tokens | `packages/ui/`, `packages/theme/` | [Packages skill](context-factory/packages/SKILL.md) |
+| Test accounts, authenticated API checks, and custom SQL inspection | `context-factory/QA/` | [QA skill](context-factory/QA/SKILL.md) |
 
 For a change crossing areas, read every applicable skill and its listed references. The files under `context-factory/` are repository guidance; inspect current code as the authority if guidance has drifted, then update the guidance in the same task.
 
@@ -16,7 +17,7 @@ For a change crossing areas, read every applicable skill and its listed referenc
 
 - Use `pnpm`; workspace membership is declared in `pnpm-workspace.yaml`, and runnable commands are in each `package.json`.
 - `/` is `apps/web/src/pages/index.astro` and hosts the React Clemora app. `/landing` is `apps/web/src/pages/landing.astro`. API routes are mounted under `/v1` in `apps/api/src/app.ts`; its OpenAPI document is `/openapi.json`.
-- Current bookings, packages, and other business screens use demo data in `apps/web/src/components/app/data.ts`. Do not describe a screen as a working backend workflow without tracing its API and persistence.
+- Package catalog cards and admin edits use the `/v1/packages` API and PostgreSQL. Bookings, quotes, payments, and other business screens still use demo data. Trace each screen's API and persistence before describing it as a working backend workflow.
 - [Product scope](docs/FEATURES.md) describes the intended business workflow; [README](README.md) describes current setup and implemented behavior. Check both when implementing product behavior.
 - Keep values from `.env`, `.secrets/`, and local databases out of chat, docs, and commits. Use the checked-in `.env.example` files when documentation needs variable names.
 

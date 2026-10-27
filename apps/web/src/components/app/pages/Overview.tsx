@@ -53,7 +53,7 @@ export function Overview({
         />
         <StatCard
           label="Confirmed revenue"
-          value="$84.6k"
+          value="₱84.6k"
           change="+12.4%"
           detail="this month"
         />

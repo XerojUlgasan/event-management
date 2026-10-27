@@ -38,7 +38,7 @@ export function ReportsPage() {
 
       <div className="stats-grid">
         <StatCard label="Confirmed bookings" value="148" change="+12.4%" detail="vs previous period" />
-        <StatCard label="Quoted value" value="$284k" change="+8.7%" detail="68% conversion rate" />
+        <StatCard label="Quoted value" value="₱284k" change="+8.7%" detail="68% conversion rate" />
         <StatCard label="Events completed" value="96" change="+6.2%" detail="96% on-time completion" />
         <StatCard label="Average rating" value="4.9" change="+0.2" detail="from 68 verified reviews" />
       </div>

@@ -1,0 +1,43 @@
+import { z } from "@hono/zod-openapi";
+
+const text = z.string().max(4000);
+export const priceSchema = z.object({
+  kind: z.literal("fixed"),
+  currency: z.literal("PHP"),
+  amountMinor: z.number().int().positive().max(2147483647),
+});
+export const contentSchema = z.object({
+  name: text,
+  eventTypes: z.array(text).max(50),
+  description: text,
+  guestMin: z.number().int().min(30).max(100),
+  guestMax: z.number().int().min(30).max(100),
+  venueDetails: text,
+  inclusions: z.array(text).max(100),
+  exclusions: z.array(text).max(100),
+  terms: text,
+  imageUrl: z.string().max(2048).refine(value => {
+    if (/^\/v1\/package-images\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) return true;
+    if (!/^https?:\/\//i.test(value) || !z.url().safeParse(value).success) return false;
+    try {
+      return !/^\/v1\/package-images(?:\/|$)/i.test(decodeURIComponent(new URL(value).pathname));
+    } catch {
+      return false;
+    }
+  }, "Must be an HTTP(S) URL or uploaded image path; uploaded images must use their relative path").nullable(),
+  price: priceSchema.nullable(),
+});
+export type Content = z.infer<typeof contentSchema>;
+export const versionSchema = contentSchema.extend({
+  id: z.string().uuid(), packageId: z.string().uuid(), version: z.number().int(),
+  state: z.enum(["draft", "published", "superseded"]),
+  updatedAt: z.string(), publishedAt: z.string().nullable(),
+});
+export const publicSchema = contentSchema.extend({
+  id: z.string().uuid(), versionId: z.string().uuid(), version: z.number().int(), publishedAt: z.string(),
+});
+export const adminSchema = z.object({
+  id: z.string().uuid(), archivedAt: z.string().nullable(),
+  draft: versionSchema.nullable(), published: versionSchema.nullable(), versions: z.array(versionSchema),
+});
+export const errorSchema = z.object({ error: z.string() });

@@ -27,3 +27,47 @@ model Session {
   @@index([userId])
   @@map("sessions")
 }
+
+model Package {
+  id        String           @id @default(uuid()) @db.Uuid
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime         @default(now()) @map("updated_at") @db.Timestamptz(6)
+  archivedAt DateTime?       @map("archived_at") @db.Timestamptz(6)
+  versions  PackageVersion[]
+
+  @@map("packages")
+}
+
+model PackageImage {
+  id          String   @id @default(uuid()) @db.Uuid
+  contentType String   @map("content_type")
+  data        Bytes
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("package_images")
+}
+
+model PackageVersion {
+  id           String    @id @default(uuid()) @db.Uuid
+  packageId    String    @map("package_id") @db.Uuid
+  version      Int
+  state        String
+  name         String
+  eventTypes   String[]  @map("event_types")
+  description  String
+  guestMin     Int       @map("guest_min")
+  guestMax     Int       @map("guest_max")
+  venueDetails String    @map("venue_details")
+  inclusions   String[]
+  exclusions   String[]
+  terms        String
+  imageUrl     String?   @map("image_url")
+  priceAmountMinor Int?  @map("price_amount_minor")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  publishedAt  DateTime? @map("published_at") @db.Timestamptz(6)
+  package      Package   @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, version])
+  @@map("package_versions")
+}

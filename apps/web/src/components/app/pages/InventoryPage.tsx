@@ -105,7 +105,7 @@ export function InventoryPage() {
       />
 
       <div className="stats-grid">
-        <StatCard label="Inventory value" value="$184k" detail="1,284 tracked items" />
+        <StatCard label="Inventory value" value="₱184k" detail="1,284 tracked items" />
         <StatCard label="Currently reserved" value="248" detail="Across 9 upcoming events" />
         <StatCard label="Low stock" value="7" detail="3 require action today" tone="attention" />
         <StatCard label="Utilization" value="74%" change="+6.2%" detail="this quarter" />

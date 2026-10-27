@@ -11,6 +11,41 @@ export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface PackageImages {
+  content_type: string;
+  created_at: Generated<Timestamp>;
+  data: Buffer;
+  id: Generated<string>;
+}
+
+export interface Packages {
+  archived_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface PackageVersions {
+  created_at: Generated<Timestamp>;
+  description: string;
+  event_types: string[];
+  exclusions: string[];
+  guest_max: number;
+  guest_min: number;
+  id: Generated<string>;
+  image_url: string | null;
+  inclusions: string[];
+  name: string;
+  package_id: string;
+  price_amount_minor: number | null;
+  published_at: Timestamp | null;
+  state: string;
+  terms: string;
+  updated_at: Generated<Timestamp>;
+  venue_details: string;
+  version: number;
+}
+
 export interface Sessions {
   created_at: Generated<Timestamp>;
   expires_at: Timestamp;
@@ -31,6 +66,9 @@ export interface Users {
 }
 
 export interface DB {
+  package_images: PackageImages;
+  package_versions: PackageVersions;
+  packages: Packages;
   sessions: Sessions;
   users: Users;
 }

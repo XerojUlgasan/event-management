@@ -25,15 +25,15 @@ type CustomerRecord = {
 
 export function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerRecord[]>([
-    { id: 1, name: "Elena Mendoza", email: "elena@example.com", phone: "+1 555 014 2830", activity: "2 bookings", value: "$18,240", status: "Active" },
-    { id: 2, name: "Noah Williams", email: "noah@example.com", phone: "+1 555 012 8841", activity: "3 bookings", value: "$26,580", status: "Active" },
-    { id: 3, name: "Mei Harlow", email: "mei@example.com", phone: "+1 555 019 4210", activity: "1 request", value: "$4,280", status: "New" },
-    { id: 4, name: "Sofia Laurent", email: "sofia@example.com", phone: "+1 555 017 9314", activity: "2 requests", value: "$12,900", status: "Active" },
-    { id: 5, name: "Lena Park", email: "lena@example.com", phone: "+1 555 015 1174", activity: "1 booking", value: "$6,420", status: "Active" },
+    { id: 1, name: "Elena Mendoza", email: "elena@example.com", phone: "+1 555 014 2830", activity: "2 bookings", value: "₱18,240", status: "Active" },
+    { id: 2, name: "Noah Williams", email: "noah@example.com", phone: "+1 555 012 8841", activity: "3 bookings", value: "₱26,580", status: "Active" },
+    { id: 3, name: "Mei Harlow", email: "mei@example.com", phone: "+1 555 019 4210", activity: "1 request", value: "₱4,280", status: "New" },
+    { id: 4, name: "Sofia Laurent", email: "sofia@example.com", phone: "+1 555 017 9314", activity: "2 requests", value: "₱12,900", status: "Active" },
+    { id: 5, name: "Lena Park", email: "lena@example.com", phone: "+1 555 015 1174", activity: "1 booking", value: "₱6,420", status: "Active" },
   ])
   const [selected, setSelected] = useState<CustomerRecord | null>(null)
   const [editing, setEditing] = useState<CustomerRecord | null>(null)
-  const emptyCustomer: CustomerRecord = { id: 0, name: "", email: "", phone: "", activity: "No bookings", value: "$0", status: "New" }
+  const emptyCustomer: CustomerRecord = { id: 0, name: "", email: "", phone: "", activity: "No bookings", value: "₱0", status: "New" }
   return (
     <div className="content-stack">
       <PageHeader

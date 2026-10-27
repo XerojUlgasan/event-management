@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react"
-import type { Dispatch, SetStateAction } from "react"
 import {
   Avatar,
   Badge,
@@ -7,7 +6,6 @@ import {
   WorkspaceLayout,
 } from "@event-management/ui"
 
-import type { EditablePackage } from "./data"
 import type { NavKey } from "./types"
 import { firstName, initialsFromName } from "../../lib/name"
 import { BookingsPage } from "./pages/BookingsPage"
@@ -26,14 +24,10 @@ export function AppShell({
   onPublic,
   profile,
   onSignOut,
-  packageRows,
-  setPackageRows,
 }: {
   onPublic: () => void
   profile: { displayName: string | null; email: string }
   onSignOut: () => void
-  packageRows: EditablePackage[]
-  setPackageRows: Dispatch<SetStateAction<EditablePackage[]>>
 }) {
   const name = profile.displayName ?? profile.email
   const [active, setActive] = useState<NavKey>("Overview")
@@ -47,18 +41,13 @@ export function AppShell({
     if (active === "Customers") return <CustomersPage />
     if (active === "Calendar") return <CalendarPage />
     if (active === "Packages")
-      return (
-        <PackagesPage
-          packageRows={packageRows}
-          setPackageRows={setPackageRows}
-        />
-      )
+      return <PackagesPage />
     if (active === "Inventory") return <InventoryPage />
     if (active === "Operations") return <OperationsPage />
     if (active === "Reports") return <ReportsPage />
     if (active === "Administration") return <SignInMethods />
     return <GenericPage page={active} />
-  }, [active, name, packageRows, setPackageRows])
+  }, [active, name])
 
   return (
     <WorkspaceLayout
@@ -146,6 +135,7 @@ export function AppShell({
         </header>
       }
     >
+      {active !== "Packages" && <p role="note">This screen uses sample data.</p>}
       {body}
     </WorkspaceLayout>
   )

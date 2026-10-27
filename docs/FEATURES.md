@@ -1,10 +1,10 @@
 # Clemora feature scope
 
-Updated: 2026-10-22
+Updated: 2026-10-27
 
 ## Current business workflow
 
-Customers start with event type, preferred date, and estimated guest count. The business offers all-inclusive packages for **30 to 100 guests**. Each package includes exclusive venue use, buffet and venue setup, full catering, and sound and lights. A reservation fee secures a date and is **credited toward the total package price**.
+Customers start with event type, preferred date, and estimated guest count. The business offers packages for **30 to 100 guests**. Staff define each package's inclusions individually; no services are inserted into every package automatically. Published packages have a fixed total price in Philippine pesos (PHP); all monetary amounts in the app use PHP. A reservation fee secures a date and is **credited toward the total package price**.
 
 This workflow is the product baseline. The earlier proposal explores a broader event and resource platform; its features are options to evaluate rather than fixed requirements.
 
@@ -54,7 +54,7 @@ The assistant may prepare and explain decisions, but authorized staff approve cu
 ## Decisions to confirm with the business
 
 - Is the venue exclusive for a whole date, or can different events use different time slots? What setup and cleanup time is required?
-- What are the exact package tiers and pricing rules for guest counts from 30 to 100?
+- What are the exact package tiers, guest ranges, and fixed PHP prices for 30 to 100 guests?
 - Which amenities are included in each package, and which add-ons can actually be sold? Can an add-on be booked for more than one event at a time?
 - How much is the reservation fee, when is it due, and does a date have a temporary hold before payment?
 - What are the rules for fee refunds, cancellation, rescheduling, balance payment, and guest-count changes?

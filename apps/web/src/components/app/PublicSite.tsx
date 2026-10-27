@@ -1,19 +1,12 @@
 import { useState } from "react"
-import type { SubmitEvent } from "react"
-import { Badge, Brand, Button, Dialog, FormField, Icon } from "@event-management/ui"
+import { Badge, Brand, Button, Dialog, Icon } from "@event-management/ui"
 
-import { packages } from "./data"
+import { PackageCatalog } from "./PackageCatalog"
 
 export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-
-  const submitQuote = (event: SubmitEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setSubmitted(true)
-  }
 
   return (
     <div className="public-site">
@@ -126,31 +119,7 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
               and service needs.
             </p>
           </div>
-          <div className="package-grid">
-            {packages.map((item) => (
-              <article className="package-card" key={item.name}>
-                <div className="package-image">
-                  <img src={item.image} alt={item.kind} />
-                  <Badge tone="light">{item.tag}</Badge>
-                </div>
-                <div className="package-body">
-                  <div className="package-kind">{item.kind}</div>
-                  <div className="card-title">{item.name}</div>
-                  <p>{item.description}</p>
-                  <div className="package-meta">
-                    <span>{item.price}</span>
-                    <span>{item.guests}</span>
-                  </div>
-                  <button
-                    className="card-link"
-                    onClick={() => setQuoteOpen(true)}
-                  >
-                    View package <Icon name="arrow" size={16} />
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
+          <PackageCatalog />
         </section>
 
         <section className="recommendation section" id="events">
@@ -181,8 +150,8 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
               <div>
                 <Icon name="check" />
                 <span>
-                  <strong>Fits your $4,500 budget</strong>
-                  <small>Estimated at $3,920 for 70 guests</small>
+                  <strong>Sample recommendation</strong>
+                  <small>Illustration only; package pricing appears in the catalog.</small>
                 </span>
               </div>
               <div>
@@ -279,83 +248,9 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
       )}
 
       {quoteOpen && (
-        <Dialog onClose={() => setQuoteOpen(false)}>
-            {submitted ? (
-              <div className="success-state">
-                <div className="success-icon">
-                  <Icon name="check" size={30} />
-                </div>
-                <div className="modal-title">Your request is on its way</div>
-                <p>
-                  We’ve saved your event details. A catering manager will review
-                  your request and follow up within one business day.
-                </p>
-                <div className="reference">
-                  Request reference <strong>QR-5821</strong>
-                </div>
-                <Button onClick={() => setQuoteOpen(false)}>Done</Button>
-              </div>
-            ) : (
-              <>
-                <span className="eyebrow">Quotation request</span>
-                <div className="modal-title">Tell us about your event</div>
-                <p className="modal-intro">
-                  Share the essentials now. You can refine every detail with
-                  your catering manager later.
-                </p>
-                <form onSubmit={submitQuote}>
-                  <div className="form-grid">
-                    <FormField label="Event type">
-                      <select required defaultValue="">
-                        <option value="" disabled>
-                          Select an event
-                        </option>
-                        <option>Wedding</option>
-                        <option>Corporate dinner</option>
-                        <option>Birthday</option>
-                        <option>Other</option>
-                      </select>
-                    </FormField>
-                    <FormField label="Preferred date">
-                      <input type="date" required />
-                    </FormField>
-                    <FormField label="Guest count">
-                      <input
-                        type="number"
-                        placeholder="e.g. 120"
-                        min="10"
-                        required
-                      />
-                    </FormField>
-                    <FormField label="Estimated budget">
-                      <select defaultValue="">
-                        <option value="" disabled>
-                          Select a range
-                        </option>
-                        <option>$2,000–$5,000</option>
-                        <option>$5,000–$10,000</option>
-                        <option>$10,000+</option>
-                      </select>
-                    </FormField>
-                    <FormField className="full" label="Venue or area">
-                      <input placeholder="Venue name or neighborhood" />
-                    </FormField>
-                    <FormField className="full" label="What matters most?">
-                      <textarea placeholder="Tell us about your menu preferences, atmosphere, or special requirements"></textarea>
-                    </FormField>
-                  </div>
-                  <div className="form-actions">
-                    <Button
-                      variant="secondary"
-                      onClick={() => setQuoteOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="submit">Send request</Button>
-                  </div>
-                </form>
-              </>
-            )}
+        <Dialog onClose={() => setQuoteOpen(false)} title="Event inquiries">
+          <p>Online inquiries are not available yet. Viewing a package does not reserve a date.</p>
+          <Button onClick={() => setQuoteOpen(false)}>Close</Button>
         </Dialog>
       )}
     </div>

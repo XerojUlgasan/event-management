@@ -20,7 +20,9 @@ packages/
 scripts/             Local development setup for `pnpm all`
 ```
 
-The root route renders the migrated Clemora frontend from `apps/web/src/components/app/`. The original Three.js landing page remains at `/landing`. Event, booking, and package screens still use local demo data. Authentication supports local email/password accounts and Firebase sign-in, with shared profiles, roles, and sessions in PostgreSQL.
+The root route renders the migrated Clemora frontend from `apps/web/src/components/app/`. The original Three.js landing page remains at `/landing`. The package catalog now reads and edits PostgreSQL records through the API; no approved packages are seeded. Event, booking, quote, and payment screens still use sample data. Authentication supports local email/password accounts and Firebase sign-in, with shared profiles, roles, and sessions in PostgreSQL.
+
+The package catalog supports private admin drafts, versioned publication, archiving, and deletion of never-published unreferenced drafts. Admins use a three-step editor with removable tags for event types, inclusions, and exclusions, plus an image URL or JPEG/PNG upload. Each package's inclusions are entered explicitly. Public and customer views show only current published packages. Package prices are fixed totals in PHP, stored as centavos. Apply package migrations with `pnpm db:deploy` on an existing local database; `pnpm --filter @event-management/api test:packages` runs catalog behavior tests against a disposable local database. See [the catalog implementation note](docs/PACKAGES_CRUD_DRAFT.md) for the API and frontend contract.
 
 ## Local development
 

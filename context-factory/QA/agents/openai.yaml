@@ -1,0 +1,4 @@
+interface:
+  display_name: "QA"
+  short_description: "Test accounts, API sessions, and PostgreSQL queries"
+  default_prompt: "Use $qa to test Clemora accounts, authenticate API requests, or inspect PostgreSQL data."
