@@ -1,20 +1,23 @@
 import { Avatar, Brand, Icon } from "@event-management/ui"
 
-import { roleNav } from "./data"
-import type { NavKey, Role } from "./types"
+import { adminNav } from "./data"
+import { initialsFromName } from "../../lib/name"
+import type { NavKey } from "./types"
 
 export function Sidebar({
-  role,
+  name,
   active,
   onNavigate,
   collapsed,
   onClose,
+  onSignOut,
 }: {
-  role: Role
+  name: string
   active: NavKey
   onNavigate: (key: NavKey) => void
   collapsed: boolean
   onClose: () => void
+  onSignOut: () => void
 }) {
   const iconFor: Record<NavKey, string> = {
     Overview: "grid",
@@ -38,7 +41,7 @@ export function Sidebar({
       </div>
       <div className="workspace-label">Workspace</div>
       <nav className="side-nav">
-        {(roleNav[role] ?? roleNav.Administrator ?? []).map((item) => (
+        {adminNav.map((item) => (
           <button
             key={item}
             className={active === item ? "active" : ""}
@@ -60,12 +63,14 @@ export function Sidebar({
         <button>Open help center</button>
       </div>
       <div className="sidebar-user">
-        <Avatar initials="MA" />
+        <Avatar initials={initialsFromName(name)} />
         <div>
-          <strong>Marin Alvarez</strong>
-          <span>{role === "Administrator" ? "Owner" : role}</span>
+          <strong>{name}</strong>
+          <span>Owner</span>
         </div>
-        <Icon name="chevron" size={16} />
+        <button className="sidebar-signout" onClick={onSignOut}>
+          Sign out
+        </button>
       </div>
     </aside>
   )

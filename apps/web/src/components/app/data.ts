@@ -1,4 +1,4 @@
-import type { NavKey, Role } from "./types"
+import type { NavKey } from "./types"
 
 export const photos = {
   hero: "/images/hero.jpg",
@@ -7,33 +7,12 @@ export const photos = {
   dessert: "/images/dessert.jpg",
 }
 
-export const demoAccounts = [
-  {
-    role: "Customer",
-    name: "Elena Mendoza",
-    email: "customer@clemora.demo",
-    password: "demo123",
-    initials: "EM",
-    description: "Bookings, quotations, notifications, and messages.",
-  },
-  {
-    role: "Administrator",
-    name: "Marin Alvarez",
-    email: "admin@clemora.demo",
-    password: "demo123",
-    initials: "MA",
-    description: "System access, reporting, AI, security, and audit controls.",
-  },
-] as const
-
-export const roleNav: Partial<Record<Role, NavKey[]>> = {
-  Administrator: [
-    "Overview",
-    "Bookings",
-    "Customers",
-    "Packages",
-  ],
-}
+export const adminNav: NavKey[] = [
+  "Overview",
+  "Bookings",
+  "Customers",
+  "Packages",
+]
 
 export const bookings = [
   {

@@ -8,7 +8,8 @@ import {
 } from "@event-management/ui"
 
 import type { EditablePackage } from "./data"
-import type { NavKey, Role } from "./types"
+import type { NavKey } from "./types"
+import { firstName, initialsFromName } from "../../lib/name"
 import { BookingsPage } from "./pages/BookingsPage"
 import { CalendarPage } from "./pages/CalendarPage"
 import { CustomersPage } from "./pages/CustomersPage"
@@ -22,23 +23,25 @@ import { Sidebar } from "./Sidebar"
 
 export function AppShell({
   onPublic,
-  initialRole,
+  profile,
+  onSignOut,
   packageRows,
   setPackageRows,
 }: {
   onPublic: () => void
-  initialRole: Role
+  profile: { displayName: string | null; email: string }
+  onSignOut: () => void
   packageRows: EditablePackage[]
   setPackageRows: Dispatch<SetStateAction<EditablePackage[]>>
 }) {
-  const [role] = useState<Role>(initialRole)
+  const name = profile.displayName ?? profile.email
   const [active, setActive] = useState<NavKey>("Overview")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notifications, setNotifications] = useState(false)
 
   const body = useMemo(() => {
     if (active === "Overview")
-      return <Overview role={role} onNavigate={setActive} />
+      return <Overview firstName={firstName(name)} onNavigate={setActive} />
     if (active === "Bookings") return <BookingsPage />
     if (active === "Customers") return <CustomersPage />
     if (active === "Calendar") return <CalendarPage />
@@ -53,18 +56,19 @@ export function AppShell({
     if (active === "Operations") return <OperationsPage />
     if (active === "Reports") return <ReportsPage />
     return <GenericPage page={active} />
-  }, [active, role, packageRows, setPackageRows])
+  }, [active, name, packageRows, setPackageRows])
 
   return (
     <WorkspaceLayout
       sidebar={
         <>
           <Sidebar
-            role={role}
+            name={name}
             active={active}
             onNavigate={setActive}
             collapsed={!sidebarOpen}
             onClose={() => setSidebarOpen(false)}
+            onSignOut={onSignOut}
           />
           {sidebarOpen && (
             <button
@@ -100,7 +104,10 @@ export function AppShell({
               <Icon name="bell" />
               <b>3</b>
             </button>
-            <Avatar initials="MA" />
+            <Avatar initials={initialsFromName(name)} />
+            <button className="back-site" onClick={onSignOut}>
+              Sign out
+            </button>
           </div>
           {notifications && (
             <div className="notification-popover">

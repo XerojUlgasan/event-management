@@ -9,77 +9,22 @@ import {
 } from "@event-management/ui"
 
 import { bookings } from "../data"
-import type { NavKey, Role } from "../types"
+import type { NavKey } from "../types"
 
 export function Overview({
-  role,
+  firstName,
   onNavigate,
 }: {
-  role: Role
+  firstName: string
   onNavigate: (key: NavKey) => void
 }) {
-  if (role === "Staff") {
-    return (
-      <div className="content-stack">
-        <PageHeader
-          className="welcome-row"
-          eyebrow="Monday, June 16"
-          title="Good morning, Marin"
-          description="You have 2 assigned events and 5 tasks this week."
-          actions={<Button icon="calendar">View my schedule</Button>}
-        />
-        <div className="stats-grid three">
-          <StatCard label="Tasks today" value="5" detail="2 due before noon" />
-          <StatCard
-            label="Events this week"
-            value="2"
-            detail="Next: Northstar Dinner"
-          />
-          <StatCard label="Announcements" value="3" detail="1 unread update" />
-        </div>
-        <Panel
-          title="Today’s assignments"
-          description="Monday, June 16"
-          action={<Badge tone="info">On shift · 9:00 AM–6:00 PM</Badge>}
-        >
-          <div className="task-list">
-            {[
-              "Check linen dispatch against inventory list",
-              "Confirm warming cabinets are labeled",
-              "Load service kits for Northstar dinner",
-              "Attend pre-event team briefing",
-            ].map((task, index) => (
-              <label className="task-row" key={task}>
-                <input type="checkbox" defaultChecked={index === 0} />
-                <span>
-                  <strong>{task}</strong>
-                  <small>
-                    {index < 2
-                      ? "Orchid Hall preparation"
-                      : "Warehouse · Operations"}
-                  </small>
-                </span>
-                <Badge tone={index === 0 ? "success" : "neutral"}>
-                  {index === 0 ? "Complete" : index === 3 ? "3:30 PM" : "Today"}
-                </Badge>
-              </label>
-            ))}
-          </div>
-        </Panel>
-      </div>
-    )
-  }
   return (
     <div className="content-stack">
       <PageHeader
         className="welcome-row"
         eyebrow="Monday, June 16"
-        title={role === "Coordinator" ? "Operations overview" : "Good morning, Marin"}
-        description={
-          role === "Coordinator"
-            ? "Monitor preparation, timing, and team readiness across active events."
-            : "Here’s what’s happening across Clemora this week."
-        }
+        title={`Good morning, ${firstName}`}
+        description="Here’s what’s happening across Clemora this week."
         actions={
           <div className="welcome-actions">
             <Button
@@ -91,11 +36,9 @@ export function Overview({
             </Button>
             <Button
               icon="clipboard"
-              onClick={() =>
-                onNavigate(role === "Coordinator" ? "Operations" : "Bookings")
-              }
+              onClick={() => onNavigate("Bookings")}
             >
-              {role === "Coordinator" ? "Open operations" : "New booking"}
+              New booking
             </Button>
           </div>
         }
@@ -109,10 +52,8 @@ export function Overview({
           detail="vs last week"
         />
         <StatCard
-          label={
-            role === "Coordinator" ? "Tasks in progress" : "Confirmed revenue"
-          }
-          value={role === "Coordinator" ? "38" : "$84.6k"}
+          label="Confirmed revenue"
+          value="$84.6k"
           change="+12.4%"
           detail="this month"
         />
@@ -123,14 +64,10 @@ export function Overview({
           tone="attention"
         />
         <StatCard
-          label={
-            role === "Coordinator" ? "Team availability" : "Guest satisfaction"
-          }
-          value={role === "Coordinator" ? "86%" : "4.9"}
+          label="Guest satisfaction"
+          value="4.9"
           change="↑ 0.2"
-          detail={
-            role === "Coordinator" ? "32 team members" : "from 68 reviews"
-          }
+          detail="from 68 reviews"
         />
       </div>
 
@@ -153,9 +90,7 @@ export function Overview({
               <button
                 className="event-row"
                 key={booking.id}
-                onClick={() =>
-                  onNavigate(role === "Coordinator" ? "Operations" : "Bookings")
-                }
+                onClick={() => onNavigate("Bookings")}
               >
                 <div className={`event-date date-${index}`}>
                   <strong>{booking.date.split(" ")[1].replace(",", "")}</strong>

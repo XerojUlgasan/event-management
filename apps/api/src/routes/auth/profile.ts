@@ -1,0 +1,29 @@
+import { z } from "@hono/zod-openapi";
+import type { Selectable } from "kysely";
+import type { Users } from "../../db/types.js";
+
+export const errorSchema = z.object({ error: z.string() });
+
+export const profileSchema = z.object({
+  id: z.string().uuid(),
+  firebaseUid: z.string(),
+  email: z.string(),
+  displayName: z.string().nullable(),
+  role: z.enum(["admin", "customer"]),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type Profile = z.infer<typeof profileSchema>;
+
+export function toProfile(row: Selectable<Users>): Profile {
+  return {
+    id: row.id,
+    firebaseUid: row.firebase_uid,
+    email: row.email,
+    displayName: row.display_name,
+    role: row.role === "admin" ? "admin" : "customer",
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+  };
+}

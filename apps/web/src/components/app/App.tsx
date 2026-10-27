@@ -1,16 +1,26 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { Brand } from "@event-management/ui"
 
+import { AuthProvider, useAuth } from "../../lib/auth"
 import { packages } from "./data"
 import type { EditablePackage } from "./data"
-import type { Role, View } from "./types"
+import type { View } from "./types"
 import { AppShell } from "./AppShell"
+import { AuthPage } from "./AuthPage"
 import { CustomerDashboard } from "./customer/CustomerDashboard"
-import { DemoLogin } from "./DemoLogin"
 import { PublicSite } from "./PublicSite"
 
 export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  )
+}
+
+function AppContent() {
+  const { status, profile, signOut } = useAuth()
   const [view, setView] = useState<View>("public")
-  const [demoRole, setDemoRole] = useState<Role>("Administrator")
   const [sharedPackages, setSharedPackages] = useState<EditablePackage[]>(
     packages.map((item, index) => ({
       ...item,
@@ -22,37 +32,57 @@ export default function App() {
     })),
   )
 
-  const login = (role: "Customer" | Role) => {
-    if (role === "Customer") {
-      setView("customer")
-      return
+  useEffect(() => {
+    if (status === "signed-in" && profile) {
+      setView(profile.role === "admin" ? "app" : "customer")
     }
-    setDemoRole(role)
-    setView("app")
+  }, [status, profile])
+
+  const handleSignOut = async () => {
+    await signOut()
+    setView("login")
   }
 
-  if (view === "public") {
-    return <PublicSite onEnterCustomer={() => setView("login")} />
-  }
-  if (view === "login") {
-    return <DemoLogin onBack={() => setView("public")} onLogin={login} />
-  }
-  if (view === "customer") {
+  if (status === "loading") {
     return (
-      <CustomerDashboard
-        onPublic={() => setView("public")}
-        onTeamPortal={() => setView("login")}
-        packageRows={sharedPackages}
-      />
+      <div className="auth-splash">
+        <Brand />
+        <span>Loading your workspace…</span>
+      </div>
     )
   }
-  return (
-    <AppShell
-      onPublic={() => setView("public")}
-      initialRole={demoRole}
-      key={demoRole}
-      packageRows={sharedPackages}
-      setPackageRows={setSharedPackages}
-    />
-  )
+
+  if (status === "signed-in" && profile) {
+    const displayName = profile.displayName ?? profile.email
+
+    if (view === "login" || view === "app" || view === "customer") {
+      if (profile.role === "admin") {
+        return (
+          <AppShell
+            onPublic={() => setView("public")}
+            profile={profile}
+            onSignOut={handleSignOut}
+            packageRows={sharedPackages}
+            setPackageRows={setSharedPackages}
+          />
+        )
+      }
+
+      return (
+        <CustomerDashboard
+          onPublic={() => setView("public")}
+          userName={displayName}
+          userEmail={profile.email}
+          onSignOut={handleSignOut}
+          packageRows={sharedPackages}
+        />
+      )
+    }
+  }
+
+  if (view === "login" || view === "app" || view === "customer") {
+    return <AuthPage onBack={() => setView("public")} />
+  }
+
+  return <PublicSite onEnterCustomer={() => setView("login")} />
 }

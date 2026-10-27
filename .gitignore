@@ -8,6 +8,9 @@ storybook-static/
 *.tsbuildinfo
 .DS_Store
 
+# Firebase service account keys (never commit)
+apps/api/.secrets/
+
 # Impeccable design skill: platform binaries are downloaded on demand.
 .agents/skills/impeccable/scripts/bin/
 

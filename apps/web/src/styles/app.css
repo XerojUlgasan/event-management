@@ -149,31 +149,14 @@
 .login-options > button { color: var(--wine); border: 0; background: none; font-size: 8px; font-weight: 700; }
 .login-error { padding: 10px; display: flex; align-items: flex-start; gap: 8px; color: #9e3737; border-radius: 7px; background: var(--red-soft); font-size: 8px; line-height: 1.45; }
 .login-submit { width: 100%; margin-top: 2px; }
-.demo-divider { margin: 24px 0 17px; display: flex; align-items: center; gap: 12px; color: #9c9591; font-size: 8px; }
-.demo-divider::before, .demo-divider::after { content: ""; height: 1px; flex: 1; background: var(--line); }
-.demo-account-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
-.demo-account-grid > button { min-width: 0; min-height: 88px; position: relative; padding: 10px 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; background: white; }
-.demo-account-grid > button:hover { border-color: #bcaea9; background: #fcfaf8; }
-.demo-account-grid > button.active { color: var(--wine); border-color: var(--wine); background: #fffafa; box-shadow: 0 0 0 2px rgba(121,13,22,.05); }
-.demo-account-grid > button > span:nth-child(2) { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.demo-account-grid strong { font-size: 8px; }
-.demo-account-grid small { max-width: 90px; overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; font-size: 6px; }
-.demo-account-grid > button > i { position: absolute; right: 5px; top: 5px; width: 17px; height: 17px; display: grid; place-items: center; color: white; border-radius: 50%; background: var(--wine); }
-.demo-avatar { width: 30px; height: 30px; display: grid; place-items: center; color: var(--wine); border-radius: 8px; background: var(--cream-soft); font-size: 8px; font-weight: 700; flex: none; }
-.demo-avatar.demo-administrator { color: #5a3d75; background: #eee8f2; }
-.demo-avatar.demo-manager { color: var(--blue); background: var(--blue-soft); }
-.demo-avatar.demo-coordinator { color: var(--green); background: var(--green-soft); }
-.demo-avatar.demo-staff { color: #8a5b23; background: var(--amber-soft); }
-.selected-demo-account { margin-top: 12px; padding: 13px; display: grid; grid-template-columns: 1.2fr 1fr auto; align-items: center; gap: 14px; border: 1px solid var(--line); border-radius: 9px; background: #faf9f7; }
-.selected-demo-account > div:first-child { min-width: 0; display: flex; align-items: center; gap: 9px; }
-.selected-demo-account > div:first-child > span:last-child { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.selected-demo-account strong { font-size: 9px; }
-.selected-demo-account small { color: var(--muted); font-size: 7px; line-height: 1.35; }
-.selected-demo-account dl { margin: 0; padding: 0 12px; border-left: 1px solid var(--line); }
-.selected-demo-account dl > div { display: grid; grid-template-columns: 48px 1fr; gap: 6px; }
-.selected-demo-account dt { color: var(--muted); font-size: 7px; }
-.selected-demo-account dd { margin: 0; font-size: 7px; font-weight: 600; }
-.selected-demo-account .button { min-height: 34px; padding: 0 10px; font-size: 8px; }
+.auth-divider { margin: 24px 0 17px; display: flex; align-items: center; gap: 12px; color: #9c9591; font-size: 8px; }
+.auth-divider::before, .auth-divider::after { content: ""; height: 1px; flex: 1; background: var(--line); }
+.google-button { width: 100%; min-height: 43px; padding: 0 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--ink); border: 1px solid #dbd5d1; border-radius: 8px; background: white; font-size: 10px; font-weight: 600; }
+.google-button:hover:not(:disabled) { border-color: #bcaea9; background: #fcfaf8; }
+.google-button:disabled { opacity: .55; cursor: not-allowed; }
+.google-icon { width: 16px; height: 16px; flex: none; }
+.auth-splash { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: var(--muted); background: white; font-size: 11px; }
+.button:disabled { opacity: .55; cursor: not-allowed; }
 .login-disclaimer { margin: 14px 0 0; color: #9b9490; text-align: center; font-size: 7px; line-height: 1.45; }
 
 /* App shell */
@@ -197,6 +180,8 @@
 .sidebar-user > div:not(.avatar) { min-width: 0; display: flex; flex-direction: column; flex: 1; }
 .sidebar-user strong { color: white; font-size: 10px; }
 .sidebar-user span { margin-top: 2px; color: rgba(255,255,255,.5); font-size: 9px; }
+.sidebar-signout { color: rgba(255,255,255,.55); border: 0; background: none; font-size: 9px; font-weight: 700; }
+.sidebar-signout:hover { color: white; }
 .app-header { height: 66px; padding: 0 32px; position: sticky; top: 0; z-index: 35; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,.97); border-bottom: 1px solid var(--line); }
 .global-search { width: 340px; height: 37px; padding: 0 10px; display: flex; align-items: center; gap: 8px; color: #928b87; border: 1px solid #e3dedb; border-radius: 8px; background: #faf9f8; }
 .global-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; font-size: 11px; }
@@ -877,9 +862,6 @@
   .dispatch-columns { grid-template-columns: 1fr 1fr; }
   .login-page { grid-template-columns: 330px 1fr; }
   .login-main { padding-left: 35px; padding-right: 35px; }
-  .demo-account-grid { grid-template-columns: repeat(3, 1fr); }
-  .selected-demo-account { grid-template-columns: 1fr; }
-  .selected-demo-account dl { padding: 10px 0; border-left: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 }
 
 @media (max-width: 820px) {
@@ -1032,8 +1014,6 @@
   .login-visual-content .login-quote { font-size: 27px; }
   .login-main { padding: 30px 18px 45px; }
   .login-title { font-size: 35px; }
-  .demo-account-grid { grid-template-columns: repeat(2, 1fr); }
-  .demo-account-grid > button:last-child { grid-column: 1/-1; }
   .auth-mode-tabs { grid-template-columns: 1fr; }
   .booking-status-editor { align-items: stretch; flex-direction: column; }
   .customer-admin-row { grid-template-columns: 1.4fr .7fr 15px; }
