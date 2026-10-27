@@ -52,7 +52,6 @@ function AppContent() {
       if (profile.role === "admin") {
         return (
           <AppShell
-            onPublic={() => setView("public")}
             profile={profile}
             onSignOut={handleSignOut}
           />

@@ -1,33 +1,31 @@
-import { Avatar, Brand, Icon } from "@event-management/ui"
+import type { ReactNode } from "react"
+import { Brand, Icon } from "@event-management/ui"
 
 import { adminNav } from "./data"
-import { initialsFromName } from "../../lib/name"
 import type { NavKey } from "./types"
 
 export function Sidebar({
-  name,
   active,
   onNavigate,
   collapsed,
   onClose,
-  onSignOut,
+  accountMenu,
 }: {
-  name: string
   active: NavKey
   onNavigate: (key: NavKey) => void
   collapsed: boolean
   onClose: () => void
-  onSignOut: () => void
+  accountMenu: ReactNode
 }) {
   const iconFor: Record<NavKey, string> = {
     Overview: "grid",
     Bookings: "clipboard",
     Customers: "users",
+    Staffs: "users",
     Calendar: "calendar",
     Packages: "box",
     Inventory: "box",
     Operations: "clipboard",
-    Team: "users",
     Reports: "chart",
     Administration: "settings",
   }
@@ -35,7 +33,7 @@ export function Sidebar({
     <aside className={`sidebar ${collapsed ? "" : "sidebar-open"}`}>
       <div className="sidebar-top">
         <Brand light />
-        <button className="sidebar-close" onClick={onClose}>
+        <button className="sidebar-close" onClick={onClose} aria-label="Close sidebar">
           <Icon name="close" />
         </button>
       </div>
@@ -56,22 +54,7 @@ export function Sidebar({
           </button>
         ))}
       </nav>
-      <div className="side-help">
-        <div className="help-icon">?</div>
-        <strong>Need help?</strong>
-        <span>View the team guide or contact support.</span>
-        <button>Open help center</button>
-      </div>
-      <div className="sidebar-user">
-        <Avatar initials={initialsFromName(name)} />
-        <div>
-          <strong>{name}</strong>
-          <span>Owner</span>
-        </div>
-        <button className="sidebar-signout" onClick={onSignOut}>
-          Sign out
-        </button>
-      </div>
+      <div className="sidebar-user">{accountMenu}</div>
     </aside>
   )
 }

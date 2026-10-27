@@ -89,7 +89,7 @@ On page load, the frontend restores the account from `GET /v1/me`, independently
 
 ### Connecting sign-in methods
 
-Customers can open **Profile → Sign-in methods**; admins use **Administration**.
+Customers and admins open the user icon or user section and choose **Account settings → Sign-in methods**. The customer profile and sign-in methods live in Account settings, rather than a primary navigation tab. Account names and email addresses are currently shown read-only; profile editing is not connected to the API.
 
 - A local account can connect Google or an existing Firebase email account by providing its current local password and signing in to Firebase. The Firebase email must be verified and the sign-in must be within the last five minutes.
 - A Firebase account can add a local password by freshly signing in with its already connected Firebase identity. Its verified Firebase email must match the account email. This adds a password; it cannot replace an existing password.

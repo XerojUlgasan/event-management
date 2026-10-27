@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Avatar,
-  Badge,
   Icon,
+  Panel,
   WorkspaceLayout,
 } from "@event-management/ui"
 
@@ -17,49 +17,114 @@ import { OperationsPage } from "./pages/OperationsPage"
 import { Overview } from "./pages/Overview"
 import { PackagesPage } from "./pages/PackagesPage"
 import { ReportsPage } from "./pages/ReportsPage"
+import { StaffsPage } from "./pages/StaffsPage"
 import { Sidebar } from "./Sidebar"
 import { SignInMethods } from "./SignInMethods"
 
+function AccountMenu({ name, sidebar = false, onSettings, onSignOut }: {
+  name: string
+  sidebar?: boolean
+  onSettings: () => void
+  onSignOut: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const container = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const dismiss = (event: PointerEvent) => {
+      if (!container.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false)
+        trigger.current?.focus()
+      }
+    }
+    document.addEventListener("pointerdown", dismiss)
+    document.addEventListener("keydown", escape)
+    return () => {
+      document.removeEventListener("pointerdown", dismiss)
+      document.removeEventListener("keydown", escape)
+    }
+  }, [open])
+
+  return (
+    <div className={`account-menu-wrap ${sidebar ? "account-menu-sidebar" : ""}`} ref={container}>
+      <button
+        type="button"
+        ref={trigger}
+        className="account-menu-trigger"
+        aria-label={`Account menu for ${name}`}
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <Avatar initials={initialsFromName(name)} />
+        {sidebar && <span>{name}</span>}
+      </button>
+      {open && (
+        <div className="account-menu">
+          <button type="button" onClick={() => { setOpen(false); onSettings() }}>Account settings</button>
+          <button type="button" onClick={() => { setOpen(false); onSignOut() }}>Sign out</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function AppShell({
-  onPublic,
   profile,
   onSignOut,
 }: {
-  onPublic: () => void
   profile: { displayName: string | null; email: string }
   onSignOut: () => void
 }) {
   const name = profile.displayName ?? profile.email
   const [active, setActive] = useState<NavKey>("Overview")
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [notifications, setNotifications] = useState(false)
 
   const body = useMemo(() => {
     if (active === "Overview")
       return <Overview firstName={firstName(name)} onNavigate={setActive} />
     if (active === "Bookings") return <BookingsPage />
     if (active === "Customers") return <CustomersPage />
+    if (active === "Staffs") return <StaffsPage />
     if (active === "Calendar") return <CalendarPage />
     if (active === "Packages")
       return <PackagesPage />
     if (active === "Inventory") return <InventoryPage />
     if (active === "Operations") return <OperationsPage />
     if (active === "Reports") return <ReportsPage />
-    if (active === "Administration") return <SignInMethods />
+    if (active === "Administration") return (
+      <section className="account-settings">
+        <h1 className="page-title">Account settings</h1>
+        <Panel className="account-summary">
+          <h2>Profile</h2>
+          <dl>
+            <div><dt>Name</dt><dd>{name}</dd></div>
+            <div><dt>Email address</dt><dd>{profile.email}</dd></div>
+          </dl>
+        </Panel>
+        <SignInMethods />
+      </section>
+    )
     return <GenericPage page={active} />
-  }, [active, name])
+  }, [active, name, profile.email])
 
   return (
     <WorkspaceLayout
       sidebar={
         <>
           <Sidebar
-            name={name}
             active={active}
             onNavigate={setActive}
             collapsed={!sidebarOpen}
             onClose={() => setSidebarOpen(false)}
-            onSignOut={onSignOut}
+            accountMenu={<AccountMenu name={name} sidebar onSettings={() => {
+              setActive("Administration")
+              setSidebarOpen(false)
+            }} onSignOut={onSignOut} />}
           />
           {sidebarOpen && (
             <button
@@ -74,68 +139,18 @@ export function AppShell({
         <header className="app-header">
           <button
             className="icon-button app-menu"
+            aria-label="Open sidebar"
             onClick={() => setSidebarOpen(true)}
           >
             <Icon name="menu" />
           </button>
-          <div className="global-search">
-            <Icon name="search" />
-            <input placeholder="Search events, customers, or bookings" />
-            <span>⌘ K</span>
-          </div>
           <div className="app-header-actions">
-            <button className="back-site" onClick={onPublic}>
-              Customer site
-            </button>
-            <Badge tone="cream">Owner workspace</Badge>
-            <button
-              className="notification-button"
-              onClick={() => setNotifications(!notifications)}
-            >
-              <Icon name="bell" />
-              <b>3</b>
-            </button>
-            <Avatar initials={initialsFromName(name)} />
-            <button className="back-site" onClick={onSignOut}>
-              Sign out
-            </button>
+            <AccountMenu name={name} onSettings={() => setActive("Administration")} onSignOut={onSignOut} />
           </div>
-          {notifications && (
-            <div className="notification-popover">
-              <div className="panel-head">
-                <div className="panel-title">Notifications</div>
-                <button>Mark all read</button>
-              </div>
-              <button>
-                <i></i>
-                <span>
-                  <strong>Quotation approved</strong>
-                  <small>Elena Mendoza approved quotation Q-2048.</small>
-                  <em>8 min ago</em>
-                </span>
-              </button>
-              <button>
-                <i></i>
-                <span>
-                  <strong>Schedule conflict</strong>
-                  <small>Two staff assignments overlap on June 24.</small>
-                  <em>34 min ago</em>
-                </span>
-              </button>
-              <button>
-                <span>
-                  <strong>Inventory returned</strong>
-                  <small>Garden Social equipment return completed.</small>
-                  <em>2 hr ago</em>
-                </span>
-              </button>
-              <a>View notification center</a>
-            </div>
-          )}
         </header>
       }
     >
-      {active !== "Packages" && <p role="note">This screen uses sample data.</p>}
+      {active !== "Packages" && active !== "Administration" && <p className="demo-note" role="note">Demo preview · Changes on this screen are not submitted.</p>}
       {body}
     </WorkspaceLayout>
   )

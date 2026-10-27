@@ -42,15 +42,6 @@ export function GenericPage({ page }: { page: NavKey }) {
         ["Low stock", "7", "3 require action"],
       ],
     },
-    Team: {
-      intro:
-        "Manage staff availability, skills, assignments, and recorded performance.",
-      cards: [
-        ["Active staff", "48", "42 available this week"],
-        ["Assigned this week", "36", "Across 12 events"],
-        ["Open shifts", "5", "2 need urgent cover"],
-      ],
-    },
     Reports: {
       intro:
         "Understand bookings, event performance, resources, feedback, and team delivery.",

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   Badge,
   Brand,
@@ -221,8 +221,40 @@ export function CustomerDashboard({
   onSignOut: () => void
 }) {
   const [tab, setTab] = useState<CustomerTab>("Home")
-  const [notifications, setNotifications] = useState(false)
   const [messageOpen, setMessageOpen] = useState(false)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  const accountMenuRef = useRef<HTMLDivElement>(null)
+  const accountTriggerRef = useRef<HTMLButtonElement>(null)
+  const [conversation, setConversation] = useState<"manager" | "assistant">("manager")
+  const [conversationOpen, setConversationOpen] = useState(false)
+  const [messageDraft, setMessageDraft] = useState("")
+  const [messages, setMessages] = useState<Record<"manager" | "assistant", { text: string; mine: boolean }[]>>({
+    manager: [
+      { text: "Hi Elena, everything is on track. Your tasting is confirmed for Thursday at 3:30 PM at our studio.", mine: false },
+      { text: "Wonderful, thank you. Can we review the vegetarian options during the tasting?", mine: true },
+      { text: "Absolutely. I’ve added that to your tasting notes and asked the chef to prepare three options.", mine: false },
+    ],
+    assistant: [{ text: "Your package recommendation has been saved.", mine: false }],
+  })
+
+  useEffect(() => {
+    if (!accountMenuOpen) return
+    const closeOnOutside = (event: MouseEvent) => {
+      if (!accountMenuRef.current?.contains(event.target as Node)) setAccountMenuOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setAccountMenuOpen(false)
+        accountTriggerRef.current?.focus()
+      }
+    }
+    document.addEventListener("mousedown", closeOnOutside)
+    document.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutside)
+      document.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [accountMenuOpen])
   const [requestPackage, setRequestPackage] = useState<string | null>(null)
   const [editingRequest, setEditingRequest] = useState<number | null>(null)
   const [quoteBookingId, setQuoteBookingId] = useState<number | null>(null)
@@ -264,11 +296,7 @@ export function CustomerDashboard({
       quote: anniversaryQuote,
     },
   ])
-  const [profile, setProfile] = useState({
-    name: userName,
-    email: userEmail,
-    phone: "+1 555 014 2830",
-  })
+
 
   const paymentDueBooking = customerBookings.find(
     (booking) => booking.status === "Awaiting payment" && booking.quote,
@@ -326,7 +354,6 @@ export function CustomerDashboard({
     { label: "My events", icon: "calendar" },
     { label: "Packages", icon: "box" },
     { label: "Messages", icon: "users" },
-    { label: "Profile", icon: "settings" },
   ]
 
   return (
@@ -344,62 +371,38 @@ export function CustomerDashboard({
             >
               <Icon name={item.icon} size={16} />
               {item.label}
-              {item.label === "Messages" && <b>2</b>}
             </button>
           ))}
         </nav>
         <div className="customer-header-actions">
-          <button className="team-portal-link" onClick={onSignOut}>
-            Sign out
-          </button>
-          <button
-            className="notification-button"
-            onClick={() => setNotifications(!notifications)}
-            aria-label="Open notifications"
-          >
-            <Icon name="bell" />
-            <b>2</b>
-          </button>
-          <div className="customer-profile">
-            <span className="avatar">{initialsFromName(profile.name)}</span>
-            <span>
-              <strong>{profile.name}</strong>
-              <small>Customer</small>
-            </span>
-            <Icon name="chevron" size={14} />
+          <div className="customer-account-menu" ref={accountMenuRef}>
+            <button
+              type="button"
+              ref={accountTriggerRef}
+              className="customer-profile account-menu-trigger"
+              aria-label={`Account menu for ${userName}`}
+              aria-expanded={accountMenuOpen}
+              aria-controls="customer-account-menu"
+              onClick={() => setAccountMenuOpen((open) => !open)}
+            >
+              <span className="avatar">{initialsFromName(userName)}</span>
+              <span><strong>{userName}</strong><small>Customer</small></span>
+              <Icon name="chevron" size={14} />
+            </button>
+            {accountMenuOpen && (
+              <div className="account-menu" id="customer-account-menu">
+                <button type="button" onClick={() => { setTab("Profile"); setAccountMenuOpen(false) }}>
+                  Account settings
+                </button>
+                <button type="button" onClick={onSignOut}>Sign out</button>
+              </div>
+            )}
           </div>
         </div>
-        {notifications && (
-          <div className="notification-popover customer-notifications">
-            <div className="panel-head">
-              <div className="panel-title">Notifications</div>
-              <button>Mark all read</button>
-            </div>
-            <button>
-              <i></i>
-              <span>
-                <strong>Your booking is confirmed</strong>
-                <small>
-                  The Mendoza–Reyes Wedding is now confirmed for June 22.
-                </small>
-                <em>12 min ago</em>
-              </span>
-            </button>
-            <button>
-              <i></i>
-              <span>
-                <strong>New message from Amina</strong>
-                <small>Your tasting appointment details are ready.</small>
-                <em>1 hr ago</em>
-              </span>
-            </button>
-            <a>View all notifications</a>
-          </div>
-        )}
       </header>
 
       <main className="customer-main">
-        {tab !== "Packages" && <p role="note">This screen uses sample data. Requests, quotes, and payments shown here are not submitted.</p>}
+        {tab !== "Packages" && tab !== "Messages" && tab !== "Profile" && <p className="demo-note" role="note">Demo preview · Requests, quotes, and payments are not submitted.</p>}
         {tab === "Home" && (
           <div className="customer-content">
             <section className="customer-welcome">
@@ -756,76 +759,60 @@ export function CustomerDashboard({
 
         {tab === "Profile" && (
           <div className="customer-content">
-            <PageHeader
-              title="Account information"
-              description="Manage the basic contact details used for your bookings."
-            />
-            <Panel className="customer-profile-form">
-              <div className="manager-profile">
-                <span className="manager-avatar">EM</span>
-                <span>
-                  <strong>{profile.name}</strong>
-                  <small>Customer account</small>
-                </span>
+            <div className="page-head">
+              <div>
+                <h1 className="page-title">Account settings</h1>
+                <p>View your account and manage sign-in methods.</p>
               </div>
-              <div className="form-grid">
-                <FormField className="full" label="Full name"><input value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} /></FormField>
-                <FormField label="Email address"><input type="email" value={profile.email} onChange={(event) => setProfile({ ...profile, email: event.target.value })} /></FormField>
-                <FormField label="Phone number"><input value={profile.phone} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} /></FormField>
-              </div>
-              <div className="form-actions">
-                <Button onClick={() => setTab("Home")}>Save account details</Button>
-                <Button variant="secondary" onClick={onSignOut}>Sign out</Button>
-              </div>
+            </div>
+            <Panel className="account-summary">
+              <h2>Profile</h2>
+              <dl>
+                <div><dt>Name</dt><dd>{userName}</dd></div>
+                <div><dt>Email address</dt><dd>{userEmail}</dd></div>
+              </dl>
             </Panel>
             <SignInMethods />
           </div>
         )}
 
         {tab === "Messages" && (
-          <div className="customer-content">
-            <PageHeader
-              title="Messages"
-              description="Your conversations with the Clemora catering team."
-            />
-            <div className="customer-messages panel">
+          <div className="customer-messages-view">
+            <div className={`customer-messages panel ${conversationOpen ? "conversation-open" : ""}`}>
               <aside>
-                <button className="active">
+                <h1>Messages</h1>
+                <button type="button" className={conversation === "manager" ? "active" : ""} aria-pressed={conversation === "manager"} onClick={() => { setConversation("manager"); setConversationOpen(true) }}>
                   <span className="manager-avatar small">AS</span>
-                  <span><strong>Amina Santos</strong><small>Your tasting appointment details...</small></span>
-                  <em>10:32</em>
+                  <span><strong>Amina Santos</strong><small>Your tasting appointment details</small></span>
                 </button>
-                <button>
+                <button type="button" className={conversation === "assistant" ? "active" : ""} aria-pressed={conversation === "assistant"} onClick={() => { setConversation("assistant"); setConversationOpen(true) }}>
                   <span className="ai-icon"><Icon name="spark" size={15} /></span>
                   <span><strong>Clemora assistant</strong><small>Package recommendation saved</small></span>
-                  <em>Jun 14</em>
                 </button>
               </aside>
               <section>
                 <div className="message-thread-head">
-                  <span className="manager-avatar small">AS</span>
-                  <span><strong>Amina Santos</strong><small>Online · Catering manager</small></span>
-                  <Badge tone="success">Human support</Badge>
+                  <button type="button" className="message-back" onClick={() => setConversationOpen(false)}>Back to conversations</button>
+                  {conversation === "manager" ? <span className="manager-avatar small">AS</span> : <span className="ai-icon"><Icon name="spark" size={15} /></span>}
+                  <span><strong>{conversation === "manager" ? "Amina Santos" : "Clemora assistant"}</strong><small>{conversation === "manager" ? "Catering manager" : "Assistant"}</small></span>
                 </div>
-                <div className="message-thread">
-                  <span className="chat-time">Today</span>
-                  <div className="message bot">
-                    Hi Elena, everything is on track. Your tasting is confirmed
-                    for Thursday at 3:30 PM at our studio.
-                  </div>
-                  <div className="message customer-message">
-                    Wonderful, thank you. Can we review the vegetarian options
-                    during the tasting?
-                  </div>
-                  <div className="message bot">
-                    Absolutely. I’ve added that to your tasting notes and asked
-                    the chef to prepare three options.
-                  </div>
+                <div className="message-thread" aria-live="polite">
+                  <span className="chat-time">Sample conversation</span>
+                  {messages[conversation].map((message, index) => (
+                    <div className={`message ${message.mine ? "customer-message" : "bot"}`} key={index}>{message.text}</div>
+                  ))}
                 </div>
-                <div className="thread-input">
-                  <input placeholder="Write a message to Amina..." />
-                  <Button icon="arrow">Send</Button>
-                </div>
+                <p className="message-demo-note">Demo only. Messages stay in this session and are not sent.</p>
+                <form className="thread-input" onSubmit={(event) => {
+                  event.preventDefault()
+                  const text = messageDraft.trim()
+                  if (!text) return
+                  setMessages((current) => ({ ...current, [conversation]: [...current[conversation], { text, mine: true }] }))
+                  setMessageDraft("")
+                }}>
+                  <input aria-label="Write a demo message" placeholder="Write a message..." value={messageDraft} onChange={(event) => setMessageDraft(event.target.value)} />
+                  <Button type="submit" icon="arrow" disabled={!messageDraft.trim()}>Send</Button>
+                </form>
               </section>
             </div>
           </div>
@@ -1071,14 +1058,14 @@ export function CustomerDashboard({
           className="compact-modal"
           eyebrow="Message your manager"
           title="How can Amina help?"
-          intro="Your event context and booking reference will be included."
+          intro="This is a demo. Your message will stay in this session and will not be sent."
           actions={
             <>
               <Button variant="secondary" onClick={() => setMessageOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={() => { setMessageOpen(false); setTab("Messages") }}>
-                Send message
+              <Button onClick={() => { setMessageOpen(false); setConversation("manager"); setConversationOpen(true); setTab("Messages") }}>
+                Open messages
               </Button>
             </>
           }
@@ -1086,7 +1073,9 @@ export function CustomerDashboard({
             <label className="message-compose">
               <span>Message</span>
               <textarea
-                defaultValue="Hi Amina, I have a question about our upcoming event."
+                value={messageDraft}
+                onChange={(event) => setMessageDraft(event.target.value)}
+                placeholder="Write a demo message"
                 autoFocus
               />
             </label>
