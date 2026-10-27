@@ -79,7 +79,7 @@ Docker Compose uses these values for PostgreSQL, and the API, Prisma, and type g
 
 ## Authentication
 
-New email/password accounts are created in PostgreSQL. Passwords are stored as salted Argon2id hashes (19 MiB memory, 2 iterations, 1 thread), never as readable passwords. New passwords must contain 15–128 characters. Google sign-in uses Firebase, and existing Firebase email/password accounts remain supported through **Use my existing Firebase email account** on the sign-in screen. New registrations always use the local account system.
+New email/password accounts are created in PostgreSQL. Passwords are stored as salted Argon2id hashes (19 MiB memory, 2 iterations, 1 thread), never as readable passwords. New passwords must contain 8–128 characters. Google sign-in uses Firebase, and existing Firebase email/password accounts remain supported through **Use my existing Firebase email account** on the sign-in screen. New registrations always use the local account system.
 
 All methods use the same `users` table and server-side `em_session` cookie. A user can have a local `password_hash`, a unique `firebase_uid`, or both. Public registration always creates a customer; roles come from the database. Existing Firebase profiles and their roles are preserved by the migration.
 
@@ -186,6 +186,18 @@ curl -b cookies.txt -X POST http://localhost:3000/v1/auth/logout
 ```
 
 The session cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` when `NODE_ENV=production`. The client can never set its own role.
+
+### Seed local accounts
+
+Run this after the database migrations:
+
+```sh
+pnpm db:seed
+```
+
+This creates one local admin (`admin1@gmail.com`) and five local customers (`user1@gmail.com` through `user5@gmail.com`). All use `p@ssword01`. Use the normal email/password sign-in option; Firebase configuration is not required.
+
+The command is repeatable: it resets these six demo accounts' names, roles, and passwords, preserves their user IDs and any Firebase connections, and invalidates their previous sessions. Other accounts are left untouched. This is development seed data.
 
 ### Auth verification
 

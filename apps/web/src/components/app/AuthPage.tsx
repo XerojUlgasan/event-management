@@ -39,8 +39,8 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
     clearError();
 
     if (mode === "register") {
-      if (password.length < 15) {
-        setFormError("Use a password with at least 15 characters.");
+      if (password.length < 8) {
+        setFormError("Use a password with at least 8 characters.");
         return;
       }
       if (password !== confirmPassword) {
@@ -183,11 +183,11 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
                     setFormError("");
                     clearError();
                   }}
-                  minLength={mode === "register" ? 15 : undefined}
+                  minLength={mode === "register" ? 8 : undefined}
                   maxLength={mode === "signin" && useFirebase ? 4096 : 128}
                   placeholder={
                     mode === "register"
-                      ? "At least 15 characters"
+                      ? "At least 8 characters"
                       : "Your password"
                   }
                   required

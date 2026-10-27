@@ -21,6 +21,7 @@
     "db:deploy": "pnpm --filter @event-management/api db:deploy",
     "db:generate": "pnpm --filter @event-management/api db:generate",
     "db:check": "pnpm --filter @event-management/api db:check",
+    "db:seed": "pnpm --filter @event-management/api db:seed",
     "db:seed-admin": "pnpm --filter @event-management/api db:seed-admin"
   },
   "devDependencies": {

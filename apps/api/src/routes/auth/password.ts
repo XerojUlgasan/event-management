@@ -9,7 +9,7 @@ import { errorSchema, profileSchema, toProfile } from "./profile.js";
 export const emailSchema = z.string().trim().toLowerCase().email().max(254);
 export const newPasswordSchema = z
   .string()
-  .min(15, "Use a password with at least 15 characters.")
+  .min(8, "Use a password with at least 8 characters.")
   .max(128);
 const credentialsSchema = z.object({
   email: emailSchema,

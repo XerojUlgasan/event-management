@@ -3,12 +3,15 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import type { Profile } from "../src/routes/auth/profile.js";
 
 const projectId = "demo-event-management";
 const database = `em_auth_test_${randomUUID().replaceAll("-", "")}`;
-const password = "a long local test password";
+const password = "testpass";
 const firebasePassword = "firebase-test-password";
 let app: typeof import("../src/app.js").app;
 let db: typeof import("../src/db/client.js").db;
@@ -153,7 +156,7 @@ function changeClaims(token: string, changes: Record<string, unknown>) {
   return `${header}.${Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(encoded, "base64url").toString()), ...changes })).toString("base64url")}.`;
 }
 
-test("local registration hashes passwords, normalizes email, ignores client roles and restores the session", async () => {
+test("eight-character passwords register, hash securely and restore the customer session", async () => {
   const response = await call("/auth/register", {
     email: "  LOCAL@example.com  ",
     password,
@@ -568,7 +571,7 @@ test("validation, origin checks, body size limits and throttling protect passwor
     (
       await call("/auth/register", {
         email: "short@example.com",
-        password: "short",
+        password: "seven77",
         displayName: "Test",
       })
     ).status,
@@ -643,4 +646,108 @@ test("OpenAPI describes both account methods and never exposes the password hash
     assert.ok(spec.paths[path], path);
   }
   assert.equal(JSON.stringify(spec).includes("password_hash"), false);
+});
+
+test("db:seed creates six usable accounts and resets them without duplicates or changes to unrelated users", async () => {
+  const unrelated = await register("unrelated-seed@example.com");
+  const original = await db
+    .selectFrom("users")
+    .selectAll()
+    .where("id", "=", unrelated.profile.id)
+    .executeTakeFirstOrThrow();
+  // Existing mixed-case addresses and Firebase connections must survive reseeding.
+  const existingAdmin = await db
+    .insertInto("users")
+    .values({
+      email: "ADMIN1@gmail.com",
+      firebase_uid: "seed-existing-firebase",
+      display_name: "Existing seed account",
+      role: "customer",
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  const runSeed = () =>
+    promisify(execFile)(
+      process.execPath,
+      ["--import", "tsx", "src/db/seed.ts"],
+      {
+        cwd: fileURLToPath(new URL("../", import.meta.url)),
+        env: {
+          ...process.env,
+          FIREBASE_PROJECT_ID: "",
+          FIREBASE_CLIENT_EMAIL: "",
+          FIREBASE_PRIVATE_KEY: "",
+          GOOGLE_APPLICATION_CREDENTIALS: "",
+          FIREBASE_AUTH_EMULATOR_HOST: "",
+        },
+      },
+    );
+  await runSeed();
+  const emails = [
+    "admin1@gmail.com",
+    ...Array.from({ length: 5 }, (_, index) => `user${index + 1}@gmail.com`),
+  ];
+  const seeded = await db
+    .selectFrom("users")
+    .selectAll()
+    .where("email", "in", emails)
+    .orderBy("email")
+    .execute();
+  assert.equal(seeded.length, 6);
+  const { verifyPassword } = await import("../src/lib/password.js");
+  for (const account of seeded) {
+    const expectedRole =
+      account.email === "admin1@gmail.com" ? "admin" : "customer";
+    assert.equal(account.role, expectedRole);
+    assert.match(account.password_hash!, /^\$argon2id\$/);
+    assert.ok(await verifyPassword(account.password_hash, "p@ssword01"));
+    const response = await call("/auth/login", {
+      email: account.email,
+      password: "p@ssword01",
+    });
+    const profile = await profileOf(response);
+    assert.equal(profile.id, account.id);
+    assert.equal(profile.role, expectedRole);
+  }
+  assert.equal(seeded[0].id, existingAdmin.id);
+  assert.equal(seeded[0].firebase_uid, "seed-existing-firebase");
+  const priorLogin = await call("/auth/login", {
+    email: "user1@gmail.com",
+    password: "p@ssword01",
+  });
+  await db
+    .updateTable("users")
+    .set({ role: "admin" })
+    .where("email", "=", "user1@gmail.com")
+    .execute();
+  await runSeed();
+  const reseeded = await db
+    .selectFrom("users")
+    .selectAll()
+    .where("email", "in", emails)
+    .orderBy("email")
+    .execute();
+  assert.equal(reseeded.length, 6);
+  assert.deepEqual(
+    reseeded.map((row) => row.id),
+    seeded.map((row) => row.id),
+  );
+  for (const account of reseeded) {
+    assert.equal(
+      account.role,
+      account.email === "admin1@gmail.com" ? "admin" : "customer",
+    );
+    assert.ok(await verifyPassword(account.password_hash, "p@ssword01"));
+  }
+  assert.equal(
+    (await call("/me", undefined, cookieOf(priorLogin))).status,
+    401,
+  );
+  const untouched = await db
+    .selectFrom("users")
+    .selectAll()
+    .where("id", "=", unrelated.profile.id)
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(untouched, original);
+  assert.equal((await call("/me", undefined, unrelated.cookie)).status, 200);
 });

@@ -99,11 +99,11 @@ export function SignInMethods() {
                     <input
                       type="password"
                       autoComplete="new-password"
-                      minLength={15}
+                      minLength={8}
                       maxLength={128}
                       value={newPassword}
                       onChange={(event) => setNewPassword(event.target.value)}
-                      placeholder="At least 15 characters"
+                      placeholder="At least 8 characters"
                       required
                     />
                   </FormField>
@@ -111,7 +111,7 @@ export function SignInMethods() {
                     <input
                       type="password"
                       autoComplete="new-password"
-                      minLength={15}
+                      minLength={8}
                       maxLength={128}
                       value={confirmPassword}
                       onChange={(event) =>
