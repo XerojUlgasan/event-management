@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Badge,
   Brand,
@@ -16,6 +16,14 @@ import { photos } from "../data"
 import { PackageCatalog } from "../PackageCatalog"
 import { initialsFromName } from "../../../lib/name"
 import { SignInMethods } from "../SignInMethods"
+import { MessagesWorkspace } from "../messages/MessagesWorkspace"
+import { mergeThread } from "../messages/thread"
+import {
+  getMyConversation,
+  sendMyMessage,
+  type ChatMessage,
+  type ChatThread,
+} from "../../../lib/api"
 
 type CustomerTab =
   | "Home"
@@ -225,17 +233,73 @@ export function CustomerDashboard({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement>(null)
   const accountTriggerRef = useRef<HTMLButtonElement>(null)
-  const [conversation, setConversation] = useState<"manager" | "assistant">("manager")
   const [conversationOpen, setConversationOpen] = useState(false)
   const [messageDraft, setMessageDraft] = useState("")
-  const [messages, setMessages] = useState<Record<"manager" | "assistant", { text: string; mine: boolean }[]>>({
-    manager: [
-      { text: "Hi Elena, everything is on track. Your tasting is confirmed for Thursday at 3:30 PM at our studio.", mine: false },
-      { text: "Wonderful, thank you. Can we review the vegetarian options during the tasting?", mine: true },
-      { text: "Absolutely. I’ve added that to your tasting notes and asked the chef to prepare three options.", mine: false },
-    ],
-    assistant: [{ text: "Your package recommendation has been saved.", mine: false }],
-  })
+  const [dialogSending, setDialogSending] = useState(false)
+  const [dialogError, setDialogError] = useState("")
+  const [messageThread, setMessageThread] = useState<ChatThread | null>(null)
+  const [messagesLoading, setMessagesLoading] = useState(false)
+  const [messagesError, setMessagesError] = useState("")
+
+  const refreshMessages = useCallback(async () => {
+    try {
+      const thread = await getMyConversation()
+      setMessageThread((current) => mergeThread(current, thread))
+      setMessagesError("")
+    } catch (cause) {
+      setMessagesError(cause instanceof Error ? cause.message : "Unable to load your messages.")
+    } finally {
+      setMessagesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (tab !== "Messages") return
+    setMessagesLoading(true)
+    void refreshMessages()
+    const timer = window.setInterval(() => void refreshMessages(), 5000)
+    return () => window.clearInterval(timer)
+  }, [tab, refreshMessages])
+
+  const appendMessage = (message: ChatMessage) => {
+    setMessageThread((current) =>
+      current
+        ? {
+            conversation: {
+              ...current.conversation,
+              lastMessage: message,
+              updatedAt: message.createdAt,
+            },
+            messages: [...current.messages, message],
+          }
+        : current,
+    )
+  }
+
+  const sendMessage = async (body: string) => {
+    const result = await sendMyMessage(body)
+    appendMessage(result.message)
+  }
+
+  const sendFromDialog = async () => {
+    const body = messageDraft.trim()
+    if (!body || dialogSending) return
+    setDialogSending(true)
+    setDialogError("")
+    try {
+      const result = await sendMyMessage(body)
+      appendMessage(result.message)
+      setMessageDraft("")
+      setMessageOpen(false)
+      setConversationOpen(true)
+      setTab("Messages")
+      notify("Message sent to the Clemora team.")
+    } catch (cause) {
+      setDialogError(cause instanceof Error ? cause.message : "Unable to send your message.")
+    } finally {
+      setDialogSending(false)
+    }
+  }
 
   useEffect(() => {
     if (!accountMenuOpen) return
@@ -778,43 +842,31 @@ export function CustomerDashboard({
 
         {tab === "Messages" && (
           <div className="customer-messages-view">
-            <div className={`customer-messages panel ${conversationOpen ? "conversation-open" : ""}`}>
-              <aside>
-                <h1>Messages</h1>
-                <button type="button" className={conversation === "manager" ? "active" : ""} aria-pressed={conversation === "manager"} onClick={() => { setConversation("manager"); setConversationOpen(true) }}>
-                  <span className="manager-avatar small">AS</span>
-                  <span><strong>Amina Santos</strong><small>Your tasting appointment details</small></span>
-                </button>
-                <button type="button" className={conversation === "assistant" ? "active" : ""} aria-pressed={conversation === "assistant"} onClick={() => { setConversation("assistant"); setConversationOpen(true) }}>
-                  <span className="ai-icon"><Icon name="spark" size={15} /></span>
-                  <span><strong>Clemora assistant</strong><small>Package recommendation saved</small></span>
-                </button>
-              </aside>
-              <section>
-                <div className="message-thread-head">
-                  <button type="button" className="message-back" onClick={() => setConversationOpen(false)}>Back to conversations</button>
-                  {conversation === "manager" ? <span className="manager-avatar small">AS</span> : <span className="ai-icon"><Icon name="spark" size={15} /></span>}
-                  <span><strong>{conversation === "manager" ? "Amina Santos" : "Clemora assistant"}</strong><small>{conversation === "manager" ? "Catering manager" : "Assistant"}</small></span>
-                </div>
-                <div className="message-thread" aria-live="polite">
-                  <span className="chat-time">Sample conversation</span>
-                  {messages[conversation].map((message, index) => (
-                    <div className={`message ${message.mine ? "customer-message" : "bot"}`} key={index}>{message.text}</div>
-                  ))}
-                </div>
-                <p className="message-demo-note">Demo only. Messages stay in this session and are not sent.</p>
-                <form className="thread-input" onSubmit={(event) => {
-                  event.preventDefault()
-                  const text = messageDraft.trim()
-                  if (!text) return
-                  setMessages((current) => ({ ...current, [conversation]: [...current[conversation], { text, mine: true }] }))
-                  setMessageDraft("")
-                }}>
-                  <input aria-label="Write a demo message" placeholder="Write a message..." value={messageDraft} onChange={(event) => setMessageDraft(event.target.value)} />
-                  <Button type="submit" icon="arrow" disabled={!messageDraft.trim()}>Send</Button>
-                </form>
-              </section>
-            </div>
+            <MessagesWorkspace
+              title="Messages"
+              viewerRole="customer"
+              conversations={messageThread ? [messageThread.conversation] : []}
+              activeId={messageThread?.conversation.id ?? null}
+              onSelect={() => setConversationOpen(true)}
+              messages={messageThread?.messages ?? []}
+              loading={messagesLoading}
+              error={messagesError}
+              onRetry={() => {
+                setMessagesLoading(true)
+                void refreshMessages()
+              }}
+              onSend={sendMessage}
+              onBack={() => setConversationOpen(false)}
+              conversationOpen={conversationOpen}
+              listEmpty={{
+                title: "No conversation yet",
+                body: "Send us a message and our team will reply here.",
+              }}
+              threadEmpty={{
+                title: "Say hello",
+                body: "Ask about your event, quotation, or anything else on your mind.",
+              }}
+            />
           </div>
         )}
       </main>
@@ -1056,16 +1108,16 @@ export function CustomerDashboard({
         <Dialog
           onClose={() => setMessageOpen(false)}
           className="compact-modal"
-          eyebrow="Message your manager"
-          title="How can Amina help?"
-          intro="This is a demo. Your message will stay in this session and will not be sent."
+          eyebrow="Message the Clemora team"
+          title="How can we help?"
+          intro="Send a message about your event, quotation, or booking. Our team will reply in Messages."
           actions={
             <>
-              <Button variant="secondary" onClick={() => setMessageOpen(false)}>
+              <Button variant="secondary" onClick={() => setMessageOpen(false)} disabled={dialogSending}>
                 Cancel
               </Button>
-              <Button onClick={() => { setMessageOpen(false); setConversation("manager"); setConversationOpen(true); setTab("Messages") }}>
-                Open messages
+              <Button onClick={sendFromDialog} disabled={!messageDraft.trim() || dialogSending}>
+                {dialogSending ? "Sending…" : "Send message"}
               </Button>
             </>
           }
@@ -1075,10 +1127,12 @@ export function CustomerDashboard({
               <textarea
                 value={messageDraft}
                 onChange={(event) => setMessageDraft(event.target.value)}
-                placeholder="Write a demo message"
+                placeholder="Write a message"
+                maxLength={4000}
                 autoFocus
               />
             </label>
+            {dialogError && <p className="messages-send-error" role="alert">{dialogError}</p>}
         </Dialog>
       )}
       {toast && <Toast>{toast}</Toast>}

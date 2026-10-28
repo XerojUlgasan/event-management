@@ -21,6 +21,7 @@ export function Sidebar({
     Overview: "grid",
     Bookings: "clipboard",
     Customers: "users",
+    Messages: "users",
     Staffs: "users",
     Calendar: "calendar",
     Packages: "box",

@@ -13,6 +13,7 @@ import { CalendarPage } from "./pages/CalendarPage"
 import { CustomersPage } from "./pages/CustomersPage"
 import { GenericPage } from "./pages/GenericPage"
 import { InventoryPage } from "./pages/InventoryPage"
+import { MessagesPage } from "./pages/MessagesPage"
 import { OperationsPage } from "./pages/OperationsPage"
 import { Overview } from "./pages/Overview"
 import { PackagesPage } from "./pages/PackagesPage"
@@ -89,6 +90,7 @@ export function AppShell({
       return <Overview firstName={firstName(name)} onNavigate={setActive} />
     if (active === "Bookings") return <BookingsPage />
     if (active === "Customers") return <CustomersPage />
+    if (active === "Messages") return <MessagesPage />
     if (active === "Staffs") return <StaffsPage />
     if (active === "Calendar") return <CalendarPage />
     if (active === "Packages")
@@ -150,7 +152,7 @@ export function AppShell({
         </header>
       }
     >
-      {active !== "Packages" && active !== "Administration" && <p className="demo-note" role="note">Demo preview · Changes on this screen are not submitted.</p>}
+      {active !== "Packages" && active !== "Administration" && active !== "Messages" && <p className="demo-note" role="note">Demo preview · Changes on this screen are not submitted.</p>}
       {body}
     </WorkspaceLayout>
   )

@@ -847,6 +847,24 @@
 .message-compose span { font-size: 10px; font-weight: 700; }
 .message-compose textarea { min-height: 130px; padding: 12px; border: 1px solid #ddd6d2; border-radius: 8px; outline: 0; resize: vertical; font-size: 11px; line-height: 1.55; }
 .message-compose textarea:focus { border-color: var(--wine); box-shadow: 0 0 0 3px rgba(121,13,22,.08); }
+.team-avatar { color: white; background: var(--wine); font-size: 8px; letter-spacing: .03em; }
+.messages-unread { min-width: 22px; height: 22px; padding: 0 6px; display: grid; place-items: center; flex: none; color: white; border-radius: 11px; background: var(--wine); font-size: 10px; font-weight: 700; }
+.messages-list-empty { padding: 24px 20px; color: var(--muted); }
+.messages-list-empty strong { display: block; color: var(--ink); font-size: 13px; }
+.messages-list-empty p { margin: 6px 0 0; font-size: 11px; line-height: 1.55; }
+.messages-list-empty .messages-retry { width: auto; min-height: 34px; margin-top: 12px; padding: 0 12px; display: inline-flex; color: var(--wine); border: 1px solid var(--line); border-bottom: 1px solid var(--line); border-radius: 7px; background: white; font-size: 11px; font-weight: 700; }
+.messages-empty { max-width: 340px; margin: auto; padding: 30px 20px; display: flex; align-self: center; flex-direction: column; align-items: center; gap: 8px; color: var(--muted); text-align: center; font-size: 12px; line-height: 1.6; }
+.messages-empty svg { color: var(--wine); }
+.messages-empty strong { color: var(--ink); font-family: var(--font-serif); font-size: 22px; line-height: 1.2; }
+.messages-empty p { margin: 0; }
+.messages-error { margin: 12px 24px 0; padding: 10px 12px; display: flex; align-items: center; gap: 10px; color: #9e3737; border: 1px solid #e5c2c2; border-radius: 8px; background: var(--red-soft); font-size: 12px; }
+.messages-error span { flex: 1; }
+.messages-error button { color: #9e3737; border: 0; background: none; font-size: 12px; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.messages-send-error { margin: 8px 24px 0; color: #9e3737; font-size: 12px; line-height: 1.5; }
+.message-meta { display: block; margin-top: 5px; color: #9b9490; text-align: right; font-size: 9px; }
+.customer-message .message-meta { color: rgba(255,255,255,.68); }
+.admin-messages { max-width: none; }
+.admin-messages .customer-messages { height: calc(100dvh - 147px); min-height: 460px; border: 1px solid var(--line); border-radius: 10px; }
 
 @media (max-width: 1100px) {
   .public-nav { display: none; position: absolute; left: 20px; right: 20px; top: 70px; padding: 20px; flex-direction: column; align-items: flex-start; background: white; border-radius: 12px; box-shadow: var(--shadow); }
@@ -899,6 +917,7 @@
   .customer-event-photo { min-height: 260px; }
   .customer-grid, .customer-grid.lower { grid-template-columns: 1fr; }
   .customer-messages { height: calc(100dvh - 115px); grid-template-columns: 250px minmax(0, 1fr); }
+  .admin-messages .customer-messages { height: calc(100dvh - 131px); }
   .calendar-side { grid-template-columns: 1fr; }
   .calendar-day { height: 92px; padding: 5px; }
   .calendar-event { padding: 0 3px; }
@@ -979,6 +998,7 @@
   .payment-method-grid { grid-template-columns: 1fr; }
   .payment-quote-head { flex-direction: column; }
   .customer-messages { height: calc(100dvh - 115px); min-height: 460px; grid-template-columns: 1fr; }
+  .admin-messages .customer-messages { height: calc(100dvh - 122px); min-height: 420px; }
   .account-summary dl { grid-template-columns: 1fr; }
   .customer-messages > section { display: none; }
   .customer-messages.conversation-open > aside { display: none; }
