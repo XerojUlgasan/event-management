@@ -67,7 +67,7 @@ The stored hash length should be 64 hexadecimal characters. No active rows means
 
 If inspecting the stored value is specifically relevant, select `s.token_hash` instead of its length. It remains a hash, not a usable login token. For a usable token, run `scripts/session.mjs` from the parent skill and use its temporary cookie-header file. There is no SQL query that reverses the hash.
 
-To correlate one known session token with its exact stored row, hash that cookie token with the same `hashSessionToken` implementation in `apps/api/src/lib/session.ts`, then bind the resulting SHA-256 hex string:
+To correlate one known session token with its exact stored row, hash that cookie token with the same `hashSessionToken` implementation in `apps/api/src/utils/session.ts`, then bind the resulting SHA-256 hex string:
 
 ```sql
 SELECT s.id AS session_id, u.email, u.role, s.created_at, s.expires_at

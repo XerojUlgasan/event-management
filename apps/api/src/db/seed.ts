@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { sql } from "kysely";
 import { db } from "./client.js";
-import { hashPassword } from "../lib/password.js";
+import { hashPassword } from "../utils/password.js";
 
 const accounts = [
   { email: "admin1@gmail.com", display_name: "Admin 1", role: "admin" },

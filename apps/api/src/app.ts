@@ -2,10 +2,10 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { db } from "./db/client.js";
-import authRoutes from "./routes/auth/index.js";
-import messageRoutes from "./routes/messages/index.js";
-import packageRoutes from "./routes/packages/index.js";
-import healthRoutes from "./routes/health/index.js";
+import authRoutes from "./controllers/auth/index.js";
+import messageRoutes from "./controllers/messages/index.js";
+import packageRoutes from "./controllers/packages/index.js";
+import healthRoutes from "./controllers/health/index.js";
 import type { HonoEnv } from "./types/hono.js";
 
 export const app = new OpenAPIHono<HonoEnv>();

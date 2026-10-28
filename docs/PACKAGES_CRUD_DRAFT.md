@@ -41,7 +41,7 @@ The API price value is `null` for an incomplete draft or `{ kind: "fixed", curre
 | `GET /v1/package-images/:id` | Public or admin | Serve a stored image. Unpublished uploads require admin access. |
 | `DELETE /v1/admin/package-images/:id` | Admin | Remove an upload only while no package version references it. |
 
-The API follows the repository's `@hono/zod-openapi` pattern in `apps/api/src/routes/packages/`. The request origin guard covers write methods, CORS allows `PATCH` and `DELETE`, and catalog writes have a body limit. Session cookie auth and the database role authorize admin routes; a Firebase ID token alone does not. Public queries exclude drafts and archived versions.
+The API follows the repository's `@hono/zod-openapi` pattern in `apps/api/src/controllers/packages/`. The request origin guard covers write methods, CORS allows `PATCH` and `DELETE`, and catalog writes have a body limit. Session cookie auth and the database role authorize admin routes; a Firebase ID token alone does not. Public queries exclude drafts and archived versions.
 
 ## Frontend integration
 

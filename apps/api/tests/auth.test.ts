@@ -7,7 +7,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
-import type { Profile } from "../src/routes/auth/profile.js";
+import type { Profile } from "../src/controllers/auth/profile.js";
 
 const projectId = "demo-event-management";
 const database = `em_auth_test_${randomUUID().replaceAll("-", "")}`;
@@ -16,7 +16,7 @@ const firebasePassword = "firebase-test-password";
 let app: typeof import("../src/app.js").app;
 let db: typeof import("../src/db/client.js").db;
 let firebase: ReturnType<
-  typeof import("../src/lib/firebase-admin.js").getFirebaseAuth
+  typeof import("../src/utils/firebase-admin.js").getFirebaseAuth
 >;
 let admin: Pool;
 let pool: Pool;
@@ -55,7 +55,7 @@ before(async () => {
   process.env.DB_NAME = database;
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
-  firebase = (await import("../src/lib/firebase-admin.js")).getFirebaseAuth();
+  firebase = (await import("../src/utils/firebase-admin.js")).getFirebaseAuth();
 });
 
 after(async () => {
@@ -694,7 +694,7 @@ test("db:seed creates six usable accounts and resets them without duplicates or 
     .orderBy("email")
     .execute();
   assert.equal(seeded.length, 6);
-  const { verifyPassword } = await import("../src/lib/password.js");
+  const { verifyPassword } = await import("../src/utils/password.js");
   for (const account of seeded) {
     const expectedRole =
       account.email === "admin1@gmail.com" ? "admin" : "customer";

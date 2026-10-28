@@ -1,12 +1,12 @@
 import { getCookie } from "hono/cookie";
 import { createMiddleware } from "hono/factory";
 import type { HonoEnv } from "../types/hono.js";
-import { getFirebaseAuth } from "../lib/firebase-admin.js";
+import { getFirebaseAuth } from "../utils/firebase-admin.js";
 import {
   clearSessionCookie,
-  hashSessionToken,
   SESSION_COOKIE,
-} from "../lib/session.js";
+} from "../utils/session.js";
+import { resolveSessionService } from "../services/auth/resolve-session.js";
 
 export const requireFirebaseAuth = createMiddleware<HonoEnv>(async (c, next) => {
   const token = c.req.header("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
@@ -48,41 +48,23 @@ export const requireSession = createMiddleware<HonoEnv>(async (c, next) => {
     return c.json({ error: "Not signed in" }, 401);
   }
 
-  const db = c.get("db");
-  const session = await db
-    .selectFrom("sessions")
-    .selectAll()
-    .where("token_hash", "=", hashSessionToken(token))
-    .executeTakeFirst();
-
-  if (!session) {
+  const result = await resolveSessionService(c.get("db"), token);
+  if (result.kind === "not-found") {
     clearSessionCookie(c);
     return c.json({ error: "Session not found" }, 401);
   }
 
-  if (session.expires_at.getTime() <= Date.now()) {
-    await db.deleteFrom("sessions").where("id", "=", session.id).execute();
+  if (result.kind === "expired") {
     clearSessionCookie(c);
     return c.json({ error: "Session expired" }, 401);
   }
 
-  const user = await db
-    .selectFrom("users")
-    .selectAll()
-    .where("id", "=", session.user_id)
-    .executeTakeFirst();
-
-  if (!user) {
-    await db.deleteFrom("sessions").where("id", "=", session.id).execute();
+  if (result.kind === "user-not-found") {
     clearSessionCookie(c);
     return c.json({ error: "Session user not found" }, 401);
   }
 
-  c.set("session", {
-    sessionId: session.id,
-    expiresAt: session.expires_at,
-    user,
-  });
+  c.set("session", result.session);
 
   await next();
 });

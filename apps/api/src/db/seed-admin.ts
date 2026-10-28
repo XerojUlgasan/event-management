@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { db } from "./client.js";
-import { getFirebaseAuth } from "../lib/firebase-admin.js";
+import { getFirebaseAuth } from "../utils/firebase-admin.js";
 
 const email = process.argv[2] ?? process.env.ADMIN_EMAIL;
 

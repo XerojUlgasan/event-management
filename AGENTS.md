@@ -13,6 +13,12 @@ This is the Clemora event-management pnpm workspace. Inspect the files involved 
 
 For a change crossing areas, read every applicable skill and its listed references. The files under `context-factory/` are repository guidance; inspect current code as the authority if guidance has drifted, then update the guidance in the same task.
 
+## API file layout
+
+Keep API code in the top-level `apps/api/src/controllers/`, `services/`, `data/`, and `utils/` folders, grouped by domain (`auth/`, `packages/`, `messages/`, or a new domain). Put HTTP route definitions and handlers in `controllers/<domain>/`, business operations in `services/<domain>/`, and Kysely queries in `data/<domain>/`. Keep reusable helpers in `utils/`; shared middleware and database setup remain in `middleware/` and `db/`.
+
+Register each domain's routes in `controllers/<domain>/index.ts`; `src/app.ts` mounts the domain groups under `/v1`. Name operation files in kebab-case by verb and entity, such as `create-package.ts`, and export `createPackageRoute` and `createPackageRouteHandler` from the controller, `createPackageService` from the service, and `createPackageData` from data where those layers are needed. Use camelCase for functions, variables, and Zod schemas; PascalCase for types and classes; and snake_case for database tables and columns. Preserve existing JSON field names and route contracts during structural refactors. Follow the [API structure reference](context-factory/api/reference/structure-and-routes.md) for the full pattern.
+
 ## Workspace facts
 
 - Use `pnpm`; workspace membership is declared in `pnpm-workspace.yaml`, and runnable commands are in each `package.json`.

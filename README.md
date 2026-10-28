@@ -276,6 +276,6 @@ Reload the app after changing a role; the client caches the profile until the ne
 
 ## API routes and shared UI
 
-For a new API feature, define a Zod schema and `createRoute` with its typed handler in `apps/api/src/routes/<feature>/`, assemble routes with `OpenAPIHono`, and mount them in `apps/api/src/app.ts`. The health route is the working example.
+For a new API feature, define a Zod schema and `createRoute` with its typed handler in a verb–entity file under `apps/api/src/controllers/<domain>/`. Register the route in that domain's `index.ts` and mount it in `apps/api/src/app.ts`. Put business rules and transaction orchestration in `apps/api/src/services/<domain>/` and focused Kysely queries in `apps/api/src/data/<domain>/`. Shared helpers live in `apps/api/src/utils/`. Files use kebab-case and exported operations use `Route`, `RouteHandler`, `Service`, or `Data` suffixes. Existing API JSON field names remain unchanged.
 
 Theme tokens live in `packages/theme/src/theme.css`. Reusable React components and their styles live in `packages/ui`; the shared library includes the wordmark, buttons, badges, icons, stat cards, links, navigation, section counter, and inclusion strip. The migrated workspace composes those primitives, while its page layouts and the procedural 3D event models live in `apps/web/src`. The landing at `/landing` remains informational: inquiry, quote, booking, and add-on selection flows are later work.

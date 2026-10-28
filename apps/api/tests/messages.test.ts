@@ -4,7 +4,7 @@ import { after, before, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { hashSessionToken } from "../src/lib/session.js";
+import { hashSessionToken } from "../src/utils/session.js";
 
 const database = `em_messages_test_${randomUUID().replaceAll("-", "")}`;
 let app: typeof import("../src/app.js").app;
