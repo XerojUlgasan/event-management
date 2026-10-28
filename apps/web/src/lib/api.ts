@@ -136,6 +136,10 @@ export type Booking = {
   status: BookingStatus;
   eventName: string;
   eventDate: string;
+  eventStartTime: string;
+  eventEndTime: string;
+  eventType: string;
+  venueName: string;
   guestCount: number;
   specialNotes: string | null;
   coordinator: string;
@@ -148,6 +152,7 @@ export type Booking = {
   paidAt: string | null;
   createdAt: string;
   updatedAt: string;
+  services: BookingService[];
 };
 
 export const listBookings = (filters?: { status?: string; customerId?: string }) =>
@@ -162,10 +167,20 @@ export const createBooking = (data: {
   customerId: string;
   eventName: string;
   eventDate: string;
+  eventStartTime: string;
+  eventEndTime: string;
+  eventType: string;
+  venueName: string;
   guestCount: number;
   specialNotes?: string;
   coordinator?: string;
   packageId?: string;
+  services?: {
+    category: string;
+    supplierId: string | null;
+    assignmentStatus?: "pending" | "confirmed" | "cancelled";
+    notes?: string;
+  }[];
 }) => request<Booking>("/admin/bookings", data);
 
 export const updateBooking = (
@@ -173,12 +188,22 @@ export const updateBooking = (
   data: {
     eventName?: string;
     eventDate?: string;
+    eventStartTime?: string;
+    eventEndTime?: string;
+    eventType?: string;
+    venueName?: string;
     guestCount?: number;
     specialNotes?: string | null;
     coordinator?: string;
     packageId?: string | null;
     totalPriceMinor?: number;
     reservationFeeMinor?: number;
+    services?: {
+      category: string;
+      supplierId: string | null;
+      assignmentStatus?: "pending" | "confirmed" | "cancelled";
+      notes?: string;
+    }[];
   },
 ) =>
   request<Booking>(
@@ -206,3 +231,60 @@ export const deleteBooking = (id: string) =>
     undefined,
     "DELETE",
   );
+
+// ── Supplier types & API ─────────────────────────────────────────────────────
+
+export type Supplier = {
+  id: string;
+  name: string;
+  category: string;
+  contactNumber: string | null;
+  email: string | null;
+  notes: string | null;
+  isInternal: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SupplierAvailability = {
+  available: boolean;
+  conflictingBookings: {
+    bookingId: string;
+    eventName: string;
+    eventDate: string;
+    eventStartTime: string;
+    eventEndTime: string;
+  }[];
+};
+
+export const listSuppliers = (filters?: { category?: string; search?: string }) =>
+  request<{ suppliers: Supplier[] }>(
+    `/admin/suppliers${filters ? `?${new URLSearchParams(filters as Record<string, string>).toString()}` : ""}`,
+  );
+
+export const getSupplier = (id: string) =>
+  request<Supplier>(`/admin/suppliers/${encodeURIComponent(id)}`);
+
+export const getSupplierAvailability = (
+  id: string,
+  date: string,
+  startTime: string,
+  endTime: string,
+) =>
+  request<SupplierAvailability>(
+    `/admin/suppliers/${encodeURIComponent(id)}/availability?${new URLSearchParams({ date, startTime, endTime }).toString()}`,
+  );
+
+// ── Booking service types ────────────────────────────────────────────────────
+
+export type BookingService = {
+  id: string;
+  bookingId: string;
+  category: string;
+  supplierId: string | null;
+  supplierName: string | null;
+  assignmentStatus: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};

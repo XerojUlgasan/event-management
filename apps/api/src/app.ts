@@ -4,7 +4,9 @@ import { bodyLimit } from "hono/body-limit";
 import { db } from "./db/client.js";
 import authRoutes from "./routes/auth/index.js";
 import bookingRoutes from "./routes/bookings/index.js";
+import customerRoutes from "./routes/customers/index.js";
 import packageRoutes from "./routes/packages/index.js";
+import supplierRoutes from "./routes/suppliers/index.js";
 import healthRoutes from "./routes/health/index.js";
 import type { HonoEnv } from "./types/hono.js";
 
@@ -41,10 +43,14 @@ app.use("/v1/auth/*", bodyLimit({ maxSize: 16 * 1024 }));
 app.use("/v1/admin/packages/*", bodyLimit({ maxSize: 64 * 1024 }));
 app.use("/v1/admin/packages", bodyLimit({ maxSize: 64 * 1024 }));
 app.use("/v1/admin/package-images", bodyLimit({ maxSize: 5 * 1024 * 1024 + 64 * 1024 }));
+app.use("/v1/admin/suppliers/*", bodyLimit({ maxSize: 16 * 1024 }));
+app.use("/v1/admin/suppliers", bodyLimit({ maxSize: 16 * 1024 }));
 
 app.route("/v1", healthRoutes);
 app.route("/v1", packageRoutes);
+app.route("/v1", customerRoutes);
 app.route("/v1", bookingRoutes);
+app.route("/v1", supplierRoutes);
 app.route("/v1", authRoutes);
 
 app.doc("/openapi.json", {

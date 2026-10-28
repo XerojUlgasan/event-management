@@ -16,9 +16,12 @@ import {
   getBookingRow,
   isDateConflict,
   listBookingRows,
+  listServicesForBooking,
+  listServicesForBookings,
   lockBookingRow,
   userFromJoin,
   validateTransition,
+  checkServiceConflict,
 } from "./store.js";
 
 const routes = new OpenAPIHono<HonoEnv>({
@@ -58,7 +61,11 @@ const listRoute = createRoute({
 routes.openapi(listRoute, async (c) => {
   const { status, customerId } = c.req.valid("query");
   const rows = await listBookingRows(c.get("db"), { status, customerId });
-  const bookings = rows.map(row => bookingDto(row, userFromJoin(row)));
+  const bookingIds = rows.map((r) => r.id);
+  const servicesMap = await listServicesForBookings(c.get("db"), bookingIds);
+  const bookings = rows.map((row) =>
+    bookingDto(row, userFromJoin(row), servicesMap.get(row.id) ?? []),
+  );
   return c.json({ bookings }, 200);
 });
 
@@ -95,22 +102,64 @@ routes.openapi(createRoute_, async (c) => {
     return c.json({ error: "A confirmed or in-preparation booking already exists for that date" }, 409);
   }
 
-  const row = await db
-    .insertInto("bookings")
-    .values({
-      id:           randomUUID(),
-      customer_id:  data.customerId,
-      event_name:   data.eventName,
-      event_date:   eventDate,
-      guest_count:  data.guestCount,
-      special_notes: data.specialNotes ?? null,
-      coordinator:  data.coordinator ?? "Unassigned",
-      package_id:   data.packageId ?? null,
-    })
-    .returningAll()
-    .executeTakeFirstOrThrow();
+  // Check service conflicts
+  if (data.services) {
+    for (const service of data.services) {
+      const conflict = await checkServiceConflict(
+        db,
+        service.supplierId,
+        service.assignmentStatus ?? "pending",
+        eventDate,
+        data.eventStartTime,
+        data.eventEndTime,
+      );
+      if (conflict) return c.json({ error: conflict }, 409);
+    }
+  }
 
-  return c.json(bookingDto(row, customer), 201);
+  const outcome = await db.transaction().execute(async (trx) => {
+    const bookingId = randomUUID();
+    const row = await trx
+      .insertInto("bookings")
+      .values({
+        id: bookingId,
+        customer_id: data.customerId,
+        event_name: data.eventName,
+        event_date: eventDate,
+        event_start_time: data.eventStartTime,
+        event_end_time: data.eventEndTime,
+        event_type: data.eventType,
+        venue_name: data.venueName,
+        guest_count: data.guestCount,
+        special_notes: data.specialNotes ?? null,
+        coordinator: data.coordinator ?? "Unassigned",
+        package_id: data.packageId ?? null,
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+
+    // Insert services
+    if (data.services && data.services.length > 0) {
+      await trx
+        .insertInto("booking_services")
+        .values(
+          data.services.map((s) => ({
+            id: randomUUID(),
+            booking_id: bookingId,
+            category: s.category,
+            supplier_id: s.supplierId,
+            assignment_status: s.assignmentStatus ?? "pending",
+            notes: s.notes ?? null,
+          })),
+        )
+        .execute();
+    }
+
+    const services = await listServicesForBooking(trx, bookingId);
+    return bookingDto(row, customer, services);
+  });
+
+  return c.json(outcome, 201);
 });
 
 // ── GET /admin/bookings/:id ──────────────────────────────────────────────────
@@ -128,7 +177,8 @@ const getRoute = createRoute({
 routes.openapi(getRoute, async (c) => {
   const row = await getBookingRow(c.get("db"), c.req.valid("param").id);
   if (!row) return c.json({ error: "Booking not found" }, 404);
-  return c.json(bookingDto(row, userFromJoin(row)), 200);
+  const services = await listServicesForBooking(c.get("db"), row.id);
+  return c.json(bookingDto(row, userFromJoin(row), services), 200);
 });
 
 // ── PATCH /admin/bookings/:id ────────────────────────────────────────────────
@@ -154,33 +204,89 @@ routes.openapi(updateRoute, async (c) => {
       return routeError("Cannot edit a completed or cancelled booking", 409);
     }
 
+    // Determine effective date/times for conflict checks
+    const effectiveDate = data.eventDate ? new Date(data.eventDate) : booking.event_date;
+    const effectiveStart = data.eventStartTime ?? booking.event_start_time;
+    const effectiveEnd = data.eventEndTime ?? booking.event_end_time;
+
     // If changing date, check for conflicts
     if (data.eventDate) {
-      const eventDate = new Date(data.eventDate);
-      if (eventDate <= new Date()) return routeError("Event date must be in the future", 400);
-      if (await isDateConflict(trx, eventDate, booking.id)) {
+      if (effectiveDate <= new Date()) return routeError("Event date must be in the future", 400);
+      if (await isDateConflict(trx, effectiveDate, booking.id)) {
         return routeError("A confirmed or in-preparation booking already exists for that date", 409);
       }
     }
 
+    // Check service conflicts for confirmed services
+    if (data.services) {
+      for (const service of data.services) {
+        const conflict = await checkServiceConflict(
+          trx,
+          service.supplierId,
+          service.assignmentStatus ?? "pending",
+          effectiveDate,
+          effectiveStart,
+          effectiveEnd,
+          booking.id,
+        );
+        if (conflict) return routeError(conflict, 409);
+      }
+    }
+
     const updates: Record<string, unknown> = {};
-    if (data.eventName    !== undefined) updates.event_name    = data.eventName;
-    if (data.eventDate    !== undefined) updates.event_date    = new Date(data.eventDate);
-    if (data.guestCount   !== undefined) updates.guest_count   = data.guestCount;
-    if (data.coordinator  !== undefined) updates.coordinator   = data.coordinator;
-    if (data.specialNotes !== undefined) updates.special_notes = data.specialNotes;
-    if (data.packageId    !== undefined) updates.package_id    = data.packageId;
+    if (data.eventName       !== undefined) updates.event_name       = data.eventName;
+    if (data.eventDate       !== undefined) updates.event_date       = new Date(data.eventDate);
+    if (data.eventStartTime  !== undefined) updates.event_start_time = data.eventStartTime;
+    if (data.eventEndTime    !== undefined) updates.event_end_time   = data.eventEndTime;
+    if (data.eventType       !== undefined) updates.event_type       = data.eventType;
+    if (data.venueName       !== undefined) updates.venue_name       = data.venueName;
+    if (data.guestCount      !== undefined) updates.guest_count      = data.guestCount;
+    if (data.coordinator     !== undefined) updates.coordinator      = data.coordinator;
+    if (data.specialNotes    !== undefined) updates.special_notes    = data.specialNotes;
+    if (data.packageId       !== undefined) updates.package_id      = data.packageId;
     if (data.totalPriceMinor     !== undefined) updates.total_price_minor     = data.totalPriceMinor;
     if (data.reservationFeeMinor !== undefined) updates.reservation_fee_minor = data.reservationFeeMinor;
 
-    if (Object.keys(updates).length === 0) return routeError("No fields to update", 400);
-    updates.updated_at = new Date();
+    const hasFieldUpdates = Object.keys(updates).length > 0;
+    const hasServiceUpdates = data.services !== undefined;
+
+    if (!hasFieldUpdates && !hasServiceUpdates) {
+      return routeError("No fields to update", 400);
+    }
+
+    if (hasFieldUpdates) {
+      updates.updated_at = new Date();
+      await trx
+        .updateTable("bookings")
+        .set(updates)
+        .where("id", "=", booking.id)
+        .execute();
+    }
+
+    // Replace services if provided (full sync)
+    if (hasServiceUpdates) {
+      await trx.deleteFrom("booking_services").where("booking_id", "=", booking.id).execute();
+      if (data.services && data.services.length > 0) {
+        await trx
+          .insertInto("booking_services")
+          .values(
+            data.services.map((s) => ({
+              id: randomUUID(),
+              booking_id: booking.id,
+              category: s.category,
+              supplier_id: s.supplierId,
+              assignment_status: s.assignmentStatus ?? "pending",
+              notes: s.notes ?? null,
+            })),
+          )
+          .execute();
+      }
+    }
 
     return trx
-      .updateTable("bookings")
-      .set(updates)
+      .selectFrom("bookings")
+      .selectAll()
       .where("id", "=", booking.id)
-      .returningAll()
       .executeTakeFirstOrThrow();
   });
 
@@ -193,7 +299,8 @@ routes.openapi(updateRoute, async (c) => {
     .where("id", "=", outcome.customer_id)
     .executeTakeFirstOrThrow();
 
-  return c.json(bookingDto(outcome, customer), 200);
+  const services = await listServicesForBooking(c.get("db"), outcome.id);
+  return c.json(bookingDto(outcome, customer, services), 200);
 });
 
 // ── POST /admin/bookings/:id/status ─────────────────────────────────────────
@@ -248,7 +355,8 @@ routes.openapi(statusRoute, async (c) => {
     .where("id", "=", outcome.customer_id)
     .executeTakeFirstOrThrow();
 
-  return c.json(bookingDto(outcome, customer), 200);
+  const services = await listServicesForBooking(db, outcome.id);
+  return c.json(bookingDto(outcome, customer, services), 200);
 });
 
 // ── POST /admin/bookings/:id/payment ────────────────────────────────────────
@@ -298,7 +406,8 @@ routes.openapi(paymentRoute, async (c) => {
     .where("id", "=", outcome.customer_id)
     .executeTakeFirstOrThrow();
 
-  return c.json(bookingDto(outcome, customer), 200);
+  const services = await listServicesForBooking(db, outcome.id);
+  return c.json(bookingDto(outcome, customer, services), 200);
 });
 
 // ── DELETE /admin/bookings/:id ───────────────────────────────────────────────

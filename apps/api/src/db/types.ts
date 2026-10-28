@@ -16,7 +16,10 @@ export interface Bookings {
   created_at: Generated<Timestamp>;
   customer_id: string;
   event_date: Timestamp;
+  event_end_time: string;
   event_name: string;
+  event_start_time: string;
+  event_type: string;
   guest_count: number;
   id: string;
   package_id: string | null;
@@ -28,6 +31,18 @@ export interface Bookings {
   special_notes: string | null;
   status: Generated<string>;
   total_price_minor: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  venue_name: string;
+}
+
+export interface BookingServices {
+  assignment_status: Generated<string>;
+  booking_id: string;
+  category: string;
+  created_at: Generated<Timestamp>;
+  id: string;
+  notes: string | null;
+  supplier_id: string | null;
   updated_at: Generated<Timestamp>;
 }
 
@@ -74,6 +89,18 @@ export interface Sessions {
   user_id: string;
 }
 
+export interface Suppliers {
+  category: string;
+  contact_number: string | null;
+  created_at: Generated<Timestamp>;
+  email: string | null;
+  id: string;
+  is_internal: Generated<boolean>;
+  name: string;
+  notes: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface Users {
   created_at: Generated<Timestamp>;
   display_name: string | null;
@@ -86,10 +113,12 @@ export interface Users {
 }
 
 export interface DB {
+  booking_services: BookingServices;
   bookings: Bookings;
   package_images: PackageImages;
   package_versions: PackageVersions;
   packages: Packages;
   sessions: Sessions;
+  suppliers: Suppliers;
   users: Users;
 }

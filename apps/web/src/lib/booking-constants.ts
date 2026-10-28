@@ -34,3 +34,33 @@ export const STATUS_TONE: Record<
 }
 
 export const COORDINATORS = ["Unassigned", "Amina Santos", "Jon Bell"]
+
+export const EVENT_TYPES = ["wedding", "birthday", "corporate", "debut", "other"] as const
+
+export const EVENT_TYPE_LABELS: Record<string, string> = {
+  wedding: "Wedding",
+  birthday: "Birthday Party",
+  corporate: "Corporate Event",
+  debut: "Debutante Ball",
+  other: "Other",
+}
+
+export const SERVICE_CATEGORIES = [
+  "Photo Booth",
+  "Photography and Videography",
+  "Sounds and Lights",
+  "Food Carts and Beverage Stations",
+  "Dessert and Food Carts",
+  "Decorations and Event Styling",
+  "Tables, Chairs, and Tents",
+  "Hosts and Performers",
+  "Event Transportation",
+] as const
+
+export const ASSIGNMENT_STATUSES = ["pending", "confirmed", "cancelled"] as const
+
+export const ASSIGNMENT_STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  cancelled: "Cancelled",
+}

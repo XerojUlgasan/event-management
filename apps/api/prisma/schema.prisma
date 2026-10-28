@@ -79,6 +79,10 @@ model Booking {
   status              String    @default("under_review")
   eventName           String    @map("event_name")
   eventDate           DateTime  @map("event_date") @db.Timestamptz(6)
+  eventStartTime      String    @map("event_start_time") @db.VarChar(5)
+  eventEndTime        String    @map("event_end_time") @db.VarChar(5)
+  eventType           String    @map("event_type")
+  venueName           String    @map("venue_name")
   guestCount          Int       @map("guest_count")
   specialNotes        String?   @map("special_notes")
   coordinator         String    @default("Unassigned")
@@ -93,9 +97,44 @@ model Booking {
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   customer            User      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  services            BookingService[]
 
   @@index([customerId])
   @@index([eventDate])
   @@index([status])
   @@map("bookings")
+}
+
+model Supplier {
+  id            String          @id @default(uuid()) @db.Uuid
+  name          String
+  category      String
+  contactNumber String?         @map("contact_number")
+  email         String?
+  notes         String?
+  isInternal    Boolean         @default(false) @map("is_internal")
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  services      BookingService[]
+
+  @@index([category])
+  @@map("suppliers")
+}
+
+model BookingService {
+  id              String    @id @default(uuid()) @db.Uuid
+  bookingId       String    @map("booking_id") @db.Uuid
+  category        String
+  supplierId      String?   @map("supplier_id") @db.Uuid
+  assignmentStatus String   @default("pending") @map("assignment_status")
+  notes           String?
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  booking         Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  supplier        Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId])
+  @@index([supplierId])
+  @@index([supplierId, assignmentStatus])
+  @@map("booking_services")
 }
