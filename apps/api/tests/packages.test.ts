@@ -186,3 +186,164 @@ test("image visibility and cleanup follow package versions", async () => {
   assert.equal((await app.request(deleteImage, { headers: { Cookie: adminCookie } })).status, 404);
   assert.ok(second.published);
 });
+
+test("services and package assignments preserve published versions and protect public catalog", async () => {
+  const content = { name: "Photography", categories: ["Media"], description: "Event coverage", imageUrl: "https://example.com/image.png" };
+  await read(await call("/admin/services"), 401);
+  await read(await call("/admin/services", "POST", content, customerCookie), 403);
+  const created = await read(await call("/admin/services", "POST", content, adminCookie), 201);
+  assert.equal((await read(await call("/services"), 200)).services.some((x: any) => x.id === created.id), false);
+  await read(await call(`/admin/services/${created.id}/publish`, "POST", { expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 200);
+  const published = await read(await call(`/services/${created.id}`), 200);
+  assert.deepEqual(published.categories, ["Media"]);
+  assert.equal(published.imageUrl, content.imageUrl);
+  for (const key of ["category", "coverage", "durationMinutes", "setupMinutes", "setupNeeds"]) assert.equal(key in published, false);
+  const include = { serviceVersionId: published.versionId, role: "included", includedQuantity: 1, addOnPrice: null, addOnMaxQuantity: null };
+  const extra = await read(await call("/admin/services", "POST", { ...content, name: "Extra coverage" }, adminCookie), 201);
+  const extraPublished = await read(await call(`/admin/services/${extra.id}/publish`, "POST", { expectedUpdatedAt: extra.draft.updatedAt }, adminCookie), 200);
+  const addon = { serviceVersionId: extraPublished.published.id, role: "add_on", includedQuantity: null, addOnPrice: { kind: "fixed", currency: "PHP", amountMinor: 250000 }, addOnMaxQuantity: 2 };
+  const price = { kind: "fixed", currency: "PHP", amountMinor: 1000000 };
+  await read(await call("/admin/packages", "POST", { ...data, price, services: [{...include, addOnPrice: addon.addOnPrice}] }, adminCookie), 400);
+  await read(await call("/admin/packages", "POST", { ...data, price, services: [{...addon, addOnPrice: {...addon.addOnPrice, currency: "USD"}}] }, adminCookie), 400);
+  await read(await call("/admin/packages", "POST", { ...data, price, services: [include, { ...addon, serviceVersionId: include.serviceVersionId }] }, adminCookie), 400);
+  const pkg = await read(await call("/admin/packages", "POST", { ...data, inclusions: [], price, services: [include, addon] }, adminCookie), 201);
+  assert.match(pkg.draft.services[0].id, /^[0-9a-f-]{36}$/);
+  const first = await read(await call(`/admin/packages/${pkg.id}/publish`, "POST", { expectedUpdatedAt: pkg.draft.updatedAt }, adminCookie), 200);
+  const publicPackage = await read(await call(`/packages/${pkg.id}`), 200);
+  assert.equal(publicPackage.services.length, 2);
+  const nested = publicPackage.services.find((x: any) => x.role === "included").service;
+  assert.deepEqual(nested.categories, ["Media"]);
+  assert.equal(nested.imageUrl, content.imageUrl);
+  for (const key of ["category", "coverage", "durationMinutes", "setupMinutes", "setupNeeds"]) assert.equal(key in nested, false);
+  assert.deepEqual(publicPackage.services.find((x: any) => x.role === "add_on").addOnPrice, addon.addOnPrice);
+  const serviceDraft = await read(await call(`/admin/services/${created.id}/draft`, "PATCH", { ...content, name: "Updated photography", expectedUpdatedAt: published.publishedAt }, adminCookie), 200);
+  await read(await call(`/admin/services/${created.id}/publish`, "POST", { expectedUpdatedAt: serviceDraft.draft.updatedAt }, adminCookie), 200);
+  assert.equal((await read(await call(`/packages/${pkg.id}`), 200)).services.find((x: any) => x.role === "included").service.name, "Photography");
+  await read(await call(`/admin/services/${created.id}/archive`, "POST", undefined, adminCookie), 409);
+  await read(await call(`/admin/services/${created.id}`, "DELETE", undefined, adminCookie), 409);
+  const currentService = await read(await call(`/services/${created.id}`), 200);
+  const next = await read(await call(`/admin/packages/${pkg.id}/draft`, "PATCH", { ...data, price, services: [{ ...include, serviceVersionId: currentService.versionId }], expectedUpdatedAt: first.published.updatedAt }, adminCookie), 200);
+  assert.equal(next.published.services.length, 2);
+  assert.equal(next.draft.services.length, 1);
+  assert.equal((await read(await call(`/packages/${pkg.id}`), 200)).services.length, 2);
+  await read(await call(`/admin/packages/${pkg.id}/archive`, "POST", undefined, adminCookie), 200);
+  await read(await call(`/admin/services/${created.id}/archive`, "POST", undefined, adminCookie), 200);
+  await read(await call(`/services/${created.id}`), 404);
+  const spec: any = await (await app.request("/openapi.json")).json();
+  assert.ok(spec.paths["/v1/admin/services/{id}/publish"].post);
+});
+
+
+test("service images and category tags follow publication and cleanup rules", async () => {
+  const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]);
+  const upload = (bytes: Uint8Array, type: string, cookie?: string) => {
+    const form = new FormData();
+    form.set("image", new File([Uint8Array.from(bytes)], "image", { type }));
+    return app.request("/v1/admin/service-images", { method: "POST", headers: cookie ? { Cookie: cookie } : {}, body: form });
+  };
+  await read(await upload(png, "image/png"), 401);
+  await read(await upload(png, "image/png", customerCookie), 403);
+  await read(await upload(png, "image/jpeg", adminCookie), 400);
+  await read(await upload(new Uint8Array(5 * 1024 * 1024 + 1), "image/png", adminCookie), 400);
+  const { imageUrl } = await read(await upload(png, "image/png", adminCookie), 201);
+  assert.match(imageUrl, /^\/v1\/service-images\/[0-9a-f-]{36}$/);
+  assert.equal((await app.request(imageUrl)).status, 404);
+  assert.equal((await app.request(imageUrl, { headers: { Cookie: adminCookie } })).status, 200);
+  const content = { name: "Photography", categories: [" Media ", "Events"], description: "Coverage", imageUrl };
+  const created = await read(await call("/admin/services", "POST", content, adminCookie), 201);
+  assert.deepEqual(created.draft.categories, ["Media", "Events"]);
+  await read(await call(`/admin/service-images/${imageUrl.split("/").pop()}`, "DELETE", undefined, adminCookie), 409);
+  await read(await call(`/admin/services/${created.id}/publish`, "POST", { expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 200);
+  const response = await app.request(imageUrl);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("Content-Type"), "image/png");
+  assert.equal(response.headers.get("X-Content-Type-Options"), "nosniff");
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), png);
+  await read(await call(`/admin/services/${created.id}/archive`, "POST", undefined, adminCookie), 200);
+  assert.equal((await app.request(imageUrl)).status, 404);
+  const incomplete = await read(await call("/admin/services", "POST", { ...content, imageUrl: null, categories: [] }, adminCookie), 201);
+  await read(await call(`/admin/services/${incomplete.id}/publish`, "POST", { expectedUpdatedAt: incomplete.draft.updatedAt }, adminCookie), 400);
+  const duplicate = await read(await call("/admin/services", "POST", { ...content, imageUrl: null, categories: ["Media", " media "] }, adminCookie), 201);
+  await read(await call(`/admin/services/${duplicate.id}/publish`, "POST", { expectedUpdatedAt: duplicate.draft.updatedAt }, adminCookie), 400);
+  await read(await call("/admin/services", "POST", { ...content, imageUrl: "http://example.com/image.png" }, adminCookie), 400);
+  await read(await call("/admin/services", "POST", { ...content, imageUrl: `/v1/service-images/${randomUUID()}` }, adminCookie), 400);
+  const unused = (await read(await upload(png, "image/png", adminCookie), 201)).imageUrl;
+  await read(await call(`/admin/service-images/${unused.split("/").pop()}`, "DELETE", undefined, adminCookie), 204);
+  const spec: any = await (await app.request("/openapi.json")).json();
+  assert.ok(spec.paths["/v1/admin/service-images"].post);
+  assert.ok(spec.paths["/v1/admin/service-images/{id}"].delete);
+  assert.ok(spec.paths["/v1/service-images/{id}"].get);
+});
+
+
+test("published packages keep images of superseded service versions visible", async () => {
+  const form = new FormData();
+  form.set("image", new File([Uint8Array.from([0xff, 0xd8, 0xff, 1])], "image.jpg", { type: "image/jpeg" }));
+  const { imageUrl } = await read(await app.request("/v1/admin/service-images", { method: "POST", headers: { Cookie: adminCookie }, body: form }), 201);
+  const content = { name: "Photo", categories: ["Media"], description: "Coverage", imageUrl };
+  const created = await read(await call("/admin/services", "POST", content, adminCookie), 201);
+  const first = await read(await call(`/admin/services/${created.id}/publish`, "POST", { expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 200);
+  const assignment = { serviceVersionId: first.published.id, role: "included", includedQuantity: 1, addOnPrice: null, addOnMaxQuantity: null };
+  const pkg = await read(await call("/admin/packages", "POST", { ...data, price: { kind: "fixed", currency: "PHP", amountMinor: 100 }, services: [assignment] }, adminCookie), 201);
+  await read(await call(`/admin/packages/${pkg.id}/publish`, "POST", { expectedUpdatedAt: pkg.draft.updatedAt }, adminCookie), 200);
+  const draft = await read(await call(`/admin/services/${created.id}/draft`, "PATCH", { ...content, imageUrl: null, expectedUpdatedAt: first.published.updatedAt }, adminCookie), 200);
+  await read(await call(`/admin/services/${created.id}/publish`, "POST", { expectedUpdatedAt: draft.draft.updatedAt }, adminCookie), 200);
+  assert.equal((await app.request(imageUrl)).status, 200);
+  assert.equal((await read(await call(`/packages/${pkg.id}`), 200)).services[0].service.imageUrl, imageUrl);
+  await read(await call(`/admin/packages/${pkg.id}/archive`, "POST", undefined, adminCookie), 200);
+  assert.equal((await app.request(imageUrl)).status, 404);
+});
+
+test("public catalog pages load 15 at a time and service previews list included packages", async () => {
+  const serviceContent = { name: "Catalog service", categories: ["Experience"], description: "For page testing", imageUrl: null };
+  const serviceIds: string[] = [];
+  for (let index = 0; index < 16; index++) {
+    const created = await read(await call("/admin/services", "POST", { ...serviceContent, name: `Catalog service ${index}` }, adminCookie), 201);
+    await read(await call(`/admin/services/${created.id}/publish`, "POST", { expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 200);
+    serviceIds.push(created.id);
+  }
+  await read(await call("/services?limit=0"), 400);
+  await read(await call("/services?limit=16"), 400);
+  await read(await call("/services?limit=15&offset=-1"), 400);
+  const firstServices = await read(await call("/services?limit=15"), 200);
+  const secondServices = await read(await call("/services?limit=15&offset=15"), 200);
+  assert.equal(firstServices.services.length, 15);
+  assert.equal(firstServices.nextOffset, 15);
+  assert.ok(secondServices.services.length >= 1);
+  assert.equal(new Set([...firstServices.services, ...secondServices.services].map((row: any) => row.id)).size, firstServices.services.length + secondServices.services.length);
+  assert.equal((await read(await call("/services?limit=3"), 200)).services.length, 3);
+
+  const target = await read(await call(`/services/${serviceIds[0]}`), 200);
+  const included = { serviceVersionId: target.versionId, role: "included", includedQuantity: 1, addOnPrice: null, addOnMaxQuantity: null };
+  const addOn = { serviceVersionId: target.versionId, role: "add_on", includedQuantity: null, addOnPrice: { kind: "fixed", currency: "PHP", amountMinor: 100 }, addOnMaxQuantity: 1 };
+  const price = { kind: "fixed", currency: "PHP", amountMinor: 100000 };
+  let includedPackageId = "";
+  let addOnPackageId = "";
+  for (let index = 0; index < 16; index++) {
+    const assignment = index === 0 ? [included] : index === 1 ? [addOn] : [];
+    const created = await read(await call("/admin/packages", "POST", { ...data, name: `Catalog package ${index}`, price, services: assignment }, adminCookie), 201);
+    await read(await call(`/admin/packages/${created.id}/publish`, "POST", { expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 200);
+    if (index === 0) includedPackageId = created.id;
+    if (index === 1) addOnPackageId = created.id;
+  }
+  await read(await call("/packages?limit=16"), 400);
+  const firstPackages = await read(await call("/packages?limit=15"), 200);
+  const secondPackages = await read(await call("/packages?limit=15&offset=15"), 200);
+  assert.equal(firstPackages.packages.length, 15);
+  assert.equal(firstPackages.nextOffset, 15);
+  assert.ok(secondPackages.packages.length >= 1);
+  assert.equal(new Set([...firstPackages.packages, ...secondPackages.packages].map((row: any) => row.id)).size, firstPackages.packages.length + secondPackages.packages.length);
+  assert.equal((await read(await call("/packages?limit=3"), 200)).packages.length, 3);
+  const related = await read(await call(`/services/${target.id}/packages`), 200);
+  assert.ok(related.packages.some((row: any) => row.id === includedPackageId));
+  assert.ok(!related.packages.some((row: any) => row.id === addOnPackageId));
+  const serviceAdmin = await read(await call(`/admin/services/${target.id}`, "GET", undefined, adminCookie), 200);
+  const revised = await read(await call(`/admin/services/${target.id}/draft`, "PATCH", { ...serviceContent, name: "Revised catalog service", expectedUpdatedAt: serviceAdmin.published.updatedAt }, adminCookie), 200);
+  await read(await call(`/admin/services/${target.id}/publish`, "POST", { expectedUpdatedAt: revised.draft.updatedAt }, adminCookie), 200);
+  assert.ok((await read(await call(`/services/${target.id}/packages`), 200)).packages.some((row: any) => row.id === includedPackageId));
+  await read(await call(`/admin/packages/${includedPackageId}/archive`, "POST", undefined, adminCookie), 200);
+  assert.ok(!(await read(await call(`/services/${target.id}/packages`), 200)).packages.some((row: any) => row.id === includedPackageId));
+  await read(await call(`/services/${randomUUID()}/packages`), 404);
+  const spec: any = await (await app.request("/openapi.json")).json();
+  assert.ok(spec.paths["/v1/services/{id}/packages"].get);
+});

@@ -2,8 +2,10 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { db } from "./db/client.js";
+import bookingRequestRoutes from "./controllers/booking-requests/index.js";
 import authRoutes from "./controllers/auth/index.js";
 import messageRoutes from "./controllers/messages/index.js";
+import serviceRoutes from "./controllers/services/index.js";
 import packageRoutes from "./controllers/packages/index.js";
 import healthRoutes from "./controllers/health/index.js";
 import type { HonoEnv } from "./types/hono.js";
@@ -45,7 +47,15 @@ app.use("/v1/admin/packages", bodyLimit({ maxSize: 64 * 1024 }));
 app.use("/v1/admin/package-images", bodyLimit({ maxSize: 5 * 1024 * 1024 + 64 * 1024 }));
 
 app.route("/v1", healthRoutes);
+app.use("/v1/admin/service-images", bodyLimit({ maxSize: 5 * 1024 * 1024 + 64 * 1024 }));
+app.use("/v1/admin/services", bodyLimit({ maxSize: 64 * 1024 }));
+app.use("/v1/admin/services/*", bodyLimit({ maxSize: 64 * 1024 }));
+app.route("/v1", serviceRoutes);
 app.route("/v1", packageRoutes);
+app.use("/v1/booking-requests", bodyLimit({ maxSize: 16 * 1024 }));
+app.use("/v1/booking-requests/*", bodyLimit({ maxSize: 16 * 1024 }));
+app.use("/v1/admin/booking-requests/*", bodyLimit({ maxSize: 16 * 1024 }));
+app.route("/v1", bookingRequestRoutes);
 app.route("/v1", messageRoutes);
 app.route("/v1", authRoutes);
 

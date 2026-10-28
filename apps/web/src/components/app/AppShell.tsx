@@ -17,6 +17,7 @@ import { MessagesPage } from "./pages/MessagesPage"
 import { OperationsPage } from "./pages/OperationsPage"
 import { Overview } from "./pages/Overview"
 import { PackagesPage } from "./pages/PackagesPage"
+import { ServicesPanel } from "./pages/ServicesPanel"
 import { ReportsPage } from "./pages/ReportsPage"
 import { StaffsPage } from "./pages/StaffsPage"
 import { Sidebar } from "./Sidebar"
@@ -95,6 +96,8 @@ export function AppShell({
     if (active === "Calendar") return <CalendarPage />
     if (active === "Packages")
       return <PackagesPage />
+    if (active === "Services")
+      return <ServicesPanel />
     if (active === "Inventory") return <InventoryPage />
     if (active === "Operations") return <OperationsPage />
     if (active === "Reports") return <ReportsPage />
@@ -152,7 +155,7 @@ export function AppShell({
         </header>
       }
     >
-      {active !== "Packages" && active !== "Administration" && active !== "Messages" && <p className="demo-note" role="note">Demo preview · Changes on this screen are not submitted.</p>}
+      {active !== "Bookings" && active !== "Packages" && active !== "Services" && active !== "Administration" && active !== "Messages" && <p className="demo-note" role="note">Demo preview · Changes on this screen are not submitted.</p>}
       {body}
     </WorkspaceLayout>
   )

@@ -25,6 +25,7 @@ export function Sidebar({
     Staffs: "users",
     Calendar: "calendar",
     Packages: "box",
+    Services: "spark",
     Inventory: "box",
     Operations: "clipboard",
     Reports: "chart",

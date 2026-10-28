@@ -1,3 +1,4 @@
+import { assignmentsData, validateAssignmentsData } from "../../data/packages/service-assignments.js";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 
@@ -18,7 +19,9 @@ export async function publishPackageService(db: Kysely<DB>, id: string, expected
     const draft = await findPackageDraftData(trx, pkg.id);
     if (!draft) return error("No draft to publish", 409);
     if (draft.updated_at.toISOString() !== expectedUpdatedAt) return error("Package changed. Refresh and try again", 409);
-    if (!complete(draft)) return error("Complete all package details and set a fixed PHP price before publishing", 400);
+    const assignments = await assignmentsData(trx, draft.id);
+    if (!complete(draft, assignments.some(assignment => assignment.role === "included"))) return error("Complete all package details and set a fixed PHP price before publishing", 400);
+    if (!await validateAssignmentsData(trx, assignments)) return error("Service assignments must reference current published services", 400);
     const now = nextUpdate(draft.updated_at);
     await supersedePublishedPackageVersionsData(trx, pkg.id);
     await publishPackageDraftData(trx, draft.id, now);

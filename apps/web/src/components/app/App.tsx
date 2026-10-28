@@ -6,6 +6,7 @@ import type { View } from "./types"
 import { AppShell } from "./AppShell"
 import { AuthPage } from "./AuthPage"
 import { CustomerDashboard } from "./customer/CustomerDashboard"
+import { BookingRequestDialog, clearBookingDraft, readBookingDraft } from "./BookingRequest"
 import { PublicSite } from "./PublicSite"
 
 export default function App() {
@@ -18,7 +19,8 @@ export default function App() {
 
 function AppContent() {
   const { status, profile, signOut } = useAuth()
-  const [view, setView] = useState<View>("public")
+  const [view, setView] = useState<View>(() => new URLSearchParams(window.location.search).get("booking") === "resume" ? "login" : "public")
+  const [draft, setDraft] = useState(() => new URLSearchParams(window.location.search).get("booking") === "resume" ? readBookingDraft() : null)
 
 
   useEffect(() => {
@@ -59,18 +61,18 @@ function AppContent() {
       }
 
       return (
-        <CustomerDashboard
+        <> <CustomerDashboard
           onPublic={() => setView("public")}
           userName={displayName}
           userEmail={profile.email}
           onSignOut={handleSignOut}
-        />
+        />{draft && <BookingRequestDialog item={draft.item} resume onClose={() => { setDraft(null); window.history.replaceState({}, "", "/") }} />}</>
       )
     }
   }
 
   if (view === "login" || view === "app" || view === "customer") {
-    return <AuthPage onBack={() => setView("public")} />
+    return <AuthPage onBack={() => { clearBookingDraft(); setDraft(null); window.history.replaceState({}, "", "/"); setView("public") }} />
   }
 
   return <PublicSite onEnterCustomer={() => setView("login")} />

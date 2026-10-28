@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Badge, Brand, Button, Dialog, Icon } from "@event-management/ui"
 
 import { PackageCatalog } from "./PackageCatalog"
+import { PublicServiceCatalog } from "../PublicServiceCatalog"
 
 export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void }) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -87,7 +88,7 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
           </div>
         </section>
 
-        <section className="intro section" id="services">
+        <section className="intro section" id="intro">
           <div>
             <span className="eyebrow">Your occasion, considered</span>
             <div className="section-title">
@@ -106,13 +107,24 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
           </div>
         </section>
 
+        <section className="public-services section" id="services" aria-labelledby="services-title">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">Make it yours</span>
+              <h2 className="section-title small" id="services-title">Explore our services</h2>
+            </div>
+            <p>Services can be included in a package or offered as optional extras. View a package for its specific inclusions and add-on prices.</p>
+          </div>
+          <PublicServiceCatalog />
+        </section>
+
         <section className="packages section" id="packages">
           <div className="section-heading">
             <div>
               <span className="eyebrow">Curated experiences</span>
-              <div className="section-title small">
+              <h2 className="section-title small">
                 A thoughtful place to begin
-              </div>
+              </h2>
             </div>
             <p>
               Every package can be tailored to your menu, setting, guest count,
@@ -199,6 +211,7 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
           final update.
         </p>
         <div>
+          <a href="#services">Services</a>
           <a href="#packages">Packages</a>
           <a href="#events">Past events</a>
           <a href="#about">Contact</a>

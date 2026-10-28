@@ -11,6 +11,37 @@ export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface BookingRequests {
+  contact_name: string;
+  created_at: Generated<Timestamp>;
+  customer_id: string;
+  ends_at: Timestamp;
+  event_type: string;
+  guest_count: number;
+  id: Generated<string>;
+  out_of_range: boolean;
+  package_id: string;
+  package_name: string;
+  package_version_id: string;
+  phone_number: string;
+  preferred_venue_location: string;
+  reference: string;
+  special_requests: string | null;
+  starts_at: Timestamp;
+  status: Generated<string>;
+  time_zone: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface BookingRequestStatusHistory {
+  booking_request_id: string;
+  changed_by: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  reason: string | null;
+  status: string;
+}
+
 export interface Conversations {
   created_at: Generated<Timestamp>;
   customer_id: string;
@@ -41,6 +72,16 @@ export interface Packages {
   updated_at: Generated<Timestamp>;
 }
 
+export interface PackageServices {
+  add_on_max_quantity: number | null;
+  add_on_unit_price_amount_minor: number | null;
+  id: Generated<string>;
+  included_quantity: number | null;
+  package_version_id: string;
+  role: string;
+  service_version_id: string;
+}
+
 export interface PackageVersions {
   created_at: Generated<Timestamp>;
   description: string;
@@ -59,6 +100,34 @@ export interface PackageVersions {
   terms: string;
   updated_at: Generated<Timestamp>;
   venue_details: string;
+  version: number;
+}
+
+export interface ServiceImages {
+  content_type: string;
+  created_at: Generated<Timestamp>;
+  data: Buffer;
+  id: Generated<string>;
+}
+
+export interface Services {
+  archived_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface ServiceVersions {
+  categories: string[];
+  created_at: Generated<Timestamp>;
+  description: string;
+  id: Generated<string>;
+  image_url: string | null;
+  name: string;
+  published_at: Timestamp | null;
+  service_id: string;
+  state: string;
+  updated_at: Generated<Timestamp>;
   version: number;
 }
 
@@ -82,11 +151,17 @@ export interface Users {
 }
 
 export interface DB {
+  booking_request_status_history: BookingRequestStatusHistory;
+  booking_requests: BookingRequests;
   conversations: Conversations;
   messages: Messages;
   package_images: PackageImages;
+  package_services: PackageServices;
   package_versions: PackageVersions;
   packages: Packages;
+  service_images: ServiceImages;
+  service_versions: ServiceVersions;
+  services: Services;
   sessions: Sessions;
   users: Users;
 }

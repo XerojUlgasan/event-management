@@ -14,6 +14,7 @@ export const adminNav: NavKey[] = [
   "Messages",
   "Staffs",
   "Packages",
+  "Services",
 ]
 
 export const bookings = [

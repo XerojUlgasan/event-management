@@ -1,3 +1,4 @@
+import { validateAssignmentsData, replaceAssignmentsData } from "../../data/packages/service-assignments.js";
 import { randomUUID } from "node:crypto";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
@@ -16,8 +17,10 @@ export async function createPackageService(db: Kysely<DB>, data: Content) {
   return db.transaction().execute(async trx => {
     await lockPackageImagesData(trx, [data.imageUrl]);
     if (!await checkPackageImageData(trx, data.imageUrl)) return error("Uploaded image not found", 400);
+    if (!await validateAssignmentsData(trx, data.services ?? [])) return error("Service assignments must reference current published services", 400);
     const pkg = await createPackageData(trx, randomUUID());
-    await createPackageDraftData(trx, pkg.id, 1, data);
+    const draft = await createPackageDraftData(trx, pkg.id, 1, data);
+    await replaceAssignmentsData(trx, draft.id, data.services ?? []);
     return adminDto(trx, pkg);
   });
 }

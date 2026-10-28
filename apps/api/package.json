@@ -13,13 +13,14 @@
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:reset": "prisma migrate reset",
+    "db:reset": "prisma migrate reset -f && pnpm db:migrate && pnpm db:seed",
     "db:generate": "tsx src/db/generate.ts",
     "db:check": "tsx src/db/check.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:seed-admin": "tsx src/db/seed-admin.ts",
     "test:packages": "tsx --test tests/packages.test.ts",
-    "test:messages": "tsx --test tests/messages.test.ts"
+    "test:messages": "tsx --test tests/messages.test.ts",
+    "test:booking-requests": "tsx --test tests/booking-requests.test.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",

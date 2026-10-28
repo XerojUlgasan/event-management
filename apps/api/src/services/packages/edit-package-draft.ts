@@ -1,3 +1,4 @@
+import { assignmentsData, validateAssignmentsData, replaceAssignmentsData } from "../../data/packages/service-assignments.js";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 
@@ -24,9 +25,13 @@ export async function editPackageDraftService(db: Kysely<DB>, id: string, data: 
     if (!current || current.updated_at.toISOString() !== data.expectedUpdatedAt) return error("Package changed. Refresh and try again", 409);
     await lockPackageImagesData(trx, [current.image_url, data.imageUrl]);
     if (!await checkPackageImageData(trx, data.imageUrl)) return error("Uploaded image not found", 400);
+    const assignments = data.services ?? (await assignmentsData(trx, current.id)).map(({ serviceVersionId, role, includedQuantity, addOnPrice, addOnMaxQuantity }) => ({ serviceVersionId, role, includedQuantity, addOnPrice, addOnMaxQuantity }));
+    if (!await validateAssignmentsData(trx, assignments)) return error("Service assignments must reference current published services", 400);
     const updatedAt = nextUpdate(current.updated_at);
+    let draftId = current.id;
     if (current.state === "draft") await updatePackageDraftData(trx, current.id, data, updatedAt);
-    else await createPackageDraftData(trx, pkg.id, current.version + 1, data, updatedAt);
+    else draftId = (await createPackageDraftData(trx, pkg.id, current.version + 1, data, updatedAt)).id;
+    await replaceAssignmentsData(trx, draftId, assignments);
     if (current.state === "draft") await deleteUnusedPackageImageData(trx, current.image_url);
     await touchPackageData(trx, pkg.id, updatedAt);
     return adminDto(trx, pkg);

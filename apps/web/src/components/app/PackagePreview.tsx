@@ -1,7 +1,10 @@
-import { useEffect, useId, useRef } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import type { PackageContent, PackagePrice, PackageVersion } from "../../lib/api"
+import { serviceImageSrc } from "../../lib/api"
+import type { PackageContent, PackagePrice, PackageService, PackageVersion } from "../../lib/api"
 import { packageImageSrc } from "../../lib/api"
+import { BookingRequestDialog } from "./BookingRequest"
+import type { PublicPackage } from "../../lib/api"
 import { photos } from "./data"
 
 export function priceLabel(price: PackagePrice | null) {
@@ -22,9 +25,13 @@ export function PackagePreview({ item, loading = false, error = "", versionState
   versionState?: PackageVersion["state"]
   onClose: () => void
 }) {
+  const [booking, setBooking] = useState(false)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const admin = !!versionState
+  const services = (item?.services || []).filter((entry): entry is PackageService => "service" in entry && !!entry.service)
+  const includedServices = services.filter(entry => entry.role === "included")
+  const addOns = services.filter(entry => entry.role === "add_on")
   const previewStateLabel = versionState === "draft" ? "Draft preview" : versionState === "published" ? "Published preview" : versionState ? "Superseded preview" : ""
 
   useEffect(() => {
@@ -40,6 +47,14 @@ export function PackagePreview({ item, loading = false, error = "", versionState
       trigger?.focus()
     }
   }, [])
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!booking && dialog && !dialog.open) {
+      dialog.showModal()
+      dialog.querySelector<HTMLButtonElement>(".booking-start")?.focus()
+    }
+  }, [booking])
 
   return createPortal(
     <dialog ref={dialogRef} className="package-preview" aria-labelledby={item ? titleId : undefined} aria-label={item ? undefined : "Package preview"} onCancel={event => { event.preventDefault(); onClose() }}>
@@ -63,9 +78,10 @@ export function PackagePreview({ item, loading = false, error = "", versionState
               <p>{item.description || "Add a description to introduce this package."}</p>
               <div className="package-preview-summary-data">
                 <div><span>Package total</span><strong>{priceLabel(item.price)}</strong></div>
-                <div><span>Guest capacity</span><strong>{item.guestMin}–{item.guestMax} guests</strong></div>
+                <div><span>Estimated guest range</span><strong>{item.guestMin}–{item.guestMax} guests</strong></div>
               </div>
-              <p className="package-preview-note">{admin ? "This preview does not publish the package." : "Viewing a package does not reserve a date. Online inquiries are not available yet."}</p>
+              <p className="package-preview-note">{admin ? "This preview does not publish the package." : "Your preferred date and final price are subject to staff review."}</p>
+            {!admin && "versionId" in item && <button className="booking-start" type="button" onClick={() => { dialogRef.current?.close(); setBooking(true) }}>Book now</button>}
             </aside>
           </div>
           <div className="package-preview-content">
@@ -79,8 +95,9 @@ export function PackagePreview({ item, loading = false, error = "", versionState
               <section>
                 <span className="package-preview-overline">01 / The details</span>
                 <h2>What’s included</h2>
-                {item.inclusions.length ? <ul className="package-preview-inclusions">{item.inclusions.map((entry, index) => <li key={`${entry}-${index}`}>{entry}</li>)}</ul> : <p>No inclusions specified yet.</p>}
+                {item.inclusions.length || includedServices.length ? <ul className="package-preview-inclusions">{item.inclusions.map((entry, index) => <li key={`${entry}-${index}`}>{entry}</li>)}{includedServices.map(entry => <li key={entry.id}><strong>{entry.service.name}</strong><br />{entry.includedQuantity} included{entry.service.imageUrl && <img className="package-preview-service-image" src={serviceImageSrc(entry.service.imageUrl)} alt="" />}{entry.service.categories.length > 0 && <><br />{entry.service.categories.join(", ")}</>}{entry.service.description && <><br />{entry.service.description}</>}</li>)}</ul> : <p>No inclusions specified yet.</p>}
               </section>
+              {addOns.length > 0 && <section><span className="package-preview-overline">Optional / Additional cost</span><h2>Optional add-ons</h2><ul className="package-preview-inclusions">{addOns.map(entry => <li key={entry.id}><strong>{entry.service.name}</strong><br />{entry.addOnPrice ? `${priceLabel(entry.addOnPrice).replace(/ total$/, "")} per unit` : "Price unavailable"} · up to {entry.addOnMaxQuantity}{entry.service.imageUrl && <img className="package-preview-service-image" src={serviceImageSrc(entry.service.imageUrl)} alt="" />}{entry.service.categories.length > 0 && <><br />{entry.service.categories.join(", ")}</>}{entry.service.description && <><br />{entry.service.description}</>}</li>)}</ul></section>}
               <section>
                 <span className="package-preview-overline">02 / The setting</span>
                 <h2>Venue &amp; arrangements</h2>
@@ -100,6 +117,7 @@ export function PackagePreview({ item, loading = false, error = "", versionState
           </div>
         </main>}
       </div>
+      {booking && item && "versionId" in item && <BookingRequestDialog item={item as PublicPackage} onClose={() => setBooking(false)} />}
     </dialog>,
     document.body,
   )

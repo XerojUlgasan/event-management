@@ -1,0 +1,10 @@
+import { createRoute, z } from "@hono/zod-openapi";
+import type { AppRouteHandler } from "../../types/hono.js";
+import { listBookingRequestsService } from "../../services/booking-requests/booking-requests.js";
+import { bookingSchema } from "./schemas.js";
+import { errors, json } from "./http.js";
+const responses = {200:{content:json(z.object({bookingRequests:z.array(bookingSchema)})),description:"Booking requests"},401:errors[401],403:errors[403]};
+export const listMyBookingRequestsRoute = createRoute({method:"get",path:"/booking-requests/mine",tags:["Booking requests"],responses});
+export const listMyBookingRequestsRouteHandler: AppRouteHandler<typeof listMyBookingRequestsRoute> = async c => c.json({bookingRequests:await listBookingRequestsService(c.get("db"),c.get("session").user.id)},200);
+export const listAdminBookingRequestsRoute = createRoute({method:"get",path:"/admin/booking-requests",tags:["Booking requests"],responses});
+export const listAdminBookingRequestsRouteHandler: AppRouteHandler<typeof listAdminBookingRequestsRoute> = async c => c.json({bookingRequests:await listBookingRequestsService(c.get("db"))},200);

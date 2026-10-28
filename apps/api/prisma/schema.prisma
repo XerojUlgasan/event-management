@@ -11,6 +11,8 @@ model User {
   role         String    @default("customer")
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  bookingRequests BookingRequest[]
+  bookingStatusChanges BookingRequestStatusHistory[]
   sessions     Session[]
   conversation Conversation? @relation("CustomerConversation")
   sentMessages Message[]     @relation("MessageSender")
@@ -60,6 +62,7 @@ model Package {
   createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime         @default(now()) @map("updated_at") @db.Timestamptz(6)
   archivedAt DateTime?       @map("archived_at") @db.Timestamptz(6)
+  bookingRequests BookingRequest[]
   versions  PackageVersion[]
 
   @@map("packages")
@@ -94,7 +97,99 @@ model PackageVersion {
   updatedAt    DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
   publishedAt  DateTime? @map("published_at") @db.Timestamptz(6)
   package      Package   @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  bookingRequests BookingRequest[]
+  services     PackageService[]
 
   @@unique([packageId, version])
   @@map("package_versions")
+}
+
+model ServiceImage {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentType String @map("content_type")
+  data Bytes
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  @@map("service_images")
+}
+
+model Service {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+  versions ServiceVersion[]
+  @@map("services")
+}
+
+model ServiceVersion {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  serviceId String @map("service_id") @db.Uuid
+  version Int
+  state String
+  name String
+  description String
+  categories String[]
+  imageUrl String? @map("image_url")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  packageServices PackageService[]
+  @@unique([serviceId, version])
+  @@map("service_versions")
+}
+
+model PackageService {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  packageVersionId String @map("package_version_id") @db.Uuid
+  serviceVersionId String @map("service_version_id") @db.Uuid
+  role String
+  includedQuantity Int? @map("included_quantity")
+  addOnUnitPriceAmountMinor Int? @map("add_on_unit_price_amount_minor")
+  addOnMaxQuantity Int? @map("add_on_max_quantity")
+  packageVersion PackageVersion @relation(fields: [packageVersionId], references: [id], onDelete: Cascade)
+  serviceVersion ServiceVersion @relation(fields: [serviceVersionId], references: [id], onDelete: Restrict)
+  @@unique([packageVersionId, serviceVersionId])
+  @@map("package_services")
+}
+
+model BookingRequest {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reference String @unique
+  customerId String @map("customer_id") @db.Uuid
+  packageId String @map("package_id") @db.Uuid
+  packageVersionId String @map("package_version_id") @db.Uuid
+  packageName String @map("package_name")
+  eventType String @map("event_type")
+  startsAt DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt DateTime @map("ends_at") @db.Timestamptz(6)
+  timeZone String @map("time_zone")
+  guestCount Int @map("guest_count")
+  contactName String @map("contact_name")
+  phoneNumber String @map("phone_number")
+  preferredVenueLocation String @map("preferred_venue_location")
+  specialRequests String? @map("special_requests")
+  status String @default("under_review")
+  outOfRange Boolean @map("out_of_range")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  customer User @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  package Package @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  packageVersion PackageVersion @relation(fields: [packageVersionId], references: [id], onDelete: Restrict)
+  history BookingRequestStatusHistory[]
+  @@index([customerId, createdAt])
+  @@map("booking_requests")
+}
+
+model BookingRequestStatusHistory {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingRequestId String @map("booking_request_id") @db.Uuid
+  status String
+  reason String?
+  changedBy String @map("changed_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  bookingRequest BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  actor User @relation(fields: [changedBy], references: [id], onDelete: Restrict)
+  @@index([bookingRequestId, createdAt])
+  @@map("booking_request_status_history")
 }

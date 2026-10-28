@@ -1,3 +1,4 @@
+import { assignmentsData } from "../../data/packages/service-assignments.js";
 import type { Kysely, Selectable, Transaction } from "kysely";
 import type { DB, PackageVersions, Packages } from "../../db/types.js";
 import { listPackageVersionsData } from "../../data/packages/list-package-versions.js";
@@ -19,16 +20,16 @@ export function versionDto(row: Version) {
   };
 }
 
-export function publicDto(row: Version) {
+export async function publicDto(db: Database, row: Version) {
   const v = versionDto(row);
-  return { id: v.packageId, versionId: v.id, version: v.version, name: v.name, eventTypes: v.eventTypes,
+  return { services: await assignmentsData(db, row.id), id: v.packageId, versionId: v.id, version: v.version, name: v.name, eventTypes: v.eventTypes,
     description: v.description, guestMin: v.guestMin, guestMax: v.guestMax, venueDetails: v.venueDetails,
     inclusions: v.inclusions, exclusions: v.exclusions, terms: v.terms, imageUrl: v.imageUrl,
     price: v.price, publishedAt: v.publishedAt! };
 }
 
 export async function adminDto(db: Database, pkg: Package) {
-  const versions = (await listPackageVersionsData(db, pkg.id)).map(versionDto);
+  const versions = await Promise.all((await listPackageVersionsData(db, pkg.id)).map(async row => ({ ...versionDto(row), services: await assignmentsData(db, row.id) })));
   return { id: pkg.id, archivedAt: pkg.archived_at?.toISOString() ?? null,
     draft: versions.find(x => x.state === "draft") ?? null,
     published: versions.find(x => x.state === "published") ?? null, versions };

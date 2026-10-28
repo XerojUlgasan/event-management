@@ -7,5 +7,5 @@ import { publicDto } from "./package-response.js";
 
 export async function getPublicPackageService(db: Kysely<DB>, id: string) {
   const row = (await listPublicPackageVersionsData(db, id))[0];
-  return row ? publicDto(row) : null;
+  return row ? publicDto(db, row) : null;
 }

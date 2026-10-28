@@ -4,14 +4,14 @@ Updated: 2026-10-27
 
 ## Current business workflow
 
-Customers start with event type, preferred date, and estimated guest count. The business offers packages for **30 to 100 guests**. Staff define each package's inclusions individually; no services are inserted into every package automatically. Published packages have a fixed total price in Philippine pesos (PHP); all monetary amounts in the app use PHP. A reservation fee secures a date and is **credited toward the total package price**.
+Customers start with event type, preferred date, and estimated guest count. Package guest ranges are **estimates**, not booking-request limits: customers may request a different count for staff review. The current catalog editor publishes packages with a stated range within 30 to 100 guests. Staff define each package's inclusions individually; no services are inserted into every package automatically. Published packages have a fixed total price in Philippine pesos (PHP); all monetary amounts in the app use PHP. Staff review the final quote for the requested event. A reservation fee secures a date and is **credited toward the total package price** under the business's agreed terms.
 
 This workflow is the product baseline. The earlier proposal explores a broader event and resource platform; its features are options to evaluate rather than fixed requirements.
 
 ## Booking journey
 
-1. Customer views package details and submits an inquiry with event type, preferred date, estimated guests, contact details, and special requests.
-2. The system shows venue availability and flags counts outside the offered range for staff review.
+1. Customer views package details and submits a signed-in booking request with event type, preferred start and end time, estimated guests, contact details, preferred venue or location, and optional special requests.
+2. The request shows its reference and review status. Counts outside the package's estimated range are flagged for staff review; the request does not reserve a date or establish a final price.
 3. Customer chooses a package and requests optional add-ons. Staff check availability and send an itemized quote.
 4. Customer accepts the quote and pays the reservation fee under the business's terms. Staff verify payment; the fee reduces the outstanding balance.
 5. The booking becomes confirmed, and staff prepare from the approved event plan.

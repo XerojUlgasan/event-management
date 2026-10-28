@@ -1,11 +1,11 @@
 # Package catalog implementation
 
-Status: implemented locally, 2026-10-27. This document records the catalog behavior and its frontend contract. Inquiry, add-on, quote, availability, and booking work is tracked in `ROADMAP.md`. `pnpm db:seed` creates three complete, publishable sample drafts, but no approved package data is seeded or automatically published.
+Status: implemented locally, 2026-10-27; service assignments added 2026-10-28 and booking requests added 2026-10-29. This document records the package catalog behavior and its frontend contract. Service catalog behavior is in [SERVICES.md](SERVICES.md). The booking-request flow and remaining quote, availability, and confirmation work are tracked in [ROADMAP.md](ROADMAP.md). `pnpm db:seed` creates sample drafts, but no approved package or service data is automatically published.
 
 ## Business boundary
 
 - `FEATURES.md` defines all-inclusive offers for 30–100 guests. Published details include the guest range, fixed PHP total, inclusions, venue details, exclusions, and terms. Paid add-ons are separate from package inclusions.
-- A package catalog entry does not reserve a date, create an inquiry, or establish a final quote. The visible public inquiry action explains that online submission is not yet available; the customer booking/request area still uses sample state.
+- A package catalog entry does not reserve a date or establish a final quote. A published package preview can start a signed-in booking request, which staff review separately.
 - Admin and public/customer package screens now read the same persisted catalog through `/v1`. Old dollar-denominated demo offers were removed from the package array and were not seeded. Exact tiers, amounts, and additional inclusions still need business approval.
 
 ## Business rules for the catalog
@@ -14,7 +14,7 @@ Status: implemented locally, 2026-10-27. This document records the catalog behav
 2. Create a package as a draft with a stable ID. The standard catalog accepts a package range within 30–100 guests, with minimum no greater than maximum. An inquiry outside the offered range goes to staff review; catalog CRUD must not silently create an out-of-range standard offer.
 3. A published version is immutable. Editing it creates a new draft version. Publishing validates required details and atomically supersedes the former version; its contents remain in history for future quote references. A failed publish leaves the former published offer intact.
 4. Archive removes an offer from new public/customer selection without erasing its versions. Archived packages reject edits and publication. Hard delete is limited to a package that has never been published and has no database reference; otherwise the API returns a conflict. A restore operation is not implemented.
-5. Admins enter each package's inclusions; the API does not append a standard list. At least one inclusion is required for publication. Exclusions may be empty. Optional paid add-ons need a separate catalog and availability rules.
+5. Admins enter each package's inclusions; the API does not append a standard list. At least one free-text inclusion or structured included service is required for publication. Exclusions may be empty. Optional paid add-ons use the separate service catalog; availability rules remain future work.
 6. Published packages use one fixed total price in PHP. Store the amount as integer centavos, never as `"From $72 / guest"`. Permit an unpriced draft but require a positive price before publication. Package visibility does not promise venue or add-on availability.
 
 ## Persistence and API contract
@@ -24,6 +24,7 @@ The Prisma migrations create `packages`, `package_versions`, and `package_images
 - `packages` stores a stable ID, timestamps, and `archived_at`.
 - `package_versions` stores a version number and state (`draft`, `published`, or `superseded`), catalog details, nullable fixed total `price_amount_minor`, and timestamps. Partial unique indexes allow at most one draft and one published version per package. A database check enforces the 30–100 guest range.
 - `package_images` stores uploaded JPEG/PNG bytes and content type. The catalog stores an API-relative image path; external HTTP(S) image URLs remain supported. Uploads are limited to 5 MiB.
+- `package_services` holds UUID-identified links from a package version to published service versions. A link is either included within the package total or an optional add-on with a fixed PHP per-unit price and maximum quantity. Published package versions retain their linked service-version details.
 - Future quotes should reference the version ID and store their issued line-item snapshot. No quote table or package reference exists yet.
 
 The API price value is `null` for an incomplete draft or `{ kind: "fixed", currency: "PHP", amountMinor }` for an approved fixed total. The server validates `amountMinor` as a positive integer. Display it with PHP currency formatting; the API never trusts a display string as a price.
@@ -48,7 +49,8 @@ The API follows the repository's `@hono/zod-openapi` pattern in `apps/api/src/co
 1. `apps/web/src/lib/api.ts` has typed catalog DTOs and explicit PATCH/DELETE support, with session cookies and API error messages.
 2. `PackageCatalog.tsx` fetches published packages for public and customer views. Its full-screen preview fetches the selected package ID and shows its approved image, terms, inclusions, guest range, and fixed PHP total. It handles loading, empty, and error states. Admins can preview draft or published versions in the same overlay without publishing them.
 3. `PackagesPage.tsx` fetches admin records and supports a three-step create/edit form: essentials, experience, and pricing/media. Event types, inclusions, and exclusions use removable tags. The final step lists missing publication requirements before draft submission, and the publish dialog guides incomplete drafts back to editing. The form accepts an HTTP(S) image URL or a JPEG/PNG upload. It uses stable IDs and `expectedUpdatedAt` for edit/publish conflicts. Search/status filters and counts use returned rows. The Quotations and Menus tabs state that they are not connected.
-4. The public fixed-reference success message was removed. The customer request and payment areas still use sample state and say so. Future inquiry work should carry `packageId` and `versionId` as a preference without claiming a reservation or quote.
+   The Experience step also assigns published services as included or optional priced add-ons. The Services sidebar item manages their drafts and publication. Public/customer preview separates included services and optional add-ons; neither implies availability or a quote.
+4. The public fixed-reference success message was removed. Book now submits a real request with `packageId` and `packageVersionId`; My events and the manager Bookings queue show that persisted record. Payment and confirmed-booking areas remain future work.
 
 ## Verification performed
 
