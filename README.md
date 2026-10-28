@@ -190,7 +190,7 @@ curl -b cookies.txt -X POST http://localhost:3000/v1/auth/logout
 
 The session cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` when `NODE_ENV=production`. The client can never set its own role.
 
-### Seed local accounts
+### Seed local accounts and sample package drafts
 
 Run this after the database migrations:
 
@@ -198,9 +198,9 @@ Run this after the database migrations:
 pnpm db:seed
 ```
 
-This creates one local admin (`admin1@gmail.com`) and five local customers (`user1@gmail.com` through `user5@gmail.com`). All use `p@ssword01`. Use the normal email/password sign-in option; Firebase configuration is not required.
+This creates one local admin (`admin1@gmail.com`) and five local customers (`user1@gmail.com` through `user5@gmail.com`). All use `p@ssword01`. Use the normal email/password sign-in option; Firebase configuration is not required. It also creates three complete wedding, birthday, and corporate sample drafts with fixed PHP totals, inclusions, venue details, exclusions, and terms. They pass the catalog's publish checks, but stay private until an admin reviews and publishes them. The names and details clearly identify them as demo offers; they are not business-approved prices or terms.
 
-The command is repeatable: it resets these six demo accounts' names, roles, and passwords, preserves their user IDs and any Firebase connections, and invalidates their previous sessions. Other accounts are left untouched. This is development seed data.
+The command is repeatable: it resets these six demo accounts' names, roles, and passwords, preserves their user IDs and any Firebase connections, and invalidates their previous sessions. Existing sample packages, including admin edits, are left untouched; only missing sample drafts are inserted. Untouched incomplete drafts from the earlier seed are upgraded to the complete samples. Other accounts and packages are left untouched. This is development seed data.
 
 ### Auth verification
 
