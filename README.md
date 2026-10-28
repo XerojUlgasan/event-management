@@ -60,6 +60,7 @@ Useful variants:
 | `pnpm all:storybook` | The above plus Storybook at `http://localhost:6006` |
 | `pnpm all:web` | Web only (no Docker, API, or database) |
 | `pnpm dev:prepare` | Database setup and migrations only |
+| `pnpm db:reset` | Delete all data in the configured database and reapply migrations (prompts for confirmation) |
 
 The frontend uses the shared component library from `@event-management/ui`, organized into `atoms/`, `molecules/`, `organisms/`, and `templates/`. Shared component styles live in `packages/ui/src/styles.css`; app-specific overrides are in `apps/web/src/styles/app.css`. Migrated screens live in `apps/web/src/components/app`, with page components in `app/pages` and the customer portal in `app/customer`. Fonts and images are vendored in `apps/web/public/fonts` and `apps/web/public/images`, so the app does not depend on external asset requests.
 

@@ -3,7 +3,7 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(uuid()) @db.Uuid
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   firebaseUid  String?   @unique @map("firebase_uid")
   passwordHash String?   @map("password_hash")
   email        String    @unique
@@ -19,7 +19,7 @@ model User {
 }
 
 model Conversation {
-  id         String    @id @default(uuid()) @db.Uuid
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   customerId String    @unique @map("customer_id") @db.Uuid
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -30,7 +30,7 @@ model Conversation {
 }
 
 model Message {
-  id             String       @id @default(uuid()) @db.Uuid
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   conversationId String       @map("conversation_id") @db.Uuid
   senderId       String       @map("sender_id") @db.Uuid
   body           String
@@ -44,7 +44,7 @@ model Message {
 }
 
 model Session {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
   tokenHash String   @unique @map("token_hash")
   expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
@@ -56,7 +56,7 @@ model Session {
 }
 
 model Package {
-  id        String           @id @default(uuid()) @db.Uuid
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime         @default(now()) @map("updated_at") @db.Timestamptz(6)
   archivedAt DateTime?       @map("archived_at") @db.Timestamptz(6)
@@ -66,7 +66,7 @@ model Package {
 }
 
 model PackageImage {
-  id          String   @id @default(uuid()) @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   contentType String   @map("content_type")
   data        Bytes
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -75,7 +75,7 @@ model PackageImage {
 }
 
 model PackageVersion {
-  id           String    @id @default(uuid()) @db.Uuid
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   packageId    String    @map("package_id") @db.Uuid
   version      Int
   state        String

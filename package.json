@@ -19,6 +19,7 @@
     "db:validate": "pnpm --filter @event-management/api db:validate",
     "db:migrate": "pnpm --filter @event-management/api db:migrate",
     "db:deploy": "pnpm --filter @event-management/api db:deploy",
+    "db:reset": "pnpm --filter @event-management/api db:reset",
     "db:generate": "pnpm --filter @event-management/api db:generate",
     "db:check": "pnpm --filter @event-management/api db:check",
     "db:seed": "pnpm --filter @event-management/api db:seed",
