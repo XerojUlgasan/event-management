@@ -20,7 +20,7 @@ packages/
 scripts/             Local development setup for `pnpm all`
 ```
 
-The root route renders the migrated Clemora frontend from `apps/web/src/components/app/`. The original Three.js landing page remains at `/landing`. The package catalog now reads and edits PostgreSQL records through the API; no approved packages are seeded. Event, booking, quote, and payment screens still use sample data. Authentication supports local email/password accounts and Firebase sign-in, with shared profiles, roles, and sessions in PostgreSQL.
+The root route renders the migrated Clemora frontend from `apps/web/src/components/app/`. The original Three.js landing page remains at `/landing`. The package catalog reads and edits PostgreSQL records through the API; no approved packages are seeded. Customer-to-staff messages also persist in PostgreSQL and are shared by the customer and admin workspaces. Event, booking, quote, and payment screens still use sample data. Authentication supports local email/password accounts and Firebase sign-in, with shared profiles, roles, and sessions in PostgreSQL.
 
 The package catalog supports private admin drafts, versioned publication, archiving, and deletion of never-published unreferenced drafts. Admins use a three-step editor with removable tags for event types, inclusions, and exclusions, plus an image URL or JPEG/PNG upload. Each package's inclusions are entered explicitly. Public and customer views show only current published packages. Package prices are fixed totals in PHP, stored as centavos. Apply package migrations with `pnpm db:deploy` on an existing local database; `pnpm --filter @event-management/api test:packages` runs catalog behavior tests against a disposable local database. See [the catalog implementation note](docs/PACKAGES_CRUD_DRAFT.md) for the API and frontend contract.
 
@@ -214,6 +214,20 @@ pnpm --filter @event-management/api test:auth
 The auth suite requires the Firebase CLI (`firebase-tools`) on PATH and a running local PostgreSQL instance configured in `apps/api/.env`. The database user needs permission to create a disposable test database. The command starts the Firebase Auth emulator using the `demo-event-management` project, creates a separate database, applies all committed migrations, tests the real routes and Firebase Admin verification, then drops only that test database and shuts down the emulator. It never creates real Firebase accounts or modifies the application database. Ports 9099, 4409, and 4509 must be free.
 
 Coverage includes local registration/login, password hashes, cookie/session persistence, expiry/logout, existing Firebase email accounts, emulated Google identities, conflicts, proof of both accounts for linking, password addition, concurrent linking, disabled Firebase users, validation, throttling, and OpenAPI routes. The emulator verifies the Firebase integration; it does not prove a production Google OAuth popup or production service-account configuration.
+
+## Customer messages
+
+Signed-in customers have one direct conversation with the Clemora team. The customer **Messages** tab and the admin **Messages** workspace read the same PostgreSQL records, refresh every five seconds, and show unread counts. Opening a thread marks the other side's messages as read. Both sides can send messages of up to 4,000 characters; the API enforces the account role, and a customer can only read their own conversation.
+
+| Route | Auth | Purpose |
+| --- | --- | --- |
+| `GET /v1/messages/conversation` | Customer session | Load the signed-in customer's conversation, creating it on first use |
+| `POST /v1/messages/conversation/messages` | Customer session | Send a message to the Clemora team |
+| `GET /v1/admin/conversations` | Admin session | List non-empty conversations with last message and unread count |
+| `GET /v1/admin/conversations/{id}` | Admin session | Load a customer conversation |
+| `POST /v1/admin/conversations/{id}/messages` | Admin session | Reply to a customer |
+
+`pnpm --filter @event-management/api test:messages` runs the messaging behavior suite against a disposable local database. Apply the messaging migration with `pnpm db:deploy` on an existing local database.
 
 ## Database workflow
 

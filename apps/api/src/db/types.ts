@@ -11,6 +11,22 @@ export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface Conversations {
+  created_at: Generated<Timestamp>;
+  customer_id: string;
+  id: Generated<string>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface Messages {
+  body: string;
+  conversation_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  read_at: Timestamp | null;
+  sender_id: string;
+}
+
 export interface PackageImages {
   content_type: string;
   created_at: Generated<Timestamp>;
@@ -66,6 +82,8 @@ export interface Users {
 }
 
 export interface DB {
+  conversations: Conversations;
+  messages: Messages;
   package_images: PackageImages;
   package_versions: PackageVersions;
   packages: Packages;

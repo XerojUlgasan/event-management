@@ -116,3 +116,38 @@ export function deleteUnreferencedPackageImage(imageUrl: string): Promise<void> 
   if (!id) throw new Error("Unable to identify the uploaded image for cleanup.")
   return request<void>(`/admin/package-images/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
 }
+
+export type ChatMessage = {
+  id: string
+  body: string
+  senderId: string
+  senderRole: "admin" | "customer"
+  senderName: string
+  createdAt: string
+  readAt: string | null
+}
+
+export type ChatConversation = {
+  id: string
+  customerId: string
+  customerName: string
+  customerEmail: string
+  lastMessage: ChatMessage | null
+  unreadCount: number
+  updatedAt: string
+}
+
+export type ChatThread = {
+  conversation: ChatConversation
+  messages: ChatMessage[]
+}
+
+export const getMyConversation = () => request<ChatThread>("/messages/conversation")
+export const sendMyMessage = (body: string) =>
+  request<{ message: ChatMessage }>("/messages/conversation/messages", { body })
+export const getAdminConversations = () =>
+  request<{ conversations: ChatConversation[] }>("/admin/conversations")
+export const getAdminConversation = (id: string) =>
+  request<ChatThread>(`/admin/conversations/${encodeURIComponent(id)}`)
+export const sendAdminMessage = (id: string, body: string) =>
+  request<{ message: ChatMessage }>(`/admin/conversations/${encodeURIComponent(id)}/messages`, { body })
