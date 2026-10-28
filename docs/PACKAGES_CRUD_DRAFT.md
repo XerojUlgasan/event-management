@@ -1,6 +1,6 @@
 # Package catalog implementation
 
-Status: implemented locally, 2026-10-27. This document records the catalog behavior and its frontend contract. Inquiry, add-on, quote, availability, and booking work is tracked in `ROADMAP.md`. No approved package data is seeded.
+Status: implemented locally, 2026-10-27. This document records the catalog behavior and its frontend contract. Inquiry, add-on, quote, availability, and booking work is tracked in `ROADMAP.md`. `pnpm db:seed` creates three complete, publishable sample drafts, but no approved package data is seeded or automatically published.
 
 ## Business boundary
 
