@@ -10,7 +10,6 @@ import type { NavKey } from "./types"
 import { firstName, initialsFromName } from "../../lib/name"
 import { BookingsPage } from "./pages/BookingsPage"
 import { CalendarPage } from "./pages/CalendarPage"
-import { CustomersPage } from "./pages/CustomersPage"
 import { GenericPage } from "./pages/GenericPage"
 import { InventoryPage } from "./pages/InventoryPage"
 import { MessagesPage } from "./pages/MessagesPage"
@@ -19,7 +18,7 @@ import { Overview } from "./pages/Overview"
 import { PackagesPage } from "./pages/PackagesPage"
 import { ServicesPanel } from "./pages/ServicesPanel"
 import { ReportsPage } from "./pages/ReportsPage"
-import { StaffsPage } from "./pages/StaffsPage"
+import { StaffCustomersPage } from "./pages/StaffCustomersPage"
 import { Sidebar } from "./Sidebar"
 import { SignInMethods } from "./SignInMethods"
 
@@ -90,9 +89,8 @@ export function AppShell({
     if (active === "Overview")
       return <Overview firstName={firstName(name)} onNavigate={setActive} />
     if (active === "Bookings") return <BookingsPage />
-    if (active === "Customers") return <CustomersPage />
     if (active === "Messages") return <MessagesPage />
-    if (active === "Staffs") return <StaffsPage />
+    if (active === "StaffCustomers") return <StaffCustomersPage />
     if (active === "Calendar") return <CalendarPage />
     if (active === "Packages")
       return <PackagesPage />
