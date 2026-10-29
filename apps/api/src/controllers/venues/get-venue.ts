@@ -11,5 +11,5 @@ export const getVenueRoute = createRoute({ method: "get", path: "/venues/{id}", 
 });
 export const getVenueRouteHandler: AppRouteHandler<typeof getVenueRoute> = async c => {
   const row = await findVenueData(c.get("db"), c.req.valid("param").id);
-  return row ? c.json(venueDto(row), 200) : c.json({ error: "Venue not found" }, 404);
+  return row && !row.archived_at ? c.json(venueDto(row), 200) : c.json({ error: "Venue not found" }, 404);
 };

@@ -1,7 +1,7 @@
 # API structure and routes
 
 - `apps/api/src/index.ts` starts the Node server. `src/app.ts` builds the `OpenAPIHono<HonoEnv>` app, configures CORS and request guards, injects `db`, mounts controller groups at `/v1`, and serves `/openapi.json`.
-- `src/controllers/<domain>/index.ts` registers routes and middleware. Each operation has a kebab-case verb–entity file exporting `<operation>Route` and `<operation>RouteHandler`; the route defines method, path, request and response schemas, while the handler maps validated input and service outcomes to HTTP responses. The active domains are `auth/`, `packages/`, `services/`, `messages/`, and `health/`.
+- `src/controllers/<domain>/index.ts` registers routes and middleware. Each operation has a kebab-case verb–entity file exporting `<operation>Route` and `<operation>RouteHandler`; the route defines method, path, request and response schemas, while the handler maps validated input and service outcomes to HTTP responses. The active domains are `auth/`, `packages/`, `services/`, `messages/`, `booking-requests/`, `venues/`, `users/`, and `health/`.
 - `src/services/<domain>/<verb>-<entity>.ts` owns business rules and coordinates transactions and data calls. Exports use the `<operation>Service` suffix. A service is optional for an operation with no business work, such as health.
 - `src/data/<domain>/<verb>-<entity>.ts` owns focused Kysely queries and accepts a database client or transaction. Exports use the `<operation>Data` suffix. `src/db/` remains the shared connection, generated types, and database setup area.
 - `src/utils/` holds reusable primitives; auth-specific and package-specific helpers can use `utils/auth/` and `utils/packages/`. `src/middleware/` holds shared request authentication middleware; `src/types/hono.ts` defines typed context variables.
@@ -18,3 +18,4 @@ For a new operation, use the matching domain folder in each layer. For example, 
 Check the affected route's OpenAPI output and behavior, especially if changing paths or response shapes consumed by `apps/web/src/lib/api.ts`.
 
 - System Administrator access requires role `admin` and staff title `System Administrator`; role `staff` can read booking requests and published catalog, but cannot access administrative catalog, messages, directory, or writes.
+- Venue catalog routes provide public active venue list and detail reads, and System Administrator writes. Selecting a venue copies text into a package; it does not create a reservation or check availability.

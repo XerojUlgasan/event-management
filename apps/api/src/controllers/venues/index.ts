@@ -1,6 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { createMiddleware } from "hono/factory";
-import { requireSession } from "../../middleware/auth.js";
+import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import { listVenuesRoute, listVenuesRouteHandler } from "./list-venues.js";
 import { getVenueRoute, getVenueRouteHandler } from "./get-venue.js";
@@ -15,13 +14,8 @@ const routes = new OpenAPIHono<HonoEnv>({
   },
 });
 
-const admin = createMiddleware<HonoEnv>(async (c, next) => {
-  if (c.get("session").user.role !== "admin") return c.json({ error: "Admin access required" }, 403);
-  await next();
-});
-
-routes.use("/admin/venues", requireSession, admin);
-routes.use("/admin/venues/*", requireSession, admin);
+routes.use("/admin/venues", requireSession, requireSystemAdmin);
+routes.use("/admin/venues/*", requireSession, requireSystemAdmin);
 
 routes.openapi(listVenuesRoute, listVenuesRouteHandler);
 routes.openapi(getVenueRoute, getVenueRouteHandler);

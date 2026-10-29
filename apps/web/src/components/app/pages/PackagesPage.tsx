@@ -1,3 +1,4 @@
+import { venueDetailsFromSelection } from "../../../lib/venue-details"
 import { useCallback, useEffect, useState } from "react"
 import { Badge, Button, Dialog, FormField, Icon, PageHeader, SearchField, Tabs } from "@event-management/ui"
 import { ApiError, archivePackage, createPackage, deletePackage, getAdminPackage, getAdminPackages, getAdminServices, publishPackage, updatePackageDraft, uploadPackageImage, deleteUnreferencedPackageImage, packageImageSrc, serviceImageSrc, getVenues, createVenue, updateVenue, archiveVenue } from "../../../lib/api"
@@ -132,13 +133,15 @@ export function PackagesPage() {
   const [notice, setNotice] = useState("")
   const [venues, setVenues] = useState<Venue[]>([])
   const [venueSearch, setVenueSearch] = useState("")
+  const [venueError, setVenueError] = useState("")
   const [venueEditing, setVenueEditing] = useState<{ id: string | null; name: string; location: string; description: string } | null>(null)
   const [venueFormError, setVenueFormError] = useState("")
   const [venueConfirm, setVenueConfirm] = useState<Venue | null>(null)
   const [venueNotice, setVenueNotice] = useState("")
 
   const loadVenues = useCallback(async () => {
-    try { setVenues((await getVenues()).venues) } catch { /* non-critical */ }
+    setVenueError("")
+    try { setVenues((await getVenues()).venues) } catch (err) { setVenueError(message(err)) }
   }, [])
   useEffect(() => { void loadVenues() }, [loadVenues])
   const load = useCallback(async () => {
@@ -205,7 +208,7 @@ export function PackagesPage() {
     if (!venueConfirm) return
     setBusy(true)
     try { await archiveVenue(venueConfirm.id); setVenueConfirm(null); setVenueNotice("Venue archived."); await loadVenues() }
-    catch (err) { setVenueFormError(message(err)); setVenueConfirm(null) } finally { setBusy(false) }
+    catch (err) { setVenueError(message(err)); setVenueConfirm(null) } finally { setBusy(false) }
   }
   const visibleVenues = venues.filter(v => !venueSearch.trim() || `${v.name} ${v.location}`.toLowerCase().includes(venueSearch.toLowerCase().trim()))
   const visible = rows.filter(item => {
@@ -220,9 +223,10 @@ export function PackagesPage() {
     {tab === "Venues" ? <>
       <div className="table-tools package-tools"><SearchField value={venueSearch} onChange={e => setVenueSearch(e.target.value)} placeholder="Search venues" /><Button icon="box" disabled={busy} onClick={() => { setVenueFormError(""); setVenueEditing({ id: null, name: "", location: "", description: "" }) }}>Add venue</Button></div>
       {venueNotice && <p role="status">{venueNotice}</p>}
+      {venueError && <p role="alert">{venueError} <button type="button" onClick={() => void loadVenues()}>Try again</button></p>}
       <div className="venue-list">
         <div className="venue-row venue-row-header"><span>Venue</span><span>Location</span><span>Description</span><span></span></div>
-        {visibleVenues.length === 0 && <p className="venue-empty">No venues found.</p>}
+        {!venueError && visibleVenues.length === 0 && <p className="venue-empty">No venues found.</p>}
         {visibleVenues.map(v => <div className="venue-row" key={v.id}>
           <strong>{v.name}</strong>
           <span className="venue-location">{v.location}</span>

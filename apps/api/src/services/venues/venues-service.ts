@@ -26,7 +26,7 @@ export async function updateVenueService(db: Kysely<DB>, id: string, name: strin
     if (!existing) return error("Venue not found", 404);
     if (existing.archived_at) return error("Venue is archived", 409);
     const row = await updateVenueData(trx, id, name.trim(), location.trim(), description.trim());
-    if (!row) return error("Venue not found", 404);
+    if (!row) return error("Venue is archived", 409);
     return venueDto(row);
   });
 }
@@ -37,7 +37,7 @@ export async function archiveVenueService(db: Kysely<DB>, id: string) {
     if (!existing) return error("Venue not found", 404);
     if (existing.archived_at) return error("Venue is already archived", 409);
     const row = await archiveVenueData(trx, id);
-    if (!row) return error("Venue not found", 404);
+    if (!row) return error("Venue is already archived", 409);
     return venueDto(row);
   });
 }

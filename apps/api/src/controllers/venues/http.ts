@@ -1,5 +1,5 @@
 import { z } from "@hono/zod-openapi";
-import { venueSchema, errorSchema } from "./schemas.js";
+import { venueSchema, venueIdSchema, errorSchema } from "./schemas.js";
 
 export const json = <T extends z.ZodType>(schema: T) => ({ "application/json": { schema } });
 export const errors = {
@@ -9,6 +9,6 @@ export const errors = {
   404: { content: json(errorSchema), description: "Venue not found" },
   409: { content: json(errorSchema), description: "Venue state conflict" },
 };
-export const idParams = z.object({ id: z.string().min(1) });
+export const idParams = z.object({ id: venueIdSchema });
 export const body = <T extends z.ZodType>(schema: T) => ({ required: true as const, content: json(schema) });
 export const result = { content: json(venueSchema), description: "Venue" };
