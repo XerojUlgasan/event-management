@@ -10,9 +10,8 @@ export const photos = {
 export const adminNav: NavKey[] = [
   "Overview",
   "Bookings",
-  "Customers",
   "Messages",
-  "Staffs",
+  "StaffCustomers",
   "Packages",
   "Services",
 ]

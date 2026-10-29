@@ -20,9 +20,8 @@ export function Sidebar({
   const iconFor: Record<NavKey, string> = {
     Overview: "grid",
     Bookings: "clipboard",
-    Customers: "users",
-    Messages: "users",
-    Staffs: "users",
+    Messages: "message",
+    StaffCustomers: "users",
     Calendar: "calendar",
     Packages: "box",
     Services: "spark",
@@ -30,6 +29,9 @@ export function Sidebar({
     Operations: "clipboard",
     Reports: "chart",
     Administration: "settings",
+  }
+  const labelFor: Partial<Record<NavKey, string>> = {
+    StaffCustomers: "Staff & Customers",
   }
   return (
     <aside className={`sidebar ${collapsed ? "" : "sidebar-open"}`}>
@@ -51,7 +53,7 @@ export function Sidebar({
             }}
           >
             <Icon name={iconFor[item]} />
-            <span>{item}</span>
+            <span>{labelFor[item] ?? item}</span>
             {item === "Operations" && <b>3</b>}
           </button>
         ))}

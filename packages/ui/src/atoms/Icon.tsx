@@ -22,6 +22,9 @@ const iconPaths: Record<string, ReactNode> = {
       <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
     </>
   ),
+  message: (
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  ),
   box: (
     <>
       <path d="m21 8-9 5-9-5 9-5 9 5Z" />
