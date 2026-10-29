@@ -12,6 +12,8 @@ let db: typeof import("../src/db/client.js").db;
 let admin: Pool;
 let pool: Pool;
 let adminCookie: string;
+let staffCookie: string;
+let undesignatedAdminCookie: string;
 let customerCookie: string;
 
 before(async () => {
@@ -27,13 +29,15 @@ before(async () => {
   process.env.DB_NAME = database;
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
-  async function session(role: string) {
+  async function session(role: string, staffRole: string | null = null) {
     const token = randomUUID();
-    const user = await db.insertInto("users").values({ email: `${role}@example.test`, password_hash: "unused", role, staff_role: role === "admin" ? "System Administrator" : null }).returning("id").executeTakeFirstOrThrow();
+    const user = await db.insertInto("users").values({ email: `${role}-${randomUUID()}@example.test`, password_hash: "unused", role, staff_role: staffRole }).returning("id").executeTakeFirstOrThrow();
     await db.insertInto("sessions").values({ user_id: user.id, token_hash: hashSessionToken(token), expires_at: new Date(Date.now() + 3600000) }).execute();
     return `em_session=${token}`;
   }
-  adminCookie = await session("admin");
+  adminCookie = await session("admin", "System Administrator");
+  undesignatedAdminCookie = await session("admin");
+  staffCookie = await session("staff", "Waiter");
   customerCookie = await session("customer");
 });
 after(async () => {
@@ -118,6 +122,8 @@ test("image uploads require admin access and validate content", async () => {
     const { imageUrl } = await read(await upload(bytes, type, adminCookie), 201);
     assert.equal((await app.request(imageUrl)).status, 404);
     assert.equal((await app.request(imageUrl, { headers: { Cookie: customerCookie } })).status, 404);
+    assert.equal((await app.request(imageUrl, { headers: { Cookie: staffCookie } })).status, 404);
+    assert.equal((await app.request(imageUrl, { headers: { Cookie: undesignatedAdminCookie } })).status, 404);
     const response = await app.request(imageUrl, { headers: { Cookie: adminCookie } });
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("Content-Type"), type);
@@ -248,6 +254,8 @@ test("service images and category tags follow publication and cleanup rules", as
   const { imageUrl } = await read(await upload(png, "image/png", adminCookie), 201);
   assert.match(imageUrl, /^\/v1\/service-images\/[0-9a-f-]{36}$/);
   assert.equal((await app.request(imageUrl)).status, 404);
+  assert.equal((await app.request(imageUrl, { headers: { Cookie: staffCookie } })).status, 404);
+  assert.equal((await app.request(imageUrl, { headers: { Cookie: undesignatedAdminCookie } })).status, 404);
   assert.equal((await app.request(imageUrl, { headers: { Cookie: adminCookie } })).status, 200);
   const content = { name: "Photography", categories: [" Media ", "Events"], description: "Coverage", imageUrl };
   const created = await read(await call("/admin/services", "POST", content, adminCookie), 201);

@@ -20,7 +20,8 @@
     "db:seed-admin": "tsx src/db/seed-admin.ts",
     "test:packages": "tsx --test tests/packages.test.ts",
     "test:messages": "tsx --test tests/messages.test.ts",
-    "test:booking-requests": "tsx --test tests/booking-requests.test.ts"
+    "test:booking-requests": "tsx --test tests/booking-requests.test.ts",
+    "test:venues": "tsx --test tests/venues.test.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",

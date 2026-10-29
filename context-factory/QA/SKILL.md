@@ -18,7 +18,7 @@ These are the development fixtures from `apps/api/src/db/seed.ts`, not Firebase 
 | staff1@example.test through staff10@example.test | staff | p@ssword01 |
 | customer1@example.test through customer10@example.test | customer | p@ssword01 |
 
-`pnpm db:seed` inserts fixtures only when their addresses are unused; existing accounts and their sessions are never changed. A collision may therefore make a demo login unavailable. Inspect fixtures first and do not run the seed against a shared database without task authorization. New local passwords have an 8-character minimum. Staff can read booking requests and published catalog; System Administrators manage the catalog, directory, messages, and request statuses.
+`pnpm db:seed` inserts fixtures only when their addresses are unused; existing accounts and their sessions are never changed. The seed also inserts 15 synthetic sample venues only when their fixed IDs are unused, preserving edited or archived venues. A collision may therefore make a demo login unavailable. Inspect fixtures first and do not run the seed against a shared database without task authorization. New local passwords have an 8-character minimum. Staff can read booking requests and published catalog; System Administrators manage the catalog, directory, messages, and request statuses. Venues are catalog entries, not availability or reservation records.
 
 ## Session cookies for API tests
 

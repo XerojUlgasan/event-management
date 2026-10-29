@@ -197,6 +197,24 @@ export type AdminUser = {
 export const getAdminUsers = () =>
   request<{ staff: AdminUser[]; customers: AdminUser[] }>("/admin/users")
 
+export type Venue = {
+  id: string
+  name: string
+  location: string
+  description: string
+  createdAt: string
+  updatedAt: string
+  archivedAt: string | null
+}
+
+export const getVenues = () => request<{ venues: Venue[] }>("/venues")
+export const createVenue = (name: string, location: string, description: string) =>
+  request<Venue>("/admin/venues", { name, location, description })
+export const updateVenue = (id: string, name: string, location: string, description: string) =>
+  request<Venue>(`/admin/venues/${encodeURIComponent(id)}`, { name, location, description }, undefined, "PATCH")
+export const archiveVenue = (id: string) =>
+  request<Venue>(`/admin/venues/${encodeURIComponent(id)}`, {}, undefined, "DELETE")
+
 export const getMyConversation = () => request<ChatThread>("/messages/conversation")
 export const sendMyMessage = (body: string) =>
   request<{ message: ChatMessage }>("/messages/conversation/messages", { body })

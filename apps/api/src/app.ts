@@ -7,6 +7,7 @@ import authRoutes from "./controllers/auth/index.js";
 import messageRoutes from "./controllers/messages/index.js";
 import serviceRoutes from "./controllers/services/index.js";
 import packageRoutes from "./controllers/packages/index.js";
+import venueRoutes from "./controllers/venues/index.js";
 import healthRoutes from "./controllers/health/index.js";
 import userRoutes from "./controllers/users/index.js";
 import type { HonoEnv } from "./types/hono.js";
@@ -45,6 +46,8 @@ app.use("/v1/admin/conversations/*", bodyLimit({ maxSize: 16 * 1024 }));
 
 app.use("/v1/admin/packages/*", bodyLimit({ maxSize: 64 * 1024 }));
 app.use("/v1/admin/packages", bodyLimit({ maxSize: 64 * 1024 }));
+app.use("/v1/admin/venues", bodyLimit({ maxSize: 64 * 1024 }));
+app.use("/v1/admin/venues/*", bodyLimit({ maxSize: 64 * 1024 }));
 app.use("/v1/admin/package-images", bodyLimit({ maxSize: 5 * 1024 * 1024 + 64 * 1024 }));
 
 app.route("/v1", healthRoutes);
@@ -53,6 +56,7 @@ app.use("/v1/admin/services", bodyLimit({ maxSize: 64 * 1024 }));
 app.use("/v1/admin/services/*", bodyLimit({ maxSize: 64 * 1024 }));
 app.route("/v1", serviceRoutes);
 app.route("/v1", packageRoutes);
+app.route("/v1", venueRoutes);
 app.use("/v1/booking-requests", bodyLimit({ maxSize: 16 * 1024 }));
 app.use("/v1/booking-requests/*", bodyLimit({ maxSize: 16 * 1024 }));
 app.use("/v1/admin/booking-requests/*", bodyLimit({ maxSize: 16 * 1024 }));

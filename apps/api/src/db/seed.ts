@@ -12,6 +12,24 @@ const demoAccounts = [
   ...Array.from({ length: 10 }, (_, i) => ({ email: `customer${i + 1}@example.test`, display_name: `Demo Customer ${i + 1}`, role: "customer", staff_role: null })),
 ];
 
+const venues = [
+  { id: "b1000000-0000-0000-0000-000000000001", name: "Sample Garden 01", location: "Demo location 01", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+  { id: "b1000000-0000-0000-0000-000000000002", name: "Sample Hall 02", location: "Demo location 02", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+  { id: "b1000000-0000-0000-0000-000000000003", name: "Sample Pavilion 03", location: "Demo location 03", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+  { id: "b1000000-0000-0000-0000-000000000004", name: "Sample Terrace 04", location: "Demo location 04", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+  { id: "b1000000-0000-0000-0000-000000000005", name: "Sample Ballroom 05", location: "Demo location 05", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+  { id: "b1000000-0000-0000-0000-000000000006", name: "Sample Courtyard 06", location: "Demo location 06", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+  { id: "b1000000-0000-0000-0000-000000000007", name: "Sample Lounge 07", location: "Demo location 07", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+  { id: "b1000000-0000-0000-0000-000000000008", name: "Sample Riverside 08", location: "Demo location 08", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+  { id: "b1000000-0000-0000-0000-000000000009", name: "Sample Orchard 09", location: "Demo location 09", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+  { id: "b1000000-0000-0000-0000-000000000010", name: "Sample Beach 10", location: "Demo location 10", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+  { id: "b1000000-0000-0000-0000-000000000011", name: "Sample Convention Hall 11", location: "Demo location 11", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+  { id: "b1000000-0000-0000-0000-000000000012", name: "Sample Studio 12", location: "Demo location 12", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+  { id: "b1000000-0000-0000-0000-000000000013", name: "Sample Loft 13", location: "Demo location 13", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+  { id: "b1000000-0000-0000-0000-000000000014", name: "Sample Grand Hall 14", location: "Demo location 14", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+  { id: "b1000000-0000-0000-0000-000000000015", name: "Sample Hotel 15", location: "Demo location 15", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
+];
+
 const legacyDescription = "Sample draft. Replace these details with an approved offer before publishing.";
 const sampleTerms = "Demo data only. Staff must approve the offer and confirm availability before using it for a customer.";
 const packages = [
@@ -88,10 +106,20 @@ try {
         .where("id", "=", existing.id).returning("id").executeTakeFirst();
       if (updated) upgradedCount++;
     }
-    return { accounts: rows, packageCount, upgradedCount };
+    let venueCount = 0;
+    for (const venue of venues) {
+      const inserted = await db
+        .insertInto("venues")
+        .values({ id: venue.id, name: venue.name, location: venue.location, description: venue.description })
+        .onConflict((conflict) => conflict.column("id").doNothing())
+        .returning("id")
+        .executeTakeFirst();
+      if (inserted) venueCount++;
+    }
+    return { accounts: rows, packageCount, upgradedCount, venueCount };
   });
   console.table(seeded.accounts.map(({ email, role, staff_role }) => ({ email, role, staff_role })));
-  console.log(`Seeded ${seeded.accounts.length} local accounts and ${seeded.packageCount} publishable sample package drafts; upgraded ${seeded.upgradedCount} untouched older drafts.`);
+  console.log(`Inserted ${seeded.accounts.length} local accounts, ${seeded.packageCount} sample package drafts (upgraded ${seeded.upgradedCount}), and ${seeded.venueCount} venues.`);
 } finally {
   await db.destroy();
 }
