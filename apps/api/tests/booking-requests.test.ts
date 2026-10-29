@@ -12,6 +12,7 @@ let db: typeof import("../src/db/client.js").db;
 let admin: Pool;
 let pool: Pool;
 let adminCookie: string;
+let staffCookie: string;
 let customerCookie: string;
 let otherCustomerCookie: string;
 let customerId: string;
@@ -35,7 +36,17 @@ before(async () => {
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((item) => item.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name))) {
+    if (entry.name === "20261030100000_designate_existing_admins") {
+      await pool.query("INSERT INTO users (email, role, staff_role, password_hash) VALUES ('old-admin@example.test', 'admin', NULL, 'unused'), ('old-staff@example.test', 'admin', 'Waiter', 'unused')");
+    }
     await pool.query(await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"));
+    if (entry.name === "20261030100000_designate_existing_admins") {
+      const migrated = await pool.query("SELECT email, role, staff_role FROM users WHERE email IN ('old-admin@example.test', 'old-staff@example.test') ORDER BY email");
+      assert.deepEqual(migrated.rows, [
+        { email: "old-admin@example.test", role: "admin", staff_role: "System Administrator" },
+        { email: "old-staff@example.test", role: "staff", staff_role: "Waiter" },
+      ]);
+    }
   }
   process.env.DB_NAME = database;
   ({ app } = await import("../src/app.js"));
@@ -45,7 +56,7 @@ before(async () => {
     const token = randomUUID();
     const user = await db
       .insertInto("users")
-      .values({ email: `${role}-${randomUUID()}@example.test`, display_name: name, password_hash: "unused", role })
+      .values({ email: `${role}-${randomUUID()}@example.test`, display_name: name, password_hash: "unused", role, staff_role: role === "admin" ? "System Administrator" : null })
       .returning("id")
       .executeTakeFirstOrThrow();
     await db
@@ -60,6 +71,7 @@ before(async () => {
   }
 
   ({ cookie: adminCookie } = await session("admin", "Admin Person"));
+  ({ cookie: staffCookie } = await session("staff", "Staff Person"));
   const customer = await session("customer", "Customer One");
   customerCookie = customer.cookie;
   customerId = customer.id;
@@ -104,10 +116,23 @@ test("requests enforce roles, version availability, ownership and status history
   await read(await call("/booking-requests","POST",{...input,endsAt:input.startsAt},customerCookie),400);
   await read(await call("/booking-requests","POST",{...input,timeZone:"Wrong/Zone"},customerCookie),400);
   await read(await call("/booking-requests","POST",{...input,packageVersionId:randomUUID()},customerCookie),409);
+  const staffProfile = await read(await call("/me", "GET", undefined, staffCookie), 200);
+  assert.equal(staffProfile.role, "staff");
+  for (const path of ["/admin/users", "/admin/conversations", "/admin/packages", "/admin/services"])
+    await read(await call(path, "GET", undefined, staffCookie), 403);
+  for (const path of ["/admin/packages", "/admin/services", "/admin/conversations", "/messages/conversation", "/booking-requests"])
+    await read(await call(path, "POST", {}, staffCookie), 403);
+  await read(await call("/messages/conversation", "GET", undefined, staffCookie), 403);
+  await read(await call(`/admin/packages/${pkg.id}`, "GET", undefined, staffCookie), 403);
+  await read(await call(`/admin/services/${randomUUID()}`, "GET", undefined, staffCookie), 403);
+  await read(await call("/packages", "GET", undefined, staffCookie), 200);
+  await read(await call("/services", "GET", undefined, staffCookie), 200);
   const created = (await read(await call("/booking-requests","POST",input,customerCookie),201)).bookingRequest;
   assert.equal(created.customerId,customerId); assert.equal(created.outOfRange,true); assert.equal(created.status,"under_review"); assert.equal(created.statusHistory.length,1);
   assert.deepEqual((await read(await call("/booking-requests/mine","GET",undefined,otherCustomerCookie),200)).bookingRequests,[]);
   assert.equal((await read(await call("/booking-requests/mine","GET",undefined,customerCookie),200)).bookingRequests[0].id,created.id);
+  assert.equal((await read(await call("/admin/booking-requests", "GET", undefined, staffCookie), 200)).bookingRequests[0].id, created.id);
+  await read(await call(`/admin/booking-requests/${created.id}/status`, "PATCH", {status:"accepted"}, staffCookie), 403);
   await read(await call(`/admin/booking-requests/${created.id}/status`,"PATCH",{status:"confirmed"},adminCookie),400);
   await read(await call(`/admin/booking-requests/${created.id}/status`,"PATCH",{status:"accepted"},customerCookie),403);
   const updated = (await read(await call(`/admin/booking-requests/${created.id}/status`,"PATCH",{status:"needs_details",reason:"Please clarify"},adminCookie),200)).bookingRequest;

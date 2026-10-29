@@ -9,7 +9,7 @@ const userSchema = z.object({
   id: z.string().uuid(),
   displayName: z.string().nullable(),
   email: z.string(),
-  role: z.enum(["admin", "customer"]),
+  role: z.enum(["admin", "staff", "customer"]),
   staffRole: z.string().nullable(),
   createdAt: z.string(),
 });
@@ -27,17 +27,18 @@ export const listAdminUsersRoute = createRoute({
 
 export const listAdminUsersRouteHandler: AppRouteHandler<typeof listAdminUsersRoute> = async (c) => {
   const db = c.get("db");
-  const [staff, customers] = await Promise.all([
+  const [admins, staff, customers] = await Promise.all([
     listUsersData(db, "admin"),
+    listUsersData(db, "staff"),
     listUsersData(db, "customer"),
   ]);
   const toDto = (row: (typeof staff)[number]) => ({
     id: row.id,
     displayName: row.display_name,
     email: row.email,
-    role: row.role as "admin" | "customer",
+    role: row.role as "admin" | "staff" | "customer",
     staffRole: row.staff_role ?? null,
     createdAt: new Date(row.created_at).toISOString(),
   });
-  return c.json({ staff: staff.map(toDto), customers: customers.map(toDto) }, 200);
+  return c.json({ staff: [...admins, ...staff].map(toDto), customers: customers.map(toDto) }, 200);
 };

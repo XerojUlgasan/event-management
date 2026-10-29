@@ -20,7 +20,7 @@ packages/
 scripts/             Local development setup for `pnpm all`
 ```
 
-The root route renders the migrated Clemora frontend from `apps/web/src/components/app/`. The original Three.js landing page remains at `/landing`. The package catalog reads and edits PostgreSQL records through the API; no approved packages are seeded. Customer-to-staff messages and booking requests persist in PostgreSQL and are shared by the customer and admin workspaces. Booking requests are inquiries for staff review; they do not reserve dates, approve final prices, or confirm bookings. Quote, payment, and other event-delivery screens remain demo or future work. Authentication supports local email/password accounts and Firebase sign-in, with shared profiles, roles, and sessions in PostgreSQL.
+The root route renders the migrated Clemora frontend from `apps/web/src/components/app/`. The original Three.js landing page remains at `/landing`. The package catalog reads and edits PostgreSQL records through the API; no approved packages are seeded. Customer-to-admin messages and booking requests persist in PostgreSQL and are shared by the customer and admin workspaces. Booking requests are inquiries for staff review; they do not reserve dates, approve final prices, or confirm bookings. Quote, payment, and other event-delivery screens remain demo or future work. Authentication supports local email/password accounts and Firebase sign-in, with shared profiles, roles, and sessions in PostgreSQL.
 
 The package catalog supports private admin drafts, versioned publication, archiving, and deletion of never-published unreferenced drafts. Admins use a three-step editor with removable tags for event types, inclusions, and exclusions, plus an image URL or JPEG/PNG upload. Each package's inclusions are entered explicitly. Public and customer views show only current published packages. Package prices are fixed totals in PHP, stored as centavos. Admins can also publish versioned services with category tags and an image URL or JPEG/PNG upload, then assign them to packages as included benefits or optional paid add-ons. Add-on prices are fixed PHP amounts per unit for each package assignment. Apply catalog migrations with `pnpm db:deploy` on an existing local database; `pnpm --filter @event-management/api test:packages` runs catalog behavior tests against a disposable local database. See the [package](docs/PACKAGES_CRUD_DRAFT.md) and [service](docs/SERVICES.md) catalog notes for the contracts.
 
@@ -145,7 +145,7 @@ pnpm db:seed-admin admin@example.com
 Roles live in the `users` table, so you can also promote or demote an account directly:
 
 ```sql
-update users set role = 'admin' where email = 'admin@example.com';
+update users set role = 'admin', staff_role = 'System Administrator' where email = 'admin@example.com';
 update users set role = 'customer' where email = 'admin@example.com';
 ```
 
@@ -190,6 +190,8 @@ curl -b cookies.txt -X POST http://localhost:3000/v1/auth/logout
 
 The session cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` when `NODE_ENV=production`. The client can never set its own role.
 
+Only System Administrators can manage catalog drafts, the user directory, messages, and booking request statuses. Staff can sign in to view booking requests and the published package and service catalog.
+
 ### Seed local accounts and sample package drafts
 
 Run this after the database migrations:
@@ -198,9 +200,9 @@ Run this after the database migrations:
 pnpm db:seed
 ```
 
-This creates one local admin (`admin1@gmail.com`) and five local customers (`user1@gmail.com` through `user5@gmail.com`). All use `p@ssword01`. Use the normal email/password sign-in option; Firebase configuration is not required. It also creates three complete wedding, birthday, and corporate sample drafts with fixed PHP totals, inclusions, venue details, exclusions, and terms. They pass the catalog's publish checks, but stay private until an admin reviews and publishes them. The names and details clearly identify them as demo offers; they are not business-approved prices or terms.
+This inserts the legacy local admin (`admin1@gmail.com`) and five customers (`user1@gmail.com` through `user5@gmail.com`), and inserts missing demo staff (`staff1@example.test` through `staff10@example.test`) and customers (`customer1@example.test` through `customer10@example.test`). Newly created fixtures use `p@ssword01`. Use the normal email/password sign-in option; Firebase configuration is not required. It also creates three complete wedding, birthday, and corporate sample drafts with fixed PHP totals, inclusions, venue details, exclusions, and terms. They pass the catalog's publish checks, but stay private until an admin reviews and publishes them. The names and details clearly identify them as demo offers; they are not business-approved prices or terms.
 
-The command is repeatable: it resets these six demo accounts' names, roles, and passwords, preserves their user IDs and any Firebase connections, and invalidates their previous sessions. Existing sample packages, including admin edits, are left untouched; only missing sample drafts are inserted. Untouched incomplete drafts from the earlier seed are upgraded to the complete samples. Other accounts and packages are left untouched. This is development seed data.
+The command is repeatable: all fixture accounts are insert-only, and existing accounts and sessions are preserved. Existing sample packages, including admin edits, are left untouched; only missing sample drafts are inserted. Untouched incomplete drafts from the earlier seed are upgraded to the complete samples. Existing example.test accounts are never updated and their sessions remain valid, so an address collision may not be a usable fixture. Other accounts and packages are left untouched. This is development seed data.
 
 ### Auth verification
 
@@ -269,7 +271,7 @@ select id, user_id, expires_at, created_at
 from sessions
 order by created_at desc;
 
-update users set role = 'admin' where email = 'admin@example.com';
+update users set role = 'admin', staff_role = 'System Administrator' where email = 'admin@example.com';
 ```
 
 Reload the app after changing a role; the client caches the profile until the next page load or sign-in.

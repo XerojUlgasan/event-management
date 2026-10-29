@@ -70,7 +70,7 @@ function ServicePreview({ id, onClose, onPackage }: { id: string; onClose: () =>
   </dialog>, document.body)
 }
 
-function CatalogPreview({ selected, onClose, onPackage }: { selected: Preview; onClose: () => void; onPackage: (id: string) => void }) {
+function CatalogPreview({ selected, onClose, onPackage, allowBooking }: { selected: Preview; onClose: () => void; onPackage: (id: string) => void; allowBooking: boolean }) {
   const [packageDetail, setPackageDetail] = useState<PublicPackage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -82,11 +82,11 @@ function CatalogPreview({ selected, onClose, onPackage }: { selected: Preview; o
     return () => { active = false }
   }, [selected])
   if (selected?.kind === "services") return <ServicePreview id={selected.id} onClose={onClose} onPackage={onPackage} />
-  if (selected?.kind === "packages") return <PackagePreview item={packageDetail} loading={loading} error={error} onClose={onClose} />
+  if (selected?.kind === "packages") return <PackagePreview allowBooking={allowBooking} item={packageDetail} loading={loading} error={error} onClose={onClose} />
   return null
 }
 
-export function PublicCatalog({ kind, mode = "featured" }: { kind: Kind; mode?: "featured" | "overview" }) {
+export function PublicCatalog({ kind, mode = "featured", allowBooking = true }: { kind: Kind; mode?: "featured" | "overview"; allowBooking?: boolean }) {
   const [items, setItems] = useState<(PublicPackage | PublicService)[]>([])
   const [nextOffset, setNextOffset] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
@@ -136,7 +136,7 @@ export function PublicCatalog({ kind, mode = "featured" }: { kind: Kind; mode?: 
     {error && <p className="catalog-status" role="alert">{error} <button type="button" onClick={() => void load(items.length ? nextOffset ?? items.length : 0, items.length === 0)}>Try again</button></p>}
     {mode === "featured" && items.length > 0 && <a className="catalog-view-more" href={`/catalog?type=${kind}`}>View more {kind}<span aria-hidden="true">↗</span></a>}
     {mode === "overview" && <div className="catalog-pagination"><div ref={sentinelRef} aria-hidden="true" />{loading && initialized && <p role="status">Loading more {kind}…</p>}{nextOffset !== null && !loading && !error && <button type="button" onClick={() => void load(nextOffset)}>Load more {kind}</button>}{initialized && nextOffset === null && items.length > 0 && <p>All {items.length} {kind} shown</p>}</div>}
-    <CatalogPreview selected={selected} onClose={closePreview} onPackage={showPackage} />
+    <CatalogPreview allowBooking={allowBooking} selected={selected} onClose={closePreview} onPackage={showPackage} />
   </>
 }
 

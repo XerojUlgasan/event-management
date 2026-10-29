@@ -1,6 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { createMiddleware } from "hono/factory";
-import { requireSession } from "../../middleware/auth.js";
+import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import {
   listPublicServicesRoute,
@@ -55,11 +54,7 @@ const routes = new OpenAPIHono<HonoEnv>({
       );
   },
 });
-const admin = createMiddleware<HonoEnv>(async (c, next) => {
-  if (c.get("session").user.role !== "admin")
-    return c.json({ error: "Admin access required" }, 403);
-  await next();
-});
+const admin = requireSystemAdmin;
 routes.use("/admin/service-images", requireSession, admin);
 routes.use("/admin/service-images/*", requireSession, admin);
 routes.openapi(uploadServiceImageRoute, uploadServiceImageRouteHandler);

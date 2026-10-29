@@ -1,6 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
-import { requireSession } from "../../middleware/auth.js";
+import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import { getCustomerConversationRoute, getCustomerConversationRouteHandler } from "./get-customer-conversation.js";
 import { sendCustomerMessageRoute, sendCustomerMessageRouteHandler } from "./send-customer-message.js";
@@ -18,10 +18,7 @@ const customerOnly = createMiddleware<HonoEnv>(async (c, next) => {
   if (c.get("session").user.role !== "customer") return c.json({ error: "Customer access required" }, 403);
   await next();
 });
-const adminOnly = createMiddleware<HonoEnv>(async (c, next) => {
-  if (c.get("session").user.role !== "admin") return c.json({ error: "Admin access required" }, 403);
-  await next();
-});
+const adminOnly = requireSystemAdmin;
 routes.use("/messages", requireSession, customerOnly);
 routes.use("/messages/*", requireSession, customerOnly);
 routes.use("/admin/conversations", requireSession, adminOnly);

@@ -18,11 +18,12 @@ export function priceLabel(price: PackagePrice | null) {
   }
 }
 
-export function PackagePreview({ item, loading = false, error = "", versionState, onClose }: {
+export function PackagePreview({ item, loading = false, error = "", versionState, onClose, allowBooking = true }: {
   item: PackageContent | null
   loading?: boolean
   error?: string
   versionState?: PackageVersion["state"]
+  allowBooking?: boolean
   onClose: () => void
 }) {
   const [booking, setBooking] = useState(false)
@@ -81,7 +82,7 @@ export function PackagePreview({ item, loading = false, error = "", versionState
                 <div><span>Estimated guest range</span><strong>{item.guestMin}–{item.guestMax} guests</strong></div>
               </div>
               <p className="package-preview-note">{admin ? "This preview does not publish the package." : "Your preferred date and final price are subject to staff review."}</p>
-            {!admin && "versionId" in item && <button className="booking-start" type="button" onClick={() => { dialogRef.current?.close(); setBooking(true) }}>Book now</button>}
+            {allowBooking && !admin && "versionId" in item && <button className="booking-start" type="button" onClick={() => { dialogRef.current?.close(); setBooking(true) }}>Book now</button>}
             </aside>
           </div>
           <div className="package-preview-content">

@@ -1,6 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
-import { requireSession } from "../../middleware/auth.js";
+import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import { createBookingRequestRoute, createBookingRequestRouteHandler } from "./create-booking-request.js";
 import { listMyBookingRequestsRoute, listMyBookingRequestsRouteHandler, listAdminBookingRequestsRoute, listAdminBookingRequestsRouteHandler } from "./list-booking-requests.js";
@@ -8,11 +8,14 @@ import { cancelBookingRequestRoute, cancelBookingRequestRouteHandler } from "./c
 import { updateBookingStatusRoute, updateBookingStatusRouteHandler } from "./update-booking-status.js";
 const routes = new OpenAPIHono<HonoEnv>({defaultHook:(result,c) => { if (!result.success) return c.json({error:result.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; ")},400); }});
 const customer = createMiddleware<HonoEnv>(async (c,next) => { if(c.get("session").user.role !== "customer") return c.json({error:"Customer access required"},403); await next(); });
-const admin = createMiddleware<HonoEnv>(async (c,next) => { if(c.get("session").user.role !== "admin") return c.json({error:"Admin access required"},403); await next(); });
+const admin = createMiddleware<HonoEnv>(async (c,next) => { if(!["admin", "staff"].includes(c.get("session").user.role)) return c.json({error:"Admin access required"},403); await next(); });
 routes.use("/booking-requests",requireSession,customer);
 routes.use("/booking-requests/*",requireSession,customer);
 routes.use("/admin/booking-requests",requireSession,admin);
-routes.use("/admin/booking-requests/*",requireSession,admin);
+routes.use("/admin/booking-requests/*",requireSession,createMiddleware<HonoEnv>(async (c, next) => {
+  if (c.req.method === "GET" && c.req.path === "/v1/admin/booking-requests") return next();
+  return requireSystemAdmin(c, next);
+}));
 routes.openapi(createBookingRequestRoute,createBookingRequestRouteHandler);
 routes.openapi(cancelBookingRequestRoute,cancelBookingRequestRouteHandler);
 routes.openapi(listMyBookingRequestsRoute,listMyBookingRequestsRouteHandler);

@@ -4,7 +4,8 @@ export type Profile = {
   hasPassword: boolean;
   email: string;
   displayName: string | null;
-  role: "admin" | "customer";
+  role: "admin" | "staff" | "customer";
+  staffRole: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -188,7 +189,7 @@ export type AdminUser = {
   id: string
   displayName: string | null
   email: string
-  role: "admin" | "customer"
+  role: "admin" | "staff" | "customer"
   staffRole: string | null
   createdAt: string
 }

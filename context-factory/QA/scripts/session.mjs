@@ -7,8 +7,8 @@ import { join } from "node:path";
 async function main() {
   const [email, apiUrl = `http://localhost:${process.env.API_PORT ?? 3000}/v1`, ...extra] = process.argv.slice(2);
   if (email === "--help") return console.log("Usage: node context-factory/QA/scripts/session.mjs FIXTURE_EMAIL [LOCAL_API_BASE_URL]");
-  if (extra.length || !/^(admin1|user[1-5])@gmail\.com$/.test(email ?? "")) {
-    throw new Error("Choose admin1@gmail.com or user1@gmail.com through user5@gmail.com.");
+  if (extra.length || !/^(?:(?:admin1|user[1-5])@gmail\.com|staff(?:[1-9]|10)@example\.test|customer(?:[1-9]|10)@example\.test)$/.test(email ?? "")) {
+    throw new Error("Choose a documented legacy or example.test demo fixture.");
   }
   const target = new URL(apiUrl);
   if (!["http:", "https:"].includes(target.protocol) ||

@@ -648,106 +648,24 @@ test("OpenAPI describes both account methods and never exposes the password hash
   assert.equal(JSON.stringify(spec).includes("password_hash"), false);
 });
 
-test("db:seed creates six usable accounts and resets them without duplicates or changes to unrelated users", async () => {
+test("db:seed inserts fixtures without changing existing accounts or sessions", async () => {
   const unrelated = await register("unrelated-seed@example.com");
-  const original = await db
-    .selectFrom("users")
-    .selectAll()
-    .where("id", "=", unrelated.profile.id)
-    .executeTakeFirstOrThrow();
-  // Existing mixed-case addresses and Firebase connections must survive reseeding.
-  const existingAdmin = await db
-    .insertInto("users")
-    .values({
-      email: "ADMIN1@gmail.com",
-      firebase_uid: "seed-existing-firebase",
-      display_name: "Existing seed account",
-      role: "customer",
-    })
-    .returningAll()
-    .executeTakeFirstOrThrow();
-  const runSeed = () =>
-    promisify(execFile)(
-      process.execPath,
-      ["--import", "tsx", "src/db/seed.ts"],
-      {
-        cwd: fileURLToPath(new URL("../", import.meta.url)),
-        env: {
-          ...process.env,
-          FIREBASE_PROJECT_ID: "",
-          FIREBASE_CLIENT_EMAIL: "",
-          FIREBASE_PRIVATE_KEY: "",
-          GOOGLE_APPLICATION_CREDENTIALS: "",
-          FIREBASE_AUTH_EMULATOR_HOST: "",
-        },
-      },
-    );
+  const collision = await db.insertInto("users").values({ email: "staff1@example.test", display_name: "Existing account", role: "customer", password_hash: "existing-hash" }).returningAll().executeTakeFirstOrThrow();
+  const plausible = await db.insertInto("users").values({ email: "marcos.reyes@clemora.com", display_name: "Real person", role: "customer", password_hash: "other-hash" }).returningAll().executeTakeFirstOrThrow();
+  const existingAdmin = await db.insertInto("users").values({ email: "ADMIN1@gmail.com", firebase_uid: "seed-existing-firebase", display_name: "Existing account", role: "customer" }).returningAll().executeTakeFirstOrThrow();
+  const runSeed = () => promisify(execFile)(process.execPath, ["--import", "tsx", "src/db/seed.ts"], { cwd: fileURLToPath(new URL("../", import.meta.url)), env: { ...process.env, FIREBASE_PROJECT_ID: "", FIREBASE_CLIENT_EMAIL: "", FIREBASE_PRIVATE_KEY: "", GOOGLE_APPLICATION_CREDENTIALS: "", FIREBASE_AUTH_EMULATOR_HOST: "" } });
   await runSeed();
-  const emails = [
-    "admin1@gmail.com",
-    ...Array.from({ length: 5 }, (_, index) => `user${index + 1}@gmail.com`),
-  ];
-  const seeded = await db
-    .selectFrom("users")
-    .selectAll()
-    .where("email", "in", emails)
-    .orderBy("email")
-    .execute();
-  assert.equal(seeded.length, 6);
-  const { verifyPassword } = await import("../src/utils/password.js");
-  for (const account of seeded) {
-    const expectedRole =
-      account.email === "admin1@gmail.com" ? "admin" : "customer";
-    assert.equal(account.role, expectedRole);
-    assert.match(account.password_hash!, /^\$argon2id\$/);
-    assert.ok(await verifyPassword(account.password_hash, "p@ssword01"));
-    const response = await call("/auth/login", {
-      email: account.email,
-      password: "p@ssword01",
-    });
+  for (const original of [collision, plausible, existingAdmin]) assert.deepEqual(await db.selectFrom("users").selectAll().where("id", "=", original.id).executeTakeFirstOrThrow(), original);
+  for (const email of ["user1@gmail.com", "user2@gmail.com", "user3@gmail.com", "user4@gmail.com", "user5@gmail.com", "staff2@example.test", "customer1@example.test"]) {
+    const response = await call("/auth/login", { email, password: "p@ssword01" });
     const profile = await profileOf(response);
-    assert.equal(profile.id, account.id);
-    assert.equal(profile.role, expectedRole);
+    assert.equal(profile.role, email.startsWith("staff") ? "staff" : "customer");
+    if (profile.role === "staff") assert.equal((await profileOf(await call("/me", undefined, cookieOf(response)))).staffRole, "Event Coordinator");
   }
-  assert.equal(seeded[0].id, existingAdmin.id);
-  assert.equal(seeded[0].firebase_uid, "seed-existing-firebase");
-  const priorLogin = await call("/auth/login", {
-    email: "user1@gmail.com",
-    password: "p@ssword01",
-  });
-  await db
-    .updateTable("users")
-    .set({ role: "admin" })
-    .where("email", "=", "user1@gmail.com")
-    .execute();
+  const staffLogin = await call("/auth/login", { email: "staff2@example.test", password: "p@ssword01" });
   await runSeed();
-  const reseeded = await db
-    .selectFrom("users")
-    .selectAll()
-    .where("email", "in", emails)
-    .orderBy("email")
-    .execute();
-  assert.equal(reseeded.length, 6);
-  assert.deepEqual(
-    reseeded.map((row) => row.id),
-    seeded.map((row) => row.id),
-  );
-  for (const account of reseeded) {
-    assert.equal(
-      account.role,
-      account.email === "admin1@gmail.com" ? "admin" : "customer",
-    );
-    assert.ok(await verifyPassword(account.password_hash, "p@ssword01"));
-  }
-  assert.equal(
-    (await call("/me", undefined, cookieOf(priorLogin))).status,
-    401,
-  );
-  const untouched = await db
-    .selectFrom("users")
-    .selectAll()
-    .where("id", "=", unrelated.profile.id)
-    .executeTakeFirstOrThrow();
-  assert.deepEqual(untouched, original);
+  for (const original of [collision, plausible, existingAdmin]) assert.deepEqual(await db.selectFrom("users").selectAll().where("id", "=", original.id).executeTakeFirstOrThrow(), original);
+  assert.equal((await call("/me", undefined, cookieOf(staffLogin))).status, 200);
   assert.equal((await call("/me", undefined, unrelated.cookie)).status, 200);
+  assert.equal((await db.selectFrom("users").select("id").where("email", "=", "staff2@example.test").execute()).length, 1);
 });

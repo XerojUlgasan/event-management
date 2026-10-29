@@ -45,7 +45,7 @@ before(async () => {
     const token = randomUUID();
     const user = await db
       .insertInto("users")
-      .values({ email: `${role}-${randomUUID()}@example.test`, display_name: name, password_hash: "unused", role })
+      .values({ email: `${role}-${randomUUID()}@example.test`, display_name: name, password_hash: "unused", role, staff_role: role === "admin" ? "System Administrator" : null })
       .returning("id")
       .executeTakeFirstOrThrow();
     await db

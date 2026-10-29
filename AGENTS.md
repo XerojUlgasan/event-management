@@ -23,7 +23,7 @@ Register each domain's routes in `controllers/<domain>/index.ts`; `src/app.ts` m
 
 - Use `pnpm`; workspace membership is declared in `pnpm-workspace.yaml`, and runnable commands are in each `package.json`.
 - `/` is `apps/web/src/pages/index.astro` and hosts the React Clemora app. `/landing` is `apps/web/src/pages/landing.astro`. API routes are mounted under `/v1` in `apps/api/src/app.ts`; its OpenAPI document is `/openapi.json`.
-- Package catalog cards and admin edits use the `/v1/packages` API and PostgreSQL. Customer-to-admin messages use `/v1/messages` and `/v1/admin/conversations` with PostgreSQL. Bookings, quotes, payments, and other business screens still use demo data. Trace each screen's API and persistence before describing it as a working backend workflow.
+- Package catalog cards and admin edits use the `/v1/packages` API and PostgreSQL. Customer-to-admin messages use `/v1/messages` and `/v1/admin/conversations` with PostgreSQL. Booking requests persist in PostgreSQL through `/v1/booking-requests` and `/v1/admin/booking-requests`; confirmed bookings, quotes, payments, and other business screens still use demo data. Trace each screen's API and persistence before describing it as a working backend workflow.
 - [Product scope](docs/FEATURES.md) describes the intended business workflow; [README](README.md) describes current setup and implemented behavior. Check both when implementing product behavior.
 - Keep values from `.env`, `.secrets/`, and local databases out of chat, docs, and commits. Use the checked-in `.env.example` files when documentation needs variable names.
 
