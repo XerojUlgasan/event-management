@@ -3,13 +3,13 @@ import { sql } from "kysely";
 import { db } from "./client.js";
 import { hashPassword } from "../utils/password.js";
 
-const accounts = [
-  { email: "admin1@gmail.com", display_name: "Admin 1", role: "admin" },
-  ...Array.from({ length: 5 }, (_, index) => ({
-    email: `user${index + 1}@gmail.com`,
-    display_name: `User ${index + 1}`,
-    role: "customer",
-  })),
+const legacyAccounts = [
+  { email: "admin1@gmail.com", display_name: "System Admin", role: "admin", staff_role: "System Administrator" },
+  ...Array.from({ length: 5 }, (_, i) => ({ email: `user${i + 1}@gmail.com`, display_name: `User ${i + 1}`, role: "customer", staff_role: null })),
+];
+const demoAccounts = [
+  ...["Event Coordinator", "Event Coordinator", "Head Waiter", "Waiter", "Waiter", "Waiter", "Graphic Designer", "Photographer", "Host", "Catering Supervisor"].map((staff_role, i) => ({ email: `staff${i + 1}@example.test`, display_name: `Demo Staff ${i + 1}`, role: "staff", staff_role })),
+  ...Array.from({ length: 10 }, (_, i) => ({ email: `customer${i + 1}@example.test`, display_name: `Demo Customer ${i + 1}`, role: "customer", staff_role: null })),
 ];
 
 const legacyDescription = "Sample draft. Replace these details with an approved offer before publishing.";
@@ -41,32 +41,13 @@ const packages = [
 try {
   const seeded = await db.transaction().execute(async (db) => {
     const rows = [];
-    for (const account of accounts) {
-      const values = {
-        ...account,
-        password_hash: await hashPassword("p@ssword01"),
-      };
-      const row = await db
-        .insertInto("users")
-        .values(values)
-        .onConflict((conflict) =>
-          conflict
-            .expression(sql`lower(trim(email))`)
-            .doUpdateSet({ ...values, updated_at: new Date() }),
-        )
-        .returning(["id", "email", "role"])
-        .executeTakeFirstOrThrow();
-      rows.push(row);
+    // Fixture addresses are insert-only: a pre-existing account is never claimed.
+    for (const account of [...legacyAccounts, ...demoAccounts]) {
+      const row = await db.insertInto("users").values({ ...account, password_hash: await hashPassword("p@ssword01") })
+        .onConflict((conflict) => conflict.expression(sql`lower(trim(email))`).doNothing())
+        .returning(["id", "email", "role", "staff_role"]).executeTakeFirst();
+      if (row) rows.push(row);
     }
-    // Password resets invalidate previous sessions for these demo accounts only.
-    await db
-      .deleteFrom("sessions")
-      .where(
-        "user_id",
-        "in",
-        rows.map((row) => row.id),
-      )
-      .execute();
     let packageCount = 0;
     let upgradedCount = 0;
     for (const pkg of packages) {
@@ -109,7 +90,7 @@ try {
     }
     return { accounts: rows, packageCount, upgradedCount };
   });
-  console.table(seeded.accounts.map(({ email, role }) => ({ email, role })));
+  console.table(seeded.accounts.map(({ email, role, staff_role }) => ({ email, role, staff_role })));
   console.log(`Seeded ${seeded.accounts.length} local accounts and ${seeded.packageCount} publishable sample package drafts; upgraded ${seeded.upgradedCount} untouched older drafts.`);
 } finally {
   await db.destroy();

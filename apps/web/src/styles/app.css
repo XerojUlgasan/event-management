@@ -1102,3 +1102,7 @@
 .service-assignment-preview { display: flex; gap: 12px; margin: 8px 0; }
 .service-assignment-preview img { width: 88px; height: 66px; object-fit: cover; border-radius: 6px; }
 .service-assignment-preview p { margin: 4px 0; }
+
+.staff-nav { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+.staff-nav button { padding: 0.5rem; }
+@media (max-width: 860px) { .public-header:has(.staff-nav) { height: auto; min-height: 78px; flex-wrap: wrap; gap: 0.5rem; padding-block: 1rem; } }

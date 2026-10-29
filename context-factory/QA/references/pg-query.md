@@ -63,7 +63,7 @@ WHERE lower(trim(u.email)) = $1 AND s.expires_at > now()
 ORDER BY s.created_at DESC;
 ```
 
-The stored hash length should be 64 hexadecimal characters. No active rows means no current session, not necessarily a broken account. Logging in creates a session; logout deletes it, and seeding resets fixture sessions.
+The stored hash length should be 64 hexadecimal characters. No active rows means no current session, not necessarily a broken account. Logging in creates a session; logout deletes it, and seeding preserves existing fixture sessions.
 
 If inspecting the stored value is specifically relevant, select `s.token_hash` instead of its length. It remains a hash, not a usable login token. For a usable token, run `scripts/session.mjs` from the parent skill and use its temporary cookie-header file. There is no SQL query that reverses the hash.
 

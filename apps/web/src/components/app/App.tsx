@@ -7,6 +7,7 @@ import { AppShell } from "./AppShell"
 import { AuthPage } from "./AuthPage"
 import { CustomerDashboard } from "./customer/CustomerDashboard"
 import { BookingRequestDialog, clearBookingDraft, readBookingDraft } from "./BookingRequest"
+import { StaffWorkspace } from "./StaffWorkspace"
 import { PublicSite } from "./PublicSite"
 
 export default function App() {
@@ -25,7 +26,7 @@ function AppContent() {
 
   useEffect(() => {
     if (status === "signed-in" && profile) {
-      setView(profile.role === "admin" ? "app" : "customer")
+      setView(profile.role !== "customer" ? "app" : "customer")
     }
   }, [status, profile])
 
@@ -51,6 +52,7 @@ function AppContent() {
     const displayName = profile.displayName ?? profile.email
 
     if (view === "login" || view === "app" || view === "customer") {
+      if (profile.role === "staff" || (profile.role === "admin" && profile.staffRole !== "System Administrator")) return <StaffWorkspace profile={profile} onSignOut={handleSignOut} />
       if (profile.role === "admin") {
         return (
           <AppShell

@@ -4,7 +4,8 @@ export type Profile = {
   hasPassword: boolean;
   email: string;
   displayName: string | null;
-  role: "admin" | "customer";
+  role: "admin" | "staff" | "customer";
+  staffRole: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -183,6 +184,18 @@ export type ChatThread = {
   conversation: ChatConversation
   messages: ChatMessage[]
 }
+
+export type AdminUser = {
+  id: string
+  displayName: string | null
+  email: string
+  role: "admin" | "staff" | "customer"
+  staffRole: string | null
+  createdAt: string
+}
+
+export const getAdminUsers = () =>
+  request<{ staff: AdminUser[]; customers: AdminUser[] }>("/admin/users")
 
 export const getMyConversation = () => request<ChatThread>("/messages/conversation")
 export const sendMyMessage = (body: string) =>

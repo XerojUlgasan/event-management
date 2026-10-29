@@ -13,14 +13,12 @@ These are the development fixtures from `apps/api/src/db/seed.ts`, not Firebase 
 
 | Email | Role | Password |
 | --- | --- | --- |
-| admin1@gmail.com | admin | p@ssword01 |
-| user1@gmail.com | customer | p@ssword01 |
-| user2@gmail.com | customer | p@ssword01 |
-| user3@gmail.com | customer | p@ssword01 |
-| user4@gmail.com | customer | p@ssword01 |
-| user5@gmail.com | customer | p@ssword01 |
+| admin1@gmail.com | System Administrator | p@ssword01 |
+| user1@gmail.com through user5@gmail.com | customer | p@ssword01 |
+| staff1@example.test through staff10@example.test | staff | p@ssword01 |
+| customer1@example.test through customer10@example.test | customer | p@ssword01 |
 
-`pnpm db:seed` creates/resets these six accounts, including names, roles, passwords, and previous sessions. Run it when fixture setup/reset is within the task; it can invalidate another agent's test session. First inspect existing fixtures if they may already be usable. New local passwords have an 8-character minimum.
+`pnpm db:seed` inserts fixtures only when their addresses are unused; existing accounts and their sessions are never changed. A collision may therefore make a demo login unavailable. Inspect fixtures first and do not run the seed against a shared database without task authorization. New local passwords have an 8-character minimum. Staff can read booking requests and published catalog; System Administrators manage the catalog, directory, messages, and request statuses.
 
 ## Session cookies for API tests
 

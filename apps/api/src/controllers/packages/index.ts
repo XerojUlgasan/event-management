@@ -1,6 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { createMiddleware } from "hono/factory";
-import { requireSession } from "../../middleware/auth.js";
+import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import { uploadPackageImageRoute, uploadPackageImageRouteHandler } from "./upload-package-image.js";
 import { getPackageImageRoute, getPackageImageRouteHandler } from "./get-package-image.js";
@@ -21,10 +20,7 @@ const routes = new OpenAPIHono<HonoEnv>({
       return c.json({ error: result.error.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join("; ") }, 400);
   },
 });
-const admin = createMiddleware<HonoEnv>(async (c, next) => {
-  if (c.get("session").user.role !== "admin") return c.json({ error: "Admin access required" }, 403);
-  await next();
-});
+const admin = requireSystemAdmin;
 routes.use("/admin/packages", requireSession, admin);
 routes.use("/admin/packages/*", requireSession, admin);
 routes.use("/admin/package-images", requireSession, admin);

@@ -8,6 +8,7 @@ import messageRoutes from "./controllers/messages/index.js";
 import serviceRoutes from "./controllers/services/index.js";
 import packageRoutes from "./controllers/packages/index.js";
 import healthRoutes from "./controllers/health/index.js";
+import userRoutes from "./controllers/users/index.js";
 import type { HonoEnv } from "./types/hono.js";
 
 export const app = new OpenAPIHono<HonoEnv>();
@@ -58,6 +59,7 @@ app.use("/v1/admin/booking-requests/*", bodyLimit({ maxSize: 16 * 1024 }));
 app.route("/v1", bookingRequestRoutes);
 app.route("/v1", messageRoutes);
 app.route("/v1", authRoutes);
+app.route("/v1", userRoutes);
 
 app.doc("/openapi.json", {
   openapi: "3.0.0",
