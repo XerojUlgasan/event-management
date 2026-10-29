@@ -147,6 +147,7 @@ export interface Users {
   id: Generated<string>;
   password_hash: string | null;
   role: Generated<string>;
+  staff_role: string | null;
   updated_at: Generated<Timestamp>;
 }
 

@@ -4,12 +4,30 @@ import { db } from "./client.js";
 import { hashPassword } from "../utils/password.js";
 
 const accounts = [
-  { email: "admin1@gmail.com", display_name: "Admin 1", role: "admin" },
-  ...Array.from({ length: 5 }, (_, index) => ({
-    email: `user${index + 1}@gmail.com`,
-    display_name: `User ${index + 1}`,
-    role: "customer",
-  })),
+  // System admin
+  { email: "admin1@gmail.com",           display_name: "System Admin",    role: "admin", staff_role: "System Administrator" },
+  // Staff (admin)
+  { email: "marcos.reyes@clemora.com",    display_name: "Marcos Reyes",    role: "admin", staff_role: "Event Coordinator" },
+  { email: "isabelle.santos@clemora.com", display_name: "Isabelle Santos", role: "admin", staff_role: "Event Coordinator" },
+  { email: "daniel.cruz@clemora.com",     display_name: "Daniel Cruz",     role: "admin", staff_role: "Head Waiter" },
+  { email: "patricia.lim@clemora.com",    display_name: "Patricia Lim",    role: "admin", staff_role: "Waiter" },
+  { email: "jose.torres@clemora.com",     display_name: "Jose Torres",     role: "admin", staff_role: "Waiter" },
+  { email: "angela.rivera@clemora.com",   display_name: "Angela Rivera",   role: "admin", staff_role: "Waiter" },
+  { email: "rafael.mendoza@clemora.com",  display_name: "Rafael Mendoza",  role: "admin", staff_role: "Graphic Designer" },
+  { email: "clara.navarro@clemora.com",   display_name: "Clara Navarro",   role: "admin", staff_role: "Photographer" },
+  { email: "miguel.bautista@clemora.com", display_name: "Miguel Bautista", role: "admin", staff_role: "Host" },
+  { email: "diana.flores@clemora.com",    display_name: "Diana Flores",    role: "admin", staff_role: "Catering Supervisor" },
+  // Customers
+  { email: "james.ochoa@gmail.com",       display_name: "James Ochoa",     role: "customer", staff_role: null },
+  { email: "sophia.reyes@gmail.com",      display_name: "Sophia Reyes",    role: "customer", staff_role: null },
+  { email: "nathan.garcia@gmail.com",     display_name: "Nathan Garcia",   role: "customer", staff_role: null },
+  { email: "emily.dela.cruz@gmail.com",   display_name: "Emily Dela Cruz", role: "customer", staff_role: null },
+  { email: "aaron.villanueva@gmail.com",  display_name: "Aaron Villanueva",role: "customer", staff_role: null },
+  { email: "mia.santos@gmail.com",        display_name: "Mia Santos",      role: "customer", staff_role: null },
+  { email: "carlos.ramos@gmail.com",      display_name: "Carlos Ramos",    role: "customer", staff_role: null },
+  { email: "grace.aquino@gmail.com",      display_name: "Grace Aquino",    role: "customer", staff_role: null },
+  { email: "luis.fernandez@gmail.com",    display_name: "Luis Fernandez",  role: "customer", staff_role: null },
+  { email: "jasmine.catalan@gmail.com",   display_name: "Jasmine Catalan", role: "customer", staff_role: null },
 ];
 
 const legacyDescription = "Sample draft. Replace these details with an approved offer before publishing.";
@@ -54,7 +72,7 @@ try {
             .expression(sql`lower(trim(email))`)
             .doUpdateSet({ ...values, updated_at: new Date() }),
         )
-        .returning(["id", "email", "role"])
+        .returning(["id", "email", "role", "staff_role"])
         .executeTakeFirstOrThrow();
       rows.push(row);
     }
@@ -109,7 +127,7 @@ try {
     }
     return { accounts: rows, packageCount, upgradedCount };
   });
-  console.table(seeded.accounts.map(({ email, role }) => ({ email, role })));
+  console.table(seeded.accounts.map(({ email, role, staff_role }) => ({ email, role, staff_role })));
   console.log(`Seeded ${seeded.accounts.length} local accounts and ${seeded.packageCount} publishable sample package drafts; upgraded ${seeded.upgradedCount} untouched older drafts.`);
 } finally {
   await db.destroy();

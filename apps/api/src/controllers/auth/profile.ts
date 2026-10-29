@@ -11,6 +11,7 @@ export const profileSchema = z.object({
   email: z.string(),
   displayName: z.string().nullable(),
   role: z.enum(["admin", "customer"]),
+  staffRole: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -25,6 +26,7 @@ export function toProfile(row: Selectable<Users>): Profile {
     email: row.email,
     displayName: row.display_name,
     role: row.role === "admin" ? "admin" : "customer",
+    staffRole: row.staff_role ?? null,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };

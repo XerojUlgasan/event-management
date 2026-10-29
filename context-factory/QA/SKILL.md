@@ -11,16 +11,31 @@ Use this skill for account-based QA, API sessions, or local database inspection 
 
 These are the development fixtures from `apps/api/src/db/seed.ts`, not Firebase accounts. Use the normal email/password login, leaving **Use my existing Firebase email account** unchecked.
 
-| Email | Role | Password |
-| --- | --- | --- |
-| admin1@gmail.com | admin | p@ssword01 |
-| user1@gmail.com | customer | p@ssword01 |
-| user2@gmail.com | customer | p@ssword01 |
-| user3@gmail.com | customer | p@ssword01 |
-| user4@gmail.com | customer | p@ssword01 |
-| user5@gmail.com | customer | p@ssword01 |
+| Email | Display name | Role | Staff role | Password |
+| --- | --- | --- | --- | --- |
+| admin@clemora.com | System Admin | admin | System Administrator | p@ssword01 |
+| marcos.reyes@clemora.com | Marcos Reyes | admin | Event Coordinator | p@ssword01 |
+| isabelle.santos@clemora.com | Isabelle Santos | admin | Event Coordinator | p@ssword01 |
+| daniel.cruz@clemora.com | Daniel Cruz | admin | Head Waiter | p@ssword01 |
+| patricia.lim@clemora.com | Patricia Lim | admin | Waiter | p@ssword01 |
+| jose.torres@clemora.com | Jose Torres | admin | Waiter | p@ssword01 |
+| angela.rivera@clemora.com | Angela Rivera | admin | Waiter | p@ssword01 |
+| rafael.mendoza@clemora.com | Rafael Mendoza | admin | Graphic Designer | p@ssword01 |
+| clara.navarro@clemora.com | Clara Navarro | admin | Photographer | p@ssword01 |
+| miguel.bautista@clemora.com | Miguel Bautista | admin | Host | p@ssword01 |
+| diana.flores@clemora.com | Diana Flores | admin | Catering Supervisor | p@ssword01 |
+| james.ochoa@gmail.com | James Ochoa | customer | — | p@ssword01 |
+| sophia.reyes@gmail.com | Sophia Reyes | customer | — | p@ssword01 |
+| nathan.garcia@gmail.com | Nathan Garcia | customer | — | p@ssword01 |
+| emily.dela.cruz@gmail.com | Emily Dela Cruz | customer | — | p@ssword01 |
+| aaron.villanueva@gmail.com | Aaron Villanueva | customer | — | p@ssword01 |
+| mia.santos@gmail.com | Mia Santos | customer | — | p@ssword01 |
+| carlos.ramos@gmail.com | Carlos Ramos | customer | — | p@ssword01 |
+| grace.aquino@gmail.com | Grace Aquino | customer | — | p@ssword01 |
+| luis.fernandez@gmail.com | Luis Fernandez | customer | — | p@ssword01 |
+| jasmine.catalan@gmail.com | Jasmine Catalan | customer | — | p@ssword01 |
 
-`pnpm db:seed` creates/resets these six accounts, including names, roles, passwords, and previous sessions. Run it when fixture setup/reset is within the task; it can invalidate another agent's test session. First inspect existing fixtures if they may already be usable. New local passwords have an 8-character minimum.
+`pnpm db:seed` creates/resets these 21 accounts, including names, roles, passwords, and previous sessions. Run it when fixture setup/reset is within the task; it can invalidate another agent's test session. First inspect existing fixtures if they may already be usable. New local passwords have an 8-character minimum.
 
 ## Session cookies for API tests
 

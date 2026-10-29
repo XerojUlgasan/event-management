@@ -184,6 +184,18 @@ export type ChatThread = {
   messages: ChatMessage[]
 }
 
+export type AdminUser = {
+  id: string
+  displayName: string | null
+  email: string
+  role: "admin" | "customer"
+  staffRole: string | null
+  createdAt: string
+}
+
+export const getAdminUsers = () =>
+  request<{ staff: AdminUser[]; customers: AdminUser[] }>("/admin/users")
+
 export const getMyConversation = () => request<ChatThread>("/messages/conversation")
 export const sendMyMessage = (body: string) =>
   request<{ message: ChatMessage }>("/messages/conversation/messages", { body })
