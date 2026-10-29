@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Badge, Button, Dialog, FormField, Tabs } from "@event-management/ui"
 import { ApiError, archiveService, createService, deleteService, deleteUnreferencedServiceImage, getAdminService, getAdminServices, publishService, serviceImageSrc, updateServiceDraft, uploadServiceImage } from "../../../lib/api"
 import type { AdminService, ServiceContent, ServiceVersion } from "../../../lib/api"
-import { TagInput } from "./PackagesPage"
+import { TagInput } from "../TagInput"
 
 const empty: ServiceContent = { name: "", categories: [], description: "", imageUrl: null }
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : "Something went wrong. Please try again."

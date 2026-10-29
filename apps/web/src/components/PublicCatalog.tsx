@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { getIncludingPackages, getPackage, getPackages, getService, getServices, packageImageSrc, serviceImageSrc } from "../lib/api"
-import type { PublicPackage, PublicService } from "../lib/api"
+import { getIncludingPackages, getPackage, getPackages, getService, getServices, getVenues, packageImageSrc, serviceImageSrc, venueImageSrc } from "../lib/api"
+import type { PublicPackage, PublicService, Venue } from "../lib/api"
 import { PackagePreview, priceLabel } from "./app/PackagePreview"
 import { photos } from "./app/data"
 
-type Kind = "services" | "packages"
+type Kind = "services" | "packages" | "venues"
 type Preview = { kind: Kind; id: string } | null
 
 function PackageCard({ item, onPreview }: { item: PublicPackage; onPreview: () => void }) {
@@ -25,6 +25,28 @@ function ServiceCard({ item, onPreview }: { item: PublicService; onPreview: () =
       <button type="button" className="catalog-card-action" onClick={onPreview}>View service <span aria-hidden="true">↗</span></button>
     </div>
   </article>
+}
+
+function VenueCard({ item, onPreview }: { item: Venue; onPreview: () => void }) {
+  return <article className="catalog-card"><div className="catalog-card-image">{item.imageUrls[0] ? <img src={venueImageSrc(item.imageUrls[0])} alt="" loading="lazy" /> : <span className="venue-photo-fallback">No venue photos available</span>}</div><div className="catalog-card-body"><span className="catalog-card-kicker">{item.location}</span><h3>{item.name}</h3><p>{item.description}</p><button type="button" className="catalog-card-action" onClick={onPreview}>View venue <span aria-hidden="true">↗</span></button></div></article>
+}
+
+function VenuePreview({ item, onClose }: { item: Venue; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const titleId = useId()
+  useEffect(() => {
+    const dialog = dialogRef.current
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const previousOverflow = document.body.style.overflow
+    dialog?.showModal()
+    document.body.style.overflow = "hidden"
+    dialog?.querySelector<HTMLButtonElement>(".package-preview-close")?.focus()
+    return () => { dialog?.close(); document.body.style.overflow = previousOverflow; trigger?.focus() }
+  }, [])
+  return createPortal(<dialog ref={dialogRef} className="package-preview" aria-labelledby={titleId} onCancel={event => { event.preventDefault(); onClose() }}>
+    <header className="package-preview-bar"><button type="button" className="package-preview-close" aria-label="Close venue preview" onClick={onClose}>×</button><span className="package-preview-brand">Clemora</span><span className="package-preview-divider" aria-hidden="true" /><span className="package-preview-label">Venue preview</span></header>
+    <div className="package-preview-scroll"><main className="package-preview-main"><div className="package-preview-intro"><span className="package-preview-overline">{item.location}</span><h1 id={titleId}>{item.name}</h1><p>{item.description}</p>{item.categories.length > 0 && <p>{item.categories.join(" · ")}</p>}{item.capacityMin != null && item.capacityMax != null && <p>{item.capacityMin}–{item.capacityMax} guests</p>}{item.imageUrls.length ? <div className="venue-photo-list">{item.imageUrls.map((url, index) => <img key={`${url}-${index}`} src={venueImageSrc(url)} alt={`${item.name} photo ${index + 1}`} />)}</div> : <p>No venue photos available.</p>}</div></main></div>
+  </dialog>, document.body)
 }
 
 function ServicePreview({ id, onClose, onPackage }: { id: string; onClose: () => void; onPackage: (id: string) => void }) {
@@ -70,7 +92,7 @@ function ServicePreview({ id, onClose, onPackage }: { id: string; onClose: () =>
   </dialog>, document.body)
 }
 
-function CatalogPreview({ selected, onClose, onPackage, allowBooking }: { selected: Preview; onClose: () => void; onPackage: (id: string) => void; allowBooking: boolean }) {
+function CatalogPreview({ selected, venue, onClose, onPackage, allowBooking }: { selected: Preview; venue: Venue | undefined; onClose: () => void; onPackage: (id: string) => void; allowBooking: boolean }) {
   const [packageDetail, setPackageDetail] = useState<PublicPackage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -81,13 +103,14 @@ function CatalogPreview({ selected, onClose, onPackage, allowBooking }: { select
     getPackage(selected.id).then(detail => { if (active) setPackageDetail(detail) }).catch(reason => { if (active) setError(reason instanceof Error ? reason.message : "Unable to load package.") }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [selected])
+  if (selected?.kind === "venues" && venue) return <VenuePreview item={venue} onClose={onClose} />
   if (selected?.kind === "services") return <ServicePreview id={selected.id} onClose={onClose} onPackage={onPackage} />
   if (selected?.kind === "packages") return <PackagePreview allowBooking={allowBooking} item={packageDetail} loading={loading} error={error} onClose={onClose} />
   return null
 }
 
 export function PublicCatalog({ kind, mode = "featured", allowBooking = true }: { kind: Kind; mode?: "featured" | "overview"; allowBooking?: boolean }) {
-  const [items, setItems] = useState<(PublicPackage | PublicService)[]>([])
+  const [items, setItems] = useState<(PublicPackage | PublicService | Venue)[]>([])
   const [nextOffset, setNextOffset] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -106,6 +129,10 @@ export function PublicCatalog({ kind, mode = "featured", allowBooking = true }: 
       if (kind === "packages") {
         const result = await getPackages({ limit, offset })
         setItems(previous => reset ? result.packages : [...previous, ...result.packages])
+        setNextOffset(result.nextOffset)
+      } else if (kind === "venues") {
+        const result = await getVenues({ limit, offset })
+        setItems(previous => reset ? result.venues : [...previous, ...result.venues])
         setNextOffset(result.nextOffset)
       } else {
         const result = await getServices({ limit, offset })
@@ -131,22 +158,23 @@ export function PublicCatalog({ kind, mode = "featured", allowBooking = true }: 
 
   return <>
     {!initialized && <p className="catalog-status" role="status">Loading {kind}…</p>}
-    {initialized && items.length === 0 && !error && <p className="catalog-status">{kind === "packages" ? "No packages are published yet." : "Our service catalog is being prepared. Please check back soon."}</p>}
-    {items.length > 0 && <div className="catalog-grid">{kind === "packages" ? (items as PublicPackage[]).map(item => <PackageCard key={item.id} item={item} onPreview={() => showPackage(item.id)} />) : (items as PublicService[]).map(item => <ServiceCard key={item.id} item={item} onPreview={() => setSelected({ kind: "services", id: item.id })} />)}</div>}
+    {initialized && items.length === 0 && !error && <p className="catalog-status">{kind === "packages" ? "No packages are published yet." : kind === "venues" ? "No venues are available yet." : "Our service catalog is being prepared. Please check back soon."}</p>}
+    {items.length > 0 && <div className="catalog-grid">{kind === "packages" ? (items as PublicPackage[]).map(item => <PackageCard key={item.id} item={item} onPreview={() => showPackage(item.id)} />) : kind === "venues" ? (items as Venue[]).map(item => <VenueCard key={item.id} item={item} onPreview={() => setSelected({ kind: "venues", id: item.id })} />) : (items as PublicService[]).map(item => <ServiceCard key={item.id} item={item} onPreview={() => setSelected({ kind: "services", id: item.id })} />)}</div>}
     {error && <p className="catalog-status" role="alert">{error} <button type="button" onClick={() => void load(items.length ? nextOffset ?? items.length : 0, items.length === 0)}>Try again</button></p>}
     {mode === "featured" && items.length > 0 && <a className="catalog-view-more" href={`/catalog?type=${kind}`}>View more {kind}<span aria-hidden="true">↗</span></a>}
     {mode === "overview" && <div className="catalog-pagination"><div ref={sentinelRef} aria-hidden="true" />{loading && initialized && <p role="status">Loading more {kind}…</p>}{nextOffset !== null && !loading && !error && <button type="button" onClick={() => void load(nextOffset)}>Load more {kind}</button>}{initialized && nextOffset === null && items.length > 0 && <p>All {items.length} {kind} shown</p>}</div>}
-    <CatalogPreview allowBooking={allowBooking} selected={selected} onClose={closePreview} onPackage={showPackage} />
+    <CatalogPreview allowBooking={allowBooking} selected={selected} venue={selected?.kind === "venues" ? (items as Venue[]).find(item => item.id === selected.id) : undefined} onClose={closePreview} onPackage={showPackage} />
   </>
 }
 
 export function CatalogOverview() {
-  const kind: Kind = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("type") === "services" ? "services" : "packages"
+  const requested = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("type") : null
+  const kind: Kind = requested === "services" || requested === "venues" ? requested : "packages"
   return <div className="catalog-overview">
     <header className="catalog-overview-header"><a href="/landing" className="catalog-overview-brand">Clemora</a><a href="/landing" className="catalog-overview-back">← Back to home</a></header>
-    <main className="catalog-overview-main"><p className="catalog-overview-eyebrow">THE CLEMORA COLLECTION</p><h1>Explore your possibilities.</h1><p className="catalog-overview-intro">Find the package that fits your gathering, then discover the services that make it yours.</p>
-      <nav className="catalog-overview-tabs" aria-label="Catalog type"><a href="/catalog?type=packages" aria-current={kind === "packages" ? "page" : undefined}>Packages</a><a href="/catalog?type=services" aria-current={kind === "services" ? "page" : undefined}>Services</a></nav>
-      <h2>{kind === "packages" ? "All packages" : "All services"}</h2><PublicCatalog kind={kind} mode="overview" />
+    <main className="catalog-overview-main"><p className="catalog-overview-eyebrow">THE CLEMORA COLLECTION</p><h1>Explore your possibilities.</h1><p className="catalog-overview-intro">Explore packages, services, and venues for your gathering.</p>
+      <nav className="catalog-overview-tabs" aria-label="Catalog type"><a href="/catalog?type=packages" aria-current={kind === "packages" ? "page" : undefined}>Packages</a><a href="/catalog?type=services" aria-current={kind === "services" ? "page" : undefined}>Services</a><a href="/catalog?type=venues" aria-current={kind === "venues" ? "page" : undefined}>Venues</a></nav>
+      <h2>{kind === "packages" ? "All packages" : kind === "services" ? "All services" : "All venues"}</h2><PublicCatalog kind={kind} mode="overview" />
     </main><footer className="catalog-overview-footer"><span>Clemora / Thoughtful events, together.</span><a href="/landing">Return to home ↗</a></footer>
   </div>
 }

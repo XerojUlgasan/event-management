@@ -36,21 +36,21 @@ const packages = [
   {
     id: "a4e55db2-745b-4bdb-bf92-38e7d29261d1", name: "Sample Wedding Package", eventTypes: ["Wedding"],
     description: "Demo wedding reception package with a fixed sample total for 50 to 100 guests.",
-    guestMin: 50, guestMax: 100, venueDetails: "Sample reception venue; staff must confirm the actual venue and date.",
+    guestMin: 50, guestMax: 100,
     inclusions: ["Sample reception setup", "Sample buffet catering"],
     exclusions: ["Optional add-ons and extra venue hours"], priceAmountMinor: 12000000,
   },
   {
     id: "a4e55db2-745b-4bdb-bf92-38e7d29261d2", name: "Sample Birthday Package", eventTypes: ["Birthday"],
     description: "Demo birthday celebration package with a fixed sample total for 30 to 80 guests.",
-    guestMin: 30, guestMax: 80, venueDetails: "Sample celebration venue; staff must confirm the actual venue and date.",
+    guestMin: 30, guestMax: 80,
     inclusions: ["Sample party setup", "Sample buffet catering"],
     exclusions: ["Optional add-ons and extra venue hours"], priceAmountMinor: 6000000,
   },
   {
     id: "a4e55db2-745b-4bdb-bf92-38e7d29261d3", name: "Sample Corporate Package", eventTypes: ["Corporate"],
     description: "Demo corporate gathering package with a fixed sample total for 30 to 100 guests.",
-    guestMin: 30, guestMax: 100, venueDetails: "Sample event venue; staff must confirm the actual venue and date.",
+    guestMin: 30, guestMax: 100,
     inclusions: ["Sample event setup", "Sample buffet catering"],
     exclusions: ["Optional add-ons and extra venue hours"], priceAmountMinor: 9000000,
   },
@@ -75,7 +75,7 @@ try {
         description: pkg.description,
         guest_min: pkg.guestMin,
         guest_max: pkg.guestMax,
-        venue_details: pkg.venueDetails,
+        venue_details: "",
         inclusions: pkg.inclusions,
         exclusions: pkg.exclusions,
         terms: sampleTerms,
@@ -110,11 +110,14 @@ try {
     for (const venue of venues) {
       const inserted = await db
         .insertInto("venues")
-        .values({ id: venue.id, name: venue.name, location: venue.location, description: venue.description })
+        .values({ id: venue.id })
         .onConflict((conflict) => conflict.column("id").doNothing())
         .returning("id")
         .executeTakeFirst();
-      if (inserted) venueCount++;
+      if (inserted) {
+        await db.insertInto("venue_versions").values({ venue_id: venue.id, version: 1, state: "draft", name: venue.name, location: venue.location, description: venue.description, categories: [], capacity_min: null, capacity_max: null }).execute();
+        venueCount++;
+      }
     }
     return { accounts: rows, packageCount, upgradedCount, venueCount };
   });

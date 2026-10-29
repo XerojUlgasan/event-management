@@ -9,6 +9,7 @@ const navigation = [
   { label: "Experience", href: "#top" },
   { label: "Included", href: "#packages" },
   { label: "Services", href: "#services" },
+  { label: "Venues", href: "/catalog?type=venues" },
   { label: "Planning", href: "#planning" },
 ];
 ---
@@ -18,7 +19,7 @@ const navigation = [
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Clemora brings your event together in one place. Explore all-inclusive venue and catering packages for 30 to 100 guests." />
+    <meta name="description" content="Clemora brings your event together in one place. Explore event packages, services, and venues." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>Clemora | A space for your event</title>
   </head>
@@ -65,12 +66,12 @@ const navigation = [
         <div class="landing-package-panel">
           <div class="landing-package-panel__top"><span>ALL-INCLUSIVE</span><span>30–100 GUESTS</span></div>
           <div class="landing-package-panel__center">
-            <p>One venue.<br />One clear plan.</p>
+            <p>Your occasion.<br />One clear plan.</p>
             <span>Your day, considered from the first detail to the last.</span>
           </div>
           <div class="landing-package-panel__bottom"><span>CLEMORA / EVENTS</span><span>01 — 04</span></div>
         </div>
-        <InclusionStrip items={["Exclusive venue use", "Buffet & venue setup", "Full catering", "Sound & lights"]} />
+        <InclusionStrip items={["Package inclusions", "Guest range", "Exclusions", "Terms and pricing"]} />
         <p class="landing-included__note">Choose the details that make it yours, including extras like a photo booth.</p>
         <div class="landing-featured-heading"><p class="landing-eyebrow">EXPLORE THE COLLECTION</p><h2>Packages for your occasion.</h2></div>
         <PackageCatalog client:load />

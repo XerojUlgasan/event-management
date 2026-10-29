@@ -4,7 +4,7 @@ Status: implemented locally, 2026-10-27; service assignments added 2026-10-28 an
 
 ## Business boundary
 
-- `FEATURES.md` defines all-inclusive offers for 30–100 guests. Published details include the guest range, fixed PHP total, inclusions, venue details, exclusions, and terms. Paid add-ons are separate from package inclusions.
+- `FEATURES.md` defines all-inclusive offers for 30–100 guests. Published details include the guest range, fixed PHP total, inclusions, exclusions, and terms. Venue records belong to a standalone catalog and are not package API or screen fields or publication requirements. Keep the legacy venue-details database field so existing values remain stored; do not expose it in package DTOs or previews. Booking-request preferred venue/location remains a separate inquiry field. Paid add-ons are separate from package inclusions.
 - A package catalog entry does not reserve a date or establish a final quote. A published package preview can start a signed-in booking request, which staff review separately.
 - Admin and public/customer package screens now read the same persisted catalog through `/v1`. Old dollar-denominated demo offers were removed from the package array and were not seeded. Exact tiers, amounts, and additional inclusions still need business approval.
 
@@ -22,7 +22,7 @@ Status: implemented locally, 2026-10-27; service assignments added 2026-10-28 an
 The Prisma migrations create `packages`, `package_versions`, and `package_images`; Kysely runtime types were regenerated from the migrated schema.
 
 - `packages` stores a stable ID, timestamps, and `archived_at`.
-- `package_versions` stores a version number and state (`draft`, `published`, or `superseded`), catalog details, nullable fixed total `price_amount_minor`, and timestamps. Partial unique indexes allow at most one draft and one published version per package. A database check enforces the 30–100 guest range.
+- `package_versions` stores a version number and state (`draft`, `published`, or `superseded`), catalog details, nullable fixed total `price_amount_minor`, and timestamps. The legacy venue-details column remains in storage for existing data but is excluded from current package API/display behavior. Partial unique indexes allow at most one draft and one published version per package. A database check enforces the 30–100 guest range.
 - `package_images` stores uploaded JPEG/PNG bytes and content type. The catalog stores an API-relative image path; external HTTP(S) image URLs remain supported. Uploads are limited to 5 MiB.
 - `package_services` holds UUID-identified links from a package version to published service versions. A link is either included within the package total or an optional add-on with a fixed PHP per-unit price and maximum quantity. Published package versions retain their linked service-version details.
 - Future quotes should reference the version ID and store their issued line-item snapshot. No quote table or package reference exists yet.
@@ -63,7 +63,7 @@ The API follows the repository's `@hono/zod-openapi` pattern in `apps/api/src/co
 
 - Exact package names/tiers and per-package guest ranges within the 30–100 offer.
 - Exact fixed PHP amounts and whether taxes/service charges affect the displayed price.
-- Exact inclusions, venue details, exclusions, terms, image ownership, and which optional items are paid add-ons.
+- Exact inclusions, exclusions, terms, image ownership, and which optional items are paid add-ons.
 - Whether any role beyond the current `admin` may publish, and whether a restore operation is needed after archiving.
 
 Admins should enter only business-approved offers. The application validates completeness and price shape; it cannot determine whether a specific amount or term was approved outside the system. Availability, quote approval, reservation fees, and booking confirmation remain separate workflows.

@@ -16,6 +16,7 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
         <nav className={`public-nav ${mobileOpen ? "open" : ""}`}>
           <a href="#services">Services</a>
           <a href="#packages">Packages</a>
+          <a href="/catalog?type=venues">Venues</a>
           <a href="#events">Past events</a>
           <a href="#about">About us</a>
         </nav>
@@ -213,6 +214,7 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
         <div>
           <a href="#services">Services</a>
           <a href="#packages">Packages</a>
+          <a href="/catalog?type=venues">Venues</a>
           <a href="#events">Past events</a>
           <a href="#about">Contact</a>
         </div>

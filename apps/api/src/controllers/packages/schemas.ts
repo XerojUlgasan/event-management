@@ -16,7 +16,6 @@ export const contentSchema = z.object({
   description: text,
   guestMin: z.number().int().min(30).max(100),
   guestMax: z.number().int().min(30).max(100),
-  venueDetails: text,
   inclusions: z.array(text).max(100),
   exclusions: z.array(text).max(100),
   terms: text,

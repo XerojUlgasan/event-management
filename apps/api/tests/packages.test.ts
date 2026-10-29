@@ -48,7 +48,7 @@ after(async () => {
 function call(path: string, method = "GET", body?: unknown, cookie?: string, origin?: string) {
   return app.request(`/v1${path}`, { method, headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...(cookie ? { Cookie: cookie } : {}), ...(origin ? { Origin: origin } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
-const data = { name: "Celebration", eventTypes: ["Birthday"], description: "A celebration", guestMin: 30, guestMax: 100, venueDetails: "Main hall", inclusions: ["Decorations"], exclusions: ["Extra hours"], terms: "Terms apply", imageUrl: null, price: null };
+const data = { name: "Celebration", eventTypes: ["Birthday"], description: "A celebration", guestMin: 30, guestMax: 100, inclusions: ["Decorations"], exclusions: ["Extra hours"], terms: "Terms apply", imageUrl: null, price: null };
 async function read(response: Response, status: number): Promise<any> {
   assert.equal(response.status, status, await response.clone().text());
   return response.status === 204 ? null : response.json();
@@ -66,6 +66,9 @@ test("catalog protects drafts, validates price, preserves versions and archives 
   const created = await read(await call("/admin/packages", "POST", data, adminCookie), 201);
   const path = `/admin/packages/${created.id}`;
   assert.deepEqual(created.draft.inclusions, ["Decorations"]);
+  assert.equal("venueDetails" in created.draft, false);
+  assert.equal((await pool.query("SELECT venue_details FROM package_versions WHERE id = $1", [created.draft.id])).rows[0].venue_details, "");
+  await pool.query("UPDATE package_versions SET venue_details = $1 WHERE id = $2", ["Historical venue details", created.draft.id]);
   assert.deepEqual((await read(await call("/packages"), 200)).packages, []);
   await read(await call(`/packages/${created.id}`), 404);
   await read(await call(`${path}/publish`, "POST", { expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 400);
@@ -73,14 +76,18 @@ test("catalog protects drafts, validates price, preserves versions and archives 
   const missingInclusions = await read(await call("/admin/packages", "POST", { ...data, inclusions: [], exclusions: [], price }, adminCookie), 201);
   await read(await call(`/admin/packages/${missingInclusions.id}/publish`, "POST", { expectedUpdatedAt: missingInclusions.draft.updatedAt }, adminCookie), 400);
   const edited = await read(await call(`${path}/draft`, "PATCH", { ...data, exclusions: [], price, expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 200);
+  assert.equal((await pool.query("SELECT venue_details FROM package_versions WHERE id = $1", [created.draft.id])).rows[0].venue_details, "Historical venue details");
   await read(await call(`${path}/draft`, "PATCH", { ...data, price, expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 409);
   await read(await call(`${path}/publish`, "POST", { expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 409);
   const first = await read(await call(`${path}/publish`, "POST", { expectedUpdatedAt: edited.draft.updatedAt }, adminCookie), 200);
+  assert.equal("venueDetails" in await read(await call(`/packages/${created.id}`), 200), false);
   assert.deepEqual((await read(await call(`/packages/${created.id}`), 200)).price, price);
   assert.deepEqual((await read(await call(`/packages/${created.id}`), 200)).inclusions, ["Decorations"]);
   assert.deepEqual((await read(await call(`/packages/${created.id}`), 200)).exclusions, []);
   const replacement = await read(await call(`${path}/draft`, "PATCH", { ...data, name: "New name", price, expectedUpdatedAt: first.published.updatedAt }, adminCookie), 200);
   assert.equal(replacement.draft.version, 2);
+  assert.equal((await pool.query("SELECT venue_details FROM package_versions WHERE id = $1", [first.published.id])).rows[0].venue_details, "Historical venue details");
+  assert.equal((await pool.query("SELECT venue_details FROM package_versions WHERE id = $1", [replacement.draft.id])).rows[0].venue_details, "");
   assert.equal((await read(await call(`/packages/${created.id}`), 200)).name, "Celebration");
   const second = await read(await call(`${path}/publish`, "POST", { expectedUpdatedAt: replacement.draft.updatedAt }, adminCookie), 200);
   assert.equal(second.versions.find((v: any) => v.version === 1).state, "superseded");

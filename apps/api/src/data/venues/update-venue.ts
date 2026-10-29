@@ -1,7 +1,4 @@
-import type { Transaction } from "kysely";
+import type { Kysely, Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
-
-export function updateVenueData(db: Transaction<DB>, id: string, name: string, location: string, description: string) {
-  return db.updateTable("venues").set({ name, location, description, updated_at: new Date() })
-    .where("id", "=", id).where("archived_at", "is", null).returningAll().executeTakeFirst();
-}
+type Database = Kysely<DB> | Transaction<DB>;
+export function touchVenueData(db: Transaction<DB>, id: string, now: Date) { return db.updateTable("venues").set({ updated_at: now }).where("id", "=", id).execute(); }

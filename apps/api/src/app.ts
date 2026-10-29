@@ -48,6 +48,7 @@ app.use("/v1/admin/packages/*", bodyLimit({ maxSize: 64 * 1024 }));
 app.use("/v1/admin/packages", bodyLimit({ maxSize: 64 * 1024 }));
 app.use("/v1/admin/venues", bodyLimit({ maxSize: 64 * 1024 }));
 app.use("/v1/admin/venues/*", bodyLimit({ maxSize: 64 * 1024 }));
+app.use("/v1/admin/venue-images", bodyLimit({ maxSize: 5 * 1024 * 1024 + 64 * 1024 }));
 app.use("/v1/admin/package-images", bodyLimit({ maxSize: 5 * 1024 * 1024 + 64 * 1024 }));
 
 app.route("/v1", healthRoutes);
