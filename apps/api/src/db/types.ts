@@ -151,6 +151,16 @@ export interface Users {
   updated_at: Generated<Timestamp>;
 }
 
+export interface Venues {
+  archived_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  description: string;
+  id: Generated<string>;
+  location: string;
+  name: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface DB {
   booking_request_status_history: BookingRequestStatusHistory;
   booking_requests: BookingRequests;
@@ -165,4 +175,5 @@ export interface DB {
   services: Services;
   sessions: Sessions;
   users: Users;
+  venues: Venues;
 }

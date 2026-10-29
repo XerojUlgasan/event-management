@@ -78,6 +78,18 @@ model PackageImage {
   @@map("package_images")
 }
 
+model Venue {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  location    String
+  description String
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  archivedAt  DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  @@map("venues")
+}
+
 model PackageVersion {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   packageId    String    @map("package_id") @db.Uuid
