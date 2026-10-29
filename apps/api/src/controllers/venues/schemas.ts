@@ -1,20 +1,15 @@
 import { z } from "@hono/zod-openapi";
-
-export const contentSchema = z.object({
-  name: z.string().trim().min(1).max(200),
-  location: z.string().trim().min(1).max(200),
-  description: z.string().trim().min(1).max(4000),
-});
-
 export const venueIdSchema = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
-
-export const venueSchema = contentSchema.extend({
-  id: venueIdSchema,
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  archivedAt: z.string().nullable(),
+const text = z.string().max(4000);
+export const contentSchema = z.object({
+  name: z.string().max(200), location: z.string().max(200), description: text,
+  categories: z.array(z.string().trim().min(1).max(200)).max(50).refine(values => new Set(values.map(v => v.toLowerCase())).size === values.length, "Categories must be unique"),
+  capacityMin: z.number().int().positive().max(2147483647).nullable(),
+  capacityMax: z.number().int().positive().max(2147483647).nullable(),
+  imageUrls: z.array(z.string().regex(/^\/v1\/venue-images\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)).max(10).refine(values => new Set(values.map(v => v.toLowerCase())).size === values.length, "Photos must be unique"),
 });
-
+export type VenueContent = z.infer<typeof contentSchema>;
+export const versionSchema = contentSchema.extend({ id: venueIdSchema, venueId: venueIdSchema, version: z.number().int(), state: z.enum(["draft", "published", "superseded"]), updatedAt: z.string(), publishedAt: z.string().nullable() });
+export const adminSchema = z.object({ id: venueIdSchema, archivedAt: z.string().nullable(), draft: versionSchema.nullable(), published: versionSchema.nullable(), versions: z.array(versionSchema) });
+export const publicSchema = contentSchema.extend({ id: venueIdSchema, versionId: venueIdSchema, version: z.number().int(), publishedAt: z.string(), createdAt: z.string(), updatedAt: z.string(), archivedAt: z.null() });
 export const errorSchema = z.object({ error: z.string() });
-
-export type Content = z.infer<typeof contentSchema>;

@@ -3,24 +3,30 @@ import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import { listVenuesRoute, listVenuesRouteHandler } from "./list-venues.js";
 import { getVenueRoute, getVenueRouteHandler } from "./get-venue.js";
+import { listAdminVenuesRoute, listAdminVenuesRouteHandler } from "./list-admin-venues.js";
+import { getAdminVenueRoute, getAdminVenueRouteHandler } from "./get-admin-venue.js";
 import { createVenueRoute, createVenueRouteHandler } from "./create-venue.js";
-import { updateVenueRoute, updateVenueRouteHandler } from "./update-venue.js";
-import { archiveVenueRoute, archiveVenueRouteHandler } from "./archive-venue.js";
-
-const routes = new OpenAPIHono<HonoEnv>({
-  defaultHook: (result, c) => {
-    if (!result.success)
-      return c.json({ error: result.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; ") }, 400);
-  },
-});
-
-routes.use("/admin/venues", requireSession, requireSystemAdmin);
-routes.use("/admin/venues/*", requireSession, requireSystemAdmin);
-
+import { updateVenueRoute, updateVenueRouteHandler, updateVenueLegacyRoute, updateVenueLegacyRouteHandler } from "./update-venue.js";
+import { publishVenueRoute, publishVenueRouteHandler } from "./publish-venue.js";
+import { archiveVenueRoute, archiveVenueRouteHandler, archiveVenueLegacyRoute, archiveVenueLegacyRouteHandler } from "./archive-venue.js";
+import { deleteVenueRoute, deleteVenueRouteHandler } from "./delete-venue.js";
+import { uploadVenueImageRoute, uploadVenueImageRouteHandler } from "./upload-venue-image.js";
+import { getVenueImageRoute, getVenueImageRouteHandler } from "./get-venue-image.js";
+import { deleteVenueImageRoute, deleteVenueImageRouteHandler } from "./delete-venue-image.js";
+const routes = new OpenAPIHono<HonoEnv>({defaultHook: (result,c) => {if(!result.success) return c.json({error:result.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; ")},400);}});
+for (const path of ["/admin/venues", "/admin/venues/*", "/admin/venue-images", "/admin/venue-images/*"]) routes.use(path,requireSession,requireSystemAdmin);
 routes.openapi(listVenuesRoute, listVenuesRouteHandler);
 routes.openapi(getVenueRoute, getVenueRouteHandler);
+routes.openapi(listAdminVenuesRoute, listAdminVenuesRouteHandler);
+routes.openapi(getAdminVenueRoute, getAdminVenueRouteHandler);
 routes.openapi(createVenueRoute, createVenueRouteHandler);
 routes.openapi(updateVenueRoute, updateVenueRouteHandler);
+routes.openapi(updateVenueLegacyRoute, updateVenueLegacyRouteHandler);
+routes.openapi(publishVenueRoute, publishVenueRouteHandler);
 routes.openapi(archiveVenueRoute, archiveVenueRouteHandler);
-
+routes.openapi(archiveVenueLegacyRoute, archiveVenueLegacyRouteHandler);
+routes.openapi(deleteVenueRoute, deleteVenueRouteHandler);
+routes.openapi(uploadVenueImageRoute, uploadVenueImageRouteHandler);
+routes.openapi(getVenueImageRoute, getVenueImageRouteHandler);
+routes.openapi(deleteVenueImageRoute, deleteVenueImageRouteHandler);
 export default routes;

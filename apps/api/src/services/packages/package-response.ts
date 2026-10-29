@@ -12,7 +12,7 @@ export function versionDto(row: Version) {
     id: row.id, packageId: row.package_id, version: row.version,
     state: row.state as "draft" | "published" | "superseded",
     name: row.name, eventTypes: row.event_types, description: row.description,
-    guestMin: row.guest_min, guestMax: row.guest_max, venueDetails: row.venue_details,
+    guestMin: row.guest_min, guestMax: row.guest_max,
     inclusions: row.inclusions, exclusions: row.exclusions, terms: row.terms, imageUrl: row.image_url,
     price: row.price_amount_minor !== null
       ? { kind: "fixed" as const, currency: "PHP" as const, amountMinor: row.price_amount_minor } : null,
@@ -23,7 +23,7 @@ export function versionDto(row: Version) {
 export async function publicDto(db: Database, row: Version) {
   const v = versionDto(row);
   return { services: await assignmentsData(db, row.id), id: v.packageId, versionId: v.id, version: v.version, name: v.name, eventTypes: v.eventTypes,
-    description: v.description, guestMin: v.guestMin, guestMax: v.guestMax, venueDetails: v.venueDetails,
+    description: v.description, guestMin: v.guestMin, guestMax: v.guestMax,
     inclusions: v.inclusions, exclusions: v.exclusions, terms: v.terms, imageUrl: v.imageUrl,
     price: v.price, publishedAt: v.publishedAt! };
 }

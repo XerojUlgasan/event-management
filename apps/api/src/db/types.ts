@@ -151,14 +151,40 @@ export interface Users {
   updated_at: Generated<Timestamp>;
 }
 
+export interface VenueImages {
+  content_type: string;
+  created_at: Generated<Timestamp>;
+  data: Buffer;
+  id: Generated<string>;
+}
+
 export interface Venues {
   archived_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface VenueVersionPhotos {
+  image_id: string;
+  position: number;
+  venue_version_id: string;
+}
+
+export interface VenueVersions {
+  capacity_max: number | null;
+  capacity_min: number | null;
+  categories: Generated<string[]>;
   created_at: Generated<Timestamp>;
   description: string;
   id: Generated<string>;
   location: string;
   name: string;
+  published_at: Timestamp | null;
+  state: string;
   updated_at: Generated<Timestamp>;
+  venue_id: string;
+  version: number;
 }
 
 export interface DB {
@@ -175,5 +201,8 @@ export interface DB {
   services: Services;
   sessions: Sessions;
   users: Users;
+  venue_images: VenueImages;
+  venue_version_photos: VenueVersionPhotos;
+  venue_versions: VenueVersions;
   venues: Venues;
 }

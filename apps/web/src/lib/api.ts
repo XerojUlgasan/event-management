@@ -80,7 +80,7 @@ export type PackageServiceInput = { serviceVersionId: string; role: "included" |
 export type PackageService = PackageServiceInput & { id: string; service: ServiceVersion }
 export type PackageContent = {
   name: string; eventTypes: string[]; description: string; guestMin: number; guestMax: number;
-  venueDetails: string; inclusions: string[]; exclusions: string[]; terms: string;
+  inclusions: string[]; exclusions: string[]; terms: string;
   imageUrl: string | null; price: PackagePrice | null; services?: PackageServiceInput[]
 }
 export type PackageVersion = PackageContent & {
@@ -197,23 +197,30 @@ export type AdminUser = {
 export const getAdminUsers = () =>
   request<{ staff: AdminUser[]; customers: AdminUser[] }>("/admin/users")
 
-export type Venue = {
-  id: string
-  name: string
-  location: string
-  description: string
-  createdAt: string
-  updatedAt: string
-  archivedAt: string | null
+export type VenueContent = { name: string; location: string; description: string; categories: string[]; capacityMin: number | null; capacityMax: number | null; imageUrls: string[] }
+export type VenueVersion = VenueContent & { id: string; venueId: string; version: number; state: "draft" | "published" | "superseded"; updatedAt: string; publishedAt: string | null }
+export type Venue = VenueContent & { id: string; versionId: string; version: number; publishedAt: string; createdAt: string; updatedAt: string; archivedAt: null }
+export type AdminVenue = { id: string; archivedAt: string | null; draft: VenueVersion | null; published: VenueVersion | null; versions?: VenueVersion[] }
+export const getVenues = (page?: { limit: number; offset?: number }) => request<{ venues: Venue[]; nextOffset: number | null }>(`/venues${pageQuery(page)}`)
+export const getAdminVenues = () => request<{ venues: AdminVenue[] }>("/admin/venues")
+export const getAdminVenue = (id: string) => request<AdminVenue>(`/admin/venues/${encodeURIComponent(id)}`)
+export const createVenue = (content: VenueContent) => request<AdminVenue>("/admin/venues", content)
+export const updateVenueDraft = (id: string, content: VenueContent, expectedUpdatedAt: string) => request<AdminVenue>(`/admin/venues/${encodeURIComponent(id)}/draft`, { ...content, expectedUpdatedAt }, undefined, "PATCH")
+export const publishVenue = (id: string, expectedUpdatedAt: string) => request<AdminVenue>(`/admin/venues/${encodeURIComponent(id)}/publish`, { expectedUpdatedAt })
+export const archiveVenue = (id: string) => request<AdminVenue>(`/admin/venues/${encodeURIComponent(id)}/archive`, {})
+export const deleteVenue = (id: string) => request<void>(`/admin/venues/${encodeURIComponent(id)}/draft`, undefined, undefined, "DELETE")
+export function venueImageSrc(imageUrl: string): string { return imageUrl.startsWith("/v1/venue-images/") ? new URL(imageUrl, new URL(apiUrl, window.location.origin)).href : imageUrl }
+export async function uploadVenueImage(file: File): Promise<string> {
+  const body = new FormData(); body.append("image", file)
+  const response = await fetch(`${apiUrl}/admin/venue-images`, { method: "POST", credentials: "include", body })
+  if (!response.ok) { const result = await response.json().catch(() => ({})) as { error?: string }; throw new ApiError(typeof result.error === "string" ? result.error : "Unable to upload image. Please try again.", response.status) }
+  return ((await response.json()) as { imageUrl: string }).imageUrl
 }
-
-export const getVenues = () => request<{ venues: Venue[] }>("/venues")
-export const createVenue = (name: string, location: string, description: string) =>
-  request<Venue>("/admin/venues", { name, location, description })
-export const updateVenue = (id: string, name: string, location: string, description: string) =>
-  request<Venue>(`/admin/venues/${encodeURIComponent(id)}`, { name, location, description }, undefined, "PATCH")
-export const archiveVenue = (id: string) =>
-  request<Venue>(`/admin/venues/${encodeURIComponent(id)}`, {}, undefined, "DELETE")
+export function deleteUnreferencedVenueImage(imageUrl: string): Promise<void> {
+  const id = imageUrl.match(/^\/v1\/venue-images\/([0-9a-f-]+)$/i)?.[1]
+  if (!id) throw new Error("Unable to identify the uploaded image for cleanup.")
+  return request<void>(`/admin/venue-images/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
+}
 
 export const getMyConversation = () => request<ChatThread>("/messages/conversation")
 export const sendMyMessage = (body: string) =>

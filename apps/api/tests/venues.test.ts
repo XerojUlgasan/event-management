@@ -5,10 +5,16 @@ import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
+import sharp from "sharp";
 import { hashSessionToken } from "../src/utils/session.js";
 
+const legacyActiveId = "b1000000-0000-0000-0000-000000000001";
+const legacyArchivedId = "b1000000-0000-0000-0000-000000000002";
+const legacyCreatedAt = "2026-01-01T00:00:00.000Z";
+const legacyUpdatedAt = "2026-02-02T00:00:00.000Z";
 const database = `em_venues_test_${randomUUID().replaceAll("-", "")}`;
 let app: typeof import("../src/app.js").app;
 let db: typeof import("../src/db/client.js").db;
@@ -27,6 +33,9 @@ before(async () => {
   pool = new Pool({ ...connection, database });
   const root = new URL("../prisma/migrations/", import.meta.url);
   for (const entry of (await readdir(root, { withFileTypes: true })).filter(e => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
+    if (entry.name === "20261030110000_version_venues") {
+      await pool.query("INSERT INTO venues (id, name, location, description, created_at, updated_at, archived_at) VALUES ($1,'Legacy active','Original location','Original description',$3,$4,NULL), ($2,'Legacy archived','Archived location','Archived description',$3,$4,$4)", [legacyActiveId, legacyArchivedId, legacyCreatedAt, legacyUpdatedAt]);
+    }
     await pool.query(await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"));
   }
   process.env.DB_NAME = database;
@@ -46,73 +55,195 @@ before(async () => {
 after(async () => {
   await db?.destroy();
   await pool?.end();
-  if (admin) { await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`); await admin.end(); }
+  if (admin) {
+    // pg-pool may resolve end() before every idle socket has disconnected.
+    // Wait for disconnects instead of forcibly terminating those sockets.
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const active = await admin.query("SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1", [database]);
+      if (active.rows[0].count === 0) break;
+      await delay(10);
+    }
+    await admin.query(`DROP DATABASE IF EXISTS "${database}"`); await admin.end();
+  }
 });
 function call(path: string, method = "GET", body?: unknown, cookie?: string, origin?: string) {
   return app.request(`/v1${path}`, { method, headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...(cookie ? { Cookie: cookie } : {}), ...(origin ? { Origin: origin } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
 async function read(response: Response, status: number): Promise<any> {
   assert.equal(response.status, status, await response.clone().text());
-  return response.json();
+  return status === 204 ? null : response.headers.get("Content-Type")?.startsWith("image/") ? response.arrayBuffer() : response.json();
 }
 
-test("venue routes validate, normalize, and archive catalog records", async () => {
-  const { venueSchema } = await import("../src/controllers/venues/schemas.js");
-  const legacyId = "b1000000-0000-0000-0000-000000000001";
-  await pool.query("INSERT INTO venues (id, name, location, description) VALUES ($1, $2, $3, $4)", [legacyId, "Sample", "Demo", "Demo only"]);
-  const legacy = await read(await call(`/venues/${legacyId}`), 200);
-  assert.ok(venueSchema.safeParse(legacy).success);
-  assert.ok(venueSchema.safeParse((await read(await call("/venues"), 200)).venues[0]).success);
-  for (const method of ["GET", "PATCH", "DELETE"]) {
-    const path = method === "GET" ? "/venues/not-a-uuid" : "/admin/venues/not-a-uuid";
-    await read(await call(path, method, method === "PATCH" ? { name: "A", location: "B", description: "C" } : undefined, adminCookie), 400);
-  }
-  const input = { name: "  Sample hall  ", location: "  Demo city  ", description: "  Demo description  " };
-  await read(await call("/admin/venues", "POST", input), 401);
-  await read(await call("/admin/venues", "POST", input, customerCookie), 403);
-  await read(await call("/admin/venues", "POST", input, staffCookie), 403);
-  await read(await call("/admin/venues", "POST", input, undesignatedAdminCookie), 403);
-  for (const field of ["name", "location", "description"]) {
-    await read(await call("/admin/venues", "POST", { ...input, [field]: "  " }, adminCookie), 400);
-    await read(await call(`/admin/venues/${legacyId}`, "PATCH", { ...input, [field]: "  " }, adminCookie), 400);
-  }
-  const created = await read(await call("/admin/venues", "POST", input, adminCookie), 201);
-  assert.deepEqual([created.name, created.location, created.description], ["Sample hall", "Demo city", "Demo description"]);
-  assert.ok(venueSchema.safeParse(created).success);
-  for (const cookie of [staffCookie, undesignatedAdminCookie, customerCookie]) {
-    await read(await call(`/admin/venues/${created.id}`, "PATCH", input, cookie), 403);
-    await read(await call(`/admin/venues/${created.id}`, "DELETE", undefined, cookie), 403);
-  }
-  await read(await call(`/admin/venues/${created.id}`, "PATCH", { ...input, name: " Revised " }, adminCookie), 200);
-  await read(await call(`/admin/venues/${created.id}`, "DELETE", undefined, adminCookie), 200);
-  await read(await call(`/venues/${created.id}`), 404);
-  await read(await call(`/admin/venues/${created.id}`, "PATCH", input, adminCookie), 409);
-  assert.ok(!(await read(await call("/venues"), 200)).venues.some((v: any) => v.id === created.id));
+const content = { name: "  Garden  ", location: "  City  ", description: "  Venue description  ", categories: [" Garden "], capacityMin: 30, capacityMax: 100, imageUrls: [] as string[] };
+const png = await sharp({ create: { width: 1, height: 1, channels: 3, background: "#aabbcc" } }).png().toBuffer();
+async function upload(cookie = adminCookie, data = png, type = "image/png") {
+  const form = new FormData(); form.append("image", new File([new Uint8Array(data)], "photo.png", { type }));
+  return app.request("/v1/admin/venue-images", { method: "POST", headers: { Cookie: cookie }, body: form });
+}
+async function photo() { return (await read(await upload(), 201)).imageUrl as string; }
+const imagePath = (url: string) => url.replace(/^\/v1/, "");
+const imageDeletePath = (url: string) => imagePath(url).replace("/venue-images/", "/admin/venue-images/");
+
+test("migration preserves legacy content, IDs, dates and archived visibility", async () => {
+  const active = await read(await call(`/venues/${legacyActiveId}`), 200);
+  assert.equal(active.id, legacyActiveId); assert.equal(active.name, "Legacy active");
+  assert.equal(active.location, "Original location"); assert.equal(active.description, "Original description");
+  assert.equal(active.createdAt, legacyCreatedAt); assert.equal(active.updatedAt, legacyUpdatedAt); assert.equal(active.archivedAt, null);
+  assert.equal(active.publishedAt, legacyCreatedAt); assert.equal(active.capacityMin, null); assert.deepEqual(active.categories, []); assert.deepEqual(active.imageUrls, []);
+  const stored = await pool.query("SELECT v.created_at, v.updated_at, p.created_at AS parent_created_at, p.updated_at AS parent_updated_at FROM venue_versions v JOIN venues p ON p.id=v.venue_id WHERE p.id=$1",[legacyActiveId]);
+  assert.equal(stored.rows[0].created_at.toISOString(), legacyCreatedAt); assert.equal(stored.rows[0].updated_at.toISOString(), legacyUpdatedAt);
+  assert.equal(stored.rows[0].parent_created_at.toISOString(), legacyCreatedAt); assert.equal(stored.rows[0].parent_updated_at.toISOString(), legacyUpdatedAt);
+  await read(await call(`/venues/${legacyArchivedId}`),404);
+  const archived = await read(await call(`/admin/venues/${legacyArchivedId}`,"GET",undefined,adminCookie),200);
+  assert.equal(archived.published.name,"Legacy archived"); assert.equal(archived.archivedAt,legacyUpdatedAt);
+  assert.ok(!(await read(await call("/venues"),200)).venues.some((v:any)=>v.id===legacyArchivedId));
+  for (const id of [legacyActiveId,legacyArchivedId]) await read(await call(`/admin/venues/${id}/draft`,"DELETE",undefined,adminCookie),409);
 });
 
-test("seed reruns preserve edited and archived sample venues", async () => {
-  const id = "b1000000-0000-0000-0000-000000000002";
-  await pool.query("INSERT INTO venues (id, name, location, description, archived_at) VALUES ($1, $2, $3, $4, now())", [id, "Edited venue", "Edited location", "Approved copy"]);
-  const runSeed = () => promisify(execFile)(process.execPath, ["--import", "tsx", "src/db/seed.ts"], {
-    cwd: fileURLToPath(new URL("../", import.meta.url)),
-    env: { ...process.env, FIREBASE_PROJECT_ID: "", FIREBASE_CLIENT_EMAIL: "", FIREBASE_PRIVATE_KEY: "", GOOGLE_APPLICATION_CREDENTIALS: "" },
-  });
-  await runSeed();
-  await runSeed();
-  const row = await pool.query("SELECT name, location, description, archived_at FROM venues WHERE id = $1", [id]);
-  assert.deepEqual([row.rows[0].name, row.rows[0].location, row.rows[0].description], ["Edited venue", "Edited location", "Approved copy"]);
-  assert.ok(row.rows[0].archived_at);
-  assert.equal((await pool.query("SELECT count(*)::int AS count FROM venues WHERE id::text LIKE 'b1000000-0000-0000-0000-0000000000%'")).rows[0].count, 15);
+test("venue catalog protects every administrative operation and validates inputs", async () => {
+  const routes: [string,string,unknown?][] = [
+    ["/admin/venues","GET"], [`/admin/venues/${legacyActiveId}`,"GET"], ["/admin/venues","POST",content],
+    [`/admin/venues/${legacyActiveId}/draft`,"PATCH",{...content,expectedUpdatedAt:legacyUpdatedAt}],
+    [`/admin/venues/${legacyActiveId}/publish`,"POST",{expectedUpdatedAt:legacyUpdatedAt}],
+    [`/admin/venues/${legacyActiveId}/archive`,"POST"], [`/admin/venues/${legacyActiveId}`,"DELETE"], [`/admin/venues/${legacyActiveId}/draft`,"DELETE"],
+    [`/admin/venues/${legacyActiveId}`,"PATCH",{name:"Old client",location:"City",description:"Description"}],
+    [`/admin/venue-images/${randomUUID()}`,"DELETE"],
+  ];
+  for (const [path,method,body] of routes) {
+    await read(await call(path,method,body),401);
+    for (const cookie of [staffCookie,customerCookie,undesignatedAdminCookie]) await read(await call(path,method,body,cookie),403);
+  }
+  for (const cookie of [staffCookie,customerCookie,undesignatedAdminCookie]) await read(await upload(cookie),403);
+  for (const invalid of [
+    {...content,capacityMin:0}, {...content,capacityMax:1.5}, {...content,capacityMin:101},
+    {...content,categories:["garden"," Garden "]}, {...content,imageUrls:["https://example.test/image.png"]},
+    {...content,imageUrls:Array(11).fill(`/v1/venue-images/${randomUUID()}`)},
+    {...content,imageUrls:[`/v1/venue-images/${randomUUID()}`]},
+  ]) await read(await call("/admin/venues","POST",invalid,adminCookie),400);
+  await read(await call("/venues/not-a-uuid"),400);
+  await read(await call("/venues?limit=16"),400);
+  await read(await call("/venues?offset=-1"),400);
+  await read(await call("/admin/venues","POST",content,adminCookie,"https://untrusted.example"),403);
+  const oldEdit = await read(await call(`/admin/venues/${legacyActiveId}`,"PATCH",{name:"Old client",location:"City",description:"Description"},adminCookie),409);
+  assert.match(oldEdit.error,/versioned drafts/);
 });
 
-test("venue picker details fit the package API limit", async () => {
-  const { venueDetailsFromSelection } = await import("../../web/src/lib/venue-details.js");
-  const venue = { name: "N".repeat(200), location: "L".repeat(200), description: "D".repeat(4000) };
-  const details = venueDetailsFromSelection(venue);
-  assert.equal(details.length, 4000);
-  assert.ok(details.startsWith(`${venue.name} — ${venue.location}. `));
-  assert.ok(details.endsWith("…"));
-  const packageContent = { name: "Sample", eventTypes: [], description: "Demo", guestMin: 30, guestMax: 100, venueDetails: details, inclusions: [], exclusions: [], terms: "Demo", imageUrl: null, price: null };
-  const result = await read(await call("/admin/packages", "POST", packageContent, adminCookie), 201);
-  assert.equal(result.draft.venueDetails, details);
+test("draft publication requires capacity and photos, protects snapshots and stale edits", async () => {
+  let created = await read(await call("/admin/venues","POST",{...content,capacityMin:null,capacityMax:null},adminCookie),201);
+  const path = `/admin/venues/${created.id}`;
+  assert.equal(created.draft.name,"Garden"); assert.equal(created.draft.location,"City"); assert.deepEqual(created.draft.categories,["Garden"]);
+  await read(await call(`/venues/${created.id}`),404);
+  await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:created.draft.updatedAt},adminCookie),400);
+  const firstPhoto = await photo(); const secondPhoto = await photo();
+  let edited = await read(await call(`${path}/draft`,"PATCH",{...content,capacityMin:null,capacityMax:null,imageUrls:[firstPhoto],expectedUpdatedAt:created.draft.updatedAt},adminCookie),200);
+  await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:edited.draft.updatedAt},adminCookie),400);
+  edited = await read(await call(`${path}/draft`,"PATCH",{...content,imageUrls:[],expectedUpdatedAt:edited.draft.updatedAt},adminCookie),200);
+  await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:edited.draft.updatedAt},adminCookie),400);
+  // The removed draft-only image is cleaned up, so upload again.
+  const thirdPhoto = await photo();
+  edited = await read(await call(`${path}/draft`,"PATCH",{...content,imageUrls:[thirdPhoto,secondPhoto],expectedUpdatedAt:edited.draft.updatedAt},adminCookie),200);
+  await read(await call(`${path}/draft`,"PATCH",{...content,expectedUpdatedAt:created.draft.updatedAt},adminCookie),409);
+  await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:created.draft.updatedAt},adminCookie),409);
+  const published = await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:edited.draft.updatedAt},adminCookie),200);
+  assert.equal(published.draft,null); assert.deepEqual(published.published.imageUrls,[thirdPhoto,secondPhoto]);
+  assert.deepEqual((await read(await call(`/venues/${created.id}`),200)).imageUrls,[thirdPhoto,secondPhoto]);
+  const replacementPhoto = await photo();
+  let replacement = await read(await call(`${path}/draft`,"PATCH",{...content,name:"Changed",imageUrls:[replacementPhoto],expectedUpdatedAt:published.published.updatedAt},adminCookie),200);
+  assert.equal(replacement.draft.version,2);
+  assert.equal((await read(await call(`/venues/${created.id}`),200)).name,"Garden");
+  await read(await call(imagePath(thirdPhoto)),200);
+  await read(await call(imagePath(replacementPhoto)),404);
+  replacement = await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:replacement.draft.updatedAt},adminCookie),200);
+  const history = replacement.versions.find((v:any)=>v.version===1);
+  assert.equal(history.state,"superseded"); assert.deepEqual(history.imageUrls,[thirdPhoto,secondPhoto]);
+  await read(await call(imagePath(thirdPhoto)),404);
+  await read(await call(imagePath(thirdPhoto),"GET",undefined,adminCookie),200);
+  await read(await call(imageDeletePath(thirdPhoto),"DELETE",undefined,adminCookie),409);
+  await read(await call(`${path}/archive`,"POST",undefined,adminCookie),200);
+  await read(await call(`/venues/${created.id}`),404);
+  await read(await call(imagePath(replacementPhoto)),404);
+  await read(await call(imagePath(replacementPhoto),"GET",undefined,adminCookie),200);
+  await read(await call(`${path}/draft`,"PATCH",{...content,expectedUpdatedAt:replacement.published.updatedAt},adminCookie),409);
+  await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:replacement.published.updatedAt},adminCookie),409);
+  await read(await call(`${path}/draft`,"DELETE",undefined,adminCookie),409);
+});
+
+test("venue photos enforce signatures, size, access, ordered association and cleanup", async () => {
+  await read(await upload(adminCookie,Buffer.from("invalid")),400);
+  await read(await upload(adminCookie,png.subarray(0,8)),400);
+  await read(await upload(adminCookie,png,"image/jpeg"),400);
+  await read(await upload(adminCookie,Buffer.alloc(5*1024*1024+1)),400);
+  assert.equal((await upload(adminCookie,Buffer.alloc(6*1024*1024))).status,413);
+  const url = await photo();
+  const response = await call(imagePath(url),"GET",undefined,adminCookie);
+  assert.equal(response.status,200); assert.equal(response.headers.get("Content-Type"),"image/png"); assert.equal(response.headers.get("X-Content-Type-Options"),"nosniff");
+  for (const cookie of [undefined,staffCookie,customerCookie,undesignatedAdminCookie]) await read(await call(imagePath(url),"GET",undefined,cookie),404);
+  await read(await call("/admin/venues","POST",{...content,imageUrls:[url,url.toUpperCase().replace("/V1/VENUE-IMAGES/","/v1/venue-images/")]},adminCookie),400);
+  const draft = await read(await call("/admin/venues","POST",{...content,imageUrls:[url]},adminCookie),201);
+  await read(await call(imageDeletePath(url),"DELETE",undefined,adminCookie),409);
+  await read(await call(`/admin/venues/${draft.id}/draft`,"DELETE",undefined,adminCookie),204);
+  await read(await call(imagePath(url),"GET",undefined,adminCookie),404);
+  const orphan = await photo(); await read(await call(imageDeletePath(orphan),"DELETE",undefined,adminCookie),204);
+  await read(await call(imageDeletePath(orphan),"DELETE",undefined,adminCookie),404);
+});
+
+test("legacy DELETE endpoint archives a draft instead of deleting it", async () => {
+  const draft = await read(await call("/admin/venues", "POST", content, adminCookie), 201);
+  const archived = await read(await call(`/admin/venues/${draft.id}`, "DELETE", undefined, adminCookie), 200);
+  assert.ok(archived.archivedAt);
+  assert.equal(archived.draft.id, draft.draft.id);
+  const saved = await read(await call(`/admin/venues/${draft.id}`, "GET", undefined, adminCookie), 200);
+  assert.equal(saved.draft.name, "Garden");
+});
+
+test("public pagination is stable and only returns published nonarchived venues; OpenAPI matches", async () => {
+  for(let i=0;i<17;i++) {
+    const venue = await db.insertInto("venues").defaultValues().returning("id").executeTakeFirstOrThrow();
+    await db.insertInto("venue_versions").values({venue_id:venue.id,version:1,state:"published",name:`Pagination ${String(i).padStart(2,"0")}`,location:"Demo",description:"Demo",published_at:new Date()}).execute();
+  }
+  const all = (await read(await call("/venues"),200)).venues;
+  const first = await read(await call("/venues?limit=15&offset=0"),200);
+  const second = await read(await call(`/venues?limit=15&offset=${first.nextOffset}`),200);
+  assert.equal(first.venues.length,15); assert.equal(first.nextOffset,15); assert.equal(second.nextOffset,null);
+  assert.deepEqual([...first.venues,...second.venues].map((v:any)=>v.id),all.map((v:any)=>v.id));
+  assert.ok((await read(await call("/admin/venues","GET",undefined,adminCookie),200)).venues.some((v:any)=>v.id===legacyArchivedId));
+  const spec = await (await app.request("/openapi.json")).json() as any;
+  for(const path of ["/v1/venues","/v1/admin/venues/{id}/draft","/v1/admin/venues/{id}/publish","/v1/admin/venues/{id}/archive","/v1/admin/venue-images"]) assert.ok(spec.paths[path]);
+  assert.ok(spec.paths["/v1/admin/venues/{id}"].delete);
+  assert.ok(spec.paths["/v1/admin/venues/{id}/draft"].delete);
+  assert.ok(spec.paths["/v1/admin/venues/{id}"].patch);
+});
+
+test("concurrent draft edits preserve one winner and database constraints reject inconsistent state", async () => {
+  const draft = await read(await call("/admin/venues", "POST", content, adminCookie), 201);
+  const path = `/admin/venues/${draft.id}/draft`;
+  const responses = await Promise.all(["First", "Second"].map(name => call(path, "PATCH", {...content, name, expectedUpdatedAt: draft.draft.updatedAt}, adminCookie)));
+  assert.deepEqual(responses.map(response => response.status).sort(), [200,409]);
+  for (const response of responses) await response.text();
+  const saved = await read(await call(`/admin/venues/${draft.id}`, "GET", undefined, adminCookie), 200);
+  assert.ok(["First", "Second"].includes(saved.draft.name)); assert.equal(saved.versions.length,1);
+  await assert.rejects(pool.query("UPDATE venue_versions SET published_at = now() WHERE id = $1", [saved.draft.id]), (cause: any) => cause.code === "23514");
+  await assert.rejects(pool.query("INSERT INTO venue_images (content_type, data) VALUES ('image/gif', $1)", [png]), (cause: any) => cause.code === "23514");
+  const jpeg = await sharp({ create: { width: 1, height: 1, channels: 3, background: "#aabbcc" } }).jpeg().toBuffer();
+  await read(await upload(adminCookie,jpeg.subarray(0,3),"image/jpeg"),400);
+  const image = await read(await upload(adminCookie,jpeg,"image/jpeg"),201);
+  const fetched = await call(imagePath(image.imageUrl),"GET",undefined,adminCookie);
+  assert.equal(fetched.status,200); assert.equal(fetched.headers.get("Content-Type"),"image/jpeg");
+  assert.deepEqual(Buffer.from(await fetched.arrayBuffer()),jpeg);
+});
+
+test("seed reruns preserve legacy archived venues and edited new drafts", async () => {
+  const runSeed = () => promisify(execFile)(process.execPath,["--import","tsx","src/db/seed.ts"],{cwd:fileURLToPath(new URL("../",import.meta.url)),env:{...process.env,FIREBASE_PROJECT_ID:"",FIREBASE_CLIENT_EMAIL:"",FIREBASE_PRIVATE_KEY:"",GOOGLE_APPLICATION_CREDENTIALS:""}});
+  await runSeed();
+  const id = "b1000000-0000-0000-0000-000000000003";
+  let row = await read(await call(`/admin/venues/${id}`,"GET",undefined,adminCookie),200);
+  assert.equal(row.published,null); assert.equal(row.draft.state,"draft");
+  row = await read(await call(`/admin/venues/${id}/draft`,"PATCH",{...content,name:"Edited fixture",expectedUpdatedAt:row.draft.updatedAt},adminCookie),200);
+  await call(`/admin/venues/${id}/archive`,"POST",undefined,adminCookie);
+  await runSeed();
+  const saved = await read(await call(`/admin/venues/${id}`,"GET",undefined,adminCookie),200);
+  assert.equal(saved.draft.name,"Edited fixture"); assert.ok(saved.archivedAt); assert.equal(saved.versions.length,1);
+  const legacy = await read(await call(`/admin/venues/${legacyArchivedId}`,"GET",undefined,adminCookie),200);
+  assert.equal(legacy.published.name,"Legacy archived"); assert.equal(legacy.archivedAt,legacyUpdatedAt);
+  assert.equal((await pool.query("SELECT count(*)::int AS count FROM venues WHERE id::text LIKE 'b1000000-0000-0000-0000-0000000000%'")).rows[0].count,15);
 });

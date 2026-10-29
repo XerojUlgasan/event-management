@@ -1,6 +1,4 @@
-import type { Transaction } from "kysely";
+import type { Kysely, Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
-
-export function createVenueData(db: Transaction<DB>, name: string, location: string, description: string) {
-  return db.insertInto("venues").values({ name, location, description }).returningAll().executeTakeFirstOrThrow();
-}
+type Database = Kysely<DB> | Transaction<DB>;
+export function createVenueData(db: Transaction<DB>) { return db.insertInto("venues").defaultValues().returningAll().executeTakeFirstOrThrow(); }

@@ -79,15 +79,52 @@ model PackageImage {
 }
 
 model Venue {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String
-  location    String
-  description String
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  archivedAt  DateTime? @map("archived_at") @db.Timestamptz(6)
-
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+  versions VenueVersion[]
   @@map("venues")
+}
+
+model VenueVersion {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  venueId String @map("venue_id") @db.Uuid
+  version Int
+  state String
+  name String
+  location String
+  description String
+  categories String[]
+  capacityMin Int? @map("capacity_min")
+  capacityMax Int? @map("capacity_max")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  photos VenueVersionPhoto[]
+  @@unique([venueId, version])
+  @@map("venue_versions")
+}
+
+model VenueImage {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentType String @map("content_type")
+  data Bytes
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  photos VenueVersionPhoto[]
+  @@map("venue_images")
+}
+
+model VenueVersionPhoto {
+  venueVersionId String @map("venue_version_id") @db.Uuid
+  imageId String @map("image_id") @db.Uuid
+  position Int
+  version VenueVersion @relation(fields: [venueVersionId], references: [id], onDelete: Cascade)
+  image VenueImage @relation(fields: [imageId], references: [id], onDelete: Restrict)
+  @@id([venueVersionId, imageId])
+  @@unique([venueVersionId, position])
+  @@map("venue_version_photos")
 }
 
 model PackageVersion {

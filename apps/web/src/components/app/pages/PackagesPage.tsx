@@ -1,9 +1,9 @@
-import { venueDetailsFromSelection } from "../../../lib/venue-details"
 import { useCallback, useEffect, useState } from "react"
 import { Badge, Button, Dialog, FormField, Icon, PageHeader, SearchField, Tabs } from "@event-management/ui"
-import { ApiError, archivePackage, createPackage, deletePackage, getAdminPackage, getAdminPackages, getAdminServices, publishPackage, updatePackageDraft, uploadPackageImage, deleteUnreferencedPackageImage, packageImageSrc, serviceImageSrc, getVenues, createVenue, updateVenue, archiveVenue } from "../../../lib/api"
-import type { AdminPackage, AdminService, PackageContent, PackageVersion, Venue } from "../../../lib/api"
+import { ApiError, archivePackage, createPackage, deletePackage, getAdminPackage, getAdminPackages, getAdminServices, publishPackage, updatePackageDraft, uploadPackageImage, deleteUnreferencedPackageImage, packageImageSrc, serviceImageSrc } from "../../../lib/api"
+import type { AdminPackage, AdminService, PackageContent, PackageVersion } from "../../../lib/api"
 import { photos } from "../data"
+import { TagInput } from "../TagInput"
 import { PackagePreview, priceLabel } from "../PackagePreview"
 
 type FormService = { serviceVersionId: string; role: "included" | "add_on"; includedQuantity: string; addOnPrice: string; addOnMaxQuantity: string }
@@ -11,12 +11,12 @@ type Form = Omit<PackageContent, "eventTypes" | "inclusions" | "exclusions" | "p
   eventTypes: string[]; inclusions: string[]; exclusions: string[]; guestMin: string; guestMax: string; price: string
   services: FormService[]
 }
-const emptyForm: Form = { name: "", eventTypes: [], description: "", guestMin: "30", guestMax: "100", venueDetails: "", inclusions: [], exclusions: [], terms: "", imageUrl: null, price: "", services: [] }
+const emptyForm: Form = { name: "", eventTypes: [], description: "", guestMin: "30", guestMax: "100", inclusions: [], exclusions: [], terms: "", imageUrl: null, price: "", services: [] }
 function formFrom(version: PackageVersion): Form {
   return { ...version, eventTypes: [...version.eventTypes], inclusions: [...version.inclusions], exclusions: [...version.exclusions], guestMin: String(version.guestMin), guestMax: String(version.guestMax), price: version.price ? (version.price.amountMinor / 100).toFixed(2) : "", services: (version.services || []).map(entry => ({ serviceVersionId: entry.serviceVersionId, role: entry.role, includedQuantity: String(entry.includedQuantity ?? 1), addOnPrice: entry.addOnPrice ? (entry.addOnPrice.amountMinor / 100).toFixed(2) : "", addOnMaxQuantity: String(entry.addOnMaxQuantity ?? 1) })) }
 }
 function contentFrom(form: Form): PackageContent {
-  const textFields = [form.name, form.description, form.venueDetails, form.terms, ...form.eventTypes, ...form.inclusions, ...form.exclusions]
+  const textFields = [form.name, form.description, form.terms, ...form.eventTypes, ...form.inclusions, ...form.exclusions]
   if (textFields.some(value => value.length > 4000)) throw new Error("Each text value must be 4,000 characters or fewer.")
   if (form.eventTypes.length > 50 || form.inclusions.length > 100 || form.exclusions.length > 100) throw new Error("Use up to 50 event types and 100 inclusions or exclusions.")
   if (form.imageUrl) {
@@ -49,7 +49,7 @@ function contentFrom(form: Form): PackageContent {
     }
     return { serviceVersionId: entry.serviceVersionId, role: entry.role, includedQuantity: entry.role === "included" ? quantity : null, addOnPrice, addOnMaxQuantity: entry.role === "add_on" ? quantity : null }
   })
-  return { name: form.name, description: form.description, venueDetails: form.venueDetails, terms: form.terms, eventTypes: form.eventTypes, inclusions: form.inclusions, exclusions: form.exclusions, guestMin: min, guestMax: max, imageUrl: form.imageUrl?.trim() || null, price, services }
+  return { name: form.name, description: form.description, terms: form.terms, eventTypes: form.eventTypes, inclusions: form.inclusions, exclusions: form.exclusions, guestMin: min, guestMax: max, imageUrl: form.imageUrl?.trim() || null, price, services }
 }
 const message = (err: unknown) => err instanceof Error ? err.message : "Something went wrong. Please try again."
 const steps = ["Essentials", "Experience", "Pricing & media"]
@@ -61,27 +61,10 @@ function missing(form: Form): Requirement[] {
   if (!form.description.trim()) result.push({ label: "Description", step: 0 })
   const min = Number(form.guestMin), max = Number(form.guestMax)
   if (!Number.isInteger(min) || !Number.isInteger(max) || min < 30 || max > 100 || min > max) result.push({ label: "Valid guest range (30–100)", step: 0 })
-  if (!form.venueDetails.trim()) result.push({ label: "Venue details", step: 1 })
   if (!form.inclusions.length && !form.services.some(service => service.role === "included")) result.push({ label: "At least one inclusion or included service", step: 1 })
   if (!form.terms.trim()) result.push({ label: "Terms", step: 1 })
   if (!/^(?:\d+)(?:\.\d{1,2})?$/.test(form.price.trim()) || Number(form.price) <= 0 || Number(form.price) > 21474836.47) result.push({ label: "Valid fixed PHP price", step: 2 })
   return result
-}
-export function TagInput({ label, values, onChange, required = false }: { label: string; values: string[]; onChange: (values: string[]) => void; required?: boolean }) {
-  const [input, setInput] = useState("")
-  const inputId = `tags-${label.toLowerCase().replace(/\s+/g, "-")}`
-  const add = () => {
-    const entries = input.split(",").map(value => value.trim()).filter(Boolean)
-    if (entries.length) {
-      const next = [...values]
-      for (const entry of entries) {
-        if (!next.some(value => value.trim().toLowerCase() === entry.toLowerCase())) next.push(entry)
-      }
-      onChange(next)
-    }
-    setInput("")
-  }
-  return <div className="package-tag-field full"><div className="package-tag-heading"><label htmlFor={inputId}>{label}{required && " *"}</label>{values.length > 0 && <button type="button" aria-label={`Remove all ${label.toLowerCase()}`} onClick={() => onChange([])}>Remove all</button>}</div><div className="package-tags">{values.map(value => <span className="package-tag" key={value}>{value}<button type="button" aria-label={`Remove ${value}`} onClick={() => onChange(values.filter(item => item !== value))}>×</button></span>)}<input id={inputId} value={input} placeholder={values.length ? "Add another" : `Add ${label.toLowerCase()}`} onChange={event => setInput(event.target.value)} onBlur={add} onKeyDown={event => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); add() } }} /></div><small>Type a value and press Enter or comma.</small></div>
 }
 
 function ServiceAssignments({ value, onChange, services, error, onLoad }: { value: FormService[]; onChange: (value: FormService[]) => void; services: AdminService[]; error: string; onLoad: () => Promise<void> }) {
@@ -131,19 +114,6 @@ export function PackagesPage() {
   const [preview, setPreview] = useState<PackageVersion | null>(null)
   const [confirm, setConfirm] = useState<{ item: AdminPackage; action: "publish" | "archive" | "delete" } | null>(null)
   const [notice, setNotice] = useState("")
-  const [venues, setVenues] = useState<Venue[]>([])
-  const [venueSearch, setVenueSearch] = useState("")
-  const [venueError, setVenueError] = useState("")
-  const [venueEditing, setVenueEditing] = useState<{ id: string | null; name: string; location: string; description: string } | null>(null)
-  const [venueFormError, setVenueFormError] = useState("")
-  const [venueConfirm, setVenueConfirm] = useState<Venue | null>(null)
-  const [venueNotice, setVenueNotice] = useState("")
-
-  const loadVenues = useCallback(async () => {
-    setVenueError("")
-    try { setVenues((await getVenues()).venues) } catch (err) { setVenueError(message(err)) }
-  }, [])
-  useEffect(() => { void loadVenues() }, [loadVenues])
   const load = useCallback(async () => {
     setLoading(true); setError("")
     try { setRows((await getAdminPackages()).packages) } catch (err) { setError(message(err)) } finally { setLoading(false) }
@@ -195,22 +165,6 @@ export function PackagesPage() {
       setNotice(`Package ${confirm.action === "publish" ? "published" : confirm.action === "archive" ? "archived" : "deleted"}.`); setConfirm(null); await load()
     } catch (err) { setError(err instanceof ApiError && err.status === 409 ? `${message(err)} Refresh the list and review the latest draft before trying again.` : message(err)); setConfirm(null) } finally { setBusy(false) }
   }
-  const saveVenue = async () => {
-    if (!venueEditing) return
-    setVenueFormError(""); setBusy(true)
-    try {
-      if (venueEditing.id) await updateVenue(venueEditing.id, venueEditing.name, venueEditing.location, venueEditing.description)
-      else await createVenue(venueEditing.name, venueEditing.location, venueEditing.description)
-      setVenueEditing(null); setVenueNotice(venueEditing.id ? "Venue updated." : "Venue added."); await loadVenues()
-    } catch (err) { setVenueFormError(message(err)) } finally { setBusy(false) }
-  }
-  const confirmArchiveVenue = async () => {
-    if (!venueConfirm) return
-    setBusy(true)
-    try { await archiveVenue(venueConfirm.id); setVenueConfirm(null); setVenueNotice("Venue archived."); await loadVenues() }
-    catch (err) { setVenueError(message(err)); setVenueConfirm(null) } finally { setBusy(false) }
-  }
-  const visibleVenues = venues.filter(v => !venueSearch.trim() || `${v.name} ${v.location}`.toLowerCase().includes(venueSearch.toLowerCase().trim()))
   const visible = rows.filter(item => {
     const version = item.draft || item.published
     const matchesSearch = !search.trim() || `${version?.name || ""} ${version?.eventTypes.join(" ") || ""}`.toLowerCase().includes(search.toLowerCase().trim())
@@ -219,25 +173,7 @@ export function PackagesPage() {
   const setField = <K extends keyof Form>(key: K, value: Form[K]) => setEditing(current => current ? { ...current, form: { ...current.form, [key]: value } } : current)
   return <div className="content-stack packages-page">
     <PageHeader title="Packages" description="Manage your package catalog." actions={tab === "Packages" ? <Button icon="box" disabled={busy} onClick={() => { setFormError(""); setStep(0); setSelectedImage(null); setEditing({ id: null, updatedAt: null, form: { ...emptyForm } }) }}>Create package</Button> : undefined} />
-    <Tabs className="package-tabs" active={tab} onChange={setTab} items={[{ value: "Packages", label: "Packages", count: rows.filter(item => !item.archivedAt).length }, { value: "Archives", label: "Archives", count: rows.filter(item => item.archivedAt).length }, { value: "Venues", label: "Venues", count: venues.length }]} />
-    {tab === "Venues" ? <>
-      <div className="table-tools package-tools"><SearchField value={venueSearch} onChange={e => setVenueSearch(e.target.value)} placeholder="Search venues" /><Button icon="box" disabled={busy} onClick={() => { setVenueFormError(""); setVenueEditing({ id: null, name: "", location: "", description: "" }) }}>Add venue</Button></div>
-      {venueNotice && <p role="status">{venueNotice}</p>}
-      {venueError && <p role="alert">{venueError} <button type="button" onClick={() => void loadVenues()}>Try again</button></p>}
-      <div className="venue-list">
-        <div className="venue-row venue-row-header"><span>Venue</span><span>Location</span><span>Description</span><span></span></div>
-        {!venueError && visibleVenues.length === 0 && <p className="venue-empty">No venues found.</p>}
-        {visibleVenues.map(v => <div className="venue-row" key={v.id}>
-          <strong>{v.name}</strong>
-          <span className="venue-location">{v.location}</span>
-          <p className="venue-description">{v.description}</p>
-          <div className="venue-actions">
-            <Button variant="secondary" disabled={busy} onClick={() => { setVenueFormError(""); setVenueEditing({ id: v.id, name: v.name, location: v.location, description: v.description }) }}>Edit</Button>
-            <Button variant="secondary" disabled={busy} onClick={() => setVenueConfirm(v)}>Archive</Button>
-          </div>
-        </div>)}
-      </div>
-    </> : <>
+    <Tabs className="package-tabs" active={tab} onChange={setTab} items={[{ value: "Packages", label: "Packages", count: rows.filter(item => !item.archivedAt).length }, { value: "Archives", label: "Archives", count: rows.filter(item => item.archivedAt).length }]} />
       {tab === "Packages" && <div className="package-admin-summary"><div><span>Published</span><strong>{rows.filter(item => item.published && !item.archivedAt).length}</strong><small>Visible to customers</small></div><div><span>Drafts</span><strong>{rows.filter(item => item.draft && !item.archivedAt).length}</strong><small>Awaiting publication</small></div><div><span>Archived</span><strong>{rows.filter(item => item.archivedAt).length}</strong><small>Hidden from customers</small></div></div>}
       <div className="table-tools package-tools"><SearchField value={search} onChange={event => setSearch(event.target.value)} placeholder="Search packages" />{tab === "Packages" && <select aria-label="Package status" value={status} onChange={event => setStatus(event.target.value)}><option value="all">All statuses</option><option value="published">Published</option><option value="draft">Draft</option></select>}</div>
       {loading && <p>Loading packages…</p>}{error && <p role="alert">{error} <button onClick={() => void load()}>Try again</button></p>}{notice && <p role="status">{notice}</p>}
@@ -247,24 +183,15 @@ export function PackagesPage() {
         if (!version) return null
         return <article className="admin-package-card" key={item.id}><div className="admin-package-image"><img src={packageImageSrc(version.imageUrl) || photos.dinner} alt="" onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = photos.dinner }} /><Badge tone={item.archivedAt ? "neutral" : item.draft ? "warning" : "success"}>{item.archivedAt ? "Archived" : item.draft ? item.published ? "Draft changes" : "Draft" : "Published"}</Badge></div><div className="admin-package-body"><span className="package-kind">{version.eventTypes.join(", ")}</span><div className="card-title">{version.name || "Untitled package"}</div><p>{version.description}</p><div className="admin-package-data"><span><small>Price</small><strong>{priceLabel(version.price)}</strong></span><span><small>Capacity</small><strong>{version.guestMin}–{version.guestMax} guests</strong></span></div><div className="admin-package-actions"><Button variant="secondary" onClick={() => setPreview(version)}>Preview</Button>{!item.archivedAt && <Button disabled={busy} onClick={() => void openEdit(item.id)}>Edit draft</Button>}{item.draft && !item.archivedAt && <Button disabled={busy} onClick={() => setConfirm({ item, action: "publish" })}>Publish draft</Button>}{!item.archivedAt && item.published && <Button variant="secondary" disabled={busy} onClick={() => setConfirm({ item, action: "archive" })}>Archive</Button>}{!item.published && !item.archivedAt && <Button variant="secondary" disabled={busy} onClick={() => setConfirm({ item, action: "delete" })}>Delete</Button>}</div></div></article>
       })}{tab === "Packages" && <button className="new-package-card" onClick={() => { setFormError(""); setStep(0); setSelectedImage(null); setEditing({ id: null, updatedAt: null, form: { ...emptyForm } }) }}><span><Icon name="box" /></span><strong>Create a new package</strong><small>Start with a draft.</small></button>}</div>
-    </>}
     {editing && <Dialog className="package-wizard" onClose={() => { if (!busy && window.confirm("Discard unsaved changes?")) { setEditing(null); setSelectedImage(null) } }} eyebrow="Event package" title={editing.id ? "Edit draft" : "Create package"} actions={<><Button variant="secondary" disabled={busy} onClick={() => { if (step > 0) setStep(step - 1); else if (window.confirm("Discard unsaved changes?")) { setEditing(null); setSelectedImage(null) } }}>{step > 0 ? "Back" : "Cancel"}</Button>{step < 2 ? <Button disabled={busy} onClick={() => setStep(step + 1)}>Continue</Button> : <Button disabled={busy} onClick={() => void save()}>{uploadingImage ? "Uploading image…" : busy ? "Saving…" : "Save draft"}</Button>}</>}>
       <div className="package-steps" aria-label="Package editor steps">{steps.map((name, index) => <button type="button" key={name} className={step === index ? "active" : ""} aria-current={step === index ? "step" : undefined} onClick={() => setStep(index)}><span>{index + 1}</span>{name}</button>)}</div>
       {formError && <p role="alert">{formError}</p>}
       {step === 0 && <div className="form-grid"><FormField label="Package name *"><input value={editing.form.name} onChange={e => setField("name", e.target.value)} /></FormField><TagInput label="Event types" required values={editing.form.eventTypes} onChange={value => setField("eventTypes", value)} /><FormField className="full" label="Description *"><textarea value={editing.form.description} onChange={e => setField("description", e.target.value)} /></FormField><FormField label="Minimum guests *"><input type="number" min="30" max="100" value={editing.form.guestMin} onChange={e => setField("guestMin", e.target.value)} /></FormField><FormField label="Maximum guests *"><input type="number" min="30" max="100" value={editing.form.guestMax} onChange={e => setField("guestMax", e.target.value)} /></FormField></div>}
-      {step === 1 && <div className="form-grid"><div className="full venue-picker-field"><label className="venue-picker-label">Pick a venue <span className="field-optional">(optional)</span></label><select className="venue-picker-select" value="" onChange={e => { const v = venues.find(x => x.id === e.target.value); if (v) setField("venueDetails", venueDetailsFromSelection(v)) }}><option value="">— Select a venue to pre-fill details —</option>{venues.map(v => <option key={v.id} value={v.id}>{v.name} · {v.location}</option>)}</select><small className="venue-picker-hint">Selecting a venue fills in the details below. You can still edit the text.</small></div><FormField className="full" label="Venue details *"><textarea value={editing.form.venueDetails} onChange={e => setField("venueDetails", e.target.value)} /></FormField><TagInput label="Inclusions" values={editing.form.inclusions} onChange={value => setField("inclusions", value)} /><p className="full">Add at least one inclusion or included service before publishing.</p><TagInput label="Exclusions" values={editing.form.exclusions} onChange={value => setField("exclusions", value)} /><ServiceAssignments value={editing.form.services} onChange={value => setField("services", value)} services={services} error={serviceError} onLoad={loadServices} /><FormField className="full" label="Terms *"><textarea value={editing.form.terms} onChange={e => setField("terms", e.target.value)} /></FormField></div>}
+      {step === 1 && <div className="form-grid"><TagInput label="Inclusions" values={editing.form.inclusions} onChange={value => setField("inclusions", value)} /><p className="full">Add at least one inclusion or included service before publishing.</p><TagInput label="Exclusions" values={editing.form.exclusions} onChange={value => setField("exclusions", value)} /><ServiceAssignments value={editing.form.services} onChange={value => setField("services", value)} services={services} error={serviceError} onLoad={loadServices} /><FormField className="full" label="Terms *"><textarea value={editing.form.terms} onChange={e => setField("terms", e.target.value)} /></FormField></div>}
       {step === 2 && <><div className="form-grid"><FormField label="Package total (PHP) *"><input inputMode="decimal" placeholder="e.g. 50000.00" value={editing.form.price} onChange={e => setField("price", e.target.value)} /></FormField><FormField label="Image URL"><input type="url" placeholder="https://..." value={editing.form.imageUrl || ""} onChange={e => { setSelectedImage(null); setField("imageUrl", e.target.value) }} /></FormField><FormField className="full" label="Or upload a JPEG or PNG (up to 5 MiB)"><input type="file" accept="image/jpeg,image/png" disabled={busy} onChange={e => { const file = e.target.files?.[0]; e.target.value = ""; if (!file) return; if (!["image/jpeg", "image/png"].includes(file.type) || file.size > 5 * 1024 * 1024 || file.size === 0) { setFormError("Choose a JPEG or PNG image up to 5 MiB."); return } setFormError(""); setSelectedImage(file); setField("imageUrl", null) }} /></FormField>{selectedImage && <p className="full package-selected-image" role="status">Selected: {selectedImage.name} · uploaded when you save</p>}{(imagePreview || editing.form.imageUrl) && <div className="full package-image-preview"><img src={imagePreview || packageImageSrc(editing.form.imageUrl)} alt="Package preview" /><button type="button" onClick={() => { setSelectedImage(null); setField("imageUrl", null) }}>Remove image</button></div>}</div><div className="package-requirements"><strong>{missing(editing.form).length ? "Before publishing" : "Ready to publish"}</strong><p>{missing(editing.form).length ? "You can save this draft now. Complete these details before publishing:" : "All required details are present. Save the draft, then publish it from the package list."}</p>{missing(editing.form).length > 0 && <ul>{missing(editing.form).map(item => <li key={item.label}><button type="button" onClick={() => setStep(item.step)}>{item.label}</button></li>)}</ul>}</div></>}
     </Dialog>}
     {preview && <PackagePreview item={preview} versionState={preview.state} onClose={() => setPreview(null)} />}
     {confirm && <Dialog onClose={() => { if (!busy) setConfirm(null) }} title={`${confirm.action === "publish" ? "Publish" : confirm.action === "archive" ? "Archive" : "Delete"} package?`} actions={<><Button variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>Cancel</Button>{confirm.action === "publish" && confirm.item.draft && missing(formFrom(confirm.item.draft)).length > 0 ? <Button disabled={busy} onClick={() => { const id = confirm.item.id; setConfirm(null); void openEdit(id) }}>Edit draft</Button> : <Button disabled={busy} onClick={() => void act()}>{busy ? "Please wait…" : confirm.action === "publish" ? "Publish" : confirm.action === "archive" ? "Archive" : "Delete"}</Button>}</>}><p>{confirm.action === "publish" ? "The draft will become visible to customers after the server validates it." : confirm.action === "archive" ? "The package will be hidden from customers and its history retained." : "This permanently removes the never-published draft."}</p>{confirm.action === "publish" && confirm.item.draft && missing(formFrom(confirm.item.draft)).length > 0 && <div className="package-requirements"><strong>Complete these details first</strong><ul>{missing(formFrom(confirm.item.draft)).map(item => <li key={item.label}>{item.label}</li>)}</ul></div>}</Dialog>}
-    {venueEditing && <Dialog className="venue-dialog" onClose={() => { if (!busy) setVenueEditing(null) }} title={venueEditing.id ? "Edit venue" : "Add venue"} actions={<><Button variant="secondary" disabled={busy} onClick={() => setVenueEditing(null)}>Cancel</Button><Button disabled={busy} onClick={() => void saveVenue()}>{busy ? "Saving…" : "Save"}</Button></>}>
-      {venueFormError && <p role="alert">{venueFormError}</p>}
-      <div className="form-grid">
-        <FormField label="Venue name *"><input value={venueEditing.name} onChange={e => setVenueEditing({ ...venueEditing, name: e.target.value })} placeholder="e.g. Sample Garden" /></FormField>
-        <FormField label="Location *"><input value={venueEditing.location} onChange={e => setVenueEditing({ ...venueEditing, location: e.target.value })} placeholder="e.g. Quezon City" /></FormField>
-        <FormField className="full" label="Description *"><textarea value={venueEditing.description} onChange={e => setVenueEditing({ ...venueEditing, description: e.target.value })} placeholder="Describe the venue and its setting." /></FormField>
-      </div>
-    </Dialog>}
-    {venueConfirm && <Dialog onClose={() => { if (!busy) setVenueConfirm(null) }} title="Archive venue?" actions={<><Button variant="secondary" disabled={busy} onClick={() => setVenueConfirm(null)}>Cancel</Button><Button disabled={busy} onClick={() => void confirmArchiveVenue()}>{busy ? "Please wait…" : "Archive"}</Button></>}><p>The venue will be hidden from the picker but existing packages are not affected.</p></Dialog>}
+
   </div>
 }

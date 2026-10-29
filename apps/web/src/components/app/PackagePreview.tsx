@@ -99,18 +99,13 @@ export function PackagePreview({ item, loading = false, error = "", versionState
                 {item.inclusions.length || includedServices.length ? <ul className="package-preview-inclusions">{item.inclusions.map((entry, index) => <li key={`${entry}-${index}`}>{entry}</li>)}{includedServices.map(entry => <li key={entry.id}><strong>{entry.service.name}</strong><br />{entry.includedQuantity} included{entry.service.imageUrl && <img className="package-preview-service-image" src={serviceImageSrc(entry.service.imageUrl)} alt="" />}{entry.service.categories.length > 0 && <><br />{entry.service.categories.join(", ")}</>}{entry.service.description && <><br />{entry.service.description}</>}</li>)}</ul> : <p>No inclusions specified yet.</p>}
               </section>
               {addOns.length > 0 && <section><span className="package-preview-overline">Optional / Additional cost</span><h2>Optional add-ons</h2><ul className="package-preview-inclusions">{addOns.map(entry => <li key={entry.id}><strong>{entry.service.name}</strong><br />{entry.addOnPrice ? `${priceLabel(entry.addOnPrice).replace(/ total$/, "")} per unit` : "Price unavailable"} · up to {entry.addOnMaxQuantity}{entry.service.imageUrl && <img className="package-preview-service-image" src={serviceImageSrc(entry.service.imageUrl)} alt="" />}{entry.service.categories.length > 0 && <><br />{entry.service.categories.join(", ")}</>}{entry.service.description && <><br />{entry.service.description}</>}</li>)}</ul></section>}
-              <section>
-                <span className="package-preview-overline">02 / The setting</span>
-                <h2>Venue &amp; arrangements</h2>
-                <p>{item.venueDetails || "Venue details have not been specified yet."}</p>
-              </section>
               {item.exclusions.length > 0 && <section>
-                <span className="package-preview-overline">03 / Good to know</span>
+                <span className="package-preview-overline">02 / Good to know</span>
                 <h2>Not included</h2>
                 <ul className="package-preview-plain-list">{item.exclusions.map((entry, index) => <li key={`${entry}-${index}`}>{entry}</li>)}</ul>
               </section>}
               <section>
-                <span className="package-preview-overline">{item.exclusions.length > 0 ? "04" : "03"} / Before you plan</span>
+                <span className="package-preview-overline">{item.exclusions.length > 0 ? "03" : "02"} / Before you plan</span>
                 <h2>Terms</h2>
                 <p>{item.terms || "Terms have not been specified yet."}</p>
               </section>
