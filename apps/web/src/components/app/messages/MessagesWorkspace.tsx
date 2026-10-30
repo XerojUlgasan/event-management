@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, type SyntheticEvent } from "react"
+import { Fragment, useEffect, useRef, useState, type SubmitEvent } from "react"
 import { Button, Icon } from "@event-management/ui"
 
 import type { ChatConversation, ChatMessage } from "../../../lib/api"
@@ -31,7 +31,21 @@ function dayLabel(value: string) {
 function preview(conversation: ChatConversation) {
   const message = conversation.lastMessage
   if (!message) return "No messages yet"
-  return message.body
+  return message.senderRole === "assistant" ? `AI: ${message.body}` : message.body
+}
+
+function conversationState(status: ChatConversation["status"]) {
+  if (status === "waiting_staff") return "Waiting for staff"
+  if (status === "staff") return "Staff handling · AI paused"
+  if (status === "closed") return "Closed"
+  return "AI assistant available"
+}
+
+function waitingLabel(status: ChatConversation["status"]) {
+  if (status === "waiting_staff") return "Waiting"
+  if (status === "staff") return "Staff"
+  if (status === "closed") return "Closed"
+  return null
 }
 
 export function MessagesWorkspace({
@@ -49,6 +63,15 @@ export function MessagesWorkspace({
   conversationOpen,
   listEmpty,
   threadEmpty,
+  onRequestStaff,
+  onEditContext,
+  onTakeover,
+  assistantPending = false,
+  assistantError = "",
+  onRetryAssistant,
+  staffRequesting = false,
+  takeoverBusy = false,
+  readOnly = false,
 }: {
   title: string
   viewerRole: "admin" | "customer"
@@ -64,18 +87,31 @@ export function MessagesWorkspace({
   conversationOpen: boolean
   listEmpty: { title: string; body: string }
   threadEmpty: { title: string; body: string }
+  onRequestStaff?: () => void
+  onEditContext?: () => void
+  onTakeover?: () => void
+  assistantPending?: boolean
+  assistantError?: string
+  onRetryAssistant?: () => void
+  staffRequesting?: boolean
+  takeoverBusy?: boolean
+  readOnly?: boolean
 }) {
   const [draft, setDraft] = useState("")
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState("")
   const thread = useRef<HTMLDivElement>(null)
   const active = conversations.find((item) => item.id === activeId) ?? null
-  const activeName =
-    viewerRole === "customer" ? "Clemora team" : active?.customerName ?? "Messages"
-  const activeDetail =
-    viewerRole === "customer" ? "Events and catering support" : active?.customerEmail ?? "Choose a conversation to reply"
-  const activeInitials =
-    viewerRole === "customer" ? "CT" : active ? initialsFromName(active.customerName) : "CT"
+  const isTeam = viewerRole === "customer"
+  const singleConversation = isTeam && conversations.length === 1
+  const activeName = isTeam ? "Clemora team" : active?.customerName ?? "Messages"
+  const activeDetail = isTeam
+    ? [active?.packageName, active?.eventType].filter(Boolean).join(" · ") ||
+      "Events and catering support"
+    : active?.customerEmail ?? "Choose a conversation to reply"
+  const avatar = active && !isTeam ? initialsFromName(active.customerName) : "CT"
+  const activeState = active ? conversationState(active.status) : ""
+  const closedForCustomer = isTeam && active?.status === "closed"
 
   useEffect(() => {
     setDraft("")
@@ -85,12 +121,12 @@ export function MessagesWorkspace({
   useEffect(() => {
     const element = thread.current
     if (element) element.scrollTop = element.scrollHeight
-  }, [messages.length, activeId])
+  }, [messages.length, activeId, assistantPending])
 
-  async function submit(event: SyntheticEvent<HTMLFormElement>) {
+  async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     const body = draft.trim()
-    if (!body || sending || !activeId) return
+    if (!body || sending || assistantPending || readOnly || !activeId) return
     setSending(true)
     setSendError("")
     try {
@@ -104,12 +140,14 @@ export function MessagesWorkspace({
   }
 
   return (
-    <div className={`customer-messages panel ${conversationOpen ? "conversation-open" : ""}`}>
+    <div
+      className={`customer-messages panel ${conversationOpen ? "conversation-open" : ""} ${singleConversation ? "single-conversation" : ""}`}
+    >
       <aside>
         <h1>{title}</h1>
         {conversations.map((conversation) => {
-          const name = viewerRole === "customer" ? "Clemora team" : conversation.customerName
-          const avatar = viewerRole === "customer" ? "CT" : initialsFromName(conversation.customerName)
+          const name = isTeam ? "Clemora team" : conversation.customerName
+          const conversationAvatar = isTeam ? "C" : initialsFromName(conversation.customerName)
           return (
             <button
               type="button"
@@ -118,14 +156,25 @@ export function MessagesWorkspace({
               aria-pressed={conversation.id === activeId}
               onClick={() => onSelect(conversation.id)}
             >
-              <span className={`manager-avatar small ${viewerRole === "customer" ? "team-avatar" : ""}`}>{avatar}</span>
+              <span className={`manager-avatar small ${isTeam ? "team-avatar" : ""}`}>
+                {isTeam ? <Icon name="spark" size={15} /> : conversationAvatar}
+              </span>
               <span>
                 <strong>{name}</strong>
                 <small>{preview(conversation)}</small>
               </span>
-              {conversation.unreadCount > 0 && (
-                <span className="messages-unread" aria-label={`${conversation.unreadCount} unread messages`}>
-                  {conversation.unreadCount > 9 ? "9+" : conversation.unreadCount}
+              {(waitingLabel(conversation.status) || conversation.unreadCount > 0) && (
+                <span className="conversation-badges">
+                  {waitingLabel(conversation.status) && (
+                    <em className={`conversation-waiting ${conversation.status}`}>
+                      {waitingLabel(conversation.status)}
+                    </em>
+                  )}
+                  {conversation.unreadCount > 0 && (
+                    <span className="messages-unread" aria-label={`${conversation.unreadCount} unread messages`}>
+                      {conversation.unreadCount > 9 ? "9+" : conversation.unreadCount}
+                    </span>
+                  )}
                 </span>
               )}
             </button>
@@ -146,14 +195,60 @@ export function MessagesWorkspace({
 
       <section>
         <div className="message-thread-head">
-          <button type="button" className="message-back" onClick={onBack}>
-            Back to conversations
-          </button>
-          <span className={`manager-avatar small ${viewerRole === "customer" ? "team-avatar" : ""}`}>{activeInitials}</span>
-          <span>
-            <strong>{activeName}</strong>
-            <small>{activeDetail}</small>
+          {!singleConversation && (
+            <button
+              type="button"
+              className="message-back"
+              onClick={onBack}
+              aria-label="Back to conversations"
+            >
+              <Icon name="chevron" size={16} />
+              <span>Back</span>
+            </button>
+          )}
+          <span className={`manager-avatar small ${isTeam ? "team-avatar" : ""}`}>
+            {isTeam ? <Icon name="spark" size={15} /> : avatar}
           </span>
+          <div className="message-thread-title">
+            <span className="message-thread-name">
+              <strong>{activeName}</strong>
+              {active && (
+                <span className={`conversation-state ${active.status}`}>{activeState}</span>
+              )}
+            </span>
+            <small>{activeDetail}</small>
+          </div>
+          {active && (
+            <div className="message-head-actions">
+              {isTeam && active.status === "active" && onRequestStaff && (
+                <button
+                  type="button"
+                  className="message-action"
+                  onClick={onRequestStaff}
+                  disabled={staffRequesting}
+                >
+                  {staffRequesting ? "Requesting…" : "Talk to staff"}
+                </button>
+              )}
+              {isTeam && active.status !== "closed" && onEditContext && (
+                <button type="button" className="message-action" onClick={onEditContext}>
+                  Event details
+                </button>
+              )}
+              {!isTeam &&
+                (active.status === "active" || active.status === "waiting_staff") &&
+                onTakeover && (
+                  <button
+                    type="button"
+                    className="message-action"
+                    onClick={onTakeover}
+                    disabled={takeoverBusy}
+                  >
+                    {takeoverBusy ? "Taking over…" : "Take over"}
+                  </button>
+                )}
+            </div>
+          )}
         </div>
 
         {error && (
@@ -189,7 +284,7 @@ export function MessagesWorkspace({
             return (
               <Fragment key={message.id}>
                 {showDay && <span className="chat-time">{dayLabel(message.createdAt)}</span>}
-                <div className={`message ${mine ? "customer-message" : "bot"}`}>
+                <div className={`message ${mine ? "customer-message" : "bot"} ${message.senderRole === "assistant" ? "assistant-message" : ""}`}>
                   {message.body}
                   <small className="message-meta">
                     {!mine && `${message.senderName} · `}
@@ -199,7 +294,27 @@ export function MessagesWorkspace({
               </Fragment>
             )
           })}
+          {assistantPending && (
+            <div className="message bot chat-typing" role="status">
+              Clemora assistant is thinking…
+            </div>
+          )}
         </div>
+
+        {assistantError && (
+          <div className="messages-send-error assistant-error" role="alert">
+            <span>{assistantError}</span>
+            {onRetryAssistant && (
+              <button
+                type="button"
+                onClick={onRetryAssistant}
+                disabled={assistantPending}
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        )}
 
         {sendError && (
           <p className="messages-send-error" role="alert">
@@ -207,19 +322,41 @@ export function MessagesWorkspace({
           </p>
         )}
 
-        <form className="thread-input" onSubmit={submit}>
-          <input
-            aria-label="Write a message"
-            placeholder="Write a message…"
-            value={draft}
-            disabled={!activeId || sending}
-            maxLength={4000}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-          <Button type="submit" icon="arrow" disabled={!draft.trim() || !activeId || sending}>
-            {sending ? "Sending" : "Send"}
-          </Button>
-        </form>
+        {readOnly && (
+          <p className="messages-closed-note">
+            This conversation is closed. Its history is kept for reference.
+          </p>
+        )}
+        {closedForCustomer && (
+          <p className="messages-closed-note">
+            This conversation closed after inactivity. Send a message to reopen it; the
+            history stays here.
+          </p>
+        )}
+
+        {!readOnly && (
+          <form className="thread-input" onSubmit={submit}>
+            <input
+              aria-label="Write a message"
+              placeholder={
+                closedForCustomer
+                  ? "Send a message to reopen this conversation"
+                  : "Write a message…"
+              }
+              value={draft}
+              disabled={!activeId || sending}
+              maxLength={4000}
+              onChange={(event) => setDraft(event.target.value)}
+            />
+            <Button
+              type="submit"
+              icon="arrow"
+              disabled={!draft.trim() || !activeId || sending || assistantPending}
+            >
+              {sending ? "Sending" : "Send"}
+            </Button>
+          </form>
+        )}
       </section>
     </div>
   )

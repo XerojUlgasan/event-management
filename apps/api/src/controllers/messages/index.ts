@@ -7,6 +7,11 @@ import { sendCustomerMessageRoute, sendCustomerMessageRouteHandler } from "./sen
 import { listAdminConversationsRoute, listAdminConversationsRouteHandler } from "./list-admin-conversations.js";
 import { getAdminConversationRoute, getAdminConversationRouteHandler } from "./get-admin-conversation.js";
 import { sendAdminMessageRoute, sendAdminMessageRouteHandler } from "./send-admin-message.js";
+import { claimConversationRoute, claimConversationRouteHandler } from "./claim-conversation.js";
+import { updateConversationContextRoute, updateConversationContextRouteHandler } from "./update-conversation-context.js";
+import { requestStaffRoute, requestStaffRouteHandler } from "./request-staff.js";
+import { assistantReplyRoute, assistantReplyRouteHandler } from "./assistant-reply.js";
+import { takeoverConversationRoute, takeoverConversationRouteHandler } from "./takeover-conversation.js";
 
 const routes = new OpenAPIHono<HonoEnv>({
   defaultHook: (result, c) => {
@@ -29,7 +34,12 @@ routes.use("/admin/conversations/*", requireSession, adminOnly);
 
 routes.openapi(getCustomerConversationRoute, getCustomerConversationRouteHandler);
 routes.openapi(sendCustomerMessageRoute, sendCustomerMessageRouteHandler);
+routes.openapi(claimConversationRoute, claimConversationRouteHandler);
+routes.openapi(updateConversationContextRoute, updateConversationContextRouteHandler);
+routes.openapi(requestStaffRoute, requestStaffRouteHandler);
+routes.openapi(assistantReplyRoute, assistantReplyRouteHandler);
 routes.openapi(listAdminConversationsRoute, listAdminConversationsRouteHandler);
 routes.openapi(getAdminConversationRoute, getAdminConversationRouteHandler);
 routes.openapi(sendAdminMessageRoute, sendAdminMessageRouteHandler);
+routes.openapi(takeoverConversationRoute, takeoverConversationRouteHandler);
 export default routes;

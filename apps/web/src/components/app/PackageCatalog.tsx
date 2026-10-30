@@ -5,7 +5,11 @@ import type { PublicPackage } from "../../lib/api"
 import { photos } from "./data"
 import { PackagePreview, priceLabel } from "./PackagePreview"
 
-export function PackageCatalog() {
+export function PackageCatalog({
+  onAsk,
+}: {
+  onAsk?: (item: PublicPackage) => void
+} = {}) {
   const [rows, setRows] = useState<PublicPackage[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -38,6 +42,6 @@ export function PackageCatalog() {
         <button className="card-link" onClick={() => { setDetail(null); setDetailError(""); setDetailLoading(true); setSelectedId(item.id) }}>View package <Icon name="arrow" size={16} /></button>
       </div>
     </article>)}</div>
-    {selectedId && <PackagePreview item={detail} loading={detailLoading} error={detailError} onClose={() => setSelectedId(null)} />}
+    {selectedId && <PackagePreview item={detail} loading={detailLoading} error={detailError} onClose={() => setSelectedId(null)} onAsk={onAsk && detail ? () => { setSelectedId(null); onAsk(detail) } : undefined} />}
   </>
 }

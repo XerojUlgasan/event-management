@@ -4,6 +4,7 @@ import { after, before, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
+import { sql } from "kysely";
 import { hashSessionToken } from "../src/utils/session.js";
 
 const database = `em_messages_test_${randomUUID().replaceAll("-", "")}`;
@@ -16,6 +17,9 @@ let customerCookie: string;
 let otherCustomerCookie: string;
 let customerId: string;
 let otherCustomerId: string;
+let chatCustomerCookie: string;
+let chatCustomerId: string;
+let packageId: string;
 
 before(async () => {
   assert.ok(
@@ -66,6 +70,33 @@ before(async () => {
   const other = await session("customer", "Customer Two");
   otherCustomerCookie = other.cookie;
   otherCustomerId = other.id;
+  const chatCustomer = await session("customer", "Chat Customer");
+  chatCustomerCookie = chatCustomer.cookie;
+  chatCustomerId = chatCustomer.id;
+
+  const pkg = await sql<{ id: string }>`INSERT INTO "packages" DEFAULT VALUES RETURNING "id"`
+    .execute(db)
+    .then((result) => result.rows[0]);
+  packageId = pkg.id;
+  await db
+    .insertInto("package_versions")
+    .values({
+      package_id: packageId,
+      version: 1,
+      state: "published",
+      name: "Garden Wedding",
+      event_types: ["Wedding"],
+      description: "A garden wedding package",
+      guest_min: 50,
+      guest_max: 100,
+      venue_details: "Garden venue",
+      inclusions: ["Buffet dinner"],
+      exclusions: ["Drinks"],
+      terms: "50% deposit",
+      price_amount_minor: 15_000_000,
+      published_at: new Date(),
+    })
+    .execute();
 });
 
 after(async () => {
@@ -197,11 +228,323 @@ test("conversations are isolated per customer and unknown ids return 404", async
   );
 });
 
+async function withGeminiMock<T>(run: (calls: Array<{ url: string; init: RequestInit }>) => Promise<T>) {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.GEMINI_API_KEY;
+  const originalModel = process.env.GEMINI_MODEL;
+  process.env.GEMINI_API_KEY = "test-key";
+  process.env.GEMINI_MODEL = "gemini-test";
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({ url: String(input), init: init ?? {} });
+    return new Response(
+      JSON.stringify({ candidates: [{ content: { parts: [{ text: "Mocked reply" }] } }] }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  }) as typeof fetch;
+  try {
+    return await run(calls);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalKey;
+    if (originalModel === undefined) delete process.env.GEMINI_MODEL;
+    else process.env.GEMINI_MODEL = originalModel;
+  }
+}
+
+test("guest chatbot validates input and answers from approved package records", async () => {
+  const originalKey = process.env.GEMINI_API_KEY;
+  delete process.env.GEMINI_API_KEY;
+  const unavailable = await read(
+    await call("/chatbot/guest-reply", "POST", { messages: [{ role: "user", body: "Hi" }] }),
+    503,
+  );
+  assert.match(unavailable.error, /assistant is unavailable right now/i);
+  if (originalKey !== undefined) process.env.GEMINI_API_KEY = originalKey;
+
+  await read(
+    await call("/chatbot/guest-reply", "POST", {
+      messages: [
+        { role: "user", body: "Hi" },
+        { role: "assistant", body: "Hello" },
+      ],
+    }),
+    400,
+  );
+
+  await withGeminiMock(async (calls) => {
+    const result = await read(
+      await call("/chatbot/guest-reply", "POST", {
+        messages: [
+          { role: "assistant", body: "Hello" },
+          { role: "user", body: "What is in the garden wedding package?" },
+        ],
+        context: { packageId },
+      }),
+      200,
+    );
+    assert.equal(result.reply, "Mocked reply");
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].url, /gemini-test:generateContent/);
+    assert.equal((calls[0].init.headers as Record<string, string>)["x-goog-api-key"], "test-key");
+    const payload = JSON.parse(String(calls[0].init.body));
+    const prompt = payload.systemInstruction.parts[0].text;
+    assert.match(prompt, /Garden Wedding/);
+    assert.match(prompt, /PHP 150,000\.00/);
+    assert.match(prompt, /never invent/i);
+    assert.equal(payload.contents.at(-1).role, "user");
+    assert.match(payload.contents.at(-1).parts[0].text, /garden wedding package/i);
+  });
+});
+
+test("guest history is claimed once into the signed-in customer conversation", async () => {
+  const claim = {
+    guestChatId: "guest-chat-import-1",
+    messages: [
+      { role: "assistant", body: "Welcome to Clemora" },
+      { role: "user", body: "I want a garden wedding" },
+      { role: "assistant", body: "Great choice" },
+    ],
+    context: { packageId, eventType: "Wedding" },
+  };
+  const first = await read(
+    await call("/messages/conversation/claim", "POST", claim, chatCustomerCookie),
+    200,
+  );
+  assert.equal(first.conversation.customerId, chatCustomerId);
+  assert.equal(first.conversation.packageId, packageId);
+  assert.equal(first.conversation.packageName, "Garden Wedding");
+  assert.equal(first.conversation.eventType, "Wedding");
+  assert.equal(first.conversation.status, "active");
+  assert.deepEqual(
+    first.messages.map((message: any) => message.senderRole),
+    ["assistant", "customer", "assistant"],
+  );
+  assert.equal(first.messages[1].senderId, chatCustomerId);
+  assert.equal(first.messages[0].senderId, null);
+
+  const again = await read(
+    await call("/messages/conversation/claim", "POST", claim, chatCustomerCookie),
+    200,
+  );
+  assert.equal(again.messages.length, 3);
+
+  await read(
+    await call(
+      "/messages/conversation/claim",
+      "POST",
+      { ...claim, guestChatId: "guest-chat-import-2", context: { packageId: randomUUID() } },
+      chatCustomerCookie,
+    ),
+    400,
+  );
+});
+
+test("conversation context, staff handoff, and takeover gate assistant replies", async () => {
+  const now = Date.now();
+  await read(
+    await call(
+      "/messages/conversation/context",
+      "PATCH",
+      {
+        eventStartsAt: new Date(now + 86_400_000).toISOString(),
+        eventEndsAt: new Date(now).toISOString(),
+      },
+      chatCustomerCookie,
+    ),
+    400,
+  );
+  await read(
+    await call("/messages/conversation/context", "PATCH", { packageId: randomUUID() }, chatCustomerCookie),
+    400,
+  );
+
+  // A partial update cannot move the end before an existing start.
+  await read(
+    await call(
+      "/messages/conversation/context",
+      "PATCH",
+      { eventStartsAt: new Date(now + 10 * 86_400_000).toISOString() },
+      chatCustomerCookie,
+    ),
+    200,
+  );
+  await read(
+    await call(
+      "/messages/conversation/context",
+      "PATCH",
+      { eventEndsAt: new Date(now + 5 * 86_400_000).toISOString() },
+      chatCustomerCookie,
+    ),
+    400,
+  );
+  await read(
+    await call(
+      "/messages/conversation/context",
+      "PATCH",
+      {
+        eventStartsAt: null,
+        eventEndsAt: new Date(now + 7 * 86_400_000).toISOString(),
+      },
+      chatCustomerCookie,
+    ),
+    200,
+  );
+
+  const updated = await read(
+    await call(
+      "/messages/conversation/context",
+      "PATCH",
+      {
+        eventType: "Wedding reception",
+        guestCount: 80,
+        eventEndsAt: new Date(now + 7 * 86_400_000).toISOString(),
+      },
+      chatCustomerCookie,
+    ),
+    200,
+  );
+  assert.equal(updated.conversation.eventType, "Wedding reception");
+  assert.equal(updated.conversation.guestCount, 80);
+
+  await read(
+    await call("/messages/conversation/messages", "POST", { body: "Can you help?" }, chatCustomerCookie),
+    201,
+  );
+  const reply = await withGeminiMock(async () =>
+    read(await call("/messages/conversation/assistant-reply", "POST", {}, chatCustomerCookie), 200),
+  );
+  assert.equal(reply.status, "active");
+  assert.equal(reply.message.senderRole, "assistant");
+  assert.equal(reply.message.senderId, null);
+  assert.equal(reply.message.body, "Mocked reply");
+
+  const waiting = await read(
+    await call("/messages/conversation/request-staff", "POST", {}, chatCustomerCookie),
+    200,
+  );
+  assert.equal(waiting.conversation.status, "waiting_staff");
+
+  const list = await read(await call("/admin/conversations", "GET", undefined, adminCookie), 200);
+  assert.equal(list.conversations[0].id, waiting.conversation.id);
+  assert.equal(list.conversations[0].status, "waiting_staff");
+
+  const paused = await read(
+    await call("/messages/conversation/assistant-reply", "POST", {}, chatCustomerCookie),
+    200,
+  );
+  assert.equal(paused.message, null);
+  assert.equal(paused.status, "waiting_staff");
+
+  const taken = await read(
+    await call(
+      `/admin/conversations/${waiting.conversation.id}/takeover`,
+      "POST",
+      {},
+      adminCookie,
+    ),
+    200,
+  );
+  assert.equal(taken.conversation.status, "staff");
+
+  const stillPaused = await read(
+    await call("/messages/conversation/assistant-reply", "POST", {}, chatCustomerCookie),
+    200,
+  );
+  assert.equal(stillPaused.message, null);
+  assert.equal(stillPaused.status, "staff");
+
+  // Importing a new browser chat must not quietly undo the takeover.
+  const afterTakeover = await read(
+    await call(
+      "/messages/conversation/claim",
+      "POST",
+      {
+        guestChatId: "guest-chat-after-takeover",
+        messages: [{ role: "user", body: "One more thing" }],
+      },
+      chatCustomerCookie,
+    ),
+    200,
+  );
+  assert.equal(afterTakeover.conversation.status, "staff");
+
+  // Asking for staff again must not hand a taken-over thread back to the queue.
+  const stillTaken = await read(
+    await call("/messages/conversation/request-staff", "POST", {}, chatCustomerCookie),
+    200,
+  );
+  assert.equal(stillTaken.conversation.status, "staff");
+});
+
+test("inactive and finished-event conversations close and keep their history", async () => {
+  const current = await read(
+    await call("/messages/conversation", "GET", undefined, chatCustomerCookie),
+    200,
+  );
+  const count = current.messages.length;
+
+  await db
+    .updateTable("conversations")
+    .set({
+      status: "active",
+      closed_at: null,
+      event_starts_at: null,
+      event_ends_at: null,
+      updated_at: new Date(Date.now() - 25 * 60 * 60 * 1000),
+    })
+    .where("customer_id", "=", chatCustomerId)
+    .execute();
+  const expired = await read(
+    await call("/messages/conversation", "GET", undefined, chatCustomerCookie),
+    200,
+  );
+  assert.equal(expired.conversation.status, "closed");
+  assert.ok(expired.conversation.closedAt);
+  assert.equal(expired.messages.length, count);
+
+  await read(
+    await call("/messages/conversation/messages", "POST", { body: "Hello again" }, chatCustomerCookie),
+    201,
+  );
+  const reopened = await read(
+    await call("/messages/conversation", "GET", undefined, chatCustomerCookie),
+    200,
+  );
+  assert.equal(reopened.conversation.status, "active");
+  assert.equal(reopened.conversation.closedAt, null);
+  assert.equal(reopened.conversation.packageId, null);
+  assert.equal(reopened.messages.length, count + 1);
+
+  await db
+    .updateTable("conversations")
+    .set({
+      status: "active",
+      closed_at: null,
+      event_ends_at: new Date(Date.now() - 25 * 60 * 60 * 1000),
+      updated_at: new Date(),
+    })
+    .where("customer_id", "=", chatCustomerId)
+    .execute();
+  const eventExpired = await read(
+    await call("/messages/conversation", "GET", undefined, chatCustomerCookie),
+    200,
+  );
+  assert.equal(eventExpired.conversation.status, "closed");
+});
+
 test("message routes appear in the OpenAPI document", async () => {
   const spec: any = await (await app.request("/openapi.json")).json();
   assert.ok(spec.paths["/v1/messages/conversation"].get);
   assert.ok(spec.paths["/v1/messages/conversation/messages"].post);
+  assert.ok(spec.paths["/v1/messages/conversation/claim"].post);
+  assert.ok(spec.paths["/v1/messages/conversation/context"].patch);
+  assert.ok(spec.paths["/v1/messages/conversation/request-staff"].post);
+  assert.ok(spec.paths["/v1/messages/conversation/assistant-reply"].post);
+  assert.ok(spec.paths["/v1/chatbot/guest-reply"].post);
   assert.ok(spec.paths["/v1/admin/conversations"].get);
   assert.ok(spec.paths["/v1/admin/conversations/{id}"].get);
   assert.ok(spec.paths["/v1/admin/conversations/{id}/messages"].post);
+  assert.ok(spec.paths["/v1/admin/conversations/{id}/takeover"].post);
 });

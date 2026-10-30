@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from "react"
 import { createPortal } from "react-dom"
+import { Button } from "@event-management/ui"
 import type { PackageContent, PackagePrice, PackageVersion } from "../../lib/api"
 import { packageImageSrc } from "../../lib/api"
 import { photos } from "./data"
@@ -15,12 +16,13 @@ export function priceLabel(price: PackagePrice | null) {
   }
 }
 
-export function PackagePreview({ item, loading = false, error = "", versionState, onClose }: {
+export function PackagePreview({ item, loading = false, error = "", versionState, onClose, onAsk }: {
   item: PackageContent | null
   loading?: boolean
   error?: string
   versionState?: PackageVersion["state"]
   onClose: () => void
+  onAsk?: () => void
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const titleId = useId()
@@ -65,7 +67,12 @@ export function PackagePreview({ item, loading = false, error = "", versionState
                 <div><span>Package total</span><strong>{priceLabel(item.price)}</strong></div>
                 <div><span>Guest capacity</span><strong>{item.guestMin}–{item.guestMax} guests</strong></div>
               </div>
-              <p className="package-preview-note">{admin ? "This preview does not publish the package." : "Viewing a package does not reserve a date. Online inquiries are not available yet."}</p>
+              <p className="package-preview-note">{admin ? "This preview does not publish the package." : "Viewing a package does not reserve a date. Staff confirm availability and booking details."}</p>
+              {!admin && onAsk && (
+                <Button variant="secondary" onClick={onAsk} icon="spark">
+                  Ask Clemora about this package
+                </Button>
+              )}
             </aside>
           </div>
           <div className="package-preview-content">

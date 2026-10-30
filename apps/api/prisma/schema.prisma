@@ -19,25 +19,36 @@ model User {
 }
 
 model Conversation {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  customerId String    @unique @map("customer_id") @db.Uuid
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  customer   User      @relation("CustomerConversation", fields: [customerId], references: [id], onDelete: Cascade)
-  messages   Message[]
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId      String    @unique @map("customer_id") @db.Uuid
+  packageId       String?   @map("package_id") @db.Uuid
+  eventType       String?   @map("event_type")
+  eventStartsAt   DateTime? @map("event_starts_at") @db.Timestamptz(6)
+  eventEndsAt     DateTime? @map("event_ends_at") @db.Timestamptz(6)
+  guestCount      Int?      @map("guest_count")
+  status          String    @default("active")
+  closedAt        DateTime? @map("closed_at") @db.Timestamptz(6)
+  guestChatId     String?   @map("guest_chat_id")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  customer        User      @relation("CustomerConversation", fields: [customerId], references: [id], onDelete: Cascade)
+  package         Package?  @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  messages        Message[]
 
+  @@index([status])
   @@map("conversations")
 }
 
 model Message {
   id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   conversationId String       @map("conversation_id") @db.Uuid
-  senderId       String       @map("sender_id") @db.Uuid
+  senderId       String?      @map("sender_id") @db.Uuid
+  senderRole     String       @default("customer") @map("sender_role")
   body           String
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   readAt         DateTime?    @map("read_at") @db.Timestamptz(6)
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  sender         User?        @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
   @@map("messages")
@@ -56,11 +67,12 @@ model Session {
 }
 
 model Package {
-  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime         @default(now()) @map("updated_at") @db.Timestamptz(6)
-  archivedAt DateTime?       @map("archived_at") @db.Timestamptz(6)
-  versions  PackageVersion[]
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime         @default(now()) @map("updated_at") @db.Timestamptz(6)
+  archivedAt    DateTime?        @map("archived_at") @db.Timestamptz(6)
+  versions      PackageVersion[]
+  conversations Conversation[]
 
   @@map("packages")
 }

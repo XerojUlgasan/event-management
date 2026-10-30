@@ -20,7 +20,6 @@ function AppContent() {
   const { status, profile, signOut } = useAuth()
   const [view, setView] = useState<View>("public")
 
-
   useEffect(() => {
     if (status === "signed-in" && profile) {
       setView(profile.role === "admin" ? "app" : "customer")
