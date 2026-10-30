@@ -447,6 +447,7 @@ test("conversation context, staff handoff, and takeover gate assistant replies",
     200,
   );
   assert.equal(taken.conversation.status, "staff");
+  assert.match(taken.messages.at(-1).body, /Admin Person has taken over this conversation/);
 
   const stillPaused = await read(
     await call("/messages/conversation/assistant-reply", "POST", {}, chatCustomerCookie),
@@ -476,6 +477,24 @@ test("conversation context, staff handoff, and takeover gate assistant replies",
     200,
   );
   assert.equal(stillTaken.conversation.status, "staff");
+
+  const returnedToAi = await read(
+    await call(
+      `/admin/conversations/${waiting.conversation.id}/return-to-ai`,
+      "POST",
+      {},
+      adminCookie,
+    ),
+    200,
+  );
+  assert.equal(returnedToAi.conversation.status, "active");
+  assert.match(returnedToAi.messages.at(-1).body, /Admin Person returned this conversation to AI responses/);
+
+  const resumed = await withGeminiMock(async () =>
+    read(await call("/messages/conversation/assistant-reply", "POST", {}, chatCustomerCookie), 200),
+  );
+  assert.equal(resumed.status, "active");
+  assert.equal(resumed.message.senderRole, "assistant");
 });
 
 test("inactive and finished-event conversations close and keep their history", async () => {
@@ -547,4 +566,5 @@ test("message routes appear in the OpenAPI document", async () => {
   assert.ok(spec.paths["/v1/admin/conversations/{id}"].get);
   assert.ok(spec.paths["/v1/admin/conversations/{id}/messages"].post);
   assert.ok(spec.paths["/v1/admin/conversations/{id}/takeover"].post);
+  assert.ok(spec.paths["/v1/admin/conversations/{id}/return-to-ai"].post);
 });

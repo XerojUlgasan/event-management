@@ -26,7 +26,7 @@ function turnsFromHistory(messages: GuestHistory[]): ChatTurn[] {
 }
 
 function turnsFromThread(messages: MessageWithSender[]): ChatTurn[] {
-  return messages.slice(-30).map((message) => ({
+  return messages.filter((message) => message.sender_role !== "system").slice(-30).map((message) => ({
     role: message.sender_role === "customer" ? "user" : "model",
     text:
       message.sender_role === "admin"

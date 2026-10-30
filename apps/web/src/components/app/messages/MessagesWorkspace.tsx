@@ -38,7 +38,7 @@ function conversationState(status: ChatConversation["status"]) {
   if (status === "waiting_staff") return "Waiting for staff"
   if (status === "staff") return "Staff handling · AI paused"
   if (status === "closed") return "Closed"
-  return "AI assistant available"
+  return "AI responding"
 }
 
 function waitingLabel(status: ChatConversation["status"]) {
@@ -66,11 +66,13 @@ export function MessagesWorkspace({
   onRequestStaff,
   onEditContext,
   onTakeover,
+  onReturnToAi,
   assistantPending = false,
   assistantError = "",
   onRetryAssistant,
   staffRequesting = false,
   takeoverBusy = false,
+  returningToAi = false,
   readOnly = false,
 }: {
   title: string
@@ -90,11 +92,13 @@ export function MessagesWorkspace({
   onRequestStaff?: () => void
   onEditContext?: () => void
   onTakeover?: () => void
+  onReturnToAi?: () => void
   assistantPending?: boolean
   assistantError?: string
   onRetryAssistant?: () => void
   staffRequesting?: boolean
   takeoverBusy?: boolean
+  returningToAi?: boolean
   readOnly?: boolean
 }) {
   const [draft, setDraft] = useState("")
@@ -163,8 +167,11 @@ export function MessagesWorkspace({
                 <strong>{name}</strong>
                 <small>{preview(conversation)}</small>
               </span>
-              {(waitingLabel(conversation.status) || conversation.unreadCount > 0) && (
+              {(conversation.status === "active" || waitingLabel(conversation.status) || conversation.unreadCount > 0) && (
                 <span className="conversation-badges">
+                  {conversation.status === "active" && (
+                    <em className="conversation-ai" aria-label="AI responses active">AI</em>
+                  )}
                   {waitingLabel(conversation.status) && (
                     <em className={`conversation-waiting ${conversation.status}`}>
                       {waitingLabel(conversation.status)}
@@ -235,18 +242,21 @@ export function MessagesWorkspace({
                   Event details
                 </button>
               )}
-              {!isTeam &&
-                (active.status === "active" || active.status === "waiting_staff") &&
-                onTakeover && (
-                  <button
-                    type="button"
-                    className="message-action"
-                    onClick={onTakeover}
-                    disabled={takeoverBusy}
-                  >
-                    {takeoverBusy ? "Taking over…" : "Take over"}
-                  </button>
-                )}
+              {!isTeam && active.status !== "closed" && (onTakeover || onReturnToAi) && (
+                <label className="message-ai-switch">
+                  <span>AI responses</span>
+                  <input
+                    type="checkbox"
+                    checked={active.status === "active"}
+                    onChange={active.status === "active" ? onTakeover : onReturnToAi}
+                    disabled={takeoverBusy || returningToAi}
+                  />
+                  <span className="message-ai-switch-track" aria-hidden="true" />
+                  <span className="sr-only">
+                    {active.status === "active" ? "Turn AI responses off" : "Turn AI responses on"}
+                  </span>
+                </label>
+              )}
             </div>
           )}
         </div>
@@ -279,6 +289,9 @@ export function MessagesWorkspace({
             </div>
           )}
           {messages.map((message, index) => {
+            if (message.senderRole === "system") {
+              return <p className="message-system-notice" key={message.id}>{message.body}</p>
+            }
             const mine = message.senderRole === viewerRole
             const showDay = index === 0 || dayKey(message.createdAt) !== dayKey(messages[index - 1].createdAt)
             return (

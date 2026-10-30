@@ -879,6 +879,7 @@
 .messages-error button { color: #9e3737; border: 0; background: none; font-size: 12px; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .messages-send-error { margin: 8px 24px 0; color: #9e3737; font-size: 12px; line-height: 1.5; }
 .message-meta { display: block; margin-top: 5px; color: #7d7470; text-align: right; font-size: 10px; }
+.message-system-notice { width: 100%; margin: 18px 0 4px; color: var(--muted); text-align: center; font-size: 11px; line-height: 1.5; }
 .customer-message .message-meta { color: rgba(255,255,255,.78); }
 .admin-messages { max-width: none; }
 .admin-messages .customer-messages { height: calc(100dvh - 147px); min-height: 460px; border: 1px solid var(--line); border-radius: 10px; }
@@ -1167,11 +1168,21 @@
 .message-action:hover { border-color: var(--wine); background: var(--cream-soft); }
 .message-action:disabled { opacity: .55; cursor: not-allowed; }
 .message-action:focus-visible { outline: 2px solid var(--wine); outline-offset: 2px; }
+.message-ai-switch { min-height: 34px; padding: 0 9px 0 11px; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); border: 1px solid var(--line); border-radius: 7px; background: white; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.message-ai-switch input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.message-ai-switch-track { width: 31px; height: 18px; position: relative; display: inline-block; border-radius: 10px; background: #c9c1bd; transition: background .18s ease; }
+.message-ai-switch-track::after { content: ""; width: 14px; height: 14px; position: absolute; top: 2px; left: 2px; border-radius: 50%; background: white; box-shadow: 0 1px 2px rgba(20, 10, 10, .2); transition: transform .18s ease; }
+.message-ai-switch input:checked + .message-ai-switch-track { background: var(--wine); }
+.message-ai-switch input:checked + .message-ai-switch-track::after { transform: translateX(13px); }
+.message-ai-switch:has(input:focus-visible) { outline: 2px solid var(--wine); outline-offset: 2px; }
+.message-ai-switch:has(input:disabled) { opacity: .55; cursor: not-allowed; }
 .conversation-state { flex: none; padding: 5px 9px; border-radius: 99px; color: var(--muted); background: var(--canvas); font-size: 11px; font-weight: 700; white-space: nowrap; }
 .conversation-state.waiting_staff { color: #8b5c31; background: #f3eadf; }
+.conversation-state.active { color: #2f725c; background: #e6f2ec; }
 .conversation-state.staff { color: #506b64; background: #e8f1ee; }
 .conversation-state.closed { color: #6f6868; background: #f0edeb; }
 .conversation-badges { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
+.conversation-ai { padding: 4px 8px; color: #2f725c; border-radius: 99px; background: #e6f2ec; font-size: 10px; font-style: normal; font-weight: 700; }
 .conversation-waiting { padding: 4px 8px; color: #8b5c31; border-radius: 99px; background: #f3eadf; font-size: 10px; font-style: normal; font-weight: 700; }
 .conversation-waiting.staff { color: #506b64; background: #e8f1ee; }
 .conversation-waiting.closed { color: #6f6868; background: #f0edeb; }

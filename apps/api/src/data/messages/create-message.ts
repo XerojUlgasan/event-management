@@ -8,9 +8,10 @@ export async function createMessageData(
   db: Database,
   conversation: ConversationWithCustomer,
   senderId: string | null,
-  senderRole: "customer" | "admin" | "assistant",
+  senderRole: "customer" | "admin" | "assistant" | "system",
   body: string,
   conversationStatus?: "staff",
+  senderName?: string,
 ) {
   return db.transaction().execute(async (trx) => {
     const row = await trx
@@ -20,7 +21,7 @@ export async function createMessageData(
         sender_id: senderId,
         sender_role: senderRole,
         body,
-        read_at: senderRole === "assistant" ? new Date() : null,
+        read_at: senderRole === "assistant" || senderRole === "system" ? new Date() : null,
       })
       .returningAll()
       .executeTakeFirstOrThrow();
@@ -35,7 +36,7 @@ export async function createMessageData(
     if (!senderId) {
       return {
         ...row,
-        sender_display_name: "Clemora assistant",
+        sender_display_name: senderName ?? (senderRole === "system" ? "Clemora" : "Clemora assistant"),
         sender_email: null,
       };
     }

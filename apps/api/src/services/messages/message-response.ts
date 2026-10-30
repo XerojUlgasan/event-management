@@ -5,7 +5,7 @@ export type MessageDto = {
   id: string;
   body: string;
   senderId: string | null;
-  senderRole: "admin" | "customer" | "assistant";
+  senderRole: "admin" | "customer" | "assistant" | "system";
   senderName: string;
   createdAt: string;
   readAt: string | null;
@@ -32,7 +32,7 @@ export type ConversationDto = {
 
 export function messageDto(row: MessageWithSender): MessageDto {
   const role: MessageDto["senderRole"] =
-    row.sender_role === "admin" || row.sender_role === "assistant"
+    row.sender_role === "admin" || row.sender_role === "assistant" || row.sender_role === "system"
       ? row.sender_role
       : "customer";
   return {
@@ -43,6 +43,8 @@ export function messageDto(row: MessageWithSender): MessageDto {
     senderName:
       role === "assistant"
         ? "Clemora assistant"
+        : role === "system"
+          ? "Clemora"
         : row.sender_display_name ?? row.sender_email ?? "Clemora team",
     createdAt: row.created_at.toISOString(),
     readAt: row.read_at?.toISOString() ?? null,

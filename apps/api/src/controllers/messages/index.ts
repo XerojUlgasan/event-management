@@ -12,6 +12,7 @@ import { updateConversationContextRoute, updateConversationContextRouteHandler }
 import { requestStaffRoute, requestStaffRouteHandler } from "./request-staff.js";
 import { assistantReplyRoute, assistantReplyRouteHandler } from "./assistant-reply.js";
 import { takeoverConversationRoute, takeoverConversationRouteHandler } from "./takeover-conversation.js";
+import { returnToAiRoute, returnToAiRouteHandler } from "./return-to-ai.js";
 
 const routes = new OpenAPIHono<HonoEnv>({
   defaultHook: (result, c) => {
@@ -42,4 +43,5 @@ routes.openapi(listAdminConversationsRoute, listAdminConversationsRouteHandler);
 routes.openapi(getAdminConversationRoute, getAdminConversationRouteHandler);
 routes.openapi(sendAdminMessageRoute, sendAdminMessageRouteHandler);
 routes.openapi(takeoverConversationRoute, takeoverConversationRouteHandler);
+routes.openapi(returnToAiRoute, returnToAiRouteHandler);
 export default routes;

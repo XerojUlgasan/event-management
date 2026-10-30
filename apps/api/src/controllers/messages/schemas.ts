@@ -12,7 +12,7 @@ export const messageSchema = z.object({
   id: z.string().uuid(),
   body: z.string(),
   senderId: z.string().uuid().nullable(),
-  senderRole: z.enum(["admin", "customer", "assistant"]),
+  senderRole: z.enum(["admin", "customer", "assistant", "system"]),
   senderName: z.string(),
   createdAt: z.string(),
   readAt: z.string().nullable(),

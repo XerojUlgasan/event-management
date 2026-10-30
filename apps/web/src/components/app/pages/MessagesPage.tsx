@@ -5,6 +5,7 @@ import {
   getAdminConversations,
   sendAdminMessage,
   takeoverConversation,
+  returnConversationToAi,
   type ChatConversation,
   type ChatThread,
 } from "../../../lib/api"
@@ -21,6 +22,7 @@ export function MessagesPage() {
   const [threadError, setThreadError] = useState("")
   const [conversationOpen, setConversationOpen] = useState(false)
   const [takeoverBusy, setTakeoverBusy] = useState(false)
+  const [returningToAi, setReturningToAi] = useState(false)
 
   const loadList = useCallback(async () => {
     try {
@@ -106,6 +108,21 @@ export function MessagesPage() {
     }
   }
 
+  const returnToAi = async () => {
+    if (!activeId || returningToAi) return
+    setReturningToAi(true)
+    try {
+      const result = await returnConversationToAi(activeId)
+      setThread(result)
+      setThreadError("")
+      void loadList()
+    } catch (cause) {
+      setThreadError(cause instanceof Error ? cause.message : "Unable to return this conversation to AI.")
+    } finally {
+      setReturningToAi(false)
+    }
+  }
+
   return (
     <div className="content-stack admin-messages">
       <MessagesWorkspace
@@ -141,6 +158,8 @@ export function MessagesPage() {
         conversationOpen={conversationOpen}
         onTakeover={takeOver}
         takeoverBusy={takeoverBusy}
+        onReturnToAi={returnToAi}
+        returningToAi={returningToAi}
         readOnly={thread?.conversation.status === "closed"}
         listEmpty={{
           title: "No customer messages yet",

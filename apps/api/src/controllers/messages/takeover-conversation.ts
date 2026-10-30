@@ -16,7 +16,11 @@ export const takeoverConversationRoute = createRoute({
   },
 });
 export const takeoverConversationRouteHandler: AppRouteHandler<typeof takeoverConversationRoute> = async (c) => {
-  const result = await takeoverConversationService(c.get("db"), c.req.valid("param").id);
+  const result = await takeoverConversationService(
+    c.get("db"),
+    c.req.valid("param").id,
+    c.get("session").user.id,
+  );
   if (result.kind === "ok") return c.json(result.thread, 200);
   return result.kind === "closed"
     ? c.json({ error: "Conversation is closed" }, 409)

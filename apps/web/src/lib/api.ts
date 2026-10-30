@@ -123,7 +123,7 @@ export type ChatMessage = {
   id: string
   body: string
   senderId: string | null
-  senderRole: "admin" | "customer" | "assistant"
+  senderRole: "admin" | "customer" | "assistant" | "system"
   senderName: string
   createdAt: string
   readAt: string | null
@@ -191,3 +191,5 @@ export const sendAdminMessage = (id: string, body: string) =>
   request<{ message: ChatMessage }>(`/admin/conversations/${encodeURIComponent(id)}/messages`, { body })
 export const takeoverConversation = (id: string) =>
   request<ChatThread>(`/admin/conversations/${encodeURIComponent(id)}/takeover`, {})
+export const returnConversationToAi = (id: string) =>
+  request<ChatThread>(`/admin/conversations/${encodeURIComponent(id)}/return-to-ai`, {})
