@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useRef, useState, type SubmitEvent } from "react"
-import { Button, Icon } from "@event-management/ui"
+import { Button, Dialog, Icon } from "@event-management/ui"
 
-import type { ChatConversation, ChatMessage } from "../../../lib/api"
+import { PackageCatalog } from "../PackageCatalog"
+import type { ChatConversation, ChatMessage, PublicPackage } from "../../../lib/api"
 import { initialsFromName } from "../../../lib/name"
 
 const dayFormatter = new Intl.DateTimeFormat("en-PH", {
@@ -73,6 +74,9 @@ export function MessagesWorkspace({
   staffRequesting = false,
   takeoverBusy = false,
   returningToAi = false,
+  onSelectPackage,
+  onNewChat,
+  newChatBusy = false,
   readOnly = false,
 }: {
   title: string
@@ -99,11 +103,16 @@ export function MessagesWorkspace({
   staffRequesting?: boolean
   takeoverBusy?: boolean
   returningToAi?: boolean
+  onSelectPackage?: (item: PublicPackage) => Promise<void>
+  onNewChat?: () => void
+  newChatBusy?: boolean
   readOnly?: boolean
 }) {
   const [draft, setDraft] = useState("")
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState("")
+  const [packagePickerOpen, setPackagePickerOpen] = useState(false)
+  const [packageSelecting, setPackageSelecting] = useState(false)
   const thread = useRef<HTMLDivElement>(null)
   const active = conversations.find((item) => item.id === activeId) ?? null
   const isTeam = viewerRole === "customer"
@@ -116,6 +125,8 @@ export function MessagesWorkspace({
   const avatar = active && !isTeam ? initialsFromName(active.customerName) : "CT"
   const activeState = active ? conversationState(active.status) : ""
   const closedForCustomer = isTeam && active?.status === "closed"
+  const adminNeedsTakeover =
+    !isTeam && (active?.status === "active" || active?.status === "waiting_staff")
 
   useEffect(() => {
     setDraft("")
@@ -148,7 +159,14 @@ export function MessagesWorkspace({
       className={`customer-messages panel ${conversationOpen ? "conversation-open" : ""} ${singleConversation ? "single-conversation" : ""}`}
     >
       <aside>
-        <h1>{title}</h1>
+        <div className="messages-sidebar-head">
+          <h1>{title}</h1>
+          {isTeam && onNewChat && (
+            <button type="button" className="message-action" onClick={onNewChat} disabled={newChatBusy}>
+              {newChatBusy ? "Starting…" : "New chat"}
+            </button>
+          )}
+        </div>
         {conversations.map((conversation) => {
           const name = isTeam ? "Clemora team" : conversation.customerName
           const conversationAvatar = isTeam ? "C" : initialsFromName(conversation.customerName)
@@ -240,6 +258,16 @@ export function MessagesWorkspace({
               {isTeam && active.status !== "closed" && onEditContext && (
                 <button type="button" className="message-action" onClick={onEditContext}>
                   Event details
+                </button>
+              )}
+              {isTeam && active.status !== "closed" && onSelectPackage && (
+                <button
+                  type="button"
+                  className="message-action"
+                  onClick={() => setPackagePickerOpen(true)}
+                  disabled={packageSelecting}
+                >
+                  {active.packageId ? "Change package" : "Select package"}
                 </button>
               )}
               {!isTeam && active.status !== "closed" && (onTakeover || onReturnToAi) && (
@@ -347,7 +375,20 @@ export function MessagesWorkspace({
           </p>
         )}
 
-        {!readOnly && (
+        {adminNeedsTakeover && onTakeover && (
+          <div className="admin-takeover-prompt">
+            <p>
+              {active?.status === "waiting_staff"
+                ? "The customer is waiting for staff assistance."
+                : "AI is currently handling this conversation."}
+            </p>
+            <Button type="button" onClick={onTakeover} disabled={takeoverBusy}>
+              {takeoverBusy ? "Taking over…" : "Take over to reply"}
+            </Button>
+          </div>
+        )}
+
+        {!readOnly && !adminNeedsTakeover && (
           <form className="thread-input" onSubmit={submit}>
             <input
               aria-label="Write a message"
@@ -371,6 +412,30 @@ export function MessagesWorkspace({
           </form>
         )}
       </section>
+      {packagePickerOpen && onSelectPackage && (
+        <Dialog
+          onClose={() => setPackagePickerOpen(false)}
+          className="package-picker-modal"
+          eyebrow="Conversation package"
+          title="Select a package"
+          intro="Choose a published package so Clemora can keep the conversation focused and open through your event."
+        >
+          <div className="package-picker-content">
+            <PackageCatalog
+              selectionMode
+              onAsk={async (item) => {
+                setPackageSelecting(true)
+                try {
+                  await onSelectPackage(item)
+                  setPackagePickerOpen(false)
+                } finally {
+                  setPackageSelecting(false)
+                }
+              }}
+            />
+          </div>
+        </Dialog>
+      )}
     </div>
   )
 }

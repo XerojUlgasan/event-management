@@ -1,6 +1,7 @@
 import { z } from "@hono/zod-openapi";
 
 export const messageBodySchema = z.object({
+  conversationId: z.string().uuid().optional(),
   body: z
     .string()
     .trim()
@@ -63,6 +64,7 @@ const dateTime = z
 
 export const conversationContextSchema = z
   .object({
+    conversationId: z.string().uuid().optional(),
     packageId: z.string().uuid().nullable().optional(),
     eventType: z.string().trim().max(120).nullable().optional(),
     eventStartsAt: dateTime.nullable().optional(),

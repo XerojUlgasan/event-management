@@ -71,7 +71,7 @@ export function conversationDto(
     guestCount: row.guest_count,
     status: row.status as ConversationDto["status"],
     closedAt: row.closed_at ? new Date(row.closed_at).toISOString() : null,
-    expiresAt: conversationExpiresAt(row.event_ends_at, row.updated_at).toISOString(),
+    expiresAt: conversationExpiresAt(row.package_id, row.event_ends_at, row.created_at).toISOString(),
     lastMessage,
     unreadCount,
     updatedAt: row.updated_at.toISOString(),

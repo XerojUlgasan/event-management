@@ -12,7 +12,7 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   sessions     Session[]
-  conversation Conversation? @relation("CustomerConversation")
+  conversations Conversation[] @relation("CustomerConversations")
   sentMessages Message[]     @relation("MessageSender")
 
   @@map("users")
@@ -20,7 +20,7 @@ model User {
 
 model Conversation {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  customerId      String    @unique @map("customer_id") @db.Uuid
+  customerId      String    @map("customer_id") @db.Uuid
   packageId       String?   @map("package_id") @db.Uuid
   eventType       String?   @map("event_type")
   eventStartsAt   DateTime? @map("event_starts_at") @db.Timestamptz(6)
@@ -31,11 +31,12 @@ model Conversation {
   guestChatId     String?   @map("guest_chat_id")
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  customer        User      @relation("CustomerConversation", fields: [customerId], references: [id], onDelete: Cascade)
+  customer        User      @relation("CustomerConversations", fields: [customerId], references: [id], onDelete: Cascade)
   package         Package?  @relation(fields: [packageId], references: [id], onDelete: SetNull)
   messages        Message[]
 
   @@index([status])
+  @@index([customerId, createdAt])
   @@map("conversations")
 }
 

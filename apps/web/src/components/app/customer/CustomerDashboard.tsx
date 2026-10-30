@@ -20,11 +20,14 @@ import { MessagesWorkspace } from "../messages/MessagesWorkspace"
 import { mergeThread } from "../messages/thread"
 import {
   getAssistantReply,
-  getMyConversation,
+  createMyConversation,
+  getMyConversations,
+  getMyConversationById,
   requestStaffAssistance,
   sendMyMessage,
   updateConversationContext,
   type ChatMessage,
+  type ChatConversation,
   type ChatThread,
   type PublicPackage,
 } from "../../../lib/api"
@@ -258,6 +261,8 @@ export function CustomerDashboard({
   const [dialogSending, setDialogSending] = useState(false)
   const [dialogError, setDialogError] = useState("")
   const [messageThread, setMessageThread] = useState<ChatThread | null>(null)
+  const [messageConversations, setMessageConversations] = useState<ChatConversation[]>([])
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesError, setMessagesError] = useState("")
   const [assistantPending, setAssistantPending] = useState(false)
@@ -266,20 +271,36 @@ export function CustomerDashboard({
   const [eventDetailsOpen, setEventDetailsOpen] = useState(false)
   const [eventSaving, setEventSaving] = useState(false)
   const [eventError, setEventError] = useState("")
+  const [newChatBusy, setNewChatBusy] = useState(false)
 
   const refreshMessages = useCallback(async () => {
     try {
       // Restore a guest chat saved in this browser before loading the DB thread.
       const claimed = await claimPendingGuestChat()
-      const thread = claimed ?? (await getMyConversation())
-      setMessageThread((current) => mergeThread(current, thread))
+      const { conversations } = await getMyConversations()
+      setMessageConversations(conversations)
+      if (claimed) {
+        setSelectedConversationId(claimed.conversation.id)
+        setMessageThread(claimed)
+      } else {
+        const targetId = selectedConversationId && conversations.some((item) => item.id === selectedConversationId)
+          ? selectedConversationId
+          : conversations[0]?.id ?? null
+        setSelectedConversationId(targetId)
+        if (targetId) {
+          const thread = await getMyConversationById(targetId)
+          setMessageThread((current) => mergeThread(current, thread))
+        } else {
+          setMessageThread(null)
+        }
+      }
       setMessagesError("")
     } catch (cause) {
       setMessagesError(cause instanceof Error ? cause.message : "Unable to load your messages.")
     } finally {
       setMessagesLoading(false)
     }
-  }, [])
+  }, [selectedConversationId])
 
   useEffect(() => {
     if (tab !== "Messages") return
@@ -330,7 +351,7 @@ export function CustomerDashboard({
 
   const sendMessage = async (body: string) => {
     const previousStatus = messageThread?.conversation.status ?? "active"
-    const result = await sendMyMessage(body)
+    const result = await sendMyMessage(body, messageThread?.conversation.id)
     appendMessage(result.message)
     // A new message reopens a closed general conversation; staff-handled
     // conversations stay with staff until they finish.
@@ -367,7 +388,10 @@ export function CustomerDashboard({
       // the assistant answering a customer who asked for a person.
       const thread = await requestStaffAssistance()
       setMessageThread(thread)
-      const sent = await sendMyMessage("I’d like to speak with a staff member about my event.")
+      const sent = await sendMyMessage(
+        "I’d like to speak with a staff member about my event.",
+        messageThread?.conversation.id,
+      )
       appendMessage(sent.message)
       setAssistantPending(false)
       notify("Our team has been notified. You can keep adding details here.")
@@ -383,13 +407,44 @@ export function CustomerDashboard({
       const thread = await updateConversationContext({
         packageId: item.id,
         eventType: item.eventTypes[0] ?? null,
-      })
+      }, messageThread?.conversation.id)
       setMessageThread(thread)
       setConversationOpen(true)
       setTab("Messages")
       notify(`${item.name} is now linked to your conversation.`)
     } catch (cause) {
       notify(cause instanceof Error ? cause.message : "Unable to link this package.")
+    }
+  }
+
+  const startNewChat = async () => {
+    if (newChatBusy) return
+    setNewChatBusy(true)
+    try {
+      const thread = await createMyConversation()
+      setSelectedConversationId(thread.conversation.id)
+      setMessageThread(thread)
+      setMessageConversations((current) => [thread.conversation, ...current])
+      setConversationOpen(true)
+      notify("New chat started.")
+    } catch (cause) {
+      notify(cause instanceof Error ? cause.message : "Unable to start a new chat.")
+    } finally {
+      setNewChatBusy(false)
+    }
+  }
+
+  const selectConversation = async (id: string) => {
+    setSelectedConversationId(id)
+    setConversationOpen(true)
+    setMessagesLoading(true)
+    try {
+      setMessageThread(await getMyConversationById(id))
+      setMessagesError("")
+    } catch (cause) {
+      setMessagesError(cause instanceof Error ? cause.message : "Unable to load this conversation.")
+    } finally {
+      setMessagesLoading(false)
     }
   }
 
@@ -406,7 +461,7 @@ export function CustomerDashboard({
         eventType: eventType || null,
         guestCount: guestCount ? Number(guestCount) : null,
         eventEndsAt: eventEndsAt ? new Date(eventEndsAt).toISOString() : null,
-      })
+      }, messageThread?.conversation.id)
       setMessageThread(thread)
       setEventDetailsOpen(false)
       notify("Event details saved to this conversation.")
@@ -425,7 +480,7 @@ export function CustomerDashboard({
     try {
       const thread = await requestStaffAssistance()
       setMessageThread(thread)
-      const result = await sendMyMessage(body)
+      const result = await sendMyMessage(body, messageThread?.conversation.id)
       appendMessage(result.message)
       setMessageDraft("")
       setMessageOpen(false)
@@ -983,9 +1038,9 @@ export function CustomerDashboard({
             <MessagesWorkspace
               title="Messages"
               viewerRole="customer"
-              conversations={messageThread ? [messageThread.conversation] : []}
+              conversations={messageConversations}
               activeId={messageThread?.conversation.id ?? null}
-              onSelect={() => setConversationOpen(true)}
+              onSelect={(id) => void selectConversation(id)}
               messages={messageThread?.messages ?? []}
               loading={messagesLoading}
               error={messagesError}
@@ -1001,6 +1056,9 @@ export function CustomerDashboard({
                 setEventError("")
                 setEventDetailsOpen(true)
               }}
+              onSelectPackage={askAboutPackage}
+              onNewChat={startNewChat}
+              newChatBusy={newChatBusy}
               assistantPending={assistantPending}
               assistantError={assistantError}
               onRetryAssistant={() => void fetchAssistantReply()}

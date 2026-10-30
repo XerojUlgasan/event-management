@@ -57,6 +57,7 @@ export async function claimGuestHistoryData(
         // expired conversation returns to the assistant.
         status: reopening ? "active" : conversation.status,
         closed_at: reopening ? null : conversation.closed_at,
+        created_at: reopening ? new Date() : conversation.created_at,
         updated_at: new Date(),
         // A closed conversation may still point at an old event. Reopening it
         // for a fresh guest chat starts a clean cycle; history is preserved.

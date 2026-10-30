@@ -7,8 +7,10 @@ import { PackagePreview, priceLabel } from "./PackagePreview"
 
 export function PackageCatalog({
   onAsk,
+  selectionMode = false,
 }: {
   onAsk?: (item: PublicPackage) => void
+  selectionMode?: boolean
 } = {}) {
   const [rows, setRows] = useState<PublicPackage[]>([])
   const [loading, setLoading] = useState(true)
@@ -39,7 +41,14 @@ export function PackageCatalog({
       <div className="package-image"><img src={packageImageSrc(item.imageUrl) || photos.dinner} alt="" onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = photos.dinner }} /><Badge tone="light">{item.guestMin}–{item.guestMax} guests</Badge></div>
       <div className="package-body"><div className="package-kind">{item.eventTypes.join(", ")}</div><div className="card-title">{item.name}</div><p>{item.description}</p>
         <div className="package-meta"><span>{priceLabel(item.price)}</span><span>{item.guestMin}–{item.guestMax} guests</span></div>
-        <button className="card-link" onClick={() => { setDetail(null); setDetailError(""); setDetailLoading(true); setSelectedId(item.id) }}>View package <Icon name="arrow" size={16} /></button>
+        <div className="package-card-actions">
+          <button className="card-link" onClick={() => { setDetail(null); setDetailError(""); setDetailLoading(true); setSelectedId(item.id) }}>View package <Icon name="arrow" size={16} /></button>
+          {selectionMode && onAsk && (
+            <button className="package-select-link" type="button" onClick={() => onAsk(item)}>
+              Select package
+            </button>
+          )}
+        </div>
       </div>
     </article>)}</div>
     {selectedId && <PackagePreview item={detail} loading={detailLoading} error={detailError} onClose={() => setSelectedId(null)} onAsk={onAsk && detail ? () => { setSelectedId(null); onAsk(detail) } : undefined} />}

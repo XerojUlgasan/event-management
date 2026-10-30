@@ -836,7 +836,9 @@
 .customer-messages-view { width: 100%; }
 .customer-messages { width: 100%; height: calc(100dvh - 72px); min-height: 520px; padding: 0 !important; overflow: hidden; display: grid; grid-template-columns: clamp(280px, 25vw, 360px) minmax(0, 1fr); border: 0; border-radius: 0; }
 .customer-messages > aside { min-height: 0; overflow-y: auto; border-right: 1px solid var(--line); background: white; }
-.customer-messages > aside h1 { margin: 0; padding: 22px 20px 16px; font-family: var(--font-serif); font-size: 30px; line-height: 1.1; }
+.messages-sidebar-head { padding: 22px 20px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.customer-messages > aside h1 { margin: 0; font-family: var(--font-serif); font-size: 30px; line-height: 1.1; }
+.messages-sidebar-head .message-action { min-height: 32px; padding: 0 9px; }
 .customer-messages > aside button { width: 100%; min-height: 76px; padding: 14px 18px; display: flex; align-items: center; gap: 11px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: white; cursor: pointer; }
 .customer-messages > aside button.active { background: var(--cream-soft); box-shadow: inset 3px 0 var(--wine); }
 .customer-messages > aside button > span:nth-child(2) { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
@@ -880,6 +882,14 @@
 .messages-send-error { margin: 8px 24px 0; color: #9e3737; font-size: 12px; line-height: 1.5; }
 .message-meta { display: block; margin-top: 5px; color: #7d7470; text-align: right; font-size: 10px; }
 .message-system-notice { width: 100%; margin: 18px 0 4px; color: var(--muted); text-align: center; font-size: 11px; line-height: 1.5; }
+.package-picker-modal { width: min(940px, calc(100vw - 32px)); max-width: none; }
+.package-picker-content { max-height: min(68vh, 680px); overflow-y: auto; }
+.package-picker-content .package-grid { margin-top: 0; }
+.package-card-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 15px; }
+.package-card-actions .card-link { margin-top: 0; }
+.package-select-link { min-height: 34px; padding: 0 12px; color: white; border: 1px solid var(--wine); border-radius: 7px; background: var(--wine); font-size: 11px; font-weight: 700; cursor: pointer; }
+.package-select-link:hover { background: #5f0a12; }
+.package-select-link:focus-visible { outline: 2px solid var(--wine); outline-offset: 2px; }
 .customer-message .message-meta { color: rgba(255,255,255,.78); }
 .admin-messages { max-width: none; }
 .admin-messages .customer-messages { height: calc(100dvh - 147px); min-height: 460px; border: 1px solid var(--line); border-radius: 10px; }
@@ -1192,6 +1202,9 @@
 .assistant-error span { flex: 1; min-width: 0; }
 .assistant-error button { min-height: 26px; flex: none; padding: 0; color: #9e3737; border: 0; background: none; font-size: 12px; font-weight: 700; text-decoration: underline; }
 .messages-closed-note { margin: 8px 24px 0; padding: 9px 11px; color: var(--muted); border-radius: 7px; background: var(--canvas); font-size: 12px; line-height: 1.5; }
+.admin-takeover-prompt { padding: 13px 20px 17px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid var(--line); background: white; }
+.admin-takeover-prompt p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.admin-takeover-prompt .button { min-height: 40px; flex: none; }
 .messages-closed-note + .messages-closed-note { margin-top: 6px; }
 .event-context-package { margin: 0 0 16px; padding: 10px 12px; color: var(--muted); border-radius: 7px; background: var(--cream-soft); font-size: 12px; }
 .event-context-package strong { color: var(--ink); }

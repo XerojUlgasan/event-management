@@ -168,15 +168,18 @@ export type GuestChatMessage = {
 }
 
 export const getMyConversation = () => request<ChatThread>("/messages/conversation")
-export const sendMyMessage = (body: string) =>
-  request<{ message: ChatMessage }>("/messages/conversation/messages", { body })
+export const createMyConversation = () => request<ChatThread>("/messages/conversations", {})
+export const getMyConversations = () => request<{ conversations: ChatConversation[] }>("/messages/conversations")
+export const getMyConversationById = (id: string) => request<ChatThread>(`/messages/conversations/${encodeURIComponent(id)}`)
+export const sendMyMessage = (body: string, conversationId?: string) =>
+  request<{ message: ChatMessage }>("/messages/conversation/messages", { body, conversationId })
 export const claimGuestConversation = (payload: {
   guestChatId: string
   messages: GuestChatMessage[]
   context?: ConversationContextInput
 }) => request<ChatThread>("/messages/conversation/claim", payload)
-export const updateConversationContext = (context: ConversationContextInput) =>
-  request<ChatThread>("/messages/conversation/context", context, undefined, "PATCH")
+export const updateConversationContext = (context: ConversationContextInput, conversationId?: string) =>
+  request<ChatThread>("/messages/conversation/context", { ...context, conversationId }, undefined, "PATCH")
 export const requestStaffAssistance = () =>
   request<ChatThread>("/messages/conversation/request-staff", {})
 export const getAssistantReply = () =>

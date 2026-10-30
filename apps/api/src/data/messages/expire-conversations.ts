@@ -4,8 +4,8 @@ import { CONVERSATION_EXPIRY_MS } from "../../utils/conversation-expiry.js";
 
 type Database = Kysely<DB>;
 
-// General conversations expire 24 hours after their last activity. Conversations
-// tied to an event stay available until 24 hours after the event end.
+// Conversations without a selected package expire 24 hours after creation.
+// Package conversations stay available until 24 hours after the event end.
 export async function expireConversationsData(db: Database) {
   const cutoff = new Date(Date.now() - CONVERSATION_EXPIRY_MS);
   await db
@@ -14,8 +14,20 @@ export async function expireConversationsData(db: Database) {
     .where("status", "!=", "closed")
     .where((eb) =>
       eb.or([
-        eb.and([eb("event_ends_at", "is not", null), eb("event_ends_at", "<=", cutoff)]),
-        eb.and([eb("event_ends_at", "is", null), eb("updated_at", "<=", cutoff)]),
+        eb.and([
+          eb("package_id", "is not", null),
+          eb("event_ends_at", "is not", null),
+          eb("event_ends_at", "<=", cutoff),
+        ]),
+        eb.and([
+          eb("package_id", "is", null),
+          eb("created_at", "<=", cutoff),
+        ]),
+        eb.and([
+          eb("package_id", "is not", null),
+          eb("event_ends_at", "is", null),
+          eb("created_at", "<=", cutoff),
+        ]),
       ]),
     )
     .execute();

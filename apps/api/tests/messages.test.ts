@@ -228,6 +228,21 @@ test("conversations are isolated per customer and unknown ids return 404", async
   );
 });
 
+test("customers can start a separate conversation without losing the previous one", async () => {
+  const previous = await read(await call("/messages/conversation", "GET", undefined, otherCustomerCookie), 200);
+  const created = await read(await call("/messages/conversations", "POST", {}, otherCustomerCookie), 201);
+  assert.notEqual(created.conversation.id, previous.conversation.id);
+  assert.equal(created.messages.length, 0);
+  const current = await read(await call("/messages/conversation", "GET", undefined, otherCustomerCookie), 200);
+  assert.equal(current.conversation.id, created.conversation.id);
+  assert.equal(current.messages.length, 0);
+  const old = await read(
+    await call(`/admin/conversations/${previous.conversation.id}`, "GET", undefined, adminCookie),
+    200,
+  );
+  assert.ok(old.messages.some((message: any) => message.body === "Second customer here"));
+});
+
 async function withGeminiMock<T>(run: (calls: Array<{ url: string; init: RequestInit }>) => Promise<T>) {
   const originalFetch = globalThis.fetch;
   const originalKey = process.env.GEMINI_API_KEY;
@@ -408,6 +423,17 @@ test("conversation context, staff handoff, and takeover gate assistant replies",
   assert.equal(updated.conversation.eventType, "Wedding reception");
   assert.equal(updated.conversation.guestCount, 80);
 
+  const packageRemoved = await read(
+    await call("/messages/conversation/context", "PATCH", { packageId: null }, chatCustomerCookie),
+    200,
+  );
+  assert.match(packageRemoved.messages.at(-1).body, /Garden Wedding was removed/);
+  const packageSelected = await read(
+    await call("/messages/conversation/context", "PATCH", { packageId }, chatCustomerCookie),
+    200,
+  );
+  assert.match(packageSelected.messages.at(-1).body, /Garden Wedding was selected/);
+
   await read(
     await call("/messages/conversation/messages", "POST", { body: "Can you help?" }, chatCustomerCookie),
     201,
@@ -425,6 +451,7 @@ test("conversation context, staff handoff, and takeover gate assistant replies",
     200,
   );
   assert.equal(waiting.conversation.status, "waiting_staff");
+  assert.match(waiting.messages.at(-1).body, /customer requested staff assistance/i);
 
   const list = await read(await call("/admin/conversations", "GET", undefined, adminCookie), 200);
   assert.equal(list.conversations[0].id, waiting.conversation.id);
@@ -509,8 +536,10 @@ test("inactive and finished-event conversations close and keep their history", a
     .set({
       status: "active",
       closed_at: null,
+      package_id: null,
       event_starts_at: null,
       event_ends_at: null,
+      created_at: new Date(Date.now() - 25 * 60 * 60 * 1000),
       updated_at: new Date(Date.now() - 25 * 60 * 60 * 1000),
     })
     .where("customer_id", "=", chatCustomerId)
@@ -541,6 +570,7 @@ test("inactive and finished-event conversations close and keep their history", a
     .set({
       status: "active",
       closed_at: null,
+      package_id: packageId,
       event_ends_at: new Date(Date.now() - 25 * 60 * 60 * 1000),
       updated_at: new Date(),
     })
@@ -556,6 +586,7 @@ test("inactive and finished-event conversations close and keep their history", a
 test("message routes appear in the OpenAPI document", async () => {
   const spec: any = await (await app.request("/openapi.json")).json();
   assert.ok(spec.paths["/v1/messages/conversation"].get);
+  assert.ok(spec.paths["/v1/messages/conversations"].post);
   assert.ok(spec.paths["/v1/messages/conversation/messages"].post);
   assert.ok(spec.paths["/v1/messages/conversation/claim"].post);
   assert.ok(spec.paths["/v1/messages/conversation/context"].patch);
