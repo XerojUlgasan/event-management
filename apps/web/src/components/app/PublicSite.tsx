@@ -3,20 +3,24 @@ import { Badge, Brand, Button, Dialog, Icon } from "@event-management/ui"
 
 import { PackageCatalog } from "./PackageCatalog"
 import { PublicServiceCatalog } from "../PublicServiceCatalog"
+import { CatalogOverlay, PublicCatalog } from "../PublicCatalog"
+
+type CatalogKind = "services" | "packages" | "venues"
 
 export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
+  const [catalogOverlay, setCatalogOverlay] = useState<CatalogKind | null>(null)
 
   return (
     <div className="public-site">
       <header className="public-header">
         <Brand />
         <nav className={`public-nav ${mobileOpen ? "open" : ""}`}>
-          <a href="#services">Services</a>
           <a href="#packages">Packages</a>
-          <a href="/catalog?type=venues">Venues</a>
+          <a href="#services">Services</a>
+          <a href="#venues">Venues</a>
           <a href="#events">Past events</a>
           <a href="#about">About us</a>
         </nav>
@@ -89,6 +93,44 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
           </div>
         </section>
 
+        <section className="packages section" id="packages">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">Curated experiences</span>
+              <h2 className="section-title small">
+                A thoughtful place to begin
+              </h2>
+            </div>
+            <p>
+              Every package can be tailored to your menu, setting, guest count,
+              and service needs.
+            </p>
+          </div>
+          <PackageCatalog onViewMore={() => setCatalogOverlay("packages")} />
+        </section>
+
+        <section className="public-services section" id="services" aria-labelledby="services-title">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">Make it yours</span>
+              <h2 className="section-title small" id="services-title">Explore our services</h2>
+            </div>
+            <p>Services can be included in a package or offered as optional extras. View a package for its specific inclusions and add-on prices.</p>
+          </div>
+          <PublicServiceCatalog onViewMore={() => setCatalogOverlay("services")} />
+        </section>
+
+        <section className="public-venues section" id="venues" aria-labelledby="venues-title">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">Find your setting</span>
+              <h2 className="section-title small" id="venues-title">Explore our venues</h2>
+            </div>
+            <p>Discover published venues and their details. Availability is confirmed by our team when reviewing your request.</p>
+          </div>
+          <PublicCatalog kind="venues" onViewMore={() => setCatalogOverlay("venues")} />
+        </section>
+
         <section className="intro section" id="intro">
           <div>
             <span className="eyebrow">Your occasion, considered</span>
@@ -106,33 +148,6 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
               How Clemora works <Icon name="arrow" size={16} />
             </a>
           </div>
-        </section>
-
-        <section className="public-services section" id="services" aria-labelledby="services-title">
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">Make it yours</span>
-              <h2 className="section-title small" id="services-title">Explore our services</h2>
-            </div>
-            <p>Services can be included in a package or offered as optional extras. View a package for its specific inclusions and add-on prices.</p>
-          </div>
-          <PublicServiceCatalog />
-        </section>
-
-        <section className="packages section" id="packages">
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">Curated experiences</span>
-              <h2 className="section-title small">
-                A thoughtful place to begin
-              </h2>
-            </div>
-            <p>
-              Every package can be tailored to your menu, setting, guest count,
-              and service needs.
-            </p>
-          </div>
-          <PackageCatalog />
         </section>
 
         <section className="recommendation section" id="events">
@@ -212,9 +227,9 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
           final update.
         </p>
         <div>
-          <a href="#services">Services</a>
           <a href="#packages">Packages</a>
-          <a href="/catalog?type=venues">Venues</a>
+          <a href="#services">Services</a>
+          <a href="#venues">Venues</a>
           <a href="#events">Past events</a>
           <a href="#about">Contact</a>
         </div>
@@ -268,6 +283,7 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
           <Button onClick={() => setQuoteOpen(false)}>Close</Button>
         </Dialog>
       )}
+      {catalogOverlay && <CatalogOverlay kind={catalogOverlay} onClose={() => setCatalogOverlay(null)} />}
     </div>
   )
 }

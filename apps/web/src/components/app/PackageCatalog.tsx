@@ -1,3 +1,3 @@
 import { PublicCatalog } from "../PublicCatalog"
 
-export function PackageCatalog() { return <PublicCatalog kind="packages" /> }
+export function PackageCatalog({ onViewMore }: { onViewMore?: () => void }) { return <PublicCatalog kind="packages" onViewMore={onViewMore} /> }

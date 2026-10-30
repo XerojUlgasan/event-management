@@ -41,6 +41,7 @@
 .inline-link { display: inline-flex; align-items: center; gap: 8px; color: var(--wine); border: 0; background: none; padding: 0 0 4px; border-bottom: 1px solid var(--cream); font-size: 13px; font-weight: 700; }
 .intro-copy .inline-link { margin-top: 14px; }
 .public-services { --service-line: #e8dfda; --service-card: #fff; --service-accent: var(--wine); --service-ink: var(--ink); --service-muted: var(--muted); --service-heading-font: var(--font-serif); }
+.public-venues { --catalog-line: #e8dfda; --catalog-card: #fff; --catalog-image: #e9e4e1; --catalog-accent: var(--wine); --catalog-ink: var(--ink); --catalog-muted: var(--muted); --catalog-heading: var(--font-serif); }
 .packages { max-width: none; background: var(--canvas); padding-left: max(30px, calc((100vw - 1160px) / 2)); padding-right: max(30px, calc((100vw - 1160px) / 2)); }
 .section-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 40px; }
 .section-heading h2 { margin: 0; }

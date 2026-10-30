@@ -2,6 +2,5 @@
 @import "tailwindcss";
 @import "@event-management/theme/theme.css";
 @import "@event-management/ui/styles.css";
-@import "./landing.css";
 @import "./public-preview.css";
 @import "./public-catalog.css";

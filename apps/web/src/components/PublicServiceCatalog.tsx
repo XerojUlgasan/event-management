@@ -1,3 +1,3 @@
 import { PublicCatalog } from "./PublicCatalog"
 
-export function PublicServiceCatalog() { return <PublicCatalog kind="services" /> }
+export function PublicServiceCatalog({ onViewMore }: { onViewMore?: () => void }) { return <PublicCatalog kind="services" onViewMore={onViewMore} /> }
