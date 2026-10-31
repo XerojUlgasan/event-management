@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type SubmitEvent } from "react"
 import {
   Brand,
   Button,
   Dialog,
+  FormField,
   Icon,
   PageHeader,
   Panel,
+  Toast,
 } from "@event-management/ui"
 
 import { photos } from "../data"
@@ -16,11 +18,23 @@ import { SignInMethods } from "../SignInMethods"
 import { MessagesWorkspace } from "../messages/MessagesWorkspace"
 import { mergeThread } from "../messages/thread"
 import {
-  getMyConversation,
+  getAssistantReply,
+  createMyConversation,
+  getMyConversations,
+  getMyConversationById,
+  requestStaffAssistance,
   sendMyMessage,
+  updateConversationContext,
   type ChatMessage,
+  type ChatConversation,
   type ChatThread,
+  type PublicPackage,
 } from "../../../lib/api"
+import {
+  claimPendingGuestChat,
+  hasGuestHistory,
+  loadGuestChat,
+} from "../../../lib/guest-chat"
 
 type CustomerTab =
   | "Home"
@@ -28,6 +42,14 @@ type CustomerTab =
   | "Packages"
   | "Messages"
   | "Profile"
+
+function localDateTime(value: string | null) {
+  if (!value) return ""
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+  const pad = (part: number) => String(part).padStart(2, "0")
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
 
 export function CustomerDashboard({
   onPublic,
@@ -40,7 +62,10 @@ export function CustomerDashboard({
   userEmail: string
   onSignOut: () => void
 }) {
-  const [tab, setTab] = useState<CustomerTab>("Home")
+  // A customer who signed in from the guest chat lands back in that thread.
+  const [tab, setTab] = useState<CustomerTab>(() =>
+    hasGuestHistory(loadGuestChat()) ? "Messages" : "Home",
+  )
   const [messageOpen, setMessageOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement>(null)
@@ -50,20 +75,52 @@ export function CustomerDashboard({
   const [dialogSending, setDialogSending] = useState(false)
   const [dialogError, setDialogError] = useState("")
   const [messageThread, setMessageThread] = useState<ChatThread | null>(null)
+  const [messageConversations, setMessageConversations] = useState<ChatConversation[]>([])
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesError, setMessagesError] = useState("")
+  const [assistantPending, setAssistantPending] = useState(false)
+  const [assistantError, setAssistantError] = useState("")
+  const [staffRequesting, setStaffRequesting] = useState(false)
+  const [eventDetailsOpen, setEventDetailsOpen] = useState(false)
+  const [eventSaving, setEventSaving] = useState(false)
+  const [eventError, setEventError] = useState("")
+  const [newChatBusy, setNewChatBusy] = useState(false)
+  const [toast, setToast] = useState("")
+
+  const notify = (message: string) => {
+    setToast(message)
+    window.setTimeout(() => setToast(""), 2600)
+  }
 
   const refreshMessages = useCallback(async () => {
     try {
-      const thread = await getMyConversation()
-      setMessageThread((current) => mergeThread(current, thread))
+      // Restore a guest chat saved in this browser before loading the DB thread.
+      const claimed = await claimPendingGuestChat()
+      const { conversations } = await getMyConversations()
+      setMessageConversations(conversations)
+      if (claimed) {
+        setSelectedConversationId(claimed.conversation.id)
+        setMessageThread(claimed)
+      } else {
+        const targetId = selectedConversationId && conversations.some((item) => item.id === selectedConversationId)
+          ? selectedConversationId
+          : conversations[0]?.id ?? null
+        setSelectedConversationId(targetId)
+        if (targetId) {
+          const thread = await getMyConversationById(targetId)
+          setMessageThread((current) => mergeThread(current, thread))
+        } else {
+          setMessageThread(null)
+        }
+      }
       setMessagesError("")
     } catch (cause) {
       setMessagesError(cause instanceof Error ? cause.message : "Unable to load your messages.")
     } finally {
       setMessagesLoading(false)
     }
-  }, [])
+  }, [selectedConversationId])
 
   useEffect(() => {
     if (tab !== "Messages") return
@@ -74,23 +131,165 @@ export function CustomerDashboard({
   }, [tab, refreshMessages])
 
   const appendMessage = (message: ChatMessage) => {
-    setMessageThread((current) =>
-      current
-        ? {
-            conversation: {
-              ...current.conversation,
-              lastMessage: message,
-              updatedAt: message.createdAt,
-            },
-            messages: [...current.messages, message],
-          }
-        : current,
-    )
+    setMessageThread((current) => {
+      if (!current) return current
+      if (current.messages.some((item) => item.id === message.id)) return current
+      return {
+        conversation: {
+          ...current.conversation,
+          lastMessage: message,
+          updatedAt: message.createdAt,
+        },
+        messages: [...current.messages, message],
+      }
+    })
+  }
+
+  const fetchAssistantReply = async () => {
+    setAssistantPending(true)
+    setAssistantError("")
+    try {
+      const reply = await getAssistantReply()
+      if (reply.message) appendMessage(reply.message)
+      if (reply.status !== "active") {
+        setMessageThread((current) =>
+          current
+            ? { ...current, conversation: { ...current.conversation, status: reply.status } }
+            : current,
+        )
+      }
+    } catch (cause) {
+      setAssistantError(
+        cause instanceof Error
+          ? cause.message
+          : "Clemora AI is unavailable right now. You can still ask for staff help.",
+      )
+    } finally {
+      setAssistantPending(false)
+    }
   }
 
   const sendMessage = async (body: string) => {
-    const result = await sendMyMessage(body)
+    const previousStatus = messageThread?.conversation.status ?? "active"
+    const result = await sendMyMessage(body, messageThread?.conversation.id)
     appendMessage(result.message)
+    // A new message reopens a closed general conversation; staff-handled
+    // conversations stay with staff until they finish.
+    if (previousStatus === "closed") {
+      setMessageThread((current) =>
+        current
+          ? {
+              ...current,
+              conversation: {
+                ...current.conversation,
+                status: "active",
+                closedAt: null,
+                packageId: null,
+                packageName: null,
+                eventType: null,
+                eventStartsAt: null,
+                eventEndsAt: null,
+                guestCount: null,
+              },
+            }
+          : current,
+      )
+    }
+    if (previousStatus !== "active" && previousStatus !== "closed") return
+    await fetchAssistantReply()
+  }
+
+  const askForStaff = async () => {
+    if (staffRequesting) return
+    setStaffRequesting(true)
+    setAssistantError("")
+    try {
+      // Put the thread in the staff queue first so a send failure cannot leave
+      // the assistant answering a customer who asked for a person.
+      const thread = await requestStaffAssistance()
+      setMessageThread(thread)
+      const sent = await sendMyMessage(
+        "I’d like to speak with a staff member about my event.",
+        messageThread?.conversation.id,
+      )
+      appendMessage(sent.message)
+      setAssistantPending(false)
+      notify("Our team has been notified. You can keep adding details here.")
+    } catch (cause) {
+      notify(cause instanceof Error ? cause.message : "Unable to request staff assistance.")
+    } finally {
+      setStaffRequesting(false)
+    }
+  }
+
+  const askAboutPackage = async (item: PublicPackage) => {
+    try {
+      const thread = await updateConversationContext({
+        packageId: item.id,
+        eventType: item.eventTypes[0] ?? null,
+      }, messageThread?.conversation.id)
+      setMessageThread(thread)
+      setConversationOpen(true)
+      setTab("Messages")
+      notify(`${item.name} is now linked to your conversation.`)
+    } catch (cause) {
+      notify(cause instanceof Error ? cause.message : "Unable to link this package.")
+    }
+  }
+
+  const startNewChat = async () => {
+    if (newChatBusy) return
+    setNewChatBusy(true)
+    try {
+      const thread = await createMyConversation()
+      setSelectedConversationId(thread.conversation.id)
+      setMessageThread(thread)
+      setMessageConversations((current) => [thread.conversation, ...current])
+      setConversationOpen(true)
+      notify("New chat started.")
+    } catch (cause) {
+      notify(cause instanceof Error ? cause.message : "Unable to start a new chat.")
+    } finally {
+      setNewChatBusy(false)
+    }
+  }
+
+  const selectConversation = async (id: string) => {
+    setSelectedConversationId(id)
+    setConversationOpen(true)
+    setMessagesLoading(true)
+    try {
+      setMessageThread(await getMyConversationById(id))
+      setMessagesError("")
+    } catch (cause) {
+      setMessagesError(cause instanceof Error ? cause.message : "Unable to load this conversation.")
+    } finally {
+      setMessagesLoading(false)
+    }
+  }
+
+  const saveEventDetails = async (event: SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const data = new FormData(event.currentTarget)
+    const eventType = String(data.get("eventType") ?? "").trim()
+    const guestCount = String(data.get("guestCount") ?? "").trim()
+    const eventEndsAt = String(data.get("eventEndsAt") ?? "")
+    setEventSaving(true)
+    setEventError("")
+    try {
+      const thread = await updateConversationContext({
+        eventType: eventType || null,
+        guestCount: guestCount ? Number(guestCount) : null,
+        eventEndsAt: eventEndsAt ? new Date(eventEndsAt).toISOString() : null,
+      }, messageThread?.conversation.id)
+      setMessageThread(thread)
+      setEventDetailsOpen(false)
+      notify("Event details saved to this conversation.")
+    } catch (cause) {
+      setEventError(cause instanceof Error ? cause.message : "Unable to save event details.")
+    } finally {
+      setEventSaving(false)
+    }
   }
 
   const sendFromDialog = async () => {
@@ -99,13 +298,15 @@ export function CustomerDashboard({
     setDialogSending(true)
     setDialogError("")
     try {
-      const result = await sendMyMessage(body)
+      const thread = await requestStaffAssistance()
+      setMessageThread(thread)
+      const result = await sendMyMessage(body, messageThread?.conversation.id)
       appendMessage(result.message)
       setMessageDraft("")
       setMessageOpen(false)
       setConversationOpen(true)
       setTab("Messages")
-
+      notify("Message sent. Our team is notified and will reply here.")
     } catch (cause) {
       setDialogError(cause instanceof Error ? cause.message : "Unable to send your message.")
     } finally {
@@ -200,7 +401,7 @@ export function CustomerDashboard({
               description="Explore currently published packages."
 
             />
-            <PackageCatalog />
+            <PackageCatalog onAsk={askAboutPackage} />
           </div>
         )}
 
@@ -228,9 +429,9 @@ export function CustomerDashboard({
             <MessagesWorkspace
               title="Messages"
               viewerRole="customer"
-              conversations={messageThread ? [messageThread.conversation] : []}
+              conversations={messageConversations}
               activeId={messageThread?.conversation.id ?? null}
-              onSelect={() => setConversationOpen(true)}
+              onSelect={(id) => void selectConversation(id)}
               messages={messageThread?.messages ?? []}
               loading={messagesLoading}
               error={messagesError}
@@ -241,19 +442,95 @@ export function CustomerDashboard({
               onSend={sendMessage}
               onBack={() => setConversationOpen(false)}
               conversationOpen={conversationOpen}
+              onRequestStaff={askForStaff}
+              onEditContext={() => {
+                setEventError("")
+                setEventDetailsOpen(true)
+              }}
+              onSelectPackage={askAboutPackage}
+              onNewChat={startNewChat}
+              newChatBusy={newChatBusy}
+              assistantPending={assistantPending}
+              assistantError={assistantError}
+              onRetryAssistant={() => void fetchAssistantReply()}
+              staffRequesting={staffRequesting}
               listEmpty={{
                 title: "No conversation yet",
-                body: "Send us a message and our team will reply here.",
+                body: "Ask Clemora about your event, or request staff assistance.",
               }}
               threadEmpty={{
                 title: "Say hello",
-                body: "Ask about your event, quotation, or anything else on your mind.",
+                body: "Ask about your event, a package, or request staff assistance.",
               }}
             />
           </div>
         )}
       </main>
 
+      {eventDetailsOpen && messageThread && (
+        <Dialog
+          onClose={() => setEventDetailsOpen(false)}
+          className="compact-modal"
+          eyebrow="Conversation context"
+          title="Event details"
+          intro="These details help Clemora answer with the right context. The event end also controls how long this conversation stays open."
+        >
+          <form onSubmit={saveEventDetails}>
+            {messageThread.conversation.packageName && (
+              <p className="event-context-package">
+                Linked package <strong>{messageThread.conversation.packageName}</strong>
+              </p>
+            )}
+            <div className="form-grid">
+              <FormField label="Event type">
+                <input
+                  name="eventType"
+                  maxLength={120}
+                  defaultValue={messageThread.conversation.eventType ?? ""}
+                  placeholder="Wedding, birthday, corporate…"
+                />
+              </FormField>
+              <FormField label="Estimated guests">
+                <input
+                  name="guestCount"
+                  type="number"
+                  min="1"
+                  defaultValue={messageThread.conversation.guestCount ?? ""}
+                  placeholder="e.g. 80"
+                />
+              </FormField>
+              <FormField className="full" label="Event end date and time">
+                <input
+                  name="eventEndsAt"
+                  type="datetime-local"
+                  defaultValue={localDateTime(messageThread.conversation.eventEndsAt)}
+                />
+              </FormField>
+            </div>
+            <p className="event-context-note">
+              Event-related conversations remain available until 24 hours after the
+              event ends. General conversations close after 24 hours without activity.
+            </p>
+            {eventError && (
+              <p className="messages-send-error" role="alert">
+                {eventError}
+              </p>
+            )}
+            <div className="form-actions">
+              <Button
+                variant="secondary"
+                onClick={() => setEventDetailsOpen(false)}
+                disabled={eventSaving}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={eventSaving}>
+                {eventSaving ? "Saving…" : "Save event details"}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
+      )}
       {messageOpen && (
         <Dialog
           onClose={() => setMessageOpen(false)}
@@ -286,6 +563,7 @@ export function CustomerDashboard({
         </Dialog>
       )}
 
+      {toast && <Toast>{toast}</Toast>}
     </div>
   )
 }

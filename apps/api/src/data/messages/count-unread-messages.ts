@@ -7,10 +7,9 @@ export async function countUnreadMessagesData(db: Database, conversationIds: str
   if (!conversationIds.length) return new Map<string, number>();
   const rows = await db
     .selectFrom("messages as m")
-    .innerJoin("conversations as c", "c.id", "m.conversation_id")
     .select((eb) => ["m.conversation_id", eb.fn.count("m.id").as("count")])
     .where("m.conversation_id", "in", conversationIds)
-    .whereRef("m.sender_id", "=", "c.customer_id")
+    .where("m.sender_role", "=", "customer")
     .where("m.read_at", "is", null)
     .groupBy("m.conversation_id")
     .execute();

@@ -8,12 +8,13 @@ import { photos } from "./app/data"
 type Kind = "services" | "packages" | "venues"
 type Preview = { kind: Kind; id: string } | null
 
-function PackageCard({ item, onPreview }: { item: PublicPackage; onPreview: () => void }) {
+function PackageCard({ item, onPreview, onAsk, selectionMode = false }: { item: PublicPackage; onPreview: () => void; onAsk?: (item: PublicPackage) => void; selectionMode?: boolean }) {
   return <article className="catalog-card">
     <div className="catalog-card-image"><img src={packageImageSrc(item.imageUrl) || photos.dinner} alt="" loading="lazy" onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = photos.dinner }} /></div>
     <div className="catalog-card-body"><span className="catalog-card-kicker">{item.eventTypes.join(" · ") || "Event package"}</span><h3>{item.name}</h3><p>{item.description}</p>
       <div className="catalog-card-meta"><span>{priceLabel(item.price)}</span><span>{item.guestMin}–{item.guestMax} guests</span></div>
       <button type="button" className="catalog-card-action" onClick={onPreview}>View package <span aria-hidden="true">↗</span></button>
+      {selectionMode && onAsk && <button type="button" className="package-select-link" onClick={() => onAsk(item)}>Select package</button>}
     </div>
   </article>
 }
@@ -92,7 +93,7 @@ function ServicePreview({ id, onClose, onPackage }: { id: string; onClose: () =>
   </dialog>, document.body)
 }
 
-function CatalogPreview({ selected, venue, onClose, onPackage, allowBooking }: { selected: Preview; venue: Venue | undefined; onClose: () => void; onPackage: (id: string) => void; allowBooking: boolean }) {
+function CatalogPreview({ selected, venue, onClose, onPackage, onAsk, allowBooking }: { selected: Preview; venue: Venue | undefined; onClose: () => void; onPackage: (id: string) => void; onAsk?: (item: PublicPackage) => void; allowBooking: boolean }) {
   const [packageDetail, setPackageDetail] = useState<PublicPackage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -105,11 +106,11 @@ function CatalogPreview({ selected, venue, onClose, onPackage, allowBooking }: {
   }, [selected])
   if (selected?.kind === "venues" && venue) return <VenuePreview item={venue} onClose={onClose} />
   if (selected?.kind === "services") return <ServicePreview id={selected.id} onClose={onClose} onPackage={onPackage} />
-  if (selected?.kind === "packages") return <PackagePreview allowBooking={allowBooking} item={packageDetail} loading={loading} error={error} onClose={onClose} />
+  if (selected?.kind === "packages") return <PackagePreview allowBooking={allowBooking} item={packageDetail} loading={loading} error={error} onClose={onClose} onAsk={onAsk && packageDetail ? () => onAsk(packageDetail) : undefined} />
   return null
 }
 
-export function PublicCatalog({ kind, mode = "featured", allowBooking = true, onViewMore }: { kind: Kind; mode?: "featured" | "overview"; allowBooking?: boolean; onViewMore?: () => void }) {
+export function PublicCatalog({ kind, mode = "featured", allowBooking = true, onViewMore, onAsk, selectionMode = false }: { kind: Kind; mode?: "featured" | "overview"; allowBooking?: boolean; onViewMore?: () => void; onAsk?: (item: PublicPackage) => void; selectionMode?: boolean }) {
   const [items, setItems] = useState<(PublicPackage | PublicService | Venue)[]>([])
   const [nextOffset, setNextOffset] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
@@ -155,15 +156,16 @@ export function PublicCatalog({ kind, mode = "featured", allowBooking = true, on
 
   const showPackage = (id: string) => { if (selected?.kind === "services") setParentService(selected.id); setSelected({ kind: "packages", id }) }
   const closePreview = () => { if (selected?.kind === "packages" && parentService) { setSelected({ kind: "services", id: parentService }); setParentService(null) } else setSelected(null) }
+  const askAboutPackage = onAsk ? (item: PublicPackage) => { setSelected(null); setParentService(null); onAsk(item) } : undefined
 
   return <>
     {!initialized && <p className="catalog-status" role="status">Loading {kind}…</p>}
     {initialized && items.length === 0 && !error && <p className="catalog-status">{kind === "packages" ? "No packages are published yet." : kind === "venues" ? "No venues are available yet." : "Our service catalog is being prepared. Please check back soon."}</p>}
-    {items.length > 0 && <div className="catalog-grid">{kind === "packages" ? (items as PublicPackage[]).map(item => <PackageCard key={item.id} item={item} onPreview={() => showPackage(item.id)} />) : kind === "venues" ? (items as Venue[]).map(item => <VenueCard key={item.id} item={item} onPreview={() => setSelected({ kind: "venues", id: item.id })} />) : (items as PublicService[]).map(item => <ServiceCard key={item.id} item={item} onPreview={() => setSelected({ kind: "services", id: item.id })} />)}</div>}
+    {items.length > 0 && <div className="catalog-grid">{kind === "packages" ? (items as PublicPackage[]).map(item => <PackageCard key={item.id} item={item} onPreview={() => showPackage(item.id)} onAsk={askAboutPackage} selectionMode={selectionMode} />) : kind === "venues" ? (items as Venue[]).map(item => <VenueCard key={item.id} item={item} onPreview={() => setSelected({ kind: "venues", id: item.id })} />) : (items as PublicService[]).map(item => <ServiceCard key={item.id} item={item} onPreview={() => setSelected({ kind: "services", id: item.id })} />)}</div>}
     {error && <p className="catalog-status" role="alert">{error} <button type="button" onClick={() => void load(items.length ? nextOffset ?? items.length : 0, items.length === 0)}>Try again</button></p>}
     {mode === "featured" && (onViewMore || items.length > 0) && (onViewMore ? <button type="button" className="catalog-view-more" onClick={onViewMore}>View more {kind}<span aria-hidden="true">↗</span></button> : <a className="catalog-view-more" href={`/catalog?type=${kind}`}>View more {kind}<span aria-hidden="true">↗</span></a>)}
     {mode === "overview" && <div className="catalog-pagination"><div ref={sentinelRef} aria-hidden="true" />{loading && initialized && <p role="status">Loading more {kind}…</p>}{nextOffset !== null && !loading && !error && <button type="button" onClick={() => void load(nextOffset)}>Load more {kind}</button>}{initialized && nextOffset === null && items.length > 0 && <p>All {items.length} {kind} shown</p>}</div>}
-    <CatalogPreview allowBooking={allowBooking} selected={selected} venue={selected?.kind === "venues" ? (items as Venue[]).find(item => item.id === selected.id) : undefined} onClose={closePreview} onPackage={showPackage} />
+    <CatalogPreview allowBooking={allowBooking} selected={selected} venue={selected?.kind === "venues" ? (items as Venue[]).find(item => item.id === selected.id) : undefined} onClose={closePreview} onPackage={showPackage} onAsk={askAboutPackage} />
   </>
 }
 

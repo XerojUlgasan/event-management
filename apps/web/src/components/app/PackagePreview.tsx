@@ -1,8 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { serviceImageSrc } from "../../lib/api"
+import { Button } from "@event-management/ui"
+import { packageImageSrc, serviceImageSrc } from "../../lib/api"
 import type { PackageContent, PackagePrice, PackageService, PackageVersion } from "../../lib/api"
-import { packageImageSrc } from "../../lib/api"
 import { BookingRequestDialog } from "./BookingRequest"
 import type { PublicPackage } from "../../lib/api"
 import { photos } from "./data"
@@ -18,13 +18,14 @@ export function priceLabel(price: PackagePrice | null) {
   }
 }
 
-export function PackagePreview({ item, loading = false, error = "", versionState, onClose, allowBooking = true }: {
+export function PackagePreview({ item, loading = false, error = "", versionState, onClose, allowBooking = true, onAsk }: {
   item: PackageContent | null
   loading?: boolean
   error?: string
   versionState?: PackageVersion["state"]
   allowBooking?: boolean
   onClose: () => void
+  onAsk?: () => void
 }) {
   const [booking, setBooking] = useState(false)
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -81,8 +82,13 @@ export function PackagePreview({ item, loading = false, error = "", versionState
                 <div><span>Package total</span><strong>{priceLabel(item.price)}</strong></div>
                 <div><span>Estimated guest range</span><strong>{item.guestMin}–{item.guestMax} guests</strong></div>
               </div>
-              <p className="package-preview-note">{admin ? "This preview does not publish the package." : "Your preferred date and final price are subject to staff review."}</p>
-            {allowBooking && !admin && "versionId" in item && <button className="booking-start" type="button" onClick={() => { dialogRef.current?.close(); setBooking(true) }}>Book now</button>}
+              <p className="package-preview-note">{admin ? "This preview does not publish the package." : "Viewing a package does not reserve a date. Your preferred date and final price are subject to staff review."}</p>
+              {!admin && onAsk && (
+                <Button variant="secondary" onClick={onAsk} icon="spark">
+                  Ask Clemora about this package
+                </Button>
+              )}
+              {allowBooking && !admin && "versionId" in item && <button className="booking-start" type="button" onClick={() => { dialogRef.current?.close(); setBooking(true) }}>Book now</button>}
             </aside>
           </div>
           <div className="package-preview-content">

@@ -15,9 +15,23 @@ export const sendCustomerMessageRoute = createRoute({
     400: errors[400],
     401: errors[401],
     403: errors[403],
+    404: errors[404],
   },
 });
 export const sendCustomerMessageRouteHandler: AppRouteHandler<typeof sendCustomerMessageRoute> = async (c) => {
-  const message = await sendCustomerMessageService(c.get("db"), c.get("session").user.id, c.req.valid("json").body);
-  return c.json({ message }, 201);
+  const input = c.req.valid("json");
+  try {
+    const message = await sendCustomerMessageService(
+      c.get("db"),
+      c.get("session").user.id,
+      input.body,
+      input.conversationId,
+    );
+    return c.json({ message }, 201);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Conversation not found") {
+      return c.json({ error: error.message }, 404);
+    }
+    throw error;
+  }
 };

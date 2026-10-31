@@ -6,11 +6,12 @@ type Database = Kysely<DB>;
 export function selectMessageColumnsData(db: Database, conversationId: string) {
   return db
     .selectFrom("messages as m")
-    .innerJoin("users as sender", "sender.id", "m.sender_id")
+    .leftJoin("users as sender", "sender.id", "m.sender_id")
     .select((eb) => [
       "m.id",
       "m.conversation_id",
       "m.sender_id",
+      "m.sender_role",
       "m.body",
       "m.created_at",
       "m.read_at",
@@ -19,4 +20,3 @@ export function selectMessageColumnsData(db: Database, conversationId: string) {
     ])
     .where("m.conversation_id", "=", conversationId);
 }
-
