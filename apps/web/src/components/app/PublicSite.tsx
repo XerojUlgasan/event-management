@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { Badge, Brand, Button, Dialog, Icon } from "@event-management/ui"
 
+import type { PublicPackage } from "../../lib/api"
+import { GuestChatPanel } from "./chat/GuestChatPanel"
 import { PackageCatalog } from "./PackageCatalog"
 import { PublicServiceCatalog } from "../PublicServiceCatalog"
 import { CatalogOverlay, PublicCatalog } from "../PublicCatalog"
@@ -161,7 +163,13 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
               We’ll suggest a starting package—with clear reasons—then your
               catering manager can refine it with you.
             </p>
-            <Button onClick={() => setChatOpen(true)}>Find my best fit</Button>
+            <Button
+              onClick={() => {
+                setChatOpen(true)
+              }}
+            >
+              Find my best fit
+            </Button>
           </div>
           <div className="recommendation-card">
             <div className="rec-top">
@@ -236,45 +244,26 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
         <span>© 2025 Clemora Catering</span>
       </footer>
 
-      <button className="chat-launcher" onClick={() => setChatOpen(!chatOpen)}>
+      <button
+        className="chat-launcher"
+        aria-expanded={chatOpen}
+        onClick={() => {
+          if (chatOpen) {
+            setChatOpen(false)
+          } else {
+            setChatOpen(true)
+          }
+        }}
+      >
         <Icon name={chatOpen ? "close" : "spark"} />
         <span>{chatOpen ? "Close" : "Ask Clemora"}</span>
       </button>
 
       {chatOpen && (
-        <div className="chat-panel">
-          <div className="chat-header">
-            <div className="ai-icon">
-              <Icon name="spark" />
-            </div>
-            <div>
-              <strong>Clemora assistant</strong>
-              <small>Online · Answers from our service guide</small>
-            </div>
-          </div>
-          <div className="chat-body">
-            <span className="chat-time">Today, 10:42 AM</span>
-            <div className="message bot">
-              Hi, I’m here to help you explore packages, menus, pricing, and our
-              booking process. What are you planning?
-            </div>
-            <div className="quick-replies">
-              <button>Recommend a package</button>
-              <button>View sample menus</button>
-              <button>Booking process</button>
-            </div>
-          </div>
-          <div className="handover">
-            <span>Need a person?</span>
-            <button>Request human assistance</button>
-          </div>
-          <div className="chat-input">
-            <input placeholder="Ask about your event..." />
-            <button aria-label="Send">
-              <Icon name="arrow" />
-            </button>
-          </div>
-        </div>
+        <GuestChatPanel
+          onSignIn={onEnterCustomer}
+          onClose={() => setChatOpen(false)}
+        />
       )}
 
       {quoteOpen && (

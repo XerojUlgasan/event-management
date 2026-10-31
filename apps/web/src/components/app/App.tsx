@@ -23,7 +23,6 @@ function AppContent() {
   const [view, setView] = useState<View>(() => new URLSearchParams(window.location.search).get("booking") === "resume" ? "login" : "public")
   const [draft, setDraft] = useState(() => new URLSearchParams(window.location.search).get("booking") === "resume" ? readBookingDraft() : null)
 
-
   useEffect(() => {
     if (status === "signed-in" && profile) {
       setView(profile.role !== "customer" ? "app" : "customer")

@@ -8,11 +8,12 @@ export async function listLastMessagesData(db: Database, conversationIds: string
   if (!conversationIds.length) return new Map<string, MessageWithSender>();
   const rows = await db
     .selectFrom("messages as m")
-    .innerJoin("users as sender", "sender.id", "m.sender_id")
+    .leftJoin("users as sender", "sender.id", "m.sender_id")
     .select((eb) => [
       "m.id",
       "m.conversation_id",
       "m.sender_id",
+      "m.sender_role",
       "m.body",
       "m.created_at",
       "m.read_at",

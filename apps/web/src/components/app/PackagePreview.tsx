@@ -1,8 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { serviceImageSrc } from "../../lib/api"
+import { packageImageSrc, serviceImageSrc } from "../../lib/api"
 import type { PackageContent, PackagePrice, PackageService, PackageVersion } from "../../lib/api"
-import { packageImageSrc } from "../../lib/api"
 import { BookingRequestDialog } from "./BookingRequest"
 import type { PublicPackage } from "../../lib/api"
 import { photos } from "./data"
@@ -81,8 +80,8 @@ export function PackagePreview({ item, loading = false, error = "", versionState
                 <div><span>Package total</span><strong>{priceLabel(item.price)}</strong></div>
                 <div><span>Estimated guest range</span><strong>{item.guestMin}–{item.guestMax} guests</strong></div>
               </div>
-              <p className="package-preview-note">{admin ? "This preview does not publish the package." : "Your preferred date and final price are subject to staff review."}</p>
-            {allowBooking && !admin && "versionId" in item && <button className="booking-start" type="button" onClick={() => { dialogRef.current?.close(); setBooking(true) }}>Book now</button>}
+              <p className="package-preview-note">{admin ? "This preview does not publish the package." : "Viewing a package does not reserve a date. Your preferred date and final price are subject to staff review."}</p>
+              {allowBooking && !admin && "versionId" in item && <button className="booking-start" type="button" onClick={() => { dialogRef.current?.close(); setBooking(true) }}>Book now</button>}
             </aside>
           </div>
           <div className="package-preview-content">

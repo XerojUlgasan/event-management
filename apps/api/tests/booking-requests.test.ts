@@ -129,6 +129,11 @@ test("requests enforce roles, version availability, ownership and status history
   await read(await call("/services", "GET", undefined, staffCookie), 200);
   const created = (await read(await call("/booking-requests","POST",input,customerCookie),201)).bookingRequest;
   assert.equal(created.customerId,customerId); assert.equal(created.outOfRange,true); assert.equal(created.status,"under_review"); assert.equal(created.statusHistory.length,1);
+  const linkedConversation = await db.selectFrom("conversations").selectAll().where("booking_request_id", "=", created.id).executeTakeFirst();
+  assert.ok(linkedConversation);
+  assert.equal(linkedConversation.customer_id, customerId);
+  assert.equal(linkedConversation.event_ends_at!.toISOString(), input.endsAt);
+  assert.equal(linkedConversation.status, "active");
   assert.deepEqual((await read(await call("/booking-requests/mine","GET",undefined,otherCustomerCookie),200)).bookingRequests,[]);
   assert.equal((await read(await call("/booking-requests/mine","GET",undefined,customerCookie),200)).bookingRequests[0].id,created.id);
   assert.equal((await read(await call("/admin/booking-requests", "GET", undefined, staffCookie), 200)).bookingRequests[0].id, created.id);

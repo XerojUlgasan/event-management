@@ -160,11 +160,13 @@ export function deleteUnreferencedServiceImage(imageUrl: string): Promise<void> 
   return request<void>(`/admin/service-images/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
 }
 
+export type ConversationStatus = "active" | "waiting_staff" | "staff" | "closed"
+
 export type ChatMessage = {
   id: string
   body: string
-  senderId: string
-  senderRole: "admin" | "customer"
+  senderId: string | null
+  senderRole: "admin" | "customer" | "assistant" | "system"
   senderName: string
   createdAt: string
   readAt: string | null
@@ -175,6 +177,17 @@ export type ChatConversation = {
   customerId: string
   customerName: string
   customerEmail: string
+  packageId: string | null
+  packageName: string | null
+  bookingRequestId: string | null
+  bookingRequestReference: string | null
+  eventType: string | null
+  eventStartsAt: string | null
+  eventEndsAt: string | null
+  guestCount: number | null
+  status: ConversationStatus
+  closedAt: string | null
+  expiresAt: string
   lastMessage: ChatMessage | null
   unreadCount: number
   updatedAt: string
@@ -222,9 +235,39 @@ export function deleteUnreferencedVenueImage(imageUrl: string): Promise<void> {
   return request<void>(`/admin/venue-images/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
 }
 
+export type ConversationContextInput = {
+  packageId?: string | null
+  eventType?: string | null
+  eventStartsAt?: string | null
+  eventEndsAt?: string | null
+  guestCount?: number | null
+}
+
+export type GuestChatMessage = {
+  role: "user" | "assistant"
+  body: string
+  createdAt?: string
+}
+
 export const getMyConversation = () => request<ChatThread>("/messages/conversation")
-export const sendMyMessage = (body: string) =>
-  request<{ message: ChatMessage }>("/messages/conversation/messages", { body })
+export const createMyConversation = () => request<ChatThread>("/messages/conversations", {})
+export const getMyConversations = () => request<{ conversations: ChatConversation[] }>("/messages/conversations")
+export const getMyConversationById = (id: string) => request<ChatThread>(`/messages/conversations/${encodeURIComponent(id)}`)
+export const sendMyMessage = (body: string, conversationId?: string) =>
+  request<{ message: ChatMessage }>("/messages/conversation/messages", { body, conversationId })
+export const claimGuestConversation = (payload: {
+  guestChatId: string
+  messages: GuestChatMessage[]
+  context?: ConversationContextInput
+}) => request<ChatThread>("/messages/conversation/claim", payload)
+export const updateConversationContext = (context: ConversationContextInput, conversationId?: string) =>
+  request<ChatThread>("/messages/conversation/context", { ...context, conversationId }, undefined, "PATCH")
+export const requestStaffAssistance = (conversationId?: string) =>
+  request<ChatThread>("/messages/conversation/request-staff", { conversationId });
+export const getAssistantReply = (conversationId?: string) =>
+  request<{ message: ChatMessage | null; status: ConversationStatus }>("/messages/conversation/assistant-reply", { conversationId });
+export const getGuestReply = (messages: GuestChatMessage[], context?: ConversationContextInput) =>
+  request<{ reply: string }>("/chatbot/guest-reply", { messages, context })
 export const getAdminConversations = () =>
   request<{ conversations: ChatConversation[] }>("/admin/conversations")
 export const getAdminConversation = (id: string) =>
@@ -241,3 +284,8 @@ export const getAdminBookingRequests = () => request<{ bookingRequests: BookingR
 export const updateBookingRequestStatus = (id: string, status: BookingStatus, reason?: string) => request<{ bookingRequest: BookingRequest }>(`/admin/booking-requests/${encodeURIComponent(id)}/status`, { status, ...(reason ? { reason } : {}) }, undefined, "PATCH")
 
 export const cancelMyBookingRequest = (id: string, reason: string) => request<{ bookingRequest: BookingRequest }>(`/booking-requests/${encodeURIComponent(id)}/cancel`, { reason }, undefined, "PATCH")
+
+export const takeoverConversation = (id: string) =>
+  request<ChatThread>(`/admin/conversations/${encodeURIComponent(id)}/takeover`, {})
+export const returnConversationToAi = (id: string) =>
+  request<ChatThread>(`/admin/conversations/${encodeURIComponent(id)}/return-to-ai`, {})
