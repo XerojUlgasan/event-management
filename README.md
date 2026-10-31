@@ -20,7 +20,7 @@ packages/
 scripts/             Local development setup for `pnpm all`
 ```
 
-The root route renders the Clemora frontend from `apps/web/src/components/app/`. It features packages, services, and venues in that order; each View more control opens the full catalog in an overlay. The package catalog reads and edits PostgreSQL records through the API; `db:seed` adds clearly labeled published demo offers, not business-approved packages. Customer-to-admin messages, the Clemora assistant conversation, and booking requests persist in PostgreSQL and are shared by the customer and admin workspaces; guests can start a browser-only chat before signing in. A booking request asks for a preferred date, guest estimate, approximate event length, event type, and contact phone; exact hours and venue are gathered later. Booking requests are inquiries for staff review; they do not reserve dates, approve final prices, or confirm bookings. Quote, payment, and other event-delivery screens remain demo or future work. Authentication supports local email/password accounts and Firebase sign-in, with shared profiles, roles, and sessions in PostgreSQL.
+The root route renders the Clemora frontend from `apps/web/src/components/app/`. It features packages, services, and venues in that order; each View more control opens the full catalog in an overlay. The package catalog reads and edits PostgreSQL records through the API; `db:seed` adds clearly labeled published demo offers, not business-approved packages. Customer-to-admin messages and booking requests persist in PostgreSQL and are shared by the customer and admin workspaces. A booking request asks for a preferred date, guest estimate, approximate event length, event type, and contact phone; exact hours and venue are gathered later. Booking requests are inquiries for staff review; they do not reserve dates, approve final prices, or confirm bookings. Quote, payment, and other event-delivery screens remain demo or future work. Authentication supports local email/password accounts and Firebase sign-in, with shared profiles, roles, and sessions in PostgreSQL.
 
 The package catalog supports private admin drafts, versioned publication, archiving, and deletion of never-published unreferenced drafts. Admins use a three-step editor with removable tags for event types, inclusions, and exclusions, plus an HTTPS image URL. Each package's inclusions are entered explicitly. Public and customer views show only current published packages. Package prices are fixed totals in PHP, stored as centavos. Admins can also publish versioned services with category tags and an HTTPS image URL, then assign them to packages as included benefits or optional paid add-ons. Add-on prices are fixed PHP amounts per unit for each package assignment. Apply catalog migrations with `pnpm db:deploy` on an existing local database; `pnpm --filter @event-management/api test:packages` runs catalog behavior tests against a disposable local database. See the [package](docs/PACKAGES_CRUD_DRAFT.md) and [service](docs/SERVICES.md) catalog notes for the contracts.
 
@@ -222,38 +222,31 @@ The auth suite requires the Firebase CLI (`firebase-tools`) on PATH and a runnin
 
 Coverage includes local registration/login, password hashes, cookie/session persistence, expiry/logout, existing Firebase email accounts, emulated Google identities, conflicts, proof of both accounts for linking, password addition, concurrent linking, disabled Firebase users, validation, throttling, and OpenAPI routes. The emulator verifies the Firebase integration; it does not prove a production Google OAuth popup or production service-account configuration.
 
-## Customer messages and assistant
+## Customer and team messages
 
-Signed-in customers have one direct conversation with the Clemora team. The customer **Messages** tab and the admin **Messages** workspace read the same PostgreSQL records, refresh every five seconds, and show unread counts. Opening a thread marks the other side's messages as read. Both sides can send messages of up to 4,000 characters; the API enforces the account role, and a customer can only read their own conversation.
+Signed-in customers can start direct conversations with the Clemora team, including conversations linked to booking requests. The customer **Messages** tab and the admin **Messages** workspace read the same PostgreSQL records, refresh every five seconds, and show unread counts and each conversation's last update. Opening a thread marks the other side's messages as read. Both sides can send messages of up to 4,000 characters; the API enforces the account role, and a customer can only read their own conversations. A booking-linked thread shows its event type and opens the existing booking details dialog from an info icon. Customer booking details are read-only; System Administrators can update request status there.
 
-The same conversation is shared by three participants: the customer, the Clemora assistant, and staff. Assistant messages have `senderRole: "assistant"` and no sender account. A conversation has one of four states:
-
-- `active`: the assistant may answer the customer's latest message.
-- `waiting_staff`: the customer requested a person; the assistant is paused and the thread is sorted first in the admin inbox.
-- `staff`: staff replied or explicitly took over; the assistant stays paused.
-- `closed`: history is read-only for staff. A customer's new message reopens a closed general conversation.
+Customer and administrator messages retain their sender identity. Conversations are `active` or `closed`; closed history is read-only for staff, and a customer's new message reopens a closed general conversation. AI replies, guest chat import, handoff, and takeover are deferred.
 
 General conversations close after 24 hours without activity. Event-related conversations close 24 hours after the stored event end, so changing the event schedule in the customer **Event details** dialog also changes the expiry. Closed conversations keep their full message history; expiry is checked whenever conversations are read or written.
 
-Guests can chat from the public site before signing in. That thread is stored only in the browser (`localStorage`, 24-hour expiry) and is imported into the customer's existing database conversation after sign-in. Importing the same guest ID twice is idempotent. A package viewed on the public site or selected in the customer catalog is stored on the conversation as context; no real inquiry or booking table exists yet, so bookings, quotes, and payments remain demo-only.
-
-The assistant is a Gemini model called only from the API. It receives the published package records and the current conversation context. Its instructions forbid inventing prices, inclusions, availability, policies, or booking/payment status; staff confirm bookings and payments. Set `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in `apps/api/.env`; `GEMINI_MODEL` is optional and defaults to `gemini-3.6-flash`. Gemini retires models and individual models sometimes return `503` under load, so the API falls back to a few recent flash models before reporting `503`; the server log names the failing model and status. Without a key, public and signed-in AI replies return `503` and staff messaging continues to work.
+The conversation retains optional package and event context. A booking request creates its own linked conversation. The public site has no guest chat or AI assistant; customers sign in to message the team.
 
 | Route | Auth | Purpose |
 | --- | --- | --- |
-| `POST /v1/chatbot/guest-reply` | Public | Answer a guest from the browser chat history (no database write) |
 | `GET /v1/messages/conversation` | Customer session | Load the signed-in customer's conversation, creating it on first use |
+| `POST /v1/messages/conversations` | Customer session | Start a customer conversation |
+| `GET /v1/messages/conversations` | Customer session | List the customer's conversations |
+| `GET /v1/messages/conversations/{id}` | Customer session | Read one owned conversation |
 | `POST /v1/messages/conversation/messages` | Customer session | Send a message; reopens a closed general conversation |
-| `POST /v1/messages/conversation/claim` | Customer session | Import a browser guest chat and optional package/event context |
 | `PATCH /v1/messages/conversation/context` | Customer session | Link a published package or update event type, guests, and schedule |
-| `POST /v1/messages/conversation/request-staff` | Customer session | Set `waiting_staff` and pause the assistant |
-| `POST /v1/messages/conversation/assistant-reply` | Customer session | Ask the assistant to answer the latest customer message |
-| `GET /v1/admin/conversations` | Admin session | List non-empty conversations with status, last message, and unread count |
+| `GET /v1/admin/conversations` | Admin session | List all conversations, including empty ones, in pages of 15 ordered by latest update; accepts an optional `cursor` and returns `nextCursor`, status, last message, and unread count |
 | `GET /v1/admin/conversations/{id}` | Admin session | Load a customer conversation |
-| `POST /v1/admin/conversations/{id}/messages` | Admin session | Reply as staff and set `staff` |
-| `POST /v1/admin/conversations/{id}/takeover` | Admin session | Set `staff` without sending a reply |
+| `POST /v1/admin/conversations/{id}/messages` | Admin session | Reply to a customer |
+| `GET /v1/booking-requests/{id}` | Customer session | Read one owned request with status history |
+| `GET /v1/admin/booking-requests/{id}` | Staff session | Read one request with status history |
 
-`pnpm --filter @event-management/api test:messages` runs the messaging behavior suite against a disposable local database, including a mocked Gemini response, guest import, handoff, takeover, and expiry. Apply the messaging migration with `pnpm db:deploy` on an existing local database. The suite does not call the live Gemini API; verify the configured key separately.
+`pnpm --filter @event-management/api test:messages` runs the messaging behavior suite against a disposable local database, including ownership, sending, read state, and expiry. Apply the forward migration with `pnpm db:deploy` on an existing local database. It removes automated assistant/handoff messages and AI routing state while preserving human messages and conversations.
 
 ## Database workflow
 

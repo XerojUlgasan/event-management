@@ -21,7 +21,6 @@ export async function sendAdminMessageService(
   const conversation = await findConversationData(db, id);
   if (!conversation) return { kind: "not-found" };
   if (conversation.status === "closed") return { kind: "closed" };
-  // Replying is also a takeover: automatic assistant replies stop.
-  const message = await createMessageData(db, conversation, senderId, "admin", body, "staff");
+  const message = await createMessageData(db, conversation, senderId, "admin", body);
   return { kind: "ok", message: messageDto(message) };
 }

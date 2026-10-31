@@ -17,10 +17,8 @@ These are transport limits enforced only by the API in `apps/api/src/constants/h
 
 | API constant | Current cap | Applied to |
 | --- | --- | --- |
-| `SMALL_JSON_BODY_LIMIT_BYTES` | 16 KiB | Auth, admin conversations, and booking-request API paths. |
+| `SMALL_JSON_BODY_LIMIT_BYTES` | 16 KiB | Auth, customer and admin conversations, and booking-request API paths. |
 | `CATALOG_JSON_BODY_LIMIT_BYTES` | 64 KiB | Admin package, service, and venue catalog JSON paths. |
-| Inline message cap in `apps/api/src/app.ts` | 1 MiB | Customer message paths, including guest chat import. |
-| Inline chatbot cap in `apps/api/src/app.ts` | 640 KiB | Guest chatbot requests. |
 
 An API request can therefore be rejected by its total body size even when an individual field or file is within its domain limit. Browser hints do not replace server-side limits.
 

@@ -52,7 +52,6 @@ export interface Conversations {
   event_ends_at: Timestamp | null;
   event_starts_at: Timestamp | null;
   event_type: string | null;
-  guest_chat_id: string | null;
   guest_count: number | null;
   id: Generated<string>;
   package_id: string | null;
@@ -66,7 +65,7 @@ export interface Messages {
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   read_at: Timestamp | null;
-  sender_id: string | null;
+  sender_id: string;
   sender_role: Generated<string>;
 }
 

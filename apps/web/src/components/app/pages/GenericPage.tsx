@@ -56,7 +56,7 @@ export function GenericPage({ page }: { page: NavKey }) {
         "Manage access, knowledge, security controls, conversations, and audit activity.",
       cards: [
         ["Active users", "86", "5 roles configured"],
-        ["AI conversations", "1,248", "42 handed to a person"],
+        ["Conversations", "1,248", "Customer messages"],
         ["Audit events", "3,904", "No critical alerts"],
       ],
     },
@@ -66,7 +66,7 @@ export function GenericPage({ page }: { page: NavKey }) {
     page === "Administration"
       ? [
           "User & role management",
-          "AI knowledge base",
+          "Team resources",
           "Conversation monitoring",
           "Security & data access",
           "Audit logs",

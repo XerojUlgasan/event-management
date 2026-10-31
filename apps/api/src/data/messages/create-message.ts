@@ -7,11 +7,9 @@ type Database = Kysely<DB>;
 export async function createMessageData(
   db: Database,
   conversation: ConversationWithCustomer,
-  senderId: string | null,
-  senderRole: "customer" | "admin" | "assistant" | "system",
+  senderId: string,
+  senderRole: "customer" | "admin",
   body: string,
-  conversationStatus?: "staff",
-  senderName?: string,
 ) {
   return db.transaction().execute(async (trx) => {
     const row = await trx
@@ -21,7 +19,7 @@ export async function createMessageData(
         sender_id: senderId,
         sender_role: senderRole,
         body,
-        read_at: senderRole === "assistant" || senderRole === "system" ? new Date() : null,
+        read_at: null,
       })
       .returningAll()
       .executeTakeFirstOrThrow();
@@ -29,17 +27,9 @@ export async function createMessageData(
       .updateTable("conversations")
       .set({
         updated_at: row.created_at,
-        ...(conversationStatus ? { status: conversationStatus, closed_at: null } : {}),
       })
       .where("id", "=", conversation.id)
       .execute();
-    if (!senderId) {
-      return {
-        ...row,
-        sender_display_name: senderName ?? (senderRole === "system" ? "Clemora" : "Clemora assistant"),
-        sender_email: null,
-      };
-    }
     const sender = await trx
       .selectFrom("users")
       .select(["display_name", "email"])

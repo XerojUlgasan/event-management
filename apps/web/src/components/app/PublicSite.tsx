@@ -1,8 +1,6 @@
 import { useState } from "react"
 import { Badge, Brand, Button, Dialog, Icon } from "@event-management/ui"
 
-import type { PublicPackage } from "../../lib/api"
-import { GuestChatPanel } from "./chat/GuestChatPanel"
 import { PackageCatalog } from "./PackageCatalog"
 import { PublicServiceCatalog } from "../PublicServiceCatalog"
 import { CatalogOverlay, PublicCatalog } from "../PublicCatalog"
@@ -11,7 +9,6 @@ type CatalogKind = "services" | "packages" | "venues"
 
 export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void }) {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [chatOpen, setChatOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
   const [catalogOverlay, setCatalogOverlay] = useState<CatalogKind | null>(null)
 
@@ -23,7 +20,6 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
           <a href="#packages">Packages</a>
           <a href="#services">Services</a>
           <a href="#venues">Venues</a>
-          <a href="#events">Past events</a>
           <a href="#about">About us</a>
         </nav>
         <div className="header-actions">
@@ -152,65 +148,6 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
           </div>
         </section>
 
-        <section className="recommendation section" id="events">
-          <div className="recommendation-copy">
-            <Badge tone="gold">
-              <Icon name="spark" size={14} /> Clemora AI
-            </Badge>
-            <div className="section-title small">Not sure where to start?</div>
-            <p>
-              Tell us about your occasion, guest count, and what matters most.
-              We’ll suggest a starting package—with clear reasons—then your
-              catering manager can refine it with you.
-            </p>
-            <Button
-              onClick={() => {
-                setChatOpen(true)
-              }}
-            >
-              Find my best fit
-            </Button>
-          </div>
-          <div className="recommendation-card">
-            <div className="rec-top">
-              <div className="ai-icon">
-                <Icon name="spark" />
-              </div>
-              <div>
-                <span className="muted-label">Recommended for you</span>
-                <div className="card-title">Garden Social</div>
-              </div>
-              <Badge tone="success">94% match</Badge>
-            </div>
-            <div className="rec-reasons">
-              <div>
-                <Icon name="check" />
-                <span>
-                  <strong>Sample recommendation</strong>
-                  <small>Illustration only; package pricing appears in the catalog.</small>
-                </span>
-              </div>
-              <div>
-                <Icon name="check" />
-                <span>
-                  <strong>Designed for relaxed celebrations</strong>
-                  <small>Flexible stations and garden-ready service</small>
-                </span>
-              </div>
-              <div>
-                <Icon name="check" />
-                <span>
-                  <strong>Vegetarian-friendly menu</strong>
-                  <small>12 included dishes meet your preferences</small>
-                </span>
-              </div>
-            </div>
-            <div className="rec-note">
-              Suggestions require review and do not reserve availability.
-            </div>
-          </div>
-        </section>
-
         <section className="cta section" id="about">
           <div>
             <span className="eyebrow light">
@@ -238,33 +175,10 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
           <a href="#packages">Packages</a>
           <a href="#services">Services</a>
           <a href="#venues">Venues</a>
-          <a href="#events">Past events</a>
           <a href="#about">Contact</a>
         </div>
         <span>© 2025 Clemora Catering</span>
       </footer>
-
-      <button
-        className="chat-launcher"
-        aria-expanded={chatOpen}
-        onClick={() => {
-          if (chatOpen) {
-            setChatOpen(false)
-          } else {
-            setChatOpen(true)
-          }
-        }}
-      >
-        <Icon name={chatOpen ? "close" : "spark"} />
-        <span>{chatOpen ? "Close" : "Ask Clemora"}</span>
-      </button>
-
-      {chatOpen && (
-        <GuestChatPanel
-          onSignIn={onEnterCustomer}
-          onClose={() => setChatOpen(false)}
-        />
-      )}
 
       {quoteOpen && (
         <Dialog onClose={() => setQuoteOpen(false)} title="Event inquiries">

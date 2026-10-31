@@ -22,8 +22,8 @@ export async function sendCustomerMessageService(
     throw new Error("Conversation not found");
   }
 
-  // The schema keeps one conversation per customer. Sending after expiry starts
-  // a new active cycle while preserving the previous message history.
+  // Sending after expiry starts a new active cycle in this thread while
+  // preserving the previous message history.
   if (conversation.status === "closed") {
     await updateConversationData(db, conversation.id, {
       status: "active",

@@ -13,8 +13,8 @@ export const messageBodySchema = z.object({
 export const messageSchema = z.object({
   id: z.string().uuid(),
   body: z.string(),
-  senderId: z.string().uuid().nullable(),
-  senderRole: z.enum(["admin", "customer", "assistant", "system"]),
+  senderId: z.string().uuid(),
+  senderRole: z.enum(["admin", "customer"]),
   senderName: z.string(),
   createdAt: z.string(),
   readAt: z.string().nullable(),
@@ -22,8 +22,6 @@ export const messageSchema = z.object({
 
 export const conversationStatusSchema = z.enum([
   "active",
-  "waiting_staff",
-  "staff",
   "closed",
 ]);
 
@@ -57,6 +55,10 @@ export const conversationsSchema = z.object({
   conversations: z.array(conversationSchema),
 });
 
+export const adminConversationsPageSchema = conversationsSchema.extend({
+  nextCursor: z.string().nullable(),
+});
+
 export const messageResultSchema = z.object({
   message: messageSchema,
 });
@@ -81,26 +83,5 @@ export const conversationContextSchema = z
       Date.parse(value.eventEndsAt) >= Date.parse(value.eventStartsAt),
     { message: "Event end must be after the event start", path: ["eventEndsAt"] },
   );
-
-const guestMessageSchema = z.object({
-  role: z.enum(["user", "assistant"]),
-  body: z.string().trim().min(1).max(4000),
-  createdAt: dateTime.optional(),
-});
-
-export const claimConversationSchema = z.object({
-  guestChatId: z.string().trim().min(8).max(100),
-  messages: z.array(guestMessageSchema).max(50),
-  context: conversationContextSchema.optional(),
-});
-
-export const assistantReplySchema = z.object({
-  message: messageSchema.nullable(),
-  status: conversationStatusSchema,
-});
-
-export const conversationIdBodySchema = z.object({
-  conversationId: z.string().uuid().optional(),
-});
 
 export const errorSchema = z.object({ error: z.string() });

@@ -336,17 +336,6 @@ export function CalendarPage() {
               <small>Current end time leaves no travel buffer</small>
             </div>
           </div>
-          <div className="recommended-fix">
-            <span className="ai-icon"><Icon name="spark" /></span>
-            <span>
-              <strong>Suggested resolution</strong>
-              <small>
-                Reassign the tasting to Sofia King, who is available and has
-                the required dietary consultation skill.
-              </small>
-            </span>
-            <Badge tone="success">Strong fit</Badge>
-          </div>
         </Dialog>
       )}
     </div>

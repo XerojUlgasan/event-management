@@ -3,7 +3,7 @@ import type { Kysely, Selectable, Transaction } from "kysely";
 import type { DB, BookingRequests } from "../../db/types.js";
 import type { BookingEstimatedDuration } from "@event-management/contracts/limits/booking-requests";
 import type { CreateInput, Status } from "../../controllers/booking-requests/schemas.js";
-import { findAvailableVersionData, createBookingRequestData, createBookingConversationData, addStatusHistoryData, lockBookingRequestData, updateBookingStatusData, listBookingRequestsData, listAdminBookingRequestsPageData, listBookingRequestDailyCountsData, listStatusHistoryData } from "../../data/booking-requests/booking-requests.js";
+import { findAvailableVersionData, createBookingRequestData, createBookingConversationData, addStatusHistoryData, lockBookingRequestData, updateBookingStatusData, listBookingRequestsData, listAdminBookingRequestsPageData, listBookingRequestDailyCountsData, listStatusHistoryData, findBookingRequestData } from "../../data/booking-requests/booking-requests.js";
 type Database = Kysely<DB> | Transaction<DB>;
 const error = (message: string, status: 400 | 404 | 409) => ({ message, status });
 async function response(db: Database, rows: Selectable<BookingRequests>[]) {
@@ -51,4 +51,9 @@ export async function cancelBookingRequestService(db: Kysely<DB>, id: string, cu
     await addStatusHistoryData(trx, id, "cancelled", customerId, reason || null);
     return (await response(trx, [updated]))[0]!;
   });
+}
+
+export async function getBookingRequestService(db: Kysely<DB>, id: string, customerId?: string) {
+  const row = await findBookingRequestData(db, id, customerId);
+  return row ? (await response(db, [row]))[0]! : null;
 }

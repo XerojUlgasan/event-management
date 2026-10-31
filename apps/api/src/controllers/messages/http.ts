@@ -8,7 +8,6 @@ export const errors = {
   403: { content: json(errorSchema), description: "Wrong account role" },
   404: { content: json(errorSchema), description: "Conversation not found" },
   409: { content: json(errorSchema), description: "Conversation is closed" },
-  503: { content: json(errorSchema), description: "Assistant is unavailable" },
 };
 export const idParams = z.object({ id: z.string().uuid() });
 export const body = <T extends z.ZodType>(schema: T) => ({ required: true as const, content: json(schema) });

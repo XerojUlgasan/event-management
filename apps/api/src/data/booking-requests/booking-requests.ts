@@ -26,3 +26,9 @@ export const listBookingRequestDailyCountsData = (db: Database, month: string, s
   return query.groupBy("preferred_date").orderBy("preferred_date", "asc").execute();
 };
 export const listStatusHistoryData = (db: Database, ids: string[]) => ids.length ? db.selectFrom("booking_request_status_history").selectAll().where("booking_request_id", "in", ids).orderBy("created_at", "asc").orderBy("id", "asc").execute() : Promise.resolve([]);
+
+export const findBookingRequestData = (db: Database, id: string, customerId?: string) => {
+  let query = db.selectFrom("booking_requests").selectAll().where("id", "=", id);
+  if (customerId) query = query.where("customer_id", "=", customerId);
+  return query.executeTakeFirst();
+};

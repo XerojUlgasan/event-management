@@ -114,7 +114,7 @@ function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
   </div>
 }
 function BookingStatusBadge({ status }: { status: BookingStatus }) { return <span className={`booking-badge booking-badge-${status}`}>{labels[status]}</span> }
-function BookingDetails({ item, readOnly, onClose, onSaved }: { item: BookingRequest; readOnly: boolean; onClose: () => void; onSaved: (item: BookingRequest) => void }) {
+export function BookingDetails({ item, readOnly, onClose, onSaved }: { item: BookingRequest; readOnly: boolean; onClose: () => void; onSaved: (item: BookingRequest) => void }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [status, setStatus] = useState(item.status)
   const [reason, setReason] = useState("")

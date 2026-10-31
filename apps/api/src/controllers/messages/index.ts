@@ -7,12 +7,7 @@ import { sendCustomerMessageRoute, sendCustomerMessageRouteHandler } from "./sen
 import { listAdminConversationsRoute, listAdminConversationsRouteHandler } from "./list-admin-conversations.js";
 import { getAdminConversationRoute, getAdminConversationRouteHandler } from "./get-admin-conversation.js";
 import { sendAdminMessageRoute, sendAdminMessageRouteHandler } from "./send-admin-message.js";
-import { claimConversationRoute, claimConversationRouteHandler } from "./claim-conversation.js";
 import { updateConversationContextRoute, updateConversationContextRouteHandler } from "./update-conversation-context.js";
-import { requestStaffRoute, requestStaffRouteHandler } from "./request-staff.js";
-import { assistantReplyRoute, assistantReplyRouteHandler } from "./assistant-reply.js";
-import { takeoverConversationRoute, takeoverConversationRouteHandler } from "./takeover-conversation.js";
-import { returnToAiRoute, returnToAiRouteHandler } from "./return-to-ai.js";
 import { createCustomerConversationRoute, createCustomerConversationRouteHandler } from "./create-customer-conversation.js";
 import { listCustomerConversationsRoute, listCustomerConversationsRouteHandler } from "./list-customer-conversations.js";
 import { getCustomerConversationByIdRoute, getCustomerConversationByIdRouteHandler } from "./get-customer-conversation-by-id.js";
@@ -38,13 +33,8 @@ routes.openapi(createCustomerConversationRoute, createCustomerConversationRouteH
 routes.openapi(listCustomerConversationsRoute, listCustomerConversationsRouteHandler);
 routes.openapi(getCustomerConversationByIdRoute, getCustomerConversationByIdRouteHandler);
 routes.openapi(sendCustomerMessageRoute, sendCustomerMessageRouteHandler);
-routes.openapi(claimConversationRoute, claimConversationRouteHandler);
 routes.openapi(updateConversationContextRoute, updateConversationContextRouteHandler);
-routes.openapi(requestStaffRoute, requestStaffRouteHandler);
-routes.openapi(assistantReplyRoute, assistantReplyRouteHandler);
 routes.openapi(listAdminConversationsRoute, listAdminConversationsRouteHandler);
 routes.openapi(getAdminConversationRoute, getAdminConversationRouteHandler);
 routes.openapi(sendAdminMessageRoute, sendAdminMessageRouteHandler);
-routes.openapi(takeoverConversationRoute, takeoverConversationRouteHandler);
-routes.openapi(returnToAiRoute, returnToAiRouteHandler);
 export default routes;

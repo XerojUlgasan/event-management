@@ -147,6 +147,18 @@ test("requests enforce roles, version availability, ownership and status history
   await read(await call("/services", "GET", undefined, staffCookie), 200);
   const created = (await read(await call("/booking-requests","POST",input,customerCookie),201)).bookingRequest;
   assert.equal(created.preferredDate, input.preferredDate); assert.equal(created.estimatedDuration, "8_hours");
+  const detail = (await read(await call(`/booking-requests/${created.id}`, "GET", undefined, customerCookie), 200)).bookingRequest;
+  assert.deepEqual(detail, created);
+  for (const cookie of [adminCookie, staffCookie]) {
+    assert.deepEqual((await read(await call(`/admin/booking-requests/${created.id}`, "GET", undefined, cookie), 200)).bookingRequest, created);
+  }
+  await read(await call(`/booking-requests/${created.id}`, "GET"), 401);
+  await read(await call(`/booking-requests/${created.id}`, "GET", undefined, otherCustomerCookie), 404);
+  await read(await call(`/booking-requests/${created.id}`, "GET", undefined, adminCookie), 403);
+  await read(await call(`/admin/booking-requests/${created.id}`, "GET", undefined, customerCookie), 403);
+  await read(await call(`/booking-requests/${randomUUID()}`, "GET", undefined, customerCookie), 404);
+  await read(await call(`/admin/booking-requests/${randomUUID()}`, "GET", undefined, adminCookie), 404);
+  await read(await call(`/booking-requests/invalid`, "GET", undefined, customerCookie), 400);
   assert.equal(created.startsAt, null); assert.equal(created.endsAt, null); assert.equal(created.preferredVenueLocation, null);
   assert.equal(created.customerId,customerId); assert.equal(created.outOfRange,true); assert.equal(created.status,"under_review"); assert.equal(created.statusHistory.length,1);
   const linkedConversation = await db.selectFrom("conversations").selectAll().where("booking_request_id", "=", created.id).executeTakeFirst();
@@ -166,6 +178,7 @@ test("requests enforce roles, version availability, ownership and status history
   await read(await call(`/admin/booking-requests/${created.id}/status`,"PATCH",{status:"confirmed"},adminCookie),400);
   await read(await call(`/admin/booking-requests/${created.id}/status`,"PATCH",{status:"accepted"},customerCookie),403);
   const updated = (await read(await call(`/admin/booking-requests/${created.id}/status`,"PATCH",{status:"needs_details",reason:"Please clarify"},adminCookie),200)).bookingRequest;
+  assert.deepEqual((await read(await call(`/booking-requests/${created.id}`, "GET", undefined, customerCookie), 200)).bookingRequest.statusHistory, updated.statusHistory);
   assert.equal(updated.status,"needs_details"); assert.equal(updated.statusHistory[1].reason,"Please clarify");
   for (const status of ["needs_details", "declined", "cancelled"]) await read(await call(`/admin/booking-requests/${created.id}/status`,"PATCH",{status, reason:"  "},adminCookie),400);
   await read(await call(`/admin/booking-requests/${created.id}/status`,"PATCH",{status:"declined", reason:"Unavailable"},adminCookie),200);
@@ -194,6 +207,8 @@ test("requests enforce roles, version availability, ownership and status history
   const original = list.find((item: any) => item.id === created.id);
   assert.equal(original.packageName,"Garden"); assert.equal(original.packageVersionId,version.id); assert.equal(original.statusHistory.length,3);
   const spec:any = await (await app.request("/openapi.json")).json();
+  assert.ok(spec.paths["/v1/booking-requests/{id}"].get);
+  assert.ok(spec.paths["/v1/admin/booking-requests/{id}"].get);
   const requestSchema = spec.paths["/v1/booking-requests"].post.requestBody.content["application/json"].schema;
   assert.ok(requestSchema.required.includes("preferredDate"));
   assert.ok(!requestSchema.required.includes("startsAt"));

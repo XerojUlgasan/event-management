@@ -19,22 +19,16 @@ import { SignInMethods } from "../SignInMethods"
 import { MessagesWorkspace } from "../messages/MessagesWorkspace"
 import { mergeThread } from "../messages/thread"
 import {
-  getAssistantReply,
   createMyConversation,
   getMyConversations,
+  getMyConversation,
   getMyConversationById,
-  requestStaffAssistance,
   sendMyMessage,
   updateConversationContext,
   type ChatMessage,
   type ChatConversation,
   type ChatThread,
 } from "../../../lib/api"
-import {
-  claimPendingGuestChat,
-  hasGuestHistory,
-  loadGuestChat,
-} from "../../../lib/guest-chat"
 
 type CustomerTab =
   | "Home"
@@ -62,10 +56,7 @@ export function CustomerDashboard({
   userEmail: string
   onSignOut: () => void
 }) {
-  // A customer who signed in from the guest chat lands back in that thread.
-  const [tab, setTab] = useState<CustomerTab>(() =>
-    hasGuestHistory(loadGuestChat()) ? "Messages" : "Home",
-  )
+  const [tab, setTab] = useState<CustomerTab>("Home")
   const [messageOpen, setMessageOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement>(null)
@@ -80,9 +71,6 @@ export function CustomerDashboard({
   const [pendingBookingReference, setPendingBookingReference] = useState<string | null>(null)
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesError, setMessagesError] = useState("")
-  const [assistantPending, setAssistantPending] = useState(false)
-  const [assistantError, setAssistantError] = useState("")
-  const [staffRequesting, setStaffRequesting] = useState(false)
   const [eventDetailsOpen, setEventDetailsOpen] = useState(false)
   const [eventSaving, setEventSaving] = useState(false)
   const [eventError, setEventError] = useState("")
@@ -96,26 +84,19 @@ export function CustomerDashboard({
 
   const refreshMessages = useCallback(async () => {
     try {
-      // Restore a guest chat saved in this browser before loading the DB thread.
-      const claimed = await claimPendingGuestChat()
       const { conversations } = await getMyConversations()
       setMessageConversations(conversations)
-      if (claimed) {
-        setSelectedConversationId(claimed.conversation.id)
-        setMessageThread(claimed)
+      const targetId = pendingBookingReference
+        ? conversations.find((item) => item.bookingRequestReference === pendingBookingReference)?.id ?? null
+        : selectedConversationId && conversations.some((item) => item.id === selectedConversationId)
+        ? selectedConversationId
+        : conversations[0]?.id ?? null
+      setSelectedConversationId(targetId)
+      if (targetId) {
+        const thread = await getMyConversationById(targetId)
+        setMessageThread((current) => mergeThread(current, thread))
       } else {
-        const targetId = pendingBookingReference
-          ? conversations.find((item) => item.bookingRequestReference === pendingBookingReference)?.id ?? null
-          : selectedConversationId && conversations.some((item) => item.id === selectedConversationId)
-          ? selectedConversationId
-          : conversations[0]?.id ?? null
-        setSelectedConversationId(targetId)
-        if (targetId) {
-          const thread = await getMyConversationById(targetId)
-          setMessageThread((current) => mergeThread(current, thread))
-        } else {
-          setMessageThread(null)
-        }
+        setMessageThread(null)
       }
       setMessagesError("")
     } catch (cause) {
@@ -133,6 +114,16 @@ export function CustomerDashboard({
     return () => window.clearInterval(timer)
   }, [tab, refreshMessages])
 
+  const showSentInList = (conversation: ChatConversation, message: ChatMessage) => {
+    setMessageConversations((current) => {
+      const source = current.find((item) => item.id === conversation.id) ?? conversation
+      return [
+        { ...source, status: "active", lastMessage: message, updatedAt: message.createdAt },
+        ...current.filter((item) => item.id !== conversation.id),
+      ]
+    })
+  }
+
   const appendMessage = (message: ChatMessage) => {
     setMessageThread((current) => {
       if (!current) return current
@@ -148,36 +139,12 @@ export function CustomerDashboard({
     })
   }
 
-  const fetchAssistantReply = async () => {
-    setAssistantPending(true)
-    setAssistantError("")
-    try {
-      const reply = await getAssistantReply(messageThread?.conversation.id)
-      if (reply.message) appendMessage(reply.message)
-      if (reply.status !== "active") {
-        setMessageThread((current) =>
-          current
-            ? { ...current, conversation: { ...current.conversation, status: reply.status } }
-            : current,
-        )
-      }
-    } catch (cause) {
-      setAssistantError(
-        cause instanceof Error
-          ? cause.message
-          : "Clemora AI is unavailable right now. You can still ask for staff help.",
-      )
-    } finally {
-      setAssistantPending(false)
-    }
-  }
-
   const sendMessage = async (body: string) => {
     const previousStatus = messageThread?.conversation.status ?? "active"
     const result = await sendMyMessage(body, messageThread?.conversation.id)
     appendMessage(result.message)
-    // A new message reopens a closed general conversation; staff-handled
-    // conversations stay with staff until they finish.
+    if (messageThread) showSentInList(messageThread.conversation, result.message)
+    // A new message reopens a closed general conversation.
     if (previousStatus === "closed") {
       setMessageThread((current) =>
         current
@@ -197,31 +164,6 @@ export function CustomerDashboard({
             }
           : current,
       )
-    }
-    if (previousStatus !== "active" && previousStatus !== "closed") return
-    await fetchAssistantReply()
-  }
-
-  const askForStaff = async () => {
-    if (staffRequesting) return
-    setStaffRequesting(true)
-    setAssistantError("")
-    try {
-      // Put the thread in the staff queue first so a send failure cannot leave
-      // the assistant answering a customer who asked for a person.
-      const thread = await requestStaffAssistance(messageThread?.conversation.id)
-      setMessageThread(thread)
-      const sent = await sendMyMessage(
-        "I’d like to speak with a staff member about my event.",
-        messageThread?.conversation.id,
-      )
-      appendMessage(sent.message)
-      setAssistantPending(false)
-      notify("Our team has been notified. You can keep adding details here.")
-    } catch (cause) {
-      notify(cause instanceof Error ? cause.message : "Unable to request staff assistance.")
-    } finally {
-      setStaffRequesting(false)
     }
   }
 
@@ -286,10 +228,14 @@ export function CustomerDashboard({
     setDialogSending(true)
     setDialogError("")
     try {
-      const thread = await requestStaffAssistance(messageThread?.conversation.id)
-      setMessageThread(thread)
-      const result = await sendMyMessage(body, messageThread?.conversation.id)
-      appendMessage(result.message)
+      const thread = messageThread ?? await getMyConversation()
+      const result = await sendMyMessage(body, thread.conversation.id)
+      setSelectedConversationId(thread.conversation.id)
+      setMessageThread({
+        conversation: { ...thread.conversation, status: "active", lastMessage: result.message, updatedAt: result.message.createdAt },
+        messages: [...thread.messages, result.message],
+      })
+      showSentInList(thread.conversation, result.message)
       setMessageDraft("")
       setMessageOpen(false)
       setConversationOpen(true)
@@ -430,24 +376,19 @@ export function CustomerDashboard({
               onSend={sendMessage}
               onBack={() => setConversationOpen(false)}
               conversationOpen={conversationOpen}
-              onRequestStaff={askForStaff}
               onEditContext={() => {
                 setEventError("")
                 setEventDetailsOpen(true)
               }}
               onNewChat={startNewChat}
               newChatBusy={newChatBusy}
-              assistantPending={assistantPending}
-              assistantError={assistantError}
-              onRetryAssistant={() => void fetchAssistantReply()}
-              staffRequesting={staffRequesting}
               listEmpty={{
                 title: "No conversation yet",
-                body: "Ask Clemora about your event, or request staff assistance.",
+                body: "Start a conversation with the Clemora team.",
               }}
               threadEmpty={{
                 title: "Say hello",
-                body: "Ask about your event, a package, or request staff assistance.",
+                body: "Ask the team about your event or a package.",
               }}
             />
           </div>
@@ -460,7 +401,7 @@ export function CustomerDashboard({
           className="compact-modal"
           eyebrow="Conversation context"
           title="Event details"
-          intro="These details help Clemora answer with the right context. The event end also controls how long this conversation stays open."
+          intro="These details help the team understand your event. The event end also controls how long this conversation stays open."
         >
           <form onSubmit={saveEventDetails}>
             <div className="form-grid">

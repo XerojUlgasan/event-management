@@ -1,43 +1,70 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import {
   getAdminConversation,
   getAdminConversations,
   sendAdminMessage,
-  takeoverConversation,
-  returnConversationToAi,
   type ChatConversation,
   type ChatThread,
 } from "../../../lib/api"
 import { MessagesWorkspace } from "../messages/MessagesWorkspace"
 import { mergeThread } from "../messages/thread"
 
+function mergeConversations(current: ChatConversation[], incoming: ChatConversation[], newestFirst: boolean) {
+  const incomingIds = new Set(incoming.map((conversation) => conversation.id))
+  const remaining = current.filter((conversation) => !incomingIds.has(conversation.id))
+  return newestFirst ? [...incoming, ...remaining] : [...remaining, ...incoming]
+}
+
 export function MessagesPage() {
   const [conversations, setConversations] = useState<ChatConversation[]>([])
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [thread, setThread] = useState<ChatThread | null>(null)
   const [loadingList, setLoadingList] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [loadingThread, setLoadingThread] = useState(false)
   const [listError, setListError] = useState("")
+  const [loadMoreError, setLoadMoreError] = useState("")
   const [threadError, setThreadError] = useState("")
   const [conversationOpen, setConversationOpen] = useState(false)
-  const [takeoverBusy, setTakeoverBusy] = useState(false)
-  const [returningToAi, setReturningToAi] = useState(false)
+  const listBusy = useRef(false)
+  const moreBusy = useRef(false)
+  const hasLoadedMore = useRef(false)
 
   const loadList = useCallback(async () => {
+    if (listBusy.current || moreBusy.current) return
+    listBusy.current = true
     try {
       const result = await getAdminConversations()
-      setConversations(result.conversations)
+      setConversations((current) => mergeConversations(current, result.conversations, true))
+      if (!hasLoadedMore.current) setNextCursor(result.nextCursor)
       setListError("")
-      setActiveId((current) =>
-        current && result.conversations.some((item) => item.id === current) ? current : null,
-      )
     } catch (cause) {
       setListError(cause instanceof Error ? cause.message : "Unable to load conversations.")
     } finally {
+      listBusy.current = false
       setLoadingList(false)
     }
   }, [])
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || moreBusy.current || listBusy.current) return
+    moreBusy.current = true
+    setLoadingMore(true)
+    setLoadMoreError("")
+    try {
+      const result = await getAdminConversations(nextCursor)
+      setConversations((current) => mergeConversations(current, result.conversations, false))
+      setNextCursor(result.nextCursor)
+      hasLoadedMore.current = true
+    } catch (cause) {
+      setLoadMoreError(cause instanceof Error ? cause.message : "Unable to load more conversations.")
+    } finally {
+      moreBusy.current = false
+      setLoadingMore(false)
+    }
+  }, [nextCursor])
 
   useEffect(() => {
     void loadList()
@@ -50,6 +77,7 @@ export function MessagesPage() {
     try {
       const result = await getAdminConversation(id)
       setThread((current) => mergeThread(current, result))
+      setConversations((current) => current.map((item) => item.id === id ? result.conversation : item))
       setThreadError("")
     } catch (cause) {
       setThreadError(cause instanceof Error ? cause.message : "Unable to load this conversation.")
@@ -82,7 +110,7 @@ export function MessagesPage() {
         ? {
             conversation: {
               ...current.conversation,
-              status: "staff",
+              status: "active",
               lastMessage: result.message,
               updatedAt: result.message.createdAt,
             },
@@ -93,42 +121,16 @@ export function MessagesPage() {
     void loadList()
   }
 
-  const takeOver = async () => {
-    if (!activeId || takeoverBusy) return
-    setTakeoverBusy(true)
-    try {
-      const result = await takeoverConversation(activeId)
-      setThread(result)
-      setThreadError("")
-      void loadList()
-    } catch (cause) {
-      setThreadError(cause instanceof Error ? cause.message : "Unable to take over this conversation.")
-    } finally {
-      setTakeoverBusy(false)
-    }
-  }
-
-  const returnToAi = async () => {
-    if (!activeId || returningToAi) return
-    setReturningToAi(true)
-    try {
-      const result = await returnConversationToAi(activeId)
-      setThread(result)
-      setThreadError("")
-      void loadList()
-    } catch (cause) {
-      setThreadError(cause instanceof Error ? cause.message : "Unable to return this conversation to AI.")
-    } finally {
-      setReturningToAi(false)
-    }
-  }
-
   return (
     <div className="content-stack admin-messages">
       <MessagesWorkspace
         title="Messages"
         viewerRole="admin"
         conversations={conversations}
+        hasMore={!!nextCursor}
+        loadingMore={loadingMore}
+        loadMoreError={loadMoreError}
+        onLoadMore={() => void loadMore()}
         activeId={activeId}
         onSelect={(id) => {
           setActiveId(id)
@@ -156,18 +158,14 @@ export function MessagesPage() {
           setThread(null)
         }}
         conversationOpen={conversationOpen}
-        onTakeover={takeOver}
-        takeoverBusy={takeoverBusy}
-        onReturnToAi={returnToAi}
-        returningToAi={returningToAi}
         readOnly={thread?.conversation.status === "closed"}
         listEmpty={{
-          title: "No customer messages yet",
-          body: "When a customer messages your team, the conversation will appear here.",
+          title: "No conversations yet",
+          body: "Customer conversations will appear here when they are created.",
         }}
         threadEmpty={{
           title: "No messages yet",
-          body: "Send the first reply to start this conversation.",
+          body: "Messages will appear here when the customer or team writes.",
         }}
       />
     </div>

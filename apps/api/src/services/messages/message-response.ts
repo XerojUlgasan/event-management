@@ -4,8 +4,8 @@ import { conversationExpiresAt } from "../../utils/conversation-expiry.js";
 export type MessageDto = {
   id: string;
   body: string;
-  senderId: string | null;
-  senderRole: "admin" | "customer" | "assistant" | "system";
+  senderId: string;
+  senderRole: "admin" | "customer";
   senderName: string;
   createdAt: string;
   readAt: string | null;
@@ -24,7 +24,7 @@ export type ConversationDto = {
   eventStartsAt: string | null;
   eventEndsAt: string | null;
   guestCount: number | null;
-  status: "active" | "waiting_staff" | "staff" | "closed";
+  status: "active" | "closed";
   closedAt: string | null;
   expiresAt: string;
   lastMessage: MessageDto | null;
@@ -34,20 +34,13 @@ export type ConversationDto = {
 
 export function messageDto(row: MessageWithSender): MessageDto {
   const role: MessageDto["senderRole"] =
-    row.sender_role === "admin" || row.sender_role === "assistant" || row.sender_role === "system"
-      ? row.sender_role
-      : "customer";
+    row.sender_role === "admin" ? "admin" : "customer";
   return {
     id: row.id,
     body: row.body,
     senderId: row.sender_id,
     senderRole: role,
-    senderName:
-      role === "assistant"
-        ? "Clemora assistant"
-        : role === "system"
-          ? "Clemora"
-        : row.sender_display_name ?? row.sender_email ?? "Clemora team",
+    senderName: row.sender_display_name ?? row.sender_email ?? "Clemora team",
     createdAt: row.created_at.toISOString(),
     readAt: row.read_at?.toISOString() ?? null,
   };
@@ -76,8 +69,8 @@ export function conversationDto(
     status: row.status as ConversationDto["status"],
     closedAt: row.closed_at ? new Date(row.closed_at).toISOString() : null,
     expiresAt: conversationExpiresAt(
-      row.guest_chat_id ? null : row.package_id,
-      row.guest_chat_id ? null : row.booking_request_ends_at ?? row.event_ends_at,
+      row.package_id,
+      row.booking_request_ends_at ?? row.event_ends_at,
       row.created_at,
     ).toISOString(),
     lastMessage,

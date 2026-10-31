@@ -5,7 +5,6 @@ import { bodyLimit } from "hono/body-limit";
 import { db } from "./db/client.js";
 import bookingRequestRoutes from "./controllers/booking-requests/index.js";
 import authRoutes from "./controllers/auth/index.js";
-import chatbotRoutes from "./controllers/chatbot/index.js";
 import messageRoutes from "./controllers/messages/index.js";
 import serviceRoutes from "./controllers/services/index.js";
 import packageRoutes from "./controllers/packages/index.js";
@@ -43,9 +42,8 @@ app.use("/v1/*", async (c, next) => {
 });
 
 app.use("/v1/auth/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/messages/*", bodyLimit({ maxSize: 1024 * 1024 }));
+app.use("/v1/messages/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/admin/conversations/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/chatbot/*", bodyLimit({ maxSize: 640 * 1024 }));
 
 app.use("/v1/admin/packages/*", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/admin/packages", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
@@ -63,7 +61,6 @@ app.use("/v1/booking-requests/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYT
 app.use("/v1/admin/booking-requests/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.route("/v1", bookingRequestRoutes);
 app.route("/v1", messageRoutes);
-app.route("/v1", chatbotRoutes);
 app.route("/v1", authRoutes);
 app.route("/v1", userRoutes);
 

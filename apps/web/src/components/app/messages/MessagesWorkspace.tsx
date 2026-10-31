@@ -2,7 +2,8 @@ import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/mess
 import { Fragment, useEffect, useRef, useState, type SubmitEvent } from "react"
 import { Button, Icon } from "@event-management/ui"
 
-import type { ChatConversation, ChatMessage } from "../../../lib/api"
+import { getAdminBookingRequest, getMyBookingRequest, type BookingRequest, type ChatConversation, type ChatMessage } from "../../../lib/api"
+import { BookingDetails } from "../BookingList"
 import { initialsFromName } from "../../../lib/name"
 
 const dayFormatter = new Intl.DateTimeFormat("en-PH", {
@@ -32,27 +33,17 @@ function dayLabel(value: string) {
 function preview(conversation: ChatConversation) {
   const message = conversation.lastMessage
   if (!message) return "No messages yet"
-  return message.senderRole === "assistant" ? `AI: ${message.body}` : message.body
-}
-
-function conversationState(status: ChatConversation["status"]) {
-  if (status === "waiting_staff") return "Waiting for staff"
-  if (status === "staff") return "Staff handling · AI paused"
-  if (status === "closed") return "Closed"
-  return "AI responding"
-}
-
-function waitingLabel(status: ChatConversation["status"]) {
-  if (status === "waiting_staff") return "Waiting"
-  if (status === "staff") return "Staff"
-  if (status === "closed") return "Closed"
-  return null
+  return message.body
 }
 
 export function MessagesWorkspace({
   title,
   viewerRole,
   conversations,
+  hasMore = false,
+  loadingMore = false,
+  loadMoreError = "",
+  onLoadMore,
   activeId,
   onSelect,
   messages,
@@ -64,16 +55,7 @@ export function MessagesWorkspace({
   conversationOpen,
   listEmpty,
   threadEmpty,
-  onRequestStaff,
   onEditContext,
-  onTakeover,
-  onReturnToAi,
-  assistantPending = false,
-  assistantError = "",
-  onRetryAssistant,
-  staffRequesting = false,
-  takeoverBusy = false,
-  returningToAi = false,
   onNewChat,
   newChatBusy = false,
   readOnly = false,
@@ -81,6 +63,10 @@ export function MessagesWorkspace({
   title: string
   viewerRole: "admin" | "customer"
   conversations: ChatConversation[]
+  hasMore?: boolean
+  loadingMore?: boolean
+  loadMoreError?: string
+  onLoadMore?: () => void
   activeId: string | null
   onSelect: (id: string) => void
   messages: ChatMessage[]
@@ -92,16 +78,7 @@ export function MessagesWorkspace({
   conversationOpen: boolean
   listEmpty: { title: string; body: string }
   threadEmpty: { title: string; body: string }
-  onRequestStaff?: () => void
   onEditContext?: () => void
-  onTakeover?: () => void
-  onReturnToAi?: () => void
-  assistantPending?: boolean
-  assistantError?: string
-  onRetryAssistant?: () => void
-  staffRequesting?: boolean
-  takeoverBusy?: boolean
-  returningToAi?: boolean
   onNewChat?: () => void
   newChatBusy?: boolean
   readOnly?: boolean
@@ -109,39 +86,68 @@ export function MessagesWorkspace({
   const [draft, setDraft] = useState("")
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState("")
+  const [booking, setBooking] = useState<BookingRequest | null>(null)
+  const [bookingLoading, setBookingLoading] = useState(false)
+  const [bookingError, setBookingError] = useState("")
+  const bookingLoad = useRef(0)
   const thread = useRef<HTMLDivElement>(null)
+  const sidebar = useRef<HTMLElement>(null)
+  const listEnd = useRef<HTMLDivElement>(null)
   const active = conversations.find((item) => item.id === activeId) ?? null
   const isTeam = viewerRole === "customer"
   const singleConversation = isTeam && conversations.length === 1
   const activeName = isTeam ? "Clemora team" : active?.customerName ?? "Messages"
   const activeDetail = isTeam
-    ? active?.bookingRequestReference
-      ? `${active.bookingRequestReference} · ${active.eventType || "Event support"}`
-      : active?.eventType ||
-      "Events and catering support"
-    : active?.bookingRequestReference
-      ? `${active.bookingRequestReference} · ${active.customerEmail}`
-      : active?.customerEmail ?? "Choose a conversation to reply"
+    ? active?.eventType || "Events and catering support"
+    : [active?.eventType, active?.customerEmail].filter(Boolean).join(" · ") || "Choose a conversation to reply"
   const avatar = active && !isTeam ? initialsFromName(active.customerName) : "CT"
-  const activeState = active ? conversationState(active.status) : ""
   const closedForCustomer = isTeam && active?.status === "closed"
-  const adminNeedsTakeover =
-    !isTeam && (active?.status === "active" || active?.status === "waiting_staff")
 
   useEffect(() => {
     setDraft("")
     setSendError("")
+    setBooking(null)
+    setBookingError("")
+    setBookingLoading(false)
+    bookingLoad.current++
   }, [activeId])
 
   useEffect(() => {
     const element = thread.current
     if (element) element.scrollTop = element.scrollHeight
-  }, [messages.length, activeId, assistantPending])
+  }, [messages.length, activeId])
+
+  useEffect(() => {
+    if (!hasMore || loadingMore || loadMoreError || !onLoadMore || !listEnd.current || !sidebar.current || typeof IntersectionObserver === "undefined") return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) onLoadMore()
+      },
+      { root: sidebar.current, rootMargin: "0px 0px 150px 0px" },
+    )
+    observer.observe(listEnd.current)
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore, loadMoreError, onLoadMore])
+
+  async function openBooking() {
+    if (!active?.bookingRequestId || bookingLoading) return
+    const request = ++bookingLoad.current
+    setBookingLoading(true)
+    setBookingError("")
+    try {
+      const result = await (isTeam ? getMyBookingRequest(active.bookingRequestId) : getAdminBookingRequest(active.bookingRequestId))
+      if (request === bookingLoad.current) setBooking(result.bookingRequest)
+    } catch (cause) {
+      if (request === bookingLoad.current) setBookingError(cause instanceof Error ? cause.message : "Unable to load booking details.")
+    } finally {
+      if (request === bookingLoad.current) setBookingLoading(false)
+    }
+  }
 
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     const body = draft.trim()
-    if (!body || sending || assistantPending || readOnly || !activeId) return
+    if (!body || sending || readOnly || !activeId) return
     setSending(true)
     setSendError("")
     try {
@@ -158,7 +164,7 @@ export function MessagesWorkspace({
     <div
       className={`customer-messages panel ${conversationOpen ? "conversation-open" : ""} ${singleConversation ? "single-conversation" : ""}`}
     >
-      <aside>
+      <aside ref={sidebar}>
         <div className="messages-sidebar-head">
           <h1>{title}</h1>
           {isTeam && onNewChat && (
@@ -179,32 +185,23 @@ export function MessagesWorkspace({
               onClick={() => onSelect(conversation.id)}
             >
               <span className={`manager-avatar small ${isTeam ? "team-avatar" : ""}`}>
-                {isTeam ? <Icon name="spark" size={15} /> : conversationAvatar}
+                {conversationAvatar}
               </span>
               <span>
                 <strong>{name}</strong>
-                {conversation.bookingRequestReference && (
-                  <em className="conversation-booking">{conversation.bookingRequestReference}</em>
-                )}
+                {conversation.eventType && <em className="conversation-booking">{conversation.eventType}</em>}
                 <small>{preview(conversation)}</small>
               </span>
-              {(conversation.status === "active" || waitingLabel(conversation.status) || conversation.unreadCount > 0) && (
-                <span className="conversation-badges">
-                  {conversation.status === "active" && (
-                    <em className="conversation-ai" aria-label="AI responses active">AI</em>
-                  )}
-                  {waitingLabel(conversation.status) && (
-                    <em className={`conversation-waiting ${conversation.status}`}>
-                      {waitingLabel(conversation.status)}
-                    </em>
-                  )}
+              <span className="conversation-badges">
+                  <time dateTime={conversation.updatedAt} title={new Date(conversation.updatedAt).toLocaleString()}>
+                    {dayKey(conversation.updatedAt) === dayKey(new Date().toISOString()) ? timeFormatter.format(new Date(conversation.updatedAt)) : `${dayLabel(conversation.updatedAt)} · ${timeFormatter.format(new Date(conversation.updatedAt))}`}
+                  </time>
                   {conversation.unreadCount > 0 && (
                     <span className="messages-unread" aria-label={`${conversation.unreadCount} unread messages`}>
                       {conversation.unreadCount > 9 ? "9+" : conversation.unreadCount}
                     </span>
                   )}
-                </span>
-              )}
+              </span>
             </button>
           )
         })}
@@ -219,6 +216,16 @@ export function MessagesWorkspace({
             )}
           </div>
         )}
+        {loadingMore && <p className="messages-list-status" role="status">Loading more conversations…</p>}
+        {loadMoreError && <p className="messages-list-status" role="alert">{loadMoreError}</p>}
+        {hasMore && onLoadMore && (
+          <div className="messages-list-footer">
+            <button type="button" className="messages-load-more" onClick={onLoadMore} disabled={loadingMore}>
+              {loadingMore ? "Loading…" : "Load more conversations"}
+            </button>
+          </div>
+        )}
+        {hasMore && <div ref={listEnd} aria-hidden="true" />}
       </aside>
 
       <section>
@@ -235,34 +242,20 @@ export function MessagesWorkspace({
             </button>
           )}
           <span className={`manager-avatar small ${isTeam ? "team-avatar" : ""}`}>
-            {isTeam ? <Icon name="spark" size={15} /> : avatar}
+            {avatar}
           </span>
           <div className="message-thread-title">
             <span className="message-thread-name">
               <strong>{activeName}</strong>
-              {active && (
-                <span className={`conversation-state ${active.status}`}>{activeState}</span>
-              )}
+              {active?.status === "closed" && <span className="conversation-state closed">Closed</span>}
             </span>
-            {active?.bookingRequestReference && (
-              <span className="message-booking-context">
-                <Icon name="clipboard" size={13} />
-                <span>Booking request {active.bookingRequestReference}</span>
-                {active.eventType && <span>· {active.eventType}</span>}
-              </span>
-            )}
             <small>{activeDetail}</small>
           </div>
           {active && (
             <div className="message-head-actions">
-              {isTeam && active.status === "active" && onRequestStaff && (
-                <button
-                  type="button"
-                  className="message-action"
-                  onClick={onRequestStaff}
-                  disabled={staffRequesting}
-                >
-                  {staffRequesting ? "Requesting…" : "Talk to staff"}
+              {active.bookingRequestId && (
+                <button type="button" className="message-info" aria-label="View booking request details" title="View booking request details" onClick={() => void openBooking()} disabled={bookingLoading}>
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
                 </button>
               )}
               {isTeam && active.status !== "closed" && onEditContext && (
@@ -270,25 +263,12 @@ export function MessagesWorkspace({
                   Event details
                 </button>
               )}
-              {!isTeam && active.status !== "closed" && (onTakeover || onReturnToAi) && (
-                <label className="message-ai-switch">
-                  <span>AI responses</span>
-                  <input
-                    type="checkbox"
-                    checked={active.status === "active"}
-                    onChange={active.status === "active" ? onTakeover : onReturnToAi}
-                    disabled={takeoverBusy || returningToAi}
-                  />
-                  <span className="message-ai-switch-track" aria-hidden="true" />
-                  <span className="sr-only">
-                    {active.status === "active" ? "Turn AI responses off" : "Turn AI responses on"}
-                  </span>
-                </label>
-              )}
+
             </div>
           )}
         </div>
 
+        {bookingError && <div className="messages-error" role="alert"><span>{bookingError}</span><button type="button" onClick={() => void openBooking()}>Try again</button></div>}
         {error && (
           <div className="messages-error" role="alert">
             <span>{error}</span>
@@ -317,15 +297,12 @@ export function MessagesWorkspace({
             </div>
           )}
           {messages.map((message, index) => {
-            if (message.senderRole === "system") {
-              return <p className="message-system-notice" key={message.id}>{message.body}</p>
-            }
             const mine = message.senderRole === viewerRole
             const showDay = index === 0 || dayKey(message.createdAt) !== dayKey(messages[index - 1].createdAt)
             return (
               <Fragment key={message.id}>
                 {showDay && <span className="chat-time">{dayLabel(message.createdAt)}</span>}
-                <div className={`message ${mine ? "customer-message" : "bot"} ${message.senderRole === "assistant" ? "assistant-message" : ""}`}>
+                <div className={`message ${mine ? "customer-message" : "bot"}`}>
                   {message.body}
                   <small className="message-meta">
                     {!mine && `${message.senderName} · `}
@@ -335,27 +312,7 @@ export function MessagesWorkspace({
               </Fragment>
             )
           })}
-          {assistantPending && (
-            <div className="message bot chat-typing" role="status">
-              Clemora assistant is thinking…
-            </div>
-          )}
         </div>
-
-        {assistantError && (
-          <div className="messages-send-error assistant-error" role="alert">
-            <span>{assistantError}</span>
-            {onRetryAssistant && (
-              <button
-                type="button"
-                onClick={onRetryAssistant}
-                disabled={assistantPending}
-              >
-                Try again
-              </button>
-            )}
-          </div>
-        )}
 
         {sendError && (
           <p className="messages-send-error" role="alert">
@@ -375,20 +332,7 @@ export function MessagesWorkspace({
           </p>
         )}
 
-        {adminNeedsTakeover && onTakeover && (
-          <div className="admin-takeover-prompt">
-            <p>
-              {active?.status === "waiting_staff"
-                ? "The customer is waiting for staff assistance."
-                : "AI is currently handling this conversation."}
-            </p>
-            <Button type="button" onClick={onTakeover} disabled={takeoverBusy}>
-              {takeoverBusy ? "Taking over…" : "Take over to reply"}
-            </Button>
-          </div>
-        )}
-
-        {!readOnly && !adminNeedsTakeover && (
+        {!readOnly && (
           <form className="thread-input" onSubmit={submit}>
             <input
               aria-label="Write a message"
@@ -405,13 +349,14 @@ export function MessagesWorkspace({
             <Button
               type="submit"
               icon="arrow"
-              disabled={!draft.trim() || !activeId || sending || assistantPending}
+              disabled={!draft.trim() || !activeId || sending}
             >
               {sending ? "Sending" : "Send"}
             </Button>
           </form>
         )}
       </section>
+      {booking && <BookingDetails item={booking} readOnly={isTeam} onClose={() => setBooking(null)} onSaved={setBooking} />}
     </div>
   )
 }

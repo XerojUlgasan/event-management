@@ -1,6 +1,6 @@
 # Clemora feature scope
 
-Updated: 2026-10-30
+Updated: 2026-11-01
 
 ## Current business workflow
 
@@ -34,18 +34,9 @@ This workflow is the product baseline. The earlier proposal explores a broader e
 | Communication | Send and retain quote, fee, confirmation, change, and balance notices. Keep customer-to-staff messages tied to the event. |
 | Access | Customer view of their inquiry/booking and authorized staff views for catalog, quotes, payments, calendar, and preparation. Enforce permissions on the server. |
 
-## Main agentic AI integration
+## Deferred assistant integration
 
-The **Clemora Event Planning Assistant** carries a customer inquiry from the first message to a staff-ready booking request. It uses the system's approved package, pricing, add-on, availability, and booking records rather than inventing answers.
-
-1. **Gather requirements:** Ask for event type, preferred date, estimated guests, and preferences. Ask follow-up questions when details are missing or unclear.
-2. **Check live information:** Look up eligible packages, included amenities, optional add-ons, approved prices, and venue or add-on availability.
-3. **Recommend an arrangement:** Suggest a suitable package and relevant add-ons, explain why they fit, and distinguish inclusions from extra charges.
-4. **Prepare the request:** Save the conversation as a structured inquiry and draft an itemized quote for staff review.
-5. **Guide the next step:** Explain the approved quote, reservation fee, and current booking status. Follow up when the customer needs to provide information or take action.
-6. **Hand off to staff:** Escalate custom requests, uncertain answers, pricing exceptions, and booking decisions with a concise summary of the details collected.
-
-The assistant may prepare and explain decisions, but authorized staff approve custom prices and booking commitments. Payment verification and date-conflict enforcement belong to the booking system; the assistant cannot mark a fee paid or promise an unconfirmed date.
+AI-assisted event planning is deferred. Customer messages go to the Clemora team, and authorized staff handle replies and booking decisions. The current release does not expose AI replies, handoff, or takeover controls. Any future assistant must use approved catalog and booking records, and staff must retain authority over prices, commitments, and payment verification.
 
 ## Next features
 

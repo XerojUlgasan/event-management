@@ -8,7 +8,7 @@ export const sendAdminMessageRoute = createRoute({
   method: "post",
   path: "/admin/conversations/{id}/messages",
   tags: ["Messages"],
-  summary: "Reply to a customer as staff and take over the conversation",
+  summary: "Reply to a customer as staff",
   request: { params: idParams, body: body(messageBodySchema) },
   responses: {
     201: { content: json(messageResultSchema), description: "Reply sent" },

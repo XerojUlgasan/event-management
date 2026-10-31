@@ -12,7 +12,7 @@ export async function listCustomerConversationsService(db: Kysely<DB>, customerI
   const ids = rows.map((row) => row.id);
   const [last, unread] = await Promise.all([
     listLastMessagesData(db, ids),
-    countUnreadMessagesData(db, ids),
+    countUnreadMessagesData(db, ids, "customer"),
   ]);
   return rows.map((row) => {
     const latest = last.get(row.id);
