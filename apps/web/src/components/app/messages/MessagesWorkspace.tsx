@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type SubmitEvent } from "react"
 import { Button, Icon } from "@event-management/ui"
+import ReactMarkdown from "react-markdown"
 
 import type { ChatConversation, ChatMessage } from "../../../lib/api"
 import { initialsFromName } from "../../../lib/name"
@@ -183,7 +184,9 @@ export function MessagesWorkspace({
               <span>
                 <strong>{name}</strong>
                 {conversation.bookingRequestReference && (
-                  <em className="conversation-booking">{conversation.bookingRequestReference}</em>
+                  <em className="conversation-booking">
+                    {isTeam ? conversation.bookingRequestReference : conversation.packageName ?? conversation.bookingRequestReference}
+                  </em>
                 )}
                 <small>{preview(conversation)}</small>
               </span>
@@ -246,7 +249,7 @@ export function MessagesWorkspace({
             {active?.bookingRequestReference && (
               <span className="message-booking-context">
                 <Icon name="clipboard" size={13} />
-                <span>Booking request {active.bookingRequestReference}</span>
+                <span>{isTeam ? `Booking request ${active.bookingRequestReference}` : `Package: ${active.packageName ?? active.bookingRequestReference}`}</span>
                 {active.eventType && <span>· {active.eventType}</span>}
               </span>
             )}
@@ -325,7 +328,7 @@ export function MessagesWorkspace({
               <Fragment key={message.id}>
                 {showDay && <span className="chat-time">{dayLabel(message.createdAt)}</span>}
                 <div className={`message ${mine ? "customer-message" : "bot"} ${message.senderRole === "assistant" ? "assistant-message" : ""}`}>
-                  {message.body}
+                  <ReactMarkdown>{message.body}</ReactMarkdown>
                   <small className="message-meta">
                     {!mine && `${message.senderName} · `}
                     {timeFormatter.format(new Date(message.createdAt))}

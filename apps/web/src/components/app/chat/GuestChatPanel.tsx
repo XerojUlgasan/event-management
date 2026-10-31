@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type SubmitEvent } from "react"
 import { Button, Icon } from "@event-management/ui"
+import ReactMarkdown from "react-markdown"
 
 import { getGuestReply } from "../../../lib/api"
 import {
@@ -189,7 +190,7 @@ export function GuestChatPanel({
             className={`message ${message.role === "user" ? "customer-message" : "bot"}`}
             key={message.id}
           >
-            {message.body}
+            <ReactMarkdown>{message.body}</ReactMarkdown>
             <small className="message-meta">
               {timeFormatter.format(new Date(message.createdAt))}
             </small>

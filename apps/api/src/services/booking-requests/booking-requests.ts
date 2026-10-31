@@ -17,7 +17,7 @@ export async function createBookingRequestService(db: Kysely<DB>, customerId: st
     if (!version) return error("Package version is no longer available. Refresh and try again", 409);
     const row = await createBookingRequestData(trx, { reference:`BR-${randomUUID().toUpperCase()}`, customer_id:customerId, package_id:input.packageId, package_version_id:version.id, package_name:version.name, event_type:input.eventType, starts_at:start, ends_at:end, time_zone:input.timeZone, guest_count:input.guestCount, contact_name:input.contactName, phone_number:input.phoneNumber, preferred_venue_location:input.preferredVenueLocation, special_requests:input.specialRequests || null, status:"under_review", out_of_range:input.guestCount < version.guest_min || input.guestCount > version.guest_max });
     await addStatusHistoryData(trx, row.id, "under_review", customerId, null);
-    await createBookingConversationData(trx, { customer_id: customerId, booking_request_id: row.id, package_id: row.package_id, event_type: row.event_type, event_starts_at: row.starts_at, event_ends_at: row.ends_at, guest_count: row.guest_count });
+    await createBookingConversationData(trx, { customer_id: customerId, booking_request_id: row.id, package_id: row.package_id, event_type: row.event_type, event_starts_at: row.starts_at, event_ends_at: row.ends_at, guest_count: row.guest_count, booking_reference: row.reference, package_name: row.package_name });
     return (await response(trx, [row]))[0]!;
   });
 }

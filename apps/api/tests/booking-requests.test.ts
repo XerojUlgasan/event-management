@@ -134,6 +134,11 @@ test("requests enforce roles, version availability, ownership and status history
   assert.equal(linkedConversation.customer_id, customerId);
   assert.equal(linkedConversation.event_ends_at!.toISOString(), input.endsAt);
   assert.equal(linkedConversation.status, "active");
+  const adminConversations = await read(await call("/admin/conversations", "GET", undefined, adminCookie), 200);
+  const bookingConversation = adminConversations.conversations.find((item: any) => item.id === linkedConversation.id);
+  assert.ok(bookingConversation);
+  assert.equal(bookingConversation.lastMessage.senderRole, "assistant");
+  assert.match(bookingConversation.lastMessage.body, /booking request/i);
   assert.deepEqual((await read(await call("/booking-requests/mine","GET",undefined,otherCustomerCookie),200)).bookingRequests,[]);
   assert.equal((await read(await call("/booking-requests/mine","GET",undefined,customerCookie),200)).bookingRequests[0].id,created.id);
   assert.equal((await read(await call("/admin/booking-requests", "GET", undefined, staffCookie), 200)).bookingRequests[0].id, created.id);
