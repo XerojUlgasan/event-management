@@ -35,9 +35,3 @@ export async function ensureUnboundConversationData(db: Database, customerId: st
     .executeTakeFirstOrThrow();
 }
 
-export async function findGuestConversationData(db: Database, customerId: string, guestChatId: string) {
-  return selectConversationColumnsData(db)
-    .where("c.customer_id", "=", customerId)
-    .where("c.guest_chat_id", "=", guestChatId)
-    .executeTakeFirst();
-}

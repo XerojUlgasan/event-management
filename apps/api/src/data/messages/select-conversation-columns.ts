@@ -17,7 +17,6 @@ export function selectConversationColumnsData(db: Database) {
       "c.guest_count",
       "c.status",
       "c.closed_at",
-      "c.guest_chat_id",
       "c.booking_request_id",
       "c.created_at",
       "c.updated_at",

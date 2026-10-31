@@ -125,35 +125,26 @@ export function guestChatContext(chat: GuestChat): ConversationContextInput {
 }
 
 async function claimGuestChat(chat: GuestChat): Promise<ChatThread> {
-  const payload = {
+  return claimGuestConversation({
     guestChatId: chat.guestChatId,
     messages: guestChatMessages(chat, 50),
     context: guestChatContext(chat),
-  }
-  return claimGuestConversation(payload)
+  })
 }
 
 let pendingClaim: Promise<ChatThread | null> | null = null
 
-// Import a browser-only guest conversation once a customer signs in. The
-// server treats repeated claims of the same guestChatId as idempotent, and
-// this in-flight guard keeps polls from posting the same claim twice.
 export function claimPendingGuestChat(): Promise<ChatThread | null> {
   pendingClaim ??= (async () => {
     if (typeof window === "undefined") return null
     const chat = loadGuestChat()
-    if (!hasGuestHistory(chat)) return null
+    if (!chat.needsStaff || !hasGuestHistory(chat)) return null
     try {
       const claimed = await claimGuestChat(chat)
-      // A guest who asked for a person should land in the staff queue, not
-      // back with the assistant. Claiming is idempotent if this retries.
-      const thread = chat.needsStaff
-        ? await requestStaffAssistance(claimed.conversation.id)
-        : claimed
+      const thread = await (chat.needsStaff ? requestStaffAssistance(claimed.conversation.id) : Promise.resolve(claimed))
       clearGuestChat()
       return thread
     } catch {
-      // Keep the browser copy so a later visit can retry the import.
       return null
     }
   })().finally(() => {
@@ -161,3 +152,4 @@ export function claimPendingGuestChat(): Promise<ChatThread | null> {
   })
   return pendingClaim
 }
+

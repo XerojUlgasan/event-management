@@ -17,6 +17,7 @@ import { initialsFromName } from "../../../lib/name"
 import { SignInMethods } from "../SignInMethods"
 import { MessagesWorkspace } from "../messages/MessagesWorkspace"
 import { mergeThread } from "../messages/thread"
+import { claimPendingGuestChat, hasGuestHistory, loadGuestChat } from "../../../lib/guest-chat"
 import {
   getAssistantReply,
   createMyConversation,
@@ -29,11 +30,6 @@ import {
   type ChatConversation,
   type ChatThread,
 } from "../../../lib/api"
-import {
-  claimPendingGuestChat,
-  hasGuestHistory,
-  loadGuestChat,
-} from "../../../lib/guest-chat"
 
 type CustomerTab =
   | "Home"
@@ -61,10 +57,10 @@ export function CustomerDashboard({
   userEmail: string
   onSignOut: () => void
 }) {
-  // A customer who signed in from the guest chat lands back in that thread.
-  const [tab, setTab] = useState<CustomerTab>(() =>
-    hasGuestHistory(loadGuestChat()) ? "Messages" : "Home",
-  )
+  const [tab, setTab] = useState<CustomerTab>(() => {
+    const guestChat = loadGuestChat()
+    return guestChat.needsStaff && hasGuestHistory(guestChat) ? "Messages" : "Home"
+  })
   const [messageOpen, setMessageOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement>(null)
@@ -95,26 +91,24 @@ export function CustomerDashboard({
 
   const refreshMessages = useCallback(async () => {
     try {
-      // Restore a guest chat saved in this browser before loading the DB thread.
       const claimed = await claimPendingGuestChat()
       const { conversations } = await getMyConversations()
       setMessageConversations(conversations)
+      const targetId = claimed
+        ? claimed.conversation.id
+        : pendingBookingReference
+        ? conversations.find((item) => item.bookingRequestReference === pendingBookingReference)?.id ?? null
+        : selectedConversationId && conversations.some((item) => item.id === selectedConversationId)
+        ? selectedConversationId
+        : conversations[0]?.id ?? null
+      setSelectedConversationId(targetId)
       if (claimed) {
-        setSelectedConversationId(claimed.conversation.id)
         setMessageThread(claimed)
+      } else if (targetId) {
+        const thread = await getMyConversationById(targetId)
+        setMessageThread((current) => mergeThread(current, thread))
       } else {
-        const targetId = pendingBookingReference
-          ? conversations.find((item) => item.bookingRequestReference === pendingBookingReference)?.id ?? null
-          : selectedConversationId && conversations.some((item) => item.id === selectedConversationId)
-          ? selectedConversationId
-          : conversations[0]?.id ?? null
-        setSelectedConversationId(targetId)
-        if (targetId) {
-          const thread = await getMyConversationById(targetId)
-          setMessageThread((current) => mergeThread(current, thread))
-        } else {
-          setMessageThread(null)
-        }
+        setMessageThread(null)
       }
       setMessagesError("")
     } catch (cause) {

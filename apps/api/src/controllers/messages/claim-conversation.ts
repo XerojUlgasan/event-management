@@ -17,6 +17,7 @@ export const claimConversationRoute = createRoute({
     403: errors[403],
   },
 });
+
 export const claimConversationRouteHandler: AppRouteHandler<typeof claimConversationRoute> = async (c) => {
   const input = c.req.valid("json");
   const result = await claimGuestConversationService(
@@ -28,12 +29,7 @@ export const claimConversationRouteHandler: AppRouteHandler<typeof claimConversa
   );
   if (result.kind === "ok") return c.json(result.thread, 200);
   return c.json(
-    {
-      error:
-        result.kind === "invalid-package"
-          ? "Package not found"
-          : "Event end must be after the event start",
-    },
+    { error: result.kind === "invalid-package" ? "Package not found" : "Event end must be after the event start" },
     400,
   );
 };

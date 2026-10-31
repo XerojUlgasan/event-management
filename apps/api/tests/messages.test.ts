@@ -313,91 +313,6 @@ test("guest chatbot validates input and answers from approved package records", 
   });
 });
 
-test("guest history is claimed once into the signed-in customer conversation", async () => {
-  const packageVersion = await db
-    .selectFrom("package_versions")
-    .select("id")
-    .where("package_id", "=", packageId)
-    .executeTakeFirstOrThrow();
-  const booking = await db
-    .insertInto("booking_requests")
-    .values({
-      reference: `BR-TEST-${randomUUID()}`,
-      customer_id: chatCustomerId,
-      package_id: packageId,
-      package_version_id: packageVersion.id,
-      package_name: "Garden Wedding",
-      event_type: "Wedding",
-      starts_at: new Date(Date.now() + 86_400_000),
-      ends_at: new Date(Date.now() + 90_000_000),
-      time_zone: "Asia/Manila",
-      guest_count: 80,
-      contact_name: "Chat Customer",
-      phone_number: "123",
-      preferred_venue_location: "Manila",
-      special_requests: null,
-      status: "under_review",
-      out_of_range: false,
-    })
-    .returning("id")
-    .executeTakeFirstOrThrow();
-  const bound = await db
-    .insertInto("conversations")
-    .values({
-      customer_id: chatCustomerId,
-      booking_request_id: booking.id,
-      package_id: packageId,
-      event_type: "Wedding",
-      event_starts_at: new Date(Date.now() + 86_400_000),
-      event_ends_at: new Date(Date.now() + 90_000_000),
-      guest_count: 80,
-    })
-    .returning("id")
-    .executeTakeFirstOrThrow();
-  const claim = {
-    guestChatId: "guest-chat-import-1",
-    messages: [
-      { role: "assistant", body: "Welcome to Clemora" },
-      { role: "user", body: "I want a garden wedding" },
-      { role: "assistant", body: "Great choice" },
-    ],
-    context: { packageId, eventType: "Wedding" },
-  };
-  const first = await read(
-    await call("/messages/conversation/claim", "POST", claim, chatCustomerCookie),
-    200,
-  );
-  assert.equal(first.conversation.customerId, chatCustomerId);
-  assert.equal(first.conversation.packageId, packageId);
-  assert.equal(first.conversation.packageName, "Garden Wedding");
-  assert.equal(first.conversation.eventType, "Wedding");
-  assert.equal(first.conversation.status, "active");
-  assert.notEqual(first.conversation.id, bound.id);
-  assert.equal(first.conversation.bookingRequestId, null);
-  assert.deepEqual(
-    first.messages.map((message: any) => message.senderRole),
-    ["assistant", "customer", "assistant"],
-  );
-  assert.equal(first.messages[1].senderId, chatCustomerId);
-  assert.equal(first.messages[0].senderId, null);
-
-  const again = await read(
-    await call("/messages/conversation/claim", "POST", claim, chatCustomerCookie),
-    200,
-  );
-  assert.equal(again.messages.length, 3);
-
-  await read(
-    await call(
-      "/messages/conversation/claim",
-      "POST",
-      { ...claim, guestChatId: "guest-chat-import-2", context: { packageId: randomUUID() } },
-      chatCustomerCookie,
-    ),
-    400,
-  );
-});
-
 test("conversation context, staff handoff, and takeover gate assistant replies", async () => {
   const now = Date.now();
   await read(
@@ -525,21 +440,6 @@ test("conversation context, staff handoff, and takeover gate assistant replies",
   assert.equal(stillPaused.message, null);
   assert.equal(stillPaused.status, "staff");
 
-  // Importing a new browser chat must not quietly undo the takeover.
-  const afterTakeover = await read(
-    await call(
-      "/messages/conversation/claim",
-      "POST",
-      {
-        guestChatId: "guest-chat-after-takeover",
-        messages: [{ role: "user", body: "One more thing" }],
-      },
-      chatCustomerCookie,
-    ),
-    200,
-  );
-  assert.equal(afterTakeover.conversation.status, "staff");
-
   // Asking for staff again must not hand a taken-over thread back to the queue.
   const stillTaken = await read(
     await call("/messages/conversation/request-staff", "POST", {}, chatCustomerCookie),
@@ -558,6 +458,11 @@ test("conversation context, staff handoff, and takeover gate assistant replies",
   );
   assert.equal(returnedToAi.conversation.status, "active");
   assert.match(returnedToAi.messages.at(-1).body, /Admin Person returned this conversation to AI responses/);
+
+  await read(
+    await call("/messages/conversation/messages", "POST", { body: "One more thing" }, chatCustomerCookie),
+    201,
+  );
 
   const resumed = await withGeminiMock(async () =>
     read(await call("/messages/conversation/assistant-reply", "POST", {}, chatCustomerCookie), 200),
@@ -630,7 +535,6 @@ test("message routes appear in the OpenAPI document", async () => {
   assert.ok(spec.paths["/v1/messages/conversation"].get);
   assert.ok(spec.paths["/v1/messages/conversations"].post);
   assert.ok(spec.paths["/v1/messages/conversation/messages"].post);
-  assert.ok(spec.paths["/v1/messages/conversation/claim"].post);
   assert.ok(spec.paths["/v1/messages/conversation/context"].patch);
   assert.ok(spec.paths["/v1/messages/conversation/request-staff"].post);
   assert.ok(spec.paths["/v1/messages/conversation/assistant-reply"].post);

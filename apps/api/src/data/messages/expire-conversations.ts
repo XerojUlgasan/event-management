@@ -15,10 +15,6 @@ export async function expireConversationsData(db: Database) {
     .where((eb) =>
       eb.or([
         eb.and([
-          eb("guest_chat_id", "is not", null),
-          eb("created_at", "<=", cutoff),
-        ]),
-        eb.and([
           eb("package_id", "is not", null),
           eb("event_ends_at", "is not", null),
           eb("event_ends_at", "<=", cutoff),

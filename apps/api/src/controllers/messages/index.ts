@@ -7,7 +7,6 @@ import { sendCustomerMessageRoute, sendCustomerMessageRouteHandler } from "./sen
 import { listAdminConversationsRoute, listAdminConversationsRouteHandler } from "./list-admin-conversations.js";
 import { getAdminConversationRoute, getAdminConversationRouteHandler } from "./get-admin-conversation.js";
 import { sendAdminMessageRoute, sendAdminMessageRouteHandler } from "./send-admin-message.js";
-import { claimConversationRoute, claimConversationRouteHandler } from "./claim-conversation.js";
 import { updateConversationContextRoute, updateConversationContextRouteHandler } from "./update-conversation-context.js";
 import { requestStaffRoute, requestStaffRouteHandler } from "./request-staff.js";
 import { assistantReplyRoute, assistantReplyRouteHandler } from "./assistant-reply.js";
@@ -16,6 +15,7 @@ import { returnToAiRoute, returnToAiRouteHandler } from "./return-to-ai.js";
 import { createCustomerConversationRoute, createCustomerConversationRouteHandler } from "./create-customer-conversation.js";
 import { listCustomerConversationsRoute, listCustomerConversationsRouteHandler } from "./list-customer-conversations.js";
 import { getCustomerConversationByIdRoute, getCustomerConversationByIdRouteHandler } from "./get-customer-conversation-by-id.js";
+import { claimConversationRoute, claimConversationRouteHandler } from "./claim-conversation.js";
 
 const routes = new OpenAPIHono<HonoEnv>({
   defaultHook: (result, c) => {

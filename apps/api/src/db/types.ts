@@ -50,7 +50,6 @@ export interface Conversations {
   event_ends_at: Timestamp | null;
   event_starts_at: Timestamp | null;
   event_type: string | null;
-  guest_chat_id: string | null;
   guest_count: number | null;
   id: Generated<string>;
   package_id: string | null;

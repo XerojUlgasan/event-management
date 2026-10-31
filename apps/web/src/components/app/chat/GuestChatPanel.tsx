@@ -68,8 +68,10 @@ export function GuestChatPanel({
         guestChatMessages(source),
         guestChatContext(source),
       )
+      const needsAccount = /\bsign in|create an account|staff assistance|book(ing)? now|book this\b/i.test(result.reply)
       const withReply: GuestChat = {
         ...source,
+        needsStaff: source.needsStaff || needsAccount,
         messages: [
           ...source.messages,
           {

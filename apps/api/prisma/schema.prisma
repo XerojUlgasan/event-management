@@ -31,7 +31,6 @@ model Conversation {
   guestCount      Int?      @map("guest_count")
   status          String    @default("active")
   closedAt        DateTime? @map("closed_at") @db.Timestamptz(6)
-  guestChatId     String?   @map("guest_chat_id")
   bookingRequestId String?  @unique @map("booking_request_id") @db.Uuid
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
