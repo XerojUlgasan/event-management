@@ -1,0 +1,1 @@
+export const MAX_CATALOG_TEXT_LENGTH = 4000;

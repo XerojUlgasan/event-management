@@ -1,3 +1,4 @@
+import { MAX_DISPLAY_NAME_LENGTH } from "@event-management/contracts/limits/auth";
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { profileSchema, toProfile } from "./profile.js";
@@ -18,7 +19,7 @@ export const registerUserRoute = createRoute({
           schema: z.object({
             email: emailSchema,
             password: newPasswordSchema,
-            displayName: z.string().trim().min(1).max(120),
+            displayName: z.string().trim().min(1).max(MAX_DISPLAY_NAME_LENGTH),
           }),
         },
       },

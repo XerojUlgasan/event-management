@@ -13,5 +13,8 @@ Use this skill for `apps/api/` changes. Read every reference below before editin
 - [Authentication and sessions](reference/auth-and-sessions.md)
 - [Database and migrations](reference/database-and-migrations.md)
 - [Verification](reference/verification.md)
+- [R2 catalog image storage](reference/r2-image-storage.md)
 
 For a change involving the browser API contract or client auth flow, also load the [frontend skill](../frontend/SKILL.md). For product behavior, consult [`docs/FEATURES.md`](../../docs/FEATURES.md) and distinguish planned workflows from implemented endpoints.
+
+For shared field, file, or collection limits and the API's HTTP body caps, read the [shared limits guidance](../limits/SKILL.md).

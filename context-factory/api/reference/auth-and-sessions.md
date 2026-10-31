@@ -8,4 +8,6 @@ Current paths are registered in `apps/api/src/controllers/auth/index.ts`. Read t
 - `src/controllers/auth/register-user.ts`, `login-user.ts`, `sync-firebase-profile.ts`, `link-firebase.ts`, and `add-password.ts` define the HTTP contracts. Corresponding service and data operation files own the business checks and Kysely queries. Password hashing is in `src/utils/password.ts`, Firebase setup in `src/utils/firebase-admin.ts`, and attempt limiting in `src/utils/auth-limit.ts`.
 - Public registration creates customers. Roles come from database state; the browser must not assign or promote them. Matching email addresses do not automatically merge local and Firebase accounts.
 
+Auth field bounds are shared through `@event-management/contracts/limits/auth`; consult the [shared limits guidance](../../limits/SKILL.md) when changing API schemas or client hints.
+
 The root README's Authentication and Session API sections document the current user-facing contract. Verify any changed claim against code and tests before updating that documentation.

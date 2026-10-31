@@ -1,3 +1,4 @@
+import { SMALL_JSON_BODY_LIMIT_BYTES, CATALOG_JSON_BODY_LIMIT_BYTES, IMAGE_UPLOAD_BODY_LIMIT_BYTES } from "./constants/http.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
@@ -41,28 +42,28 @@ app.use("/v1/*", async (c, next) => {
   await next();
 });
 
-app.use("/v1/auth/*", bodyLimit({ maxSize: 16 * 1024 }));
+app.use("/v1/auth/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/messages/*", bodyLimit({ maxSize: 1024 * 1024 }));
-app.use("/v1/admin/conversations/*", bodyLimit({ maxSize: 16 * 1024 }));
+app.use("/v1/admin/conversations/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/chatbot/*", bodyLimit({ maxSize: 640 * 1024 }));
 
-app.use("/v1/admin/packages/*", bodyLimit({ maxSize: 64 * 1024 }));
-app.use("/v1/admin/packages", bodyLimit({ maxSize: 64 * 1024 }));
-app.use("/v1/admin/venues", bodyLimit({ maxSize: 64 * 1024 }));
-app.use("/v1/admin/venues/*", bodyLimit({ maxSize: 64 * 1024 }));
-app.use("/v1/admin/venue-images", bodyLimit({ maxSize: 5 * 1024 * 1024 + 64 * 1024 }));
-app.use("/v1/admin/package-images", bodyLimit({ maxSize: 5 * 1024 * 1024 + 64 * 1024 }));
+app.use("/v1/admin/packages/*", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/admin/packages", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/admin/venues", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/admin/venues/*", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/admin/venue-images", bodyLimit({ maxSize: IMAGE_UPLOAD_BODY_LIMIT_BYTES }));
+app.use("/v1/admin/package-images", bodyLimit({ maxSize: IMAGE_UPLOAD_BODY_LIMIT_BYTES }));
 
 app.route("/v1", healthRoutes);
-app.use("/v1/admin/service-images", bodyLimit({ maxSize: 5 * 1024 * 1024 + 64 * 1024 }));
-app.use("/v1/admin/services", bodyLimit({ maxSize: 64 * 1024 }));
-app.use("/v1/admin/services/*", bodyLimit({ maxSize: 64 * 1024 }));
+app.use("/v1/admin/service-images", bodyLimit({ maxSize: IMAGE_UPLOAD_BODY_LIMIT_BYTES }));
+app.use("/v1/admin/services", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/admin/services/*", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
 app.route("/v1", serviceRoutes);
 app.route("/v1", packageRoutes);
 app.route("/v1", venueRoutes);
-app.use("/v1/booking-requests", bodyLimit({ maxSize: 16 * 1024 }));
-app.use("/v1/booking-requests/*", bodyLimit({ maxSize: 16 * 1024 }));
-app.use("/v1/admin/booking-requests/*", bodyLimit({ maxSize: 16 * 1024 }));
+app.use("/v1/booking-requests", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/booking-requests/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/admin/booking-requests/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.route("/v1", bookingRequestRoutes);
 app.route("/v1", messageRoutes);
 app.route("/v1", chatbotRoutes);

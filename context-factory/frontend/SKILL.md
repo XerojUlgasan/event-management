@@ -14,3 +14,5 @@ Use this skill for `apps/web/` changes. Read every reference below before editin
 - [Styling and verification](reference/styling-and-verification.md)
 
 For API route or database work, also load the [API skill](../api/SKILL.md). For reusable UI or tokens, also load the [packages skill](../packages/SKILL.md).
+
+When a browser form mirrors API field, image, or collection limits, read the [shared limits guidance](../limits/SKILL.md) and keep client hints aligned with the API contract.

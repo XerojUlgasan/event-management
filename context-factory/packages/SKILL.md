@@ -14,3 +14,5 @@ Use this skill for `packages/ui/` or `packages/theme/` changes. Read every refer
 - [Theme, styles, and verification](reference/theme-and-verification.md)
 
 For app-specific use or changes to `apps/web`, also load the [frontend skill](../frontend/SKILL.md).
+
+Shared domain limit constants live in `@event-management/contracts`; read the [shared limits guidance](../limits/SKILL.md) when changing those values or their consumers.

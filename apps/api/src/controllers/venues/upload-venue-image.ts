@@ -1,3 +1,4 @@
+import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images";
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { json, errors, body } from "./http.js";
@@ -12,8 +13,8 @@ export const uploadVenueImageRoute = createRoute({ method: "post", path: "/admin
 } });
 export const uploadVenueImageRouteHandler: AppRouteHandler<typeof uploadVenueImageRoute> = async c => {
   const image = c.req.valid("form").image;
-  if (!(image instanceof File) || image.size > 5 * 1024 * 1024 || !["image/jpeg", "image/png"].includes(image.type)) {
-    return c.json({ error: "Choose a JPEG or PNG image up to 5 MiB" }, 400);
+  if (!(image instanceof File) || image.size > MAX_IMAGE_SIZE_BYTES || !["image/jpeg", "image/png"].includes(image.type)) {
+    return c.json({ error: "Choose a JPEG or PNG image up to 10 MiB" }, 400);
   }
   const data = Buffer.from(await image.arrayBuffer());
   try {
@@ -23,7 +24,7 @@ export const uploadVenueImageRouteHandler: AppRouteHandler<typeof uploadVenueIma
     if (!contentType || contentType !== image.type) throw new Error("Image type mismatch");
     await decoder.stats();
   } catch {
-    return c.json({ error: "Choose a valid JPEG or PNG image up to 5 MiB" }, 400);
+    return c.json({ error: "Choose a valid JPEG or PNG image up to 10 MiB" }, 400);
   }
   return c.json({ imageUrl: await uploadVenueImageService(c.get("db"), image.type, data) }, 201);
 };

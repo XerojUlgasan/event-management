@@ -10,6 +10,8 @@ import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import sharp from "sharp";
 import { hashSessionToken } from "../src/utils/session.js";
+import { installR2ImageStoreMock } from "./r2-image-store.js";
+import { imageObjectKey } from "../src/utils/upload-image-to-r2.js";
 
 const legacyActiveId = "b1000000-0000-0000-0000-000000000001";
 const legacyArchivedId = "b1000000-0000-0000-0000-000000000002";
@@ -24,8 +26,10 @@ let adminCookie: string;
 let staffCookie: string;
 let undesignatedAdminCookie: string;
 let customerCookie: string;
+let r2ImageStore: ReturnType<typeof installR2ImageStoreMock>;
 
 before(async () => {
+  r2ImageStore = installR2ImageStoreMock();
   assert.ok(["localhost", "127.0.0.1", "::1"].includes(process.env.DB_HOST ?? "localhost"), "Tests require local PostgreSQL");
   const connection = { host: process.env.DB_HOST ?? "localhost", port: Number(process.env.DB_PORT ?? 5432), user: process.env.DB_USER, password: process.env.DB_PASSWORD };
   admin = new Pool({ ...connection, database: process.env.DB_NAME });
@@ -65,6 +69,7 @@ after(async () => {
     }
     await admin.query(`DROP DATABASE IF EXISTS "${database}"`); await admin.end();
   }
+  r2ImageStore?.restore();
 });
 function call(path: string, method = "GET", body?: unknown, cookie?: string, origin?: string) {
   return app.request(`/v1${path}`, { method, headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...(cookie ? { Cookie: cookie } : {}), ...(origin ? { Origin: origin } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -128,7 +133,7 @@ test("venue catalog protects every administrative operation and validates inputs
   assert.match(oldEdit.error,/versioned drafts/);
 });
 
-test("draft publication requires capacity and photos, protects snapshots and stale edits", async () => {
+test("draft publication requires capacity, protects snapshots and stale edits", async () => {
   let created = await read(await call("/admin/venues","POST",{...content,capacityMin:null,capacityMax:null},adminCookie),201);
   const path = `/admin/venues/${created.id}`;
   assert.equal(created.draft.name,"Garden"); assert.equal(created.draft.location,"City"); assert.deepEqual(created.draft.categories,["Garden"]);
@@ -138,7 +143,6 @@ test("draft publication requires capacity and photos, protects snapshots and sta
   let edited = await read(await call(`${path}/draft`,"PATCH",{...content,capacityMin:null,capacityMax:null,imageUrls:[firstPhoto],expectedUpdatedAt:created.draft.updatedAt},adminCookie),200);
   await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:edited.draft.updatedAt},adminCookie),400);
   edited = await read(await call(`${path}/draft`,"PATCH",{...content,imageUrls:[],expectedUpdatedAt:edited.draft.updatedAt},adminCookie),200);
-  await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:edited.draft.updatedAt},adminCookie),400);
   // The removed draft-only image is cleaned up, so upload again.
   const thirdPhoto = await photo();
   edited = await read(await call(`${path}/draft`,"PATCH",{...content,imageUrls:[thirdPhoto,secondPhoto],expectedUpdatedAt:edited.draft.updatedAt},adminCookie),200);
@@ -168,13 +172,28 @@ test("draft publication requires capacity and photos, protects snapshots and sta
   await read(await call(`${path}/draft`,"DELETE",undefined,adminCookie),409);
 });
 
+test("complete venue drafts publish and stay public without photos", async () => {
+  const created = await read(await call("/admin/venues", "POST", content, adminCookie), 201);
+  assert.deepEqual(created.draft.imageUrls, []);
+  const published = await read(await call(`/admin/venues/${created.id}/publish`, "POST", { expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 200);
+  assert.equal(published.draft, null);
+  assert.deepEqual(published.published.imageUrls, []);
+  const publicVenue = await read(await call(`/venues/${created.id}`), 200);
+  assert.deepEqual(publicVenue.imageUrls, []);
+  assert.ok((await read(await call("/venues"), 200)).venues.some((venue: any) => venue.id === created.id));
+});
+
 test("venue photos enforce signatures, size, access, ordered association and cleanup", async () => {
   await read(await upload(adminCookie,Buffer.from("invalid")),400);
   await read(await upload(adminCookie,png.subarray(0,8)),400);
   await read(await upload(adminCookie,png,"image/jpeg"),400);
-  await read(await upload(adminCookie,Buffer.alloc(5*1024*1024+1)),400);
-  assert.equal((await upload(adminCookie,Buffer.alloc(6*1024*1024))).status,413);
+  const max = Buffer.alloc(10*1024*1024); png.copy(max);
+  await read(await upload(adminCookie,max),201);
+  await read(await upload(adminCookie,Buffer.alloc(10*1024*1024+1)),400);
+  assert.equal((await upload(adminCookie,Buffer.alloc(11*1024*1024))).status,413);
   const url = await photo();
+  const key = imageObjectKey("venues", url.split("/").pop()!, "image/png");
+  assert.deepEqual(r2ImageStore.objects.get(key), png);
   const response = await call(imagePath(url),"GET",undefined,adminCookie);
   assert.equal(response.status,200); assert.equal(response.headers.get("Content-Type"),"image/png"); assert.equal(response.headers.get("X-Content-Type-Options"),"nosniff");
   for (const cookie of [undefined,staffCookie,customerCookie,undesignatedAdminCookie]) await read(await call(imagePath(url),"GET",undefined,cookie),404);
@@ -183,6 +202,7 @@ test("venue photos enforce signatures, size, access, ordered association and cle
   await read(await call(imageDeletePath(url),"DELETE",undefined,adminCookie),409);
   await read(await call(`/admin/venues/${draft.id}/draft`,"DELETE",undefined,adminCookie),204);
   await read(await call(imagePath(url),"GET",undefined,adminCookie),404);
+  assert.equal(r2ImageStore.objects.has(key), false);
   const orphan = await photo(); await read(await call(imageDeletePath(orphan),"DELETE",undefined,adminCookie),204);
   await read(await call(imageDeletePath(orphan),"DELETE",undefined,adminCookie),404);
 });
@@ -223,7 +243,7 @@ test("concurrent draft edits preserve one winner and database constraints reject
   const saved = await read(await call(`/admin/venues/${draft.id}`, "GET", undefined, adminCookie), 200);
   assert.ok(["First", "Second"].includes(saved.draft.name)); assert.equal(saved.versions.length,1);
   await assert.rejects(pool.query("UPDATE venue_versions SET published_at = now() WHERE id = $1", [saved.draft.id]), (cause: any) => cause.code === "23514");
-  await assert.rejects(pool.query("INSERT INTO venue_images (content_type, data) VALUES ('image/gif', $1)", [png]), (cause: any) => cause.code === "23514");
+  await assert.rejects(pool.query("INSERT INTO venue_images (content_type) VALUES ('image/gif')"), (cause: any) => cause.code === "23514");
   const jpeg = await sharp({ create: { width: 1, height: 1, channels: 3, background: "#aabbcc" } }).jpeg().toBuffer();
   await read(await upload(adminCookie,jpeg.subarray(0,3),"image/jpeg"),400);
   const image = await read(await upload(adminCookie,jpeg,"image/jpeg"),201);

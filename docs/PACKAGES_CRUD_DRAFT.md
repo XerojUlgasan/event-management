@@ -23,7 +23,7 @@ The Prisma migrations create `packages`, `package_versions`, and `package_images
 
 - `packages` stores a stable ID, timestamps, and `archived_at`.
 - `package_versions` stores a version number and state (`draft`, `published`, or `superseded`), catalog details, nullable fixed total `price_amount_minor`, and timestamps. The legacy venue-details column remains in storage for existing data but is excluded from current package API/display behavior. Partial unique indexes allow at most one draft and one published version per package. A database check enforces the 30–100 guest range.
-- `package_images` stores uploaded JPEG/PNG bytes and content type. The catalog stores an API-relative image path; external HTTP(S) image URLs remain supported. Uploads are limited to 5 MiB.
+- `package_images` stores uploaded JPEG/PNG image metadata; bytes live in R2. The catalog stores an API-relative image path; external HTTP(S) image URLs remain supported. Each uploaded image is limited to 10 MiB by the shared `MAX_IMAGE_SIZE_BYTES` constant; see the [shared limits guidance](../context-factory/limits/SKILL.md) and [R2 key layout](../context-factory/api/reference/r2-image-storage.md).
 - `package_services` holds UUID-identified links from a package version to published service versions. A link is either included within the package total or an optional add-on with a fixed PHP per-unit price and maximum quantity. Published package versions retain their linked service-version details.
 - Future quotes should reference the version ID and store their issued line-item snapshot. No quote table or package reference exists yet.
 

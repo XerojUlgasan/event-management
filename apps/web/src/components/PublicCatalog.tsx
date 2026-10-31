@@ -161,22 +161,10 @@ export function PublicCatalog({ kind, mode = "featured", allowBooking = true, on
     {initialized && items.length === 0 && !error && <p className="catalog-status">{kind === "packages" ? "No packages are published yet." : kind === "venues" ? "No venues are available yet." : "Our service catalog is being prepared. Please check back soon."}</p>}
     {items.length > 0 && <div className="catalog-grid">{kind === "packages" ? (items as PublicPackage[]).map(item => <PackageCard key={item.id} item={item} onPreview={() => showPackage(item.id)} />) : kind === "venues" ? (items as Venue[]).map(item => <VenueCard key={item.id} item={item} onPreview={() => setSelected({ kind: "venues", id: item.id })} />) : (items as PublicService[]).map(item => <ServiceCard key={item.id} item={item} onPreview={() => setSelected({ kind: "services", id: item.id })} />)}</div>}
     {error && <p className="catalog-status" role="alert">{error} <button type="button" onClick={() => void load(items.length ? nextOffset ?? items.length : 0, items.length === 0)}>Try again</button></p>}
-    {mode === "featured" && (onViewMore || items.length > 0) && (onViewMore ? <button type="button" className="catalog-view-more" onClick={onViewMore}>View more {kind}<span aria-hidden="true">↗</span></button> : <a className="catalog-view-more" href={`/catalog?type=${kind}`}>View more {kind}<span aria-hidden="true">↗</span></a>)}
+    {mode === "featured" && onViewMore && <button type="button" className="catalog-view-more" onClick={onViewMore}>View more {kind}<span aria-hidden="true">↗</span></button>}
     {mode === "overview" && <div className="catalog-pagination"><div ref={sentinelRef} aria-hidden="true" />{loading && initialized && <p role="status">Loading more {kind}…</p>}{nextOffset !== null && !loading && !error && <button type="button" onClick={() => void load(nextOffset)}>Load more {kind}</button>}{initialized && nextOffset === null && items.length > 0 && <p>All {items.length} {kind} shown</p>}</div>}
     <CatalogPreview allowBooking={allowBooking} selected={selected} venue={selected?.kind === "venues" ? (items as Venue[]).find(item => item.id === selected.id) : undefined} onClose={closePreview} onPackage={showPackage} />
   </>
-}
-
-export function CatalogOverview() {
-  const requested = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("type") : null
-  const kind: Kind = requested === "services" || requested === "venues" ? requested : "packages"
-  return <div className="catalog-overview">
-    <header className="catalog-overview-header"><a href="/" className="catalog-overview-brand">Clemora</a><a href="/" className="catalog-overview-back">← Back to home</a></header>
-    <main className="catalog-overview-main"><p className="catalog-overview-eyebrow">THE CLEMORA COLLECTION</p><h1>Explore your possibilities.</h1><p className="catalog-overview-intro">Explore packages, services, and venues for your gathering.</p>
-      <nav className="catalog-overview-tabs" aria-label="Catalog type"><a href="/catalog?type=packages" aria-current={kind === "packages" ? "page" : undefined}>Packages</a><a href="/catalog?type=services" aria-current={kind === "services" ? "page" : undefined}>Services</a><a href="/catalog?type=venues" aria-current={kind === "venues" ? "page" : undefined}>Venues</a></nav>
-      <h2>{kind === "packages" ? "All packages" : kind === "services" ? "All services" : "All venues"}</h2><PublicCatalog kind={kind} mode="overview" />
-    </main><footer className="catalog-overview-footer"><span>Clemora / Thoughtful events, together.</span><a href="/">Return to home ↗</a></footer>
-  </div>
 }
 
 export function CatalogOverlay({ kind, onClose }: { kind: Kind; onClose: () => void }) {

@@ -7,3 +7,5 @@
 - `src/db/seed.ts` and `seed-admin.ts` are data setup commands, not migrations. Do not run a seed against a database without checking its target and impact.
 
 Database commands use local settings from `apps/api/.env`. Use `.env.example` for variable names and keep values out of chat, docs, and logs.
+
+Catalog image bytes live in R2; the three image tables contain metadata only. Read [R2 catalog image storage](r2-image-storage.md) before changing image schema, migration, retrieval, or deletion.

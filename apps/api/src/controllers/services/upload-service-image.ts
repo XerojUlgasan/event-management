@@ -1,7 +1,9 @@
+import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images";
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { json, errors, body } from "../packages/http.js";
 import { uploadServiceImageService } from "../../services/services/upload-service-image.js";
+import { InvalidImageError } from "../../utils/upload-image-to-r2.js";
 
 export const uploadServiceImageRoute = createRoute({ method: "post", path: "/admin/service-images", tags: ["Services"], request: {
   body: { required: true, content: { "multipart/form-data": { schema: z.object({ image: z.any().openapi({ type: "string", format: "binary" }) }) } } },
@@ -11,8 +13,8 @@ export const uploadServiceImageRoute = createRoute({ method: "post", path: "/adm
 } });
 export const uploadServiceImageRouteHandler: AppRouteHandler<typeof uploadServiceImageRoute> = async c => {
   const image = c.req.valid("form").image;
-  if (!(image instanceof File) || image.size > 5 * 1024 * 1024 || !["image/jpeg", "image/png"].includes(image.type)) {
-    return c.json({ error: "Choose a JPEG or PNG image up to 5 MiB" }, 400);
+  if (!(image instanceof File) || image.size > MAX_IMAGE_SIZE_BYTES || !["image/jpeg", "image/png"].includes(image.type)) {
+    return c.json({ error: "Choose a JPEG or PNG image up to 10 MiB" }, 400);
   }
   const data = Buffer.from(await image.arrayBuffer());
   const jpeg = data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff;
@@ -21,5 +23,10 @@ export const uploadServiceImageRouteHandler: AppRouteHandler<typeof uploadServic
   if (!contentType || image.type !== contentType) {
     return c.json({ error: "Image content does not match its type" }, 400);
   }
-  return c.json({ imageUrl: await uploadServiceImageService(c.get("db"), contentType, data) }, 201);
+  try {
+    return c.json({ imageUrl: await uploadServiceImageService(c.get("db"), contentType, data) }, 201);
+  } catch (cause) {
+    if (cause instanceof InvalidImageError) return c.json({ error: cause.message }, 400);
+    throw cause;
+  }
 };

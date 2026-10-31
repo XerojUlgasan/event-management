@@ -1,7 +1,8 @@
+import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 import { versionSchema as serviceVersionSchema } from "../services/schemas.js";
 import { z } from "@hono/zod-openapi";
 
-const text = z.string().max(4000);
+const text = z.string().max(MAX_CATALOG_TEXT_LENGTH);
 export const priceSchema = z.object({
   kind: z.literal("fixed"),
   currency: z.literal("PHP"),

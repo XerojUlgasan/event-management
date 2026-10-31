@@ -71,7 +71,6 @@ export interface Messages {
 export interface PackageImages {
   content_type: string;
   created_at: Generated<Timestamp>;
-  data: Buffer;
   id: Generated<string>;
 }
 
@@ -116,7 +115,6 @@ export interface PackageVersions {
 export interface ServiceImages {
   content_type: string;
   created_at: Generated<Timestamp>;
-  data: Buffer;
   id: Generated<string>;
 }
 
@@ -164,7 +162,6 @@ export interface Users {
 export interface VenueImages {
   content_type: string;
   created_at: Generated<Timestamp>;
-  data: Buffer;
   id: Generated<string>;
 }
 

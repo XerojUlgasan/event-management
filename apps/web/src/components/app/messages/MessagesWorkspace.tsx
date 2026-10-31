@@ -1,3 +1,4 @@
+import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages"
 import { Fragment, useEffect, useRef, useState, type SubmitEvent } from "react"
 import { Button, Icon } from "@event-management/ui"
 
@@ -398,7 +399,7 @@ export function MessagesWorkspace({
               }
               value={draft}
               disabled={!activeId || sending}
-              maxLength={4000}
+              maxLength={MAX_MESSAGE_BODY_LENGTH}
               onChange={(event) => setDraft(event.target.value)}
             />
             <Button

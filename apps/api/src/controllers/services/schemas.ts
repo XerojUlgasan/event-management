@@ -1,5 +1,6 @@
+import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 import { z } from "@hono/zod-openapi";
-const text = z.string().max(4000);
+const text = z.string().max(MAX_CATALOG_TEXT_LENGTH);
 export const contentSchema = z.object({
   name: text,
   categories: z.array(text).max(50),

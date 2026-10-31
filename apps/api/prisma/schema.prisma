@@ -87,7 +87,6 @@ model Package {
 model PackageImage {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   contentType String   @map("content_type")
-  data        Bytes
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("package_images")
@@ -125,7 +124,6 @@ model VenueVersion {
 model VenueImage {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   contentType String @map("content_type")
-  data Bytes
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   photos VenueVersionPhoto[]
   @@map("venue_images")
@@ -172,7 +170,6 @@ model PackageVersion {
 model ServiceImage {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   contentType String @map("content_type")
-  data Bytes
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   @@map("service_images")
 }

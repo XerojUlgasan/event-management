@@ -1,3 +1,4 @@
+import { MAX_DISPLAY_NAME_LENGTH, MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@event-management/contracts/limits/auth"
 import { useState } from "react";
 import type { SubmitEvent } from "react";
 import { Brand, Button, FormField, Icon } from "@event-management/ui";
@@ -39,8 +40,8 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
     clearError();
 
     if (mode === "register") {
-      if (password.length < 8) {
-        setFormError("Use a password with at least 8 characters.");
+      if (password.length < MIN_PASSWORD_LENGTH) {
+        setFormError(`Use a password with at least ${MIN_PASSWORD_LENGTH} characters.`);
         return;
       }
       if (password !== confirmPassword) {
@@ -140,6 +141,7 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
                   <Icon name="users" size={16} />
                   <input
                     autoComplete="name"
+                    maxLength={MAX_DISPLAY_NAME_LENGTH}
                     value={name}
                     onChange={(event) => {
                       setName(event.target.value);
@@ -158,6 +160,7 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
                 <input
                   type="email"
                   autoComplete="email"
+                  maxLength={MAX_EMAIL_LENGTH}
                   value={email}
                   onChange={(event) => {
                     setEmail(event.target.value);
@@ -183,11 +186,11 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
                     setFormError("");
                     clearError();
                   }}
-                  minLength={mode === "register" ? 8 : undefined}
-                  maxLength={mode === "signin" && useFirebase ? 4096 : 128}
+                  minLength={mode === "register" ? MIN_PASSWORD_LENGTH : undefined}
+                  maxLength={mode === "signin" && useFirebase ? 4096 : MAX_PASSWORD_LENGTH}
                   placeholder={
                     mode === "register"
-                      ? "At least 8 characters"
+                      ? `At least ${MIN_PASSWORD_LENGTH} characters`
                       : "Your password"
                   }
                   required
@@ -207,6 +210,7 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
                   <input
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
+                    maxLength={MAX_PASSWORD_LENGTH}
                     value={confirmPassword}
                     onChange={(event) => {
                       setConfirmPassword(event.target.value);

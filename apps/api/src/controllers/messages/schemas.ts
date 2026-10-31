@@ -1,3 +1,4 @@
+import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import { z } from "@hono/zod-openapi";
 
 export const messageBodySchema = z.object({
@@ -6,7 +7,7 @@ export const messageBodySchema = z.object({
     .string()
     .trim()
     .min(1, "Write a message before sending")
-    .max(4000, "Messages can be at most 4000 characters"),
+    .max(MAX_MESSAGE_BODY_LENGTH, `Messages can be at most ${MAX_MESSAGE_BODY_LENGTH} characters`),
 });
 
 export const messageSchema = z.object({

@@ -1,3 +1,4 @@
+import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages"
 import { useCallback, useEffect, useRef, useState, type SubmitEvent } from "react"
 import {
   Brand,
@@ -536,7 +537,7 @@ export function CustomerDashboard({
                 value={messageDraft}
                 onChange={(event) => setMessageDraft(event.target.value)}
                 placeholder="Write a message"
-                maxLength={4000}
+                maxLength={MAX_MESSAGE_BODY_LENGTH}
                 autoFocus
               />
             </label>

@@ -2,6 +2,7 @@ import "dotenv/config";
 import { sql } from "kysely";
 import { db } from "./client.js";
 import { hashPassword } from "../utils/password.js";
+import { seedDemo } from "./seed-demo.js";
 
 const legacyAccounts = [
   { email: "admin1@gmail.com", display_name: "System Admin", role: "admin", staff_role: "System Administrator" },
@@ -119,10 +120,12 @@ try {
         venueCount++;
       }
     }
-    return { accounts: rows, packageCount, upgradedCount, venueCount };
+    const demo = await seedDemo(db);
+    return { accounts: rows, packageCount, upgradedCount, venueCount, demo };
   });
   console.table(seeded.accounts.map(({ email, role, staff_role }) => ({ email, role, staff_role })));
   console.log(`Inserted ${seeded.accounts.length} local accounts, ${seeded.packageCount} sample package drafts (upgraded ${seeded.upgradedCount}), and ${seeded.venueCount} venues.`);
+  console.log("Inserted connected demo rows:", seeded.demo);
 } finally {
   await db.destroy();
 }

@@ -1,3 +1,4 @@
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@event-management/contracts/limits/auth"
 import { useState } from "react";
 import type { SubmitEvent } from "react";
 import { Button, FormField, Panel } from "@event-management/ui";
@@ -87,7 +88,7 @@ export function SignInMethods() {
                   <input
                     type="password"
                     autoComplete="current-password"
-                    maxLength={128}
+                    maxLength={MAX_PASSWORD_LENGTH}
                     value={currentPassword}
                     onChange={(event) => setCurrentPassword(event.target.value)}
                     required
@@ -99,11 +100,11 @@ export function SignInMethods() {
                     <input
                       type="password"
                       autoComplete="new-password"
-                      minLength={8}
-                      maxLength={128}
+                      minLength={MIN_PASSWORD_LENGTH}
+                      maxLength={MAX_PASSWORD_LENGTH}
                       value={newPassword}
                       onChange={(event) => setNewPassword(event.target.value)}
-                      placeholder="At least 8 characters"
+                      placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
                       required
                     />
                   </FormField>
@@ -111,8 +112,8 @@ export function SignInMethods() {
                     <input
                       type="password"
                       autoComplete="new-password"
-                      minLength={8}
-                      maxLength={128}
+                      minLength={MIN_PASSWORD_LENGTH}
+                      maxLength={MAX_PASSWORD_LENGTH}
                       value={confirmPassword}
                       onChange={(event) =>
                         setConfirmPassword(event.target.value)

@@ -11,13 +11,15 @@ import { lockPackageData } from "../../data/packages/lock-package.js";
 import { deleteUnusedPackageImageData } from "../../data/packages/delete-unused-package-image.js";
 import { touchPackageData } from "../../data/packages/touch-package.js";
 import { updatePackageDraftData } from "../../data/packages/update-package-draft.js";
+import { cleanupImagesFromR2 } from "../../utils/r2-image-storage.js";
 
 import { adminDto } from "./package-response.js";
 import { error, nextUpdate } from "./package-rules.js";
 
 export async function editPackageDraftService(db: Kysely<DB>, id: string, data: Content & { expectedUpdatedAt: string }) {
   if (data.guestMin > data.guestMax) return error("Minimum guests must not exceed maximum guests", 400);
-  return db.transaction().execute(async trx => {
+  let deletedKey: string | null = null;
+  const outcome = await db.transaction().execute(async trx => {
     const pkg = await lockPackageData(trx, id);
     if (!pkg) return error("Package not found", 404);
     if (pkg.archived_at) return error("Archived packages cannot be edited", 409);
@@ -32,8 +34,10 @@ export async function editPackageDraftService(db: Kysely<DB>, id: string, data: 
     if (current.state === "draft") await updatePackageDraftData(trx, current.id, data, updatedAt);
     else draftId = (await createPackageDraftData(trx, pkg.id, current.version + 1, data, updatedAt)).id;
     await replaceAssignmentsData(trx, draftId, assignments);
-    if (current.state === "draft") await deleteUnusedPackageImageData(trx, current.image_url);
+    if (current.state === "draft") deletedKey = await deleteUnusedPackageImageData(trx, current.image_url);
     await touchPackageData(trx, pkg.id, updatedAt);
     return adminDto(trx, pkg);
   });
+  if (deletedKey) await cleanupImagesFromR2([deletedKey]);
+  return outcome;
 }

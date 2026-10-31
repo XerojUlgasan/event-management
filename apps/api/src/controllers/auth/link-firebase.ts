@@ -1,3 +1,4 @@
+import { MAX_PASSWORD_LENGTH } from "@event-management/contracts/limits/auth";
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { errorSchema, profileSchema, toProfile } from "./profile.js";
@@ -15,7 +16,7 @@ export const linkFirebaseRoute = createRoute({
       content: {
         "application/json": {
           schema: z.object({
-            currentPassword: z.string().min(1).max(128),
+            currentPassword: z.string().min(1).max(MAX_PASSWORD_LENGTH),
           }),
         },
       },
