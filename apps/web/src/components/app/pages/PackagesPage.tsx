@@ -1,8 +1,7 @@
-import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images"
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog"
 import { useCallback, useEffect, useState } from "react"
 import { Badge, Button, Dialog, FormField, Icon, PageHeader, SearchField, Tabs } from "@event-management/ui"
-import { ApiError, archivePackage, createPackage, deletePackage, getAdminPackage, getAdminPackages, getAdminServices, publishPackage, updatePackageDraft, uploadPackageImage, deleteUnreferencedPackageImage, packageImageSrc, serviceImageSrc } from "../../../lib/api"
+import { ApiError, archivePackage, createPackage, deletePackage, getAdminPackage, getAdminPackages, getAdminServices, publishPackage, updatePackageDraft, packageImageSrc, serviceImageSrc } from "../../../lib/api"
 import type { AdminPackage, AdminService, PackageContent, PackageVersion } from "../../../lib/api"
 import { photos } from "../data"
 import { TagInput } from "../TagInput"
@@ -23,10 +22,9 @@ function contentFrom(form: Form): PackageContent {
   if (form.eventTypes.length > 50 || form.inclusions.length > 100 || form.exclusions.length > 100) throw new Error("Use up to 50 event types and 100 inclusions or exclusions.")
   if (form.imageUrl) {
     const imageUrl = form.imageUrl.trim()
-    const uploaded = /^\/v1\/package-images\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(imageUrl)
     let external = false
-    try { const url = new URL(imageUrl); external = url.protocol === "http:" || url.protocol === "https:" } catch { /* Invalid URL */ }
-    if (imageUrl.length > 2048 || (!uploaded && !external)) throw new Error("Enter a valid HTTP or HTTPS image URL.")
+    try { const url = new URL(imageUrl); external = url.protocol === "https:" } catch { /* Invalid URL */ }
+    if (imageUrl.length > 2048 || !external) throw new Error("Enter a valid HTTPS image URL.")
   }
   const min = Number(form.guestMin), max = Number(form.guestMax)
   if (!Number.isInteger(min) || !Number.isInteger(max) || min < 30 || max > 100 || min > max) throw new Error("Guest range must be between 30 and 100, with minimum no greater than maximum.")
@@ -103,15 +101,6 @@ export function PackagesPage() {
   const [serviceError, setServiceError] = useState("")
   const [editing, setEditing] = useState<{ id: string | null; updatedAt: string | null; form: Form } | null>(null)
   const [formError, setFormError] = useState("")
-  const [selectedImage, setSelectedImage] = useState<File | null>(null)
-  const [uploadingImage, setUploadingImage] = useState(false)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
-  useEffect(() => {
-    if (!selectedImage) { setImagePreview(null); return }
-    const url = URL.createObjectURL(selectedImage)
-    setImagePreview(url)
-    return () => URL.revokeObjectURL(url)
-  }, [selectedImage])
   const [step, setStep] = useState(0)
   const [preview, setPreview] = useState<PackageVersion | null>(null)
   const [confirm, setConfirm] = useState<{ item: AdminPackage; action: "publish" | "archive" | "delete" } | null>(null)
@@ -128,30 +117,20 @@ export function PackagesPage() {
       const item = await getAdminPackage(id)
       const version = item.draft || item.published
       if (!version) throw new Error("This package has no editable details.")
-      setFormError(""); setStep(0); setSelectedImage(null); setEditing({ id, updatedAt: version.updatedAt, form: formFrom(version) })
+      setFormError(""); setStep(0); setEditing({ id, updatedAt: version.updatedAt, form: formFrom(version) })
     } catch (err) { setError(message(err)) } finally { setBusy(false) }
   }
   const save = async () => {
     if (!editing) return
     setFormError(""); setBusy(true)
-    let uploadedImage: string | null = null
     try {
       const content = contentFrom(editing.form)
-      if (selectedImage) {
-        setUploadingImage(true)
-        try { uploadedImage = await uploadPackageImage(selectedImage) } finally { setUploadingImage(false) }
-        content.imageUrl = uploadedImage
-      }
       if (editing.id && editing.updatedAt) await updatePackageDraft(editing.id, content, editing.updatedAt)
       else await createPackage(content)
-      setEditing(null); setSelectedImage(null); setNotice("Draft saved."); await load()
+      setEditing(null); setNotice("Draft saved."); await load()
     } catch (err) {
-      let cleanupFailed = false
-      if (uploadedImage) {
-        try { await deleteUnreferencedPackageImage(uploadedImage) } catch { cleanupFailed = true }
-      }
       const detail = err instanceof ApiError && err.status === 409 ? `${message(err)} This package changed. Close and reopen it to load the latest details.` : message(err)
-      setFormError(cleanupFailed ? `${detail} The uploaded image could not be cleaned up.` : detail)
+      setFormError(detail)
     } finally { setBusy(false) }
   }
   const act = async () => {
@@ -174,7 +153,7 @@ export function PackagesPage() {
   })
   const setField = <K extends keyof Form>(key: K, value: Form[K]) => setEditing(current => current ? { ...current, form: { ...current.form, [key]: value } } : current)
   return <div className="content-stack packages-page">
-    <PageHeader title="Packages" description="Manage your package catalog." actions={tab === "Packages" ? <Button icon="box" disabled={busy} onClick={() => { setFormError(""); setStep(0); setSelectedImage(null); setEditing({ id: null, updatedAt: null, form: { ...emptyForm } }) }}>Create package</Button> : undefined} />
+    <PageHeader title="Packages" description="Manage your package catalog." actions={tab === "Packages" ? <Button icon="box" disabled={busy} onClick={() => { setFormError(""); setStep(0); setEditing({ id: null, updatedAt: null, form: { ...emptyForm } }) }}>Create package</Button> : undefined} />
     <Tabs className="package-tabs" active={tab} onChange={setTab} items={[{ value: "Packages", label: "Packages", count: rows.filter(item => !item.archivedAt).length }, { value: "Archives", label: "Archives", count: rows.filter(item => item.archivedAt).length }]} />
       {tab === "Packages" && <div className="package-admin-summary"><div><span>Published</span><strong>{rows.filter(item => item.published && !item.archivedAt).length}</strong><small>Visible to customers</small></div><div><span>Drafts</span><strong>{rows.filter(item => item.draft && !item.archivedAt).length}</strong><small>Awaiting publication</small></div><div><span>Archived</span><strong>{rows.filter(item => item.archivedAt).length}</strong><small>Hidden from customers</small></div></div>}
       <div className="table-tools package-tools"><SearchField value={search} onChange={event => setSearch(event.target.value)} placeholder="Search packages" />{tab === "Packages" && <select aria-label="Package status" value={status} onChange={event => setStatus(event.target.value)}><option value="all">All statuses</option><option value="published">Published</option><option value="draft">Draft</option></select>}</div>
@@ -184,13 +163,13 @@ export function PackagesPage() {
         const version = item.draft || item.published
         if (!version) return null
         return <article className="admin-package-card" key={item.id}><div className="admin-package-image"><img src={packageImageSrc(version.imageUrl) || photos.dinner} alt="" onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = photos.dinner }} /><Badge tone={item.archivedAt ? "neutral" : item.draft ? "warning" : "success"}>{item.archivedAt ? "Archived" : item.draft ? item.published ? "Draft changes" : "Draft" : "Published"}</Badge></div><div className="admin-package-body"><span className="package-kind">{version.eventTypes.join(", ")}</span><div className="card-title">{version.name || "Untitled package"}</div><p>{version.description}</p><div className="admin-package-data"><span><small>Price</small><strong>{priceLabel(version.price)}</strong></span><span><small>Capacity</small><strong>{version.guestMin}–{version.guestMax} guests</strong></span></div><div className="admin-package-actions"><Button variant="secondary" onClick={() => setPreview(version)}>Preview</Button>{!item.archivedAt && <Button disabled={busy} onClick={() => void openEdit(item.id)}>Edit draft</Button>}{item.draft && !item.archivedAt && <Button disabled={busy} onClick={() => setConfirm({ item, action: "publish" })}>Publish draft</Button>}{!item.archivedAt && item.published && <Button variant="secondary" disabled={busy} onClick={() => setConfirm({ item, action: "archive" })}>Archive</Button>}{!item.published && !item.archivedAt && <Button variant="secondary" disabled={busy} onClick={() => setConfirm({ item, action: "delete" })}>Delete</Button>}</div></div></article>
-      })}{tab === "Packages" && <button className="new-package-card" onClick={() => { setFormError(""); setStep(0); setSelectedImage(null); setEditing({ id: null, updatedAt: null, form: { ...emptyForm } }) }}><span><Icon name="box" /></span><strong>Create a new package</strong><small>Start with a draft.</small></button>}</div>
-    {editing && <Dialog className="package-wizard" onClose={() => { if (!busy && window.confirm("Discard unsaved changes?")) { setEditing(null); setSelectedImage(null) } }} eyebrow="Event package" title={editing.id ? "Edit draft" : "Create package"} actions={<><Button variant="secondary" disabled={busy} onClick={() => { if (step > 0) setStep(step - 1); else if (window.confirm("Discard unsaved changes?")) { setEditing(null); setSelectedImage(null) } }}>{step > 0 ? "Back" : "Cancel"}</Button>{step < 2 ? <Button disabled={busy} onClick={() => setStep(step + 1)}>Continue</Button> : <Button disabled={busy} onClick={() => void save()}>{uploadingImage ? "Uploading image…" : busy ? "Saving…" : "Save draft"}</Button>}</>}>
+      })}{tab === "Packages" && <button className="new-package-card" onClick={() => { setFormError(""); setStep(0); setEditing({ id: null, updatedAt: null, form: { ...emptyForm } }) }}><span><Icon name="box" /></span><strong>Create a new package</strong><small>Start with a draft.</small></button>}</div>
+    {editing && <Dialog className="package-wizard" onClose={() => { if (!busy && window.confirm("Discard unsaved changes?")) setEditing(null) }} eyebrow="Event package" title={editing.id ? "Edit draft" : "Create package"} actions={<><Button variant="secondary" disabled={busy} onClick={() => { if (step > 0) setStep(step - 1); else if (window.confirm("Discard unsaved changes?")) setEditing(null) }}>{step > 0 ? "Back" : "Cancel"}</Button>{step < 2 ? <Button disabled={busy} onClick={() => setStep(step + 1)}>Continue</Button> : <Button disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save draft"}</Button>}</>}>
       <div className="package-steps" aria-label="Package editor steps">{steps.map((name, index) => <button type="button" key={name} className={step === index ? "active" : ""} aria-current={step === index ? "step" : undefined} onClick={() => setStep(index)}><span>{index + 1}</span>{name}</button>)}</div>
       {formError && <p role="alert">{formError}</p>}
       {step === 0 && <div className="form-grid"><FormField label="Package name *"><input value={editing.form.name} onChange={e => setField("name", e.target.value)} /></FormField><TagInput label="Event types" required values={editing.form.eventTypes} onChange={value => setField("eventTypes", value)} /><FormField className="full" label="Description *"><textarea value={editing.form.description} onChange={e => setField("description", e.target.value)} /></FormField><FormField label="Minimum guests *"><input type="number" min="30" max="100" value={editing.form.guestMin} onChange={e => setField("guestMin", e.target.value)} /></FormField><FormField label="Maximum guests *"><input type="number" min="30" max="100" value={editing.form.guestMax} onChange={e => setField("guestMax", e.target.value)} /></FormField></div>}
       {step === 1 && <div className="form-grid"><TagInput label="Inclusions" values={editing.form.inclusions} onChange={value => setField("inclusions", value)} /><p className="full">Add at least one inclusion or included service before publishing.</p><TagInput label="Exclusions" values={editing.form.exclusions} onChange={value => setField("exclusions", value)} /><ServiceAssignments value={editing.form.services} onChange={value => setField("services", value)} services={services} error={serviceError} onLoad={loadServices} /><FormField className="full" label="Terms *"><textarea value={editing.form.terms} onChange={e => setField("terms", e.target.value)} /></FormField></div>}
-      {step === 2 && <><div className="form-grid"><FormField label="Package total (PHP) *"><input inputMode="decimal" placeholder="e.g. 50000.00" value={editing.form.price} onChange={e => setField("price", e.target.value)} /></FormField><FormField label="Image URL"><input type="url" placeholder="https://..." value={editing.form.imageUrl || ""} onChange={e => { setSelectedImage(null); setField("imageUrl", e.target.value) }} /></FormField><FormField className="full" label={`Or upload a JPEG or PNG (up to ${MAX_IMAGE_SIZE_BYTES / 1024 / 1024} MiB)`}><input type="file" accept="image/jpeg,image/png" disabled={busy} onChange={e => { const file = e.target.files?.[0]; e.target.value = ""; if (!file) return; if (!["image/jpeg", "image/png"].includes(file.type) || file.size > MAX_IMAGE_SIZE_BYTES || file.size === 0) { setFormError(`Choose a JPEG or PNG image up to ${MAX_IMAGE_SIZE_BYTES / 1024 / 1024} MiB.`); return } setFormError(""); setSelectedImage(file); setField("imageUrl", null) }} /></FormField>{selectedImage && <p className="full package-selected-image" role="status">Selected: {selectedImage.name} · uploaded when you save</p>}{(imagePreview || editing.form.imageUrl) && <div className="full package-image-preview"><img src={imagePreview || packageImageSrc(editing.form.imageUrl)} alt="Package preview" /><button type="button" onClick={() => { setSelectedImage(null); setField("imageUrl", null) }}>Remove image</button></div>}</div><div className="package-requirements"><strong>{missing(editing.form).length ? "Before publishing" : "Ready to publish"}</strong><p>{missing(editing.form).length ? "You can save this draft now. Complete these details before publishing:" : "All required details are present. Save the draft, then publish it from the package list."}</p>{missing(editing.form).length > 0 && <ul>{missing(editing.form).map(item => <li key={item.label}><button type="button" onClick={() => setStep(item.step)}>{item.label}</button></li>)}</ul>}</div></>}
+      {step === 2 && <><div className="form-grid"><FormField label="Package total (PHP) *"><input inputMode="decimal" placeholder="e.g. 50000.00" value={editing.form.price} onChange={e => setField("price", e.target.value)} /></FormField><FormField label="Image URL"><input type="url" placeholder="https://..." value={editing.form.imageUrl || ""} onChange={e => setField("imageUrl", e.target.value)} /></FormField>{editing.form.imageUrl && <div className="full package-image-preview"><img src={packageImageSrc(editing.form.imageUrl)} alt="Package preview" /><button type="button" onClick={() => setField("imageUrl", null)}>Remove image</button></div>}</div><div className="package-requirements"><strong>{missing(editing.form).length ? "Before publishing" : "Ready to publish"}</strong><p>{missing(editing.form).length ? "You can save this draft now. Complete these details before publishing:" : "All required details are present. Save the draft, then publish it from the package list."}</p>{missing(editing.form).length > 0 && <ul>{missing(editing.form).map(item => <li key={item.label}><button type="button" onClick={() => setStep(item.step)}>{item.label}</button></li>)}</ul>}</div></>}
     </Dialog>}
     {preview && <PackagePreview item={preview} versionState={preview.state} onClose={() => setPreview(null)} />}
     {confirm && <Dialog onClose={() => { if (!busy) setConfirm(null) }} title={`${confirm.action === "publish" ? "Publish" : confirm.action === "archive" ? "Archive" : "Delete"} package?`} actions={<><Button variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>Cancel</Button>{confirm.action === "publish" && confirm.item.draft && missing(formFrom(confirm.item.draft)).length > 0 ? <Button disabled={busy} onClick={() => { const id = confirm.item.id; setConfirm(null); void openEdit(id) }}>Edit draft</Button> : <Button disabled={busy} onClick={() => void act()}>{busy ? "Please wait…" : confirm.action === "publish" ? "Publish" : confirm.action === "archive" ? "Archive" : "Delete"}</Button>}</>}><p>{confirm.action === "publish" ? "The draft will become visible to customers after the server validates it." : confirm.action === "archive" ? "The package will be hidden from customers and its history retained." : "This permanently removes the never-published draft."}</p>{confirm.action === "publish" && confirm.item.draft && missing(formFrom(confirm.item.draft)).length > 0 && <div className="package-requirements"><strong>Complete these details first</strong><ul>{missing(formFrom(confirm.item.draft)).map(item => <li key={item.label}>{item.label}</li>)}</ul></div>}</Dialog>}

@@ -6,7 +6,7 @@ After applying the API migrations to a local database, run the workspace command
 pnpm db:seed
 ```
 
-It runs `apps/api/src/db/seed.ts` in one PostgreSQL transaction. It does not reset or truncate the database. The script writes PostgreSQL rows only; it does not create Firebase users, upload images to R2, send outbound messages, or call payment or quote services.
+It runs `apps/api/src/db/seed.ts` in one PostgreSQL transaction. It does not reset or truncate the database. The script writes PostgreSQL rows only; it does not create Firebase users, send outbound messages, or call payment or quote services.
 
 ## What it inserts
 

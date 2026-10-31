@@ -1,9 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
-import { uploadPackageImageRoute, uploadPackageImageRouteHandler } from "./upload-package-image.js";
-import { getPackageImageRoute, getPackageImageRouteHandler } from "./get-package-image.js";
-import { deletePackageImageRoute, deletePackageImageRouteHandler } from "./delete-package-image.js";
 import { listPublicPackagesRoute, listPublicPackagesRouteHandler } from "./list-public-packages.js";
 import { getPublicPackageRoute, getPublicPackageRouteHandler } from "./get-public-package.js";
 import { listAdminPackagesRoute, listAdminPackagesRouteHandler } from "./list-admin-packages.js";
@@ -23,12 +20,7 @@ const routes = new OpenAPIHono<HonoEnv>({
 const admin = requireSystemAdmin;
 routes.use("/admin/packages", requireSession, admin);
 routes.use("/admin/packages/*", requireSession, admin);
-routes.use("/admin/package-images", requireSession, admin);
-routes.use("/admin/package-images/*", requireSession, admin);
 
-routes.openapi(uploadPackageImageRoute, uploadPackageImageRouteHandler);
-routes.openapi(getPackageImageRoute, getPackageImageRouteHandler);
-routes.openapi(deletePackageImageRoute, deletePackageImageRouteHandler);
 routes.openapi(listPublicPackagesRoute, listPublicPackagesRouteHandler);
 routes.openapi(getPublicPackageRoute, getPublicPackageRouteHandler);
 routes.openapi(listAdminPackagesRoute, listAdminPackagesRouteHandler);

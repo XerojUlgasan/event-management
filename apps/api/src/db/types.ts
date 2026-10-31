@@ -15,7 +15,8 @@ export interface BookingRequests {
   contact_name: string;
   created_at: Generated<Timestamp>;
   customer_id: string;
-  ends_at: Timestamp;
+  ends_at: Timestamp | null;
+  estimated_duration: Generated<string>;
   event_type: string;
   guest_count: number;
   id: Generated<string>;
@@ -24,10 +25,11 @@ export interface BookingRequests {
   package_name: string;
   package_version_id: string;
   phone_number: string;
-  preferred_venue_location: string;
+  preferred_date: string;
+  preferred_venue_location: string | null;
   reference: string;
   special_requests: string | null;
-  starts_at: Timestamp;
+  starts_at: Timestamp | null;
   status: Generated<string>;
   time_zone: string;
   updated_at: Generated<Timestamp>;
@@ -68,12 +70,6 @@ export interface Messages {
   sender_role: Generated<string>;
 }
 
-export interface PackageImages {
-  content_type: string;
-  created_at: Generated<Timestamp>;
-  id: Generated<string>;
-}
-
 export interface Packages {
   archived_at: Timestamp | null;
   created_at: Generated<Timestamp>;
@@ -110,12 +106,6 @@ export interface PackageVersions {
   updated_at: Generated<Timestamp>;
   venue_details: string;
   version: number;
-}
-
-export interface ServiceImages {
-  content_type: string;
-  created_at: Generated<Timestamp>;
-  id: Generated<string>;
 }
 
 export interface Services {
@@ -159,23 +149,11 @@ export interface Users {
   updated_at: Generated<Timestamp>;
 }
 
-export interface VenueImages {
-  content_type: string;
-  created_at: Generated<Timestamp>;
-  id: Generated<string>;
-}
-
 export interface Venues {
   archived_at: Timestamp | null;
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   updated_at: Generated<Timestamp>;
-}
-
-export interface VenueVersionPhotos {
-  image_id: string;
-  position: number;
-  venue_version_id: string;
 }
 
 export interface VenueVersions {
@@ -185,6 +163,7 @@ export interface VenueVersions {
   created_at: Generated<Timestamp>;
   description: string;
   id: Generated<string>;
+  image_urls: Generated<string[]>;
   location: string;
   name: string;
   published_at: Timestamp | null;
@@ -199,17 +178,13 @@ export interface DB {
   booking_requests: BookingRequests;
   conversations: Conversations;
   messages: Messages;
-  package_images: PackageImages;
   package_services: PackageServices;
   package_versions: PackageVersions;
   packages: Packages;
-  service_images: ServiceImages;
   service_versions: ServiceVersions;
   services: Services;
   sessions: Sessions;
   users: Users;
-  venue_images: VenueImages;
-  venue_version_photos: VenueVersionPhotos;
   venue_versions: VenueVersions;
   venues: Venues;
 }

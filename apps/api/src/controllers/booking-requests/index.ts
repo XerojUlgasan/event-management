@@ -6,6 +6,7 @@ import { createBookingRequestRoute, createBookingRequestRouteHandler } from "./c
 import { listMyBookingRequestsRoute, listMyBookingRequestsRouteHandler, listAdminBookingRequestsRoute, listAdminBookingRequestsRouteHandler } from "./list-booking-requests.js";
 import { cancelBookingRequestRoute, cancelBookingRequestRouteHandler } from "./cancel-booking-request.js";
 import { updateBookingStatusRoute, updateBookingStatusRouteHandler } from "./update-booking-status.js";
+import { getBookingCalendarRoute, getBookingCalendarRouteHandler } from "./get-booking-calendar.js";
 const routes = new OpenAPIHono<HonoEnv>({defaultHook:(result,c) => { if (!result.success) return c.json({error:result.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; ")},400); }});
 const customer = createMiddleware<HonoEnv>(async (c,next) => { if(c.get("session").user.role !== "customer") return c.json({error:"Customer access required"},403); await next(); });
 const bookingReader = createMiddleware<HonoEnv>(async (c,next) => { if(!["admin", "staff"].includes(c.get("session").user.role)) return c.json({error:"Staff access required"},403); await next(); });
@@ -14,12 +15,13 @@ routes.use("/booking-requests/*",requireSession,customer);
 routes.use("/admin/booking-requests",requireSession,bookingReader);
 // Hono's wildcard also matches the collection path, so keep its GET readable.
 routes.use("/admin/booking-requests/*",requireSession,createMiddleware<HonoEnv>(async (c, next) => {
-  if (c.req.method === "GET" && c.req.path === "/v1/admin/booking-requests") return next();
+  if (c.req.method === "GET" && ["/v1/admin/booking-requests", "/v1/admin/booking-requests/calendar"].includes(c.req.path)) return bookingReader(c, next);
   return requireSystemAdmin(c, next);
 }));
 routes.openapi(createBookingRequestRoute,createBookingRequestRouteHandler);
 routes.openapi(cancelBookingRequestRoute,cancelBookingRequestRouteHandler);
 routes.openapi(listMyBookingRequestsRoute,listMyBookingRequestsRouteHandler);
 routes.openapi(listAdminBookingRequestsRoute,listAdminBookingRequestsRouteHandler);
+routes.openapi(getBookingCalendarRoute,getBookingCalendarRouteHandler);
 routes.openapi(updateBookingStatusRoute,updateBookingStatusRouteHandler);
 export default routes;

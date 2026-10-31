@@ -8,4 +8,4 @@
 
 Database commands use local settings from `apps/api/.env`. Use `.env.example` for variable names and keep values out of chat, docs, and logs.
 
-Catalog image bytes live in R2; the three image tables contain metadata only. Read [R2 catalog image storage](r2-image-storage.md) before changing image schema, migration, retrieval, or deletion.
+Catalog versions store external HTTPS image URLs. Read [external catalog image URLs](external-image-urls.md) before changing image schema or migration behavior.

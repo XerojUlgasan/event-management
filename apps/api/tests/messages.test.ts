@@ -328,6 +328,7 @@ test("guest history is claimed once into the signed-in customer conversation", a
       package_version_id: packageVersion.id,
       package_name: "Garden Wedding",
       event_type: "Wedding",
+      preferred_date: "2099-01-02",
       starts_at: new Date(Date.now() + 86_400_000),
       ends_at: new Date(Date.now() + 90_000_000),
       time_zone: "Asia/Manila",

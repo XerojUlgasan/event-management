@@ -20,15 +20,7 @@ export const contentSchema = z.object({
   inclusions: z.array(text).max(100),
   exclusions: z.array(text).max(100),
   terms: text,
-  imageUrl: z.string().max(2048).refine(value => {
-    if (/^\/v1\/package-images\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) return true;
-    if (!/^https?:\/\//i.test(value) || !z.url().safeParse(value).success) return false;
-    try {
-      return !/^\/v1\/package-images(?:\/|$)/i.test(decodeURIComponent(new URL(value).pathname));
-    } catch {
-      return false;
-    }
-  }, "Must be an HTTP(S) URL or uploaded image path; uploaded images must use their relative path").nullable(),
+  imageUrl: z.url().startsWith("https://").max(2048).nullable(),
   price: priceSchema.nullable(),
 });
 export type Content = z.infer<typeof contentSchema>;

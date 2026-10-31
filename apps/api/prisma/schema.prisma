@@ -84,14 +84,6 @@ model Package {
   @@map("packages")
 }
 
-model PackageImage {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  contentType String   @map("content_type")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  @@map("package_images")
-}
-
 model Venue {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -112,32 +104,13 @@ model VenueVersion {
   categories String[]
   capacityMin Int? @map("capacity_min")
   capacityMax Int? @map("capacity_max")
+  imageUrls String[] @default([]) @map("image_urls")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
   venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
-  photos VenueVersionPhoto[]
   @@unique([venueId, version])
   @@map("venue_versions")
-}
-
-model VenueImage {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  contentType String @map("content_type")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  photos VenueVersionPhoto[]
-  @@map("venue_images")
-}
-
-model VenueVersionPhoto {
-  venueVersionId String @map("venue_version_id") @db.Uuid
-  imageId String @map("image_id") @db.Uuid
-  position Int
-  version VenueVersion @relation(fields: [venueVersionId], references: [id], onDelete: Cascade)
-  image VenueImage @relation(fields: [imageId], references: [id], onDelete: Restrict)
-  @@id([venueVersionId, imageId])
-  @@unique([venueVersionId, position])
-  @@map("venue_version_photos")
 }
 
 model PackageVersion {
@@ -165,13 +138,6 @@ model PackageVersion {
 
   @@unique([packageId, version])
   @@map("package_versions")
-}
-
-model ServiceImage {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  contentType String @map("content_type")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  @@map("service_images")
 }
 
 model Service {
@@ -223,13 +189,15 @@ model BookingRequest {
   packageVersionId String @map("package_version_id") @db.Uuid
   packageName String @map("package_name")
   eventType String @map("event_type")
-  startsAt DateTime @map("starts_at") @db.Timestamptz(6)
-  endsAt DateTime @map("ends_at") @db.Timestamptz(6)
+  preferredDate String @map("preferred_date")
+  estimatedDuration String @default("undecided") @map("estimated_duration")
+  startsAt DateTime? @map("starts_at") @db.Timestamptz(6)
+  endsAt DateTime? @map("ends_at") @db.Timestamptz(6)
   timeZone String @map("time_zone")
   guestCount Int @map("guest_count")
   contactName String @map("contact_name")
   phoneNumber String @map("phone_number")
-  preferredVenueLocation String @map("preferred_venue_location")
+  preferredVenueLocation String? @map("preferred_venue_location")
   specialRequests String? @map("special_requests")
   status String @default("under_review")
   outOfRange Boolean @map("out_of_range")

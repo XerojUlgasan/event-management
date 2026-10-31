@@ -1,4 +1,4 @@
-import { SMALL_JSON_BODY_LIMIT_BYTES, CATALOG_JSON_BODY_LIMIT_BYTES, IMAGE_UPLOAD_BODY_LIMIT_BYTES } from "./constants/http.js";
+import { SMALL_JSON_BODY_LIMIT_BYTES, CATALOG_JSON_BODY_LIMIT_BYTES } from "./constants/http.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
@@ -51,11 +51,8 @@ app.use("/v1/admin/packages/*", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYT
 app.use("/v1/admin/packages", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/admin/venues", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/admin/venues/*", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/admin/venue-images", bodyLimit({ maxSize: IMAGE_UPLOAD_BODY_LIMIT_BYTES }));
-app.use("/v1/admin/package-images", bodyLimit({ maxSize: IMAGE_UPLOAD_BODY_LIMIT_BYTES }));
 
 app.route("/v1", healthRoutes);
-app.use("/v1/admin/service-images", bodyLimit({ maxSize: IMAGE_UPLOAD_BODY_LIMIT_BYTES }));
 app.use("/v1/admin/services", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/admin/services/*", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
 app.route("/v1", serviceRoutes);

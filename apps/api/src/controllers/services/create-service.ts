@@ -17,6 +17,5 @@ export const createServiceRouteHandler: AppRouteHandler<
   typeof createServiceRoute
 > = async (c) => {
   const value = await createServiceService(c.get("db"), c.req.valid("json"));
-  if ("status" in value) return c.json({ error: value.message }, value.status);
   return c.json(value, 201);
 };

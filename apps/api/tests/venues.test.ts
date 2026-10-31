@@ -8,10 +8,7 @@ import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
-import sharp from "sharp";
 import { hashSessionToken } from "../src/utils/session.js";
-import { installR2ImageStoreMock } from "./r2-image-store.js";
-import { imageObjectKey } from "../src/utils/upload-image-to-r2.js";
 
 const legacyActiveId = "b1000000-0000-0000-0000-000000000001";
 const legacyArchivedId = "b1000000-0000-0000-0000-000000000002";
@@ -26,10 +23,8 @@ let adminCookie: string;
 let staffCookie: string;
 let undesignatedAdminCookie: string;
 let customerCookie: string;
-let r2ImageStore: ReturnType<typeof installR2ImageStoreMock>;
 
 before(async () => {
-  r2ImageStore = installR2ImageStoreMock();
   assert.ok(["localhost", "127.0.0.1", "::1"].includes(process.env.DB_HOST ?? "localhost"), "Tests require local PostgreSQL");
   const connection = { host: process.env.DB_HOST ?? "localhost", port: Number(process.env.DB_PORT ?? 5432), user: process.env.DB_USER, password: process.env.DB_PASSWORD };
   admin = new Pool({ ...connection, database: process.env.DB_NAME });
@@ -69,7 +64,6 @@ after(async () => {
     }
     await admin.query(`DROP DATABASE IF EXISTS "${database}"`); await admin.end();
   }
-  r2ImageStore?.restore();
 });
 function call(path: string, method = "GET", body?: unknown, cookie?: string, origin?: string) {
   return app.request(`/v1${path}`, { method, headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...(cookie ? { Cookie: cookie } : {}), ...(origin ? { Origin: origin } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -80,14 +74,7 @@ async function read(response: Response, status: number): Promise<any> {
 }
 
 const content = { name: "  Garden  ", location: "  City  ", description: "  Venue description  ", categories: [" Garden "], capacityMin: 30, capacityMax: 100, imageUrls: [] as string[] };
-const png = await sharp({ create: { width: 1, height: 1, channels: 3, background: "#aabbcc" } }).png().toBuffer();
-async function upload(cookie = adminCookie, data = png, type = "image/png") {
-  const form = new FormData(); form.append("image", new File([new Uint8Array(data)], "photo.png", { type }));
-  return app.request("/v1/admin/venue-images", { method: "POST", headers: { Cookie: cookie }, body: form });
-}
-async function photo() { return (await read(await upload(), 201)).imageUrl as string; }
-const imagePath = (url: string) => url.replace(/^\/v1/, "");
-const imageDeletePath = (url: string) => imagePath(url).replace("/venue-images/", "/admin/venue-images/");
+const photo = (name: string) => `https://images.example.test/${name}.jpg`;
 
 test("migration preserves legacy content, IDs, dates and archived visibility", async () => {
   const active = await read(await call(`/venues/${legacyActiveId}`), 200);
@@ -112,17 +99,15 @@ test("venue catalog protects every administrative operation and validates inputs
     [`/admin/venues/${legacyActiveId}/publish`,"POST",{expectedUpdatedAt:legacyUpdatedAt}],
     [`/admin/venues/${legacyActiveId}/archive`,"POST"], [`/admin/venues/${legacyActiveId}`,"DELETE"], [`/admin/venues/${legacyActiveId}/draft`,"DELETE"],
     [`/admin/venues/${legacyActiveId}`,"PATCH",{name:"Old client",location:"City",description:"Description"}],
-    [`/admin/venue-images/${randomUUID()}`,"DELETE"],
   ];
   for (const [path,method,body] of routes) {
     await read(await call(path,method,body),401);
     for (const cookie of [staffCookie,customerCookie,undesignatedAdminCookie]) await read(await call(path,method,body,cookie),403);
   }
-  for (const cookie of [staffCookie,customerCookie,undesignatedAdminCookie]) await read(await upload(cookie),403);
   for (const invalid of [
     {...content,capacityMin:0}, {...content,capacityMax:1.5}, {...content,capacityMin:101},
-    {...content,categories:["garden"," Garden "]}, {...content,imageUrls:["https://example.test/image.png"]},
-    {...content,imageUrls:Array(11).fill(`/v1/venue-images/${randomUUID()}`)},
+    {...content,categories:["garden"," Garden "]}, {...content,imageUrls:["http://example.test/image.png"]},
+    {...content,imageUrls:Array(11).fill(photo("excess"))},
     {...content,imageUrls:[`/v1/venue-images/${randomUUID()}`]},
   ]) await read(await call("/admin/venues","POST",invalid,adminCookie),400);
   await read(await call("/venues/not-a-uuid"),400);
@@ -139,34 +124,26 @@ test("draft publication requires capacity, protects snapshots and stale edits", 
   assert.equal(created.draft.name,"Garden"); assert.equal(created.draft.location,"City"); assert.deepEqual(created.draft.categories,["Garden"]);
   await read(await call(`/venues/${created.id}`),404);
   await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:created.draft.updatedAt},adminCookie),400);
-  const firstPhoto = await photo(); const secondPhoto = await photo();
+  const firstPhoto = photo("first"); const secondPhoto = photo("second");
   let edited = await read(await call(`${path}/draft`,"PATCH",{...content,capacityMin:null,capacityMax:null,imageUrls:[firstPhoto],expectedUpdatedAt:created.draft.updatedAt},adminCookie),200);
   await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:edited.draft.updatedAt},adminCookie),400);
   edited = await read(await call(`${path}/draft`,"PATCH",{...content,imageUrls:[],expectedUpdatedAt:edited.draft.updatedAt},adminCookie),200);
-  // The removed draft-only image is cleaned up, so upload again.
-  const thirdPhoto = await photo();
+  const thirdPhoto = photo("third");
   edited = await read(await call(`${path}/draft`,"PATCH",{...content,imageUrls:[thirdPhoto,secondPhoto],expectedUpdatedAt:edited.draft.updatedAt},adminCookie),200);
   await read(await call(`${path}/draft`,"PATCH",{...content,expectedUpdatedAt:created.draft.updatedAt},adminCookie),409);
   await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:created.draft.updatedAt},adminCookie),409);
   const published = await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:edited.draft.updatedAt},adminCookie),200);
   assert.equal(published.draft,null); assert.deepEqual(published.published.imageUrls,[thirdPhoto,secondPhoto]);
   assert.deepEqual((await read(await call(`/venues/${created.id}`),200)).imageUrls,[thirdPhoto,secondPhoto]);
-  const replacementPhoto = await photo();
+  const replacementPhoto = photo("replacement");
   let replacement = await read(await call(`${path}/draft`,"PATCH",{...content,name:"Changed",imageUrls:[replacementPhoto],expectedUpdatedAt:published.published.updatedAt},adminCookie),200);
   assert.equal(replacement.draft.version,2);
   assert.equal((await read(await call(`/venues/${created.id}`),200)).name,"Garden");
-  await read(await call(imagePath(thirdPhoto)),200);
-  await read(await call(imagePath(replacementPhoto)),404);
   replacement = await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:replacement.draft.updatedAt},adminCookie),200);
   const history = replacement.versions.find((v:any)=>v.version===1);
   assert.equal(history.state,"superseded"); assert.deepEqual(history.imageUrls,[thirdPhoto,secondPhoto]);
-  await read(await call(imagePath(thirdPhoto)),404);
-  await read(await call(imagePath(thirdPhoto),"GET",undefined,adminCookie),200);
-  await read(await call(imageDeletePath(thirdPhoto),"DELETE",undefined,adminCookie),409);
   await read(await call(`${path}/archive`,"POST",undefined,adminCookie),200);
   await read(await call(`/venues/${created.id}`),404);
-  await read(await call(imagePath(replacementPhoto)),404);
-  await read(await call(imagePath(replacementPhoto),"GET",undefined,adminCookie),200);
   await read(await call(`${path}/draft`,"PATCH",{...content,expectedUpdatedAt:replacement.published.updatedAt},adminCookie),409);
   await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:replacement.published.updatedAt},adminCookie),409);
   await read(await call(`${path}/draft`,"DELETE",undefined,adminCookie),409);
@@ -183,28 +160,16 @@ test("complete venue drafts publish and stay public without photos", async () =>
   assert.ok((await read(await call("/venues"), 200)).venues.some((venue: any) => venue.id === created.id));
 });
 
-test("venue photos enforce signatures, size, access, ordered association and cleanup", async () => {
-  await read(await upload(adminCookie,Buffer.from("invalid")),400);
-  await read(await upload(adminCookie,png.subarray(0,8)),400);
-  await read(await upload(adminCookie,png,"image/jpeg"),400);
-  const max = Buffer.alloc(10*1024*1024); png.copy(max);
-  await read(await upload(adminCookie,max),201);
-  await read(await upload(adminCookie,Buffer.alloc(10*1024*1024+1)),400);
-  assert.equal((await upload(adminCookie,Buffer.alloc(11*1024*1024))).status,413);
-  const url = await photo();
-  const key = imageObjectKey("venues", url.split("/").pop()!, "image/png");
-  assert.deepEqual(r2ImageStore.objects.get(key), png);
-  const response = await call(imagePath(url),"GET",undefined,adminCookie);
-  assert.equal(response.status,200); assert.equal(response.headers.get("Content-Type"),"image/png"); assert.equal(response.headers.get("X-Content-Type-Options"),"nosniff");
-  for (const cookie of [undefined,staffCookie,customerCookie,undesignatedAdminCookie]) await read(await call(imagePath(url),"GET",undefined,cookie),404);
-  await read(await call("/admin/venues","POST",{...content,imageUrls:[url,url.toUpperCase().replace("/V1/VENUE-IMAGES/","/v1/venue-images/")]},adminCookie),400);
-  const draft = await read(await call("/admin/venues","POST",{...content,imageUrls:[url]},adminCookie),201);
-  await read(await call(imageDeletePath(url),"DELETE",undefined,adminCookie),409);
-  await read(await call(`/admin/venues/${draft.id}/draft`,"DELETE",undefined,adminCookie),204);
-  await read(await call(imagePath(url),"GET",undefined,adminCookie),404);
-  assert.equal(r2ImageStore.objects.has(key), false);
-  const orphan = await photo(); await read(await call(imageDeletePath(orphan),"DELETE",undefined,adminCookie),204);
-  await read(await call(imageDeletePath(orphan),"DELETE",undefined,adminCookie),404);
+test("venue photo URLs keep order and reject duplicates", async () => {
+  const first = photo("cover"), second = photo("detail");
+  await read(await call("/admin/venues", "POST", { ...content, imageUrls: [first, first] }, adminCookie), 400);
+  const draft = await read(await call("/admin/venues", "POST", { ...content, imageUrls: [first, second] }, adminCookie), 201);
+  assert.deepEqual(draft.draft.imageUrls, [first, second]);
+  const published = await read(await call(`/admin/venues/${draft.id}/publish`, "POST", { expectedUpdatedAt: draft.draft.updatedAt }, adminCookie), 200);
+  assert.deepEqual(published.published.imageUrls, [first, second]);
+  assert.deepEqual((await read(await call(`/venues/${draft.id}`), 200)).imageUrls, [first, second]);
+  const spec: any = await (await app.request("/openapi.json")).json();
+  assert.equal(spec.paths["/v1/admin/venue-images"], undefined);
 });
 
 test("legacy DELETE endpoint archives a draft instead of deleting it", async () => {
@@ -228,7 +193,7 @@ test("public pagination is stable and only returns published nonarchived venues;
   assert.deepEqual([...first.venues,...second.venues].map((v:any)=>v.id),all.map((v:any)=>v.id));
   assert.ok((await read(await call("/admin/venues","GET",undefined,adminCookie),200)).venues.some((v:any)=>v.id===legacyArchivedId));
   const spec = await (await app.request("/openapi.json")).json() as any;
-  for(const path of ["/v1/venues","/v1/admin/venues/{id}/draft","/v1/admin/venues/{id}/publish","/v1/admin/venues/{id}/archive","/v1/admin/venue-images"]) assert.ok(spec.paths[path]);
+  for(const path of ["/v1/venues","/v1/admin/venues/{id}/draft","/v1/admin/venues/{id}/publish","/v1/admin/venues/{id}/archive"]) assert.ok(spec.paths[path]);
   assert.ok(spec.paths["/v1/admin/venues/{id}"].delete);
   assert.ok(spec.paths["/v1/admin/venues/{id}/draft"].delete);
   assert.ok(spec.paths["/v1/admin/venues/{id}"].patch);
@@ -243,13 +208,7 @@ test("concurrent draft edits preserve one winner and database constraints reject
   const saved = await read(await call(`/admin/venues/${draft.id}`, "GET", undefined, adminCookie), 200);
   assert.ok(["First", "Second"].includes(saved.draft.name)); assert.equal(saved.versions.length,1);
   await assert.rejects(pool.query("UPDATE venue_versions SET published_at = now() WHERE id = $1", [saved.draft.id]), (cause: any) => cause.code === "23514");
-  await assert.rejects(pool.query("INSERT INTO venue_images (content_type) VALUES ('image/gif')"), (cause: any) => cause.code === "23514");
-  const jpeg = await sharp({ create: { width: 1, height: 1, channels: 3, background: "#aabbcc" } }).jpeg().toBuffer();
-  await read(await upload(adminCookie,jpeg.subarray(0,3),"image/jpeg"),400);
-  const image = await read(await upload(adminCookie,jpeg,"image/jpeg"),201);
-  const fetched = await call(imagePath(image.imageUrl),"GET",undefined,adminCookie);
-  assert.equal(fetched.status,200); assert.equal(fetched.headers.get("Content-Type"),"image/jpeg");
-  assert.deepEqual(Buffer.from(await fetched.arrayBuffer()),jpeg);
+
 });
 
 test("seed reruns preserve legacy archived venues and edited new drafts", async () => {

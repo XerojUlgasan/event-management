@@ -1,12 +1,11 @@
-import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images"
 import { MAX_VENUE_PHOTOS } from "@event-management/contracts/limits/venues"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Badge, Button, Dialog, FormField, Tabs } from "@event-management/ui"
-import { ApiError, archiveVenue, createVenue, deleteUnreferencedVenueImage, deleteVenue, getAdminVenue, getAdminVenues, publishVenue, updateVenueDraft, uploadVenueImage, venueImageSrc } from "../../../lib/api"
+import { ApiError, archiveVenue, createVenue, deleteVenue, getAdminVenue, getAdminVenues, publishVenue, updateVenueDraft, venueImageSrc } from "../../../lib/api"
 import type { AdminVenue, VenueContent, VenueVersion } from "../../../lib/api"
 import { TagInput } from "../TagInput"
 
-type Photo = { key: string; url: string; file?: File }
+type Photo = { key: string; url: string }
 type Form = Omit<VenueContent, "capacityMin" | "capacityMax" | "imageUrls"> & { capacityMin: string; capacityMax: string; photos: Photo[] }
 const empty = (): Form => ({ name: "", location: "", description: "", categories: [], capacityMin: "", capacityMax: "", photos: [] })
 const message = (error: unknown) => error instanceof Error ? error.message : "Something went wrong. Please try again."
@@ -23,43 +22,48 @@ export function VenuesPage() {
   const [tab, setTab] = useState("Venues")
   const [editing, setEditing] = useState<{ id: string | null; updatedAt: string | null; form: Form } | null>(null)
   const [formError, setFormError] = useState("")
+  const [newPhotoUrl, setNewPhotoUrl] = useState("")
   const [confirm, setConfirm] = useState<{ item: AdminVenue; action: "publish" | "archive" | "delete" } | null>(null)
   const load = useCallback(async () => {
     setLoading(true); setError("")
     try { setRows((await getAdminVenues()).venues) } catch (err) { setError(message(err)) } finally { setLoading(false) }
   }, [])
   useEffect(() => { void load() }, [load])
-  const previewUrls = useRef(new Set<string>())
-  useEffect(() => () => { for (const url of previewUrls.current) URL.revokeObjectURL(url); previewUrls.current.clear() }, [])
-  const revoke = (url: string) => { URL.revokeObjectURL(url); previewUrls.current.delete(url) }
   const close = () => {
-    if (editing) for (const photo of editing.form.photos) if (photo.file) revoke(photo.url)
     setEditing(null)
+    setNewPhotoUrl("")
   }
   const openEdit = async (id: string) => {
     setBusy(true); setError("")
-    try { const item = await getAdminVenue(id), version = item.draft || item.published; if (!version) throw new Error("This venue has no editable details."); setFormError(""); setEditing({ id, updatedAt: version.updatedAt, form: formFrom(version) }) }
+    try { const item = await getAdminVenue(id), version = item.draft || item.published; if (!version) throw new Error("This venue has no editable details."); setFormError(""); setNewPhotoUrl(""); setEditing({ id, updatedAt: version.updatedAt, form: formFrom(version) }) }
     catch (err) { setError(message(err)) } finally { setBusy(false) }
   }
   const field = <K extends keyof Form>(key: K, value: Form[K]) => setEditing(current => current ? { ...current, form: { ...current.form, [key]: value } } : current)
+  const addPhoto = () => {
+    const url = newPhotoUrl.trim()
+    if (!editing || !url) return
+    try { if (new URL(url).protocol !== "https:" || url.length > 2048) throw new Error() }
+    catch { setFormError("Enter a valid HTTPS photo URL."); return }
+    if (editing.form.photos.some(photo => photo.url.toLowerCase() === url.toLowerCase())) { setFormError("Each photo URL must be unique."); return }
+    if (editing.form.photos.length >= MAX_VENUE_PHOTOS) { setFormError(`Use up to ${MAX_VENUE_PHOTOS} photo URLs.`); return }
+    field("photos", [...editing.form.photos, { key: crypto.randomUUID(), url }])
+    setNewPhotoUrl(""); setFormError("")
+  }
   const save = async () => {
     if (!editing) return
     setBusy(true); setFormError("")
-    const uploaded: string[] = []
     try {
       const parseCapacity = (value: string) => { if (!value.trim()) return null; const number = Number(value); if (!Number.isInteger(number) || number < 1 || number > 2147483647) throw new Error("Capacity must be a positive whole number."); return number }
       const capacityMin = parseCapacity(editing.form.capacityMin), capacityMax = parseCapacity(editing.form.capacityMax)
       if (capacityMin !== null && capacityMax !== null && capacityMin > capacityMax) throw new Error("Minimum capacity cannot exceed maximum capacity.")
-      const imageUrls: string[] = []
-      for (const photo of editing.form.photos) { if (photo.file) { const url = await uploadVenueImage(photo.file); uploaded.push(url); imageUrls.push(url) } else imageUrls.push(photo.url) }
+      const imageUrls = editing.form.photos.map(photo => photo.url.trim())
+      if (imageUrls.length > MAX_VENUE_PHOTOS || new Set(imageUrls.map(url => url.toLowerCase())).size !== imageUrls.length || imageUrls.some(url => { try { return new URL(url).protocol !== "https:" || url.length > 2048 } catch { return true } })) throw new Error("Enter up to 10 unique HTTPS photo URLs.")
       const form: VenueContent = { name: editing.form.name, location: editing.form.location, description: editing.form.description, categories: editing.form.categories.map(value => value.trim()).filter(Boolean), capacityMin, capacityMax, imageUrls }
       if (editing.id && editing.updatedAt) await updateVenueDraft(editing.id, form, editing.updatedAt); else await createVenue(form)
       close(); setNotice("Venue draft saved."); await load()
     } catch (err) {
-      let cleanupFailed = false
-      for (const url of uploaded) try { await deleteUnreferencedVenueImage(url) } catch { cleanupFailed = true }
       const detail = err instanceof ApiError && err.status === 409 ? `${message(err)} This venue changed. Close and reopen it to load the latest details.` : message(err)
-      setFormError(cleanupFailed ? `${detail} Some uploaded images could not be cleaned up.` : detail)
+      setFormError(detail)
     } finally { setBusy(false) }
   }
   const act = async () => {
@@ -85,7 +89,7 @@ export function VenuesPage() {
     </article> })}</div>
     {editing && <Dialog title={editing.id ? "Edit venue draft" : "Create venue"} eyebrow="Venue catalog" onClose={() => { if (!busy && window.confirm("Discard unsaved changes?")) close() }} actions={<><Button variant="secondary" disabled={busy} onClick={() => { if (window.confirm("Discard unsaved changes?")) close() }}>Cancel</Button><Button disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save draft"}</Button></>}>
       {formError && <p role="alert">{formError}</p>}
-      <div className="form-grid"><FormField className="full" label="Title *"><input value={editing.form.name} onChange={e => field("name", e.target.value)} /></FormField><FormField className="full" label="Location *"><input value={editing.form.location} onChange={e => field("location", e.target.value)} /></FormField><FormField className="full" label="Description *"><textarea value={editing.form.description} onChange={e => field("description", e.target.value)} /></FormField><TagInput label="Categories" values={editing.form.categories} onChange={value => field("categories", value)} /><FormField label="Minimum capacity"><input type="number" min="1" step="1" value={editing.form.capacityMin} onChange={e => field("capacityMin", e.target.value)} /></FormField><FormField label="Maximum capacity"><input type="number" min="1" step="1" value={editing.form.capacityMax} onChange={e => field("capacityMax", e.target.value)} /></FormField><FormField className="full" label={`Photos (optional, up to ${MAX_VENUE_PHOTOS} JPEG or PNG files, ${MAX_IMAGE_SIZE_BYTES / 1024 / 1024} MiB each)`}><input type="file" accept="image/jpeg,image/png" multiple disabled={busy} onChange={e => { const files = Array.from(e.target.files || []); e.target.value = ""; if (!files.length) return; if (editing.form.photos.length + files.length > MAX_VENUE_PHOTOS || files.some(file => !["image/jpeg", "image/png"].includes(file.type) || file.size === 0 || file.size > MAX_IMAGE_SIZE_BYTES)) { setFormError(`Choose up to ${MAX_VENUE_PHOTOS} JPEG or PNG photos, each up to ${MAX_IMAGE_SIZE_BYTES / 1024 / 1024} MiB.`); return } setFormError(""); field("photos", [...editing.form.photos, ...files.map(file => { const url = URL.createObjectURL(file); previewUrls.current.add(url); return { key: crypto.randomUUID(), url, file } })]) }} /></FormField><div className="full"><p>Photos are optional. If added, the first photo is the cover. Add both capacity values before publishing.</p><div className="venue-photo-list">{editing.form.photos.map((photo, index) => <div className="venue-photo" key={photo.key}><img src={photo.file ? photo.url : venueImageSrc(photo.url)} alt={`Venue photo ${index + 1}${index === 0 ? ", cover" : ""}`} /><span>{index === 0 ? "Cover" : `Photo ${index + 1}`}</span><button type="button" disabled={busy || index === 0} onClick={() => { const photos = [...editing.form.photos]; [photos[index - 1], photos[index]] = [photos[index], photos[index - 1]]; field("photos", photos) }}>Move earlier</button><button type="button" disabled={busy || index === editing.form.photos.length - 1} onClick={() => { const photos = [...editing.form.photos]; [photos[index + 1], photos[index]] = [photos[index], photos[index + 1]]; field("photos", photos) }}>Move later</button><button type="button" disabled={busy} onClick={() => { if (photo.file) revoke(photo.url); field("photos", editing.form.photos.filter((_, i) => i !== index)) }}>Remove</button></div>)}</div></div></div>
+      <div className="form-grid"><FormField className="full" label="Title *"><input value={editing.form.name} onChange={e => field("name", e.target.value)} /></FormField><FormField className="full" label="Location *"><input value={editing.form.location} onChange={e => field("location", e.target.value)} /></FormField><FormField className="full" label="Description *"><textarea value={editing.form.description} onChange={e => field("description", e.target.value)} /></FormField><TagInput label="Categories" values={editing.form.categories} onChange={value => field("categories", value)} /><FormField label="Minimum capacity"><input type="number" min="1" step="1" value={editing.form.capacityMin} onChange={e => field("capacityMin", e.target.value)} /></FormField><FormField label="Maximum capacity"><input type="number" min="1" step="1" value={editing.form.capacityMax} onChange={e => field("capacityMax", e.target.value)} /></FormField><FormField className="full" label="Photo URL"><div><input type="url" placeholder="https://..." value={newPhotoUrl} disabled={busy || editing.form.photos.length >= MAX_VENUE_PHOTOS} onChange={e => setNewPhotoUrl(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addPhoto() } }} /><button type="button" disabled={busy || !newPhotoUrl.trim() || editing.form.photos.length >= MAX_VENUE_PHOTOS} onClick={addPhoto}>Add photo URL</button><p>Up to {MAX_VENUE_PHOTOS} HTTPS photo URLs; the first is the cover.</p></div></FormField><div className="full"><div className="venue-photo-list">{editing.form.photos.map((photo, index) => <div className="venue-photo" key={photo.key}><img src={venueImageSrc(photo.url)} alt={`Venue photo ${index + 1}${index === 0 ? ", cover" : ""}`} /><span>{index === 0 ? "Cover" : `Photo ${index + 1}`}</span><button type="button" disabled={busy || index === 0} onClick={() => { const photos = [...editing.form.photos]; [photos[index - 1], photos[index]] = [photos[index], photos[index - 1]]; field("photos", photos) }}>Move earlier</button><button type="button" disabled={busy || index === editing.form.photos.length - 1} onClick={() => { const photos = [...editing.form.photos]; [photos[index + 1], photos[index]] = [photos[index], photos[index + 1]]; field("photos", photos) }}>Move later</button><button type="button" disabled={busy} onClick={() => field("photos", editing.form.photos.filter((_, i) => i !== index))}>Remove</button></div>)}</div></div></div>
     </Dialog>}
     {confirm && <Dialog title={`${confirm.action === "publish" ? "Publish" : confirm.action === "archive" ? "Archive" : "Delete"} venue?`} onClose={() => { if (!busy) setConfirm(null) }} actions={<><Button variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>Cancel</Button><Button disabled={busy || (confirm.action === "publish" && (!confirm.item.draft || !ready(confirm.item.draft)))} onClick={() => void act()}>{busy ? "Please wait…" : confirm.action === "publish" ? "Publish" : confirm.action === "archive" ? "Archive" : "Delete"}</Button></>}><p>{confirm.action === "publish" ? "The server will validate and publish this draft. Complete the title, location, description, and valid minimum and maximum capacity before publishing. Photos are optional." : confirm.action === "archive" ? "The venue will no longer appear in the public catalog." : "This permanently removes the never-published draft."}</p></Dialog>}
   </div>

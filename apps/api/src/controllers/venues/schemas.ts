@@ -8,7 +8,7 @@ export const contentSchema = z.object({
   categories: z.array(z.string().trim().min(1).max(200)).max(50).refine(values => new Set(values.map(v => v.toLowerCase())).size === values.length, "Categories must be unique"),
   capacityMin: z.number().int().positive().max(2147483647).nullable(),
   capacityMax: z.number().int().positive().max(2147483647).nullable(),
-  imageUrls: z.array(z.string().regex(/^\/v1\/venue-images\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)).max(MAX_VENUE_PHOTOS).refine(values => new Set(values.map(v => v.toLowerCase())).size === values.length, "Photos must be unique"),
+  imageUrls: z.array(z.url().startsWith("https://").max(2048)).max(MAX_VENUE_PHOTOS).refine(values => new Set(values.map(v => v.toLowerCase())).size === values.length, "Photos must be unique"),
 });
 export type VenueContent = z.infer<typeof contentSchema>;
 export const versionSchema = contentSchema.extend({ id: venueIdSchema, venueId: venueIdSchema, version: z.number().int(), state: z.enum(["draft", "published", "superseded"]), updatedAt: z.string(), publishedAt: z.string().nullable() });

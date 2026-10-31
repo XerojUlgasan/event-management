@@ -5,3 +5,5 @@ export const MAX_PHONE_NUMBER_LENGTH = 100;
 export const MAX_PREFERRED_VENUE_LOCATION_LENGTH = 1000;
 export const MAX_SPECIAL_REQUESTS_LENGTH = 4000;
 export const MAX_BOOKING_REASON_LENGTH = 1000;
+export const BOOKING_ESTIMATED_DURATIONS = ["4_hours", "8_hours", "12_hours", "1_day", "2_days", "undecided"] as const;
+export type BookingEstimatedDuration = (typeof BOOKING_ESTIMATED_DURATIONS)[number];

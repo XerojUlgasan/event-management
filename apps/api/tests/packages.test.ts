@@ -4,10 +4,7 @@ import { after, before, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import sharp from "sharp";
 import { hashSessionToken } from "../src/utils/session.js";
-import { installR2ImageStoreMock } from "./r2-image-store.js";
-import { imageObjectKey } from "../src/utils/upload-image-to-r2.js";
 
 const database = `em_packages_test_${randomUUID().replaceAll("-", "")}`;
 let app: typeof import("../src/app.js").app;
@@ -18,10 +15,8 @@ let adminCookie: string;
 let staffCookie: string;
 let undesignatedAdminCookie: string;
 let customerCookie: string;
-let r2ImageStore: ReturnType<typeof installR2ImageStoreMock>;
 
 before(async () => {
-  r2ImageStore = installR2ImageStoreMock();
   assert.ok(["localhost", "127.0.0.1", "::1"].includes(process.env.DB_HOST ?? "localhost"), "Tests require local PostgreSQL");
   const connection = { host: process.env.DB_HOST ?? "localhost", port: Number(process.env.DB_PORT ?? 5432), user: process.env.DB_USER, password: process.env.DB_PASSWORD };
   admin = new Pool({ ...connection, database: process.env.DB_NAME });
@@ -49,7 +44,6 @@ after(async () => {
   await db?.destroy();
   await pool?.end();
   if (admin) { await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`); await admin.end(); }
-  r2ImageStore?.restore();
 });
 function call(path: string, method = "GET", body?: unknown, cookie?: string, origin?: string) {
   return app.request(`/v1${path}`, { method, headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...(cookie ? { Cookie: cookie } : {}), ...(origin ? { Origin: origin } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -118,101 +112,16 @@ test("catalog protects drafts, validates price, preserves versions and archives 
   assert.ok(spec.paths["/v1/admin/packages/{id}/draft"].patch);
 });
 
-test("image uploads require admin access and validate content", async () => {
-  const png = await sharp({ create: { width: 1, height: 1, channels: 3, background: "#aabbcc" } }).png().toBuffer();
-  const jpeg = await sharp(png).jpeg().toBuffer();
-  const upload = (bytes: Uint8Array, type: string, cookie?: string) => {
-    const form = new FormData();
-    form.set("image", new File([Uint8Array.from(bytes)], "upload", { type }));
-    return app.request("/v1/admin/package-images", { method: "POST", headers: cookie ? { Cookie: cookie } : {}, body: form });
-  };
-  await read(await upload(png, "image/png"), 401);
-  await read(await upload(png, "image/png", customerCookie), 403);
-  await read(await upload(png, "image/gif", adminCookie), 400);
-  await read(await upload(jpeg, "image/png", adminCookie), 400);
-  await read(await upload(Buffer.alloc(10 * 1024 * 1024 + 1), "image/png", adminCookie), 400);
-  for (const [bytes, type] of [[png, "image/png"], [jpeg, "image/jpeg"]] as const) {
-    const { imageUrl } = await read(await upload(bytes, type, adminCookie), 201);
-    const key = imageObjectKey("packages", imageUrl.split("/").pop()!, type);
-    assert.deepEqual(r2ImageStore.objects.get(key), bytes);
-    assert.equal((await app.request(imageUrl)).status, 404);
-    assert.equal((await app.request(imageUrl, { headers: { Cookie: customerCookie } })).status, 404);
-    assert.equal((await app.request(imageUrl, { headers: { Cookie: staffCookie } })).status, 404);
-    assert.equal((await app.request(imageUrl, { headers: { Cookie: undesignatedAdminCookie } })).status, 404);
-    const response = await app.request(imageUrl, { headers: { Cookie: adminCookie } });
-    assert.equal(response.status, 200);
-    assert.equal(response.headers.get("Content-Type"), type);
-    assert.equal(response.headers.get("X-Content-Type-Options"), "nosniff");
-    assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes);
-    r2ImageStore.objects.delete(key);
-    assert.equal((await app.request(imageUrl, { headers: { Cookie: adminCookie } })).status, 404);
-    r2ImageStore.objects.set(key, bytes);
-    await read(await call("/admin/packages", "POST", { ...data, imageUrl }, adminCookie), 201);
-  }
-  const max = Buffer.alloc(10 * 1024 * 1024);
-  png.copy(max);
-  await read(await upload(max, "image/png", adminCookie), 201);
-  await read(await call(`/package-images/${randomUUID()}`), 404);
-  await read(await call("/admin/packages", "POST", { ...data, imageUrl: "data:image/png;base64,AA==" }, adminCookie), 400);
-  await read(await call("/admin/packages", "POST", { ...data, imageUrl: "https://example.com/photo.png" }, adminCookie), 201);
+test("package versions keep external image URLs and reject upload paths", async () => {
+  const imageUrl = "https://images.example.test/package.jpg";
+  await read(await call("/admin/packages", "POST", { ...data, imageUrl: "/v1/package-images/old" }, adminCookie), 400);
+  await read(await call("/admin/packages", "POST", { ...data, imageUrl: "http://images.example.test/package.jpg" }, adminCookie), 400);
+  const created = await read(await call("/admin/packages", "POST", { ...data, imageUrl, price: { kind: "fixed", currency: "PHP", amountMinor: 100 } }, adminCookie), 201);
+  const published = await read(await call(`/admin/packages/${created.id}/publish`, "POST", { expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 200);
+  assert.equal((await read(await call(`/packages/${created.id}`), 200)).imageUrl, imageUrl);
   const spec: any = await (await app.request("/openapi.json")).json();
-  assert.ok(spec.paths["/v1/admin/package-images"].post);
-  assert.ok(spec.paths["/v1/package-images/{id}"].get);
-  assert.ok(spec.paths["/v1/admin/package-images/{id}"].delete);
-});
-
-test("image visibility and cleanup follow package versions", async () => {
-  const jpeg = await sharp({ create: { width: 1, height: 1, channels: 3, background: "#aabbcc" } }).jpeg().toBuffer();
-  const upload = async () => {
-    const form = new FormData();
-    form.set("image", new File([jpeg], "image.jpg", { type: "image/jpeg" }));
-    return (await read(await app.request("/v1/admin/package-images", { method: "POST", headers: { Cookie: adminCookie }, body: form }), 201)).imageUrl as string;
-  };
-  const del = (url: string, cookie?: string, origin?: string) => call(`/admin/package-images/${url.split("/").pop()}`, "DELETE", undefined, cookie, origin);
-  const unreferenced = await upload();
-  const unreferencedKey = imageObjectKey("packages", unreferenced.split("/").pop()!, "image/jpeg");
-  assert.ok(r2ImageStore.objects.has(unreferencedKey));
-  await read(await del(unreferenced), 401);
-  await read(await del(unreferenced, customerCookie), 403);
-  await read(await del(unreferenced, adminCookie, "https://untrusted.example"), 403);
-  await read(await del(unreferenced, adminCookie), 204);
-  assert.equal(r2ImageStore.objects.has(unreferencedKey), false);
-  await read(await del(unreferenced, adminCookie), 404);
-  await read(await call("/admin/packages", "POST", { ...data, imageUrl: unreferenced }, adminCookie), 400);
-
-  const draftImage = await upload();
-  const publishedImage = await upload();
-  const finalImage = await upload();
-  const price = { kind: "fixed", currency: "PHP", amountMinor: 100 };
-  const created = await read(await call("/admin/packages", "POST", { ...data, imageUrl: draftImage, price }, adminCookie), 201);
-  const path = `/admin/packages/${created.id}`;
-  await read(await call(`${path}/draft`, "PATCH", { ...data, imageUrl: `http://localhost:3000${draftImage}`, price, expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 400);
-  assert.equal((await app.request(draftImage, { headers: { Cookie: adminCookie } })).status, 200);
-  await read(await del(draftImage, adminCookie), 409);
-  const updated = await read(await call(`${path}/draft`, "PATCH", { ...data, imageUrl: publishedImage, price, expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 200);
-  assert.equal((await app.request(draftImage, { headers: { Cookie: adminCookie } })).status, 404);
-  assert.equal((await app.request(publishedImage)).status, 404);
-  const first = await read(await call(`${path}/publish`, "POST", { expectedUpdatedAt: updated.draft.updatedAt }, adminCookie), 200);
-  assert.equal((await app.request(publishedImage)).status, 200);
-  await read(await call(`${path}/draft`, "PATCH", { ...data, imageUrl: `http://localhost:3000${publishedImage}`, price, expectedUpdatedAt: first.published.updatedAt }, adminCookie), 400);
-  assert.equal((await app.request(publishedImage)).status, 200);
-  const next = await read(await call(`${path}/draft`, "PATCH", { ...data, imageUrl: finalImage, price, expectedUpdatedAt: first.published.updatedAt }, adminCookie), 200);
-  assert.equal((await app.request(finalImage)).status, 404);
-  const second = await read(await call(`${path}/publish`, "POST", { expectedUpdatedAt: next.draft.updatedAt }, adminCookie), 200);
-  assert.equal((await app.request(publishedImage)).status, 404);
-  assert.equal((await app.request(publishedImage, { headers: { Cookie: adminCookie } })).status, 200);
-  await read(await del(publishedImage, adminCookie), 409);
-  assert.equal((await app.request(finalImage)).status, 200);
-  await read(await call(`${path}/archive`, "POST", undefined, adminCookie), 200);
-  assert.equal((await app.request(finalImage)).status, 404);
-  assert.equal((await app.request(finalImage, { headers: { Cookie: adminCookie } })).status, 200);
-  await read(await del(finalImage, adminCookie), 409);
-
-  const deleteImage = await upload();
-  const deletable = await read(await call("/admin/packages", "POST", { ...data, imageUrl: deleteImage }, adminCookie), 201);
-  await read(await call(`/admin/packages/${deletable.id}`, "DELETE", undefined, adminCookie), 204);
-  assert.equal((await app.request(deleteImage, { headers: { Cookie: adminCookie } })).status, 404);
-  assert.ok(second.published);
+  assert.equal(spec.paths["/v1/admin/package-images"], undefined);
+  assert.ok(published.published);
 });
 
 test("services and package assignments preserve published versions and protect public catalog", async () => {
@@ -262,70 +171,22 @@ test("services and package assignments preserve published versions and protect p
 });
 
 
-test("service images and category tags follow publication and cleanup rules", async () => {
-  const png = await sharp({ create: { width: 1, height: 1, channels: 3, background: "#aabbcc" } }).png().toBuffer();
-  const upload = (bytes: Uint8Array, type: string, cookie?: string) => {
-    const form = new FormData();
-    form.set("image", new File([Uint8Array.from(bytes)], "image", { type }));
-    return app.request("/v1/admin/service-images", { method: "POST", headers: cookie ? { Cookie: cookie } : {}, body: form });
-  };
-  await read(await upload(png, "image/png"), 401);
-  await read(await upload(png, "image/png", customerCookie), 403);
-  await read(await upload(png, "image/jpeg", adminCookie), 400);
-  await read(await upload(new Uint8Array(10 * 1024 * 1024 + 1), "image/png", adminCookie), 400);
-  const { imageUrl } = await read(await upload(png, "image/png", adminCookie), 201);
-  const serviceKey = imageObjectKey("services", imageUrl.split("/").pop()!, "image/png");
-  assert.deepEqual(r2ImageStore.objects.get(serviceKey), png);
-  assert.match(imageUrl, /^\/v1\/service-images\/[0-9a-f-]{36}$/);
-  assert.equal((await app.request(imageUrl)).status, 404);
-  assert.equal((await app.request(imageUrl, { headers: { Cookie: staffCookie } })).status, 404);
-  assert.equal((await app.request(imageUrl, { headers: { Cookie: undesignatedAdminCookie } })).status, 404);
-  assert.equal((await app.request(imageUrl, { headers: { Cookie: adminCookie } })).status, 200);
-  const content = { name: "Photography", categories: [" Media ", "Events"], description: "Coverage", imageUrl };
+test("service versions retain external image URLs across package snapshots", async () => {
+  const imageUrl = "https://images.example.test/service.jpg";
+  const content = { name: "Photo", categories: [" Media "], description: "Coverage", imageUrl };
+  await read(await call("/admin/services", "POST", { ...content, imageUrl: "/v1/service-images/old" }, adminCookie), 400);
+  await read(await call("/admin/services", "POST", { ...content, imageUrl: "http://images.example.test/service.jpg" }, adminCookie), 400);
   const created = await read(await call("/admin/services", "POST", content, adminCookie), 201);
-  assert.deepEqual(created.draft.categories, ["Media", "Events"]);
-  await read(await call(`/admin/service-images/${imageUrl.split("/").pop()}`, "DELETE", undefined, adminCookie), 409);
-  await read(await call(`/admin/services/${created.id}/publish`, "POST", { expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 200);
-  const response = await app.request(imageUrl);
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get("Content-Type"), "image/png");
-  assert.equal(response.headers.get("X-Content-Type-Options"), "nosniff");
-  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), Uint8Array.from(png));
-  await read(await call(`/admin/services/${created.id}/archive`, "POST", undefined, adminCookie), 200);
-  assert.equal((await app.request(imageUrl)).status, 404);
-  const incomplete = await read(await call("/admin/services", "POST", { ...content, imageUrl: null, categories: [] }, adminCookie), 201);
-  await read(await call(`/admin/services/${incomplete.id}/publish`, "POST", { expectedUpdatedAt: incomplete.draft.updatedAt }, adminCookie), 400);
-  const duplicate = await read(await call("/admin/services", "POST", { ...content, imageUrl: null, categories: ["Media", " media "] }, adminCookie), 201);
-  await read(await call(`/admin/services/${duplicate.id}/publish`, "POST", { expectedUpdatedAt: duplicate.draft.updatedAt }, adminCookie), 400);
-  await read(await call("/admin/services", "POST", { ...content, imageUrl: "http://example.com/image.png" }, adminCookie), 400);
-  await read(await call("/admin/services", "POST", { ...content, imageUrl: `/v1/service-images/${randomUUID()}` }, adminCookie), 400);
-  const unused = (await read(await upload(png, "image/png", adminCookie), 201)).imageUrl;
-  await read(await call(`/admin/service-images/${unused.split("/").pop()}`, "DELETE", undefined, adminCookie), 204);
-  assert.equal(r2ImageStore.objects.has(imageObjectKey("services", unused.split("/").pop()!, "image/png")), false);
-  const spec: any = await (await app.request("/openapi.json")).json();
-  assert.ok(spec.paths["/v1/admin/service-images"].post);
-  assert.ok(spec.paths["/v1/admin/service-images/{id}"].delete);
-  assert.ok(spec.paths["/v1/service-images/{id}"].get);
-});
-
-
-test("published packages keep images of superseded service versions visible", async () => {
-  const jpeg = await sharp({ create: { width: 1, height: 1, channels: 3, background: "#aabbcc" } }).jpeg().toBuffer();
-  const form = new FormData();
-  form.set("image", new File([jpeg], "image.jpg", { type: "image/jpeg" }));
-  const { imageUrl } = await read(await app.request("/v1/admin/service-images", { method: "POST", headers: { Cookie: adminCookie }, body: form }), 201);
-  const content = { name: "Photo", categories: ["Media"], description: "Coverage", imageUrl };
-  const created = await read(await call("/admin/services", "POST", content, adminCookie), 201);
+  assert.deepEqual(created.draft.categories, ["Media"]);
   const first = await read(await call(`/admin/services/${created.id}/publish`, "POST", { expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 200);
   const assignment = { serviceVersionId: first.published.id, role: "included", includedQuantity: 1, addOnPrice: null, addOnMaxQuantity: null };
   const pkg = await read(await call("/admin/packages", "POST", { ...data, price: { kind: "fixed", currency: "PHP", amountMinor: 100 }, services: [assignment] }, adminCookie), 201);
   await read(await call(`/admin/packages/${pkg.id}/publish`, "POST", { expectedUpdatedAt: pkg.draft.updatedAt }, adminCookie), 200);
   const draft = await read(await call(`/admin/services/${created.id}/draft`, "PATCH", { ...content, imageUrl: null, expectedUpdatedAt: first.published.updatedAt }, adminCookie), 200);
   await read(await call(`/admin/services/${created.id}/publish`, "POST", { expectedUpdatedAt: draft.draft.updatedAt }, adminCookie), 200);
-  assert.equal((await app.request(imageUrl)).status, 200);
   assert.equal((await read(await call(`/packages/${pkg.id}`), 200)).services[0].service.imageUrl, imageUrl);
-  await read(await call(`/admin/packages/${pkg.id}/archive`, "POST", undefined, adminCookie), 200);
-  assert.equal((await app.request(imageUrl)).status, 404);
+  const spec: any = await (await app.request("/openapi.json")).json();
+  assert.equal(spec.paths["/v1/admin/service-images"], undefined);
 });
 
 test("public catalog pages load 15 at a time and service previews list included packages", async () => {

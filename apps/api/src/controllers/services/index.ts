@@ -38,9 +38,6 @@ import {
   deleteServiceRoute,
   deleteServiceRouteHandler,
 } from "./delete-service.js";
-import { uploadServiceImageRoute, uploadServiceImageRouteHandler } from "./upload-service-image.js";
-import { getServiceImageRoute, getServiceImageRouteHandler } from "./get-service-image.js";
-import { deleteServiceImageRoute, deleteServiceImageRouteHandler } from "./delete-service-image.js";
 const routes = new OpenAPIHono<HonoEnv>({
   defaultHook: (result, c) => {
     if (!result.success)
@@ -55,11 +52,6 @@ const routes = new OpenAPIHono<HonoEnv>({
   },
 });
 const admin = requireSystemAdmin;
-routes.use("/admin/service-images", requireSession, admin);
-routes.use("/admin/service-images/*", requireSession, admin);
-routes.openapi(uploadServiceImageRoute, uploadServiceImageRouteHandler);
-routes.openapi(getServiceImageRoute, getServiceImageRouteHandler);
-routes.openapi(deleteServiceImageRoute, deleteServiceImageRouteHandler);
 routes.use("/admin/services", requireSession, admin);
 routes.use("/admin/services/*", requireSession, admin);
 routes.openapi(listPublicServicesRoute, listPublicServicesRouteHandler);

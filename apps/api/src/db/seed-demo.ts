@@ -147,7 +147,7 @@ export async function seedDemo(db: SeedDb) {
         existing.capacity_min !== venue.capacityMin || existing.capacity_max !== venue.capacityMax ||
         JSON.stringify(existing.categories) !== JSON.stringify(venue.categories) ||
         existing.updated_at.getTime() !== existing.created_at.getTime() ||
-        await db.selectFrom("venue_version_photos").select("image_id").where("venue_version_id", "=", existing.id).executeTakeFirst()) continue;
+        existing.image_urls.length > 0) continue;
     const publishedAt = new Date(Math.max(now.getTime(), existing.updated_at.getTime() + 1, parent.updated_at.getTime() + 1));
     await db.updateTable("venue_versions").set({ state: "published", description: publishedDescription, published_at: publishedAt, updated_at: publishedAt }).where("id", "=", existing.id).execute();
     await db.updateTable("venues").set({ updated_at: publishedAt }).where("id", "=", parent.id).execute();
@@ -186,7 +186,7 @@ export async function seedDemo(db: SeedDb) {
     const endsAt = new Date(startsAt.getTime() + 4 * 3600000);
     const id = seedId(`booking-request:${scenario.key}`);
     const reference = `DEMO-${String(index + 1).padStart(3, "0")}`;
-    const inserted = await db.insertInto("booking_requests").values({ id, reference, customer_id: customer.id, package_id: pkg.id, package_version_id: pkg.versionId, package_name: pkg.name, event_type: pkg.eventType, starts_at: startsAt, ends_at: endsAt, time_zone: "Asia/Manila", guest_count: guestCount, contact_name: customer.name, phone_number: "+63 917 555 0100", preferred_venue_location: pick(venues, random).location, special_requests: scenario.note, status: scenario.status, out_of_range: guestCount < pkg.guestMin || guestCount > pkg.guestMax, created_at: now, updated_at: now })
+    const inserted = await db.insertInto("booking_requests").values({ id, reference, customer_id: customer.id, package_id: pkg.id, package_version_id: pkg.versionId, package_name: pkg.name, event_type: pkg.eventType, preferred_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(startsAt), estimated_duration: "4_hours", starts_at: startsAt, ends_at: endsAt, time_zone: "Asia/Manila", guest_count: guestCount, contact_name: customer.name, phone_number: "+63 917 555 0100", preferred_venue_location: pick(venues, random).location, special_requests: scenario.note, status: scenario.status, out_of_range: guestCount < pkg.guestMin || guestCount > pkg.guestMax, created_at: now, updated_at: now })
       .onConflict((conflict) => conflict.doNothing()).returning("id").executeTakeFirst();
     if (inserted) count.requests++;
     const request = await db.selectFrom("booking_requests").select(["id", "customer_id", "status"]).where("id", "=", id).executeTakeFirst();

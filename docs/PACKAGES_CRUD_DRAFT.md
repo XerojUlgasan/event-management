@@ -19,11 +19,11 @@ Status: implemented locally, 2026-10-27; service assignments added 2026-10-28 an
 
 ## Persistence and API contract
 
-The Prisma migrations create `packages`, `package_versions`, and `package_images`; Kysely runtime types were regenerated from the migrated schema.
+The Prisma migrations create `packages` and `package_versions`; Kysely runtime types were regenerated from the migrated schema.
 
 - `packages` stores a stable ID, timestamps, and `archived_at`.
 - `package_versions` stores a version number and state (`draft`, `published`, or `superseded`), catalog details, nullable fixed total `price_amount_minor`, and timestamps. The legacy venue-details column remains in storage for existing data but is excluded from current package API/display behavior. Partial unique indexes allow at most one draft and one published version per package. A database check enforces the 30–100 guest range.
-- `package_images` stores uploaded JPEG/PNG image metadata; bytes live in R2. The catalog stores an API-relative image path; external HTTP(S) image URLs remain supported. Each uploaded image is limited to 10 MiB by the shared `MAX_IMAGE_SIZE_BYTES` constant; see the [shared limits guidance](../context-factory/limits/SKILL.md) and [R2 key layout](../context-factory/api/reference/r2-image-storage.md).
+- `package_versions.image_url` stores an optional external HTTPS image URL. The API does not store or upload image files. See the [image cleanup migration](../context-factory/api/reference/external-image-urls.md).
 - `package_services` holds UUID-identified links from a package version to published service versions. A link is either included within the package total or an optional add-on with a fixed PHP per-unit price and maximum quantity. Published package versions retain their linked service-version details.
 - Future quotes should reference the version ID and store their issued line-item snapshot. No quote table or package reference exists yet.
 
@@ -38,9 +38,6 @@ The API price value is `null` for an incomplete draft or `{ kind: "fixed", curre
 | `POST /v1/admin/packages/:id/publish` | Admin | Accept the reviewed draft's `expectedUpdatedAt`, reject stale or archived drafts with 409, validate completeness and fixed PHP price, then publish in a transaction. |
 | `POST /v1/admin/packages/:id/archive` | Admin | Hide an existing offer from new selection while retaining history. |
 | `DELETE /v1/admin/packages/:id` | Admin | Hard-delete only a never-published, unreferenced draft; otherwise 409. |
-| `POST /v1/admin/package-images` | Admin | Validate and store a JPEG or PNG upload; return its API-relative image URL. |
-| `GET /v1/package-images/:id` | Public or admin | Serve a stored image. Unpublished uploads require admin access. |
-| `DELETE /v1/admin/package-images/:id` | Admin | Remove an upload only while no package version references it. |
 
 The API follows the repository's `@hono/zod-openapi` pattern in `apps/api/src/controllers/packages/`. The request origin guard covers write methods, CORS allows `PATCH` and `DELETE`, and catalog writes have a body limit. Session cookie auth and the database role authorize admin routes; a Firebase ID token alone does not. Public queries exclude drafts and archived versions.
 
@@ -48,16 +45,16 @@ The API follows the repository's `@hono/zod-openapi` pattern in `apps/api/src/co
 
 1. `apps/web/src/lib/api.ts` has typed catalog DTOs and explicit PATCH/DELETE support, with session cookies and API error messages.
 2. `PackageCatalog.tsx` fetches published packages for public and customer views. Its full-screen preview fetches the selected package ID and shows its approved image, terms, inclusions, guest range, and fixed PHP total. It handles loading, empty, and error states. Admins can preview draft or published versions in the same overlay without publishing them.
-3. `PackagesPage.tsx` fetches admin records and supports a three-step create/edit form: essentials, experience, and pricing/media. Event types, inclusions, and exclusions use removable tags. The final step lists missing publication requirements before draft submission, and the publish dialog guides incomplete drafts back to editing. The form accepts an HTTP(S) image URL or a JPEG/PNG upload. It uses stable IDs and `expectedUpdatedAt` for edit/publish conflicts. Search/status filters and counts use returned rows. The Quotations and Menus tabs state that they are not connected.
+3. `PackagesPage.tsx` fetches admin records and supports a three-step create/edit form: essentials, experience, and pricing/media. Event types, inclusions, and exclusions use removable tags. The final step lists missing publication requirements before draft submission, and the publish dialog guides incomplete drafts back to editing. The form accepts an HTTPS image URL. It uses stable IDs and `expectedUpdatedAt` for edit/publish conflicts. Search/status filters and counts use returned rows. The Quotations and Menus tabs state that they are not connected.
    The Experience step also assigns published services as included or optional priced add-ons. The Services sidebar item manages their drafts and publication. Public/customer preview separates included services and optional add-ons; neither implies availability or a quote.
 4. The public fixed-reference success message was removed. Book now submits a real request with `packageId` and `packageVersionId`; My events and the manager Bookings queue show that persisted record. Payment and confirmed-booking areas remain future work.
 
 ## Verification performed
 
-- `pnpm db:validate`, `pnpm check`, `pnpm build`, and `pnpm --filter @event-management/api test:packages` passed. The package suite creates and removes a disposable local PostgreSQL database. It checks private drafts, roles, validation, stale edits/publication, version replacement, archive visibility, deletion conflicts, origin rejection, and OpenAPI paths. Its image tests cover admin-only upload, JPEG/PNG type and size checks, draft image privacy, public visibility after publication, and cleanup after draft changes or deletion.
+- The package suite checks external HTTPS image URLs, rejects former upload paths, and verifies image URLs on published versions alongside catalog behavior. Current verification is reported with the change that removed uploads.
 - Both package migrations were applied to the configured local `event_management` database with `pnpm db:deploy`; no package or image records were seeded.
 - Browser QA with local test accounts saved and reloaded a private draft, edited a ₱1,250.00 fixed total, and confirmed it displayed correctly. A temporary complete offer was then published: its PHP price, terms, exclusions, and inclusions appeared in the public detail dialog, and its card appeared in the customer catalog. After archival, the public catalog returned to its empty state. Both temporary records were removed from the local database after testing; no package records were seeded.
-- Browser QA of the three-step editor confirmed typed event type and inclusion tags survive step changes and draft reload. The pricing step listed the missing price; the publish dialog offered an edit path until the price was saved. Publication then succeeded, and the public detail showed only the entered inclusion, with no automatic inclusions. A PNG selected in the browser appeared in the local preview without a database row; saving created the image row, and the admin card rendered the stored image. Its public URL returned 404 before publication, 200 with `image/png` after publication, and 404 after archival. The temporary published offers and uploaded image were removed from the local database after testing.
+- Earlier browser QA covered the previous upload workflow. The current editor accepts an HTTPS image URL and no longer uploads files; a new browser check is needed to prove the updated UI journey.
 
 ## Business decisions required before publication
 
