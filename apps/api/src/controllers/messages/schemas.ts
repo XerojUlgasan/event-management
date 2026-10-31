@@ -33,6 +33,8 @@ export const conversationSchema = z.object({
   customerEmail: z.string(),
   packageId: z.string().uuid().nullable(),
   packageName: z.string().nullable(),
+  bookingRequestId: z.string().uuid().nullable(),
+  bookingRequestReference: z.string().nullable(),
   eventType: z.string().nullable(),
   eventStartsAt: z.string().nullable(),
   eventEndsAt: z.string().nullable(),
@@ -94,6 +96,10 @@ export const claimConversationSchema = z.object({
 export const assistantReplySchema = z.object({
   message: messageSchema.nullable(),
   status: conversationStatusSchema,
+});
+
+export const conversationIdBodySchema = z.object({
+  conversationId: z.string().uuid().optional(),
 });
 
 export const errorSchema = z.object({ error: z.string() });

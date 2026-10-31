@@ -64,6 +64,7 @@ export async function claimGuestHistoryData(
         ...(reopening
           ? {
               package_id: null,
+              booking_request_id: null,
               event_type: null,
               event_starts_at: null,
               event_ends_at: null,

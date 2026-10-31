@@ -1,8 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type SubmitEvent } from "react"
-import { Button, Dialog, Icon } from "@event-management/ui"
+import { Button, Icon } from "@event-management/ui"
 
-import { PackageCatalog } from "../PackageCatalog"
-import type { ChatConversation, ChatMessage, PublicPackage } from "../../../lib/api"
+import type { ChatConversation, ChatMessage } from "../../../lib/api"
 import { initialsFromName } from "../../../lib/name"
 
 const dayFormatter = new Intl.DateTimeFormat("en-PH", {
@@ -74,7 +73,6 @@ export function MessagesWorkspace({
   staffRequesting = false,
   takeoverBusy = false,
   returningToAi = false,
-  onSelectPackage,
   onNewChat,
   newChatBusy = false,
   readOnly = false,
@@ -103,7 +101,6 @@ export function MessagesWorkspace({
   staffRequesting?: boolean
   takeoverBusy?: boolean
   returningToAi?: boolean
-  onSelectPackage?: (item: PublicPackage) => Promise<void>
   onNewChat?: () => void
   newChatBusy?: boolean
   readOnly?: boolean
@@ -111,17 +108,19 @@ export function MessagesWorkspace({
   const [draft, setDraft] = useState("")
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState("")
-  const [packagePickerOpen, setPackagePickerOpen] = useState(false)
-  const [packageSelecting, setPackageSelecting] = useState(false)
   const thread = useRef<HTMLDivElement>(null)
   const active = conversations.find((item) => item.id === activeId) ?? null
   const isTeam = viewerRole === "customer"
   const singleConversation = isTeam && conversations.length === 1
   const activeName = isTeam ? "Clemora team" : active?.customerName ?? "Messages"
   const activeDetail = isTeam
-    ? [active?.packageName, active?.eventType].filter(Boolean).join(" · ") ||
+    ? active?.bookingRequestReference
+      ? `${active.bookingRequestReference} · ${active.eventType || "Event support"}`
+      : active?.eventType ||
       "Events and catering support"
-    : active?.customerEmail ?? "Choose a conversation to reply"
+    : active?.bookingRequestReference
+      ? `${active.bookingRequestReference} · ${active.customerEmail}`
+      : active?.customerEmail ?? "Choose a conversation to reply"
   const avatar = active && !isTeam ? initialsFromName(active.customerName) : "CT"
   const activeState = active ? conversationState(active.status) : ""
   const closedForCustomer = isTeam && active?.status === "closed"
@@ -183,6 +182,9 @@ export function MessagesWorkspace({
               </span>
               <span>
                 <strong>{name}</strong>
+                {conversation.bookingRequestReference && (
+                  <em className="conversation-booking">{conversation.bookingRequestReference}</em>
+                )}
                 <small>{preview(conversation)}</small>
               </span>
               {(conversation.status === "active" || waitingLabel(conversation.status) || conversation.unreadCount > 0) && (
@@ -241,6 +243,13 @@ export function MessagesWorkspace({
                 <span className={`conversation-state ${active.status}`}>{activeState}</span>
               )}
             </span>
+            {active?.bookingRequestReference && (
+              <span className="message-booking-context">
+                <Icon name="clipboard" size={13} />
+                <span>Booking request {active.bookingRequestReference}</span>
+                {active.eventType && <span>· {active.eventType}</span>}
+              </span>
+            )}
             <small>{activeDetail}</small>
           </div>
           {active && (
@@ -258,16 +267,6 @@ export function MessagesWorkspace({
               {isTeam && active.status !== "closed" && onEditContext && (
                 <button type="button" className="message-action" onClick={onEditContext}>
                   Event details
-                </button>
-              )}
-              {isTeam && active.status !== "closed" && onSelectPackage && (
-                <button
-                  type="button"
-                  className="message-action"
-                  onClick={() => setPackagePickerOpen(true)}
-                  disabled={packageSelecting}
-                >
-                  {active.packageId ? "Change package" : "Select package"}
                 </button>
               )}
               {!isTeam && active.status !== "closed" && (onTakeover || onReturnToAi) && (
@@ -412,30 +411,6 @@ export function MessagesWorkspace({
           </form>
         )}
       </section>
-      {packagePickerOpen && onSelectPackage && (
-        <Dialog
-          onClose={() => setPackagePickerOpen(false)}
-          className="package-picker-modal"
-          eyebrow="Conversation package"
-          title="Select a package"
-          intro="Choose a published package so Clemora can keep the conversation focused and open through your event."
-        >
-          <div className="package-picker-content">
-            <PackageCatalog
-              selectionMode
-              onAsk={async (item) => {
-                setPackageSelecting(true)
-                try {
-                  await onSelectPackage(item)
-                  setPackagePickerOpen(false)
-                } finally {
-                  setPackageSelecting(false)
-                }
-              }}
-            />
-          </div>
-        </Dialog>
-      )}
     </div>
   )
 }

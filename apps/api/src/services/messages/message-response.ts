@@ -18,6 +18,8 @@ export type ConversationDto = {
   customerEmail: string;
   packageId: string | null;
   packageName: string | null;
+  bookingRequestId: string | null;
+  bookingRequestReference: string | null;
   eventType: string | null;
   eventStartsAt: string | null;
   eventEndsAt: string | null;
@@ -63,6 +65,8 @@ export function conversationDto(
     customerEmail: row.customer_email,
     packageId: row.package_id,
     packageName: row.package_name,
+    bookingRequestId: row.booking_request_id,
+    bookingRequestReference: row.booking_request_reference,
     eventType: row.event_type,
     eventStartsAt: row.event_starts_at
       ? new Date(row.event_starts_at).toISOString()
@@ -71,7 +75,11 @@ export function conversationDto(
     guestCount: row.guest_count,
     status: row.status as ConversationDto["status"],
     closedAt: row.closed_at ? new Date(row.closed_at).toISOString() : null,
-    expiresAt: conversationExpiresAt(row.package_id, row.event_ends_at, row.created_at).toISOString(),
+    expiresAt: conversationExpiresAt(
+      row.guest_chat_id ? null : row.package_id,
+      row.guest_chat_id ? null : row.booking_request_ends_at ?? row.event_ends_at,
+      row.created_at,
+    ).toISOString(),
     lastMessage,
     unreadCount,
     updatedAt: row.updated_at.toISOString(),

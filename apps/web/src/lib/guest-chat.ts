@@ -1,5 +1,4 @@
 import {
-  ApiError,
   claimGuestConversation,
   requestStaffAssistance,
   type ChatThread,
@@ -18,7 +17,6 @@ export type GuestChatEntry = {
 }
 
 export type GuestChatContext = {
-  packageId: string | null
   eventType: string | null
   eventStartsAt: string | null
   eventEndsAt: string | null
@@ -34,7 +32,6 @@ export type GuestChat = {
 }
 
 const emptyContext = (): GuestChatContext => ({
-  packageId: null,
   eventType: null,
   eventStartsAt: null,
   eventEndsAt: null,
@@ -120,7 +117,6 @@ export function guestChatMessages(chat: GuestChat, limit = 30): GuestChatMessage
 
 export function guestChatContext(chat: GuestChat): ConversationContextInput {
   const context: ConversationContextInput = {}
-  if (chat.context.packageId) context.packageId = chat.context.packageId
   if (chat.context.eventType) context.eventType = chat.context.eventType
   if (chat.context.eventStartsAt) context.eventStartsAt = chat.context.eventStartsAt
   if (chat.context.eventEndsAt) context.eventEndsAt = chat.context.eventEndsAt
@@ -134,23 +130,7 @@ async function claimGuestChat(chat: GuestChat): Promise<ChatThread> {
     messages: guestChatMessages(chat, 50),
     context: guestChatContext(chat),
   }
-  try {
-    return await claimGuestConversation(payload)
-  } catch (error) {
-    // A package can be archived between browsing and signing in. Keep the
-    // conversation and event details, and retry without the stale package.
-    if (
-      !(error instanceof ApiError) ||
-      error.status !== 400 ||
-      !payload.context.packageId
-    ) {
-      throw error
-    }
-    return claimGuestConversation({
-      ...payload,
-      context: { ...payload.context, packageId: null },
-    })
-  }
+  return claimGuestConversation(payload)
 }
 
 let pendingClaim: Promise<ChatThread | null> | null = null
@@ -167,7 +147,9 @@ export function claimPendingGuestChat(): Promise<ChatThread | null> {
       const claimed = await claimGuestChat(chat)
       // A guest who asked for a person should land in the staff queue, not
       // back with the assistant. Claiming is idempotent if this retries.
-      const thread = chat.needsStaff ? await requestStaffAssistance() : claimed
+      const thread = chat.needsStaff
+        ? await requestStaffAssistance(claimed.conversation.id)
+        : claimed
       clearGuestChat()
       return thread
     } catch {

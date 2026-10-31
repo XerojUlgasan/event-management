@@ -18,6 +18,7 @@ export function selectConversationColumnsData(db: Database) {
       "c.status",
       "c.closed_at",
       "c.guest_chat_id",
+      "c.booking_request_id",
       "c.created_at",
       "c.updated_at",
       eb.ref("customer.display_name").as("customer_display_name"),
@@ -30,5 +31,17 @@ export function selectConversationColumnsData(db: Database) {
         .orderBy("pv.published_at", "desc")
         .limit(1)
         .as("package_name"),
+      eb
+        .selectFrom("booking_requests as br")
+        .select("br.reference")
+        .whereRef("br.id", "=", "c.booking_request_id")
+        .limit(1)
+        .as("booking_request_reference"),
+      eb
+        .selectFrom("booking_requests as br")
+        .select("br.ends_at")
+        .whereRef("br.id", "=", "c.booking_request_id")
+        .limit(1)
+        .as("booking_request_ends_at"),
     ]);
 }

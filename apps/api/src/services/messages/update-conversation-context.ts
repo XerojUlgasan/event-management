@@ -5,7 +5,6 @@ import { expireConversationsData } from "../../data/messages/expire-conversation
 import { ensureConversationData } from "../../data/messages/ensure-conversation.js";
 import { updateConversationContextData } from "../../data/messages/update-conversation.js";
 import { findConversationData } from "../../data/messages/find-conversation.js";
-import { createMessageData } from "../../data/messages/create-message.js";
 import { getPublicPackageService } from "../packages/get-public-package.js";
 import { getConversationThreadService } from "./get-conversation-thread.js";
 
@@ -66,21 +65,7 @@ export async function updateConversationContextService(
   const values = await conversationContextValues(db, input);
   if (!values) return { kind: "invalid-package" as const };
   if (eventWindowInvalid(conversation, values)) return { kind: "invalid-dates" as const };
-  const packageChanged =
-    values.package_id !== undefined && values.package_id !== conversation.package_id;
-  const selectedPackage =
-    packageChanged && values.package_id
-      ? await getPublicPackageService(db, values.package_id)
-      : null;
   await updateConversationContextData(db, conversation, values);
-  if (packageChanged) {
-    const notice = selectedPackage
-      ? conversation.package_name
-        ? `Package changed from ${conversation.package_name} to ${selectedPackage.name}.`
-        : `${selectedPackage.name} was selected for this conversation.`
-      : `${conversation.package_name ?? "The selected package"} was removed from this conversation.`;
-    await createMessageData(db, conversation, null, "system", notice, undefined, "Clemora");
-  }
   const updated = await ensureConversationData(db, customerId);
   return {
     kind: "ok" as const,

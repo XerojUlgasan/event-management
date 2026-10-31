@@ -33,11 +33,9 @@ const unavailableMessage =
   "The assistant is unavailable right now. Please try again, or ask to speak with our team."
 
 export function GuestChatPanel({
-  packageContext,
   onSignIn,
   onClose,
 }: {
-  packageContext: { id: string; name: string } | null
   onSignIn: () => void
   onClose: () => void
 }) {
@@ -47,19 +45,6 @@ export function GuestChatPanel({
   const [error, setError] = useState("")
   const [showSignIn, setShowSignIn] = useState(chat.needsStaff)
   const thread = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    // The launcher opens a general chat; only the package "Ask" flow supplies
-    // a package. Keep the stored guest context in sync with that choice.
-    const packageId = packageContext?.id ?? null
-    if (chat.context.packageId === packageId) return
-    const next = {
-      ...chat,
-      context: { ...chat.context, packageId },
-    }
-    setChat(next)
-    saveGuestChat(next)
-  }, [packageContext, chat])
 
   useEffect(() => {
     const element = thread.current
@@ -187,15 +172,6 @@ export function GuestChatPanel({
           <Icon name="close" size={18} />
         </button>
       </div>
-
-      {packageContext && (
-        <div className="chat-context">
-          <Icon name="box" size={14} />
-          <span>
-            Asking about <strong>{packageContext.name}</strong>
-          </span>
-        </div>
-      )}
 
       <div className="chat-body chat-messages" ref={thread} aria-live="polite">
         {chat.messages.length === 0 && !sending && !error && (

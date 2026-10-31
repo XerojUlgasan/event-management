@@ -834,6 +834,7 @@
 .customer-messages > aside button > span:nth-child(2) { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .customer-messages > aside strong { font-size: 13px; }
 .customer-messages > aside small { overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.conversation-booking { width: fit-content; padding: 3px 7px; color: var(--wine); border: 1px solid #ead7d2; border-radius: 999px; background: #fff8f5; font-size: 10px; font-style: normal; font-weight: 700; }
 .customer-messages > section { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #faf9f7; }
 .message-thread-head { min-height: 72px; padding: 10px 24px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); background: white; }
 .message-thread-head .manager-avatar { flex: none; }
@@ -842,6 +843,8 @@
 .message-thread-name { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
 .message-thread-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .message-thread-title small { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.message-booking-context { min-width: 0; display: flex; align-items: center; gap: 5px; color: var(--wine); font-size: 11px; font-weight: 700; }
+.message-booking-context span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .message-back { display: none; }
 .message-thread { min-height: 0; flex: 1; overflow-y: auto; padding: 24px clamp(24px, 5vw, 72px); display: flex; flex-direction: column; align-items: flex-start; background: #faf9f7; }
 .message-thread .message { width: fit-content; max-width: min(65%, 560px); overflow-wrap: anywhere; margin-top: 12px; font-size: 13px; }
@@ -872,14 +875,6 @@
 .messages-send-error { margin: 8px 24px 0; color: #9e3737; font-size: 12px; line-height: 1.5; }
 .message-meta { display: block; margin-top: 5px; color: #7d7470; text-align: right; font-size: 10px; }
 .message-system-notice { width: 100%; margin: 18px 0 4px; color: var(--muted); text-align: center; font-size: 11px; line-height: 1.5; }
-.package-picker-modal { width: min(940px, calc(100vw - 32px)); max-width: none; }
-.package-picker-content { max-height: min(68vh, 680px); overflow-y: auto; }
-.package-picker-content .package-grid { margin-top: 0; }
-.package-card-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 15px; }
-.package-card-actions .card-link { margin-top: 0; }
-.package-select-link { min-height: 34px; padding: 0 12px; color: white; border: 1px solid var(--wine); border-radius: 7px; background: var(--wine); font-size: 11px; font-weight: 700; cursor: pointer; }
-.package-select-link:hover { background: #5f0a12; }
-.package-select-link:focus-visible { outline: 2px solid var(--wine); outline-offset: 2px; }
 .customer-message .message-meta { color: rgba(255,255,255,.78); }
 .admin-messages { max-width: none; }
 .admin-messages .customer-messages { height: calc(100dvh - 147px); min-height: 460px; border: 1px solid var(--line); border-radius: 10px; }
@@ -1155,13 +1150,7 @@
 
 .venue-photo-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; min-height: 140px; padding: 16px; color: #554c48; background: #f2eeeb; text-align: center; }
 
-/* Package preview call to action (layout lives in public-preview.css) */
-.package-preview-summary .button { width: fit-content; margin-top: 16px; }
-
 /* Shared guest and customer conversation states */
-.chat-context { padding: 9px 16px; display: flex; align-items: center; gap: 6px; flex: none; color: var(--wine); border-bottom: 1px solid var(--line); background: var(--cream-soft); font-size: 12px; }
-.chat-context > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-context strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-messages { min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
 .chat-messages .message { width: fit-content; max-width: 88%; }
 .chat-messages .customer-message { margin-left: auto; }
@@ -1210,8 +1199,6 @@
 .admin-takeover-prompt p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .admin-takeover-prompt .button { min-height: 40px; flex: none; }
 .messages-closed-note + .messages-closed-note { margin-top: 6px; }
-.event-context-package { margin: 0 0 16px; padding: 10px 12px; color: var(--muted); border-radius: 7px; background: var(--cream-soft); font-size: 12px; }
-.event-context-package strong { color: var(--ink); }
 .event-context-note { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .package-preview-summary .button { width: fit-content; margin-top: 16px; }
 
@@ -1219,7 +1206,6 @@
   .chat-panel { right: 16px; left: 16px; bottom: 74px; width: auto; max-height: calc(100dvh - 92px); }
   .chat-body { padding: 14px; }
   .chat-header { padding: 13px 14px; }
-  .chat-context { padding: 8px 14px; }
   .message { font-size: 14px; }
   .chat-time { font-size: 11px; }
   .message-meta { font-size: 10px; }

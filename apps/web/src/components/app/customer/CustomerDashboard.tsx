@@ -11,7 +11,7 @@ import {
 } from "@event-management/ui"
 
 import { photos } from "../data"
-import { BookingList } from "../BookingList"
+import { BookingList } from "./BookingList"
 import { PackageCatalog } from "../PackageCatalog"
 import { initialsFromName } from "../../../lib/name"
 import { SignInMethods } from "../SignInMethods"
@@ -28,7 +28,6 @@ import {
   type ChatMessage,
   type ChatConversation,
   type ChatThread,
-  type PublicPackage,
 } from "../../../lib/api"
 import {
   claimPendingGuestChat,
@@ -77,6 +76,7 @@ export function CustomerDashboard({
   const [messageThread, setMessageThread] = useState<ChatThread | null>(null)
   const [messageConversations, setMessageConversations] = useState<ChatConversation[]>([])
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
+  const [pendingBookingReference, setPendingBookingReference] = useState<string | null>(null)
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesError, setMessagesError] = useState("")
   const [assistantPending, setAssistantPending] = useState(false)
@@ -103,7 +103,9 @@ export function CustomerDashboard({
         setSelectedConversationId(claimed.conversation.id)
         setMessageThread(claimed)
       } else {
-        const targetId = selectedConversationId && conversations.some((item) => item.id === selectedConversationId)
+        const targetId = pendingBookingReference
+          ? conversations.find((item) => item.bookingRequestReference === pendingBookingReference)?.id ?? null
+          : selectedConversationId && conversations.some((item) => item.id === selectedConversationId)
           ? selectedConversationId
           : conversations[0]?.id ?? null
         setSelectedConversationId(targetId)
@@ -120,7 +122,7 @@ export function CustomerDashboard({
     } finally {
       setMessagesLoading(false)
     }
-  }, [selectedConversationId])
+  }, [pendingBookingReference, selectedConversationId])
 
   useEffect(() => {
     if (tab !== "Messages") return
@@ -149,7 +151,7 @@ export function CustomerDashboard({
     setAssistantPending(true)
     setAssistantError("")
     try {
-      const reply = await getAssistantReply()
+      const reply = await getAssistantReply(messageThread?.conversation.id)
       if (reply.message) appendMessage(reply.message)
       if (reply.status !== "active") {
         setMessageThread((current) =>
@@ -206,7 +208,7 @@ export function CustomerDashboard({
     try {
       // Put the thread in the staff queue first so a send failure cannot leave
       // the assistant answering a customer who asked for a person.
-      const thread = await requestStaffAssistance()
+      const thread = await requestStaffAssistance(messageThread?.conversation.id)
       setMessageThread(thread)
       const sent = await sendMyMessage(
         "I’d like to speak with a staff member about my event.",
@@ -219,21 +221,6 @@ export function CustomerDashboard({
       notify(cause instanceof Error ? cause.message : "Unable to request staff assistance.")
     } finally {
       setStaffRequesting(false)
-    }
-  }
-
-  const askAboutPackage = async (item: PublicPackage) => {
-    try {
-      const thread = await updateConversationContext({
-        packageId: item.id,
-        eventType: item.eventTypes[0] ?? null,
-      }, messageThread?.conversation.id)
-      setMessageThread(thread)
-      setConversationOpen(true)
-      setTab("Messages")
-      notify(`${item.name} is now linked to your conversation.`)
-    } catch (cause) {
-      notify(cause instanceof Error ? cause.message : "Unable to link this package.")
     }
   }
 
@@ -298,7 +285,7 @@ export function CustomerDashboard({
     setDialogSending(true)
     setDialogError("")
     try {
-      const thread = await requestStaffAssistance()
+      const thread = await requestStaffAssistance(messageThread?.conversation.id)
       setMessageThread(thread)
       const result = await sendMyMessage(body, messageThread?.conversation.id)
       appendMessage(result.message)
@@ -392,7 +379,7 @@ export function CustomerDashboard({
             <section className="customer-grid"><Panel title="Your requests" description="See the latest status of your event requests."><p>Preferred dates and final prices are reviewed by our team.</p><Button variant="secondary" onClick={() => setTab("My events")}>View my events</Button></Panel><Panel className="customer-manager-card" title="Talk with our team" description="Have a question about your plans?"><p>Send us a message and we’ll continue the conversation in your workspace.</p><Button variant="secondary" className="full-button" onClick={() => setMessageOpen(true)}>Send a message</Button></Panel></section>
           </div>
         )}
-        {tab === "My events" && <div className="customer-content"><BookingList onExplore={() => setTab("Packages")} /></div>}
+        {tab === "My events" && <div className="customer-content"><BookingList onExplore={() => setTab("Packages")} onOpenChat={(reference: string) => { setPendingBookingReference(reference); setTab("Messages") }} /></div>}
 
         {tab === "Packages" && (
           <div className="customer-content">
@@ -401,7 +388,7 @@ export function CustomerDashboard({
               description="Explore currently published packages."
 
             />
-            <PackageCatalog onAsk={askAboutPackage} />
+            <PackageCatalog />
           </div>
         )}
 
@@ -447,7 +434,6 @@ export function CustomerDashboard({
                 setEventError("")
                 setEventDetailsOpen(true)
               }}
-              onSelectPackage={askAboutPackage}
               onNewChat={startNewChat}
               newChatBusy={newChatBusy}
               assistantPending={assistantPending}
@@ -476,11 +462,6 @@ export function CustomerDashboard({
           intro="These details help Clemora answer with the right context. The event end also controls how long this conversation stays open."
         >
           <form onSubmit={saveEventDetails}>
-            {messageThread.conversation.packageName && (
-              <p className="event-context-package">
-                Linked package <strong>{messageThread.conversation.packageName}</strong>
-              </p>
-            )}
             <div className="form-grid">
               <FormField label="Event type">
                 <input

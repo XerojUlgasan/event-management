@@ -179,6 +179,8 @@ export type ChatConversation = {
   customerEmail: string
   packageId: string | null
   packageName: string | null
+  bookingRequestId: string | null
+  bookingRequestReference: string | null
   eventType: string | null
   eventStartsAt: string | null
   eventEndsAt: string | null
@@ -260,10 +262,10 @@ export const claimGuestConversation = (payload: {
 }) => request<ChatThread>("/messages/conversation/claim", payload)
 export const updateConversationContext = (context: ConversationContextInput, conversationId?: string) =>
   request<ChatThread>("/messages/conversation/context", { ...context, conversationId }, undefined, "PATCH")
-export const requestStaffAssistance = () =>
-  request<ChatThread>("/messages/conversation/request-staff", {})
-export const getAssistantReply = () =>
-  request<{ message: ChatMessage | null; status: ConversationStatus }>("/messages/conversation/assistant-reply", {})
+export const requestStaffAssistance = (conversationId?: string) =>
+  request<ChatThread>("/messages/conversation/request-staff", { conversationId });
+export const getAssistantReply = (conversationId?: string) =>
+  request<{ message: ChatMessage | null; status: ConversationStatus }>("/messages/conversation/assistant-reply", { conversationId });
 export const getGuestReply = (messages: GuestChatMessage[], context?: ConversationContextInput) =>
   request<{ reply: string }>("/chatbot/guest-reply", { messages, context })
 export const getAdminConversations = () =>

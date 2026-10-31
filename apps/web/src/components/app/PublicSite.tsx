@@ -12,7 +12,6 @@ type CatalogKind = "services" | "packages" | "venues"
 export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
-  const [chatPackage, setChatPackage] = useState<PublicPackage | null>(null)
   const [quoteOpen, setQuoteOpen] = useState(false)
   const [catalogOverlay, setCatalogOverlay] = useState<CatalogKind | null>(null)
 
@@ -109,13 +108,7 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
               and service needs.
             </p>
           </div>
-          <PackageCatalog
-            onViewMore={() => setCatalogOverlay("packages")}
-            onAsk={(item) => {
-              setChatPackage(item)
-              setChatOpen(true)
-            }}
-          />
+          <PackageCatalog onViewMore={() => setCatalogOverlay("packages")} />
         </section>
 
         <section className="public-services section" id="services" aria-labelledby="services-title">
@@ -172,7 +165,6 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
             </p>
             <Button
               onClick={() => {
-                setChatPackage(null)
                 setChatOpen(true)
               }}
             >
@@ -259,7 +251,6 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
           if (chatOpen) {
             setChatOpen(false)
           } else {
-            setChatPackage(null)
             setChatOpen(true)
           }
         }}
@@ -270,9 +261,6 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
 
       {chatOpen && (
         <GuestChatPanel
-          packageContext={
-            chatPackage ? { id: chatPackage.id, name: chatPackage.name } : null
-          }
           onSignIn={onEnterCustomer}
           onClose={() => setChatOpen(false)}
         />

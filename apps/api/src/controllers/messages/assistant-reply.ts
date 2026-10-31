@@ -1,7 +1,7 @@
 import { createRoute } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
-import { assistantReplySchema } from "./schemas.js";
-import { errors, json } from "./http.js";
+import { assistantReplySchema, conversationIdBodySchema } from "./schemas.js";
+import { body, errors, json } from "./http.js";
 import { replyToConversationService } from "../../services/chatbot/reply.js";
 import { GeminiUnavailableError } from "../../services/chatbot/gemini.js";
 
@@ -16,10 +16,11 @@ export const assistantReplyRoute = createRoute({
     403: errors[403],
     503: errors[503],
   },
+  request: { body: body(conversationIdBodySchema) },
 });
 export const assistantReplyRouteHandler: AppRouteHandler<typeof assistantReplyRoute> = async (c) => {
   try {
-    const result = await replyToConversationService(c.get("db"), c.get("session").user.id);
+    const result = await replyToConversationService(c.get("db"), c.get("session").user.id, c.req.valid("json").conversationId);
     return result.kind === "ok"
       ? c.json({ message: result.message, status: result.status }, 200)
       : c.json({ message: null, status: result.status as "waiting_staff" | "staff" | "closed" }, 200);

@@ -2,7 +2,7 @@ import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 import { claimGuestHistoryData } from "../../data/messages/claim-guest-history.js";
 import type { GuestHistoryMessage } from "../../data/messages/claim-guest-history.js";
-import { ensureConversationData } from "../../data/messages/ensure-conversation.js";
+import { ensureUnboundConversationData, findGuestConversationData } from "../../data/messages/ensure-conversation.js";
 import { expireConversationsData } from "../../data/messages/expire-conversations.js";
 import { updateConversationContextData } from "../../data/messages/update-conversation.js";
 import {
@@ -20,8 +20,9 @@ export async function claimGuestConversationService(
   context?: ConversationContextInput,
 ) {
   await expireConversationsData(db);
-  const conversation = await ensureConversationData(db, customerId);
-  if (conversation.guest_chat_id === guestChatId) {
+  const existingGuestConversation = await findGuestConversationData(db, customerId, guestChatId);
+  const conversation = existingGuestConversation ?? await ensureUnboundConversationData(db, customerId);
+  if (existingGuestConversation) {
     return {
       kind: "ok" as const,
       thread: await getConversationThreadService(db, conversation, "customer"),
@@ -36,7 +37,8 @@ export async function claimGuestConversationService(
   if (Object.keys(contextValues).length) {
     await updateConversationContextData(db, conversation, contextValues);
   }
-  const updated = await ensureConversationData(db, customerId);
+  const updated = await findGuestConversationData(db, customerId, guestChatId);
+  if (!updated) return { kind: "invalid-dates" as const };
   return {
     kind: "ok" as const,
     thread: await getConversationThreadService(db, updated, "customer"),

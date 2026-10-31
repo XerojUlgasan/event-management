@@ -32,9 +32,11 @@ model Conversation {
   status          String    @default("active")
   closedAt        DateTime? @map("closed_at") @db.Timestamptz(6)
   guestChatId     String?   @map("guest_chat_id")
+  bookingRequestId String?  @unique @map("booking_request_id") @db.Uuid
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   customer        User      @relation("CustomerConversations", fields: [customerId], references: [id], onDelete: Cascade)
+  bookingRequest  BookingRequest? @relation("BookingRequestConversation", fields: [bookingRequestId], references: [id], onDelete: SetNull)
   package         Package?  @relation(fields: [packageId], references: [id], onDelete: SetNull)
   messages        Message[]
 
@@ -240,6 +242,7 @@ model BookingRequest {
   package Package @relation(fields: [packageId], references: [id], onDelete: Restrict)
   packageVersion PackageVersion @relation(fields: [packageVersionId], references: [id], onDelete: Restrict)
   history BookingRequestStatusHistory[]
+  conversation Conversation? @relation("BookingRequestConversation")
   @@index([customerId, createdAt])
   @@map("booking_requests")
 }

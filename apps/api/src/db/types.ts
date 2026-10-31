@@ -43,6 +43,7 @@ export interface BookingRequestStatusHistory {
 }
 
 export interface Conversations {
+  booking_request_id: string | null;
   closed_at: Timestamp | null;
   created_at: Generated<Timestamp>;
   customer_id: string;

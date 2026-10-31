@@ -314,6 +314,46 @@ test("guest chatbot validates input and answers from approved package records", 
 });
 
 test("guest history is claimed once into the signed-in customer conversation", async () => {
+  const packageVersion = await db
+    .selectFrom("package_versions")
+    .select("id")
+    .where("package_id", "=", packageId)
+    .executeTakeFirstOrThrow();
+  const booking = await db
+    .insertInto("booking_requests")
+    .values({
+      reference: `BR-TEST-${randomUUID()}`,
+      customer_id: chatCustomerId,
+      package_id: packageId,
+      package_version_id: packageVersion.id,
+      package_name: "Garden Wedding",
+      event_type: "Wedding",
+      starts_at: new Date(Date.now() + 86_400_000),
+      ends_at: new Date(Date.now() + 90_000_000),
+      time_zone: "Asia/Manila",
+      guest_count: 80,
+      contact_name: "Chat Customer",
+      phone_number: "123",
+      preferred_venue_location: "Manila",
+      special_requests: null,
+      status: "under_review",
+      out_of_range: false,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const bound = await db
+    .insertInto("conversations")
+    .values({
+      customer_id: chatCustomerId,
+      booking_request_id: booking.id,
+      package_id: packageId,
+      event_type: "Wedding",
+      event_starts_at: new Date(Date.now() + 86_400_000),
+      event_ends_at: new Date(Date.now() + 90_000_000),
+      guest_count: 80,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
   const claim = {
     guestChatId: "guest-chat-import-1",
     messages: [
@@ -332,6 +372,8 @@ test("guest history is claimed once into the signed-in customer conversation", a
   assert.equal(first.conversation.packageName, "Garden Wedding");
   assert.equal(first.conversation.eventType, "Wedding");
   assert.equal(first.conversation.status, "active");
+  assert.notEqual(first.conversation.id, bound.id);
+  assert.equal(first.conversation.bookingRequestId, null);
   assert.deepEqual(
     first.messages.map((message: any) => message.senderRole),
     ["assistant", "customer", "assistant"],
@@ -427,12 +469,12 @@ test("conversation context, staff handoff, and takeover gate assistant replies",
     await call("/messages/conversation/context", "PATCH", { packageId: null }, chatCustomerCookie),
     200,
   );
-  assert.match(packageRemoved.messages.at(-1).body, /Garden Wedding was removed/);
+  assert.equal(packageRemoved.conversation.packageId, null);
   const packageSelected = await read(
     await call("/messages/conversation/context", "PATCH", { packageId }, chatCustomerCookie),
     200,
   );
-  assert.match(packageSelected.messages.at(-1).body, /Garden Wedding was selected/);
+  assert.equal(packageSelected.conversation.packageId, packageId);
 
   await read(
     await call("/messages/conversation/messages", "POST", { body: "Can you help?" }, chatCustomerCookie),

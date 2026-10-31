@@ -47,9 +47,14 @@ export async function replyToGuestService(
   return generateGeminiReply(systemPrompt, turnsFromHistory(messages));
 }
 
-export async function replyToConversationService(db: Kysely<DB>, customerId: string) {
+export async function replyToConversationService(db: Kysely<DB>, customerId: string, conversationId?: string) {
   await expireConversationsData(db);
-  const conversation = await ensureConversationData(db, customerId);
+  const conversation = conversationId
+    ? await findConversationData(db, conversationId)
+    : await ensureConversationData(db, customerId);
+  if (!conversation || conversation.customer_id !== customerId) {
+    return { kind: "paused" as const, status: "closed" as const };
+  }
   if (conversation.status !== "active") {
     return { kind: "paused" as const, status: conversation.status };
   }
