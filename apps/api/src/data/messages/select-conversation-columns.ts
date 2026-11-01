@@ -7,14 +7,10 @@ export function selectConversationColumnsData(db: Database) {
   return db
     .selectFrom("conversations as c")
     .innerJoin("users as customer", "customer.id", "c.customer_id")
+    .leftJoin("booking_requests as br", "br.id", "c.booking_request_id")
     .select((eb) => [
       "c.id",
       "c.customer_id",
-      "c.package_id",
-      "c.event_type",
-      "c.event_starts_at",
-      "c.event_ends_at",
-      "c.guest_count",
       "c.status",
       "c.closed_at",
       "c.booking_request_id",
@@ -22,25 +18,12 @@ export function selectConversationColumnsData(db: Database) {
       "c.updated_at",
       eb.ref("customer.display_name").as("customer_display_name"),
       eb.ref("customer.email").as("customer_email"),
-      eb
-        .selectFrom("package_versions as pv")
-        .select("pv.name")
-        .whereRef("pv.package_id", "=", "c.package_id")
-        .where("pv.state", "=", "published")
-        .orderBy("pv.published_at", "desc")
-        .limit(1)
-        .as("package_name"),
-      eb
-        .selectFrom("booking_requests as br")
-        .select("br.reference")
-        .whereRef("br.id", "=", "c.booking_request_id")
-        .limit(1)
-        .as("booking_request_reference"),
-      eb
-        .selectFrom("booking_requests as br")
-        .select("br.ends_at")
-        .whereRef("br.id", "=", "c.booking_request_id")
-        .limit(1)
-        .as("booking_request_ends_at"),
+      eb.ref("br.package_id").as("package_id"),
+      eb.ref("br.package_name").as("package_name"),
+      eb.ref("br.reference").as("booking_request_reference"),
+      eb.ref("br.event_type").as("event_type"),
+      eb.ref("br.starts_at").as("event_starts_at"),
+      eb.ref("br.ends_at").as("event_ends_at"),
+      eb.ref("br.guest_count").as("guest_count"),
     ]);
 }

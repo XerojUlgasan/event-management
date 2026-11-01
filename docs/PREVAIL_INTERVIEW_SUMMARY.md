@@ -58,7 +58,7 @@ The early comment about lacking a BIR certificate has uncertain speaker attribut
 
 ## Decisions needed before changing this workspace's product scope
 
-1. Is Prevail the same beneficiary as Clemora, a replacement beneficiary, or a separate project? Clemora's [current scope](FEATURES.md) has fixed PHP packages for 30–100 guests, while this interview discusses wider event types, custom prices, and a 500-guest example. (Video 1, 23:28–26:12)
+1. Is Prevail the same beneficiary as Clemora, a replacement beneficiary, or a separate project? Clemora's [current scope](FEATURES.md) has fixed PHP packages with a configurable maximum guest count, while this interview discusses wider event types, custom prices, and a 500-guest example. (Video 1, 23:28–26:12)
 2. Which parts of the proposed website, assistant, customer portal, management system, and staff app are actually in the first release? Prevail is also building its own AI setup, so define how the new assistant would fit alongside it. (Video 2, 10:23–11:12)
 3. What are the approved intake fields, package rules, quotation format and revisions, availability checks, venue holds, booking states, down-payment terms, receipt process, cancellation/change rules, and supplier responsibilities?
 4. Will the system remain standalone, exchange data with Meta Business Suite, or simply support staff who continue using Meta? Obtain explicit permission and a data-access plan before any integration.

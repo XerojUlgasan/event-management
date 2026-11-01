@@ -12,7 +12,7 @@ function PackageCard({ item, onPreview }: { item: PublicPackage; onPreview: () =
   return <article className="catalog-card">
     <div className="catalog-card-image"><img src={packageImageSrc(item.imageUrl) || photos.dinner} alt="" loading="lazy" onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = photos.dinner }} /></div>
     <div className="catalog-card-body"><span className="catalog-card-kicker">{item.eventTypes.join(" · ") || "Event package"}</span><h3>{item.name}</h3><p>{item.description}</p>
-      <div className="catalog-card-meta"><span>{priceLabel(item.price)}</span><span>{item.guestMin}–{item.guestMax} guests</span></div>
+      <div className="catalog-card-meta"><span>{priceLabel(item.price)}</span><span>Up to {item.guestMax} guests</span></div>
       <button type="button" className="catalog-card-action" onClick={onPreview}>View package <span aria-hidden="true">↗</span></button>
     </div>
   </article>
@@ -45,7 +45,7 @@ function VenuePreview({ item, onClose }: { item: Venue; onClose: () => void }) {
   }, [])
   return createPortal(<dialog ref={dialogRef} className="package-preview" aria-labelledby={titleId} onCancel={event => { event.preventDefault(); onClose() }}>
     <header className="package-preview-bar"><button type="button" className="package-preview-close" aria-label="Close venue preview" onClick={onClose}>×</button><span className="package-preview-brand">Clemora</span><span className="package-preview-divider" aria-hidden="true" /><span className="package-preview-label">Venue preview</span></header>
-    <div className="package-preview-scroll"><main className="package-preview-main"><div className="package-preview-intro"><span className="package-preview-overline">{item.location}</span><h1 id={titleId}>{item.name}</h1><p>{item.description}</p>{item.categories.length > 0 && <p>{item.categories.join(" · ")}</p>}{item.capacityMin != null && item.capacityMax != null && <p>{item.capacityMin}–{item.capacityMax} guests</p>}{item.imageUrls.length ? <div className="venue-photo-list">{item.imageUrls.map((url, index) => <img key={`${url}-${index}`} src={venueImageSrc(url)} alt={`${item.name} photo ${index + 1}`} />)}</div> : <p>No venue photos available.</p>}</div></main></div>
+    <div className="package-preview-scroll"><main className="package-preview-main"><div className="package-preview-intro"><span className="package-preview-overline">{item.location}</span><h1 id={titleId}>{item.name}</h1><p>{item.description}</p>{item.categories.length > 0 && <p>{item.categories.join(" · ")}</p>}{item.capacityMax != null && <p>Up to {item.capacityMax} guests</p>}{item.imageUrls.length ? <div className="venue-photo-list">{item.imageUrls.map((url, index) => <img key={`${url}-${index}`} src={venueImageSrc(url)} alt={`${item.name} photo ${index + 1}`} />)}</div> : <p>No venue photos available.</p>}</div></main></div>
   </dialog>, document.body)
 }
 
@@ -85,7 +85,7 @@ function ServicePreview({ id, onClose, onPackage }: { id: string; onClose: () =>
         <div className="package-preview-topline"><span>Event service</span><span>Clemora collection</span></div>
         <div className="service-preview-hero"><div className="service-preview-image">{service.imageUrl && <img src={serviceImageSrc(service.imageUrl)} alt="" />}</div><div className="service-preview-summary"><span className="package-preview-overline">The detail</span><h1 id={titleId}>{service.name}</h1><p>{service.description}</p><div className="package-preview-types">{service.categories.map(category => <span key={category}>{category}</span>)}</div></div></div>
         <section className="service-preview-related" aria-labelledby="service-packages-heading"><span className="package-preview-overline">Explore the experience</span><h2 id="service-packages-heading">Packages that include this service</h2>
-          {packages.length ? <div className="service-preview-package-list">{packages.map(item => <article key={item.id} className="service-preview-package"><div><h3>{item.name}</h3><p>{item.guestMin}–{item.guestMax} guests · {priceLabel(item.price)}</p></div><button type="button" onClick={() => onPackage(item.id)}>View package <span aria-hidden="true">↗</span></button></article>)}</div> : <p className="service-preview-empty">No current package includes this service. It may be available as an optional extra; check each package for its offered add-ons.</p>}
+          {packages.length ? <div className="service-preview-package-list">{packages.map(item => <article key={item.id} className="service-preview-package"><div><h3>{item.name}</h3><p>Up to {item.guestMax} guests · {priceLabel(item.price)}</p></div><button type="button" onClick={() => onPackage(item.id)}>View package <span aria-hidden="true">↗</span></button></article>)}</div> : <p className="service-preview-empty">No current package includes this service. It may be available as an optional extra; check each package for its offered add-ons.</p>}
         </section>
       </main>}
     </div>

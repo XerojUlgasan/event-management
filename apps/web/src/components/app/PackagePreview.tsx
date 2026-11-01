@@ -9,9 +9,8 @@ import { photos } from "./data"
 export function priceLabel(price: PackagePrice | null) {
   if (!price) return "Price on request"
   try {
-    const format = new Intl.NumberFormat("en-PH", { style: "currency", currency: price.currency })
-    const digits = format.resolvedOptions().maximumFractionDigits ?? 2
-    return `${format.format(price.amountMinor / 10 ** digits)} total`
+    const format = new Intl.NumberFormat("en-PH", { style: "currency", currency: price.currency, minimumFractionDigits: 0, maximumFractionDigits: 2 })
+    return `${format.format(price.amountMinor / 100)} total`
   } catch {
     return `${price.currency} ${price.amountMinor} centavos total`
   }
@@ -78,7 +77,7 @@ export function PackagePreview({ item, loading = false, error = "", versionState
               <p>{item.description || "Add a description to introduce this package."}</p>
               <div className="package-preview-summary-data">
                 <div><span>Package total</span><strong>{priceLabel(item.price)}</strong></div>
-                <div><span>Estimated guest range</span><strong>{item.guestMin}–{item.guestMax} guests</strong></div>
+                <div><span>Maximum guests</span><strong>Up to {item.guestMax} guests</strong></div>
               </div>
               <p className="package-preview-note">{admin ? "This preview does not publish the package." : "Viewing a package does not reserve a date. Your preferred date and final price are subject to staff review."}</p>
               {allowBooking && !admin && "versionId" in item && <button className="booking-start" type="button" onClick={() => { dialogRef.current?.close(); setBooking(true) }}>Book now</button>}
@@ -103,11 +102,6 @@ export function PackagePreview({ item, loading = false, error = "", versionState
                 <h2>Not included</h2>
                 <ul className="package-preview-plain-list">{item.exclusions.map((entry, index) => <li key={`${entry}-${index}`}>{entry}</li>)}</ul>
               </section>}
-              <section>
-                <span className="package-preview-overline">{item.exclusions.length > 0 ? "03" : "02"} / Before you plan</span>
-                <h2>Terms</h2>
-                <p>{item.terms || "Terms have not been specified yet."}</p>
-              </section>
             </div>
           </div>
         </main>}

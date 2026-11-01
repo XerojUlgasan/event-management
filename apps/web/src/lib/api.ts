@@ -81,8 +81,8 @@ export type AdminService = { id: string; archivedAt: string | null; draft: Servi
 export type PackageServiceInput = { serviceVersionId: string; role: "included" | "add_on"; includedQuantity: number | null; addOnPrice: PackagePrice | null; addOnMaxQuantity: number | null }
 export type PackageService = PackageServiceInput & { id: string; service: ServiceVersion }
 export type PackageContent = {
-  name: string; eventTypes: string[]; description: string; guestMin: number; guestMax: number;
-  inclusions: string[]; exclusions: string[]; terms: string;
+  name: string; eventTypes: string[]; description: string; guestMax: number;
+  inclusions: string[]; exclusions: string[];
   imageUrl: string | null; price: PackagePrice | null; services?: PackageServiceInput[]
 }
 export type PackageVersion = PackageContent & {
@@ -170,7 +170,7 @@ export type AdminUser = {
 export const getAdminUsers = () =>
   request<{ staff: AdminUser[]; customers: AdminUser[] }>("/admin/users")
 
-export type VenueContent = { name: string; location: string; description: string; categories: string[]; capacityMin: number | null; capacityMax: number | null; imageUrls: string[] }
+export type VenueContent = { name: string; location: string; description: string; categories: string[]; capacityMax: number | null; imageUrls: string[] }
 export type VenueVersion = VenueContent & { id: string; venueId: string; version: number; state: "draft" | "published" | "superseded"; updatedAt: string; publishedAt: string | null }
 export type Venue = VenueContent & { id: string; versionId: string; version: number; publishedAt: string; createdAt: string; updatedAt: string; archivedAt: null }
 export type AdminVenue = { id: string; archivedAt: string | null; draft: VenueVersion | null; published: VenueVersion | null; versions?: VenueVersion[] }
@@ -184,22 +184,12 @@ export const archiveVenue = (id: string) => request<AdminVenue>(`/admin/venues/$
 export const deleteVenue = (id: string) => request<void>(`/admin/venues/${encodeURIComponent(id)}/draft`, undefined, undefined, "DELETE")
 export const venueImageSrc = (imageUrl: string): string => imageUrl
 
-export type ConversationContextInput = {
-  packageId?: string | null
-  eventType?: string | null
-  eventStartsAt?: string | null
-  eventEndsAt?: string | null
-  guestCount?: number | null
-}
-
 export const getMyConversation = () => request<ChatThread>("/messages/conversation")
 export const createMyConversation = () => request<ChatThread>("/messages/conversations", {})
 export const getMyConversations = () => request<{ conversations: ChatConversation[] }>("/messages/conversations")
 export const getMyConversationById = (id: string) => request<ChatThread>(`/messages/conversations/${encodeURIComponent(id)}`)
 export const sendMyMessage = (body: string, conversationId?: string) =>
   request<{ message: ChatMessage }>("/messages/conversation/messages", { body, conversationId })
-export const updateConversationContext = (context: ConversationContextInput, conversationId?: string) =>
-  request<ChatThread>("/messages/conversation/context", { ...context, conversationId }, undefined, "PATCH")
 export const getAdminConversations = (cursor?: string) =>
   request<{ conversations: ChatConversation[]; nextCursor: string | null }>(
     `/admin/conversations${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
@@ -210,8 +200,8 @@ export const sendAdminMessage = (id: string, body: string) =>
   request<{ message: ChatMessage }>(`/admin/conversations/${encodeURIComponent(id)}/messages`, { body })
 
 export type BookingStatus = "under_review" | "needs_details" | "accepted" | "declined" | "cancelled"
-export type BookingRequestInput = { packageId: string; packageVersionId: string; eventType: string; preferredDate: string; estimatedDuration: BookingEstimatedDuration; timeZone: string; guestCount: number; contactName: string; phoneNumber: string; specialRequests?: string }
-export type BookingRequest = Omit<BookingRequestInput, "specialRequests" | "preferredDate" | "estimatedDuration"> & { preferredDate: string | null; estimatedDuration: BookingEstimatedDuration | null; startsAt: string | null; endsAt: string | null; preferredVenueLocation: string | null; specialRequests: string | null; id: string; reference: string; customerId: string; packageName: string; status: BookingStatus; outOfRange: boolean; createdAt: string; updatedAt: string; statusHistory: { status: BookingStatus; reason: string | null; changedBy: string; createdAt: string }[] }
+export type BookingRequestInput = { packageId: string; packageVersionId: string; eventType: string; preferredDate: string; estimatedDuration: BookingEstimatedDuration; estimatedDurationDays?: number; timeZone: string; contactName: string; phoneNumber: string; specialRequests?: string }
+export type BookingRequest = Omit<BookingRequestInput, "specialRequests" | "preferredDate" | "estimatedDuration" | "estimatedDurationDays"> & { preferredDate: string | null; estimatedDuration: BookingEstimatedDuration | null; estimatedDurationDays: number | null; guestCount: number | null; startsAt: string | null; endsAt: string | null; preferredVenueLocation: string | null; specialRequests: string | null; id: string; reference: string; customerId: string; packageName: string; status: BookingStatus; outOfRange: boolean; createdAt: string; updatedAt: string; statusHistory: { status: BookingStatus; reason: string | null; changedBy: string; createdAt: string }[] }
 export const createBookingRequest = (body: BookingRequestInput) => request<{ bookingRequest: BookingRequest }>("/booking-requests", body)
 export const getMyBookingRequests = () => request<{ bookingRequests: BookingRequest[] }>("/booking-requests/mine")
 export const getMyBookingRequest = (id: string) => request<{ bookingRequest: BookingRequest }>(`/booking-requests/${encodeURIComponent(id)}`)

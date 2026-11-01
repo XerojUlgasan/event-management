@@ -63,25 +63,4 @@ export const messageResultSchema = z.object({
   message: messageSchema,
 });
 
-const dateTime = z
-  .string()
-  .refine((value) => !Number.isNaN(Date.parse(value)), "Must be a valid date and time");
-
-export const conversationContextSchema = z
-  .object({
-    conversationId: z.string().uuid().optional(),
-    packageId: z.string().uuid().nullable().optional(),
-    eventType: z.string().trim().max(120).nullable().optional(),
-    eventStartsAt: dateTime.nullable().optional(),
-    eventEndsAt: dateTime.nullable().optional(),
-    guestCount: z.number().int().min(1).max(100000).nullable().optional(),
-  })
-  .refine(
-    (value) =>
-      !value.eventStartsAt ||
-      !value.eventEndsAt ||
-      Date.parse(value.eventEndsAt) >= Date.parse(value.eventStartsAt),
-    { message: "Event end must be after the event start", path: ["eventEndsAt"] },
-  );
-
 export const errorSchema = z.object({ error: z.string() });

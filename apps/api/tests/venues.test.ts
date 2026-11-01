@@ -73,15 +73,17 @@ async function read(response: Response, status: number): Promise<any> {
   return status === 204 ? null : response.headers.get("Content-Type")?.startsWith("image/") ? response.arrayBuffer() : response.json();
 }
 
-const content = { name: "  Garden  ", location: "  City  ", description: "  Venue description  ", categories: [" Garden "], capacityMin: 30, capacityMax: 100, imageUrls: [] as string[] };
+const content = { name: "  Garden  ", location: "  City  ", description: "  Venue description  ", categories: [" Garden "], capacityMax: 100, imageUrls: [] as string[] };
 const photo = (name: string) => `https://images.example.test/${name}.jpg`;
 
 test("migration preserves legacy content, IDs, dates and archived visibility", async () => {
+  const removedCapacityColumn = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'venue_versions' AND column_name = 'capacity_min'");
+  assert.deepEqual(removedCapacityColumn.rows, []);
   const active = await read(await call(`/venues/${legacyActiveId}`), 200);
   assert.equal(active.id, legacyActiveId); assert.equal(active.name, "Legacy active");
   assert.equal(active.location, "Original location"); assert.equal(active.description, "Original description");
   assert.equal(active.createdAt, legacyCreatedAt); assert.equal(active.updatedAt, legacyUpdatedAt); assert.equal(active.archivedAt, null);
-  assert.equal(active.publishedAt, legacyCreatedAt); assert.equal(active.capacityMin, null); assert.deepEqual(active.categories, []); assert.deepEqual(active.imageUrls, []);
+  assert.equal(active.publishedAt, legacyCreatedAt); assert.equal(active.capacityMax, null); assert.equal("capacityMin" in active, false); assert.deepEqual(active.categories, []); assert.deepEqual(active.imageUrls, []);
   const stored = await pool.query("SELECT v.created_at, v.updated_at, p.created_at AS parent_created_at, p.updated_at AS parent_updated_at FROM venue_versions v JOIN venues p ON p.id=v.venue_id WHERE p.id=$1",[legacyActiveId]);
   assert.equal(stored.rows[0].created_at.toISOString(), legacyCreatedAt); assert.equal(stored.rows[0].updated_at.toISOString(), legacyUpdatedAt);
   assert.equal(stored.rows[0].parent_created_at.toISOString(), legacyCreatedAt); assert.equal(stored.rows[0].parent_updated_at.toISOString(), legacyUpdatedAt);
@@ -105,7 +107,7 @@ test("venue catalog protects every administrative operation and validates inputs
     for (const cookie of [staffCookie,customerCookie,undesignatedAdminCookie]) await read(await call(path,method,body,cookie),403);
   }
   for (const invalid of [
-    {...content,capacityMin:0}, {...content,capacityMax:1.5}, {...content,capacityMin:101},
+    {...content,capacityMax:0}, {...content,capacityMax:1.5},
     {...content,categories:["garden"," Garden "]}, {...content,imageUrls:["http://example.test/image.png"]},
     {...content,imageUrls:Array(11).fill(photo("excess"))},
     {...content,imageUrls:[`/v1/venue-images/${randomUUID()}`]},
@@ -119,13 +121,14 @@ test("venue catalog protects every administrative operation and validates inputs
 });
 
 test("draft publication requires capacity, protects snapshots and stale edits", async () => {
-  let created = await read(await call("/admin/venues","POST",{...content,capacityMin:null,capacityMax:null},adminCookie),201);
+  let created = await read(await call("/admin/venues","POST",{...content,capacityMax:null},adminCookie),201);
   const path = `/admin/venues/${created.id}`;
   assert.equal(created.draft.name,"Garden"); assert.equal(created.draft.location,"City"); assert.deepEqual(created.draft.categories,["Garden"]);
+  assert.equal(created.draft.capacityMax, null); assert.equal("capacityMin" in created.draft, false);
   await read(await call(`/venues/${created.id}`),404);
   await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:created.draft.updatedAt},adminCookie),400);
   const firstPhoto = photo("first"); const secondPhoto = photo("second");
-  let edited = await read(await call(`${path}/draft`,"PATCH",{...content,capacityMin:null,capacityMax:null,imageUrls:[firstPhoto],expectedUpdatedAt:created.draft.updatedAt},adminCookie),200);
+  let edited = await read(await call(`${path}/draft`,"PATCH",{...content,capacityMax:null,imageUrls:[firstPhoto],expectedUpdatedAt:created.draft.updatedAt},adminCookie),200);
   await read(await call(`${path}/publish`,"POST",{expectedUpdatedAt:edited.draft.updatedAt},adminCookie),400);
   edited = await read(await call(`${path}/draft`,"PATCH",{...content,imageUrls:[],expectedUpdatedAt:edited.draft.updatedAt},adminCookie),200);
   const thirdPhoto = photo("third");
@@ -154,8 +157,12 @@ test("complete venue drafts publish and stay public without photos", async () =>
   assert.deepEqual(created.draft.imageUrls, []);
   const published = await read(await call(`/admin/venues/${created.id}/publish`, "POST", { expectedUpdatedAt: created.draft.updatedAt }, adminCookie), 200);
   assert.equal(published.draft, null);
+  assert.equal(published.published.capacityMax, 100);
+  assert.equal("capacityMin" in published.published, false);
   assert.deepEqual(published.published.imageUrls, []);
   const publicVenue = await read(await call(`/venues/${created.id}`), 200);
+  assert.equal(publicVenue.capacityMax, 100);
+  assert.equal("capacityMin" in publicVenue, false);
   assert.deepEqual(publicVenue.imageUrls, []);
   assert.ok((await read(await call("/venues"), 200)).venues.some((venue: any) => venue.id === created.id));
 });

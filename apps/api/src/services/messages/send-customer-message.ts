@@ -22,18 +22,13 @@ export async function sendCustomerMessageService(
     throw new Error("Conversation not found");
   }
 
-  // Sending after expiry starts a new active cycle in this thread while
-  // preserving the previous message history.
+  // General conversations can reopen, but expired booking threads remain closed.
   if (conversation.status === "closed") {
+    if (conversation.booking_request_id) throw new Error("Conversation is closed");
     await updateConversationData(db, conversation.id, {
       status: "active",
       closed_at: null,
       created_at: new Date(),
-      package_id: null,
-      event_type: null,
-      event_starts_at: null,
-      event_ends_at: null,
-      guest_count: null,
     });
   }
 

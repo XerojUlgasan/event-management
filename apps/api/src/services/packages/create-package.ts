@@ -11,7 +11,6 @@ import { adminDto } from "./package-response.js";
 import { error } from "./package-rules.js";
 
 export async function createPackageService(db: Kysely<DB>, data: Content) {
-  if (data.guestMin > data.guestMax) return error("Minimum guests must not exceed maximum guests", 400);
   return db.transaction().execute(async trx => {
     if (!await validateAssignmentsData(trx, data.services ?? [])) return error("Service assignments must reference current published services", 400);
     const pkg = await createPackageData(trx, randomUUID());

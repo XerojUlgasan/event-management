@@ -69,8 +69,7 @@ export function conversationDto(
     status: row.status as ConversationDto["status"],
     closedAt: row.closed_at ? new Date(row.closed_at).toISOString() : null,
     expiresAt: conversationExpiresAt(
-      row.package_id,
-      row.booking_request_ends_at ?? row.event_ends_at,
+      row.event_ends_at,
       row.created_at,
     ).toISOString(),
     lastMessage,

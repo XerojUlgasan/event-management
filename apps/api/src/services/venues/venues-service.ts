@@ -10,20 +10,17 @@ import { archiveVenueData } from "../../data/venues/archive-venue.js";
 import { deleteVenueData } from "../../data/venues/delete-venue.js";
 import { venueAdminDto, venuePublicDto } from "./venue-response.js";
 import { error, nextUpdate } from "./venue-rules.js";
-const validCapacity = (input: VenueContent) => input.capacityMin === null || input.capacityMax === null || input.capacityMin <= input.capacityMax;
 export async function listVenuesService(db: Kysely<DB>, limit?: number, offset = 0) { const rows = await listPublicVenuesData(db, limit === undefined ? undefined : limit + 1, offset); return { venues: await Promise.all((limit === undefined ? rows : rows.slice(0, limit)).map(v => venuePublicDto(db, v))), nextOffset: limit !== undefined && rows.length > limit ? offset + limit : null }; }
 export async function listAdminVenuesService(db: Kysely<DB>) { return { venues: await Promise.all((await listAdminVenuesData(db)).map(v => venueAdminDto(db, v))) }; }
 export async function getVenueService(db: Kysely<DB>, id: string) { const row = await findPublishedVenueData(db, id); return row ? venuePublicDto(db, row) : error("Venue not found", 404); }
 export async function getAdminVenueService(db: Kysely<DB>, id: string) { const venue = await findVenueData(db, id); return venue ? venueAdminDto(db, venue) : error("Venue not found", 404); }
 export async function createVenueService(db: Kysely<DB>, input: VenueContent) {
- if (!validCapacity(input)) return error("Minimum capacity must not exceed maximum capacity", 400);
  return db.transaction().execute(async trx => {
   const venue = await createVenueData(trx); await createVenueDraftData(trx, venue.id, 1, input);
   return venueAdminDto(trx, venue);
  });
 }
 export async function updateVenueService(db: Kysely<DB>, id: string, input: VenueContent & { expectedUpdatedAt: string }) {
- if (!validCapacity(input)) return error("Minimum capacity must not exceed maximum capacity", 400);
  const outcome = await db.transaction().execute(async trx => {
   const venue = await lockVenueData(trx, id); if (!venue) return error("Venue not found", 404);
   if (venue.archived_at) return error("Archived venues cannot be edited", 409);
@@ -43,7 +40,7 @@ export async function publishVenueService(db: Kysely<DB>, id: string, expected: 
   const draft = (await listVenueVersionsData(trx, id)).find(v => v.state === "draft");
   if (!draft) return error("No draft to publish", 409);
   if (draft.updated_at.toISOString() !== expected) return error("Venue changed. Refresh and try again", 409);
-  if (![draft.name, draft.location, draft.description].every(v => v.trim()) || draft.capacity_min === null || draft.capacity_max === null) return error("Complete title, location, description, and capacity before publishing", 400);
+  if (![draft.name, draft.location, draft.description].every(v => v.trim()) || draft.capacity_max === null) return error("Complete title, location, description, and maximum capacity before publishing", 400);
   const now = nextUpdate(draft.updated_at); await publishVenueDraftData(trx, id, draft.id, now); await touchVenueData(trx, id, now);
   return venueAdminDto(trx, venue);
  });

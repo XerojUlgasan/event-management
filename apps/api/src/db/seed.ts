@@ -32,28 +32,27 @@ const venues = [
 ];
 
 const legacyDescription = "Sample draft. Replace these details with an approved offer before publishing.";
-const sampleTerms = "Demo data only. Staff must approve the offer and confirm availability before using it for a customer.";
 const packages = [
   {
     id: "a4e55db2-745b-4bdb-bf92-38e7d29261d1", name: "Sample Wedding Package", eventTypes: ["Wedding"],
-    description: "Demo wedding reception package with a fixed sample total for 50 to 100 guests.",
-    guestMin: 50, guestMax: 100,
+    description: "Demo wedding reception package with a fixed sample total for up to 100 guests.",
+    guestMax: 100,
     inclusions: ["Sample reception setup", "Sample buffet catering"],
-    exclusions: ["Optional add-ons and extra venue hours"], priceAmountMinor: 12000000,
+    exclusions: ["Optional add-ons and extra venue hours"], price: 120000,
   },
   {
     id: "a4e55db2-745b-4bdb-bf92-38e7d29261d2", name: "Sample Birthday Package", eventTypes: ["Birthday"],
-    description: "Demo birthday celebration package with a fixed sample total for 30 to 80 guests.",
-    guestMin: 30, guestMax: 80,
+    description: "Demo birthday celebration package with a fixed sample total for up to 80 guests.",
+    guestMax: 80,
     inclusions: ["Sample party setup", "Sample buffet catering"],
-    exclusions: ["Optional add-ons and extra venue hours"], priceAmountMinor: 6000000,
+    exclusions: ["Optional add-ons and extra venue hours"], price: 60000,
   },
   {
     id: "a4e55db2-745b-4bdb-bf92-38e7d29261d3", name: "Sample Corporate Package", eventTypes: ["Corporate"],
-    description: "Demo corporate gathering package with a fixed sample total for 30 to 100 guests.",
-    guestMin: 30, guestMax: 100,
+    description: "Demo corporate gathering package with a fixed sample total for up to 100 guests.",
+    guestMax: 100,
     inclusions: ["Sample event setup", "Sample buffet catering"],
-    exclusions: ["Optional add-ons and extra venue hours"], priceAmountMinor: 9000000,
+    exclusions: ["Optional add-ons and extra venue hours"], price: 90000,
   },
 ];
 
@@ -74,14 +73,11 @@ try {
         name: pkg.name,
         event_types: pkg.eventTypes,
         description: pkg.description,
-        guest_min: pkg.guestMin,
         guest_max: pkg.guestMax,
-        venue_details: "",
         inclusions: pkg.inclusions,
         exclusions: pkg.exclusions,
-        terms: sampleTerms,
         image_url: null,
-        price_amount_minor: pkg.priceAmountMinor,
+        price: pkg.price,
       };
       const inserted = await db
         .insertInto("packages")
@@ -100,9 +96,9 @@ try {
         .where("package_id", "=", pkg.id).where("version", "=", 1).forUpdate().executeTakeFirst();
       if (existing?.state !== "draft" || existing.name !== pkg.name ||
           existing.event_types.length !== 1 || existing.event_types[0] !== pkg.eventTypes[0] ||
-          existing.description !== legacyDescription || existing.guest_min !== 30 || existing.guest_max !== 100 ||
-          existing.venue_details !== "" || existing.inclusions.length !== 0 || existing.exclusions.length !== 0 ||
-          existing.terms !== "" || existing.image_url !== null || existing.price_amount_minor !== null) continue;
+          existing.description !== legacyDescription || existing.guest_max !== 100 ||
+          existing.inclusions.length !== 0 || existing.exclusions.length !== 0 ||
+          existing.image_url !== null || existing.price !== null) continue;
       const updated = await db.updateTable("package_versions").set({ ...content, updated_at: new Date() })
         .where("id", "=", existing.id).returning("id").executeTakeFirst();
       if (updated) upgradedCount++;
@@ -116,7 +112,7 @@ try {
         .returning("id")
         .executeTakeFirst();
       if (inserted) {
-        await db.insertInto("venue_versions").values({ venue_id: venue.id, version: 1, state: "draft", name: venue.name, location: venue.location, description: venue.description, categories: [], capacity_min: null, capacity_max: null }).execute();
+        await db.insertInto("venue_versions").values({ venue_id: venue.id, version: 1, state: "draft", name: venue.name, location: venue.location, description: venue.description, categories: [], capacity_max: null }).execute();
         venueCount++;
       }
     }

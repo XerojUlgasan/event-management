@@ -13,7 +13,6 @@ import { adminDto } from "./package-response.js";
 import { error, nextUpdate } from "./package-rules.js";
 
 export async function editPackageDraftService(db: Kysely<DB>, id: string, data: Content & { expectedUpdatedAt: string }) {
-  if (data.guestMin > data.guestMax) return error("Minimum guests must not exceed maximum guests", 400);
   const outcome = await db.transaction().execute(async trx => {
     const pkg = await lockPackageData(trx, id);
     if (!pkg) return error("Package not found", 404);

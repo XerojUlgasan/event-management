@@ -8,6 +8,7 @@ export const priceSchema = z.object({
   currency: z.literal("PHP"),
   amountMinor: z.number().int().positive().max(2147483647),
 });
+const packagePriceSchema = priceSchema.refine(price => price.amountMinor % 100 === 0, "Package price must be a whole peso amount");
 export const assignmentInputSchema = z.object({ serviceVersionId: z.string().uuid(), role: z.enum(["included", "add_on"]), includedQuantity: z.number().int().positive().max(2147483647).nullable(), addOnPrice: priceSchema.nullable(), addOnMaxQuantity: z.number().int().positive().max(2147483647).nullable() }).refine(v => v.role === "included" ? v.includedQuantity !== null && v.addOnPrice === null && v.addOnMaxQuantity === null : v.includedQuantity === null && v.addOnPrice !== null && v.addOnMaxQuantity !== null, "Invalid service assignment for role");
 export const assignmentSchema = z.object({ id: z.string().uuid(), serviceVersionId: z.string().uuid(), role: z.enum(["included", "add_on"]), includedQuantity: z.number().int().nullable(), addOnPrice: priceSchema.nullable(), addOnMaxQuantity: z.number().int().nullable(), service: serviceVersionSchema });
 export const contentSchema = z.object({
@@ -15,13 +16,11 @@ export const contentSchema = z.object({
   name: text,
   eventTypes: z.array(text).max(50),
   description: text,
-  guestMin: z.number().int().min(30).max(100),
-  guestMax: z.number().int().min(30).max(100),
+  guestMax: z.number().int().positive().max(2147483647),
   inclusions: z.array(text).max(100),
   exclusions: z.array(text).max(100),
-  terms: text,
   imageUrl: z.url().startsWith("https://").max(2048).nullable(),
-  price: priceSchema.nullable(),
+  price: packagePriceSchema.nullable(),
 });
 export type Content = z.infer<typeof contentSchema>;
 export const versionSchema = contentSchema.extend({

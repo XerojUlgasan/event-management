@@ -24,11 +24,6 @@ model User {
 model Conversation {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   customerId      String    @map("customer_id") @db.Uuid
-  packageId       String?   @map("package_id") @db.Uuid
-  eventType       String?   @map("event_type")
-  eventStartsAt   DateTime? @map("event_starts_at") @db.Timestamptz(6)
-  eventEndsAt     DateTime? @map("event_ends_at") @db.Timestamptz(6)
-  guestCount      Int?      @map("guest_count")
   status          String    @default("active")
   closedAt        DateTime? @map("closed_at") @db.Timestamptz(6)
   bookingRequestId String?  @unique @map("booking_request_id") @db.Uuid
@@ -36,7 +31,6 @@ model Conversation {
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   customer        User      @relation("CustomerConversations", fields: [customerId], references: [id], onDelete: Cascade)
   bookingRequest  BookingRequest? @relation("BookingRequestConversation", fields: [bookingRequestId], references: [id], onDelete: SetNull)
-  package         Package?  @relation(fields: [packageId], references: [id], onDelete: SetNull)
   messages        Message[]
 
   @@index([status])
@@ -79,7 +73,6 @@ model Package {
   archivedAt      DateTime?         @map("archived_at") @db.Timestamptz(6)
   bookingRequests BookingRequest[]
   versions        PackageVersion[]
-  conversations   Conversation[]
 
   @@map("packages")
 }
@@ -102,7 +95,6 @@ model VenueVersion {
   location String
   description String
   categories String[]
-  capacityMin Int? @map("capacity_min")
   capacityMax Int? @map("capacity_max")
   imageUrls String[] @default([]) @map("image_urls")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -121,14 +113,11 @@ model PackageVersion {
   name         String
   eventTypes   String[]  @map("event_types")
   description  String
-  guestMin     Int       @map("guest_min")
   guestMax     Int       @map("guest_max")
-  venueDetails String    @map("venue_details")
   inclusions   String[]
   exclusions   String[]
-  terms        String
   imageUrl     String?   @map("image_url")
-  priceAmountMinor Int?  @map("price_amount_minor")
+  price        Int?
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
   publishedAt  DateTime? @map("published_at") @db.Timestamptz(6)
@@ -191,10 +180,11 @@ model BookingRequest {
   eventType String @map("event_type")
   preferredDate String @map("preferred_date")
   estimatedDuration String @default("undecided") @map("estimated_duration")
+  estimatedDurationDays Int? @map("estimated_duration_days")
   startsAt DateTime? @map("starts_at") @db.Timestamptz(6)
   endsAt DateTime? @map("ends_at") @db.Timestamptz(6)
   timeZone String @map("time_zone")
-  guestCount Int @map("guest_count")
+  guestCount Int? @map("guest_count")
   contactName String @map("contact_name")
   phoneNumber String @map("phone_number")
   preferredVenueLocation String? @map("preferred_venue_location")

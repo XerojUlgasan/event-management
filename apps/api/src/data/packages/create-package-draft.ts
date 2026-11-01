@@ -6,6 +6,6 @@ import { columns } from "../../utils/packages/package-columns.js";
 type Database = Kysely<DB> | Transaction<DB>;
 
 export function createPackageDraftData(db: Transaction<DB>, packageId: string, version: number, content: Content, updatedAt?: Date) {
-  return db.insertInto("package_versions").values({ package_id: packageId, version, state: "draft", venue_details: "",
+  return db.insertInto("package_versions").values({ package_id: packageId, version, state: "draft",
     ...(updatedAt ? { updated_at: updatedAt } : {}), ...columns(content) }).returning("id").executeTakeFirstOrThrow();
 }

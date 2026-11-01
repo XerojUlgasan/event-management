@@ -17,7 +17,7 @@ The schema has no mandatory lookup tables. The seed supplies catalog and account
 
 The connected records are built in dependency order: users, service and package parents with version rows, and venue parents with published versions. Assignments link published package versions to published service versions. Booking requests link a demo customer to a published package and its version; their history rows link the request and the customer or demo administrator who changed its status. Conversations link each demo customer to their messages, including an administrator reply. Venue catalog rows are independent of package and booking foreign keys; booking requests use a preferred-location text snapshot. If a required user, published version, or relationship is unavailable, dependent demo rows can be skipped.
 
-The 15 older synthetic venues remain private drafts without capacity values or photos. The three connected demo venues have sample capacity values and publish without photos. An untouched draft from the earlier demo seed is published on rerun; edited or archived venues remain unchanged. The seed creates no quote or payment tables or records.
+The 15 older synthetic venues remain private drafts without capacity values or photos. The three connected demo venues have sample maximum capacity values and publish without photos. An untouched draft from the earlier demo seed is published on rerun; edited or archived venues remain unchanged. The seed creates no quote or payment tables or records.
 
 ## Repeat runs and stable data
 

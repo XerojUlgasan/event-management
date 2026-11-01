@@ -55,7 +55,6 @@ export function MessagesWorkspace({
   conversationOpen,
   listEmpty,
   threadEmpty,
-  onEditContext,
   onNewChat,
   newChatBusy = false,
   readOnly = false,
@@ -78,7 +77,6 @@ export function MessagesWorkspace({
   conversationOpen: boolean
   listEmpty: { title: string; body: string }
   threadEmpty: { title: string; body: string }
-  onEditContext?: () => void
   onNewChat?: () => void
   newChatBusy?: boolean
   readOnly?: boolean
@@ -101,7 +99,8 @@ export function MessagesWorkspace({
     ? active?.eventType || "Events and catering support"
     : [active?.eventType, active?.customerEmail].filter(Boolean).join(" · ") || "Choose a conversation to reply"
   const avatar = active && !isTeam ? initialsFromName(active.customerName) : "CT"
-  const closedForCustomer = isTeam && active?.status === "closed"
+  const closedBookingForCustomer = isTeam && active?.status === "closed" && !!active.bookingRequestId
+  const closedForCustomer = isTeam && active?.status === "closed" && !active.bookingRequestId
 
   useEffect(() => {
     setDraft("")
@@ -258,11 +257,6 @@ export function MessagesWorkspace({
                   <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
                 </button>
               )}
-              {isTeam && active.status !== "closed" && onEditContext && (
-                <button type="button" className="message-action" onClick={onEditContext}>
-                  Event details
-                </button>
-              )}
 
             </div>
           )}
@@ -325,6 +319,11 @@ export function MessagesWorkspace({
             This conversation is closed. Its history is kept for reference.
           </p>
         )}
+        {closedBookingForCustomer && (
+          <p className="messages-closed-note">
+            This booking conversation is closed. Start a new chat to message the team.
+          </p>
+        )}
         {closedForCustomer && (
           <p className="messages-closed-note">
             This conversation closed after inactivity. Send a message to reopen it; the
@@ -332,7 +331,7 @@ export function MessagesWorkspace({
           </p>
         )}
 
-        {!readOnly && (
+        {!readOnly && !closedBookingForCustomer && (
           <form className="thread-input" onSubmit={submit}>
             <input
               aria-label="Write a message"

@@ -110,13 +110,10 @@ before(async () => {
       name: "Garden Wedding",
       event_types: ["Wedding"],
       description: "A garden wedding package",
-      guest_min: 50,
       guest_max: 100,
-      venue_details: "Garden venue",
       inclusions: ["Buffet dinner"],
       exclusions: ["Drinks"],
-      terms: "50% deposit",
-      price_amount_minor: 15_000_000,
+      price: 150_000,
       published_at: new Date(),
     })
     .execute();
@@ -272,158 +269,51 @@ test("customers can start a separate conversation without losing the previous on
   assert.ok(old.messages.some((message: any) => message.body === "Second customer here"));
 });
 
-test("conversation context and human replies work without AI routing state", async () => {
-  await read(await call("/messages/conversation", "GET", undefined, chatCustomerCookie), 200);
-  const now = Date.now();
-  await read(
-    await call(
-      "/messages/conversation/context",
-      "PATCH",
-      {
-        eventStartsAt: new Date(now + 86_400_000).toISOString(),
-        eventEndsAt: new Date(now).toISOString(),
-      },
-      chatCustomerCookie,
-    ),
-    400,
-  );
-  await read(
-    await call("/messages/conversation/context", "PATCH", { packageId: randomUUID() }, chatCustomerCookie),
-    400,
-  );
-
-  // A partial update cannot move the end before an existing start.
-  await read(
-    await call(
-      "/messages/conversation/context",
-      "PATCH",
-      { eventStartsAt: new Date(now + 10 * 86_400_000).toISOString() },
-      chatCustomerCookie,
-    ),
-    200,
-  );
-  await read(
-    await call(
-      "/messages/conversation/context",
-      "PATCH",
-      { eventEndsAt: new Date(now + 5 * 86_400_000).toISOString() },
-      chatCustomerCookie,
-    ),
-    400,
-  );
-  await read(
-    await call(
-      "/messages/conversation/context",
-      "PATCH",
-      {
-        eventStartsAt: null,
-        eventEndsAt: new Date(now + 7 * 86_400_000).toISOString(),
-      },
-      chatCustomerCookie,
-    ),
-    200,
-  );
-
-  const updated = await read(
-    await call(
-      "/messages/conversation/context",
-      "PATCH",
-      {
-        eventType: "Wedding reception",
-        guestCount: 80,
-        eventEndsAt: new Date(now + 7 * 86_400_000).toISOString(),
-      },
-      chatCustomerCookie,
-    ),
-    200,
-  );
-  assert.equal(updated.conversation.eventType, "Wedding reception");
-  assert.equal(updated.conversation.guestCount, 80);
-
-  const packageRemoved = await read(
-    await call("/messages/conversation/context", "PATCH", { packageId: null }, chatCustomerCookie),
-    200,
-  );
-  assert.equal(packageRemoved.conversation.packageId, null);
-  const packageSelected = await read(
-    await call("/messages/conversation/context", "PATCH", { packageId }, chatCustomerCookie),
-    200,
-  );
-  assert.equal(packageSelected.conversation.packageId, packageId);
-
-  await read(
-    await call("/messages/conversation/messages", "POST", { body: "Can you help?" }, chatCustomerCookie),
-    201,
-  );
+test("general threads have no booking context and can reopen after expiry", async () => {
   const thread = await read(await call("/messages/conversation", "GET", undefined, chatCustomerCookie), 200);
-  assert.equal(thread.conversation.status, "active");
-  const reply = await read(
-    await call(`/admin/conversations/${thread.conversation.id}/messages`, "POST", { body: "We can help" }, adminCookie),
-    201,
-  );
-  assert.equal(reply.message.senderRole, "admin");
-  const updatedThread = await read(await call("/messages/conversation", "GET", undefined, chatCustomerCookie), 200);
-  assert.equal(updatedThread.conversation.status, "active");
-  assert.deepEqual(updatedThread.messages.map((message: any) => message.senderRole), ["customer", "admin"]);
+  for (const field of ["packageId", "packageName", "bookingRequestId", "eventType", "eventStartsAt", "eventEndsAt", "guestCount"]) {
+    assert.equal(thread.conversation[field], null);
+  }
+  await read(await call("/messages/conversation/messages", "POST", { body: "Can you help?", conversationId: thread.conversation.id }, chatCustomerCookie), 201);
+  await db.updateTable("conversations").set({ created_at: new Date(Date.now() - 25 * 60 * 60 * 1000) }).where("id", "=", thread.conversation.id).execute();
+  const expired = await read(await call(`/messages/conversations/${thread.conversation.id}`, "GET", undefined, chatCustomerCookie), 200);
+  assert.equal(expired.conversation.status, "closed");
+  await read(await call("/messages/conversation/messages", "POST", { body: "Hello again", conversationId: thread.conversation.id }, chatCustomerCookie), 201);
+  const reopened = await read(await call(`/messages/conversations/${thread.conversation.id}`, "GET", undefined, chatCustomerCookie), 200);
+  assert.equal(reopened.conversation.status, "active");
+  assert.deepEqual(reopened.messages.map((message: any) => message.body), ["Can you help?", "Hello again"]);
 });
 
-test("inactive and finished-event conversations close and keep their history", async () => {
-  const current = await read(
-    await call("/messages/conversation", "GET", undefined, chatCustomerCookie),
-    200,
-  );
-  const count = current.messages.length;
-
-  await db
-    .updateTable("conversations")
-    .set({
-      status: "active",
-      closed_at: null,
-      package_id: null,
-      event_starts_at: null,
-      event_ends_at: null,
-      created_at: new Date(Date.now() - 25 * 60 * 60 * 1000),
-      updated_at: new Date(Date.now() - 25 * 60 * 60 * 1000),
-    })
-    .where("customer_id", "=", chatCustomerId)
-    .execute();
-  const expired = await read(
-    await call("/messages/conversation", "GET", undefined, chatCustomerCookie),
-    200,
-  );
+test("booking conversations derive context and remain closed after expiry", async () => {
+  const version = await db.selectFrom("package_versions").select("id").where("package_id", "=", packageId).executeTakeFirstOrThrow();
+  const booking = (await read(await call("/booking-requests", "POST", {
+    packageId, packageVersionId: version.id, eventType: "Wedding", preferredDate: "2099-01-02",
+    estimatedDuration: "8_hours", timeZone: "Asia/Manila", guestCount: 80, contactName: "Customer", phoneNumber: "123",
+  }, chatCustomerCookie), 201)).bookingRequest;
+  const linked = (await read(await call("/messages/conversations", "GET", undefined, chatCustomerCookie), 200)).conversations.find((item: any) => item.bookingRequestId === booking.id);
+  assert.ok(linked);
+  assert.equal(linked.packageId, packageId);
+  assert.equal(linked.packageName, "Garden Wedding");
+  assert.equal(linked.eventType, "Wedding");
+  assert.equal(linked.guestCount, 80);
+  assert.equal(linked.eventEndsAt, null);
+  const endsAt = new Date(Date.now() - 25 * 60 * 60 * 1000);
+  const startsAt = new Date(endsAt.getTime() - 60 * 60 * 1000);
+  await db.updateTable("booking_requests").set({ event_type: "Reception", guest_count: 90, starts_at: startsAt, ends_at: endsAt }).where("id", "=", booking.id).execute();
+  const expired = await read(await call(`/messages/conversations/${linked.id}`, "GET", undefined, chatCustomerCookie), 200);
+  assert.equal(expired.conversation.eventType, "Reception");
+  assert.equal(expired.conversation.guestCount, 90);
+  assert.equal(expired.conversation.eventStartsAt, startsAt.toISOString());
+  assert.equal(expired.conversation.eventEndsAt, endsAt.toISOString());
+  assert.equal(expired.conversation.expiresAt, new Date(endsAt.getTime() + 24 * 60 * 60 * 1000).toISOString());
   assert.equal(expired.conversation.status, "closed");
-  assert.ok(expired.conversation.closedAt);
-  assert.equal(expired.messages.length, count);
-
-  await read(
-    await call("/messages/conversation/messages", "POST", { body: "Hello again" }, chatCustomerCookie),
-    201,
-  );
-  const reopened = await read(
-    await call("/messages/conversation", "GET", undefined, chatCustomerCookie),
-    200,
-  );
-  assert.equal(reopened.conversation.status, "active");
-  assert.equal(reopened.conversation.closedAt, null);
-  assert.equal(reopened.conversation.packageId, null);
-  assert.equal(reopened.messages.length, count + 1);
-
-  await db
-    .updateTable("conversations")
-    .set({
-      status: "active",
-      closed_at: null,
-      package_id: packageId,
-      event_ends_at: new Date(Date.now() - 25 * 60 * 60 * 1000),
-      updated_at: new Date(),
-    })
-    .where("customer_id", "=", chatCustomerId)
-    .execute();
-  const eventExpired = await read(
-    await call("/messages/conversation", "GET", undefined, chatCustomerCookie),
-    200,
-  );
-  assert.equal(eventExpired.conversation.status, "closed");
+  await read(await call("/messages/conversation/messages", "POST", { body: "Hello", conversationId: linked.id }, chatCustomerCookie), 409);
+  await read(await call(`/admin/conversations/${linked.id}/messages`, "POST", { body: "Hello" }, adminCookie), 409);
+  const stillClosed = await read(await call(`/messages/conversations/${linked.id}`, "GET", undefined, chatCustomerCookie), 200);
+  assert.equal(stillClosed.conversation.status, "closed");
+  assert.equal(stillClosed.messages.length, 0);
+  const fresh = await read(await call("/messages/conversations", "POST", {}, chatCustomerCookie), 201);
+  await read(await call("/messages/conversation/messages", "POST", { body: "New question", conversationId: fresh.conversation.id }, chatCustomerCookie), 201);
 });
 
 test("message routes appear in the OpenAPI document", async () => {
@@ -432,7 +322,7 @@ test("message routes appear in the OpenAPI document", async () => {
   assert.ok(spec.paths["/v1/messages/conversations"].post);
   assert.ok(spec.paths["/v1/messages/conversation/messages"].post);
 
-  assert.ok(spec.paths["/v1/messages/conversation/context"].patch);
+  assert.equal(spec.paths["/v1/messages/conversation/context"], undefined);
 
   assert.ok(spec.paths["/v1/admin/conversations"].get);
   assert.ok(spec.paths["/v1/admin/conversations/{id}"].get);

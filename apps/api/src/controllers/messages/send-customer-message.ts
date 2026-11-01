@@ -16,6 +16,7 @@ export const sendCustomerMessageRoute = createRoute({
     401: errors[401],
     403: errors[403],
     404: errors[404],
+    409: errors[409],
   },
 });
 export const sendCustomerMessageRouteHandler: AppRouteHandler<typeof sendCustomerMessageRoute> = async (c) => {
@@ -31,6 +32,9 @@ export const sendCustomerMessageRouteHandler: AppRouteHandler<typeof sendCustome
   } catch (error) {
     if (error instanceof Error && error.message === "Conversation not found") {
       return c.json({ error: error.message }, 404);
+    }
+    if (error instanceof Error && error.message === "Conversation is closed") {
+      return c.json({ error: error.message }, 409);
     }
     throw error;
   }

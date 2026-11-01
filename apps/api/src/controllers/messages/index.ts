@@ -7,7 +7,6 @@ import { sendCustomerMessageRoute, sendCustomerMessageRouteHandler } from "./sen
 import { listAdminConversationsRoute, listAdminConversationsRouteHandler } from "./list-admin-conversations.js";
 import { getAdminConversationRoute, getAdminConversationRouteHandler } from "./get-admin-conversation.js";
 import { sendAdminMessageRoute, sendAdminMessageRouteHandler } from "./send-admin-message.js";
-import { updateConversationContextRoute, updateConversationContextRouteHandler } from "./update-conversation-context.js";
 import { createCustomerConversationRoute, createCustomerConversationRouteHandler } from "./create-customer-conversation.js";
 import { listCustomerConversationsRoute, listCustomerConversationsRouteHandler } from "./list-customer-conversations.js";
 import { getCustomerConversationByIdRoute, getCustomerConversationByIdRouteHandler } from "./get-customer-conversation-by-id.js";
@@ -33,7 +32,6 @@ routes.openapi(createCustomerConversationRoute, createCustomerConversationRouteH
 routes.openapi(listCustomerConversationsRoute, listCustomerConversationsRouteHandler);
 routes.openapi(getCustomerConversationByIdRoute, getCustomerConversationByIdRouteHandler);
 routes.openapi(sendCustomerMessageRoute, sendCustomerMessageRouteHandler);
-routes.openapi(updateConversationContextRoute, updateConversationContextRouteHandler);
 routes.openapi(listAdminConversationsRoute, listAdminConversationsRouteHandler);
 routes.openapi(getAdminConversationRoute, getAdminConversationRouteHandler);
 routes.openapi(sendAdminMessageRoute, sendAdminMessageRouteHandler);

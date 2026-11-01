@@ -123,7 +123,7 @@ async function read(response: Response, status: number): Promise<any> {
 
 test("requests enforce roles, version availability, ownership and status history", async () => {
   const pkg = await db.insertInto("packages").defaultValues().returningAll().executeTakeFirstOrThrow();
-  const version = await db.insertInto("package_versions").values({ package_id:pkg.id, version:1, state:"published", name:"Garden", event_types:["Wedding"], description:"Details", guest_min:30, guest_max:100, venue_details:"Venue", inclusions:[], exclusions:[], terms:"Terms", published_at:new Date(), price_amount_minor:100 }).returningAll().executeTakeFirstOrThrow();
+  const version = await db.insertInto("package_versions").values({ package_id:pkg.id, version:1, state:"published", name:"Garden", event_types:["Wedding"], description:"Details", guest_max:100, inclusions:[], exclusions:[], price:1, published_at:new Date() }).returningAll().executeTakeFirstOrThrow();
   const input = {packageId:pkg.id,packageVersionId:version.id,eventType:"Wedding",preferredDate:"2099-01-02",estimatedDuration:"8_hours",timeZone:"Asia/Manila",guestCount:120,contactName:"Customer",phoneNumber:"123",specialRequests:"Music"};
   await read(await call("/booking-requests","POST",input),401);
   await read(await call("/booking-requests","POST",input,adminCookie),403);
@@ -147,6 +147,32 @@ test("requests enforce roles, version availability, ownership and status history
   await read(await call("/services", "GET", undefined, staffCookie), 200);
   const created = (await read(await call("/booking-requests","POST",input,customerCookie),201)).bookingRequest;
   assert.equal(created.preferredDate, input.preferredDate); assert.equal(created.estimatedDuration, "8_hours");
+  const atMaximum = (await read(await call("/booking-requests", "POST", { ...input, guestCount: 100 }, customerCookie), 201)).bookingRequest;
+  const belowPreviousMinimum = (await read(await call("/booking-requests", "POST", { ...input, guestCount: 1 }, customerCookie), 201)).bookingRequest;
+  assert.equal(atMaximum.outOfRange, false);
+  assert.equal(belowPreviousMinimum.outOfRange, false);
+  const { guestCount: _guestCount, ...withoutGuestCount } = input;
+  for (const estimatedDuration of ["3_days", "4_days", "5_days", "6_days", "1_week", "more_than_1_week"]) {
+    const estimatedDurationDays = estimatedDuration === "more_than_1_week" ? 8 : null;
+    const request = (await read(await call("/booking-requests", "POST", { ...withoutGuestCount, estimatedDuration, ...(estimatedDurationDays === null ? {} : { estimatedDurationDays }) }, customerCookie), 201)).bookingRequest;
+    assert.equal(request.estimatedDuration, estimatedDuration);
+    assert.equal(request.estimatedDurationDays, estimatedDurationDays);
+    assert.equal(request.guestCount, null);
+    assert.equal(request.outOfRange, false);
+    const saved = await pool.query("SELECT estimated_duration, estimated_duration_days, guest_count, out_of_range FROM booking_requests WHERE id = $1", [request.id]);
+    assert.deepEqual(saved.rows[0], { estimated_duration: estimatedDuration, estimated_duration_days: estimatedDurationDays, guest_count: null, out_of_range: false });
+    const fetched = (await read(await call(`/booking-requests/${request.id}`, "GET", undefined, customerCookie), 200)).bookingRequest;
+    assert.equal(fetched.estimatedDuration, estimatedDuration);
+    assert.equal(fetched.estimatedDurationDays, estimatedDurationDays);
+    assert.equal(fetched.guestCount, null);
+    assert.equal(fetched.outOfRange, false);
+  }
+  for (const estimatedDurationDays of [undefined, 7, 8.5]) {
+    await read(await call("/booking-requests", "POST", { ...input, estimatedDuration: "more_than_1_week", estimatedDurationDays }, customerCookie), 400);
+  }
+  for (const estimatedDuration of ["4_hours", "8_hours", "12_hours", "1_day", "2_days", "3_days", "4_days", "5_days", "6_days", "1_week", "undecided"]) {
+    await read(await call("/booking-requests", "POST", { ...input, estimatedDuration, estimatedDurationDays: 8 }, customerCookie), 400);
+  }
   const detail = (await read(await call(`/booking-requests/${created.id}`, "GET", undefined, customerCookie), 200)).bookingRequest;
   assert.deepEqual(detail, created);
   for (const cookie of [adminCookie, staffCookie]) {
@@ -164,11 +190,20 @@ test("requests enforce roles, version availability, ownership and status history
   const linkedConversation = await db.selectFrom("conversations").selectAll().where("booking_request_id", "=", created.id).executeTakeFirst();
   assert.ok(linkedConversation);
   assert.equal(linkedConversation.customer_id, customerId);
-  assert.equal(linkedConversation.event_starts_at, null);
-  assert.equal(linkedConversation.event_ends_at, null);
   assert.equal(linkedConversation.status, "active");
+  assert.equal("event_starts_at" in linkedConversation, false);
+  assert.equal("event_ends_at" in linkedConversation, false);
+  assert.equal("guest_count" in linkedConversation, false);
+  const linkedAdminConversation = (await read(await call("/admin/conversations", "GET", undefined, adminCookie), 200)).conversations.find((conversation: any) => conversation.bookingRequestId === created.id);
+  assert.ok(linkedAdminConversation);
+  assert.equal(linkedAdminConversation.packageId, pkg.id);
+  assert.equal(linkedAdminConversation.packageName, "Garden");
+  assert.equal(linkedAdminConversation.eventType, "Wedding");
+  assert.equal(linkedAdminConversation.guestCount, 120);
+  assert.equal(linkedAdminConversation.eventStartsAt, null);
+  assert.equal(linkedAdminConversation.eventEndsAt, null);
   assert.deepEqual((await read(await call("/booking-requests/mine","GET",undefined,otherCustomerCookie),200)).bookingRequests,[]);
-  assert.equal((await read(await call("/booking-requests/mine","GET",undefined,customerCookie),200)).bookingRequests[0].id,created.id);
+  assert.ok((await read(await call("/booking-requests/mine","GET",undefined,customerCookie),200)).bookingRequests.some((request: any) => request.id === created.id));
   const staffRequests = (await read(await call("/admin/booking-requests", "GET", undefined, staffCookie), 200)).bookingRequests;
   assert.ok(staffRequests.some((row: any) => row.id === created.id));
   const legacy = staffRequests.find((row: any) => row.reference === "LEGACY");
@@ -211,6 +246,7 @@ test("requests enforce roles, version availability, ownership and status history
   assert.ok(spec.paths["/v1/admin/booking-requests/{id}"].get);
   const requestSchema = spec.paths["/v1/booking-requests"].post.requestBody.content["application/json"].schema;
   assert.ok(requestSchema.required.includes("preferredDate"));
+  assert.ok(!requestSchema.required.includes("guestCount"));
   assert.ok(!requestSchema.required.includes("startsAt"));
   assert.ok(spec.paths["/v1/booking-requests"].post); assert.ok(spec.paths["/v1/booking-requests/{id}/cancel"].patch); assert.ok(spec.paths["/v1/admin/booking-requests/{id}/status"].patch);
 });

@@ -58,15 +58,15 @@ const services = [
 ] as const;
 
 const packages = [
-  { key: "wedding", name: "Demo Wedding Reception", eventType: "Wedding", guestMin: 50, guestMax: 100, price: 12000000, description: "Sample reception for 50 to 100 guests with buffet catering and coordination." },
-  { key: "birthday", name: "Demo Birthday Celebration", eventType: "Birthday", guestMin: 30, guestMax: 80, price: 6000000, description: "Sample birthday celebration for 30 to 80 guests with catering and coordination." },
-  { key: "corporate", name: "Demo Corporate Gathering", eventType: "Corporate", guestMin: 30, guestMax: 100, price: 9000000, description: "Sample company gathering for 30 to 100 guests with catering and coordination." },
+  { key: "wedding", name: "Demo Wedding Reception", eventType: "Wedding", guestMax: 100, price: 120000, description: "Sample reception for up to 100 guests with buffet catering and coordination." },
+  { key: "birthday", name: "Demo Birthday Celebration", eventType: "Birthday", guestMax: 80, price: 60000, description: "Sample birthday celebration for up to 80 guests with catering and coordination." },
+  { key: "corporate", name: "Demo Corporate Gathering", eventType: "Corporate", guestMax: 100, price: 90000, description: "Sample company gathering for up to 100 guests with buffet catering and coordination." },
 ] as const;
 
 const venues = [
-  { key: "garden", name: "Demo Garden Pavilion", location: "Quezon City, Metro Manila", description: "Sample open-air venue draft with covered dining space. Availability has not been checked.", categories: ["Garden", "Outdoor"], capacityMin: 50, capacityMax: 100 },
-  { key: "hall", name: "Demo City Function Hall", location: "Makati, Metro Manila", description: "Sample indoor venue draft for celebrations and company events. Availability has not been checked.", categories: ["Indoor", "Function Hall"], capacityMin: 30, capacityMax: 100 },
-  { key: "terrace", name: "Demo Rooftop Terrace", location: "Taguig, Metro Manila", description: "Sample terrace venue draft for an evening event. Availability has not been checked.", categories: ["Rooftop"], capacityMin: 30, capacityMax: 80 },
+  { key: "garden", name: "Demo Garden Pavilion", location: "Quezon City, Metro Manila", description: "Sample open-air venue draft with covered dining space. Availability has not been checked.", categories: ["Garden", "Outdoor"], capacityMax: 100 },
+  { key: "hall", name: "Demo City Function Hall", location: "Makati, Metro Manila", description: "Sample indoor venue draft for celebrations and company events. Availability has not been checked.", categories: ["Indoor", "Function Hall"], capacityMax: 100 },
+  { key: "terrace", name: "Demo Rooftop Terrace", location: "Taguig, Metro Manila", description: "Sample terrace venue draft for an evening event. Availability has not been checked.", categories: ["Rooftop"], capacityMax: 80 },
 ] as const;
 
 type UserKey = (typeof users)[number]["key"];
@@ -86,7 +86,7 @@ export async function seedDemo(db: SeedDb) {
   const count = { users: 0, services: 0, packages: 0, venues: 0, assignments: 0, requests: 0, history: 0, conversations: 0, messages: 0 };
   const persistedUsers = new Map<UserKey, { id: string; role: string; staffRole: string | null; name: string }>();
   const persistedServices = new Map<string, { id: string; versionId: string; published: boolean }>();
-  const persistedPackages = new Map<string, { id: string; versionId: string; name: string; eventType: string; guestMin: number; guestMax: number; published: boolean }>();
+  const persistedPackages = new Map<string, { id: string; versionId: string; name: string; eventType: string; guestMax: number; published: boolean }>();
 
   for (const user of users) {
     const id = seedId(`user:${user.key}`);
@@ -119,10 +119,10 @@ export async function seedDemo(db: SeedDb) {
     if (inserted) count.packages++;
     const parent = await db.selectFrom("packages").select(["id", "archived_at"]).where("id", "=", id).executeTakeFirstOrThrow();
     const versionId = seedId(`package-version:${pkg.key}:1`);
-    await db.insertInto("package_versions").values({ id: versionId, package_id: parent.id, version: 1, state: "published", name: pkg.name, event_types: [pkg.eventType], description: pkg.description, guest_min: pkg.guestMin, guest_max: pkg.guestMax, venue_details: "", inclusions: ["Buffet catering", "On-the-day event coordination"], exclusions: ["Optional add-ons", "Venue fees"], terms: "Demo offer only. Staff must confirm availability and final terms before making a commitment.", image_url: null, price_amount_minor: pkg.price, created_at: now, updated_at: now, published_at: now })
+    await db.insertInto("package_versions").values({ id: versionId, package_id: parent.id, version: 1, state: "published", name: pkg.name, event_types: [pkg.eventType], description: pkg.description, guest_max: pkg.guestMax, inclusions: ["Buffet catering", "On-the-day event coordination"], exclusions: ["Optional add-ons", "Venue fees"], image_url: null, price: pkg.price, created_at: now, updated_at: now, published_at: now })
       .onConflict((conflict) => conflict.doNothing()).execute();
-    const version = await db.selectFrom("package_versions").select(["id", "state", "name", "event_types", "guest_min", "guest_max"]).where("id", "=", versionId).where("package_id", "=", parent.id).executeTakeFirst();
-    if (version) persistedPackages.set(pkg.key, { id: parent.id, versionId: version.id, name: version.name, eventType: version.event_types[0] ?? pkg.eventType, guestMin: version.guest_min, guestMax: version.guest_max, published: !parent.archived_at && version.state === "published" });
+    const version = await db.selectFrom("package_versions").select(["id", "state", "name", "event_types", "guest_max"]).where("id", "=", versionId).where("package_id", "=", parent.id).executeTakeFirst();
+    if (version) persistedPackages.set(pkg.key, { id: parent.id, versionId: version.id, name: version.name, eventType: version.event_types[0] ?? pkg.eventType, guestMax: version.guest_max, published: !parent.archived_at && version.state === "published" });
   }
 
   for (const venue of venues) {
@@ -136,7 +136,7 @@ export async function seedDemo(db: SeedDb) {
     const versionId = seedId(`venue-version:${venue.key}:1`);
     const existing = await db.selectFrom("venue_versions").selectAll().where("id", "=", versionId).forUpdate().executeTakeFirst();
     if (!existing) {
-      await db.insertInto("venue_versions").values({ id: versionId, venue_id: parent.id, version: 1, state: "published", name: venue.name, location: venue.location, description: publishedDescription, categories: [...venue.categories], capacity_min: venue.capacityMin, capacity_max: venue.capacityMax, created_at: now, updated_at: now, published_at: now })
+      await db.insertInto("venue_versions").values({ id: versionId, venue_id: parent.id, version: 1, state: "published", name: venue.name, location: venue.location, description: publishedDescription, categories: [...venue.categories], capacity_max: venue.capacityMax, created_at: now, updated_at: now, published_at: now })
         .onConflict((conflict) => conflict.doNothing()).execute();
       continue;
     }
@@ -144,7 +144,7 @@ export async function seedDemo(db: SeedDb) {
     if (existing.venue_id !== parent.id || existing.version !== 1 || existing.state !== "draft" || existing.published_at !== null ||
         existing.name !== venue.name || existing.location !== venue.location ||
         (existing.description !== venue.description && existing.description !== publishedDescription) ||
-        existing.capacity_min !== venue.capacityMin || existing.capacity_max !== venue.capacityMax ||
+        existing.capacity_max !== venue.capacityMax ||
         JSON.stringify(existing.categories) !== JSON.stringify(venue.categories) ||
         existing.updated_at.getTime() !== existing.created_at.getTime() ||
         existing.image_urls.length > 0) continue;
@@ -165,7 +165,7 @@ export async function seedDemo(db: SeedDb) {
     }
   }
 
-  const eligiblePackages = [...persistedPackages.entries()].filter(([, pkg]) => pkg.published && pkg.guestMin >= 30 && pkg.guestMax <= 100 && pkg.guestMin <= pkg.guestMax);
+  const eligiblePackages = [...persistedPackages.entries()].filter(([, pkg]) => pkg.published && pkg.guestMax > 0);
   const eligibleCustomers = users.filter((user) => user.role === "customer" && persistedUsers.get(user.key)?.role === "customer");
   const randomScenarios = eligiblePackages.length && eligibleCustomers.length ? Array.from({ length: 5 }, (_, index) => {
     const [packageKey] = pick(eligiblePackages, random);
@@ -179,14 +179,14 @@ export async function seedDemo(db: SeedDb) {
     const adminActor = persistedUsers.get("admin");
     if (!customer || customer.role !== "customer" || !pkg?.published) continue;
     if (!["under_review", "cancelled"].includes(scenario.status) && (adminActor?.role !== "admin" || adminActor.staffRole !== "System Administrator")) continue;
-    const guestCount = "outOfRange" in scenario && scenario.outOfRange ? pkg.guestMax + 15 : pkg.guestMin + Math.floor(random() * (pkg.guestMax - pkg.guestMin + 1));
+    const guestCount = "outOfRange" in scenario && scenario.outOfRange ? pkg.guestMax + 15 : 1 + Math.floor(random() * pkg.guestMax);
     const dayOffset = 30 + index * 7 + Math.floor(random() * 5);
     const startsAt = new Date(now.getTime() + dayOffset * 86400000);
     startsAt.setUTCHours(9 + Math.floor(random() * 6), 0, 0, 0);
     const endsAt = new Date(startsAt.getTime() + 4 * 3600000);
     const id = seedId(`booking-request:${scenario.key}`);
     const reference = `DEMO-${String(index + 1).padStart(3, "0")}`;
-    const inserted = await db.insertInto("booking_requests").values({ id, reference, customer_id: customer.id, package_id: pkg.id, package_version_id: pkg.versionId, package_name: pkg.name, event_type: pkg.eventType, preferred_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(startsAt), estimated_duration: "4_hours", starts_at: startsAt, ends_at: endsAt, time_zone: "Asia/Manila", guest_count: guestCount, contact_name: customer.name, phone_number: "+63 917 555 0100", preferred_venue_location: pick(venues, random).location, special_requests: scenario.note, status: scenario.status, out_of_range: guestCount < pkg.guestMin || guestCount > pkg.guestMax, created_at: now, updated_at: now })
+    const inserted = await db.insertInto("booking_requests").values({ id, reference, customer_id: customer.id, package_id: pkg.id, package_version_id: pkg.versionId, package_name: pkg.name, event_type: pkg.eventType, preferred_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(startsAt), estimated_duration: "4_hours", starts_at: startsAt, ends_at: endsAt, time_zone: "Asia/Manila", guest_count: guestCount, contact_name: customer.name, phone_number: "+63 917 555 0100", preferred_venue_location: pick(venues, random).location, special_requests: scenario.note, status: scenario.status, out_of_range: guestCount > pkg.guestMax, created_at: now, updated_at: now })
       .onConflict((conflict) => conflict.doNothing()).returning("id").executeTakeFirst();
     if (inserted) count.requests++;
     const request = await db.selectFrom("booking_requests").select(["id", "customer_id", "status"]).where("id", "=", id).executeTakeFirst();

@@ -1,10 +1,9 @@
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages"
-import { useCallback, useEffect, useRef, useState, type SubmitEvent } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Brand,
   Button,
   Dialog,
-  FormField,
   Icon,
   PageHeader,
   Panel,
@@ -24,7 +23,6 @@ import {
   getMyConversation,
   getMyConversationById,
   sendMyMessage,
-  updateConversationContext,
   type ChatMessage,
   type ChatConversation,
   type ChatThread,
@@ -36,14 +34,6 @@ type CustomerTab =
   | "Packages"
   | "Messages"
   | "Profile"
-
-function localDateTime(value: string | null) {
-  if (!value) return ""
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ""
-  const pad = (part: number) => String(part).padStart(2, "0")
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
 
 export function CustomerDashboard({
   onPublic,
@@ -71,9 +61,6 @@ export function CustomerDashboard({
   const [pendingBookingReference, setPendingBookingReference] = useState<string | null>(null)
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesError, setMessagesError] = useState("")
-  const [eventDetailsOpen, setEventDetailsOpen] = useState(false)
-  const [eventSaving, setEventSaving] = useState(false)
-  const [eventError, setEventError] = useState("")
   const [newChatBusy, setNewChatBusy] = useState(false)
   const [toast, setToast] = useState("")
 
@@ -195,30 +182,6 @@ export function CustomerDashboard({
       setMessagesError(cause instanceof Error ? cause.message : "Unable to load this conversation.")
     } finally {
       setMessagesLoading(false)
-    }
-  }
-
-  const saveEventDetails = async (event: SubmitEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const data = new FormData(event.currentTarget)
-    const eventType = String(data.get("eventType") ?? "").trim()
-    const guestCount = String(data.get("guestCount") ?? "").trim()
-    const eventEndsAt = String(data.get("eventEndsAt") ?? "")
-    setEventSaving(true)
-    setEventError("")
-    try {
-      const thread = await updateConversationContext({
-        eventType: eventType || null,
-        guestCount: guestCount ? Number(guestCount) : null,
-        eventEndsAt: eventEndsAt ? new Date(eventEndsAt).toISOString() : null,
-      }, messageThread?.conversation.id)
-      setMessageThread(thread)
-      setEventDetailsOpen(false)
-      notify("Event details saved to this conversation.")
-    } catch (cause) {
-      setEventError(cause instanceof Error ? cause.message : "Unable to save event details.")
-    } finally {
-      setEventSaving(false)
     }
   }
 
@@ -376,10 +339,6 @@ export function CustomerDashboard({
               onSend={sendMessage}
               onBack={() => setConversationOpen(false)}
               conversationOpen={conversationOpen}
-              onEditContext={() => {
-                setEventError("")
-                setEventDetailsOpen(true)
-              }}
               onNewChat={startNewChat}
               newChatBusy={newChatBusy}
               listEmpty={{
@@ -395,65 +354,6 @@ export function CustomerDashboard({
         )}
       </main>
 
-      {eventDetailsOpen && messageThread && (
-        <Dialog
-          onClose={() => setEventDetailsOpen(false)}
-          className="compact-modal"
-          eyebrow="Conversation context"
-          title="Event details"
-          intro="These details help the team understand your event. The event end also controls how long this conversation stays open."
-        >
-          <form onSubmit={saveEventDetails}>
-            <div className="form-grid">
-              <FormField label="Event type">
-                <input
-                  name="eventType"
-                  maxLength={120}
-                  defaultValue={messageThread.conversation.eventType ?? ""}
-                  placeholder="Wedding, birthday, corporate…"
-                />
-              </FormField>
-              <FormField label="Estimated guests">
-                <input
-                  name="guestCount"
-                  type="number"
-                  min="1"
-                  defaultValue={messageThread.conversation.guestCount ?? ""}
-                  placeholder="e.g. 80"
-                />
-              </FormField>
-              <FormField className="full" label="Event end date and time">
-                <input
-                  name="eventEndsAt"
-                  type="datetime-local"
-                  defaultValue={localDateTime(messageThread.conversation.eventEndsAt)}
-                />
-              </FormField>
-            </div>
-            <p className="event-context-note">
-              Event-related conversations remain available until 24 hours after the
-              event ends. General conversations close after 24 hours without activity.
-            </p>
-            {eventError && (
-              <p className="messages-send-error" role="alert">
-                {eventError}
-              </p>
-            )}
-            <div className="form-actions">
-              <Button
-                variant="secondary"
-                onClick={() => setEventDetailsOpen(false)}
-                disabled={eventSaving}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={eventSaving}>
-                {eventSaving ? "Saving…" : "Save event details"}
-              </Button>
-            </div>
-          </form>
-        </Dialog>
-      )}
       {messageOpen && (
         <Dialog
           onClose={() => setMessageOpen(false)}

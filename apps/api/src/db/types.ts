@@ -17,8 +17,9 @@ export interface BookingRequests {
   customer_id: string;
   ends_at: Timestamp | null;
   estimated_duration: Generated<string>;
+  estimated_duration_days: number | null;
   event_type: string;
-  guest_count: number;
+  guest_count: number | null;
   id: Generated<string>;
   out_of_range: boolean;
   package_id: string;
@@ -49,12 +50,7 @@ export interface Conversations {
   closed_at: Timestamp | null;
   created_at: Generated<Timestamp>;
   customer_id: string;
-  event_ends_at: Timestamp | null;
-  event_starts_at: Timestamp | null;
-  event_type: string | null;
-  guest_count: number | null;
   id: Generated<string>;
-  package_id: string | null;
   status: Generated<string>;
   updated_at: Generated<Timestamp>;
 }
@@ -92,18 +88,15 @@ export interface PackageVersions {
   event_types: string[];
   exclusions: string[];
   guest_max: number;
-  guest_min: number;
   id: Generated<string>;
   image_url: string | null;
   inclusions: string[];
   name: string;
   package_id: string;
-  price_amount_minor: number | null;
+  price: number | null;
   published_at: Timestamp | null;
   state: string;
-  terms: string;
   updated_at: Generated<Timestamp>;
-  venue_details: string;
   version: number;
 }
 
@@ -157,7 +150,6 @@ export interface Venues {
 
 export interface VenueVersions {
   capacity_max: number | null;
-  capacity_min: number | null;
   categories: Generated<string[]>;
   created_at: Generated<Timestamp>;
   description: string;
