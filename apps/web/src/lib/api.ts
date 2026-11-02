@@ -33,10 +33,10 @@ async function request<T>(
     method: method ?? (body === undefined ? "GET" : "POST"),
     credentials: "include",
     headers: {
-      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...(body !== undefined && !(body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
       ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
     },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    ...(body !== undefined ? { body: body instanceof FormData ? body : JSON.stringify(body) } : {}),
   });
   if (!response.ok) {
     const result = (await response.json().catch(() => ({}))) as {
@@ -74,9 +74,9 @@ export const addPassword = (idToken: string, password: string) =>
   request<Profile>("/auth/password", { password }, idToken);
 
 export type PackagePrice = { kind: "fixed"; currency: "PHP"; amountMinor: number }
-export type ServiceContent = { name: string; categories: string[]; description: string; imageUrl: string | null }
-export type ServiceVersion = ServiceContent & { id: string; serviceId: string; version: number; state: "draft" | "published" | "superseded"; updatedAt: string; publishedAt: string | null }
-export type PublicService = ServiceContent & { id: string; versionId: string; version: number; publishedAt: string }
+export type ServiceContent = { name: string; description: string; hourlyRatePesos: number | null }
+export type ServiceVersion = ServiceContent & { imageId: string | null; id: string; serviceId: string; version: number; state: "draft" | "published" | "superseded"; updatedAt: string; publishedAt: string | null }
+export type PublicService = ServiceContent & { imageId: string | null; id: string; versionId: string; version: number; publishedAt: string }
 export type AdminService = { id: string; archivedAt: string | null; draft: ServiceVersion | null; published: ServiceVersion | null; versions?: ServiceVersion[] }
 export type PackageServiceInput = { serviceVersionId: string; role: "included" | "add_on"; includedQuantity: number | null; addOnPrice: PackagePrice | null; addOnMaxQuantity: number | null }
 export type PackageService = PackageServiceInput & { id: string; service: ServiceVersion }
@@ -112,13 +112,19 @@ export const getService = (id: string) => request<PublicService>(`/services/${en
 export const getIncludingPackages = (id: string) => request<{ packages: PublicPackage[] }>(`/services/${encodeURIComponent(id)}/packages`)
 export const getAdminService = (id: string) => request<AdminService>(`/admin/services/${encodeURIComponent(id)}`)
 export const createService = (content: ServiceContent) => request<AdminService>("/admin/services", content)
-export const updateServiceDraft = (id: string, content: ServiceContent, expectedUpdatedAt: string) => request<AdminService>(`/admin/services/${encodeURIComponent(id)}/draft`, { ...content, expectedUpdatedAt }, undefined, "PATCH")
+export const updateServiceDraft = (id: string, content: ServiceContent, expectedUpdatedAt: string, removeImage = false) => request<AdminService>(`/admin/services/${encodeURIComponent(id)}/draft`, { ...content, expectedUpdatedAt, ...(removeImage ? { removeImage } : {}) }, undefined, "PATCH")
+export const uploadService = (content: ServiceContent, image: File, id?: string, expectedUpdatedAt?: string) => {
+  const body = new FormData()
+  body.set("content", JSON.stringify({ ...content, ...(expectedUpdatedAt ? { expectedUpdatedAt } : {}) }))
+  body.set("image", image)
+  return request<AdminService>(id ? `/admin/service-uploads/${encodeURIComponent(id)}` : "/admin/service-uploads", body, undefined, id ? "PATCH" : "POST")
+}
 export const publishService = (id: string, expectedUpdatedAt: string) => request<AdminService>(`/admin/services/${encodeURIComponent(id)}/publish`, { expectedUpdatedAt })
 export const archiveService = (id: string) => request<AdminService>(`/admin/services/${encodeURIComponent(id)}/archive`, {})
 export const deleteService = (id: string) => request<void>(`/admin/services/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
 
 export const packageImageSrc = (imageUrl: string | null): string | undefined => imageUrl || undefined
-export const serviceImageSrc = (imageUrl: string | null): string | undefined => imageUrl || undefined
+export const serviceImageSrc = (imageId: string | null): string | undefined => imageId ? `${apiUrl}/service-images/${encodeURIComponent(imageId)}` : undefined
 
 export type ConversationStatus = "active" | "closed"
 

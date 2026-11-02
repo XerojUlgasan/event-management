@@ -1211,3 +1211,29 @@
   .message-action, .chat-signin .button { min-height: 44px; }
   .chat-close { width: 44px; height: 44px; }
 }
+
+/* Admin service editor and detail preview */
+.service-editor > label { display: block; margin-bottom: 8px; font-weight: 600; }
+.service-editor small, .service-image-options + div small { display: block; margin-top: 6px; color: var(--muted); }
+.service-image-options { display: flex; gap: 20px; border: 0; padding: 0; margin: 0; }
+.service-image-options legend { margin-bottom: 8px; font-weight: 600; }
+.service-image-options label { display: flex; gap: 6px; align-items: center; }
+.service-preview-trigger { padding: 0; border: 0; background: none; color: var(--wine); text-decoration: underline; cursor: pointer; }
+.service-admin-preview-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+.service-admin-preview-hero > img { width: 100%; max-height: 560px; object-fit: cover; }
+.service-admin-preview-hero h1 { font-family: var(--font-serif); font-size: clamp(32px, 4vw, 56px); overflow-wrap: anywhere; }
+.service-markdown { margin-top: 24px; overflow-wrap: anywhere; }
+.service-markdown .wmde-markdown { background: transparent; color: inherit; }
+@media (max-width: 720px) { .service-admin-preview-hero { grid-template-columns: 1fr; gap: 24px; } }
+
+.service-wizard .wmde-markdown-color, .service-wizard .w-md-editor-text-pre, .service-wizard .w-md-editor-text-input { color: #24201e !important; -webkit-text-fill-color: #24201e; }
+.service-wizard .w-md-editor { background: #fff; }
+.service-editor .service-markdown-toggle { display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 8px; margin: 14px 0 8px; font-weight: 500; }
+.service-editor .service-markdown-toggle input { width: auto; min-height: 0; }
+.service-editor-preview { min-height: 100px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; overflow-wrap: anywhere; }
+.service-editor-preview .wmde-markdown { background: transparent; color: var(--ink); }
+.service-wizard .form-actions { flex-wrap: wrap; }
+.service-wizard .service-save-feedback, .service-wizard .service-save-progress { flex-basis: 100%; margin: 0 0 4px; font-size: 13px; line-height: 1.4; text-align: right; }
+.service-wizard .service-save-feedback { color: #9e3737; font-weight: 600; }
+.service-wizard .service-save-progress { color: var(--muted); }
+.service-wizard .service-step-feedback { margin: 14px 0 0; color: #9e3737; font-size: 13px; font-weight: 600; line-height: 1.4; }

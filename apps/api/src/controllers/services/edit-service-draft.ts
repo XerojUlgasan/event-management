@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { json, errors, body, idParams } from "../packages/http.js";
-import { contentSchema, adminSchema, publicSchema } from "./schemas.js";
+import { serviceEditSchema, adminSchema } from "./schemas.js";
 import { editServiceDraftService } from "../../services/services/edit-service-draft.js";
 export const editServiceDraftRoute = createRoute({
   method: "patch",
@@ -10,7 +10,7 @@ export const editServiceDraftRoute = createRoute({
   request: {
     params: idParams,
     body: body(
-      contentSchema.extend({ expectedUpdatedAt: z.string().datetime() }),
+      serviceEditSchema,
     ),
   },
   responses: {

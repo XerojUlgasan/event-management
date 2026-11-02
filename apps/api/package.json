@@ -24,6 +24,7 @@
     "test:venues": "tsx --test tests/venues.test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1161.0",
     "@event-management/contracts": "workspace:*",
     "@hono/node-server": "^2.1.5",
     "@hono/zod-openapi": "^1.6.3",

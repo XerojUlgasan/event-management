@@ -8,4 +8,4 @@
 
 Database commands use local settings from `apps/api/.env`. Use `.env.example` for variable names and keep values out of chat, docs, and logs.
 
-Catalog versions store external HTTPS image URLs. Read [external catalog image URLs](external-image-urls.md) before changing image schema or migration behavior.
+Package and venue versions use external HTTPS image URLs. Service versions store an R2 upload ID and require an image for publication. Read [external catalog image URLs](external-image-urls.md) before changing image schema or migration behavior.

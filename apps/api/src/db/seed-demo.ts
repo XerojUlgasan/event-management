@@ -14,22 +14,6 @@ function seedId(key: string) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function randomSource(seed: string) {
-  let state = createHash("sha256").update(seed).digest().readUInt32LE(0);
-  return () => {
-    state += 0x6d2b79f5;
-    let value = state;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function pick<T>(items: readonly T[], random: () => number): T {
-  if (!items.length) throw new Error("Cannot choose from an empty seed set");
-  return items[Math.floor(random() * items.length)]!;
-}
-
 function seedClock() {
   const value = process.env.SEED_CLOCK;
   if (!value) return new Date();
@@ -50,19 +34,6 @@ const users = [
   { key: "ella", email: "demo.ella@clemora.example.test", name: "Ella Navarro", role: "customer", staffRole: null },
 ] as const;
 
-const services = [
-  { key: "catering", name: "Demo Buffet Catering", description: "Buffet menu and service team for a private event.", categories: ["Catering"] },
-  { key: "coordination", name: "Demo Event Coordination", description: "On-the-day event coordination and supplier handoff.", categories: ["Coordination"] },
-  { key: "photo-booth", name: "Demo Photo Booth", description: "Two-hour photo booth with an attendant and digital copies.", categories: ["Entertainment", "Photography"] },
-  { key: "audio", name: "Demo Audio and Lighting", description: "Basic sound system and event lighting with an operator.", categories: ["Production"] },
-] as const;
-
-const packages = [
-  { key: "wedding", name: "Demo Wedding Reception", eventType: "Wedding", guestMax: 100, price: 120000, description: "Sample reception for up to 100 guests with buffet catering and coordination." },
-  { key: "birthday", name: "Demo Birthday Celebration", eventType: "Birthday", guestMax: 80, price: 60000, description: "Sample birthday celebration for up to 80 guests with catering and coordination." },
-  { key: "corporate", name: "Demo Corporate Gathering", eventType: "Corporate", guestMax: 100, price: 90000, description: "Sample company gathering for up to 100 guests with buffet catering and coordination." },
-] as const;
-
 const venues = [
   { key: "garden", name: "Demo Garden Pavilion", location: "Quezon City, Metro Manila", description: "Sample open-air venue draft with covered dining space. Availability has not been checked.", categories: ["Garden", "Outdoor"], capacityMax: 100 },
   { key: "hall", name: "Demo City Function Hall", location: "Makati, Metro Manila", description: "Sample indoor venue draft for celebrations and company events. Availability has not been checked.", categories: ["Indoor", "Function Hall"], capacityMax: 100 },
@@ -70,23 +41,10 @@ const venues = [
 ] as const;
 
 type UserKey = (typeof users)[number]["key"];
-type PackageKey = (typeof packages)[number]["key"];
-
-const scenarios: { key: string; customer: UserKey; package: PackageKey; status: string; outOfRange?: boolean; note: string }[] = [
-  { key: "wedding-review", customer: "ana", package: "wedding", status: "under_review", note: "Please include a vegetarian meal option." },
-  { key: "birthday-details", customer: "ben", package: "birthday", status: "needs_details", outOfRange: true, note: "We may have more guests than the package estimate." },
-  { key: "corporate-accepted", customer: "camille", package: "corporate", status: "accepted", note: "Please share the projector requirements." },
-  { key: "wedding-declined", customer: "daniel", package: "wedding", status: "declined", note: "We can move to another date if needed." },
-  { key: "birthday-cancelled", customer: "ella", package: "birthday", status: "cancelled", note: "Family plans have changed." },
-];
-
 export async function seedDemo(db: SeedDb) {
   const now = seedClock();
-  const random = randomSource(process.env.SEED_RANDOM_SEED ?? "clemora-demo-v1");
   const count = { users: 0, services: 0, packages: 0, venues: 0, assignments: 0, requests: 0, history: 0, conversations: 0, messages: 0 };
   const persistedUsers = new Map<UserKey, { id: string; role: string; staffRole: string | null; name: string }>();
-  const persistedServices = new Map<string, { id: string; versionId: string; published: boolean }>();
-  const persistedPackages = new Map<string, { id: string; versionId: string; name: string; eventType: string; guestMax: number; published: boolean }>();
 
   for (const user of users) {
     const id = seedId(`user:${user.key}`);
@@ -97,32 +55,6 @@ export async function seedDemo(db: SeedDb) {
     }
     const row = await db.selectFrom("users").select(["id", "role", "staff_role", "display_name"]).where("id", "=", id).executeTakeFirst();
     if (row) persistedUsers.set(user.key, { id: row.id, role: row.role, staffRole: row.staff_role, name: row.display_name ?? user.name });
-  }
-
-  for (const service of services) {
-    const id = seedId(`service:${service.key}`);
-    const inserted = await db.insertInto("services").values({ id, created_at: now, updated_at: now })
-      .onConflict((conflict) => conflict.column("id").doNothing()).returning("id").executeTakeFirst();
-    if (inserted) count.services++;
-    const parent = await db.selectFrom("services").select(["id", "archived_at"]).where("id", "=", id).executeTakeFirstOrThrow();
-    const versionId = seedId(`service-version:${service.key}:1`);
-    await db.insertInto("service_versions").values({ id: versionId, service_id: parent.id, version: 1, state: "published", name: service.name, description: service.description, categories: [...service.categories], image_url: null, created_at: now, updated_at: now, published_at: now })
-      .onConflict((conflict) => conflict.doNothing()).execute();
-    const version = await db.selectFrom("service_versions").select(["id", "state"]).where("id", "=", versionId).where("service_id", "=", parent.id).executeTakeFirst();
-    if (version) persistedServices.set(service.key, { id: parent.id, versionId: version.id, published: !parent.archived_at && version.state === "published" });
-  }
-
-  for (const pkg of packages) {
-    const id = seedId(`package:${pkg.key}`);
-    const inserted = await db.insertInto("packages").values({ id, created_at: now, updated_at: now })
-      .onConflict((conflict) => conflict.column("id").doNothing()).returning("id").executeTakeFirst();
-    if (inserted) count.packages++;
-    const parent = await db.selectFrom("packages").select(["id", "archived_at"]).where("id", "=", id).executeTakeFirstOrThrow();
-    const versionId = seedId(`package-version:${pkg.key}:1`);
-    await db.insertInto("package_versions").values({ id: versionId, package_id: parent.id, version: 1, state: "published", name: pkg.name, event_types: [pkg.eventType], description: pkg.description, guest_max: pkg.guestMax, inclusions: ["Buffet catering", "On-the-day event coordination"], exclusions: ["Optional add-ons", "Venue fees"], image_url: null, price: pkg.price, created_at: now, updated_at: now, published_at: now })
-      .onConflict((conflict) => conflict.doNothing()).execute();
-    const version = await db.selectFrom("package_versions").select(["id", "state", "name", "event_types", "guest_max"]).where("id", "=", versionId).where("package_id", "=", parent.id).executeTakeFirst();
-    if (version) persistedPackages.set(pkg.key, { id: parent.id, versionId: version.id, name: version.name, eventType: version.event_types[0] ?? pkg.eventType, guestMax: version.guest_max, published: !parent.archived_at && version.state === "published" });
   }
 
   for (const venue of venues) {
@@ -153,57 +85,6 @@ export async function seedDemo(db: SeedDb) {
     await db.updateTable("venues").set({ updated_at: publishedAt }).where("id", "=", parent.id).execute();
   }
 
-  for (const pkg of packages) {
-    const parent = persistedPackages.get(pkg.key);
-    if (!parent?.published) continue;
-    for (const [serviceKey, role, price] of [["catering", "included", null], ["coordination", "included", null], ["photo-booth", "add_on", 1500000], ["audio", "add_on", 1200000]] as const) {
-      const service = persistedServices.get(serviceKey);
-      if (!service?.published) continue;
-      const inserted = await db.insertInto("package_services").values({ id: seedId(`package-service:${pkg.key}:${serviceKey}`), package_version_id: parent.versionId, service_version_id: service.versionId, role, included_quantity: role === "included" ? 1 : null, add_on_unit_price_amount_minor: price, add_on_max_quantity: role === "add_on" ? 2 : null })
-        .onConflict((conflict) => conflict.doNothing()).returning("id").executeTakeFirst();
-      if (inserted) count.assignments++;
-    }
-  }
-
-  const eligiblePackages = [...persistedPackages.entries()].filter(([, pkg]) => pkg.published && pkg.guestMax > 0);
-  const eligibleCustomers = users.filter((user) => user.role === "customer" && persistedUsers.get(user.key)?.role === "customer");
-  const randomScenarios = eligiblePackages.length && eligibleCustomers.length ? Array.from({ length: 5 }, (_, index) => {
-    const [packageKey] = pick(eligiblePackages, random);
-    const customer = pick(eligibleCustomers, random);
-    return { key: `random-${index + 1}`, customer: customer.key, package: packageKey as PackageKey, status: "under_review", note: pick(["Please advise on vegetarian options.", "We would like a simple stage setup.", "Please confirm the preferred time slot."], random) };
-  }) : [];
-
-  for (const [index, scenario] of [...scenarios, ...randomScenarios].entries()) {
-    const customer = persistedUsers.get(scenario.customer);
-    const pkg = persistedPackages.get(scenario.package);
-    const adminActor = persistedUsers.get("admin");
-    if (!customer || customer.role !== "customer" || !pkg?.published) continue;
-    if (!["under_review", "cancelled"].includes(scenario.status) && (adminActor?.role !== "admin" || adminActor.staffRole !== "System Administrator")) continue;
-    const guestCount = "outOfRange" in scenario && scenario.outOfRange ? pkg.guestMax + 15 : 1 + Math.floor(random() * pkg.guestMax);
-    const dayOffset = 30 + index * 7 + Math.floor(random() * 5);
-    const startsAt = new Date(now.getTime() + dayOffset * 86400000);
-    startsAt.setUTCHours(9 + Math.floor(random() * 6), 0, 0, 0);
-    const endsAt = new Date(startsAt.getTime() + 4 * 3600000);
-    const id = seedId(`booking-request:${scenario.key}`);
-    const reference = `DEMO-${String(index + 1).padStart(3, "0")}`;
-    const inserted = await db.insertInto("booking_requests").values({ id, reference, customer_id: customer.id, package_id: pkg.id, package_version_id: pkg.versionId, package_name: pkg.name, event_type: pkg.eventType, preferred_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(startsAt), estimated_duration: "4_hours", starts_at: startsAt, ends_at: endsAt, time_zone: "Asia/Manila", guest_count: guestCount, contact_name: customer.name, phone_number: "+63 917 555 0100", preferred_venue_location: pick(venues, random).location, special_requests: scenario.note, status: scenario.status, out_of_range: guestCount > pkg.guestMax, created_at: now, updated_at: now })
-      .onConflict((conflict) => conflict.doNothing()).returning("id").executeTakeFirst();
-    if (inserted) count.requests++;
-    const request = await db.selectFrom("booking_requests").select(["id", "customer_id", "status"]).where("id", "=", id).executeTakeFirst();
-    if (!request || request.customer_id !== customer.id) continue;
-    const first = await db.insertInto("booking_request_status_history").values({ id: seedId(`booking-history:${scenario.key}:initial`), booking_request_id: request.id, status: "under_review", reason: null, changed_by: customer.id, created_at: now })
-      .onConflict((conflict) => conflict.doNothing()).returning("id").executeTakeFirst();
-    if (first) count.history++;
-    if (scenario.status !== "under_review" && request.status === scenario.status) {
-      const actor = scenario.status === "cancelled" ? customer : adminActor;
-      if (actor && (scenario.status === "cancelled" || (actor.role === "admin" && actor.staffRole === "System Administrator"))) {
-        const second = await db.insertInto("booking_request_status_history").values({ id: seedId(`booking-history:${scenario.key}:status`), booking_request_id: request.id, status: scenario.status, reason: scenario.status === "needs_details" ? "Please confirm the final guest count." : scenario.status === "declined" ? "Requested date is unavailable." : scenario.status === "cancelled" ? "Customer changed plans." : null, changed_by: actor.id, created_at: new Date(now.getTime() + 3600000) })
-          .onConflict((conflict) => conflict.doNothing()).returning("id").executeTakeFirst();
-        if (second) count.history++;
-      }
-    }
-  }
-
   for (const user of users.filter((item) => item.role === "customer")) {
     const customer = persistedUsers.get(user.key);
     const admin = persistedUsers.get("admin");
@@ -214,9 +95,8 @@ export async function seedDemo(db: SeedDb) {
     if (inserted) count.conversations++;
     const conversation = await db.selectFrom("conversations").select(["id", "customer_id"]).where("id", "=", id).executeTakeFirst();
     if (!conversation || conversation.customer_id !== customer.id) continue;
-    const requested = scenarios.find((scenario) => scenario.customer === user.key);
-    const subject = requested ? persistedPackages.get(requested.package)?.eventType.toLowerCase() : undefined;
-    for (const [index, sender, body] of [[0, customer, `Hello, I would like to ask about a ${subject ?? "private"} event.`], [1, admin, "Thanks for reaching out. Please share your preferred date and guest count."]] as const) {
+    const subject = { ana: "wedding", ben: "birthday", camille: "corporate", daniel: "wedding", ella: "birthday" }[user.key] ?? "private";
+    for (const [index, sender, body] of [[0, customer, `Hello, I would like to ask about a ${subject} event.`], [1, admin, "Thanks for reaching out. Please share your preferred date and guest count."]] as const) {
       const message = await db.insertInto("messages").values({ id: seedId(`message:${user.key}:${index}`), conversation_id: conversation.id, sender_id: sender.id, body, created_at: new Date(now.getTime() + index * 600000), read_at: index === 0 ? new Date(now.getTime() + 600000) : null })
         .onConflict((conflict) => conflict.doNothing()).returning("id").executeTakeFirst();
       if (message) count.messages++;

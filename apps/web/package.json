@@ -14,10 +14,13 @@
     "@event-management/theme": "workspace:*",
     "@event-management/ui": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
+    "@uiw/react-markdown-preview": "5.2.1",
+    "@uiw/react-md-editor": "^4.1.5",
     "astro": "^7.4.1",
     "firebase": "^12.19.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "rehype-sanitize": "^6.0.0",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {

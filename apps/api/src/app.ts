@@ -1,4 +1,5 @@
-import { SMALL_JSON_BODY_LIMIT_BYTES, CATALOG_JSON_BODY_LIMIT_BYTES } from "./constants/http.js";
+import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images";
+import { SMALL_JSON_BODY_LIMIT_BYTES, CATALOG_JSON_BODY_LIMIT_BYTES, SERVICE_UPLOAD_BODY_OVERHEAD_BYTES } from "./constants/http.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
@@ -53,6 +54,8 @@ app.use("/v1/admin/venues/*", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES
 app.route("/v1", healthRoutes);
 app.use("/v1/admin/services", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/admin/services/*", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/admin/service-uploads", bodyLimit({ maxSize: MAX_IMAGE_SIZE_BYTES + SERVICE_UPLOAD_BODY_OVERHEAD_BYTES }));
+app.use("/v1/admin/service-uploads/*", bodyLimit({ maxSize: MAX_IMAGE_SIZE_BYTES + SERVICE_UPLOAD_BODY_OVERHEAD_BYTES }));
 app.route("/v1", serviceRoutes);
 app.route("/v1", packageRoutes);
 app.route("/v1", venueRoutes);

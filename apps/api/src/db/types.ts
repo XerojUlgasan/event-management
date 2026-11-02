@@ -108,11 +108,11 @@ export interface Services {
 }
 
 export interface ServiceVersions {
-  categories: string[];
   created_at: Generated<Timestamp>;
   description: string;
+  hourly_rate_pesos: number | null;
   id: Generated<string>;
-  image_url: string | null;
+  image_id: string | null;
   name: string;
   published_at: Timestamp | null;
   service_id: string;
