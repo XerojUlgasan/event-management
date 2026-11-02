@@ -22,8 +22,8 @@ export interface BookingRequests {
   guest_count: number | null;
   id: Generated<string>;
   out_of_range: boolean;
-  package_guest_max: number;
   package_id: string;
+  package_max_guests: number;
   package_name: string;
   package_price: number;
   phone_number: string;
@@ -114,9 +114,8 @@ export interface Packages {
   archived_at: Timestamp | null;
   created_at: Generated<Timestamp>;
   description: Generated<string>;
-  event_types: string[];
-  guest_max: number;
   id: Generated<string>;
+  max_guests: number;
   name: string;
   price: number;
   published_at: Generated<Timestamp>;
@@ -129,7 +128,6 @@ export interface Services {
   description: string;
   hourly_rate_pesos: number | null;
   id: Generated<string>;
-  image_id: string | null;
   name: string;
   published_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
@@ -157,13 +155,11 @@ export interface Users {
 
 export interface Venues {
   archived_at: Timestamp | null;
-  capacity_max: number | null;
-  categories: string[];
   created_at: Generated<Timestamp>;
   description: string;
   id: Generated<string>;
-  image_urls: Generated<string[]>;
   location: string;
+  max_guests: number | null;
   name: string;
   published_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;

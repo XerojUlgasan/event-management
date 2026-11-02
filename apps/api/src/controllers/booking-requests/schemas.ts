@@ -22,7 +22,7 @@ export const updateStatusSchema = z.object({ status: statusSchema, reason: z.str
 export const cancelSchema = z.object({ reason: z.string().trim().min(1, "A cancellation reason is required").max(MAX_BOOKING_REASON_LENGTH) });
 export const idParams = z.object({ id: z.string().uuid() });
 export const bookingSchema = z.object({
-  id: z.string().uuid(), reference: z.string(), customerId: z.string().uuid(), packageId: z.string().uuid(), packagePrice: priceSchema, packageGuestMax: z.number().int().positive(),
+  id: z.string().uuid(), reference: z.string(), customerId: z.string().uuid(), packageId: z.string().uuid(), packagePrice: priceSchema, packageMaxGuests: z.number().int().positive(),
   packageName: z.string(), eventType: z.string(), preferredDate: z.string(), estimatedDuration: estimatedDurationSchema, startsAt: z.string().nullable(), endsAt: z.string().nullable(), timeZone: z.string(), guestCount: z.number().nullable(),
   estimatedDurationDays: z.number().int().min(8).nullable(),
   contactName: z.string(), phoneNumber: z.string(), preferredVenueLocation: z.string().nullable(), specialRequests: z.string().nullable(),

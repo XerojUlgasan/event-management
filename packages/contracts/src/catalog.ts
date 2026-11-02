@@ -28,8 +28,7 @@ export type PackagePrice = { kind: "fixed"; currency: "PHP"; amountMinor: number
 export type PackageContent = {
   name: string;
   description: string;
-  eventTypes: string[];
-  guestMax: number;
+  maxGuests: number;
   price: PackagePrice;
   sections: CatalogSection[];
 };

@@ -99,8 +99,7 @@ before(async () => {
 
   const pkg = await db.insertInto("packages").values({
     name: "Garden Wedding",
-    event_types: ["Wedding"],
-    guest_max: 100,
+    max_guests: 100,
     price: 150_000,
   }).returning("id").executeTakeFirstOrThrow();
   packageId = pkg.id;
@@ -278,7 +277,7 @@ test("booking conversations derive context and remain closed after expiry", asyn
   }, chatCustomerCookie), 201)).bookingRequest;
   assert.equal(booking.packageName, "Garden Wedding");
   assert.deepEqual(booking.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });
-  assert.equal(booking.packageGuestMax, 100);
+  assert.equal(booking.packageMaxGuests, 100);
   const linked = (await read(await call("/messages/conversations", "GET", undefined, chatCustomerCookie), 200)).conversations.find((item: any) => item.bookingRequestId === booking.id);
   assert.ok(linked);
   assert.equal(linked.packageId, packageId);

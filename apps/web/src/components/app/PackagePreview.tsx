@@ -8,7 +8,7 @@ export function priceLabel(price: PackagePrice | null) {
   return price ? `${new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(price.amountMinor / 100)} total` : "Price on request"
 }
 export function PackageCanvas({ item }: { item: PackageContent }) {
-  return <main className="package-canvas-preview"><div className="canvas-intro"><span>THE CLEMORA COLLECTION</span><h1>{item.name || "Untitled package"}</h1><p>{item.eventTypes.join(" · ") || "Event package"}</p><div><strong>{priceLabel(item.price)}</strong><strong>Up to {item.guestMax} guests</strong></div></div><CatalogSections sections={item.sections} /></main>
+  return <main className="package-canvas-preview"><div className="canvas-intro"><span>THE CLEMORA COLLECTION</span><h1>{item.name || "Untitled package"}</h1><div><strong>{priceLabel(item.price)}</strong><strong>Up to {item.maxGuests} guests</strong></div></div><CatalogSections sections={item.sections} /></main>
 }
 export function PackagePreview({ item, loading = false, error = "", onClose, allowBooking = true }: { item: PublicPackage | null; loading?: boolean; error?: string; allowBooking?: boolean; onClose: () => void }) {
   const [booking, setBooking] = useState(false)

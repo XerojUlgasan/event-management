@@ -156,8 +156,7 @@ async function read(response: Response, status: number): Promise<any> {
 test("requests enforce roles, published package availability, snapshots, ownership and status history", async () => {
   const pkg = await db.insertInto("packages").values({
     name: "Garden",
-    event_types: ["Wedding"],
-    guest_max: 100,
+    max_guests: 100,
     price: 150_000,
   }).returningAll().executeTakeFirstOrThrow();
   let input = {packageId:pkg.id,packageUpdatedAt:pkg.updated_at.toISOString(),eventType:"Wedding",preferredDate:"2099-01-02",estimatedDuration:"8_hours",timeZone:"Asia/Manila",guestCount:120,contactName:"Customer",phoneNumber:"123",specialRequests:"Music"};
@@ -175,7 +174,7 @@ test("requests enforce roles, published package availability, snapshots, ownersh
   const withoutTimestamp = (await read(await call("/booking-requests","POST",withoutPackageUpdatedAt,customerCookie),201)).bookingRequest;
   assert.equal(withoutTimestamp.packageName, "Garden");
   assert.deepEqual(withoutTimestamp.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });
-  assert.equal(withoutTimestamp.packageGuestMax, 100);
+  assert.equal(withoutTimestamp.packageMaxGuests, 100);
   const staffProfile = await read(await call("/me", "GET", undefined, staffCookie), 200);
   assert.equal(staffProfile.role, "staff");
   for (const path of ["/admin/users", "/admin/conversations", "/admin/packages", "/admin/services"])
@@ -191,11 +190,11 @@ test("requests enforce roles, published package availability, snapshots, ownersh
   assert.equal(created.preferredDate, input.preferredDate); assert.equal(created.estimatedDuration, "8_hours");
   assert.equal(created.packageName, "Garden");
   assert.deepEqual(created.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });
-  assert.equal(created.packageGuestMax, 100);
+  assert.equal(created.packageMaxGuests, 100);
   assert.equal("packageVersionId" in created, false);
   assert.deepEqual(
-    (await pool.query("SELECT package_price, package_guest_max FROM booking_requests WHERE id = $1", [created.id])).rows[0],
-    { package_price: 150_000, package_guest_max: 100 },
+    (await pool.query("SELECT package_price, package_max_guests FROM booking_requests WHERE id = $1", [created.id])).rows[0],
+    { package_price: 150_000, package_max_guests: 100 },
   );
   const atMaximum = (await read(await call("/booking-requests", "POST", { ...input, guestCount: 100 }, customerCookie), 201)).bookingRequest;
   const belowPreviousMinimum = (await read(await call("/booking-requests", "POST", { ...input, guestCount: 1 }, customerCookie), 201)).bookingRequest;
@@ -284,17 +283,17 @@ test("requests enforce roles, published package availability, snapshots, ownersh
   assert.equal(todayRequest.preferredDate, todayInManila); assert.equal(todayRequest.estimatedDuration, "1_day");
   const updatedPackage = await db.updateTable("packages").set({
     name: "Updated Garden",
-    guest_max: 200,
+    max_guests: 200,
     price: 200_000,
     updated_at: new Date(),
   }).where("id", "=", pkg.id).returningAll().executeTakeFirstOrThrow();
   const persistedSnapshot = (await read(await call(`/booking-requests/${created.id}`, "GET", undefined, customerCookie), 200)).bookingRequest;
   assert.equal(persistedSnapshot.packageName, "Garden");
   assert.deepEqual(persistedSnapshot.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });
-  assert.equal(persistedSnapshot.packageGuestMax, 100);
+  assert.equal(persistedSnapshot.packageMaxGuests, 100);
   assert.deepEqual(
-    (await pool.query("SELECT package_price, package_guest_max FROM booking_requests WHERE id = $1", [created.id])).rows[0],
-    { package_price: 150_000, package_guest_max: 100 },
+    (await pool.query("SELECT package_price, package_max_guests FROM booking_requests WHERE id = $1", [created.id])).rows[0],
+    { package_price: 150_000, package_max_guests: 100 },
   );
   await read(await call("/booking-requests","POST",input,customerCookie),409);
   input = { ...input, packageUpdatedAt: updatedPackage.updated_at.toISOString() };
@@ -304,7 +303,7 @@ test("requests enforce roles, published package availability, snapshots, ownersh
   const original = list.find((item: any) => item.id === created.id);
   assert.equal(original.packageName,"Garden");
   assert.deepEqual(original.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });
-  assert.equal(original.packageGuestMax, 100);
+  assert.equal(original.packageMaxGuests, 100);
   assert.equal("packageVersionId" in original, false);
   assert.equal(original.statusHistory.length,3);
   const spec:any = await (await app.request("/openapi.json")).json();
@@ -321,7 +320,7 @@ test("requests enforce roles, published package availability, snapshots, ownersh
 
 test("admin request filters, cursor pages and calendar counts use preferred dates", async () => {
   const packageId = (await pool.query(
-    "INSERT INTO packages (name, event_types, guest_max, price) VALUES ('Filter fixture', ARRAY['Wedding'], 100, 1000) RETURNING id",
+    "INSERT INTO packages (name, max_guests, price) VALUES ('Filter fixture', 100, 1000) RETURNING id",
   )).rows[0].id;
   const ids = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()].sort().reverse();
   const rows = [
@@ -330,7 +329,7 @@ test("admin request filters, cursor pages and calendar counts use preferred date
     [ids[4], "2098-03-01", "under_review"],
   ];
   for (const [id, date, status] of rows) {
-    await pool.query(`INSERT INTO booking_requests (id, reference, customer_id, package_id, package_name, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, package_price, package_guest_max, created_at)
+    await pool.query(`INSERT INTO booking_requests (id, reference, customer_id, package_id, package_name, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, package_price, package_max_guests, created_at)
       VALUES ($1, $2, $3, $4, 'Fixture', 'Wedding', $5, 'undecided', 'Asia/Manila', 20, 'Customer', '123', $6, false, 1000, 100, '2098-01-01T00:00:00.123456Z')`, [id, `TEST-${id}`, customerId, packageId, date, status]);
   }
   const base = "/admin/booking-requests?status=under_review&preferredDate=2098-02-02&limit=1";
@@ -350,9 +349,9 @@ test("admin request filters, cursor pages and calendar counts use preferred date
 
 test("booking request pagination crosses the 50-item boundary without duplicates", async () => {
   const packageId = (await pool.query(
-    "INSERT INTO packages (name, event_types, guest_max, price) VALUES ('Pagination fixture', ARRAY['Wedding'], 100, 1000) RETURNING id",
+    "INSERT INTO packages (name, max_guests, price) VALUES ('Pagination fixture', 100, 1000) RETURNING id",
   )).rows[0].id;
-  await pool.query(`INSERT INTO booking_requests (reference, customer_id, package_id, package_name, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, package_price, package_guest_max, created_at)
+  await pool.query(`INSERT INTO booking_requests (reference, customer_id, package_id, package_name, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, package_price, package_max_guests, created_at)
     SELECT 'PAGE-' || n, $1, $2, 'Fixture', 'Wedding', '2097-05-10', 'undecided', 'Asia/Manila', 20, 'Customer', '123', 'under_review', false, 1000, 100,
       '2097-01-01T00:00:00.123456Z'::timestamptz + (n / 4) * interval '1 second'
     FROM generate_series(1, 53) AS n`, [customerId, packageId]);

@@ -3,22 +3,21 @@ import type { ReactNode } from "react"
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Button, Dialog, FormField } from "@event-management/ui"
-import { ApiError, archiveVenue, catalogMediaSrc, createVenue, deleteVenue, getAdminVenue, getAdminVenues, updateVenue, venueImageSrc } from "../../../lib/api"
+import { ApiError, archiveVenue, catalogMediaSrc, createVenue, deleteVenue, getAdminVenue, getAdminVenues, updateVenue } from "../../../lib/api"
 import type { AdminVenue, VenueContent } from "../../../lib/api"
 import { CatalogDetailPreview, VenueCanvas } from "../CatalogPreview"
-import { TagInput } from "../TagInput"
 import { CatalogEditor } from "./CatalogEditor"
 
-const empty = (): VenueContent => ({ name: "", location: "", description: "", categories: [], capacityMax: null, imageUrls: [], sections: [{ id: crypto.randomUUID(), title: "", widgets: [] }] })
+const empty = (): VenueContent => ({ name: "", location: "", description: "", maxGuests: null, sections: [{ id: crypto.randomUUID(), title: "", widgets: [] }] })
 const message = (error: unknown) => error instanceof Error ? error.message : "Something went wrong. Please try again."
-const content = (version: AdminVenue): VenueContent => ({ name: version.name, location: version.location, description: version.description, categories: [...version.categories], capacityMax: version.capacityMax, imageUrls: [...version.imageUrls], sections: version.sections?.length ? version.sections : [{ id: crypto.randomUUID(), title: "", widgets: [] }] })
+const content = (version: AdminVenue): VenueContent => ({ name: version.name, location: version.location, description: version.description, maxGuests: version.maxGuests, sections: version.sections?.length ? version.sections : [{ id: crypto.randomUUID(), title: "", widgets: [] }] })
 const cover = (version: VenueContent) => {
   const photo = version.sections?.flatMap(section => section.widgets).find(widget => widget.type === "photo" && widget.media?.url)
-  return photo?.media?.url ? catalogMediaSrc(photo.media.url) : version.imageUrls[0] ? venueImageSrc(version.imageUrls[0]) : undefined
+  return photo?.media?.url ? catalogMediaSrc(photo.media.url) : undefined
 }
 
 function VenueCard({ item, action }: { item: VenueContent; action?: ReactNode }) {
-  return <CatalogCard image={cover(item)} imageFallback="No venue photos available" eyebrow={item.categories.join(" · ") || "Event venue"} title={item.name || "Untitled venue"} description={item.description} metadata={[{ label: "Location", value: item.location || "Not specified" }, { label: "Capacity", value: item.capacityMax == null ? "Not set" : `Up to ${item.capacityMax} guests` }]} action={action} />
+  return <CatalogCard image={cover(item)} imageFallback="No venue photos available" eyebrow="Event venue" title={item.name || "Untitled venue"} description={item.description} metadata={[{ label: "Location", value: item.location || "Not specified" }, { label: "Maximum guests", value: item.maxGuests == null ? "Not set" : `Up to ${item.maxGuests} guests` }]} action={action} />
 }
 
 export function VenuesPage() {
@@ -47,8 +46,7 @@ export function VenuesPage() {
   const save = async (form: VenueContent) => {
     try {
       const { id, updatedAt } = savedRef.current
-      const clean = { ...form, categories: form.categories.map(value => value.trim()).filter(Boolean) }
-      const result = id && updatedAt ? await updateVenue(id, clean, updatedAt) : await createVenue(clean)
+      const result = id && updatedAt ? await updateVenue(id, form, updatedAt) : await createVenue(form)
       savedRef.current = { id: result.id, updatedAt: result.updatedAt }
       savedDuringEditRef.current = true
     } catch (err) {
@@ -66,7 +64,7 @@ export function VenuesPage() {
   }
   const visible = rows.filter(item => {
     if (tab === "Archives" ? !item.archivedAt : !!item.archivedAt) return false
-    return `${item.name} ${item.location} ${item.description} ${item.categories.join(" ")}`.toLowerCase().includes(search.toLowerCase().trim())
+    return `${item.name} ${item.location} ${item.description}`.toLowerCase().includes(search.toLowerCase().trim())
   })
   return <div className="pe-list">
     <div className="pe-list-head"><div><h1>Venues</h1><p>Manage your venue catalog.</p></div>{tab === "Venues" && <button className="pe-primary" disabled={busy} onClick={() => { savedDuringEditRef.current = false; savedRef.current = { id: null, updatedAt: null }; setEditing(empty()) }}>+ Create venue</button>}</div>
@@ -82,10 +80,9 @@ export function VenuesPage() {
     })}</div>
     {preview && <CatalogDetailPreview entity="venue" onClose={() => setPreview(null)}><VenueCanvas item={preview} /></CatalogDetailPreview>}
     {editing && <CatalogEditor initial={editing} entity="venue" nameMaxLength={200} onClose={() => { setEditing(null); if (savedDuringEditRef.current) void load() }} onSave={save} onSaved={() => { setEditing(null); setNotice("Venue saved."); void load() }} validate={form => {
-      if (form.categories.length > 50 || form.categories.some(value => value.trim().length > 200)) return "Use up to 50 categories, each at most 200 characters."
-      if (form.capacityMax != null && (!Number.isInteger(form.capacityMax) || form.capacityMax < 1 || form.capacityMax > 2147483647)) return "Capacity must be a positive whole number."
-      if ((!form.name.trim() || !form.location.trim() || !form.description.trim() || form.capacityMax == null)) return "Complete the title, location, description, and maximum capacity before saving."
-    }} renderDetails={(form, setForm) => <div className="form-grid"><FormField className="full" label="Location *"><input maxLength={200} value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} /></FormField><FormField className="full" label="Catalog description *"><textarea maxLength={MAX_CATALOG_TEXT_LENGTH} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></FormField><TagInput label="Categories" values={form.categories} onChange={value => setForm(current => ({ ...current, categories: value }))} /><small className="full">Up to 50 categories, each at most 200 characters.</small><FormField label="Maximum capacity"><input type="number" min="1" step="1" value={form.capacityMax ?? ""} onChange={e => setForm({ ...form, capacityMax: e.target.value === "" ? null : Number(e.target.value) })} /></FormField>{form.imageUrls.length > 0 && <div className="full"><p>Existing venue photos</p><div className="venue-photo-list">{form.imageUrls.map((url, index) => <div className="venue-photo" key={url}><img src={venueImageSrc(url)} alt={`Venue photo ${index + 1}`} /><button type="button" onClick={() => setForm(current => ({ ...current, imageUrls: current.imageUrls.filter((_, i) => i !== index) }))}>Remove</button></div>)}</div></div>}</div>} renderPreview={(form, mode) => mode === "customer" ? <VenueCanvas item={form} /> : <div className="pe-card-preview"><VenueCard item={form} action={<CatalogCardActions name={form.name} status={{ tone: "success", label: "Published" }} />} /></div>} />}
+      if (form.maxGuests != null && (!Number.isInteger(form.maxGuests) || form.maxGuests < 1 || form.maxGuests > 2147483647)) return "Maximum guests must be a positive whole number."
+      if ((!form.name.trim() || !form.location.trim() || !form.description.trim() || form.maxGuests == null)) return "Complete the title, location, description, and maximum guests before saving."
+    }} renderDetails={(form, setForm) => <div className="form-grid"><FormField className="full" label="Location *"><input maxLength={200} value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} /></FormField><FormField className="full" label="Catalog description *"><textarea maxLength={MAX_CATALOG_TEXT_LENGTH} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></FormField><FormField label="Maximum guests"><input type="number" min="1" step="1" value={form.maxGuests ?? ""} onChange={e => setForm({ ...form, maxGuests: e.target.value === "" ? null : Number(e.target.value) })} /></FormField></div>} renderPreview={(form, mode) => mode === "customer" ? <VenueCanvas item={form} /> : <div className="pe-card-preview"><VenueCard item={form} action={<CatalogCardActions name={form.name} status={{ tone: "success", label: "Published" }} />} /></div>} />}
     {confirm && <Dialog title={`${confirm.action === "archive" ? "Archive" : "Delete"} venue?`} onClose={() => { if (!busy) setConfirm(null) }} actions={<><Button variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>Cancel</Button><Button disabled={busy} onClick={() => void act()}>{busy ? "Please wait…" : confirm.action === "archive" ? "Archive" : "Delete"}</Button></>}><p>{confirm.action === "archive" ? "The venue will no longer appear in the public catalog." : "This permanently removes the venue."}</p></Dialog>}
 
   </div>

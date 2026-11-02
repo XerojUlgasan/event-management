@@ -36,9 +36,6 @@
 @media (max-width: 620px) { .catalog-grid { grid-template-columns: 1fr; } .service-preview-image { aspect-ratio: 1.15; } .service-preview-summary { padding: 25px; } .service-preview-package { align-items: flex-start; flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { .catalog-card { transition: none; } .catalog-card:hover { transform: none; } }
 
-.venue-photo-list { display: flex; flex-wrap: wrap; gap: 12px; }
-.venue-photo-list img { width: min(220px, 100%); height: 160px; object-fit: cover; border-radius: 8px; }
-
 .venue-photo-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; min-height: 140px; padding: 16px; color: #554c48; background: #f2eeeb; text-align: center; }
 
 .catalog-overlay { --catalog-line: #e8dfda; --catalog-card: #fff; --catalog-image: #ddd9e3; --catalog-accent: var(--wine); --catalog-ink: var(--ink); --catalog-muted: var(--muted); --catalog-heading: var(--font-serif); }

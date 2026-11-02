@@ -94,16 +94,16 @@ test("seed creates demo users, venues, and conversations while preserving unrela
     (SELECT count(*)::int FROM packages WHERE published_at IS NOT NULL) AS package_published,
     (SELECT count(*)::int FROM venues WHERE name LIKE 'Demo %' AND archived_at IS NULL) AS venue_published`);
   assert.deepEqual(coverage.rows[0], { requests: 0, conversations: 5, messages: 10, package_published: 3, venue_published: 3 });
-  const packageRows = await pool.query("SELECT id, name, guest_max, price, published_at IS NOT NULL AS published FROM packages ORDER BY name");
+  const packageRows = await pool.query("SELECT id, name, max_guests, price, published_at IS NOT NULL AS published FROM packages ORDER BY name");
   assert.deepEqual(packageRows.rows.map((row) => ({
     name: row.name,
-    guestMax: row.guest_max,
+    maxGuests: row.max_guests,
     price: row.price,
     published: row.published,
   })), [
-    { name: "The Grand Celebration", guestMax: 150, price: 185000, published: true },
-    { name: "The Intimate Gathering", guestMax: 50, price: 68000, published: true },
-    { name: "The Sweet Soirée", guestMax: 80, price: 95000, published: true },
+    { name: "The Grand Celebration", maxGuests: 150, price: 185000, published: true },
+    { name: "The Intimate Gathering", maxGuests: 50, price: 68000, published: true },
+    { name: "The Sweet Soirée", maxGuests: 80, price: 95000, published: true },
   ]);
   const grandCelebration = packageRows.rows.find((row) => row.name === "The Grand Celebration");
   assert.ok(grandCelebration);
@@ -134,7 +134,7 @@ test("seed creates demo users, venues, and conversations while preserving unrela
   assert.equal(demoVenues.rowCount, 3);
   const initialPublicVenues = (await read("/venues")).venues.filter((venue: any) => demoVenues.rows.some((row) => row.id === venue.id));
   assert.equal(initialPublicVenues.length, 3);
-  assert.ok(initialPublicVenues.every((venue: any) => venue.imageUrls.length === 0 && !venue.description.includes("venue draft")));
+  assert.ok(initialPublicVenues.every((venue: any) => !("imageUrls" in venue) && !venue.description.includes("venue draft")));
   assert.equal((await pool.query("SELECT count(*)::int AS count FROM services")).rows[0].count, 0);
   const conversation = await pool.query(`SELECT c.id, c.customer_id, count(m.id)::int AS message_count,
     array_agg(u.role ORDER BY m.created_at) AS sender_roles
@@ -160,7 +160,7 @@ test("seed creates demo users, venues, and conversations while preserving unrela
   assert.equal((await pool.query("SELECT display_name FROM users WHERE id = $1", [unrelated.rows[0].id])).rows[0].display_name, "Unrelated person");
 
   const publicVenues = await read("/venues");
-  assert.ok(publicVenues.venues.some((row: any) => row.id === demoVenues.rows[0].id && row.imageUrls.length === 0));
+  assert.ok(publicVenues.venues.some((row: any) => row.id === demoVenues.rows[0].id && !("imageUrls" in row)));
   assert.ok(publicVenues.venues.some((row: any) => row.id === demoVenues.rows[1].id && row.name === "Edited demo venue"));
   assert.ok(!publicVenues.venues.some((row: any) => row.id === demoVenues.rows[2].id));
   assert.equal((await read("/services")).services.length, 0);

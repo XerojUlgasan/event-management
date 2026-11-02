@@ -74,11 +74,11 @@ export const addPassword = (idToken: string, password: string) =>
   request<Profile>("/auth/password", { password }, idToken);
 
 export type { PackagePrice, PackageContent, CatalogMedia, CatalogWidget, CatalogSection } from "@event-management/contracts/catalog"
-import type { PackageContent, CatalogPackage, CatalogMedia, CatalogSection } from "@event-management/contracts/catalog"
+import type { PackageContent, PackagePrice, CatalogPackage, CatalogMedia, CatalogSection } from "@event-management/contracts/catalog"
 export type PublicPackage = CatalogPackage
 export type AdminPackage = CatalogPackage
 export type ServiceContent = { name: string; description: string; hourlyRatePesos: number | null; sections: CatalogSection[] }
-export type PublicService = ServiceContent & { imageUrl: string | null; imageId: string | null; id: string; archivedAt: string | null; createdAt: string; updatedAt: string; publishedAt: string }
+export type PublicService = ServiceContent & { imageUrl: string | null; id: string; archivedAt: string | null; createdAt: string; updatedAt: string; publishedAt: string }
 export type AdminService = PublicService
 function pageQuery(page?: { limit: number; offset?: number }) { return page ? `?limit=${page.limit}&offset=${page.offset ?? 0}` : "" }
 export const getPackages = (page?: { limit: number; offset?: number }) => request<{ packages: PublicPackage[]; nextOffset: number | null }>(`/packages${pageQuery(page)}`)
@@ -98,18 +98,11 @@ export const getServices = (page?: { limit: number; offset?: number }) => reques
 export const getService = (id: string) => request<PublicService>(`/services/${encodeURIComponent(id)}`)
 export const getAdminService = (id: string) => request<AdminService>(`/admin/services/${encodeURIComponent(id)}`)
 export const createService = (content: ServiceContent) => request<AdminService>("/admin/services", content)
-export const updateService = (id: string, content: ServiceContent, expectedUpdatedAt: string, removeImage = false) => request<AdminService>(`/admin/services/${encodeURIComponent(id)}`, { ...content, expectedUpdatedAt, ...(removeImage ? { removeImage } : {}) }, undefined, "PATCH")
-export const uploadService = (content: ServiceContent, image: File, id?: string, expectedUpdatedAt?: string) => {
-  const body = new FormData()
-  body.set("content", JSON.stringify({ ...content, ...(expectedUpdatedAt ? { expectedUpdatedAt } : {}) }))
-  body.set("image", image)
-  return request<AdminService>(id ? `/admin/service-uploads/${encodeURIComponent(id)}` : "/admin/service-uploads", body, undefined, id ? "PATCH" : "POST")
-}
+export const updateService = (id: string, content: ServiceContent, expectedUpdatedAt: string) => request<AdminService>(`/admin/services/${encodeURIComponent(id)}`, { ...content, expectedUpdatedAt }, undefined, "PATCH")
 export const archiveService = (id: string) => request<AdminService>(`/admin/services/${encodeURIComponent(id)}/archive`, {})
 export const deleteService = (id: string) => request<void>(`/admin/services/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
 
 export const packageImageSrc = (imageUrl: string | null): string | undefined => imageUrl ? catalogMediaSrc(imageUrl) : undefined
-export const serviceImageSrc = (imageId: string | null): string | undefined => imageId ? `${apiUrl}/service-images/${encodeURIComponent(imageId)}` : undefined
 
 export type ConversationStatus = "active" | "closed"
 
@@ -161,7 +154,7 @@ export type AdminUser = {
 export const getAdminUsers = () =>
   request<{ staff: AdminUser[]; customers: AdminUser[] }>("/admin/users")
 
-export type VenueContent = { name: string; location: string; description: string; categories: string[]; capacityMax: number | null; imageUrls: string[]; sections: CatalogSection[] }
+export type VenueContent = { name: string; location: string; description: string; maxGuests: number | null; sections: CatalogSection[] }
 export type Venue = VenueContent & { id: string; publishedAt: string; createdAt: string; updatedAt: string; archivedAt: string | null }
 export type AdminVenue = Venue
 export const getVenues = (page?: { limit: number; offset?: number }) => request<{ venues: Venue[]; nextOffset: number | null }>(`/venues${pageQuery(page)}`)
@@ -171,7 +164,6 @@ export const createVenue = (content: VenueContent) => request<AdminVenue>("/admi
 export const updateVenue = (id: string, content: VenueContent, expectedUpdatedAt: string) => request<AdminVenue>(`/admin/venues/${encodeURIComponent(id)}`, { ...content, expectedUpdatedAt }, undefined, "PATCH")
 export const archiveVenue = (id: string) => request<AdminVenue>(`/admin/venues/${encodeURIComponent(id)}/archive`, {})
 export const deleteVenue = (id: string) => request<void>(`/admin/venues/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
-export const venueImageSrc = (imageUrl: string): string => imageUrl
 
 export const getMyConversation = () => request<ChatThread>("/messages/conversation")
 export const createMyConversation = () => request<ChatThread>("/messages/conversations", {})
@@ -190,7 +182,7 @@ export const sendAdminMessage = (id: string, body: string) =>
 
 export type BookingStatus = "under_review" | "needs_details" | "accepted" | "declined" | "cancelled"
 export type BookingRequestInput = { packageId: string; packageUpdatedAt?: string; eventType: string; preferredDate: string; estimatedDuration: BookingEstimatedDuration; estimatedDurationDays?: number; timeZone: string; contactName: string; phoneNumber: string; specialRequests?: string }
-export type BookingRequest = Omit<BookingRequestInput, "specialRequests" | "preferredDate" | "estimatedDuration" | "estimatedDurationDays"> & { preferredDate: string | null; estimatedDuration: BookingEstimatedDuration | null; estimatedDurationDays: number | null; guestCount: number | null; startsAt: string | null; endsAt: string | null; preferredVenueLocation: string | null; specialRequests: string | null; id: string; reference: string; customerId: string; packageName: string; status: BookingStatus; outOfRange: boolean; createdAt: string; updatedAt: string; statusHistory: { status: BookingStatus; reason: string | null; changedBy: string; createdAt: string }[] }
+export type BookingRequest = Omit<BookingRequestInput, "specialRequests" | "preferredDate" | "estimatedDuration" | "estimatedDurationDays"> & { preferredDate: string | null; estimatedDuration: BookingEstimatedDuration | null; estimatedDurationDays: number | null; guestCount: number | null; startsAt: string | null; endsAt: string | null; preferredVenueLocation: string | null; specialRequests: string | null; id: string; reference: string; customerId: string; packageName: string; packagePrice: PackagePrice; packageMaxGuests: number; status: BookingStatus; outOfRange: boolean; createdAt: string; updatedAt: string; statusHistory: { status: BookingStatus; reason: string | null; changedBy: string; createdAt: string }[] }
 export const createBookingRequest = (body: BookingRequestInput) => request<{ bookingRequest: BookingRequest }>("/booking-requests", body)
 export const getMyBookingRequests = () => request<{ bookingRequests: BookingRequest[] }>("/booking-requests/mine")
 export const getMyBookingRequest = (id: string) => request<{ bookingRequest: BookingRequest }>(`/booking-requests/${encodeURIComponent(id)}`)

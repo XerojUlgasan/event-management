@@ -14,8 +14,7 @@ export async function packageDto(
   return {
     id: row.id,
     name: row.name,
-    eventTypes: row.event_types,
-    guestMax: row.guest_max,
+    maxGuests: row.max_guests,
     price: { kind: "fixed", currency: "PHP", amountMinor: row.price * 100 },
     sections,
     description: row.description,

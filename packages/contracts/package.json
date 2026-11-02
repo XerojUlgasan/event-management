@@ -7,7 +7,6 @@
     "./limits/images": "./src/limits/images.ts",
     "./limits/videos": "./src/limits/videos.ts",
     "./limits/messages": "./src/limits/messages.ts",
-    "./limits/venues": "./src/limits/venues.ts",
     "./limits/auth": "./src/limits/auth.ts",
     "./limits/booking-requests": "./src/limits/booking-requests.ts",
     "./limits/catalog": "./src/limits/catalog.ts"

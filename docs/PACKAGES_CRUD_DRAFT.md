@@ -15,7 +15,7 @@ Services and venues are also flat, directly saved catalogs. The reusable catalog
 
 The shared `PackageContent` contract contains:
 
-- `name`, one or more `eventTypes`, positive integer `guestMax`, and a required fixed PHP `price`.
+- `name`, positive integer `maxGuests`, and a required fixed PHP `price`.
 - `description`, an editable catalog summary in Package details (up to 4,000 characters), independent of canvas Markdown. Admin and public cards display it.
 - `sections`, each with an optional title and widgets arranged on a 12-column canvas. Widgets are `photo`, `markdown`, or `video`; Markdown is rendered as package content, and media widgets can contain captions and image descriptions.
 
@@ -25,7 +25,7 @@ The schema permits up to 20 sections and 100 widgets across a page; a Markdown w
 
 Photo and video widgets accept uploaded files only, alongside the built-in seeded sample photos. Uploads go through `POST /v1/admin/catalog-media` and are stored in R2. Images must be JPEG, PNG, or WebP and at most 10 MiB; videos must be MP4 or WebM and at most 25 MiB. Uploaded media remains pending until a package save references it. `DELETE /v1/admin/catalog-media/{id}` discards an unreferenced upload; saved media is served through `/v1/catalog-media/{id}`. The editor and API reject external photo/video URLs, including YouTube and Vimeo links.
 
-Packages, services, and venues share the page schema and canvas editor. Services retain the legacy service-image upload, and venues retain legacy HTTPS photo URLs alongside new canvas uploads. Migration `20261102180000_flat_services_venues` retains the selected current content and removes version tables and unselected version pages; uploaded media objects are not deleted by the migration. Back up before deployment if service/venue version history matters and inspect all pending migrations. See [catalog media and image migrations](../context-factory/api/reference/external-image-urls.md) for storage details.
+Packages, services, and venues share the page schema and canvas editor. All three catalogs use canvas media; there are no separate service images or venue URL photos. Migration `20261102180000_flat_services_venues` retains the selected current content and removes version tables and unselected version pages; uploaded media objects are not deleted by the migration. Back up before deployment if service/venue version history matters and inspect all pending migrations. See [catalog media and image migrations](../context-factory/api/reference/external-image-urls.md) for storage details.
 
 The editor canvas shows only the photo or video preview inside each media widget. Its three-dot settings button opens a modal containing the upload, optional caption, image description (photo only), and autoplay toggle (video only). Closing the modal keeps changes in the current editor session; Save changes publishes them, while Cancel discards them. Captions remain part of customer-facing content and image descriptions supply alternative text.
 
@@ -50,13 +50,13 @@ Writes use the database role and a valid `em_session` cookie. A Firebase ID toke
 
 ## Booking-request snapshots
 
-`POST /v1/booking-requests` accepts `packageId` and an optional ISO `packageUpdatedAt`; it does not accept `packageVersionId`. If the optional timestamp does not match the current package `updatedAt`, the API returns `409` so the client can refresh. On creation, the database snapshots the package name, integer-peso price, and guest maximum. Responses expose these as `packageName`, `packagePrice` (`{ kind: "fixed", currency: "PHP", amountMinor }`), and `packageGuestMax`. Later package edits do not change existing request snapshots.
+`POST /v1/booking-requests` accepts `packageId` and an optional ISO `packageUpdatedAt`; it does not accept `packageVersionId`. If the optional timestamp does not match the current package `updatedAt`, the API returns `409` so the client can refresh. On creation, the database snapshots the package name, integer-peso price, and guest maximum. Responses expose these as `packageName`, `packagePrice` (`{ kind: "fixed", currency: "PHP", amountMinor }`), and `packageMaxGuests`. Later package edits do not change existing request snapshots.
 
 Requests also store the customer's preferred date, event type, estimated duration, contact details, notes, status, and status history. Guest count may be omitted; exact times and preferred venue/location remain follow-up details. An accepted request is still not a confirmed booking or a date hold.
 
 ## Persistence and migration impact
 
-`packages` now stores each package directly: stable ID, name, event types, positive guest maximum, whole-peso price, publication timestamp, archive timestamp, and create/update timestamps. There is no `package_versions` or `package_services` table.
+`packages` now stores each package directly: stable ID, name, positive guest maximum, whole-peso price, publication timestamp, archive timestamp, and create/update timestamps. There is no `package_versions` or `package_services` table.
 
 The reusable page model consists of `catalog_pages`, `catalog_sections`, `catalog_widgets`, and `media_assets`. A page has exactly one package, service, or venue owner. Package pages store Markdown and media widget layout; uploaded media rows refer to R2 objects, while built-in sample media refers to allowlisted local paths.
 

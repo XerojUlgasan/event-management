@@ -7,3 +7,5 @@
 - A type check does not establish that a route works with PostgreSQL, the emulator, or a browser. Report which boundaries were actually exercised.
 
 - `pnpm --filter @event-management/api exec tsx --test tests/flat-catalog-migration.test.ts` applies migrations to a disposable database and checks published-content selection, draft-only archives, selected canvas/media retention, owner constraints, and removal of service/venue version tables.
+
+- `pnpm --filter @event-management/api exec tsx --test tests/catalog-cleanup-migration.test.ts` proves the catalog-field cleanup preserves retained records, guest limits, snapshots, messages, and canvas media while removing obsolete columns.

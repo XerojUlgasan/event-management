@@ -35,9 +35,9 @@ const users = [
 ] as const;
 
 const venues = [
-  { key: "garden", name: "Demo Garden Pavilion", location: "Quezon City, Metro Manila", description: "Sample open-air venue draft with covered dining space. Availability has not been checked.", categories: ["Garden", "Outdoor"], capacityMax: 100 },
-  { key: "hall", name: "Demo City Function Hall", location: "Makati, Metro Manila", description: "Sample indoor venue draft for celebrations and company events. Availability has not been checked.", categories: ["Indoor", "Function Hall"], capacityMax: 100 },
-  { key: "terrace", name: "Demo Rooftop Terrace", location: "Taguig, Metro Manila", description: "Sample terrace venue draft for an evening event. Availability has not been checked.", categories: ["Rooftop"], capacityMax: 80 },
+  { key: "garden", name: "Demo Garden Pavilion", location: "Quezon City, Metro Manila", description: "Sample open-air venue draft with covered dining space. Availability has not been checked.", maxGuests: 100 },
+  { key: "hall", name: "Demo City Function Hall", location: "Makati, Metro Manila", description: "Sample indoor venue draft for celebrations and company events. Availability has not been checked.", maxGuests: 100 },
+  { key: "terrace", name: "Demo Rooftop Terrace", location: "Taguig, Metro Manila", description: "Sample terrace venue draft for an evening event. Availability has not been checked.", maxGuests: 80 },
 ] as const;
 
 type UserKey = (typeof users)[number]["key"];
@@ -61,7 +61,7 @@ export async function seedDemo(db: SeedDb) {
     const inserted = await db.insertInto("venues").values({
       id: seedId(`venue:${venue.key}`), name: venue.name, location: venue.location,
       description: venue.description.replace("venue draft", "venue"),
-      categories: [...venue.categories], capacity_max: venue.capacityMax,
+      max_guests: venue.maxGuests,
       created_at: now, updated_at: now, published_at: now,
     }).onConflict((conflict) => conflict.column("id").doNothing()).returning("id").executeTakeFirst();
     if (inserted) count.venues++;

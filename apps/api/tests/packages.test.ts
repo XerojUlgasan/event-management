@@ -148,7 +148,7 @@ function call(
   });
 }
 const data = {
-  name: "Celebration", description: "An elegant celebration with thoughtful details.", eventTypes: ["Birthday"], guestMax: 100,
+  name: "Celebration", description: "An elegant celebration with thoughtful details.", maxGuests: 100,
   price: {kind: "fixed", currency: "PHP", amountMinor: 12000000},
   sections: [{id: randomUUID(),title: "The experience",widgets: [
     {id: randomUUID(),type: "photo",x:0,y:0,w:6,h:6,markdown:"",media:{kind:"image",source:"sample",url:"/images/wedding.jpg"},alt:"Table setting",caption:""},
@@ -160,25 +160,11 @@ async function read(response: Response, status: number): Promise<any> {
   return response.status === 204 ? null : response.json();
 }
 
-const imagePath = (id: string) => `/v1/service-images/${id}`;
-async function createUploadedService(content: unknown) {
-  const body = new FormData();
-  body.set("content", JSON.stringify(content));
-  body.set(
-    "image",
-    new Blob([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0])], {
-      type: "image/png",
-    }),
-    "image.png",
-  );
-  return read(
-    await app.request("/v1/admin/service-uploads", {
-      method: "POST",
-      headers: { Cookie: adminCookie },
-      body,
-    }),
-    201,
-  );
+async function createServiceWithPhoto(content: unknown) {
+  const media = await read(await uploadCanvas(new Uint8Array([137,80,78,71,13,10,26,10,0]), "image/png"), 201);
+  return read(await call("/admin/services", "POST", { ...(content as object), sections: [{ id: randomUUID(), title: "", widgets: [
+    { id: randomUUID(), type: "photo", x: 0, y: 0, w: 12, h: 6, markdown: "", media, alt: "Service photo", caption: "" },
+  ] }] }, adminCookie), 201);
 }
 
 test("services save directly, validate complete content, and enforce permissions", async () => {
@@ -187,15 +173,15 @@ test("services save directly, validate complete content, and enforce permissions
   for (const cookie of [staffCookie, customerCookie, undesignatedAdminCookie]) await read(await call("/admin/services", "POST", content, cookie), 403);
   for (const hourlyRatePesos of [null, 0, -1, 1.5, 2147483648]) await read(await call("/admin/services", "POST", { ...content, hourlyRatePesos }, adminCookie), 400);
   await read(await call("/admin/services", "POST", content, adminCookie), 400);
-  const created = await createUploadedService(content);
+  const created = await createServiceWithPhoto(content);
   assert.equal(created.name, content.name);
   assert.equal(created.hourlyRatePesos, 500);
-  assert.ok(created.imageId);
-  assert.equal(created.imageUrl, imagePath(created.imageId));
+  assert.equal("imageId" in created, false);
+  assert.equal(created.imageUrl, created.sections[0].widgets[0].media.url);
   assert.ok(created.publishedAt);
   for (const key of ["draft", "published", "versions", "version", "state"]) assert.equal(key in created, false);
   assert.equal((await read(await call(`/services/${created.id}`), 200)).name, content.name);
-  for (const field of [{ imageUrl: "https://example.test/image.jpg" }, { imageId: created.imageId }]) {
+  for (const field of [{ imageUrl: "https://example.test/image.jpg" }, { imageId: randomUUID() }]) {
     await read(await call("/admin/services", "POST", { ...content, ...field }, adminCookie), 400);
     await read(await call(`/admin/services/${created.id}`, "PATCH", { ...content, ...field, expectedUpdatedAt: created.updatedAt }, adminCookie), 400);
   }
@@ -215,31 +201,39 @@ test("services save directly, validate complete content, and enforce permissions
   assert.equal(spec.paths["/v1/admin/services/{id}/publish"], undefined);
 });
 
-test("service multipart updates immediately replace the public image and reject stale writes", async () => {
+test("service canvas photos replace legacy image uploads and clean up removed media", async () => {
   const content = { name: "Uploaded service", description: "Description", hourlyRatePesos: 300 };
-  const created = await createUploadedService(content);
-  const upload = (expectedUpdatedAt: string) => {
-    const body = new FormData();
-    body.set("content", JSON.stringify({ ...content, name: "Updated upload", expectedUpdatedAt }));
-    body.set("image", new Blob([Buffer.from([137,80,78,71,13,10,26,10,0])], { type: "image/png" }), "image.png");
-    return app.request(`/v1/admin/service-uploads/${created.id}`, { method: "PATCH", headers: { Cookie: adminCookie }, body });
-  };
-  const edited = await read(await upload(created.updatedAt), 200);
-  assert.notEqual(edited.imageId, created.imageId);
-  assert.equal((await read(await call(`/services/${created.id}`), 200)).imageId, edited.imageId);
-  assert.equal((await app.request(imagePath(created.imageId))).status, 404);
-  await read(await upload(created.updatedAt), 409);
+  const created = await createServiceWithPhoto(content);
+  const oldPhoto = created.sections[0].widgets[0].media;
+  const newPhoto = await read(await uploadCanvas(new Uint8Array([137,80,78,71,13,10,26,10,0]), "image/png"), 201);
+  const sections = structuredClone(created.sections);
+  sections[0].widgets[0].media = newPhoto;
+  const edited = await read(await call(`/admin/services/${created.id}`, "PATCH", { ...content, sections, expectedUpdatedAt: created.updatedAt }, adminCookie), 200);
+  assert.equal((await read(await call(`/services/${created.id}`), 200)).imageUrl, newPhoto.url);
+  assert.equal((await app.request(oldPhoto.url)).status, 404);
+  await read(await call(`/admin/services/${created.id}`, "PATCH", { ...content, sections, expectedUpdatedAt: created.updatedAt }, adminCookie), 409);
+  await read(await call(`/admin/services/${created.id}`, "PATCH", { ...content, sections: [], expectedUpdatedAt: edited.updatedAt }, adminCookie), 400);
+  assert.equal((await app.request(newPhoto.url)).status, 200);
   await read(await call(`/admin/services/${created.id}`, "DELETE", undefined, adminCookie), 204);
-  assert.equal((await app.request(imagePath(edited.imageId))).status, 404);
+  assert.equal((await app.request(newPhoto.url)).status, 404);
+  for (const [path, method] of [["/admin/service-uploads", "POST"], [`/admin/service-uploads/${created.id}`, "PATCH"], [`/service-images/${randomUUID()}`, "GET"]]) {
+    assert.equal((await app.request(`/v1${path}`, { method, headers: { Cookie: adminCookie } })).status, 404);
+  }
+  const spec: any = await (await app.request("/openapi.json")).json();
+  for (const path of ["/v1/admin/service-uploads", "/v1/admin/service-uploads/{id}", "/v1/service-images/{id}"]) assert.equal(spec.paths[path], undefined);
+  const input = spec.paths["/v1/admin/services"].post.requestBody.content["application/json"].schema;
+  const output = spec.paths["/v1/admin/services"].post.responses["201"].content["application/json"].schema;
+  assert.equal("imageId" in input.properties, false);
+  assert.equal("imageId" in output.properties, false);
 });
 
 test("canvas saves publish atomically, protect concurrent edits, and remove version/service contracts", async () => {
   await read(await call('/admin/packages'),401);
   for(const cookie of [customerCookie,staffCookie,undesignatedAdminCookie]) await read(await call('/admin/packages','POST',data,cookie),403);
-  for(const patch of [{name:''},{price:null},{price:{...data.price,amountMinor:101}},{guestMax:0},{services:[]}]) await read(await call('/admin/packages','POST',{...data,...patch},adminCookie),400);
+  for(const patch of [{name:''},{price:null},{price:{...data.price,amountMinor:101}},{maxGuests:0},{services:[]},{eventTypes:['Birthday']},{guestMax:100}]) await read(await call('/admin/packages','POST',{...data,...patch},adminCookie),400);
   const created=await read(await call('/admin/packages','POST',data,adminCookie),201);
   assert.equal(created.name,data.name);assert.equal(created.description,data.description);assert.equal(created.imageUrl,'/images/wedding.jpg');
-  for(const key of ['draft','published','versions','versionId','services']) assert.equal(key in created,false);
+  for(const key of ['draft','published','versions','versionId','services','eventTypes','guestMax']) assert.equal(key in created,false);
   const detail=await read(await call(`/packages/${created.id}`),200);assert.equal(detail.sections[0].widgets.length,2);
   const edits=await Promise.all(['First edit','Second edit'].map(name=>call(`/admin/packages/${created.id}`,'PATCH',{...data,name,expectedUpdatedAt:created.updatedAt},adminCookie)));
   assert.deepEqual(edits.map(r=>r.status).sort(),[200,409]);
@@ -408,7 +402,7 @@ test("service and venue canvases save rich content directly and enforce media ow
   assert.equal(visible.sections[0].widgets[1].autoplay, true);
   assert.equal(visible.sections[0].widgets[2].markdown, "## Details\n\n**Custom content**");
   assert.equal((await call(`/catalog-media/${photo.id}`)).status, 200);
-  const venue = { name: "Canvas venue", location: "City", description: "Summary", categories: [], capacityMax: 100, imageUrls: [], sections };
+  const venue = { name: "Canvas venue", location: "City", description: "Summary", maxGuests: 100, sections };
   await read(await call("/admin/venues", "POST", venue, adminCookie), 400);
   const { sections: ignored, ...legacy } = service;
   const edited = await read(await call(`/admin/services/${created.id}`, "PATCH", { ...legacy, name: "Changed", expectedUpdatedAt: created.updatedAt }, adminCookie), 200);

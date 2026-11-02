@@ -12,8 +12,8 @@ type Preview = { kind: Kind; id: string } | null
 function PackageCard({ item, onPreview }: { item: PublicPackage; onPreview: () => void }) {
   return <article className="catalog-card">
     <div className="catalog-card-image"><img src={packageImageSrc(item.imageUrl) || photos.dinner} alt="" loading="lazy" onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = photos.dinner }} /></div>
-    <div className="catalog-card-body"><span className="catalog-card-kicker">{item.eventTypes.join(" · ") || "Event package"}</span><h3>{item.name}</h3><p>{item.description}</p>
-      <div className="catalog-card-meta"><span>{priceLabel(item.price)}</span><span>Up to {item.guestMax} guests</span></div>
+    <div className="catalog-card-body"><span className="catalog-card-kicker">Event package</span><h3>{item.name}</h3><p>{item.description}</p>
+      <div className="catalog-card-meta"><span>{priceLabel(item.price)}</span><span>Up to {item.maxGuests} guests</span></div>
       <button type="button" className="catalog-card-action" onClick={onPreview}>View package <span aria-hidden="true">↗</span></button>
     </div>
   </article>
@@ -29,7 +29,8 @@ function ServiceCard({ item, onPreview }: { item: PublicService; onPreview: () =
 }
 
 function VenueCard({ item, onPreview }: { item: Venue; onPreview: () => void }) {
-  return <article className="catalog-card"><div className="catalog-card-image">{(item.sections.flatMap(section => section.widgets).find(widget => widget.type === "photo" && widget.media)?.media?.url || item.imageUrls[0]) ? <img src={packageImageSrc(item.sections.flatMap(section => section.widgets).find(widget => widget.type === "photo" && widget.media)?.media?.url || item.imageUrls[0])} alt="" loading="lazy" /> : <span className="venue-photo-fallback">No venue photos available</span>}</div><div className="catalog-card-body"><span className="catalog-card-kicker">{item.location}</span><h3>{item.name}</h3><p>{item.description}</p><button type="button" className="catalog-card-action" onClick={onPreview}>View venue <span aria-hidden="true">↗</span></button></div></article>
+  const photo = item.sections.flatMap(section => section.widgets).find(widget => widget.type === "photo" && widget.media)?.media?.url
+  return <article className="catalog-card"><div className="catalog-card-image">{photo ? <img src={packageImageSrc(photo)} alt="" loading="lazy" /> : <span className="venue-photo-fallback">No venue photos available</span>}</div><div className="catalog-card-body"><span className="catalog-card-kicker">{item.location}</span><h3>{item.name}</h3><p>{item.description}</p><button type="button" className="catalog-card-action" onClick={onPreview}>View venue <span aria-hidden="true">↗</span></button></div></article>
 }
 
 function VenuePreview({ item, onClose }: { item: Venue; onClose: () => void }) {

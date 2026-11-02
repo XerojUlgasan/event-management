@@ -47,7 +47,7 @@ try {
     let venueCount = 0;
     for (const venue of venues) {
       const inserted = await db.insertInto("venues")
-        .values({ ...venue, categories: [], capacity_max: null, archived_at: new Date() })
+        .values({ ...venue, max_guests: null, archived_at: new Date() })
         .onConflict((conflict) => conflict.column("id").doNothing())
         .returning("id").executeTakeFirst();
       if (inserted) venueCount++;

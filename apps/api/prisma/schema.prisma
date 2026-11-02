@@ -31,7 +31,7 @@ model Conversation {
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   customer        User      @relation("CustomerConversations", fields: [customerId], references: [id], onDelete: Cascade)
-  bookingRequest  BookingRequest? @relation("BookingRequestConversation", fields: [bookingRequestId], references: [id], onDelete: SetNull)
+  bookingRequest  BookingRequest? @relation("BookingRequestConversation", fields: [bookingRequestId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   messages        Message[]
 
   @@index([status])
@@ -74,8 +74,7 @@ model Package {
   archivedAt      DateTime?         @map("archived_at") @db.Timestamptz(6)
   name            String
   description     String            @default("")
-  eventTypes      String[]          @map("event_types")
-  guestMax        Int               @map("guest_max")
+  maxGuests       Int               @map("max_guests")
   price           Int
   publishedAt     DateTime          @default(now()) @map("published_at") @db.Timestamptz(6)
   bookingRequests BookingRequest[]
@@ -92,9 +91,7 @@ model Venue {
   name String
   location String
   description String
-  categories String[]
-  capacityMax Int? @map("capacity_max")
-  imageUrls String[] @default([]) @map("image_urls")
+  maxGuests Int? @map("max_guests")
   publishedAt DateTime @default(now()) @map("published_at") @db.Timestamptz(6)
   page CatalogPage?
   @@map("venues")
@@ -108,7 +105,6 @@ model Service {
   name String
   description String
   hourlyRatePesos Int? @map("hourly_rate_pesos")
-  imageId String? @map("image_id") @db.Uuid
   publishedAt DateTime @default(now()) @map("published_at") @db.Timestamptz(6)
   page CatalogPage?
   @@map("services")
@@ -121,9 +117,9 @@ model CatalogPage {
   serviceId String? @unique @map("service_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-  package Package? @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  venue Venue? @relation(fields: [venueId], references: [id], onDelete: Cascade)
-  service Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  package Package? @relation(fields: [packageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  venue Venue? @relation(fields: [venueId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  service Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   sections CatalogSection[]
   @@map("catalog_pages")
 }
@@ -133,7 +129,7 @@ model CatalogSection {
   pageId String @map("page_id") @db.Uuid
   title String @default("")
   sortOrder Int @map("sort_order")
-  page CatalogPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  page CatalogPage @relation(fields: [pageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   widgets CatalogWidget[]
   @@unique([pageId, sortOrder])
   @@map("catalog_sections")
@@ -153,8 +149,8 @@ model CatalogWidget {
   alt String @default("")
   caption String @default("")
   autoplay Boolean @default(false)
-  section CatalogSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  media MediaAsset? @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+  section CatalogSection @relation(fields: [sectionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  media MediaAsset? @relation(fields: [mediaId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   @@unique([sectionId, sortOrder])
   @@index([mediaId])
   @@map("catalog_widgets")
@@ -170,7 +166,7 @@ model MediaAsset {
   byteSize Int? @map("byte_size")
   createdBy String? @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  creator User? @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  creator User? @relation(fields: [createdBy], references: [id], onDelete: SetNull, onUpdate: NoAction)
   widgets CatalogWidget[]
   @@map("media_assets")
 }
@@ -182,7 +178,7 @@ model BookingRequest {
   packageId String @map("package_id") @db.Uuid
   packageName String @map("package_name")
   packagePrice Int @map("package_price")
-  packageGuestMax Int @map("package_guest_max")
+  packageMaxGuests Int @map("package_max_guests")
   eventType String @map("event_type")
   preferredDate String @map("preferred_date")
   estimatedDuration String @default("undecided") @map("estimated_duration")
@@ -199,8 +195,8 @@ model BookingRequest {
   outOfRange Boolean @map("out_of_range")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-  customer User @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  package Package @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  customer User @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  package Package @relation(fields: [packageId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   history BookingRequestStatusHistory[]
   conversation Conversation? @relation("BookingRequestConversation")
   @@index([customerId, createdAt])
@@ -214,8 +210,8 @@ model BookingRequestStatusHistory {
   reason String?
   changedBy String @map("changed_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  bookingRequest BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
-  actor User @relation(fields: [changedBy], references: [id], onDelete: Restrict)
+  bookingRequest BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  actor User @relation(fields: [changedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
   @@index([bookingRequestId, createdAt])
   @@map("booking_request_status_history")
 }

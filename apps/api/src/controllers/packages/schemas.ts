@@ -113,16 +113,15 @@ export const sectionsSchema = z.array(sectionSchema).max(MAX_CATALOG_SECTIONS).s
     ctx.addIssue({ code: "custom", message: `Use at most ${MAX_CATALOG_WIDGETS} widgets` });
 });
 export const contentSchema = z.object({
-  name: text.min(1), description: text.optional(), eventTypes: z.array(text.min(1)).min(1).max(50),
-  guestMax: z.number().int().positive().max(2147483647), price: packagePriceSchema,
+  name: text.min(1), description: text.optional(),
+  maxGuests: z.number().int().positive().max(2147483647), price: packagePriceSchema,
   sections: sectionsSchema,
 }).strict();
 export type Content = z.infer<typeof contentSchema>;
 // Response schemas include the stored description and derived cover image.
 export const publicSchema = z.object({
   name: z.string(),
-  eventTypes: z.array(z.string()),
-  guestMax: z.number(),
+  maxGuests: z.number(),
   price: priceSchema,
   sections: z.array(sectionSchema),
   id: z.string().uuid(),

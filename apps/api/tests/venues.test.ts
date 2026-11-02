@@ -63,7 +63,7 @@ async function read(response: Response, status: number): Promise<any> {
   return status === 204 ? null : response.headers.get("Content-Type")?.startsWith("image/") ? response.arrayBuffer() : response.json();
 }
 
-const content = { name: "  Garden  ", location: "  City  ", description: "  Venue description  ", categories: [" Garden "], capacityMax: 100, imageUrls: [] as string[] };
+const content = { name: "  Garden  ", location: "  City  ", description: "  Venue description  ", maxGuests: 100 };
 const photo = (name: string) => `https://images.example.test/${name}.jpg`;
 
 test("venue catalog requires complete content and protects admin operations", async () => {
@@ -80,8 +80,8 @@ test("venue catalog requires complete content and protects admin operations", as
   }
   for (const invalid of [
     { ...content, name: "" }, { ...content, location: "" }, { ...content, description: "" },
-    { ...content, capacityMax: null }, { ...content, capacityMax: 0 }, { ...content, capacityMax: 1.5 },
-    { ...content, categories: ["garden", " Garden "] }, { ...content, imageUrls: ["http://example.test/image.png"] },
+    { ...content, maxGuests: null }, { ...content, maxGuests: 0 }, { ...content, maxGuests: 1.5 },
+    { ...content, categories: [] }, { ...content, capacityMax: 100 }, { ...content, imageUrls: ["http://example.test/image.png"] },
     { ...content, imageUrls: Array(11).fill(photo("excess")) }, { ...content, imageUrls: [`/v1/venue-images/${randomUUID()}`] },
   ]) await read(await call("/admin/venues", "POST", invalid, adminCookie), 400);
   await read(await call("/venues/not-a-uuid"), 400);
@@ -94,14 +94,12 @@ test("venues save directly, publish edits immediately and reject stale or archiv
   const created = await read(await call("/admin/venues", "POST", content, adminCookie), 201);
   const path = `/admin/venues/${created.id}`;
   assert.equal(created.name, "Garden"); assert.equal(created.location, "City");
-  assert.deepEqual(created.categories, ["Garden"]); assert.deepEqual(created.imageUrls, []);
-  assert.equal(created.capacityMax, 100); assert.ok(created.publishedAt);
-  for (const key of ["draft", "published", "versions", "version", "state", "capacityMin"]) assert.equal(key in created, false);
+  assert.equal(created.maxGuests, 100); assert.ok(created.publishedAt);
+  for (const key of ["draft", "published", "versions", "version", "state", "capacityMin", "capacityMax", "categories", "imageUrls"]) assert.equal(key in created, false);
   assert.equal((await read(await call(`/venues/${created.id}`), 200)).name, "Garden");
-  const images = [photo("first"), photo("second")];
-  const edited = await read(await call(path, "PATCH", { ...content, name: "Changed", imageUrls: images, expectedUpdatedAt: created.updatedAt }, adminCookie), 200);
+  const edited = await read(await call(path, "PATCH", { ...content, name: "Changed", expectedUpdatedAt: created.updatedAt }, adminCookie), 200);
   const visible = await read(await call(`/venues/${created.id}`), 200);
-  assert.equal(visible.name, "Changed"); assert.deepEqual(visible.imageUrls, images);
+  assert.equal(visible.name, "Changed"); assert.equal(visible.maxGuests, 100);
   await read(await call(path, "PATCH", { ...content, expectedUpdatedAt: created.updatedAt }, adminCookie), 409);
   await read(await call(`${path}/archive`, "POST", undefined, adminCookie), 200);
   await read(await call(`/venues/${created.id}`), 404);
@@ -114,11 +112,15 @@ test("venues save directly, publish edits immediately and reject stale or archiv
   await read(await call(`/venues/${live.id}`), 404);
 });
 
-test("venue photos keep order, reject duplicates, and pagination is stable", async () => {
-  const first = photo("cover"), second = photo("detail");
-  await read(await call("/admin/venues", "POST", { ...content, imageUrls: [first, first] }, adminCookie), 400);
-  const created = await read(await call("/admin/venues", "POST", { ...content, imageUrls: [first, second] }, adminCookie), 201);
-  assert.deepEqual((await read(await call(`/venues/${created.id}`), 200)).imageUrls, [first, second]);
+test("venue canvas photos keep order and pagination is stable", async () => {
+  const sections = [{ id: randomUUID(), title: "Gallery", widgets: ["/images/wedding.jpg", "/images/dinner.jpg"].map((url, i) => ({
+    id: randomUUID(), type: "photo", x: i * 6, y: 0, w: 6, h: 6, markdown: "", media: { kind: "image", source: "sample", url }, alt: "Venue photo", caption: "",
+  })) }];
+  const created = await read(await call("/admin/venues", "POST", { ...content, sections }, adminCookie), 201);
+  const detail = await read(await call(`/venues/${created.id}`), 200);
+  assert.deepEqual(detail.sections[0].widgets.map((w: any) => w.media.url), ["/images/wedding.jpg", "/images/dinner.jpg"]);
+  const edited = await read(await call(`/admin/venues/${created.id}`, "PATCH", { ...content, expectedUpdatedAt: created.updatedAt }, adminCookie), 200);
+  assert.deepEqual(edited.sections, detail.sections);
   for (let i = 0; i < 17; i++) await read(await call("/admin/venues", "POST", { ...content, name: `Pagination ${String(i).padStart(2, "0")}` }, adminCookie), 201);
   const all = (await read(await call("/venues"), 200)).venues;
   const page1 = await read(await call("/venues?limit=15&offset=0"), 200);
@@ -139,5 +141,11 @@ test("concurrent venue edits have one winner and obsolete routes are absent", as
   const spec: any = await (await app.request("/openapi.json")).json();
   assert.ok(spec.paths["/v1/admin/venues/{id}"].patch); assert.ok(spec.paths["/v1/admin/venues/{id}"].delete);
   assert.ok(spec.paths["/v1/admin/venues/{id}/archive"]);
+  const input = spec.paths["/v1/admin/venues"].post.requestBody.content["application/json"].schema;
+  const output = spec.paths["/v1/admin/venues"].post.responses["201"].content["application/json"].schema;
+  assert.ok(input.required.includes("maxGuests"));
+  for (const key of ["categories", "capacityMax", "imageUrls"]) {
+    assert.equal(key in input.properties, false); assert.equal(key in output.properties, false);
+  }
   assert.equal(spec.paths["/v1/admin/venues/{id}/draft"], undefined); assert.equal(spec.paths["/v1/admin/venues/{id}/publish"], undefined);
 });
