@@ -14,6 +14,17 @@ This is the Clemora event-management pnpm workspace. Inspect the files involved 
 
 For a change crossing areas, read every applicable skill and its listed references. The files under `context-factory/` are repository guidance; inspect current code as the authority if guidance has drifted, then update the guidance in the same task.
 
+## Task skills
+
+Load the skill for the requested task alongside the relevant area guidance above.
+
+| Task | Load |
+| --- | --- |
+| Review code, a diff, or a pull request for behavior and regressions | [Code review](context-factory/skills/code-review/SKILL.md) |
+| Create or rewrite implementation, bug, spike, or Epic tickets | [Ticket writing](context-factory/skills/ticket-writing/SKILL.md) |
+
+Keep reusable task skills in `context-factory/skills/<skill-name>/SKILL.md` and link new entries here. Put detailed templates or conditional guidance in the skill's `reference/` folder when needed.
+
 ## API file layout
 
 Keep API code in the top-level `apps/api/src/controllers/`, `services/`, `data/`, and `utils/` folders, grouped by domain (`auth/`, `packages/`, `messages/`, or a new domain). Put HTTP route definitions and handlers in `controllers/<domain>/`, business operations in `services/<domain>/`, and Kysely queries in `data/<domain>/`. Keep reusable helpers in `utils/`; shared middleware and database setup remain in `middleware/` and `db/`.
