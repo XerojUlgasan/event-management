@@ -1,11 +1,13 @@
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
-
 import { findPackageData } from "../../data/packages/find-package.js";
-
-import { adminDto } from "./package-response.js";
-
+import { packageDto } from "./package-response.js";
 export async function getAdminPackageService(db: Kysely<DB>, id: string) {
-  const row = await findPackageData(db, id);
-  return row ? adminDto(db, row) : null;
+  return db
+    .transaction()
+    .setIsolationLevel("repeatable read")
+    .execute(async (trx) => {
+      const row = await findPackageData(trx, id);
+      return row ? packageDto(trx, row) : null;
+    });
 }

@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { db } from "./client.js";
 import { hashPassword } from "../utils/password.js";
 import { seedDemo } from "./seed-demo.js";
+import { seedSamplePackages } from "./seed-packages.js";
 
 const legacyAccounts = [
   { email: "admin1@gmail.com", display_name: "System Admin", role: "admin", staff_role: "System Administrator" },
@@ -31,30 +32,6 @@ const venues = [
   { id: "b1000000-0000-0000-0000-000000000015", name: "Sample Hotel 15", location: "Demo location 15", description: "Synthetic venue for demonstration only. Confirm venue details and availability separately." },
 ];
 
-const legacyDescription = "Sample draft. Replace these details with an approved offer before publishing.";
-const packages = [
-  {
-    id: "a4e55db2-745b-4bdb-bf92-38e7d29261d1", name: "Sample Wedding Package", eventTypes: ["Wedding"],
-    description: "Demo wedding reception package with a fixed sample total for up to 100 guests.",
-    guestMax: 100,
-    inclusions: ["Sample reception setup", "Sample buffet catering"],
-    exclusions: ["Optional add-ons and extra venue hours"], price: 120000,
-  },
-  {
-    id: "a4e55db2-745b-4bdb-bf92-38e7d29261d2", name: "Sample Birthday Package", eventTypes: ["Birthday"],
-    description: "Demo birthday celebration package with a fixed sample total for up to 80 guests.",
-    guestMax: 80,
-    inclusions: ["Sample party setup", "Sample buffet catering"],
-    exclusions: ["Optional add-ons and extra venue hours"], price: 60000,
-  },
-  {
-    id: "a4e55db2-745b-4bdb-bf92-38e7d29261d3", name: "Sample Corporate Package", eventTypes: ["Corporate"],
-    description: "Demo corporate gathering package with a fixed sample total for up to 100 guests.",
-    guestMax: 100,
-    inclusions: ["Sample event setup", "Sample buffet catering"],
-    exclusions: ["Optional add-ons and extra venue hours"], price: 90000,
-  },
-];
 
 try {
   const seeded = await db.transaction().execute(async (db) => {
@@ -66,61 +43,20 @@ try {
         .returning(["id", "email", "role", "staff_role"]).executeTakeFirst();
       if (row) rows.push(row);
     }
-    let packageCount = 0;
-    let upgradedCount = 0;
-    for (const pkg of packages) {
-      const content = {
-        name: pkg.name,
-        event_types: pkg.eventTypes,
-        description: pkg.description,
-        guest_max: pkg.guestMax,
-        inclusions: pkg.inclusions,
-        exclusions: pkg.exclusions,
-        image_url: null,
-        price: pkg.price,
-      };
-      const inserted = await db
-        .insertInto("packages")
-        .values({ id: pkg.id })
-        .onConflict((conflict) => conflict.column("id").doNothing())
-        .returning("id")
-        .executeTakeFirst();
-      if (inserted) {
-        await db.insertInto("package_versions").values({
-          package_id: pkg.id, version: 1, state: "draft", ...content,
-        }).execute();
-        packageCount++;
-        continue;
-      }
-      const existing = await db.selectFrom("package_versions").selectAll()
-        .where("package_id", "=", pkg.id).where("version", "=", 1).forUpdate().executeTakeFirst();
-      if (existing?.state !== "draft" || existing.name !== pkg.name ||
-          existing.event_types.length !== 1 || existing.event_types[0] !== pkg.eventTypes[0] ||
-          existing.description !== legacyDescription || existing.guest_max !== 100 ||
-          existing.inclusions.length !== 0 || existing.exclusions.length !== 0 ||
-          existing.image_url !== null || existing.price !== null) continue;
-      const updated = await db.updateTable("package_versions").set({ ...content, updated_at: new Date() })
-        .where("id", "=", existing.id).returning("id").executeTakeFirst();
-      if (updated) upgradedCount++;
-    }
+    const packageCount = await seedSamplePackages(db);
     let venueCount = 0;
     for (const venue of venues) {
-      const inserted = await db
-        .insertInto("venues")
-        .values({ id: venue.id })
+      const inserted = await db.insertInto("venues")
+        .values({ ...venue, categories: [], capacity_max: null, archived_at: new Date() })
         .onConflict((conflict) => conflict.column("id").doNothing())
-        .returning("id")
-        .executeTakeFirst();
-      if (inserted) {
-        await db.insertInto("venue_versions").values({ venue_id: venue.id, version: 1, state: "draft", name: venue.name, location: venue.location, description: venue.description, categories: [], capacity_max: null }).execute();
-        venueCount++;
-      }
+        .returning("id").executeTakeFirst();
+      if (inserted) venueCount++;
     }
     const demo = await seedDemo(db);
-    return { accounts: rows, packageCount, upgradedCount, venueCount, demo };
+    return { accounts: rows, packageCount, venueCount, demo };
   });
   console.table(seeded.accounts.map(({ email, role, staff_role }) => ({ email, role, staff_role })));
-  console.log(`Inserted ${seeded.accounts.length} local accounts, ${seeded.packageCount} sample package drafts (upgraded ${seeded.upgradedCount}), and ${seeded.venueCount} venues.`);
+  console.log(`Inserted ${seeded.accounts.length} local accounts, ${seeded.packageCount} sample canvas packages, and ${seeded.venueCount} venues.`);
   console.log("Inserted connected demo rows:", seeded.demo);
 } finally {
   await db.destroy();

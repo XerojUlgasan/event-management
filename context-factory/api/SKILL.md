@@ -13,7 +13,7 @@ Use this skill for `apps/api/` changes. Read every reference below before editin
 - [Authentication and sessions](reference/auth-and-sessions.md)
 - [Database and migrations](reference/database-and-migrations.md)
 - [Verification](reference/verification.md)
-- [External catalog image URLs](reference/external-image-urls.md)
+- [Catalog media and image migrations](reference/external-image-urls.md)
 
 For a change involving the browser API contract or client auth flow, also load the [frontend skill](../frontend/SKILL.md). For product behavior, consult [`docs/FEATURES.md`](../../docs/FEATURES.md) and distinguish planned workflows from implemented endpoints.
 

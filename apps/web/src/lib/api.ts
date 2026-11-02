@@ -73,57 +73,42 @@ export const linkFirebase = (idToken: string, currentPassword: string) =>
 export const addPassword = (idToken: string, password: string) =>
   request<Profile>("/auth/password", { password }, idToken);
 
-export type PackagePrice = { kind: "fixed"; currency: "PHP"; amountMinor: number }
-export type ServiceContent = { name: string; description: string; hourlyRatePesos: number | null }
-export type ServiceVersion = ServiceContent & { imageId: string | null; id: string; serviceId: string; version: number; state: "draft" | "published" | "superseded"; updatedAt: string; publishedAt: string | null }
-export type PublicService = ServiceContent & { imageId: string | null; id: string; versionId: string; version: number; publishedAt: string }
-export type AdminService = { id: string; archivedAt: string | null; draft: ServiceVersion | null; published: ServiceVersion | null; versions?: ServiceVersion[] }
-export type PackageServiceInput = { serviceVersionId: string; role: "included" | "add_on"; includedQuantity: number | null; addOnPrice: PackagePrice | null; addOnMaxQuantity: number | null }
-export type PackageService = PackageServiceInput & { id: string; service: ServiceVersion }
-export type PackageContent = {
-  name: string; eventTypes: string[]; description: string; guestMax: number;
-  inclusions: string[]; exclusions: string[];
-  imageUrl: string | null; price: PackagePrice | null; services?: PackageServiceInput[]
-}
-export type PackageVersion = PackageContent & {
-  id: string; packageId: string; version: number; state: "draft" | "published" | "superseded";
-  updatedAt: string; publishedAt: string | null; services?: PackageService[]
-}
-export type PublicPackage = PackageContent & { id: string; versionId: string; version: number; publishedAt: string; services?: PackageService[] }
-export type AdminPackage = { id: string; archivedAt: string | null; draft: PackageVersion | null; published: PackageVersion | null; versions?: PackageVersion[] }
-
-function pageQuery(page?: { limit: number; offset?: number }) {
-  return page ? `?limit=${page.limit}&offset=${page.offset ?? 0}` : ""
-}
+export type { PackagePrice, PackageContent, CatalogMedia, CatalogWidget, CatalogSection } from "@event-management/contracts/catalog"
+import type { PackageContent, CatalogPackage, CatalogMedia, CatalogSection } from "@event-management/contracts/catalog"
+export type PublicPackage = CatalogPackage
+export type AdminPackage = CatalogPackage
+export type ServiceContent = { name: string; description: string; hourlyRatePesos: number | null; sections: CatalogSection[] }
+export type PublicService = ServiceContent & { imageUrl: string | null; imageId: string | null; id: string; archivedAt: string | null; createdAt: string; updatedAt: string; publishedAt: string }
+export type AdminService = PublicService
+function pageQuery(page?: { limit: number; offset?: number }) { return page ? `?limit=${page.limit}&offset=${page.offset ?? 0}` : "" }
 export const getPackages = (page?: { limit: number; offset?: number }) => request<{ packages: PublicPackage[]; nextOffset: number | null }>(`/packages${pageQuery(page)}`)
 export const getPackage = (id: string) => request<PublicPackage>(`/packages/${encodeURIComponent(id)}`)
 export const getAdminPackages = () => request<{ packages: AdminPackage[] }>("/admin/packages")
 export const getAdminPackage = (id: string) => request<AdminPackage>(`/admin/packages/${encodeURIComponent(id)}`)
 export const createPackage = (content: PackageContent) => request<AdminPackage>("/admin/packages", content)
-export const updatePackageDraft = (id: string, content: PackageContent, expectedUpdatedAt: string) =>
-  request<AdminPackage>(`/admin/packages/${encodeURIComponent(id)}/draft`, { ...content, expectedUpdatedAt }, undefined, "PATCH")
-export const publishPackage = (id: string, expectedUpdatedAt: string) => request<AdminPackage>(`/admin/packages/${encodeURIComponent(id)}/publish`, { expectedUpdatedAt })
+export const updatePackage = (id: string, content: PackageContent, expectedUpdatedAt: string) => request<AdminPackage>(`/admin/packages/${encodeURIComponent(id)}`, { ...content, expectedUpdatedAt }, undefined, "PATCH")
 export const archivePackage = (id: string) => request<AdminPackage>(`/admin/packages/${encodeURIComponent(id)}/archive`, {})
 export const deletePackage = (id: string) => request<void>(`/admin/packages/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
+export const uploadCatalogMedia = (file: File) => { const body = new FormData(); body.set("file", file); return request<CatalogMedia>("/admin/catalog-media", body) }
+export const deleteCatalogMedia = (id: string) => request<void>(`/admin/catalog-media/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
+export const catalogMediaSrc = (url: string) => url.startsWith("/v1/") ? new URL(url, apiUrl).href : url
 
 export const getAdminServices = () => request<{ services: AdminService[] }>("/admin/services")
 export const getServices = (page?: { limit: number; offset?: number }) => request<{ services: PublicService[]; nextOffset: number | null }>(`/services${pageQuery(page)}`)
 export const getService = (id: string) => request<PublicService>(`/services/${encodeURIComponent(id)}`)
-export const getIncludingPackages = (id: string) => request<{ packages: PublicPackage[] }>(`/services/${encodeURIComponent(id)}/packages`)
 export const getAdminService = (id: string) => request<AdminService>(`/admin/services/${encodeURIComponent(id)}`)
 export const createService = (content: ServiceContent) => request<AdminService>("/admin/services", content)
-export const updateServiceDraft = (id: string, content: ServiceContent, expectedUpdatedAt: string, removeImage = false) => request<AdminService>(`/admin/services/${encodeURIComponent(id)}/draft`, { ...content, expectedUpdatedAt, ...(removeImage ? { removeImage } : {}) }, undefined, "PATCH")
+export const updateService = (id: string, content: ServiceContent, expectedUpdatedAt: string, removeImage = false) => request<AdminService>(`/admin/services/${encodeURIComponent(id)}`, { ...content, expectedUpdatedAt, ...(removeImage ? { removeImage } : {}) }, undefined, "PATCH")
 export const uploadService = (content: ServiceContent, image: File, id?: string, expectedUpdatedAt?: string) => {
   const body = new FormData()
   body.set("content", JSON.stringify({ ...content, ...(expectedUpdatedAt ? { expectedUpdatedAt } : {}) }))
   body.set("image", image)
   return request<AdminService>(id ? `/admin/service-uploads/${encodeURIComponent(id)}` : "/admin/service-uploads", body, undefined, id ? "PATCH" : "POST")
 }
-export const publishService = (id: string, expectedUpdatedAt: string) => request<AdminService>(`/admin/services/${encodeURIComponent(id)}/publish`, { expectedUpdatedAt })
 export const archiveService = (id: string) => request<AdminService>(`/admin/services/${encodeURIComponent(id)}/archive`, {})
 export const deleteService = (id: string) => request<void>(`/admin/services/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
 
-export const packageImageSrc = (imageUrl: string | null): string | undefined => imageUrl || undefined
+export const packageImageSrc = (imageUrl: string | null): string | undefined => imageUrl ? catalogMediaSrc(imageUrl) : undefined
 export const serviceImageSrc = (imageId: string | null): string | undefined => imageId ? `${apiUrl}/service-images/${encodeURIComponent(imageId)}` : undefined
 
 export type ConversationStatus = "active" | "closed"
@@ -176,18 +161,16 @@ export type AdminUser = {
 export const getAdminUsers = () =>
   request<{ staff: AdminUser[]; customers: AdminUser[] }>("/admin/users")
 
-export type VenueContent = { name: string; location: string; description: string; categories: string[]; capacityMax: number | null; imageUrls: string[] }
-export type VenueVersion = VenueContent & { id: string; venueId: string; version: number; state: "draft" | "published" | "superseded"; updatedAt: string; publishedAt: string | null }
-export type Venue = VenueContent & { id: string; versionId: string; version: number; publishedAt: string; createdAt: string; updatedAt: string; archivedAt: null }
-export type AdminVenue = { id: string; archivedAt: string | null; draft: VenueVersion | null; published: VenueVersion | null; versions?: VenueVersion[] }
+export type VenueContent = { name: string; location: string; description: string; categories: string[]; capacityMax: number | null; imageUrls: string[]; sections: CatalogSection[] }
+export type Venue = VenueContent & { id: string; publishedAt: string; createdAt: string; updatedAt: string; archivedAt: string | null }
+export type AdminVenue = Venue
 export const getVenues = (page?: { limit: number; offset?: number }) => request<{ venues: Venue[]; nextOffset: number | null }>(`/venues${pageQuery(page)}`)
 export const getAdminVenues = () => request<{ venues: AdminVenue[] }>("/admin/venues")
 export const getAdminVenue = (id: string) => request<AdminVenue>(`/admin/venues/${encodeURIComponent(id)}`)
 export const createVenue = (content: VenueContent) => request<AdminVenue>("/admin/venues", content)
-export const updateVenueDraft = (id: string, content: VenueContent, expectedUpdatedAt: string) => request<AdminVenue>(`/admin/venues/${encodeURIComponent(id)}/draft`, { ...content, expectedUpdatedAt }, undefined, "PATCH")
-export const publishVenue = (id: string, expectedUpdatedAt: string) => request<AdminVenue>(`/admin/venues/${encodeURIComponent(id)}/publish`, { expectedUpdatedAt })
+export const updateVenue = (id: string, content: VenueContent, expectedUpdatedAt: string) => request<AdminVenue>(`/admin/venues/${encodeURIComponent(id)}`, { ...content, expectedUpdatedAt }, undefined, "PATCH")
 export const archiveVenue = (id: string) => request<AdminVenue>(`/admin/venues/${encodeURIComponent(id)}/archive`, {})
-export const deleteVenue = (id: string) => request<void>(`/admin/venues/${encodeURIComponent(id)}/draft`, undefined, undefined, "DELETE")
+export const deleteVenue = (id: string) => request<void>(`/admin/venues/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
 export const venueImageSrc = (imageUrl: string): string => imageUrl
 
 export const getMyConversation = () => request<ChatThread>("/messages/conversation")
@@ -206,7 +189,7 @@ export const sendAdminMessage = (id: string, body: string) =>
   request<{ message: ChatMessage }>(`/admin/conversations/${encodeURIComponent(id)}/messages`, { body })
 
 export type BookingStatus = "under_review" | "needs_details" | "accepted" | "declined" | "cancelled"
-export type BookingRequestInput = { packageId: string; packageVersionId: string; eventType: string; preferredDate: string; estimatedDuration: BookingEstimatedDuration; estimatedDurationDays?: number; timeZone: string; contactName: string; phoneNumber: string; specialRequests?: string }
+export type BookingRequestInput = { packageId: string; packageUpdatedAt?: string; eventType: string; preferredDate: string; estimatedDuration: BookingEstimatedDuration; estimatedDurationDays?: number; timeZone: string; contactName: string; phoneNumber: string; specialRequests?: string }
 export type BookingRequest = Omit<BookingRequestInput, "specialRequests" | "preferredDate" | "estimatedDuration" | "estimatedDurationDays"> & { preferredDate: string | null; estimatedDuration: BookingEstimatedDuration | null; estimatedDurationDays: number | null; guestCount: number | null; startsAt: string | null; endsAt: string | null; preferredVenueLocation: string | null; specialRequests: string | null; id: string; reference: string; customerId: string; packageName: string; status: BookingStatus; outOfRange: boolean; createdAt: string; updatedAt: string; statusHistory: { status: BookingStatus; reason: string | null; changedBy: string; createdAt: string }[] }
 export const createBookingRequest = (body: BookingRequestInput) => request<{ bookingRequest: BookingRequest }>("/booking-requests", body)
 export const getMyBookingRequests = () => request<{ bookingRequests: BookingRequest[] }>("/booking-requests/mine")

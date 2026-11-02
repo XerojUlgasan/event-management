@@ -1,7 +1,21 @@
-# External catalog image URLs
+# Catalog media and image migrations
 
-Package versions keep one optional external HTTPS `image_url` (API field `imageUrl`). Venue versions keep up to 10 ordered external HTTPS `image_urls` (API field `imageUrls`); the first venue URL is the cover photo. Service versions store a nullable uploaded `image_id` (response field `imageId`); publication requires an image. JPEG, PNG, and WebP uploads are limited to 10 MiB and served at `/v1/service-images/{imageId}`. JSON edits omit `removeImage` to preserve the current upload, or set it to true to remove it. Historical versions retain image IDs. After a draft replaces or removes an upload, or an unpublished service is deleted, the API deletes the R2 object only if no service version still references its ID. A failed storage deletion is logged and does not undo the database change; it can leave an unreferenced object for later cleanup.
+## Shared catalog canvas media
 
-Migration `20261102122000_service_upload_image` refuses to drop old service image values or existing published service rows. Resolve those records deliberately before deployment; it does not convert external URLs or legacy upload paths.
+Package, service, and venue canvas pages store media references in `media_assets`; uploaded bytes are stored in R2. The shared editor uploads one file at a time to `POST /v1/admin/catalog-media`. An upload remains pending until a catalog save references its media ID. The owning administrator can discard an unreferenced upload through `DELETE /v1/admin/catalog-media/{id}`. Saved uploads stream through `GET /v1/catalog-media/{id}`.
 
-Migration `20261101110000_external_catalog_image_urls` removes the old upload metadata tables and venue photo join table. It stops if any uploaded image records exist, because dropping those records would leave R2 files and API-relative URLs without a safe conversion. Replace those images with externally hosted HTTPS URLs and clear the old uploaded records through a separately reviewed cleanup before applying the migration. It also clears any stale package or service API-relative image paths. Historical migrations remain in the repository for fresh database setup.
+Uploaded canvas images must be JPEG, PNG, or WebP and at most 10 MiB. Videos must be MP4 or WebM and at most 25 MiB. The API checks file content type as well as request MIME type. The multipart catalog-media transport cap is 25 MiB plus 64 KiB overhead.
+
+Photo and video widgets accept uploads only. External image/video URLs and hosted YouTube/Vimeo embeds are rejected. Sample image media uses the checked-in paths allowed by the catalog schema. Migration `20261102140000_upload_only_catalog_media` enforces this in PostgreSQL and refuses to proceed if external media rows remain, preserving those rows for deliberate replacement with uploads.
+
+When a catalog save removes or replaces uploaded media, the API deletes the R2 object and media row only if no catalog widget still references it. Cleanup runs after the database save; a failed R2 deletion leaves the unreferenced record and does not undo the saved catalog record. Each new upload also retries cleanup for up to 10 unreferenced assets older than 24 hours. `pnpm --filter @event-management/api media:cleanup` retries up to 100 unreferenced catalog assets older than 24 hours.
+
+Public requests can stream media referenced by published, non-archived catalog records. A signed-in System Administrator also has a private, no-store fallback for that administrator's pending uploads and uploads referenced by archived records.
+
+## Services and venues
+
+Each service and venue is a flat record with one catalog page. Public streaming requires a media reference from that record's page while it is published and non-archived. An unpublished or archived record's media is not public; an administrator preview can access media associated with that administrator's own pending uploads or archived records. Omitted `sections` on a full-content update preserve the current canvas.
+
+The legacy service-image upload routes remain supported. Those uploaded bytes are stored in R2 and exposed through `/v1/service-images/{id}`; service DTOs include `imageId` and `imageUrl`. Service saves require either the existing legacy image or a canvas photo. Venues retain up to 10 ordered legacy HTTPS photo URLs, and those existing photos remain available in details; new canvas photo/video widgets use uploads. Venue photos are optional.
+
+Migration `20261102180000_flat_services_venues` preserves IDs, timestamps, current published metadata, and the selected canvas. If no version was published, it preserves the latest content and archives the resulting record. Existing archived records remain archived. The migration drops unselected version pages and the service/venue version tables. It does not delete uploaded R2 objects. Back up before deployment if version history matters; inspect all pending migrations because earlier migrations can have separate destructive effects.

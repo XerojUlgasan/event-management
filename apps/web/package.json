@@ -20,6 +20,7 @@
     "firebase": "^12.19.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "react-grid-layout": "^2.2.2",
     "rehype-sanitize": "^6.0.0",
     "tailwindcss": "^4.3.3"
   },

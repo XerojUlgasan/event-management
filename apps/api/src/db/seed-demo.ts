@@ -58,31 +58,13 @@ export async function seedDemo(db: SeedDb) {
   }
 
   for (const venue of venues) {
-    const publishedDescription = venue.description.replace("venue draft", "venue");
-    const id = seedId(`venue:${venue.key}`);
-    const inserted = await db.insertInto("venues").values({ id, created_at: now, updated_at: now })
-      .onConflict((conflict) => conflict.column("id").doNothing()).returning("id").executeTakeFirst();
+    const inserted = await db.insertInto("venues").values({
+      id: seedId(`venue:${venue.key}`), name: venue.name, location: venue.location,
+      description: venue.description.replace("venue draft", "venue"),
+      categories: [...venue.categories], capacity_max: venue.capacityMax,
+      created_at: now, updated_at: now, published_at: now,
+    }).onConflict((conflict) => conflict.column("id").doNothing()).returning("id").executeTakeFirst();
     if (inserted) count.venues++;
-    const parent = await db.selectFrom("venues").select(["id", "archived_at", "updated_at"]).where("id", "=", id).executeTakeFirstOrThrow();
-    if (parent.archived_at) continue;
-    const versionId = seedId(`venue-version:${venue.key}:1`);
-    const existing = await db.selectFrom("venue_versions").selectAll().where("id", "=", versionId).forUpdate().executeTakeFirst();
-    if (!existing) {
-      await db.insertInto("venue_versions").values({ id: versionId, venue_id: parent.id, version: 1, state: "published", name: venue.name, location: venue.location, description: publishedDescription, categories: [...venue.categories], capacity_max: venue.capacityMax, created_at: now, updated_at: now, published_at: now })
-        .onConflict((conflict) => conflict.doNothing()).execute();
-      continue;
-    }
-    // Only upgrade the exact untouched draft created by the previous demo seed.
-    if (existing.venue_id !== parent.id || existing.version !== 1 || existing.state !== "draft" || existing.published_at !== null ||
-        existing.name !== venue.name || existing.location !== venue.location ||
-        (existing.description !== venue.description && existing.description !== publishedDescription) ||
-        existing.capacity_max !== venue.capacityMax ||
-        JSON.stringify(existing.categories) !== JSON.stringify(venue.categories) ||
-        existing.updated_at.getTime() !== existing.created_at.getTime() ||
-        existing.image_urls.length > 0) continue;
-    const publishedAt = new Date(Math.max(now.getTime(), existing.updated_at.getTime() + 1, parent.updated_at.getTime() + 1));
-    await db.updateTable("venue_versions").set({ state: "published", description: publishedDescription, published_at: publishedAt, updated_at: publishedAt }).where("id", "=", existing.id).execute();
-    await db.updateTable("venues").set({ updated_at: publishedAt }).where("id", "=", parent.id).execute();
   }
 
   for (const user of users.filter((item) => item.role === "customer")) {

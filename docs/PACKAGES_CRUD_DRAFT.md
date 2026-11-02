@@ -1,66 +1,71 @@
 # Package catalog implementation
 
-Status: implemented locally, 2026-10-27; service assignments added 2026-10-28 and booking requests added 2026-10-29. This document records the package catalog behavior and its frontend contract. Service catalog behavior is in [SERVICES.md](SERVICES.md). The booking-request flow and remaining quote, availability, and confirmation work are tracked in [ROADMAP.md](ROADMAP.md). `pnpm db:seed` creates sample drafts, but no approved package or service data is automatically published.
+Updated: 2026-11-02. This document describes the current direct-save package contract. Services and venues are also flat catalogs; service details are in [SERVICES.md](SERVICES.md). Booking requests are inquiries, not reservations, quotes, or confirmations.
 
-## Business boundary
+## Package lifecycle
 
-- Published details include the maximum guest count, fixed PHP total, inclusions, and exclusions. Venue records belong to a standalone catalog. The cleanup migration removes package venue details and terms, discarding existing values. Booking-request preferred venue/location remains a separate inquiry field. Paid add-ons are separate from package inclusions.
-- A package catalog entry does not reserve a date or establish a final quote. A published package preview can start a signed-in booking request, which staff review separately.
-- Admin and public/customer package screens now read the same persisted catalog through `/v1`. Old dollar-denominated demo offers were removed from the package array and were not seeded. Exact tiers, amounts, and additional inclusions still need business approval.
+- Only a signed-in System Administrator can create, edit, archive, or delete packages. Public reads expose published, non-archived packages; staff can read the public catalog.
+- A package is a complete record. `POST /v1/admin/packages` creates it and publishes it immediately. `PATCH /v1/admin/packages/{id}` saves edits directly to that published record and requires `expectedUpdatedAt`; stale edits return `409`.
+- There is no package draft, publish step, version history, or package-to-service assignment in this contract. Archiving hides a package from new public selection and booking requests. `DELETE /v1/admin/packages/{id}` succeeds only if no booking request references it; otherwise it returns `409`.
+- Package selection does not establish availability, a venue reservation, or a final quote. The booking request's preferred venue/location is separate from the standalone venue catalog.
 
-## Business rules for the catalog
+Services and venues are also flat, directly saved catalogs. The reusable catalog-page schema owns one page per package, service, or venue. This package contract does not add service assignments.
 
-1. Only an authenticated `admin` may create, edit, publish, archive, or delete a package. The API checks the database role on every write and admin read. Anyone may read the current published catalog; drafts, archived packages, and superseded versions stay private to admins.
-2. Create a package as a draft with a stable ID. The catalog accepts any positive integer maximum guest count. New booking requests omit guest count; staff gather it during follow-up.
-3. A published version is immutable. Editing it creates a new draft version. Publishing validates required details and atomically supersedes the former version; its contents remain in history for future quote references. A failed publish leaves the former published offer intact.
-4. Archive removes an offer from new public/customer selection without erasing its versions. Archived packages reject edits and publication. Hard delete is limited to a package that has never been published and has no database reference; otherwise the API returns a conflict. A restore operation is not implemented.
-5. Admins enter each package's inclusions; the API does not append a standard list. At least one free-text inclusion or structured included service is required for publication. Exclusions may be empty. Optional paid add-ons use the separate service catalog; availability rules remain future work.
-6. Published packages use one fixed total price in PHP. Store the amount as integer whole pesos, never as `"From $72 / guest"`. Permit an unpriced draft but require a positive price before publication. Package visibility does not promise venue or add-on availability.
+## Content and media
 
-## Persistence and API contract
+The shared `PackageContent` contract contains:
 
-The Prisma migrations create `packages` and `package_versions`; Kysely runtime types were regenerated from the migrated schema.
+- `name`, one or more `eventTypes`, positive integer `guestMax`, and a required fixed PHP `price`.
+- `description`, an editable catalog summary in Package details (up to 4,000 characters), independent of canvas Markdown. Admin and public cards display it.
+- `sections`, each with an optional title and widgets arranged on a 12-column canvas. Widgets are `photo`, `markdown`, or `video`; Markdown is rendered as package content, and media widgets can contain captions and image descriptions.
 
-- `packages` stores a stable ID, timestamps, and `archived_at`.
-- `package_versions` stores a version number and state (`draft`, `published`, or `superseded`), catalog details, nullable fixed total `price` in whole pesos, and timestamps. Partial unique indexes allow at most one draft and one published version per package. A database check requires a positive `guest_max`.
-- `package_versions.image_url` stores an optional external HTTPS image URL. The API does not store or upload image files. See the [image cleanup migration](../context-factory/api/reference/external-image-urls.md).
-- `package_services` holds UUID-identified links from a package version to published service versions. A link is either included within the package total or an optional add-on with a fixed PHP per-unit price and maximum quantity. Published package versions retain their linked service-version details.
-- Future quotes should reference the version ID and store their issued line-item snapshot. No quote table or package reference exists yet.
+The API price is `{ kind: "fixed", currency: "PHP", amountMinor }`, where `amountMinor` is centavos and must be divisible by 100. PostgreSQL stores the package total as an integer number of pesos. The package card summary uses the saved description; the cover image is derived from the first photo widget. Migration `20261102170000_package_description` copies each existing first-Markdown excerpt into the new field so current card text is preserved. Later canvas edits do not rewrite it. Older edit clients may omit `description` without erasing the saved value.
 
-The API price value is `null` for an incomplete draft or `{ kind: "fixed", currency: "PHP", amountMinor }` for an approved fixed total. The server validates `amountMinor` as a positive integer divisible by 100 for package totals; add-on prices retain centavo precision. The cleanup migration refuses to convert existing fractional-peso package prices until they are resolved. Display it with PHP currency formatting; the API never trusts a display string as a price.
+The schema permits up to 20 sections and 100 widgets across a page; a Markdown widget is limited to 20,000 characters. Shared catalog text fields are limited to 4,000 characters. The admin catalog JSON body limit is 3 MiB.
+
+Photo and video widgets accept uploaded files only, alongside the built-in seeded sample photos. Uploads go through `POST /v1/admin/catalog-media` and are stored in R2. Images must be JPEG, PNG, or WebP and at most 10 MiB; videos must be MP4 or WebM and at most 25 MiB. Uploaded media remains pending until a package save references it. `DELETE /v1/admin/catalog-media/{id}` discards an unreferenced upload; saved media is served through `/v1/catalog-media/{id}`. The editor and API reject external photo/video URLs, including YouTube and Vimeo links.
+
+Packages, services, and venues share the page schema and canvas editor. Services retain the legacy service-image upload, and venues retain legacy HTTPS photo URLs alongside new canvas uploads. Migration `20261102180000_flat_services_venues` retains the selected current content and removes version tables and unselected version pages; uploaded media objects are not deleted by the migration. Back up before deployment if service/venue version history matters and inspect all pending migrations. See [catalog media and image migrations](../context-factory/api/reference/external-image-urls.md) for storage details.
+
+The editor canvas shows only the photo or video preview inside each media widget. Its three-dot settings button opens a modal containing the upload, optional caption, image description (photo only), and autoplay toggle (video only). Closing the modal keeps changes in the current editor session; Save changes publishes them, while Cancel discards them. Captions remain part of customer-facing content and image descriptions supply alternative text.
+
+Each widget has a boolean `autoplay`, defaulting to false. Only video widgets can enable it. Customer pages and the in-editor customer preview honor this option using muted inline playback with native controls; the editing canvas and settings modal do not autoplay. Browsers can still block automatic playback. Migration `20261102150000_catalog_video_autoplay` adds the field and a video-only database constraint without deleting existing content.
+
+## API routes
 
 | Route | Access | Behavior |
 | --- | --- | --- |
-| `GET /v1/packages` and `GET /v1/packages/:id` | Public | Current published, non-archived version only. Unknown, draft, and archived IDs return 404 on detail read. |
-| `GET /v1/admin/packages` and `GET /v1/admin/packages/:id` | Admin | List/detail with draft, published, archived status and version history. Search/status filters run in the admin UI. |
-| `POST /v1/admin/packages` | Admin | Validate input and create a draft; return stable package and draft version IDs. |
-| `PATCH /v1/admin/packages/:id/draft` | Admin | Update only the draft, using a revision or `updatedAt` precondition to reject stale edits with 409. Editing a published offer first creates a new draft copy. |
-| `POST /v1/admin/packages/:id/publish` | Admin | Accept the reviewed draft's `expectedUpdatedAt`, reject stale or archived drafts with 409, validate completeness and fixed PHP price, then publish in a transaction. |
-| `POST /v1/admin/packages/:id/archive` | Admin | Hide an existing offer from new selection while retaining history. |
-| `DELETE /v1/admin/packages/:id` | Admin | Hard-delete only a never-published, unreferenced draft; otherwise 409. |
+| `GET /v1/packages` | Public | List published, non-archived packages; optional `limit` (1–15) and `offset` return `nextOffset`. |
+| `GET /v1/packages/{id}` | Public | Read one published, non-archived package; otherwise `404`. |
+| `GET /v1/admin/packages` and `GET /v1/admin/packages/{id}` | System Administrator | List and read package records, including archived records. |
+| `POST /v1/admin/packages` | System Administrator | Create a complete package and publish it immediately. |
+| `PATCH /v1/admin/packages/{id}` | System Administrator | Save complete package content with `expectedUpdatedAt`; stale or archived edits return `409`. |
+| `POST /v1/admin/packages/{id}/archive` | System Administrator | Archive the package so it is no longer offered for new inquiries. |
+| `DELETE /v1/admin/packages/{id}` | System Administrator | Delete only when no booking request references the package; otherwise `409`. |
+| `POST /v1/admin/catalog-media` | System Administrator | Upload one pending image or video file to R2. |
+| `DELETE /v1/admin/catalog-media/{id}` | System Administrator | Discard the caller's pending upload if it has not been saved. |
+| `GET /v1/catalog-media/{id}` | Public | Stream uploaded media referenced by catalog content. |
 
-The API follows the repository's `@hono/zod-openapi` pattern in `apps/api/src/controllers/packages/`. The request origin guard covers write methods, CORS allows `PATCH` and `DELETE`, and catalog writes have a body limit. Session cookie auth and the database role authorize admin routes; a Firebase ID token alone does not. Public queries exclude drafts and archived versions.
+Writes use the database role and a valid `em_session` cookie. A Firebase ID token alone does not authorize catalog administration.
 
-## Frontend integration
+## Booking-request snapshots
 
-1. `apps/web/src/lib/api.ts` has typed catalog DTOs and explicit PATCH/DELETE support, with session cookies and API error messages.
-2. `PackageCatalog.tsx` fetches published packages for public and customer views. Its full-screen preview fetches the selected package ID and shows its image, inclusions, maximum guest count, and fixed PHP total. It handles loading, empty, and error states. Admins can preview draft or published versions in the same overlay without publishing them.
-3. `PackagesPage.tsx` fetches admin records and supports a three-step create/edit form: essentials, experience, and pricing/media. Event types, inclusions, and exclusions use removable tags. The final step lists missing publication requirements before draft submission, and the publish dialog guides incomplete drafts back to editing. The form accepts an HTTPS image URL. It uses stable IDs and `expectedUpdatedAt` for edit/publish conflicts. Search/status filters and counts use returned rows. The Quotations and Menus tabs state that they are not connected.
-   The Experience step also assigns published services as included or optional priced add-ons. The Services sidebar item manages their drafts and publication. Public/customer preview separates included services and optional add-ons; neither implies availability or a quote.
-4. The public fixed-reference success message was removed. Book now submits a real request with `packageId` and `packageVersionId`; My events and the manager Bookings queue show that persisted record. Payment and confirmed-booking areas remain future work.
+`POST /v1/booking-requests` accepts `packageId` and an optional ISO `packageUpdatedAt`; it does not accept `packageVersionId`. If the optional timestamp does not match the current package `updatedAt`, the API returns `409` so the client can refresh. On creation, the database snapshots the package name, integer-peso price, and guest maximum. Responses expose these as `packageName`, `packagePrice` (`{ kind: "fixed", currency: "PHP", amountMinor }`), and `packageGuestMax`. Later package edits do not change existing request snapshots.
 
-## Verification performed
+Requests also store the customer's preferred date, event type, estimated duration, contact details, notes, status, and status history. Guest count may be omitted; exact times and preferred venue/location remain follow-up details. An accepted request is still not a confirmed booking or a date hold.
 
-- The package suite checks external HTTPS image URLs, rejects former upload paths, and verifies image URLs on published versions alongside catalog behavior. Current verification is reported with the change that removed uploads.
-- Both package migrations were applied to the configured local `event_management` database with `pnpm db:deploy`; no package or image records were seeded.
-- Browser QA with local test accounts saved and reloaded a private draft, edited a ₱1,250.00 fixed total, and confirmed it displayed correctly. A temporary complete offer was then published: its PHP price, exclusions, and inclusions appeared in the public detail dialog, and its card appeared in the customer catalog. This check predates the removal of package terms. After archival, the public catalog returned to its empty state. Both temporary records were removed from the local database after testing; no package records were seeded.
-- Earlier browser QA covered the previous upload workflow. The current editor accepts an HTTPS image URL and no longer uploads files; a new browser check is needed to prove the updated UI journey.
+## Persistence and migration impact
 
-## Business decisions required before publication
+`packages` now stores each package directly: stable ID, name, event types, positive guest maximum, whole-peso price, publication timestamp, archive timestamp, and create/update timestamps. There is no `package_versions` or `package_services` table.
 
-- Exact package names/tiers and per-package maximum guest counts.
-- Exact fixed PHP amounts and whether taxes/service charges affect the displayed price.
-- Exact inclusions, exclusions, terms, image ownership, and which optional items are paid add-ons.
-- Whether any role beyond the current `admin` may publish, and whether a restore operation is needed after archiving.
+The reusable page model consists of `catalog_pages`, `catalog_sections`, `catalog_widgets`, and `media_assets`. A page has exactly one package, service, or venue owner. Package pages store Markdown and media widget layout; uploaded media rows refer to R2 objects, while built-in sample media refers to allowlisted local paths.
 
-Admins should enter only business-approved offers. The application validates completeness and price shape; it cannot determine whether a specific amount was approved outside the system. Availability, quote approval, reservation fees, and booking confirmation remain separate workflows.
+Migration `20261102130000_package_canvas` intentionally recreates the package catalog. Applying it removes existing package records, package versions and service assignments, all existing booking requests and their status history, and conversations/messages linked to those requests. General conversations and their messages are preserved. Review this data impact before applying the migration to a database with records; `pnpm db:deploy` does not make this reset reversible.
+
+The seed inserts three sample published packages with sample photos and Markdown: The Grand Celebration (₱185,000; up to 150 guests), The Intimate Gathering (₱68,000; up to 50 guests), and The Sweet Soirée (₱95,000; up to 80 guests). These are demonstration records, not business approval. See [database seed](SEED.md).
+
+## Verification boundary
+
+The API package suite is `pnpm --filter @event-management/api test:packages`; booking snapshot behavior is covered by `pnpm --filter @event-management/api test:booking-requests`. These suites use disposable local PostgreSQL databases. Code and API tests do not establish browser behavior, availability, production R2 configuration, or production deployment success.
+
+Exact package descriptions, inclusion claims, imagery rights, price approval, and future quote rules still require business review. Availability, quotations, reservation fees, payments, and booking confirmation are separate workflows.

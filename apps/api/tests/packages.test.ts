@@ -70,7 +70,12 @@ before(async () => {
         res.end();
       } else {
         res.setHeader("Content-Type", image.contentType);
-        res.end(image.bytes);
+        const range = req.headers.range?.match(/^bytes=(\d+)-(\d+)$/);
+        if (range) {
+          const start=Number(range[1]), end=Number(range[2]);
+          res.statusCode=206;res.setHeader("Content-Range",`bytes ${start}-${end}/${image.bytes.length}`);
+          res.setHeader("Content-Length",end-start+1);res.end(image.bytes.subarray(start,end+1));
+        } else {res.setHeader("Content-Length",image.bytes.length);res.end(image.bytes);}
       }
     }
   });
@@ -143,396 +148,17 @@ function call(
   });
 }
 const data = {
-  name: "Celebration",
-  eventTypes: ["Birthday"],
-  description: "A celebration",
-  guestMax: 100,
-  inclusions: ["Decorations"],
-  exclusions: ["Extra hours"],
-  imageUrl: null,
-  price: null,
+  name: "Celebration", description: "An elegant celebration with thoughtful details.", eventTypes: ["Birthday"], guestMax: 100,
+  price: {kind: "fixed", currency: "PHP", amountMinor: 12000000},
+  sections: [{id: randomUUID(),title: "The experience",widgets: [
+    {id: randomUUID(),type: "photo",x:0,y:0,w:6,h:6,markdown:"",media:{kind:"image",source:"sample",url:"/images/wedding.jpg"},alt:"Table setting",caption:""},
+    {id: randomUUID(),type: "markdown",x:6,y:0,w:6,h:6,markdown:"## An occasion\n\nA **beautiful** celebration",media:null,alt:"",caption:""}
+  ]}]
 };
 async function read(response: Response, status: number): Promise<any> {
   assert.equal(response.status, status, await response.clone().text());
   return response.status === 204 ? null : response.json();
 }
-
-test("catalog protects drafts, validates price, preserves versions and archives published offers", async () => {
-  await read(await call("/admin/packages"), 401);
-  await read(
-    await call("/admin/packages", "GET", undefined, customerCookie),
-    403,
-  );
-  await read(await call("/admin/packages", "POST", data, customerCookie), 403);
-  await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      { ...data, guestMax: 0 },
-      adminCookie,
-    ),
-    400,
-  );
-  await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      { ...data, guestMax: 1.5 },
-      adminCookie,
-    ),
-    400,
-  );
-  await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      { ...data, guestMax: 2147483648 },
-      adminCookie,
-    ),
-    400,
-  );
-  const lowerBound = await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      { ...data, guestMax: 1 },
-      adminCookie,
-    ),
-    201,
-  );
-  assert.equal(lowerBound.draft.guestMax, 1);
-  assert.equal("guestMin" in lowerBound.draft, false);
-  const upperBound = await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      { ...data, guestMax: 2147483647 },
-      adminCookie,
-    ),
-    201,
-  );
-  assert.equal(upperBound.draft.guestMax, 2147483647);
-  await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      {
-        ...data,
-        price: { kind: "per_guest", currency: "PHP", amountMinor: 1 },
-      },
-      adminCookie,
-    ),
-    400,
-  );
-  await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      { ...data, price: { kind: "fixed", currency: "USD", amountMinor: 1 } },
-      adminCookie,
-    ),
-    400,
-  );
-  await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      { ...data, price: { kind: "fixed", currency: "PHP", amountMinor: 0 } },
-      adminCookie,
-    ),
-    400,
-  );
-  await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      {
-        ...data,
-        price: { kind: "fixed", currency: "PHP", amountMinor: 12500001 },
-      },
-      adminCookie,
-    ),
-    400,
-  );
-  const created = await read(
-    await call("/admin/packages", "POST", data, adminCookie),
-    201,
-  );
-  const path = `/admin/packages/${created.id}`;
-  assert.equal(created.draft.guestMax, 100);
-  assert.equal("guestMin" in created.draft, false);
-  assert.deepEqual(created.draft.inclusions, ["Decorations"]);
-  assert.equal("venueDetails" in created.draft, false);
-  assert.equal("terms" in created.draft, false);
-  const removedColumns = await pool.query(
-    "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'package_versions' AND column_name IN ('guest_min', 'venue_details', 'terms', 'price_amount_minor') ORDER BY column_name",
-  );
-  assert.deepEqual(removedColumns.rows, []);
-  assert.deepEqual((await read(await call("/packages"), 200)).packages, []);
-  await read(await call(`/packages/${created.id}`), 404);
-  await read(
-    await call(
-      `${path}/publish`,
-      "POST",
-      { expectedUpdatedAt: created.draft.updatedAt },
-      adminCookie,
-    ),
-    400,
-  );
-  const price = { kind: "fixed", currency: "PHP", amountMinor: 12500000 };
-  const missingInclusions = await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      { ...data, inclusions: [], exclusions: [], price },
-      adminCookie,
-    ),
-    201,
-  );
-  await read(
-    await call(
-      `/admin/packages/${missingInclusions.id}/publish`,
-      "POST",
-      { expectedUpdatedAt: missingInclusions.draft.updatedAt },
-      adminCookie,
-    ),
-    400,
-  );
-  const edited = await read(
-    await call(
-      `${path}/draft`,
-      "PATCH",
-      {
-        ...data,
-        exclusions: [],
-        price,
-        expectedUpdatedAt: created.draft.updatedAt,
-      },
-      adminCookie,
-    ),
-    200,
-  );
-  assert.equal(
-    (
-      await pool.query("SELECT price FROM package_versions WHERE id = $1", [
-        created.draft.id,
-      ])
-    ).rows[0].price,
-    125000,
-  );
-  await read(
-    await call(
-      `${path}/draft`,
-      "PATCH",
-      { ...data, price, expectedUpdatedAt: created.draft.updatedAt },
-      adminCookie,
-    ),
-    409,
-  );
-  await read(
-    await call(
-      `${path}/publish`,
-      "POST",
-      { expectedUpdatedAt: created.draft.updatedAt },
-      adminCookie,
-    ),
-    409,
-  );
-  const first = await read(
-    await call(
-      `${path}/publish`,
-      "POST",
-      { expectedUpdatedAt: edited.draft.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  assert.equal(
-    "venueDetails" in (await read(await call(`/packages/${created.id}`), 200)),
-    false,
-  );
-  assert.deepEqual(
-    (await read(await call(`/packages/${created.id}`), 200)).price,
-    price,
-  );
-  assert.deepEqual(
-    (await read(await call(`/packages/${created.id}`), 200)).inclusions,
-    ["Decorations"],
-  );
-  assert.deepEqual(
-    (await read(await call(`/packages/${created.id}`), 200)).exclusions,
-    [],
-  );
-  const replacement = await read(
-    await call(
-      `${path}/draft`,
-      "PATCH",
-      {
-        ...data,
-        name: "New name",
-        price,
-        expectedUpdatedAt: first.published.updatedAt,
-      },
-      adminCookie,
-    ),
-    200,
-  );
-  assert.equal(replacement.draft.version, 2);
-  assert.equal(
-    (
-      await pool.query("SELECT price FROM package_versions WHERE id = $1", [
-        first.published.id,
-      ])
-    ).rows[0].price,
-    125000,
-  );
-  assert.equal(
-    (await read(await call(`/packages/${created.id}`), 200)).name,
-    "Celebration",
-  );
-  const second = await read(
-    await call(
-      `${path}/publish`,
-      "POST",
-      { expectedUpdatedAt: replacement.draft.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  assert.equal(
-    second.versions.find((v: any) => v.version === 1).state,
-    "superseded",
-  );
-  assert.equal(
-    (await read(await call(`/packages/${created.id}`), 200)).name,
-    "New name",
-  );
-  await read(await call(path, "DELETE", undefined, adminCookie), 409);
-  const pending = await read(
-    await call(
-      `${path}/draft`,
-      "PATCH",
-      { ...data, price, expectedUpdatedAt: second.published.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  await read(
-    await call(`${path}/archive`, "POST", undefined, adminCookie),
-    200,
-  );
-  await read(
-    await call(
-      `${path}/publish`,
-      "POST",
-      { expectedUpdatedAt: pending.draft.updatedAt },
-      adminCookie,
-    ),
-    409,
-  );
-  await read(
-    await call(
-      `${path}/draft`,
-      "PATCH",
-      { ...data, price, expectedUpdatedAt: pending.draft.updatedAt },
-      adminCookie,
-    ),
-    409,
-  );
-  await read(await call(`/packages/${created.id}`), 404);
-  assert.equal(
-    (await read(await call(path, "GET", undefined, adminCookie), 200)).versions
-      .length,
-    3,
-  );
-  const draft = await read(
-    await call("/admin/packages", "POST", data, adminCookie),
-    201,
-  );
-  await pool.query(
-    "CREATE TABLE test_references (package_id UUID REFERENCES packages(id))",
-  );
-  await pool.query("INSERT INTO test_references (package_id) VALUES ($1)", [
-    draft.id,
-  ]);
-  await read(
-    await call(`/admin/packages/${draft.id}`, "DELETE", undefined, adminCookie),
-    409,
-  );
-  await pool.query("DELETE FROM test_references");
-  await read(
-    await call(`/admin/packages/${draft.id}`, "DELETE", undefined, adminCookie),
-    204,
-  );
-  await read(
-    await call(`/admin/packages/${draft.id}`, "GET", undefined, adminCookie),
-    404,
-  );
-  await read(
-    await call(
-      path,
-      "DELETE",
-      undefined,
-      adminCookie,
-      "https://untrusted.example",
-    ),
-    403,
-  );
-  assert.ok(edited.draft.updatedAt !== created.draft.updatedAt);
-  const spec: any = await (await app.request("/openapi.json")).json();
-  assert.ok(spec.paths["/v1/admin/packages/{id}/draft"].patch);
-});
-
-test("package versions keep external image URLs and reject upload paths", async () => {
-  const imageUrl = "https://images.example.test/package.jpg";
-  await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      { ...data, imageUrl: "/v1/package-images/old" },
-      adminCookie,
-    ),
-    400,
-  );
-  await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      { ...data, imageUrl: "http://images.example.test/package.jpg" },
-      adminCookie,
-    ),
-    400,
-  );
-  const created = await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      {
-        ...data,
-        imageUrl,
-        price: { kind: "fixed", currency: "PHP", amountMinor: 100 },
-      },
-      adminCookie,
-    ),
-    201,
-  );
-  const published = await read(
-    await call(
-      `/admin/packages/${created.id}/publish`,
-      "POST",
-      { expectedUpdatedAt: created.draft.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  assert.equal(
-    (await read(await call(`/packages/${created.id}`), 200)).imageUrl,
-    imageUrl,
-  );
-  const spec: any = await (await app.request("/openapi.json")).json();
-  assert.equal(spec.paths["/v1/admin/package-images"], undefined);
-  assert.ok(published.published);
-});
 
 const imagePath = (id: string) => `/v1/service-images/${id}`;
 async function createUploadedService(content: unknown) {
@@ -555,955 +181,260 @@ async function createUploadedService(content: unknown) {
   );
 }
 
-test("services and package assignments preserve published versions and protect public catalog", async () => {
-  const content = {
-    name: "Photography",
-    hourlyRatePesos: 500,
-    description: "Event coverage",
-  };
-  await read(await call("/admin/services"), 401);
-  await read(
-    await call("/admin/services", "POST", content, customerCookie),
-    403,
-  );
+test("services save directly, validate complete content, and enforce permissions", async () => {
+  const content = { name: "Photo", description: "Coverage", hourlyRatePesos: 500 };
+  await read(await call("/admin/services", "POST", content), 401);
+  for (const cookie of [staffCookie, customerCookie, undesignatedAdminCookie]) await read(await call("/admin/services", "POST", content, cookie), 403);
+  for (const hourlyRatePesos of [null, 0, -1, 1.5, 2147483648]) await read(await call("/admin/services", "POST", { ...content, hourlyRatePesos }, adminCookie), 400);
+  await read(await call("/admin/services", "POST", content, adminCookie), 400);
   const created = await createUploadedService(content);
-  assert.equal(
-    (await read(await call("/services"), 200)).services.some(
-      (x: any) => x.id === created.id,
-    ),
-    false,
-  );
-  await read(
-    await call(
-      `/admin/services/${created.id}/publish`,
-      "POST",
-      { expectedUpdatedAt: created.draft.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  const published = await read(await call(`/services/${created.id}`), 200);
-  assert.equal(published.hourlyRatePesos, 500);
-  assert.equal("categories" in published, false);
-  assert.equal(published.imageId, created.draft.imageId);
-  for (const key of [
-    "category",
-    "coverage",
-    "durationMinutes",
-    "setupMinutes",
-    "setupNeeds",
-  ])
-    assert.equal(key in published, false);
-  const include = {
-    serviceVersionId: published.versionId,
-    role: "included",
-    includedQuantity: 1,
-    addOnPrice: null,
-    addOnMaxQuantity: null,
-  };
-  const extra = await createUploadedService({
-    ...content,
-    name: "Extra coverage",
-  });
-  const extraPublished = await read(
-    await call(
-      `/admin/services/${extra.id}/publish`,
-      "POST",
-      { expectedUpdatedAt: extra.draft.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  const addon = {
-    serviceVersionId: extraPublished.published.id,
-    role: "add_on",
-    includedQuantity: null,
-    addOnPrice: { kind: "fixed", currency: "PHP", amountMinor: 250000 },
-    addOnMaxQuantity: 2,
-  };
-  const price = { kind: "fixed", currency: "PHP", amountMinor: 1000000 };
-  await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      {
-        ...data,
-        price,
-        services: [{ ...include, addOnPrice: addon.addOnPrice }],
-      },
-      adminCookie,
-    ),
-    400,
-  );
-  await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      {
-        ...data,
-        price,
-        services: [
-          { ...addon, addOnPrice: { ...addon.addOnPrice, currency: "USD" } },
-        ],
-      },
-      adminCookie,
-    ),
-    400,
-  );
-  await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      {
-        ...data,
-        price,
-        services: [
-          include,
-          { ...addon, serviceVersionId: include.serviceVersionId },
-        ],
-      },
-      adminCookie,
-    ),
-    400,
-  );
-  const pkg = await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      { ...data, inclusions: [], price, services: [include, addon] },
-      adminCookie,
-    ),
-    201,
-  );
-  assert.match(pkg.draft.services[0].id, /^[0-9a-f-]{36}$/);
-  const first = await read(
-    await call(
-      `/admin/packages/${pkg.id}/publish`,
-      "POST",
-      { expectedUpdatedAt: pkg.draft.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  const publicPackage = await read(await call(`/packages/${pkg.id}`), 200);
-  assert.equal(publicPackage.services.length, 2);
-  const nested = publicPackage.services.find(
-    (x: any) => x.role === "included",
-  ).service;
-  assert.equal(nested.hourlyRatePesos, 500);
-  assert.equal("categories" in nested, false);
-  assert.equal(nested.imageId, created.draft.imageId);
-  for (const key of [
-    "category",
-    "coverage",
-    "durationMinutes",
-    "setupMinutes",
-    "setupNeeds",
-  ])
-    assert.equal(key in nested, false);
-  assert.deepEqual(
-    publicPackage.services.find((x: any) => x.role === "add_on").addOnPrice,
-    addon.addOnPrice,
-  );
-  const serviceDraft = await read(
-    await call(
-      `/admin/services/${created.id}/draft`,
-      "PATCH",
-      {
-        ...content,
-        name: "Updated photography",
-        expectedUpdatedAt: published.publishedAt,
-      },
-      adminCookie,
-    ),
-    200,
-  );
-  await read(
-    await call(
-      `/admin/services/${created.id}/publish`,
-      "POST",
-      { expectedUpdatedAt: serviceDraft.draft.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  assert.equal(
-    (await read(await call(`/packages/${pkg.id}`), 200)).services.find(
-      (x: any) => x.role === "included",
-    ).service.name,
-    "Photography",
-  );
-  await read(
-    await call(
-      `/admin/services/${created.id}/archive`,
-      "POST",
-      undefined,
-      adminCookie,
-    ),
-    409,
-  );
-  await read(
-    await call(
-      `/admin/services/${created.id}`,
-      "DELETE",
-      undefined,
-      adminCookie,
-    ),
-    409,
-  );
-  const currentService = await read(await call(`/services/${created.id}`), 200);
-  const next = await read(
-    await call(
-      `/admin/packages/${pkg.id}/draft`,
-      "PATCH",
-      {
-        ...data,
-        price,
-        services: [{ ...include, serviceVersionId: currentService.versionId }],
-        expectedUpdatedAt: first.published.updatedAt,
-      },
-      adminCookie,
-    ),
-    200,
-  );
-  assert.equal(next.published.services.length, 2);
-  assert.equal(next.draft.services.length, 1);
-  assert.equal(
-    (await read(await call(`/packages/${pkg.id}`), 200)).services.length,
-    2,
-  );
-  await read(
-    await call(
-      `/admin/packages/${pkg.id}/archive`,
-      "POST",
-      undefined,
-      adminCookie,
-    ),
-    200,
-  );
-  await read(
-    await call(
-      `/admin/services/${created.id}/archive`,
-      "POST",
-      undefined,
-      adminCookie,
-    ),
-    200,
-  );
+  assert.equal(created.name, content.name);
+  assert.equal(created.hourlyRatePesos, 500);
+  assert.ok(created.imageId);
+  assert.equal(created.imageUrl, imagePath(created.imageId));
+  assert.ok(created.publishedAt);
+  for (const key of ["draft", "published", "versions", "version", "state"]) assert.equal(key in created, false);
+  assert.equal((await read(await call(`/services/${created.id}`), 200)).name, content.name);
+  for (const field of [{ imageUrl: "https://example.test/image.jpg" }, { imageId: created.imageId }]) {
+    await read(await call("/admin/services", "POST", { ...content, ...field }, adminCookie), 400);
+    await read(await call(`/admin/services/${created.id}`, "PATCH", { ...content, ...field, expectedUpdatedAt: created.updatedAt }, adminCookie), 400);
+  }
+  const edited = await read(await call(`/admin/services/${created.id}`, "PATCH", { ...content, name: "Changed", expectedUpdatedAt: created.updatedAt }, adminCookie), 200);
+  assert.equal((await read(await call(`/services/${created.id}`), 200)).name, "Changed");
+  await read(await call(`/admin/services/${created.id}`, "PATCH", { ...content, expectedUpdatedAt: created.updatedAt }, adminCookie), 409);
+  await read(await call(`/admin/services/${created.id}`, "PATCH", { ...content, removeImage: true, expectedUpdatedAt: edited.updatedAt }, adminCookie), 400);
+  await read(await call(`/admin/services/${created.id}/archive`, "POST", undefined, adminCookie), 200);
   await read(await call(`/services/${created.id}`), 404);
+  await read(await call(`/admin/services/${created.id}`, "PATCH", { ...content, expectedUpdatedAt: edited.updatedAt }, adminCookie), 409);
+  await read(await call(`/admin/services/${created.id}`, "DELETE", undefined, adminCookie), 204);
+  await read(await call(`/admin/services/${created.id}`, "GET", undefined, adminCookie), 404);
+  for (const route of ["draft", "publish"]) assert.equal((await call(`/admin/services/${created.id}/${route}`, route === "draft" ? "PATCH" : "POST", {}, adminCookie)).status, 404);
   const spec: any = await (await app.request("/openapi.json")).json();
-  assert.ok(spec.paths["/v1/admin/services/{id}/publish"].post);
+  assert.ok(spec.paths["/v1/admin/services/{id}"].patch);
+  assert.equal(spec.paths["/v1/admin/services/{id}/draft"], undefined);
+  assert.equal(spec.paths["/v1/admin/services/{id}/publish"], undefined);
 });
 
-test("service JSON requests reject image URLs and paths", async () => {
-  const content = {
-    name: "Photo",
-    hourlyRatePesos: 500,
-    description: "Coverage",
-  };
-  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
-  const body = new FormData();
-  body.set("content", JSON.stringify(content));
-  body.set(
-    "image",
-    new Blob([Buffer.from(png)], { type: "image/png" }),
-    "image.png",
-  );
-  const created = await read(
-    await app.request("/v1/admin/service-uploads", {
-      method: "POST",
-      headers: { Cookie: adminCookie },
-      body,
-    }),
-    201,
-  );
-  for (const field of [
-    { imageUrl: "https://images.example.test/service.jpg" },
-    { imageUrl: imagePath(created.draft.imageId) },
-    { imageId: created.draft.imageId },
-  ]) {
-    await read(
-      await call(
-        "/admin/services",
-        "POST",
-        { ...content, ...field },
-        adminCookie,
-      ),
-      400,
-    );
-    await read(
-      await call(
-        `/admin/services/${created.id}/draft`,
-        "PATCH",
-        { ...content, ...field, expectedUpdatedAt: created.draft.updatedAt },
-        adminCookie,
-      ),
-      400,
-    );
-  }
-  const published = await read(
-    await call(
-      `/admin/services/${created.id}/publish`,
-      "POST",
-      { expectedUpdatedAt: created.draft.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  const assignment = {
-    serviceVersionId: published.published.id,
-    role: "included",
-    includedQuantity: 1,
-    addOnPrice: null,
-    addOnMaxQuantity: null,
-  };
-  const pkg = await read(
-    await call(
-      "/admin/packages",
-      "POST",
-      {
-        ...data,
-        price: { kind: "fixed", currency: "PHP", amountMinor: 100 },
-        services: [assignment],
-      },
-      adminCookie,
-    ),
-    201,
-  );
-  await read(
-    await call(
-      `/admin/packages/${pkg.id}/publish`,
-      "POST",
-      { expectedUpdatedAt: pkg.draft.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  const edited = await read(
-    await call(
-      `/admin/services/${created.id}/draft`,
-      "PATCH",
-      {
-        ...content,
-        name: "Revised",
-        expectedUpdatedAt: published.published.updatedAt,
-      },
-      adminCookie,
-    ),
-    200,
-  );
-  assert.equal(edited.draft.imageId, created.draft.imageId);
-  const removed = await read(
-    await call(
-      `/admin/services/${created.id}/draft`,
-      "PATCH",
-      {
-        ...content,
-        removeImage: true,
-        expectedUpdatedAt: edited.draft.updatedAt,
-      },
-      adminCookie,
-    ),
-    200,
-  );
-  assert.equal(removed.draft.imageId, null);
-  assert.equal(
-    (await read(await call(`/packages/${pkg.id}`), 200)).services[0].service
-      .imageId,
-    created.draft.imageId,
-  );
-  assert.equal(
-    (await app.request(imagePath(created.draft.imageId))).status,
-    200,
-  );
-  const spec: any = await (await app.request("/openapi.json")).json();
-  assert.equal(
-    spec.paths["/v1/admin/services"].post.requestBody.content[
-      "application/json"
-    ].schema.properties.imageId,
-    undefined,
-  );
-});
-
-test("public catalog pages load 15 at a time and service previews list included packages", async () => {
-  const serviceContent = {
-    name: "Catalog service",
-    hourlyRatePesos: 500,
-    description: "For page testing",
-  };
-  const serviceIds: string[] = [];
-  for (let index = 0; index < 16; index++) {
-    const created = await createUploadedService({
-      ...serviceContent,
-      name: `Catalog service ${index}`,
-    });
-    await read(
-      await call(
-        `/admin/services/${created.id}/publish`,
-        "POST",
-        { expectedUpdatedAt: created.draft.updatedAt },
-        adminCookie,
-      ),
-      200,
-    );
-    serviceIds.push(created.id);
-  }
-  await read(await call("/services?limit=0"), 400);
-  await read(await call("/services?limit=16"), 400);
-  await read(await call("/services?limit=15&offset=-1"), 400);
-  const firstServices = await read(await call("/services?limit=15"), 200);
-  const secondServices = await read(
-    await call("/services?limit=15&offset=15"),
-    200,
-  );
-  assert.equal(firstServices.services.length, 15);
-  assert.equal(firstServices.nextOffset, 15);
-  assert.ok(secondServices.services.length >= 1);
-  assert.equal(
-    new Set(
-      [...firstServices.services, ...secondServices.services].map(
-        (row: any) => row.id,
-      ),
-    ).size,
-    firstServices.services.length + secondServices.services.length,
-  );
-  assert.equal(
-    (await read(await call("/services?limit=3"), 200)).services.length,
-    3,
-  );
-
-  const target = await read(await call(`/services/${serviceIds[0]}`), 200);
-  const included = {
-    serviceVersionId: target.versionId,
-    role: "included",
-    includedQuantity: 1,
-    addOnPrice: null,
-    addOnMaxQuantity: null,
-  };
-  const addOn = {
-    serviceVersionId: target.versionId,
-    role: "add_on",
-    includedQuantity: null,
-    addOnPrice: { kind: "fixed", currency: "PHP", amountMinor: 100 },
-    addOnMaxQuantity: 1,
-  };
-  const price = { kind: "fixed", currency: "PHP", amountMinor: 100000 };
-  let includedPackageId = "";
-  let addOnPackageId = "";
-  for (let index = 0; index < 16; index++) {
-    const assignment = index === 0 ? [included] : index === 1 ? [addOn] : [];
-    const created = await read(
-      await call(
-        "/admin/packages",
-        "POST",
-        {
-          ...data,
-          name: `Catalog package ${index}`,
-          price,
-          services: assignment,
-        },
-        adminCookie,
-      ),
-      201,
-    );
-    await read(
-      await call(
-        `/admin/packages/${created.id}/publish`,
-        "POST",
-        { expectedUpdatedAt: created.draft.updatedAt },
-        adminCookie,
-      ),
-      200,
-    );
-    if (index === 0) includedPackageId = created.id;
-    if (index === 1) addOnPackageId = created.id;
-  }
-  await read(await call("/packages?limit=16"), 400);
-  const firstPackages = await read(await call("/packages?limit=15"), 200);
-  const secondPackages = await read(
-    await call("/packages?limit=15&offset=15"),
-    200,
-  );
-  assert.equal(firstPackages.packages.length, 15);
-  assert.equal(firstPackages.nextOffset, 15);
-  assert.ok(secondPackages.packages.length >= 1);
-  assert.equal(
-    new Set(
-      [...firstPackages.packages, ...secondPackages.packages].map(
-        (row: any) => row.id,
-      ),
-    ).size,
-    firstPackages.packages.length + secondPackages.packages.length,
-  );
-  assert.equal(
-    (await read(await call("/packages?limit=3"), 200)).packages.length,
-    3,
-  );
-  const related = await read(
-    await call(`/services/${target.id}/packages`),
-    200,
-  );
-  assert.ok(related.packages.some((row: any) => row.id === includedPackageId));
-  assert.ok(!related.packages.some((row: any) => row.id === addOnPackageId));
-  const serviceAdmin = await read(
-    await call(`/admin/services/${target.id}`, "GET", undefined, adminCookie),
-    200,
-  );
-  const revised = await read(
-    await call(
-      `/admin/services/${target.id}/draft`,
-      "PATCH",
-      {
-        ...serviceContent,
-        name: "Revised catalog service",
-        expectedUpdatedAt: serviceAdmin.published.updatedAt,
-      },
-      adminCookie,
-    ),
-    200,
-  );
-  await read(
-    await call(
-      `/admin/services/${target.id}/publish`,
-      "POST",
-      { expectedUpdatedAt: revised.draft.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  assert.ok(
-    (
-      await read(await call(`/services/${target.id}/packages`), 200)
-    ).packages.some((row: any) => row.id === includedPackageId),
-  );
-  await read(
-    await call(
-      `/admin/packages/${includedPackageId}/archive`,
-      "POST",
-      undefined,
-      adminCookie,
-    ),
-    200,
-  );
-  assert.ok(
-    !(
-      await read(await call(`/services/${target.id}/packages`), 200)
-    ).packages.some((row: any) => row.id === includedPackageId),
-  );
-  await read(await call(`/services/${randomUUID()}/packages`), 404);
-  const spec: any = await (await app.request("/openapi.json")).json();
-  assert.ok(spec.paths["/v1/services/{id}/packages"].get);
-});
-
-test("service rates and image uploads enforce boundaries and preserve history", async () => {
-  const content = {
-    name: "Photo",
-    description: "**Markdown**",
-    hourlyRatePesos: null,
-  };
-  for (const hourlyRatePesos of [0, -1, 1.5, 2147483648])
-    await read(
-      await call(
-        "/admin/services",
-        "POST",
-        { ...content, hourlyRatePesos },
-        adminCookie,
-      ),
-      400,
-    );
-  const unrated = await read(
-    await call("/admin/services", "POST", { ...content }, adminCookie),
-    201,
-  );
-  await read(
-    await call(
-      `/admin/services/${unrated.id}/publish`,
-      "POST",
-      { expectedUpdatedAt: unrated.draft.updatedAt },
-      adminCookie,
-    ),
-    400,
-  );
-  const imageless = await read(
-    await call(
-      "/admin/services",
-      "POST",
-      { ...content, hourlyRatePesos: 300 },
-      adminCookie,
-    ),
-    201,
-  );
-  await read(
-    await call(
-      `/admin/services/${imageless.id}/publish`,
-      "POST",
-      { expectedUpdatedAt: imageless.draft.updatedAt },
-      adminCookie,
-    ),
-    400,
-  );
-  function form(value: unknown, bytes: Uint8Array, type: string) {
+test("service multipart updates immediately replace the public image and reject stale writes", async () => {
+  const content = { name: "Uploaded service", description: "Description", hourlyRatePesos: 300 };
+  const created = await createUploadedService(content);
+  const upload = (expectedUpdatedAt: string) => {
     const body = new FormData();
-    body.set("content", JSON.stringify(value));
-    body.set("image", new Blob([Buffer.from(bytes)], { type }), "image");
-    return body;
-  }
-  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
-  async function upload(
-    path: string,
-    method: string,
-    body: FormData,
-    cookie?: string,
-    origin?: string,
-  ) {
-    return app.request(`/v1${path}`, {
-      method,
-      headers: {
-        ...(cookie ? { Cookie: cookie } : {}),
-        ...(origin ? { Origin: origin } : {}),
-      },
-      body,
-    });
-  }
-  await read(
-    await upload(
-      "/admin/service-uploads",
-      "POST",
-      form(content, png, "image/png"),
-    ),
-    401,
-  );
-  await read(
-    await upload(
-      "/admin/service-uploads",
-      "POST",
-      form(content, png, "image/png"),
-      customerCookie,
-    ),
-    403,
-  );
-  await read(
-    await upload(
-      "/admin/service-uploads",
-      "POST",
-      form(content, png, "image/png"),
-      adminCookie,
-      "https://other.example",
-    ),
-    403,
-  );
-  await read(
-    await upload(
-      "/admin/service-uploads",
-      "POST",
-      form(content, new Uint8Array([1, 2, 3]), "image/png"),
-      adminCookie,
-    ),
-    400,
-  );
-  await read(
-    await upload(
-      "/admin/service-uploads",
-      "POST",
-      form(content, png, "image/jpeg"),
-      adminCookie,
-    ),
-    400,
-  );
-  await read(
-    await upload(
-      "/admin/service-uploads",
-      "POST",
-      form(content, new Uint8Array(10 * 1024 * 1024 + 1), "image/png"),
-      adminCookie,
-    ),
-    413,
-  );
-  const jpeg = new Uint8Array([255, 216, 255, 0]);
-  const webp = new Uint8Array([82, 73, 70, 70, 0, 0, 0, 0, 87, 69, 66, 80]);
-  await read(
-    await upload(
-      "/admin/service-uploads",
-      "POST",
-      form(content, jpeg, "image/jpeg"),
-      adminCookie,
-    ),
-    201,
-  );
-  await read(
-    await upload(
-      "/admin/service-uploads",
-      "POST",
-      form(content, webp, "image/webp"),
-      adminCookie,
-    ),
-    201,
-  );
-  const created = await read(
-    await upload(
-      "/admin/service-uploads",
-      "POST",
-      form({ ...content, hourlyRatePesos: 500 }, png, "image/png"),
-      adminCookie,
-    ),
-    201,
-  );
-  assert.match(created.draft.imageId, /^[0-9a-f-]{36}$/);
-  const retrieved = await app.request(imagePath(created.draft.imageId));
-  assert.equal(retrieved.status, 200);
-  assert.equal(retrieved.headers.get("content-type"), "image/png");
-  assert.deepEqual(new Uint8Array(await retrieved.arrayBuffer()), png);
-  const published = await read(
-    await call(
-      `/admin/services/${created.id}/publish`,
-      "POST",
-      { expectedUpdatedAt: created.draft.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  const count = storedImages.size;
-  await read(
-    await upload(
-      `/admin/service-uploads/${created.id}`,
-      "PATCH",
-      form(
-        {
-          ...content,
-          hourlyRatePesos: 600,
-          expectedUpdatedAt: created.draft.updatedAt,
-        },
-        png,
-        "image/png",
-      ),
-      adminCookie,
-    ),
-    409,
-  );
-  assert.equal(storedImages.size, count);
-  const updated = await read(
-    await upload(
-      `/admin/service-uploads/${created.id}`,
-      "PATCH",
-      form(
-        {
-          ...content,
-          hourlyRatePesos: 600,
-          expectedUpdatedAt: published.published.updatedAt,
-        },
-        png,
-        "image/png",
-      ),
-      adminCookie,
-    ),
-    200,
-  );
-  assert.equal(updated.published.imageId, created.draft.imageId);
-  assert.notEqual(updated.draft.imageId, updated.published.imageId);
-  assert.equal(updated.published.hourlyRatePesos, 500);
-  assert.equal(updated.draft.hourlyRatePesos, 600);
-  assert.equal(
-    (await app.request(imagePath(updated.published.imageId))).status,
-    200,
-  );
-  const spec: any = await (await app.request("/openapi.json")).json();
-  assert.ok(spec.paths["/v1/admin/service-uploads"].post);
-  assert.ok(spec.paths["/v1/admin/service-uploads/{id}"].patch);
-  assert.ok(spec.paths["/v1/service-images/{id}"].get);
+    body.set("content", JSON.stringify({ ...content, name: "Updated upload", expectedUpdatedAt }));
+    body.set("image", new Blob([Buffer.from([137,80,78,71,13,10,26,10,0])], { type: "image/png" }), "image.png");
+    return app.request(`/v1/admin/service-uploads/${created.id}`, { method: "PATCH", headers: { Cookie: adminCookie }, body });
+  };
+  const edited = await read(await upload(created.updatedAt), 200);
+  assert.notEqual(edited.imageId, created.imageId);
+  assert.equal((await read(await call(`/services/${created.id}`), 200)).imageId, edited.imageId);
+  assert.equal((await app.request(imagePath(created.imageId))).status, 404);
+  await read(await upload(created.updatedAt), 409);
+  await read(await call(`/admin/services/${created.id}`, "DELETE", undefined, adminCookie), 204);
+  assert.equal((await app.request(imagePath(edited.imageId))).status, 404);
 });
 
-test("unreferenced draft uploads are cleaned up and historical images survive", async () => {
-  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
-  const content = {
-    name: "Cleanup",
-    description: "Description",
-    hourlyRatePesos: 300,
-  };
-  const upload = async (path: string, method: string, value: unknown) => {
-    const body = new FormData();
-    body.set("content", JSON.stringify(value));
-    body.set(
-      "image",
-      new Blob([Buffer.from(png)], { type: "image/png" }),
-      "test.png",
-    );
-    return app.request(`/v1${path}`, {
-      method,
-      headers: { Cookie: adminCookie },
-      body,
-    });
-  };
-  const first = await read(
-    await upload("/admin/service-uploads", "POST", content),
-    201,
-  );
-  const firstImage = first.draft.imageId;
-  const second = await read(
-    await upload(`/admin/service-uploads/${first.id}`, "PATCH", {
-      ...content,
-      expectedUpdatedAt: first.draft.updatedAt,
-    }),
-    200,
-  );
-  assert.equal((await app.request(imagePath(firstImage))).status, 404);
-  const secondImage = second.draft.imageId;
-  const noImage = await read(
-    await call(
-      `/admin/services/${first.id}/draft`,
-      "PATCH",
-      {
-        ...content,
-        removeImage: true,
-        expectedUpdatedAt: second.draft.updatedAt,
-      },
-      adminCookie,
-    ),
-    200,
-  );
-  assert.equal((await app.request(imagePath(secondImage))).status, 404);
-  await read(
-    await call(
-      "/admin/services",
-      "POST",
-      { ...content, imageId: secondImage },
-      adminCookie,
-    ),
-    400,
-  );
-  const third = await read(
-    await upload(`/admin/service-uploads/${first.id}`, "PATCH", {
-      ...content,
-      expectedUpdatedAt: noImage.draft.updatedAt,
-    }),
-    200,
-  );
-  const thirdImage = third.draft.imageId;
-  await read(
-    await call(`/admin/services/${first.id}`, "DELETE", undefined, adminCookie),
-    204,
-  );
-  assert.equal((await app.request(imagePath(thirdImage))).status, 404);
-  const historical = await read(
-    await upload("/admin/service-uploads", "POST", content),
-    201,
-  );
-  const published = await read(
-    await call(
-      `/admin/services/${historical.id}/publish`,
-      "POST",
-      { expectedUpdatedAt: historical.draft.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  const replacement = await read(
-    await upload(`/admin/service-uploads/${historical.id}`, "PATCH", {
-      ...content,
-      expectedUpdatedAt: published.published.updatedAt,
-    }),
-    200,
-  );
-  await read(
-    await call(
-      `/admin/services/${historical.id}/draft`,
-      "PATCH",
-      {
-        ...content,
-        removeImage: true,
-        expectedUpdatedAt: replacement.draft.updatedAt,
-      },
-      adminCookie,
-    ),
-    200,
-  );
-  assert.equal(
-    (await app.request(imagePath(historical.draft.imageId))).status,
-    200,
-  );
-  assert.equal(
-    (await app.request(imagePath(replacement.draft.imageId))).status,
-    404,
-  );
-  await read(
-    await call(
-      `/admin/services/${historical.id}`,
-      "DELETE",
-      undefined,
-      adminCookie,
-    ),
-    409,
-  );
-  assert.equal(
-    (await app.request(imagePath(historical.draft.imageId))).status,
-    200,
-  );
+test("canvas saves publish atomically, protect concurrent edits, and remove version/service contracts", async () => {
+  await read(await call('/admin/packages'),401);
+  for(const cookie of [customerCookie,staffCookie,undesignatedAdminCookie]) await read(await call('/admin/packages','POST',data,cookie),403);
+  for(const patch of [{name:''},{price:null},{price:{...data.price,amountMinor:101}},{guestMax:0},{services:[]}]) await read(await call('/admin/packages','POST',{...data,...patch},adminCookie),400);
+  const created=await read(await call('/admin/packages','POST',data,adminCookie),201);
+  assert.equal(created.name,data.name);assert.equal(created.description,data.description);assert.equal(created.imageUrl,'/images/wedding.jpg');
+  for(const key of ['draft','published','versions','versionId','services']) assert.equal(key in created,false);
+  const detail=await read(await call(`/packages/${created.id}`),200);assert.equal(detail.sections[0].widgets.length,2);
+  const edits=await Promise.all(['First edit','Second edit'].map(name=>call(`/admin/packages/${created.id}`,'PATCH',{...data,name,expectedUpdatedAt:created.updatedAt},adminCookie)));
+  assert.deepEqual(edits.map(r=>r.status).sort(),[200,409]);
+  const current=await read(await call(`/admin/packages/${created.id}`,'GET',undefined,adminCookie),200);
+  const before=(await pool.query('SELECT count(*) FROM catalog_sections WHERE page_id=(SELECT id FROM catalog_pages WHERE package_id=$1)',[created.id])).rows[0].count;
+  const bad=structuredClone(data);bad.sections[0].widgets[0].media={kind:'image',source:'upload',id:randomUUID(),url:'/v1/catalog-media/missing'} as any;
+  await read(await call(`/admin/packages/${created.id}`,'PATCH',{...bad,name:'Must roll back',expectedUpdatedAt:current.updatedAt},adminCookie),400);
+  assert.equal((await read(await call(`/packages/${created.id}`),200)).name,current.name);
+  assert.equal((await pool.query('SELECT count(*) FROM catalog_sections WHERE page_id=(SELECT id FROM catalog_pages WHERE package_id=$1)',[created.id])).rows[0].count,before);
+  assert.equal((await call(`/admin/packages/${created.id}/draft`,'PATCH',data,adminCookie)).status,404);
+  assert.equal((await call(`/admin/packages/${created.id}/publish`,'POST',{},adminCookie)).status,404);
+  assert.equal((await call(`/services/${randomUUID()}/packages`)).status,404);
+  const archived=await read(await call(`/admin/packages/${created.id}/archive`,'POST',undefined,adminCookie),200);assert.ok(archived.archivedAt);
+  await read(await call(`/packages/${created.id}`),404);
+  await read(await call(`/admin/packages/${created.id}`,'DELETE',undefined,adminCookie),204);
+  assert.equal((await pool.query('SELECT count(*) FROM catalog_pages WHERE package_id=$1',[created.id])).rows[0].count,'0');
 });
 
-test("a storage cleanup failure does not reverse a committed edit or deletion", async () => {
-  const content = {
-    name: "Failure handling",
-    description: "Description",
-    hourlyRatePesos: 300,
-  };
-  const upload = async () => {
-    const body = new FormData();
-    body.set("content", JSON.stringify(content));
-    body.set(
-      "image",
-      new Blob([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0])], {
-        type: "image/png",
-      }),
-      "image.png",
-    );
-    return read(
-      await app.request("/v1/admin/service-uploads", {
-        method: "POST",
-        headers: { Cookie: adminCookie },
-        body,
-      }),
-      201,
-    );
-  };
-  const first = await upload();
-  const second = await upload();
-  failStorageDeletes = true;
-  try {
-    const edited = await read(
-      await call(
-        `/admin/services/${first.id}/draft`,
-        "PATCH",
-        {
-          ...content,
-          removeImage: true,
-          expectedUpdatedAt: first.draft.updatedAt,
-        },
-        adminCookie,
-      ),
-      200,
-    );
-    assert.equal(edited.draft.imageId, null);
-    await read(
-      await call(
-        `/admin/services/${second.id}`,
-        "DELETE",
-        undefined,
-        adminCookie,
-      ),
-      204,
-    );
-    await read(
-      await call(`/admin/services/${second.id}`, "GET", undefined, adminCookie),
-      404,
-    );
-    assert.equal(
-      (await app.request(imagePath(first.draft.imageId))).status,
-      200,
-    );
-    assert.equal(
-      (await app.request(imagePath(second.draft.imageId))).status,
-      200,
-    );
-  } finally {
-    failStorageDeletes = false;
+test("package descriptions are stored independently from canvas text and enforce catalog limits", async () => {
+  const created = await read(await call("/admin/packages", "POST", { ...data, description: "  A description for the card.  " }, adminCookie), 201);
+  assert.equal(created.description, "A description for the card.");
+  assert.equal((await pool.query("SELECT description FROM packages WHERE id=$1", [created.id])).rows[0].description, created.description);
+  const { description: omitted, ...legacyContent } = data;
+  const changedCanvas = structuredClone(legacyContent);
+  changedCanvas.sections[0].widgets[1].markdown = "## Different canvas text";
+  const edited = await read(await call(`/admin/packages/${created.id}`, "PATCH", { ...changedCanvas, expectedUpdatedAt: created.updatedAt }, adminCookie), 200);
+  assert.equal(edited.description, created.description);
+  assert.equal((await read(await call(`/packages/${created.id}`), 200)).description, created.description);
+  assert.equal((await read(await call("/packages"), 200)).packages.find((item: any) => item.id === created.id).description, created.description);
+  const limit = "x".repeat(4000);
+  const boundary = await read(await call(`/admin/packages/${created.id}`, "PATCH", { ...data, description: limit, expectedUpdatedAt: edited.updatedAt }, adminCookie), 200);
+  assert.equal(boundary.description, limit);
+  await read(await call(`/admin/packages/${created.id}`, "PATCH", { ...data, description: limit + "x", expectedUpdatedAt: boundary.updatedAt }, adminCookie), 400);
+  const cleared = await read(await call(`/admin/packages/${created.id}`, "PATCH", { ...data, description: "", expectedUpdatedAt: boundary.updatedAt }, adminCookie), 200);
+  assert.equal(cleared.description, "");
+  assert.equal((await read(await call(`/packages/${created.id}`), 200)).description, "");
+  const textOnly = await read(await call("/admin/packages", "POST", { ...data, description: "Card text without canvas widgets", sections: [] }, adminCookie), 201);
+  assert.equal(textOnly.description, "Card text without canvas widgets");
+  await read(await call("/admin/packages", "POST", { ...data, description: limit + "x" }, adminCookie), 400);
+  await read(await call("/admin/packages", "POST", { ...data, description: null }, adminCookie), 400);
+});
+
+test("catalog validates widget sources, bounds, counts and paginates direct packages",async()=>{
+  for(const url of ['javascript:alert(1)','http://example.test/a.mp4','https://youtube.com/watch?v=bad','https://example.test/page','https://example.test/film.mp4','https://youtu.be/aqz-KE-bpKQ','https://vimeo.com/123456']) {
+    const c=structuredClone(data);c.sections[0].widgets[0]={...c.sections[0].widgets[0],type:'video',media:{kind:'video',source:'external',url}};
+    await read(await call('/admin/packages','POST',c,adminCookie),400);
   }
+  const linkedPhoto=structuredClone(data);linkedPhoto.sections[0].widgets[0].media={kind:'image',source:'external',url:'https://example.test/photo.jpg'};
+  await read(await call('/admin/packages','POST',linkedPhoto,adminCookie),400);
+  await assert.rejects(pool.query("INSERT INTO media_assets(kind,source,url) VALUES('image','external','https://example.test/photo.jpg')"), /media_assets_source/);
+  for(const geometry of [{x:11,w:2},{h:101},{w:0}]){const c=structuredClone(data);Object.assign(c.sections[0].widgets[0],geometry);await read(await call('/admin/packages','POST',c,adminCookie),400);}
+  const c=structuredClone(data);c.sections[0].widgets.push({...c.sections[0].widgets[0]});await read(await call('/admin/packages','POST',c,adminCookie),400);
+  const countBefore=(await read(await call('/packages'),200)).packages.length;
+  for(let i=0;i<17;i++)await read(await call('/admin/packages','POST',{...data,name:`Paged ${i}`},adminCookie),201);
+  const first=await read(await call('/packages?limit=15'),200);assert.equal(first.packages.length,15);assert.equal(first.nextOffset,15);
+  const second=await read(await call('/packages?limit=15&offset=15'),200);assert.equal(second.packages.length,countBefore+2);assert.equal(second.nextOffset,null);
+  const ids=[...first.packages,...second.packages].map(p=>p.id);assert.equal(new Set(ids).size,ids.length);
+  await read(await call('/packages?limit=16'),400);
+});
+
+async function uploadCanvas(bytes:Uint8Array,mime:string,cookie=adminCookie){const form=new FormData();form.set('file',new Blob([Buffer.from(bytes)],{type:mime}),'media');return app.request('/v1/admin/catalog-media',{method:'POST',headers:{Cookie:cookie},body:form});}
+test("video autoplay is opt-in, persists on public reads, and cannot be enabled for other widgets", async () => {
+  const ordinary = await read(await call('/admin/packages', 'POST', data, adminCookie), 201);
+  assert.ok(ordinary.sections[0].widgets.every((widget: { autoplay: boolean }) => widget.autoplay === false));
+  for (const index of [0, 1]) {
+    const invalid = structuredClone(data);
+    Object.assign(invalid.sections[0].widgets[index], { autoplay: true });
+    await read(await call('/admin/packages', 'POST', invalid, adminCookie), 400);
+  }
+  await assert.rejects(pool.query('UPDATE catalog_widgets SET autoplay=true WHERE id=$1', [ordinary.sections[0].widgets[0].id]), /catalog_widgets_video_autoplay/);
+  const mp4 = new Uint8Array([0,0,0,20,102,116,121,112,105,115,111,109,0,0,0,0,105,115,111,109]);
+  const media = await read(await uploadCanvas(mp4, 'video/mp4'), 201);
+  const video = { id: randomUUID(), type: 'video', x: 0, y: 0, w: 12, h: 6, markdown: '', media, alt: '', caption: 'Event film', autoplay: true };
+  const content = { ...data, sections: [{ id: randomUUID(), title: 'Film', widgets: [video] }] };
+  const created = await read(await call('/admin/packages', 'POST', content, adminCookie), 201);
+  const published = await read(await call(`/packages/${created.id}`), 200);
+  assert.equal(published.sections[0].widgets[0].autoplay, true);
+  assert.equal(published.sections[0].widgets[0].caption, 'Event film');
+  assert.equal((await pool.query('SELECT autoplay FROM catalog_widgets WHERE id=$1', [published.sections[0].widgets[0].id])).rows[0].autoplay, true);
+  const invalid = { ...content, sections: [{ ...content.sections[0], widgets: [{ ...video, autoplay: 'true' }] }] };
+  await read(await call('/admin/packages', 'POST', invalid, adminCookie), 400);
+  const edited = await read(await call(`/admin/packages/${created.id}`, 'PATCH', { ...content, sections: [{ ...content.sections[0], widgets: [{ ...video, autoplay: false }] }], expectedUpdatedAt: created.updatedAt }, adminCookie), 200);
+  assert.equal(edited.sections[0].widgets[0].autoplay, false);
+  assert.equal((await read(await call(`/packages/${created.id}`), 200)).sections[0].widgets[0].autoplay, false);
+});
+test("pending media stays private, published video streams ranges, and cleanup preserves saved assets",async()=>{
+  const mp4=new Uint8Array([0,0,0,20,102,116,121,112,105,115,111,109,0,0,0,0,105,115,111,109]);
+  await read(await uploadCanvas(mp4,'video/mp4',customerCookie),403);
+  await read(await uploadCanvas(mp4,'image/png'),400);
+  const media=await read(await uploadCanvas(mp4,'video/mp4'),201);
+  await read(await app.request(media.url),404);
+  const c={...data,sections:[{id:randomUUID(),title:'Film',widgets:[{id:randomUUID(),type:'video',x:0,y:0,w:12,h:6,markdown:'',media,alt:'',caption:'Event film'}]}]};
+  const saved=await read(await call('/admin/packages','POST',c,adminCookie),201);
+  const stream=await app.request(media.url);assert.equal(stream.status,200);assert.equal(stream.headers.get('accept-ranges'),'bytes');assert.deepEqual(new Uint8Array(await stream.arrayBuffer()),mp4);
+  const part=await app.request(media.url,{headers:{Range:'bytes=4-7'}});assert.equal(part.status,206);assert.equal(part.headers.get('content-range'),`bytes 4-7/${mp4.length}`);assert.equal(Buffer.from(await part.arrayBuffer()).toString(),'ftyp');
+  assert.equal((await app.request(media.url,{headers:{Range:'bytes=100-200'}})).status,416);
+  await read(await call(`/admin/catalog-media/${media.id}`,'DELETE',undefined,adminCookie),409);
+  await read(await call(`/admin/packages/${saved.id}`,'PATCH',{...data,expectedUpdatedAt:saved.updatedAt},adminCookie),200);
+  await read(await app.request(media.url),404);assert.equal((await pool.query('SELECT count(*) FROM media_assets WHERE id=$1',[media.id])).rows[0].count,'0');
+  const pending=await read(await uploadCanvas(mp4,'video/mp4'),201);
+  await read(await call(`/admin/catalog-media/${pending.id}`,'DELETE',undefined,customerCookie),403);
+  await read(await call(`/admin/catalog-media/${pending.id}`,'DELETE',undefined,adminCookie),204);
+  const spec:any=await(await app.request('/openapi.json')).json();assert.ok(spec.paths['/v1/admin/packages/{id}'].patch);assert.equal(spec.paths['/v1/admin/packages/{id}/publish'],undefined);
+});
+
+test('stale pending uploads can be swept while referenced media survives',async()=>{
+  const png=new Uint8Array([137,80,78,71,13,10,26,10,0]);
+  const old=await read(await uploadCanvas(png,'image/png'),201);
+  await pool.query("UPDATE media_assets SET created_at=now()-interval '2 days' WHERE id=$1",[old.id]);
+  const {cleanupStaleCatalogMediaService}=await import('../src/services/catalog-media/catalog-media.js');
+  await cleanupStaleCatalogMediaService(db);
+  assert.equal((await pool.query('SELECT count(*) FROM media_assets WHERE id=$1',[old.id])).rows[0].count,'0');
+  const media=await read(await uploadCanvas(png,'image/png'),201);
+  const c=structuredClone(data);c.sections[0].widgets[0].media=media;
+  await read(await call('/admin/packages','POST',c,adminCookie),201);
+  await pool.query("UPDATE media_assets SET created_at=now()-interval '2 days' WHERE id=$1",[media.id]);
+  await cleanupStaleCatalogMediaService(db);
+  assert.equal((await app.request(media.url)).status,200);
+});
+
+test('admin archived media is private and unclaimed uploads cannot be taken by another admin',async()=>{
+  const token=randomUUID();const user=await db.insertInto('users').values({email:`admin-${randomUUID()}@example.test`,password_hash:'unused',role:'admin',staff_role:'System Administrator'}).returning('id').executeTakeFirstOrThrow();await db.insertInto('sessions').values({user_id:user.id,token_hash:hashSessionToken(token),expires_at:new Date(Date.now()+3600000)}).execute();const other=`em_session=${token}`;
+  const png=new Uint8Array([137,80,78,71,13,10,26,10,0]);const media=await read(await uploadCanvas(png,'image/png'),201);
+  assert.equal((await app.request(media.url)).status,404);
+  assert.equal((await app.request(media.url,{headers:{Cookie:adminCookie}})).status,200);
+  const c=structuredClone(data);c.sections[0].widgets[0].media=media;
+  await read(await call('/admin/packages','POST',c,other),400);
+  const pkg=await read(await call('/admin/packages','POST',c,adminCookie),201);
+  const edit=await read(await call(`/admin/packages/${pkg.id}`,'PATCH',{...c,name:'Other administrator edit',expectedUpdatedAt:pkg.updatedAt},other),200);
+  await read(await call(`/admin/packages/${pkg.id}/archive`,'POST',undefined,other),200);
+  assert.equal((await app.request(media.url)).status,404);
+  assert.equal((await app.request(media.url,{headers:{Cookie:customerCookie}})).status,404);
+  const archivedMedia=await app.request(media.url,{headers:{Cookie:other}});assert.equal(archivedMedia.status,200);assert.equal(archivedMedia.headers.get('cache-control'),'private, no-store');
+  await read(await call(`/admin/packages/${edit.id}`,'DELETE',undefined,other),204);
+});
+
+test('canvas collection, Markdown and transport boundaries are enforced',async()=>{
+  const {MAX_CATALOG_WIDGETS,MAX_CATALOG_SECTIONS,MAX_WIDGET_MARKDOWN_LENGTH}=await import('@event-management/contracts/catalog');
+  const {CATALOG_JSON_BODY_LIMIT_BYTES}=await import('../src/constants/http.js');
+  const {MAX_VIDEO_SIZE_BYTES}=await import('@event-management/contracts/limits/videos');
+  const makeWidget=(i:number,length=1)=>({id:randomUUID(),type:'markdown',x:0,y:i,w:12,h:1,markdown:'a'.repeat(length),media:null,alt:'',caption:''});
+  const maximum={...data,sections:[{id:randomUUID(),title:'',widgets:Array.from({length:MAX_CATALOG_WIDGETS},(_,i)=>makeWidget(i,MAX_WIDGET_MARKDOWN_LENGTH))}]};
+  const saved=await read(await call('/admin/packages','POST',maximum,adminCookie),201);assert.equal(saved.sections[0].widgets.length,MAX_CATALOG_WIDGETS);
+  await read(await call('/admin/packages','POST',{...maximum,sections:[{...maximum.sections[0],widgets:[...maximum.sections[0].widgets,makeWidget(101)]}]},adminCookie),400);
+  await read(await call('/admin/packages','POST',{...data,sections:Array.from({length:MAX_CATALOG_SECTIONS+1},()=>({id:randomUUID(),title:'',widgets:[]}))},adminCookie),400);
+  await read(await call('/admin/packages','POST',{...data,sections:[{id:randomUUID(),title:'',widgets:[makeWidget(0,MAX_WIDGET_MARKDOWN_LENGTH+1)]}]},adminCookie),400);
+  const oversized=await app.request('/v1/admin/packages',{method:'POST',headers:{Cookie:adminCookie,'Content-Type':'application/json'},body:JSON.stringify({padding:'a'.repeat(CATALOG_JSON_BODY_LIMIT_BYTES)})});assert.equal(oversized.status,413);
+  await read(await uploadCanvas(new Uint8Array(MAX_VIDEO_SIZE_BYTES+1),'video/mp4'),413);
+});
+
+test("service and venue canvases save rich content directly and enforce media ownership", async () => {
+  const image = new Uint8Array([137,80,78,71,13,10,26,10,0]);
+  const mp4 = new Uint8Array([0,0,0,20,102,116,121,112,105,115,111,109,0,0,0,0,105,115,111,109]);
+  const photo = await read(await uploadCanvas(image, "image/png"), 201);
+  const video = await read(await uploadCanvas(mp4, "video/mp4"), 201);
+  const sections = [{ id: randomUUID(), title: "Gallery", widgets: [
+    { id: randomUUID(), type: "photo", x: 0, y: 0, w: 6, h: 6, markdown: "", media: photo, alt: "Photo", caption: "", autoplay: false },
+    { id: randomUUID(), type: "video", x: 6, y: 3, w: 5, h: 8, markdown: "", media: video, alt: "Film", caption: "Film caption", autoplay: true },
+    { id: randomUUID(), type: "markdown", x: 2, y: 12, w: 8, h: 4, markdown: "## Details\n\n**Custom content**", media: null, alt: "", caption: "", autoplay: false },
+  ] }];
+  const service = { name: "Canvas service", description: "Summary", hourlyRatePesos: 100, sections };
+  const created = await read(await call("/admin/services", "POST", service, adminCookie), 201);
+  const visible = await read(await call(`/services/${created.id}`), 200);
+  assert.equal(visible.imageUrl, photo.url);
+  assert.deepEqual(visible.sections[0].widgets.map((w: any) => [w.type, w.x, w.y, w.w, w.h]), [["photo",0,0,6,6],["video",6,3,5,8],["markdown",2,12,8,4]]);
+  assert.equal(visible.sections[0].widgets[1].autoplay, true);
+  assert.equal(visible.sections[0].widgets[2].markdown, "## Details\n\n**Custom content**");
+  assert.equal((await call(`/catalog-media/${photo.id}`)).status, 200);
+  const venue = { name: "Canvas venue", location: "City", description: "Summary", categories: [], capacityMax: 100, imageUrls: [], sections };
+  await read(await call("/admin/venues", "POST", venue, adminCookie), 400);
+  const { sections: ignored, ...legacy } = service;
+  const edited = await read(await call(`/admin/services/${created.id}`, "PATCH", { ...legacy, name: "Changed", expectedUpdatedAt: created.updatedAt }, adminCookie), 200);
+  assert.equal(edited.sections[0].widgets[0].media.id, photo.id);
+  assert.equal((await read(await call(`/services/${created.id}`), 200)).name, "Changed");
+  await read(await call(`/admin/services/${created.id}/archive`, "POST", undefined, adminCookie), 200);
+  assert.equal((await call(`/catalog-media/${photo.id}`)).status, 404);
+  assert.equal((await call(`/catalog-media/${photo.id}`, "GET", undefined, adminCookie)).status, 200);
+  await read(await call(`/admin/services/${created.id}`, "DELETE", undefined, adminCookie), 204);
+  assert.equal((await pool.query("SELECT id FROM media_assets WHERE id=$1", [photo.id])).rowCount, 0);
+  assert.equal((await pool.query("SELECT id FROM media_assets WHERE id=$1", [video.id])).rowCount, 0);
+  const venuePhoto = await read(await uploadCanvas(image, "image/png"), 201);
+  const venueVideo = await read(await uploadCanvas(mp4, "video/mp4"), 201);
+  const venueSections = structuredClone(sections);
+  venueSections[0].widgets[0].media = venuePhoto;
+  venueSections[0].widgets[1].media = venueVideo;
+  const savedVenue = await read(await call("/admin/venues", "POST", { ...venue, sections: venueSections }, adminCookie), 201);
+  const publicVenue = await read(await call(`/venues/${savedVenue.id}`), 200);
+  assert.equal(publicVenue.sections[0].widgets[0].media.id, venuePhoto.id);
+  assert.equal(publicVenue.sections[0].widgets[1].autoplay, true);
+  assert.equal(publicVenue.sections[0].widgets[2].markdown, "## Details\n\n**Custom content**");
+  const { sections: ignoredVenueSections, ...legacyVenue } = venue;
+  const venueLegacyEdit = await read(await call(`/admin/venues/${savedVenue.id}`, "PATCH", { ...legacyVenue, expectedUpdatedAt: savedVenue.updatedAt }, adminCookie), 200);
+  assert.equal(venueLegacyEdit.sections[0].widgets[1].media.id, venueVideo.id);
+  const venueEdit = await read(await call(`/admin/venues/${savedVenue.id}`, "PATCH", { ...venue, sections: [], expectedUpdatedAt: venueLegacyEdit.updatedAt }, adminCookie), 200);
+  assert.deepEqual(venueEdit.sections, []);
+  assert.equal((await call(`/catalog-media/${venuePhoto.id}`)).status, 404);
+  for (const media of [venuePhoto, venueVideo]) assert.equal((await pool.query("SELECT id FROM media_assets WHERE id=$1", [media.id])).rowCount, 0);
 });

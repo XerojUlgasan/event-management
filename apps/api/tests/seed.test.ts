@@ -58,7 +58,7 @@ async function runSeed(target = database) {
   });
 }
 
-const tables = ["users", "packages", "package_versions", "services", "service_versions", "package_services", "venues", "venue_versions", "booking_requests", "booking_request_status_history", "conversations", "messages"] as const;
+const tables = ["users", "packages", "catalog_pages", "catalog_sections", "catalog_widgets", "media_assets", "services", "venues", "booking_requests", "booking_request_status_history", "conversations", "messages"] as const;
 async function ids() {
   const snapshot: Record<string, string[]> = {};
   for (const table of tables) {
@@ -91,15 +91,51 @@ test("seed creates demo users, venues, and conversations while preserving unrela
     (SELECT count(*)::int FROM booking_requests WHERE reference LIKE 'DEMO-%') AS requests,
     (SELECT count(*)::int FROM conversations c JOIN users u ON u.id = c.customer_id WHERE u.email LIKE 'demo.%@clemora.example.test') AS conversations,
     (SELECT count(*)::int FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN users u ON u.id = c.customer_id WHERE u.email LIKE 'demo.%@clemora.example.test') AS messages,
-    (SELECT count(*)::int FROM venue_versions WHERE name LIKE 'Demo %' AND state = 'published') AS venue_published`);
-  assert.deepEqual(coverage.rows[0], { requests: 0, conversations: 5, messages: 10, venue_published: 3 });
-  const demoVenues = await pool.query("SELECT v.id, version.id AS version_id FROM venues v JOIN venue_versions version ON version.venue_id = v.id WHERE version.name LIKE 'Demo %' ORDER BY version.name");
+    (SELECT count(*)::int FROM packages WHERE published_at IS NOT NULL) AS package_published,
+    (SELECT count(*)::int FROM venues WHERE name LIKE 'Demo %' AND archived_at IS NULL) AS venue_published`);
+  assert.deepEqual(coverage.rows[0], { requests: 0, conversations: 5, messages: 10, package_published: 3, venue_published: 3 });
+  const packageRows = await pool.query("SELECT id, name, guest_max, price, published_at IS NOT NULL AS published FROM packages ORDER BY name");
+  assert.deepEqual(packageRows.rows.map((row) => ({
+    name: row.name,
+    guestMax: row.guest_max,
+    price: row.price,
+    published: row.published,
+  })), [
+    { name: "The Grand Celebration", guestMax: 150, price: 185000, published: true },
+    { name: "The Intimate Gathering", guestMax: 50, price: 68000, published: true },
+    { name: "The Sweet Soirée", guestMax: 80, price: 95000, published: true },
+  ]);
+  const grandCelebration = packageRows.rows.find((row) => row.name === "The Grand Celebration");
+  assert.ok(grandCelebration);
+  const packagePageContent = await pool.query(`
+    SELECT p.name,
+      count(DISTINCT s.id)::int AS sections,
+      count(DISTINCT w.id) FILTER (WHERE w.type = 'markdown')::int AS markdown_widgets,
+      count(DISTINCT w.id) FILTER (WHERE w.type = 'photo' AND m.source = 'sample')::int AS sample_photo_widgets
+    FROM packages p
+    LEFT JOIN catalog_pages cp ON cp.package_id = p.id
+    LEFT JOIN catalog_sections s ON s.page_id = cp.id
+    LEFT JOIN catalog_widgets w ON w.section_id = s.id
+    LEFT JOIN media_assets m ON m.id = w.media_id
+    GROUP BY p.id, p.name
+    ORDER BY p.name`);
+  assert.equal(packagePageContent.rowCount, 3);
+  assert.ok(packagePageContent.rows.every((row) => row.sections > 0 && row.markdown_widgets > 0 && row.sample_photo_widgets > 0));
+  const publicPackages = (await read("/packages")).packages;
+  assert.deepEqual(publicPackages.map((row: any) => row.name).sort(), [
+    "The Grand Celebration", "The Intimate Gathering", "The Sweet Soirée",
+  ]);
+  assert.ok(publicPackages.every((pkg: any) => {
+    const widgets = pkg.sections.flatMap((section: any) => section.widgets);
+    return widgets.some((widget: any) => widget.type === "markdown") &&
+      widgets.some((widget: any) => widget.type === "photo" && widget.media?.source === "sample");
+  }));
+  const demoVenues = await pool.query("SELECT id FROM venues WHERE name LIKE 'Demo %' ORDER BY name");
   assert.equal(demoVenues.rowCount, 3);
   const initialPublicVenues = (await read("/venues")).venues.filter((venue: any) => demoVenues.rows.some((row) => row.id === venue.id));
   assert.equal(initialPublicVenues.length, 3);
   assert.ok(initialPublicVenues.every((venue: any) => venue.imageUrls.length === 0 && !venue.description.includes("venue draft")));
   assert.equal((await pool.query("SELECT count(*)::int AS count FROM services")).rows[0].count, 0);
-  assert.equal((await pool.query("SELECT count(*)::int AS count FROM package_versions WHERE state = 'published'")).rows[0].count, 0);
   const conversation = await pool.query(`SELECT c.id, c.customer_id, count(m.id)::int AS message_count,
     array_agg(u.role ORDER BY m.created_at) AS sender_roles
     FROM conversations c JOIN users customer ON customer.id = c.customer_id
@@ -109,21 +145,24 @@ test("seed creates demo users, venues, and conversations while preserving unrela
   assert.equal(conversation.rows[0].message_count, 2);
   assert.deepEqual(conversation.rows[0].sender_roles, ["customer", "admin"]);
 
-  await pool.query("UPDATE venue_versions SET state = 'draft', published_at = NULL, description = replace(description, 'venue', 'venue draft'), updated_at = created_at WHERE id = $1", [demoVenues.rows[0].version_id]);
-  await pool.query("UPDATE venue_versions SET state = 'draft', published_at = NULL, name = 'Edited demo venue', updated_at = created_at + interval '5 seconds' WHERE id = $1", [demoVenues.rows[1].version_id]);
+  await pool.query("UPDATE venues SET description = 'Edited description', updated_at = created_at + interval '5 seconds' WHERE id = $1", [demoVenues.rows[0].id]);
+  await pool.query("UPDATE venues SET name = 'Edited demo venue', updated_at = created_at + interval '5 seconds' WHERE id = $1", [demoVenues.rows[1].id]);
   await pool.query("UPDATE venues SET archived_at = now() WHERE id = $1", [demoVenues.rows[2].id]);
+  await pool.query("UPDATE packages SET price = price + 1 WHERE id = $1", [grandCelebration.id]);
   const unrelated = await pool.query("INSERT INTO users (email, display_name, role, password_hash) VALUES ($1, $2, 'customer', 'unused') RETURNING id", ["unrelated-seed-test@example.test", "Unrelated person"]);
   const beforeRerun = await ids();
   await runSeed();
   assert.deepEqual(await ids(), beforeRerun);
-  assert.deepEqual((await pool.query("SELECT state, description FROM venue_versions WHERE id = $1", [demoVenues.rows[0].version_id])).rows[0], { state: "published", description: initialPublicVenues.find((venue: any) => venue.id === demoVenues.rows[0].id).description });
-  assert.deepEqual((await pool.query("SELECT state, name FROM venue_versions WHERE id = $1", [demoVenues.rows[1].version_id])).rows[0], { state: "draft", name: "Edited demo venue" });
+  assert.equal((await pool.query("SELECT description FROM venues WHERE id = $1", [demoVenues.rows[0].id])).rows[0].description, "Edited description");
+  assert.equal((await pool.query("SELECT name FROM venues WHERE id = $1", [demoVenues.rows[1].id])).rows[0].name, "Edited demo venue");
   assert.ok((await pool.query("SELECT archived_at FROM venues WHERE id = $1", [demoVenues.rows[2].id])).rows[0].archived_at);
+  assert.equal((await pool.query("SELECT price FROM packages WHERE id = $1", [grandCelebration.id])).rows[0].price, 185001);
   assert.equal((await pool.query("SELECT display_name FROM users WHERE id = $1", [unrelated.rows[0].id])).rows[0].display_name, "Unrelated person");
 
   const publicVenues = await read("/venues");
   assert.ok(publicVenues.venues.some((row: any) => row.id === demoVenues.rows[0].id && row.imageUrls.length === 0));
-  assert.ok(!publicVenues.venues.some((row: any) => row.id === demoVenues.rows[1].id || row.id === demoVenues.rows[2].id));
+  assert.ok(publicVenues.venues.some((row: any) => row.id === demoVenues.rows[1].id && row.name === "Edited demo venue"));
+  assert.ok(!publicVenues.venues.some((row: any) => row.id === demoVenues.rows[2].id));
   assert.equal((await read("/services")).services.length, 0);
   const customerCookie = await login("demo.camille@clemora.example.test");
   const adminCookie = await login("demo.admin@clemora.example.test");

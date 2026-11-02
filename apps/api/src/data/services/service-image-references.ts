@@ -16,7 +16,7 @@ export async function lockServiceImages(
 }
 export async function hasServiceImageReference(db: Database, id: string) {
   return !!(await db
-    .selectFrom("service_versions")
+    .selectFrom("services")
     .select("id")
     .where("image_id", "=", id)
     .limit(1)

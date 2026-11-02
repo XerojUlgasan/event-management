@@ -113,7 +113,7 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
               <span className="eyebrow">Make it yours</span>
               <h2 className="section-title small" id="services-title">Explore our services</h2>
             </div>
-            <p>Services can be included in a package or offered as optional extras. View a package for its specific inclusions and add-on prices.</p>
+            <p>Discover services for your celebration and discuss the details with our team.</p>
           </div>
           <PublicServiceCatalog onViewMore={() => setCatalogOverlay("services")} />
         </section>

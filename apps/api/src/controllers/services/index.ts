@@ -9,7 +9,6 @@ import {
   getPublicServiceRoute,
   getPublicServiceRouteHandler,
 } from "./get-public-service.js";
-import { listIncludingPackagesRoute, listIncludingPackagesRouteHandler } from "./list-including-packages.js";
 import {
   listAdminServicesRoute,
   listAdminServicesRouteHandler,
@@ -23,13 +22,9 @@ import {
   createServiceRouteHandler,
 } from "./create-service.js";
 import {
-  editServiceDraftRoute,
-  editServiceDraftRouteHandler,
-} from "./edit-service-draft.js";
-import {
-  publishServiceRoute,
-  publishServiceRouteHandler,
-} from "./publish-service.js";
+  updateServiceRoute,
+  updateServiceRouteHandler,
+} from "./update-service.js";
 import {
   archiveServiceRoute,
   archiveServiceRouteHandler,
@@ -68,12 +63,10 @@ routes.use("/admin/services", requireSession, admin);
 routes.use("/admin/services/*", requireSession, admin);
 routes.openapi(listPublicServicesRoute, listPublicServicesRouteHandler);
 routes.openapi(getPublicServiceRoute, getPublicServiceRouteHandler);
-routes.openapi(listIncludingPackagesRoute, listIncludingPackagesRouteHandler);
 routes.openapi(listAdminServicesRoute, listAdminServicesRouteHandler);
 routes.openapi(getAdminServiceRoute, getAdminServiceRouteHandler);
 routes.openapi(createServiceRoute, createServiceRouteHandler);
-routes.openapi(editServiceDraftRoute, editServiceDraftRouteHandler);
-routes.openapi(publishServiceRoute, publishServiceRouteHandler);
+routes.openapi(updateServiceRoute, updateServiceRouteHandler);
 routes.openapi(archiveServiceRoute, archiveServiceRouteHandler);
 routes.openapi(deleteServiceRoute, deleteServiceRouteHandler);
 export default routes;

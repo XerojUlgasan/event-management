@@ -11,4 +11,4 @@ export const errors = {
 };
 export const idParams = z.object({ id: z.string().uuid() });
 export const body = <T extends z.ZodType>(schema: T) => ({ required: true as const, content: json(schema) });
-export const result = { content: json(adminSchema), description: "Package with versions" };
+export const result = { content: json(adminSchema), description: "Saved package" };

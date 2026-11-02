@@ -16,6 +16,7 @@ export const createServiceRoute = createRoute({
 export const createServiceRouteHandler: AppRouteHandler<
   typeof createServiceRoute
 > = async (c) => {
-  const value = await createServiceService(c.get("db"), { ...c.req.valid("json"), imageId: null });
+  const value = await createServiceService(c.get("db"), { ...c.req.valid("json"), imageId: null }, c.get("session").user.id);
+  if ("status" in value) return c.json({ error: value.message }, value.status);
   return c.json(value, 201);
 };

@@ -97,26 +97,13 @@ before(async () => {
   chatCustomerCookie = chatCustomer.cookie;
   chatCustomerId = chatCustomer.id;
 
-  const pkg = await sql<{ id: string }>`INSERT INTO "packages" DEFAULT VALUES RETURNING "id"`
-    .execute(db)
-    .then((result) => result.rows[0]);
+  const pkg = await db.insertInto("packages").values({
+    name: "Garden Wedding",
+    event_types: ["Wedding"],
+    guest_max: 100,
+    price: 150_000,
+  }).returning("id").executeTakeFirstOrThrow();
   packageId = pkg.id;
-  await db
-    .insertInto("package_versions")
-    .values({
-      package_id: packageId,
-      version: 1,
-      state: "published",
-      name: "Garden Wedding",
-      event_types: ["Wedding"],
-      description: "A garden wedding package",
-      guest_max: 100,
-      inclusions: ["Buffet dinner"],
-      exclusions: ["Drinks"],
-      price: 150_000,
-      published_at: new Date(),
-    })
-    .execute();
 });
 
 after(async () => {
@@ -285,11 +272,13 @@ test("general threads have no booking context and can reopen after expiry", asyn
 });
 
 test("booking conversations derive context and remain closed after expiry", async () => {
-  const version = await db.selectFrom("package_versions").select("id").where("package_id", "=", packageId).executeTakeFirstOrThrow();
   const booking = (await read(await call("/booking-requests", "POST", {
-    packageId, packageVersionId: version.id, eventType: "Wedding", preferredDate: "2099-01-02",
+    packageId, eventType: "Wedding", preferredDate: "2099-01-02",
     estimatedDuration: "8_hours", timeZone: "Asia/Manila", guestCount: 80, contactName: "Customer", phoneNumber: "123",
   }, chatCustomerCookie), 201)).bookingRequest;
+  assert.equal(booking.packageName, "Garden Wedding");
+  assert.deepEqual(booking.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });
+  assert.equal(booking.packageGuestMax, 100);
   const linked = (await read(await call("/messages/conversations", "GET", undefined, chatCustomerCookie), 200)).conversations.find((item: any) => item.bookingRequestId === booking.id);
   assert.ok(linked);
   assert.equal(linked.packageId, packageId);

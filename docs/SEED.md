@@ -1,43 +1,48 @@
 # Database seed
 
-After applying the API migrations to a local database, run the workspace command:
+After applying the API migrations to a local database, run:
 
 ```sh
 pnpm db:seed
 ```
 
-It runs `apps/api/src/db/seed.ts` in one PostgreSQL transaction. It does not reset or truncate the database. The script writes PostgreSQL rows only; it does not create Firebase users, send outbound messages, or call payment or quote services.
+The command runs `apps/api/src/db/seed.ts` in one PostgreSQL transaction. It does not reset or truncate the database, create Firebase users, send outbound messages, or call payment or quote services.
 
 ## What it inserts
 
-The schema has no mandatory lookup tables. The seed supplies catalog and account fixtures for development:
+- **Local account fixtures:** the legacy `admin1@gmail.com` account and `user1@gmail.com`–`user5@gmail.com`, plus up to 10 `staffN@example.test` and 10 `customerN@example.test` accounts. Newly inserted local accounts use the password defined in the seed source; credentials are not repeated here.
+- **Package samples:** three directly published packages with a catalog page, one section, a sample photo widget, and a Markdown widget each:
+  - The Grand Celebration — ₱185,000; maximum 150 guests.
+  - The Intimate Gathering — ₱68,000; maximum 50 guests.
+  - The Sweet Soirée — ₱95,000; maximum 80 guests.
 
-- **Existing fixtures:** the legacy `admin1@gmail.com` and `user1@gmail.com`–`user5@gmail.com` accounts, up to 10 `staffN@example.test` and 10 `customerN@example.test` accounts, three sample package drafts, and 15 synthetic venue drafts. These samples are not approved offers or real venues. The three legacy package drafts have fixed sample totals, but remain private drafts until an administrator publishes them.
-- **Connected demo records:** one administrator and five customers under `demo.*@clemora.example.test`; three published demo venues without photos; and one general conversation with two messages for each demo customer. The seed no longer creates published services, published packages, package-service assignments, or booking requests. All newly inserted local users use the password set in the seed source; credentials are not printed by this document.
+  These are synthetic demonstration records, not business-approved prices or content. Their photo widgets reference checked-in sample images; the seed does not upload files to R2.
+- **Venue samples:** 15 legacy synthetic venue samples are created as archived rows with null capacity. Three demo venues are inserted directly as published records, with valid capacity/content and no photos. The published demos have descriptions that say availability has not been checked.
+- **Connected demo conversations:** one demo administrator and five customers under `demo.*@clemora.example.test`, with one general conversation and two messages per customer.
 
-The connected records are built in dependency order: users and venue parents with published versions, then general conversations and messages. Venue catalog rows are independent of package and booking foreign keys. If a required user or relationship is unavailable, dependent demo rows can be skipped.
+The seed does not create services, package-to-service assignments, booking requests, quotes, or payments. Packages, services, and venues are independent flat catalog records; each catalog entity has at most one page in the reusable page/section/widget/media tables.
 
-The 15 older synthetic venues remain private drafts without capacity values or photos. The three connected demo venues have sample maximum capacity values and publish without photos. An untouched draft from the earlier demo seed is published on rerun; edited or archived venues remain unchanged. The seed creates no quote or payment tables or records.
+## Repeat runs and collisions
 
-The one-time `apps/api/scripts/cleanup-local-demo.mjs` script removes the former published service/package/request demo graph from the local development database after checking exact IDs and relationships and writing a private backup. It is not part of `db:seed` or migration deployment.
+Reference package, venue, and connected demo IDs are stable. Catalog seed rows are insert-only and do not overwrite existing edits or archives. A package's page, section, sample media row, and widgets are created only when the seed inserts that package row. Existing records with a reserved ID or email are preserved; a collision can leave the corresponding sample or dependent demo content incomplete. Inspect the target if a fixture is missing; do not use the seed to reconcile collisions or clean shared data.
 
-## Repeat runs and stable data
+The demo conversation and published demo venue IDs are derived from stable keys. Existing catalog rows are not upgraded or republished on rerun. The 15 legacy synthetic venue samples are archived; they are not private drafts.
 
-Seed-owned reference package and venue IDs are fixed. Connected demo row IDs are derived from fixed keys. Email addresses and stable IDs make reruns insert-only: existing records and admin edits are not generally refreshed or deleted, and existing sessions are not changed. Narrow compatibility cases upgrade a version-one package only when it exactly matches the old incomplete draft placeholder, and publish a demo venue version only when it exactly matches the earlier untouched photo-free draft. Other edits and archives are preserved.
+`SEED_CLOCK` optionally fixes connected demo timestamps. Supply a UTC timestamp such as `2026-10-31T00:00:00Z`; when it is omitted, current time is used. Existing rows are not retimestamped on rerun. Sample package timestamps use database defaults and are not controlled by `SEED_CLOCK`.
 
-If an account address, reserved ID, or unique request reference already belongs to another row, conflict handling skips that insert. Since dependent rows require the expected seed records, an ID collision can also leave some demo content missing or attached to an existing row with that reserved ID. A collision may make a fixture login unavailable. Do not use the seed to reconcile collisions or clean a shared database; inspect the target first.
+## Package-canvas migration impact
 
-`SEED_CLOCK` optionally fixes connected demo timestamps; provide a valid UTC timestamp such as `2026-10-31T00:00:00Z`. When omitted, the current time is used. Reruns do not replace existing rows or reset timestamps. The legacy fixtures use database defaults for timestamps and are not controlled by `SEED_CLOCK`.
+Migration `20261102130000_package_canvas` intentionally removes existing package data, package version history and service assignments, booking requests and status history, and conversations/messages linked to booking requests. General conversations and their messages remain. This migration runs before seeding on an existing database; the seed itself does not perform this cleanup. Review and back up relevant data before applying the migration to a database that contains records.
 
 ## Verify with a disposable database
 
-The focused integration test creates and drops its own local PostgreSQL database, applies checked-in migrations, runs the seed twice, and checks relationships, rerun preservation, and API reads:
+The focused integration test creates a UUID-named local PostgreSQL database, applies checked-in migrations, runs the seed twice, checks package/venue/conversation rows and public API reads, and drops only that test database:
 
 ```sh
 pnpm --filter @event-management/api exec tsx --test tests/seed.test.ts
 ```
 
-For manual inspection, create a separate local PostgreSQL database, set `DB_NAME` to its name for each command, and apply migrations before seeding. For example:
+For manual verification, create a separate local database, apply migrations, and point each seed command at it:
 
 ```sh
 DB_NAME=clemora_seed_check pnpm db:deploy
@@ -45,4 +50,4 @@ DB_NAME=clemora_seed_check SEED_CLOCK=2026-10-31T00:00:00Z pnpm db:seed
 DB_NAME=clemora_seed_check SEED_CLOCK=2026-10-31T00:00:00Z pnpm db:seed
 ```
 
-Inspect safe row counts and foreign-key relationships after the first run, then confirm the second run adds no duplicate seed records and preserves edits to existing rows. Use the read-only `context-factory/QA/scripts/pg-query.mjs` helper with `DB_NAME` pointed at the disposable database if SQL inspection is useful. Remove only the disposable database when finished. Never point this procedure at a shared or production database.
+Use the read-only `context-factory/QA/scripts/pg-query.mjs` helper with `DB_NAME` pointed at the disposable database if SQL inspection is useful. Remove only the disposable database when finished; never point this procedure at a shared or production database.

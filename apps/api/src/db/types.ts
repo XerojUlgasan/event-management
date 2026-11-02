@@ -22,9 +22,10 @@ export interface BookingRequests {
   guest_count: number | null;
   id: Generated<string>;
   out_of_range: boolean;
+  package_guest_max: number;
   package_id: string;
   package_name: string;
-  package_version_id: string;
+  package_price: number;
   phone_number: string;
   preferred_date: string;
   preferred_venue_location: string | null;
@@ -45,6 +46,38 @@ export interface BookingRequestStatusHistory {
   status: string;
 }
 
+export interface CatalogPages {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  package_id: string | null;
+  service_id: string | null;
+  updated_at: Generated<Timestamp>;
+  venue_id: string | null;
+}
+
+export interface CatalogSections {
+  id: Generated<string>;
+  page_id: string;
+  sort_order: number;
+  title: Generated<string>;
+}
+
+export interface CatalogWidgets {
+  alt: Generated<string>;
+  autoplay: Generated<boolean>;
+  caption: Generated<string>;
+  h: number;
+  id: Generated<string>;
+  markdown: Generated<string>;
+  media_id: string | null;
+  section_id: string;
+  sort_order: number;
+  type: string;
+  w: number;
+  x: number;
+  y: number;
+}
+
 export interface Conversations {
   booking_request_id: string | null;
   closed_at: Timestamp | null;
@@ -53,6 +86,18 @@ export interface Conversations {
   id: Generated<string>;
   status: Generated<string>;
   updated_at: Generated<Timestamp>;
+}
+
+export interface MediaAssets {
+  byte_size: number | null;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  kind: string;
+  mime_type: string | null;
+  source: string;
+  storage_key: string | null;
+  url: string | null;
 }
 
 export interface Messages {
@@ -68,57 +113,26 @@ export interface Messages {
 export interface Packages {
   archived_at: Timestamp | null;
   created_at: Generated<Timestamp>;
-  id: Generated<string>;
-  updated_at: Generated<Timestamp>;
-}
-
-export interface PackageServices {
-  add_on_max_quantity: number | null;
-  add_on_unit_price_amount_minor: number | null;
-  id: Generated<string>;
-  included_quantity: number | null;
-  package_version_id: string;
-  role: string;
-  service_version_id: string;
-}
-
-export interface PackageVersions {
-  created_at: Generated<Timestamp>;
-  description: string;
+  description: Generated<string>;
   event_types: string[];
-  exclusions: string[];
   guest_max: number;
   id: Generated<string>;
-  image_url: string | null;
-  inclusions: string[];
   name: string;
-  package_id: string;
-  price: number | null;
-  published_at: Timestamp | null;
-  state: string;
+  price: number;
+  published_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
-  version: number;
 }
 
 export interface Services {
   archived_at: Timestamp | null;
-  created_at: Generated<Timestamp>;
-  id: Generated<string>;
-  updated_at: Generated<Timestamp>;
-}
-
-export interface ServiceVersions {
   created_at: Generated<Timestamp>;
   description: string;
   hourly_rate_pesos: number | null;
   id: Generated<string>;
   image_id: string | null;
   name: string;
-  published_at: Timestamp | null;
-  service_id: string;
-  state: string;
+  published_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
-  version: number;
 }
 
 export interface Sessions {
@@ -143,39 +157,30 @@ export interface Users {
 
 export interface Venues {
   archived_at: Timestamp | null;
-  created_at: Generated<Timestamp>;
-  id: Generated<string>;
-  updated_at: Generated<Timestamp>;
-}
-
-export interface VenueVersions {
   capacity_max: number | null;
-  categories: Generated<string[]>;
+  categories: string[];
   created_at: Generated<Timestamp>;
   description: string;
   id: Generated<string>;
   image_urls: Generated<string[]>;
   location: string;
   name: string;
-  published_at: Timestamp | null;
-  state: string;
+  published_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
-  venue_id: string;
-  version: number;
 }
 
 export interface DB {
   booking_request_status_history: BookingRequestStatusHistory;
   booking_requests: BookingRequests;
+  catalog_pages: CatalogPages;
+  catalog_sections: CatalogSections;
+  catalog_widgets: CatalogWidgets;
   conversations: Conversations;
+  media_assets: MediaAssets;
   messages: Messages;
-  package_services: PackageServices;
-  package_versions: PackageVersions;
   packages: Packages;
-  service_versions: ServiceVersions;
   services: Services;
   sessions: Sessions;
   users: Users;
-  venue_versions: VenueVersions;
   venues: Venues;
 }

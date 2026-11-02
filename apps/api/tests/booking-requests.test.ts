@@ -17,6 +17,8 @@ let customerCookie: string;
 let otherCustomerCookie: string;
 let customerId: string;
 let otherCustomerId: string;
+let resetBookingConversationId: string | undefined;
+let preservedGeneralConversationId: string | undefined;
 
 before(async () => {
   assert.ok(
@@ -47,6 +49,26 @@ before(async () => {
       await pool.query(`INSERT INTO booking_requests (reference, customer_id, package_id, package_version_id, package_name, event_type, starts_at, ends_at, time_zone, guest_count, contact_name, phone_number, preferred_venue_location, out_of_range)
         VALUES ('LEGACY', $1, $2, $3, 'Legacy', 'Wedding', '2027-01-01T16:30:00Z', '2027-01-01T20:30:00Z', 'Asia/Manila', 10, 'Legacy Customer', '123', 'Manila', false)`, [user.rows[0].id, pkg.rows[0].id, version.rows[0].id]);
     }
+    if (entry.name === "20261102130000_package_canvas") {
+      const legacy = await pool.query("SELECT id, customer_id FROM booking_requests WHERE reference = 'LEGACY'");
+      assert.equal(legacy.rowCount, 1);
+      resetBookingConversationId = (await pool.query(
+        "INSERT INTO conversations (customer_id, booking_request_id) VALUES ($1, $2) RETURNING id",
+        [legacy.rows[0].customer_id, legacy.rows[0].id],
+      )).rows[0].id;
+      await pool.query(
+        "INSERT INTO messages (conversation_id, sender_id, sender_role, body) VALUES ($1, $2, 'customer', 'Old booking transcript')",
+        [resetBookingConversationId, legacy.rows[0].customer_id],
+      );
+      preservedGeneralConversationId = (await pool.query(
+        "INSERT INTO conversations (customer_id) VALUES ($1) RETURNING id",
+        [legacy.rows[0].customer_id],
+      )).rows[0].id;
+      await pool.query(
+        "INSERT INTO messages (conversation_id, sender_id, sender_role, body) VALUES ($1, $2, 'customer', 'Keep general transcript')",
+        [preservedGeneralConversationId, legacy.rows[0].customer_id],
+      );
+    }
     await pool.query(await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"));
     if (entry.name === "20261101100000_short_booking_intake") {
       const legacy = await pool.query("SELECT preferred_date, estimated_duration, starts_at, ends_at, preferred_venue_location FROM booking_requests WHERE reference = 'LEGACY'");
@@ -62,6 +84,16 @@ before(async () => {
         { email: "old-admin@example.test", role: "admin", staff_role: "System Administrator" },
         { email: "old-staff@example.test", role: "staff", staff_role: "Waiter" },
       ]);
+    }
+    if (entry.name === "20261102130000_package_canvas") {
+      assert.equal((await pool.query("SELECT id FROM booking_requests WHERE reference = 'LEGACY'")).rowCount, 0);
+      assert.equal((await pool.query("SELECT id FROM conversations WHERE id = $1", [resetBookingConversationId])).rowCount, 0);
+      assert.equal((await pool.query("SELECT id FROM messages WHERE conversation_id = $1", [resetBookingConversationId])).rowCount, 0);
+      assert.equal((await pool.query("SELECT id FROM conversations WHERE id = $1", [preservedGeneralConversationId])).rowCount, 1);
+      assert.deepEqual(
+        (await pool.query("SELECT body FROM messages WHERE conversation_id = $1", [preservedGeneralConversationId])).rows,
+        [{ body: "Keep general transcript" }],
+      );
     }
   }
   process.env.DB_NAME = database;
@@ -121,10 +153,14 @@ async function read(response: Response, status: number): Promise<any> {
   return response.status === 204 ? null : response.json();
 }
 
-test("requests enforce roles, version availability, ownership and status history", async () => {
-  const pkg = await db.insertInto("packages").defaultValues().returningAll().executeTakeFirstOrThrow();
-  const version = await db.insertInto("package_versions").values({ package_id:pkg.id, version:1, state:"published", name:"Garden", event_types:["Wedding"], description:"Details", guest_max:100, inclusions:[], exclusions:[], price:1, published_at:new Date() }).returningAll().executeTakeFirstOrThrow();
-  const input = {packageId:pkg.id,packageVersionId:version.id,eventType:"Wedding",preferredDate:"2099-01-02",estimatedDuration:"8_hours",timeZone:"Asia/Manila",guestCount:120,contactName:"Customer",phoneNumber:"123",specialRequests:"Music"};
+test("requests enforce roles, published package availability, snapshots, ownership and status history", async () => {
+  const pkg = await db.insertInto("packages").values({
+    name: "Garden",
+    event_types: ["Wedding"],
+    guest_max: 100,
+    price: 150_000,
+  }).returningAll().executeTakeFirstOrThrow();
+  let input = {packageId:pkg.id,packageUpdatedAt:pkg.updated_at.toISOString(),eventType:"Wedding",preferredDate:"2099-01-02",estimatedDuration:"8_hours",timeZone:"Asia/Manila",guestCount:120,contactName:"Customer",phoneNumber:"123",specialRequests:"Music"};
   await read(await call("/booking-requests","POST",input),401);
   await read(await call("/booking-requests","POST",input,adminCookie),403);
   await read(await call("/admin/booking-requests","GET",undefined,customerCookie),403);
@@ -133,7 +169,13 @@ test("requests enforce roles, version availability, ownership and status history
   await read(await call("/booking-requests","POST",{...input,estimatedDuration:"3_hours"},customerCookie),400);
   await read(await call("/booking-requests","POST",{...input,contactName:" "},customerCookie),400);
   await read(await call("/booking-requests","POST",{...input,timeZone:"Wrong/Zone"},customerCookie),400);
-  await read(await call("/booking-requests","POST",{...input,packageVersionId:randomUUID()},customerCookie),409);
+  await read(await call("/booking-requests","POST",{...input,packageId:randomUUID()},customerCookie),409);
+  await read(await call("/booking-requests","POST",{...input,packageUpdatedAt:"2000-01-01T00:00:00.000Z"},customerCookie),409);
+  const { packageUpdatedAt: _packageUpdatedAt, ...withoutPackageUpdatedAt } = input;
+  const withoutTimestamp = (await read(await call("/booking-requests","POST",withoutPackageUpdatedAt,customerCookie),201)).bookingRequest;
+  assert.equal(withoutTimestamp.packageName, "Garden");
+  assert.deepEqual(withoutTimestamp.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });
+  assert.equal(withoutTimestamp.packageGuestMax, 100);
   const staffProfile = await read(await call("/me", "GET", undefined, staffCookie), 200);
   assert.equal(staffProfile.role, "staff");
   for (const path of ["/admin/users", "/admin/conversations", "/admin/packages", "/admin/services"])
@@ -147,6 +189,14 @@ test("requests enforce roles, version availability, ownership and status history
   await read(await call("/services", "GET", undefined, staffCookie), 200);
   const created = (await read(await call("/booking-requests","POST",input,customerCookie),201)).bookingRequest;
   assert.equal(created.preferredDate, input.preferredDate); assert.equal(created.estimatedDuration, "8_hours");
+  assert.equal(created.packageName, "Garden");
+  assert.deepEqual(created.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });
+  assert.equal(created.packageGuestMax, 100);
+  assert.equal("packageVersionId" in created, false);
+  assert.deepEqual(
+    (await pool.query("SELECT package_price, package_guest_max FROM booking_requests WHERE id = $1", [created.id])).rows[0],
+    { package_price: 150_000, package_guest_max: 100 },
+  );
   const atMaximum = (await read(await call("/booking-requests", "POST", { ...input, guestCount: 100 }, customerCookie), 201)).bookingRequest;
   const belowPreviousMinimum = (await read(await call("/booking-requests", "POST", { ...input, guestCount: 1 }, customerCookie), 201)).bookingRequest;
   assert.equal(atMaximum.outOfRange, false);
@@ -206,9 +256,7 @@ test("requests enforce roles, version availability, ownership and status history
   assert.ok((await read(await call("/booking-requests/mine","GET",undefined,customerCookie),200)).bookingRequests.some((request: any) => request.id === created.id));
   const staffRequests = (await read(await call("/admin/booking-requests", "GET", undefined, staffCookie), 200)).bookingRequests;
   assert.ok(staffRequests.some((row: any) => row.id === created.id));
-  const legacy = staffRequests.find((row: any) => row.reference === "LEGACY");
-  assert.equal(legacy.preferredDate, "2027-01-02"); assert.equal(legacy.estimatedDuration, "undecided");
-  assert.equal(legacy.startsAt, "2027-01-01T16:30:00.000Z"); assert.equal(legacy.preferredVenueLocation, "Manila");
+  assert.ok(!staffRequests.some((row: any) => row.reference === "LEGACY"));
   await read(await call(`/admin/booking-requests/${created.id}/status`, "PATCH", {status:"accepted"}, staffCookie), 403);
   await read(await call(`/admin/booking-requests/${created.id}/status`,"PATCH",{status:"confirmed"},adminCookie),400);
   await read(await call(`/admin/booking-requests/${created.id}/status`,"PATCH",{status:"accepted"},customerCookie),403);
@@ -234,13 +282,31 @@ test("requests enforce roles, version availability, ownership and status history
   const todayInManila = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const todayRequest = (await read(await call("/booking-requests", "POST", { ...input, preferredDate: todayInManila, estimatedDuration: "1_day" }, customerCookie), 201)).bookingRequest;
   assert.equal(todayRequest.preferredDate, todayInManila); assert.equal(todayRequest.estimatedDuration, "1_day");
-  await db.updateTable("package_versions").set({state:"superseded"}).where("id","=",version.id).execute();
+  const updatedPackage = await db.updateTable("packages").set({
+    name: "Updated Garden",
+    guest_max: 200,
+    price: 200_000,
+    updated_at: new Date(),
+  }).where("id", "=", pkg.id).returningAll().executeTakeFirstOrThrow();
+  const persistedSnapshot = (await read(await call(`/booking-requests/${created.id}`, "GET", undefined, customerCookie), 200)).bookingRequest;
+  assert.equal(persistedSnapshot.packageName, "Garden");
+  assert.deepEqual(persistedSnapshot.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });
+  assert.equal(persistedSnapshot.packageGuestMax, 100);
+  assert.deepEqual(
+    (await pool.query("SELECT package_price, package_guest_max FROM booking_requests WHERE id = $1", [created.id])).rows[0],
+    { package_price: 150_000, package_guest_max: 100 },
+  );
   await read(await call("/booking-requests","POST",input,customerCookie),409);
+  input = { ...input, packageUpdatedAt: updatedPackage.updated_at.toISOString() };
   await db.updateTable("packages").set({archived_at:new Date()}).where("id","=",pkg.id).execute();
   await read(await call("/booking-requests","POST",input,customerCookie),409);
   const list = (await read(await call("/admin/booking-requests","GET",undefined,adminCookie),200)).bookingRequests;
   const original = list.find((item: any) => item.id === created.id);
-  assert.equal(original.packageName,"Garden"); assert.equal(original.packageVersionId,version.id); assert.equal(original.statusHistory.length,3);
+  assert.equal(original.packageName,"Garden");
+  assert.deepEqual(original.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });
+  assert.equal(original.packageGuestMax, 100);
+  assert.equal("packageVersionId" in original, false);
+  assert.equal(original.statusHistory.length,3);
   const spec:any = await (await app.request("/openapi.json")).json();
   assert.ok(spec.paths["/v1/booking-requests/{id}"].get);
   assert.ok(spec.paths["/v1/admin/booking-requests/{id}"].get);
@@ -248,12 +314,15 @@ test("requests enforce roles, version availability, ownership and status history
   assert.ok(requestSchema.required.includes("preferredDate"));
   assert.ok(!requestSchema.required.includes("guestCount"));
   assert.ok(!requestSchema.required.includes("startsAt"));
+  assert.ok(!("packageVersionId" in requestSchema.properties));
+  assert.ok("packageUpdatedAt" in requestSchema.properties);
   assert.ok(spec.paths["/v1/booking-requests"].post); assert.ok(spec.paths["/v1/booking-requests/{id}/cancel"].patch); assert.ok(spec.paths["/v1/admin/booking-requests/{id}/status"].patch);
 });
 
 test("admin request filters, cursor pages and calendar counts use preferred dates", async () => {
-  const legacy = await pool.query("SELECT * FROM booking_requests WHERE reference = 'LEGACY'");
-  const fixture = legacy.rows[0];
+  const packageId = (await pool.query(
+    "INSERT INTO packages (name, event_types, guest_max, price) VALUES ('Filter fixture', ARRAY['Wedding'], 100, 1000) RETURNING id",
+  )).rows[0].id;
   const ids = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()].sort().reverse();
   const rows = [
     [ids[0], "2098-02-02", "under_review"], [ids[1], "2098-02-02", "under_review"],
@@ -261,8 +330,8 @@ test("admin request filters, cursor pages and calendar counts use preferred date
     [ids[4], "2098-03-01", "under_review"],
   ];
   for (const [id, date, status] of rows) {
-    await pool.query(`INSERT INTO booking_requests (id, reference, customer_id, package_id, package_version_id, package_name, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, created_at)
-      VALUES ($1, $2, $3, $4, $5, 'Fixture', 'Wedding', $6, 'undecided', 'Asia/Manila', 20, 'Customer', '123', $7, false, '2098-01-01T00:00:00.123456Z')`, [id, `TEST-${id}`, fixture.customer_id, fixture.package_id, fixture.package_version_id, date, status]);
+    await pool.query(`INSERT INTO booking_requests (id, reference, customer_id, package_id, package_name, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, package_price, package_guest_max, created_at)
+      VALUES ($1, $2, $3, $4, 'Fixture', 'Wedding', $5, 'undecided', 'Asia/Manila', 20, 'Customer', '123', $6, false, 1000, 100, '2098-01-01T00:00:00.123456Z')`, [id, `TEST-${id}`, customerId, packageId, date, status]);
   }
   const base = "/admin/booking-requests?status=under_review&preferredDate=2098-02-02&limit=1";
   const first = await read(await call(base, "GET", undefined, adminCookie), 200);
@@ -280,11 +349,13 @@ test("admin request filters, cursor pages and calendar counts use preferred date
 });
 
 test("booking request pagination crosses the 50-item boundary without duplicates", async () => {
-  const fixture = (await pool.query("SELECT customer_id, package_id, package_version_id FROM booking_requests WHERE reference = 'LEGACY'")).rows[0];
-  await pool.query(`INSERT INTO booking_requests (reference, customer_id, package_id, package_version_id, package_name, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, created_at)
-    SELECT 'PAGE-' || n, $1, $2, $3, 'Fixture', 'Wedding', '2097-05-10', 'undecided', 'Asia/Manila', 20, 'Customer', '123', 'under_review', false,
+  const packageId = (await pool.query(
+    "INSERT INTO packages (name, event_types, guest_max, price) VALUES ('Pagination fixture', ARRAY['Wedding'], 100, 1000) RETURNING id",
+  )).rows[0].id;
+  await pool.query(`INSERT INTO booking_requests (reference, customer_id, package_id, package_name, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, package_price, package_guest_max, created_at)
+    SELECT 'PAGE-' || n, $1, $2, 'Fixture', 'Wedding', '2097-05-10', 'undecided', 'Asia/Manila', 20, 'Customer', '123', 'under_review', false, 1000, 100,
       '2097-01-01T00:00:00.123456Z'::timestamptz + (n / 4) * interval '1 second'
-    FROM generate_series(1, 53) AS n`, [fixture.customer_id, fixture.package_id, fixture.package_version_id]);
+    FROM generate_series(1, 53) AS n`, [customerId, packageId]);
   const expected = (await pool.query("SELECT id FROM booking_requests WHERE preferred_date = '2097-05-10' AND status = 'under_review' ORDER BY created_at DESC, id DESC")).rows.map(row => row.id);
   const base = "/admin/booking-requests?status=under_review&preferredDate=2097-05-10&limit=50";
   const first = await read(await call(base, "GET", undefined, adminCookie), 200);

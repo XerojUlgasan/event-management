@@ -2,7 +2,7 @@ import { sql, type Kysely, type Transaction } from "kysely";
 import type { DB, BookingRequests } from "../../db/types.js";
 import type { Insertable } from "kysely";
 type Database = Kysely<DB> | Transaction<DB>;
-export const findAvailableVersionData = (db: Transaction<DB>, packageId: string, versionId: string) => db.selectFrom("packages as p").innerJoin("package_versions as v", "v.package_id", "p.id").select(["v.id", "v.name", "v.guest_max"]).where("p.id", "=", packageId).where("v.id", "=", versionId).where("p.archived_at", "is", null).where("v.state", "=", "published").forUpdate().executeTakeFirst();
+export const findAvailablePackageData = (db: Transaction<DB>, packageId: string) => db.selectFrom("packages").selectAll().where("id", "=", packageId).where("archived_at", "is", null).forUpdate().executeTakeFirst();
 export const createBookingRequestData = (db: Transaction<DB>, values: Insertable<BookingRequests>) => db.insertInto("booking_requests").values(values).returningAll().executeTakeFirstOrThrow();
 export const createBookingConversationData = (db: Transaction<DB>, values: { customer_id: string; booking_request_id: string }) => db.insertInto("conversations").values(values).execute();
 export const addStatusHistoryData = (db: Transaction<DB>, bookingRequestId: string, status: string, changedBy: string, reason: string | null) => db.insertInto("booking_request_status_history").values({ booking_request_id: bookingRequestId, status, changed_by: changedBy, reason }).execute();

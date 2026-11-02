@@ -1,40 +1,137 @@
-import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
-import { versionSchema as serviceVersionSchema } from "../services/schemas.js";
 import { z } from "@hono/zod-openapi";
+import {
+  CATALOG_COLUMNS,
+  MAX_CATALOG_SECTIONS,
+  MAX_CATALOG_WIDGETS,
+  MAX_WIDGET_MARKDOWN_LENGTH,
+} from "@event-management/contracts/catalog";
+import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 
-const text = z.string().max(MAX_CATALOG_TEXT_LENGTH);
+const text = z.string().trim().max(MAX_CATALOG_TEXT_LENGTH);
+const sampleImages = new Set([
+  "/images/wedding.jpg",
+  "/images/dinner.jpg",
+  "/images/dessert.jpg",
+  "/images/hero.jpg",
+]);
 export const priceSchema = z.object({
   kind: z.literal("fixed"),
   currency: z.literal("PHP"),
   amountMinor: z.number().int().positive().max(2147483647),
 });
-const packagePriceSchema = priceSchema.refine(price => price.amountMinor % 100 === 0, "Package price must be a whole peso amount");
-export const assignmentInputSchema = z.object({ serviceVersionId: z.string().uuid(), role: z.enum(["included", "add_on"]), includedQuantity: z.number().int().positive().max(2147483647).nullable(), addOnPrice: priceSchema.nullable(), addOnMaxQuantity: z.number().int().positive().max(2147483647).nullable() }).refine(v => v.role === "included" ? v.includedQuantity !== null && v.addOnPrice === null && v.addOnMaxQuantity === null : v.includedQuantity === null && v.addOnPrice !== null && v.addOnMaxQuantity !== null, "Invalid service assignment for role");
-export const assignmentSchema = z.object({ id: z.string().uuid(), serviceVersionId: z.string().uuid(), role: z.enum(["included", "add_on"]), includedQuantity: z.number().int().nullable(), addOnPrice: priceSchema.nullable(), addOnMaxQuantity: z.number().int().nullable(), service: serviceVersionSchema });
+const packagePriceSchema = priceSchema.refine(
+  (price) => price.amountMinor % 100 === 0,
+  "Package price must be a whole peso amount",
+);
+export const mediaSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    kind: z.enum(["image", "video"]),
+    source: z.enum(["upload", "sample"]),
+    url: z.string().max(2048),
+    mimeType: z.string().max(100).optional(),
+  })
+  .strict()
+  .superRefine((media, ctx) => {
+    if (media.source === "upload" && !media.id)
+      ctx.addIssue({
+        code: "custom",
+        message: "Choose an uploaded file",
+        path: ["id"],
+      });
+    if (
+      media.source === "sample" &&
+      (media.kind !== "image" || !sampleImages.has(media.url))
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Unknown sample photo",
+        path: ["url"],
+      });
+  });
+export const widgetSchema = z
+  .object({
+    id: z.string().uuid(),
+    type: z.enum(["photo", "markdown", "video"]),
+    x: z
+      .number()
+      .int()
+      .min(0)
+      .max(CATALOG_COLUMNS - 1),
+    y: z.number().int().min(0).max(100000),
+    w: z.number().int().min(1).max(CATALOG_COLUMNS),
+    h: z.number().int().min(1).max(100),
+    markdown: z.string().max(MAX_WIDGET_MARKDOWN_LENGTH),
+    media: mediaSchema.nullable(),
+    alt: text,
+    caption: text,
+    autoplay: z.boolean().default(false),
+  })
+  .strict()
+  .superRefine((widget, ctx) => {
+    if (widget.autoplay && widget.type !== "video")
+      ctx.addIssue({
+        code: "custom",
+        message: "Autoplay is only available for video widgets",
+        path: ["autoplay"],
+      });
+    if (widget.x + widget.w > CATALOG_COLUMNS)
+      ctx.addIssue({
+        code: "custom",
+        message: "Widget exceeds the page width",
+        path: ["w"],
+      });
+    if (widget.type === "markdown") {
+      if (!widget.markdown.trim() || widget.media !== null)
+        ctx.addIssue({
+          code: "custom",
+          message: "Markdown widgets require text and no media",
+        });
+    } else if (
+      !widget.media ||
+      widget.media.kind !== (widget.type === "photo" ? "image" : "video") ||
+      widget.markdown !== ""
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Media widget requires matching media and no Markdown",
+      });
+  });
+export const sectionSchema = z
+  .object({
+    id: z.string().uuid(),
+    title: text,
+    widgets: z.array(widgetSchema).max(MAX_CATALOG_WIDGETS),
+  })
+  .strict();
+export const sectionsSchema = z.array(sectionSchema).max(MAX_CATALOG_SECTIONS).superRefine((sections, ctx) => {
+  const sectionIds = sections.map(section => section.id);
+  const widgetIds = sections.flatMap(section => section.widgets.map(widget => widget.id));
+  if (new Set(sectionIds).size !== sectionIds.length || new Set(widgetIds).size !== widgetIds.length)
+    ctx.addIssue({ code: "custom", message: "Section and widget IDs must be unique" });
+  if (widgetIds.length > MAX_CATALOG_WIDGETS)
+    ctx.addIssue({ code: "custom", message: `Use at most ${MAX_CATALOG_WIDGETS} widgets` });
+});
 export const contentSchema = z.object({
-  services: z.array(assignmentInputSchema).max(100).optional(),
-  name: text,
-  eventTypes: z.array(text).max(50),
-  description: text,
-  guestMax: z.number().int().positive().max(2147483647),
-  inclusions: z.array(text).max(100),
-  exclusions: z.array(text).max(100),
-  imageUrl: z.url().startsWith("https://").max(2048).nullable(),
-  price: packagePriceSchema.nullable(),
-});
+  name: text.min(1), description: text.optional(), eventTypes: z.array(text.min(1)).min(1).max(50),
+  guestMax: z.number().int().positive().max(2147483647), price: packagePriceSchema,
+  sections: sectionsSchema,
+}).strict();
 export type Content = z.infer<typeof contentSchema>;
-export const versionSchema = contentSchema.extend({
-  services: z.array(assignmentSchema),
-  id: z.string().uuid(), packageId: z.string().uuid(), version: z.number().int(),
-  state: z.enum(["draft", "published", "superseded"]),
-  updatedAt: z.string(), publishedAt: z.string().nullable(),
+// Response schemas include the stored description and derived cover image.
+export const publicSchema = z.object({
+  name: z.string(),
+  eventTypes: z.array(z.string()),
+  guestMax: z.number(),
+  price: priceSchema,
+  sections: z.array(sectionSchema),
+  id: z.string().uuid(),
+  description: z.string(),
+  imageUrl: z.string().nullable(),
+  archivedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  publishedAt: z.string(),
 });
-export const publicSchema = contentSchema.extend({
-  services: z.array(assignmentSchema),
-  id: z.string().uuid(), versionId: z.string().uuid(), version: z.number().int(), publishedAt: z.string(),
-});
-export const adminSchema = z.object({
-  id: z.string().uuid(), archivedAt: z.string().nullable(),
-  draft: versionSchema.nullable(), published: versionSchema.nullable(), versions: z.array(versionSchema),
-});
+export const adminSchema = publicSchema;
 export const errorSchema = z.object({ error: z.string() });

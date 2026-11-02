@@ -1,11 +1,12 @@
+import { InvalidPackageMedia, listCatalogMediaIdsData, replaceCatalogSectionsData } from "../../data/packages/catalog-page.js";
+import { cleanupCatalogMediaService } from "../catalog-media/catalog-media.js";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 import type { VenueContent } from "../../controllers/venues/schemas.js";
 import { createVenueData } from "../../data/venues/create-venue.js";
 import { findVenueData, lockVenueData } from "../../data/venues/find-venue.js";
-import { listAdminVenuesData, listPublicVenuesData, findPublishedVenueData, listVenueVersionsData } from "../../data/venues/list-venues.js";
-import { createVenueDraftData, updateVenueDraftData, publishVenueDraftData } from "../../data/venues/write-venue-version.js";
-import { touchVenueData } from "../../data/venues/update-venue.js";
+import { listAdminVenuesData, listPublicVenuesData, findPublishedVenueData } from "../../data/venues/list-venues.js";
+import { updateVenueData } from "../../data/venues/update-venue.js";
 import { archiveVenueData } from "../../data/venues/archive-venue.js";
 import { deleteVenueData } from "../../data/venues/delete-venue.js";
 import { venueAdminDto, venuePublicDto } from "./venue-response.js";
@@ -13,48 +14,32 @@ import { error, nextUpdate } from "./venue-rules.js";
 export async function listVenuesService(db: Kysely<DB>, limit?: number, offset = 0) { const rows = await listPublicVenuesData(db, limit === undefined ? undefined : limit + 1, offset); return { venues: await Promise.all((limit === undefined ? rows : rows.slice(0, limit)).map(v => venuePublicDto(db, v))), nextOffset: limit !== undefined && rows.length > limit ? offset + limit : null }; }
 export async function listAdminVenuesService(db: Kysely<DB>) { return { venues: await Promise.all((await listAdminVenuesData(db)).map(v => venueAdminDto(db, v))) }; }
 export async function getVenueService(db: Kysely<DB>, id: string) { const row = await findPublishedVenueData(db, id); return row ? venuePublicDto(db, row) : error("Venue not found", 404); }
-export async function getAdminVenueService(db: Kysely<DB>, id: string) { const venue = await findVenueData(db, id); return venue ? venueAdminDto(db, venue) : error("Venue not found", 404); }
-export async function createVenueService(db: Kysely<DB>, input: VenueContent) {
- return db.transaction().execute(async trx => {
-  const venue = await createVenueData(trx); await createVenueDraftData(trx, venue.id, 1, input);
-  return venueAdminDto(trx, venue);
- });
+export async function getAdminVenueService(db: Kysely<DB>, id: string) { const row = await findVenueData(db, id); return row ? venueAdminDto(db, row) : error("Venue not found", 404); }
+export async function createVenueService(db: Kysely<DB>, input: VenueContent, actorId: string) {
+ try { return await db.transaction().execute(async trx => {
+  const row = await createVenueData(trx, input);
+  await replaceCatalogSectionsData(trx, { kind: "venue", id: row.id }, { sections: input.sections ?? [] }, actorId, new Date());
+  return venueAdminDto(trx, row);
+ }); } catch (cause) { if (cause instanceof InvalidPackageMedia) return error(cause.message, 400); throw cause; }
 }
-export async function updateVenueService(db: Kysely<DB>, id: string, input: VenueContent & { expectedUpdatedAt: string }) {
+export async function updateVenueService(db: Kysely<DB>, id: string, input: VenueContent & { expectedUpdatedAt: string }, actorId: string) {
+ try { let previousMedia: string[] = [];
  const outcome = await db.transaction().execute(async trx => {
-  const venue = await lockVenueData(trx, id); if (!venue) return error("Venue not found", 404);
-  if (venue.archived_at) return error("Archived venues cannot be edited", 409);
-  const current = (await listVenueVersionsData(trx, id))[0];
-  if (!current || current.updated_at.toISOString() !== input.expectedUpdatedAt) return error("Venue changed. Refresh and try again", 409);
-  const now = nextUpdate(current.updated_at);
-  if (current.state === "draft") await updateVenueDraftData(trx, current.id, input, now);
-  else await createVenueDraftData(trx, id, current.version + 1, input, now);
-  await touchVenueData(trx, id, now); return venueAdminDto(trx, venue);
+  const current = await lockVenueData(trx, id); if (!current) return error("Venue not found", 404);
+  if (current.archived_at) return error("Archived venues cannot be edited", 409);
+  if (current.updated_at.toISOString() !== input.expectedUpdatedAt) return error("Venue changed. Refresh and try again", 409);
+  const now = nextUpdate(current.updated_at); const row = await updateVenueData(trx, id, input, now);
+  if (input.sections !== undefined) previousMedia = await replaceCatalogSectionsData(trx, { kind: "venue", id }, { sections: input.sections }, actorId, now);
+  return venueAdminDto(trx, row);
  });
- return outcome;
-}
-export async function publishVenueService(db: Kysely<DB>, id: string, expected: string) {
- return db.transaction().execute(async trx => {
-  const venue = await lockVenueData(trx, id); if (!venue) return error("Venue not found", 404);
-  if (venue.archived_at) return error("Archived venues cannot be published", 409);
-  const draft = (await listVenueVersionsData(trx, id)).find(v => v.state === "draft");
-  if (!draft) return error("No draft to publish", 409);
-  if (draft.updated_at.toISOString() !== expected) return error("Venue changed. Refresh and try again", 409);
-  if (![draft.name, draft.location, draft.description].every(v => v.trim()) || draft.capacity_max === null) return error("Complete title, location, description, and maximum capacity before publishing", 400);
-  const now = nextUpdate(draft.updated_at); await publishVenueDraftData(trx, id, draft.id, now); await touchVenueData(trx, id, now);
-  return venueAdminDto(trx, venue);
- });
+ if (!("status" in outcome)) await cleanupCatalogMediaService(db, previousMedia); return outcome;
+ } catch (cause) { if (cause instanceof InvalidPackageMedia) return error(cause.message, 400); throw cause; }
 }
 export async function archiveVenueService(db: Kysely<DB>, id: string) {
- return db.transaction().execute(async trx => { const venue = await lockVenueData(trx, id); if (!venue) return error("Venue not found", 404); const updated = venue.archived_at ? venue : await archiveVenueData(trx, id, new Date()); return venueAdminDto(trx, updated); });
+ return db.transaction().execute(async trx => { const row = await lockVenueData(trx, id); if (!row) return error("Venue not found", 404); const updated = await archiveVenueData(trx, id, row.archived_at ?? new Date(), nextUpdate(row.updated_at)); return venueAdminDto(trx, updated); });
 }
 export async function deleteVenueService(db: Kysely<DB>, id: string) {
- const outcome = await db.transaction().execute(async trx => {
-  const venue = await lockVenueData(trx, id); if (!venue) return error("Venue not found", 404);
-  const versions = await listVenueVersionsData(trx, id);
-  if (versions.some(v => v.published_at !== null)) return error("Published venues cannot be deleted; archive instead", 409);
-  await deleteVenueData(trx, id);
-  return null;
- });
- return outcome;
+ let media: string[] = [];
+ const outcome = await db.transaction().execute(async trx => { const row = await lockVenueData(trx, id); if (!row) return error("Venue not found", 404); media = await listCatalogMediaIdsData(trx, { kind: "venue", id }); await deleteVenueData(trx, id); return null; });
+ if (!outcome) await cleanupCatalogMediaService(db, media); return outcome;
 }

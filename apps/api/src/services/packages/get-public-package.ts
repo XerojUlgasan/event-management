@@ -1,11 +1,13 @@
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
-
-import { listPublicPackageVersionsData } from "../../data/packages/list-public-package-versions.js";
-
-import { publicDto } from "./package-response.js";
-
+import { listPublicPackagesData } from "../../data/packages/list-public-packages.js";
+import { packageDto } from "./package-response.js";
 export async function getPublicPackageService(db: Kysely<DB>, id: string) {
-  const row = (await listPublicPackageVersionsData(db, id))[0];
-  return row ? publicDto(db, row) : null;
+  return db
+    .transaction()
+    .setIsolationLevel("repeatable read")
+    .execute(async (trx) => {
+      const row = (await listPublicPackagesData(trx, id))[0];
+      return row ? packageDto(trx, row) : null;
+    });
 }

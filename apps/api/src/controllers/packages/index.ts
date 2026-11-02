@@ -6,8 +6,7 @@ import { getPublicPackageRoute, getPublicPackageRouteHandler } from "./get-publi
 import { listAdminPackagesRoute, listAdminPackagesRouteHandler } from "./list-admin-packages.js";
 import { getAdminPackageRoute, getAdminPackageRouteHandler } from "./get-admin-package.js";
 import { createPackageRoute, createPackageRouteHandler } from "./create-package.js";
-import { editPackageDraftRoute, editPackageDraftRouteHandler } from "./edit-package-draft.js";
-import { publishPackageRoute, publishPackageRouteHandler } from "./publish-package.js";
+import { updatePackageRoute, updatePackageRouteHandler } from "./update-package.js";
 import { archivePackageRoute, archivePackageRouteHandler } from "./archive-package.js";
 import { deletePackageRoute, deletePackageRouteHandler } from "./delete-package.js";
 
@@ -26,8 +25,7 @@ routes.openapi(getPublicPackageRoute, getPublicPackageRouteHandler);
 routes.openapi(listAdminPackagesRoute, listAdminPackagesRouteHandler);
 routes.openapi(getAdminPackageRoute, getAdminPackageRouteHandler);
 routes.openapi(createPackageRoute, createPackageRouteHandler);
-routes.openapi(editPackageDraftRoute, editPackageDraftRouteHandler);
-routes.openapi(publishPackageRoute, publishPackageRouteHandler);
+routes.openapi(updatePackageRoute, updatePackageRouteHandler);
 routes.openapi(archivePackageRoute, archivePackageRouteHandler);
 routes.openapi(deletePackageRoute, deletePackageRouteHandler);
 export default routes;

@@ -1,4 +1,5 @@
-import type { Kysely, Transaction } from "kysely";
+import type { Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
-type Database = Kysely<DB> | Transaction<DB>;
-export function touchVenueData(db: Transaction<DB>, id: string, now: Date) { return db.updateTable("venues").set({ updated_at: now }).where("id", "=", id).execute(); }
+import type { VenueContent } from "../../controllers/venues/schemas.js";
+import { venueColumns } from "./create-venue.js";
+export function updateVenueData(db: Transaction<DB>, id: string, input: VenueContent, now: Date) { return db.updateTable("venues").set({ ...venueColumns(input), updated_at: now }).where("id", "=", id).returningAll().executeTakeFirstOrThrow(); }

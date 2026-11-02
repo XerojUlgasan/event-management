@@ -5,7 +5,7 @@ import type { Context } from "hono";
 import type { HonoEnv } from "../../types/hono.js";
 import { contentSchema } from "./schemas.js";
 import { createServiceService } from "../../services/services/create-service.js";
-import { editServiceDraftService } from "../../services/services/edit-service-draft.js";
+import { updateServiceService } from "../../services/services/update-service.js";
 import { deleteServiceImage, detectServiceImageType, getServiceImage, putServiceImage } from "../../utils/service-image-storage.js";
 
 const uuid = z.string().uuid();
@@ -30,11 +30,12 @@ export async function serviceUploadHandler(c: Context<HonoEnv>) {
   try { await putServiceImage(imageId, bytes, contentType); } catch { return c.json({ error: "Image upload failed" }, 502); }
   try {
     if (id) {
-      const result = await editServiceDraftService(c.get("db"), id, parsed.data as typeof parsed.data & { expectedUpdatedAt: string }, imageId);
+      const result = await updateServiceService(c.get("db"), id, parsed.data as typeof parsed.data & { expectedUpdatedAt: string }, c.get("session").user.id, imageId);
       if ("status" in result) { await deleteServiceImage(imageId).catch(() => {}); return c.json({ error: result.message }, result.status); }
       return c.json(result, 200);
     }
-    const result = await createServiceService(c.get("db"), { ...parsed.data, imageId });
+    const result = await createServiceService(c.get("db"), { ...parsed.data, imageId }, c.get("session").user.id);
+    if ("status" in result) { await deleteServiceImage(imageId).catch(() => {}); return c.json({ error: result.message }, result.status); }
     return c.json(result, 201);
   } catch (err) {
     await deleteServiceImage(imageId).catch(() => {});
