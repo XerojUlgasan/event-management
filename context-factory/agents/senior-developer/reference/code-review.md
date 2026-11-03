@@ -2,7 +2,7 @@
 
 Review Clemora code, diffs, or pull requests for business-logic errors, permission gaps, contract mismatches, and regressions. Use for review or audit requests; implementation alone does not require this workflow.
 
-Review the requested scope. Edit code only when the user also asks for fixes. Load the relevant area skills from [repository guidance](../../../../AGENTS.md); keep the review grounded in the current repository.
+Review the requested scope. The review phase remains read-only; when fixes are also requested, handle accepted findings in a separate authorized implementation step. Use [interrogate](../../../engineering/interrogate/SKILL.md) for target resolution, risk review, and severity judgment, and load the relevant area skills from [repository guidance](../../../../AGENTS.md). Keep the review grounded in the current repository.
 
 ## Establish scope and expected behavior
 

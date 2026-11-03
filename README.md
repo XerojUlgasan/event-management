@@ -179,6 +179,7 @@ Run the checks matching the changed area:
 | `pnpm build` | Web production bundle and API types |
 | `pnpm build:storybook` | Shared UI rendering build |
 | `pnpm db:validate` | Prisma schema |
+| `pnpm check:guidance` | Context-factory links, anchors, skill metadata, registration, and reachability; does not verify agent compliance or application behavior |
 | `pnpm --filter @event-management/api test:auth` | Authentication and sessions with PostgreSQL and Firebase Auth emulator |
 | `pnpm --filter @event-management/api test:packages` | Package/service catalog and shared canvas behavior |
 | `pnpm --filter @event-management/api test:venues` | Venue catalog behavior |
@@ -194,4 +195,4 @@ A passing build does not establish browser, persistence, or production-provider 
 - [Database seed](docs/SEED.md): fixtures, sample records, rerun behavior, and verification.
 - [Prevail interview summary](docs/PREVAIL_INTERVIEW_SUMMARY.md): timestamped findings and separate later scope decisions.
 - [Full transcription](transcriptions/full-transcription.md), [Video 1](transcriptions/video-1.md), and [Video 2](transcriptions/video-2.md): preserved interview source text.
-- [Repository guidance](AGENTS.md) and [agent index](context-factory/agents/README.md): contributor ownership, engineering/documentation workflows, and QA guidance.
+- [Repository guidance](AGENTS.md), [context factory](context-factory/README.md), and [agent index](context-factory/agents/README.md): contributor ownership, engineering/shared skills, documentation workflows, and QA guidance.

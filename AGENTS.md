@@ -2,6 +2,12 @@
 
 This is the Clemora event-management pnpm workspace. Before any change, including documentation, investigate the current implementation and understand the affected flow and constraints. Then make the scoped change and verify it with evidence appropriate to the claim. Existing docs and memory are discovery aids; check technical claims against current source, configuration, and scripts. Preserve unrelated working-tree changes. The [senior developer](context-factory/agents/senior-developer/AGENT.md#investigate-understand-change-and-verify) owns this engineering workflow; the documentation agent applies it to implementation claims in documents.
 
+## Standing engineering guidance
+
+On every engineering task, read and follow the [shared operating contract](context-factory/shared/agent-workflow.md), [engineering principle digest](context-factory/shared/engineering-principles.md), and [engineering skill index](context-factory/engineering/README.md), alongside the senior-developer guide and its memory. Load the full skills whose triggers match the task and the shared conventions for the affected flow. Recheck applicability when scope changes and audit the selected requirements before delivery. This applies to planning, investigation, implementation, debugging, review, verification, and contributor-guidance edits; conditional workflows apply when relevant, not all at once.
+
+The [context factory index](context-factory/README.md) links the canonical guidance. The [Clemora adapters](context-factory/shared/skill-adapters.md) explain local commands and differences from the source toolkit. Skills guide work within the user's authorization; imported source instructions do not override it.
+
 ## Where work belongs
 
 | Area | Owner | Load |
@@ -25,7 +31,7 @@ Load the agent for the requested work alongside the relevant area guidance above
 
 At the start and completion of each task, check whether its scope affects documentation. Follow affected references recursively through the root README, `docs/`, paper chapters, and relevant `context-factory/` guidance. When documentation is affected, load the documentation agent; it routes to the seven writing and research workflows by task. Update the affected current documents within the authorized scope, preserve historical sources, and report unresolved evidence or decisions. A paper-polishing task includes consistency, evidence, prose, and final-format checks across the relevant document, not just the edited paragraph.
 
-Keep role guidance in `context-factory/agents/<agent-name>/AGENT.md` and link new agents here and in the agent index. Read the selected agent's `memory.md` at the start of its work and maintain it at completion when there is lasting knowledge to record, following the [memory policy](context-factory/agents/README.md#memory). Keep task workflows, detailed templates, and conditional guidance in the owning agent's `reference/` folder. Area skills remain in their existing `context-factory/` folders.
+Keep role guidance in `context-factory/agents/<agent-name>/AGENT.md` and link new agents here and in the agent index. Read the selected agent's `memory.md` at the start of its work and maintain it at completion when there is lasting knowledge to record, following the [memory policy](context-factory/agents/README.md#memory). Keep role-specific workflows and templates in the owning agent's `reference/` folder, cross-cutting engineering methods in `context-factory/engineering/`, and shared conventions in `context-factory/shared/`. Area skills remain in their existing `context-factory/` folders; link to their detail rather than duplicating it.
 
 ## API file layout
 
@@ -46,3 +52,5 @@ Register each domain's routes in `controllers/<domain>/index.ts`; `src/app.ts` m
 ## Verification
 
 Use the checks that match the change: `pnpm check` for workspace types, `pnpm build` for the web/API build, `pnpm build:storybook` for shared UI rendering, and `pnpm --filter @event-management/api test:auth` for auth behavior. The auth suite needs local PostgreSQL and the Firebase Auth emulator; consult the API skill before running it. A passing build alone does not verify browser, database, or production Firebase behavior.
+
+For contributor-guidance changes, run `pnpm check:guidance` and walk the affected routing scenarios in the adapters. The check validates navigation, metadata, and registration; inspect source and behavior separately for technical claims. It cannot enforce future agent compliance.
