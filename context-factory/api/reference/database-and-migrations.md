@@ -12,4 +12,4 @@ Packages, services, and venues are flat, directly saved catalog records. Migrati
 
 Migration `20261102130000_package_canvas` intentionally recreates package persistence. It drops package versions and service assignments, deletes existing package records and booking requests/status history, and removes conversations/messages linked to booking requests. General conversations and their messages survive. Inspect and back up affected records before applying this migration to a database with data; `pnpm db:deploy` applies this committed data change but does not make it reversible.
 
-See [catalog schema conventions](../../../docs/CATALOG_SCHEMA.md) for the shared `maxGuests` / `max_guests` name, retained inquiry snapshots, and cleanup migration `20261102190000_cleanup_catalog_fields`.
+See the root README's [catalogs and media](../../../README.md#catalogs-and-media) and [migration impact](../../../README.md#migration-impact) for shared `maxGuests` / `max_guests` names, retained inquiry snapshots, and cleanup migration `20261102190000_cleanup_catalog_fields`.

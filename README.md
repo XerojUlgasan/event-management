@@ -1,259 +1,153 @@
-# Event Management monorepo
+# Clemora
 
-This pnpm workspace contains the Astro/React website, Hono OpenAPI backend, and shared theme and UI packages. PostgreSQL runs locally in Docker Compose. Prisma owns schema changes and migrations; Kysely handles runtime SQL and uses types generated from the database.
+Clemora is the event-management product for **Prevail Events Management**. This pnpm workspace contains an Astro/React frontend, Hono OpenAPI backend, and shared UI, theme, and contract packages. PostgreSQL stores application records; Prisma owns schema changes and migrations, and Kysely handles runtime SQL.
 
-Product planning documents, including the current feature scope, roadmap, and reference proposal, are in [docs](docs/README.md).
+This README owns product scope, current implementation status, and development setup. The [interview summary](docs/PREVAIL_INTERVIEW_SUMMARY.md) records client evidence and distinguishes it from later scope decisions. The [seed guide](docs/SEED.md) covers development fixtures and repeat runs.
 
-## Layout
+## Product scope
+
+Scope recorded on 2026-11-03:
+
+| Area | Intended behavior |
+| --- | --- |
+| Catalogs | Present packages, services, and venues with administrator-managed content. |
+| Inquiries and quotations | Let customers start from a package or describe requirements first. Staff collect missing details, prepare custom quotations, issue revisions, and retain quotation history. Changes affecting an agreed price or delivery require customer reapproval. |
+| Availability and booking | Let staff check availability, control confirmation, and record event changes. Define date holds, exclusive periods, setup/cleanup buffers, and cancellation rules; prevent conflicting confirmations, including simultaneous attempts. |
+| Event preparation and workforce | Maintain event details, staff profiles and availability, manager-assigned teams, schedules, tasks/checklists, progress, operational concerns, and notifications. |
+| Customer service | Use AI for factual answers from approved information, inquiry collection, and human handoff. Staff retain quotation and commitment decisions. |
+| Reports and past events | Report on actual business records and maintain a managed past-events showcase with publication permissions. |
+| Access and communication | Give customers access to their own inquiries and conversations, and staff access appropriate to their roles. |
+
+A request does not reserve a date, establish a final price, or confirm a booking. Confirmation rules remain to be agreed and must not be inferred from payment.
+
+**Outside scope:** all payment responsibilities, including gateways, proof uploads, verification, payment records/status, balances, fee calculation or crediting, and receipts; equipment/inventory management; and supplier management or coordination. Existing demo screens do not establish requirements.
+
+**Later work:** custom package/service combination configuration, menus, policies, terms, and AI knowledge maintenance. The staff delivery platform is undecided.
+
+Before implementing dependent work, confirm intake fields and real catalog content/prices; quotation format, approvals and revisions; availability, confirmation, cancellation and event-change rules; workforce permissions and notifications; assistant sources and handoff ownership; and report/showcase definitions. Meta and other channel integrations require separate decisions.
+
+## Current implementation
+
+| Area | Implemented boundary |
+| --- | --- |
+| Website and catalogs | `/` shows packages, services, and venues in that order. View more opens paged catalog overlays; cards open detail previews. All three catalogs persist in PostgreSQL and support direct saves, canvas content, and archives. |
+| Identity | Local email/password and optional Firebase sign-in share database profiles, roles, and server-side sessions. |
+| Booking requests | Signed-in customers submit inquiries from published packages. PostgreSQL stores package snapshots, request details, status history, and a linked conversation. Signed-out drafts resume after sign-in for explicit review and submission. |
+| Messages | Customer-to-admin conversations persist in PostgreSQL, including request-linked conversations, unread counts, and read state. |
+| Directory and staff access | System Administrators have a read-only Staff & Customers directory. Ordinary staff have read-only booking requests and published package/service views. |
+| Remaining scope | Requirements-first inquiries, quotations, availability, confirmed bookings, full workforce management, AI replies/handoff, reports, and the managed showcase are not implemented. Other business screens may contain demo or local data. |
+
+### Booking requests and messages
+
+The current intake requires a customer session and a published package. It collects event type (Birthday, Wedding, Corporate, or a custom choice), preferred date, estimated event length, contact name and phone, and optional notes. Length can be one through six days, one week, more than one week with an exact day count, or unspecified. Guest count, exact times, and venue/location are gathered in follow-up; the API also accepts an optional guest count.
+
+Creation snapshots the package name, price, and maximum guests. Later catalog edits do not change those snapshots. A supplied stale `packageUpdatedAt` returns `409`. Requests start as `under_review`; other statuses are `needs_details`, `accepted`, `declined`, and `cancelled`. Acceptance is for processing only. Customers can cancel their own open requests. Only System Administrators can update review status; ordinary staff can read requests. Preferred location is independent of the venue catalog.
+
+Both message workspaces refresh every five seconds. Opening a conversation marks the other side's messages as read; messages allow up to 4,000 characters. Request-linked threads expose booking details, read-only for customers. Conversations expire 24 hours after the event end when known, or 24 hours after creation otherwise. Expired linked threads remain closed; a customer message can reopen a general conversation. Closed history is retained. There is no public guest chat or AI assistant.
+
+## Workspace layout
 
 ```text
 apps/
-  web/               Astro app hosting the Clemora workspace and public catalog
-  api/               Hono routes, Prisma schema, and Kysely database access
-    compose.yaml     Local PostgreSQL service
+  web/                 Astro host, React screens, client auth and API calls
+  api/                 Hono controllers, services, data queries, Prisma and tests
+    compose.yaml       Local PostgreSQL service
 packages/
-  theme/             Shared design tokens and CSS variables
-  ui/src/atoms/      Small reusable React components
-  ui/src/molecules/  Compositions of atoms
-  ui/src/organisms/  Larger shared compositions
-  ui/src/templates/  Page-level shared layouts
-scripts/             Local development setup for `pnpm all`
+  contracts/           Shared field, file and collection limits
+  theme/               Design tokens and CSS variables
+  ui/                  Shared React components and Storybook
+scripts/               Development startup
+context-factory/       Contributor guides, agent workflows and QA helpers
+docs/                  Seed guide and interview summary
+transcriptions/        Individual and combined interview transcripts
 ```
 
-The root route renders the Clemora frontend from `apps/web/src/components/app/`. It features packages, services, and venues in that order; each View more control opens the full catalog in an overlay. The package catalog reads and edits PostgreSQL records through the API; `db:seed` supplies three published demonstration packages, not business-approved offers. Customer-to-admin messages and booking requests persist in PostgreSQL and are shared by the customer and admin workspaces. A booking request asks for an event type, preferred date, estimated event length, contact person, and phone number; exact hours, guest count, and venue are gathered later. The event-type menu offers Birthday, Wedding, Corporate, and a custom choice. Lengths range from one day to more than a week, with an exact day count for the latter; an unspecified length is allowed. Each inquiry snapshots its package name, price, and guest maximum. Booking requests do not reserve dates, approve final prices, or confirm bookings. Quote, payment, and other event-delivery screens remain demo or future work. Authentication supports local email/password accounts and Firebase sign-in, with shared profiles, roles, and sessions in PostgreSQL.
+Astro serves the HTML shell in `apps/web/src/pages/index.astro` and provides frontend development and build tooling. The shell mounts `components/app/App.tsx`; React owns the application screens, authentication state, and in-page view switching. Shared UI uses atomic layers and exports from `packages/ui/src/index.ts`. Theme tokens live in `packages/theme/src/theme.css`; app styles live in `apps/web/src/styles/`.
 
-Packages, services, and venues are complete flat catalog records. System Administrators create them directly as public active records and update full content with `expectedUpdatedAt`; archiving hides them from public reads. Services require a name, description, positive hourly rate, and a canvas photo. Venues require name, location, description, and a positive maximum guest count; photos are optional. Migrated records may have null hourly rates or venue guest limits for reads, while saves require current valid input. Each record owns one canvas page with photo, Markdown, and video widgets. Package details include a separate editable card description. See the [shared catalog canvas notes](docs/CATALOG_CANVAS.md), [package catalog notes](docs/PACKAGES_CRUD_DRAFT.md), and [service catalog notes](docs/SERVICES.md).
-
-Package, service, and venue canvas photo and video uploads use R2-backed catalog media. JPEG, PNG, and WebP images may be up to 10 MiB; MP4 and WebM videos may be up to 25 MiB. An upload remains pending until a catalog save references it; saved media is served through `/v1/catalog-media/{id}`. Photo and video widgets accept file uploads only; external image/video links and hosted-player embeds are not supported. Built-in sample photos remain available for the seeded demonstration packages. Configure R2 using the variable names in `apps/api/.env.example`. Service saves require a canvas photo, plus a positive whole-peso hourly rate. Catalog photos live only in canvas widgets and `media_assets`; there is no service image ID or venue photo URL list. The [catalog media and image migration reference](context-factory/api/reference/external-image-urls.md) describes the shared storage path.
-
-Migration `20261102130000_package_canvas` intentionally removes existing package rows, package versions and service assignments, booking requests and status history, and conversations/messages linked to booking requests. General conversations and their messages remain. Review and back up relevant data before applying it to a database with existing records.
-
-Venues have a standalone flat admin catalog and a public Venues section on `/`. Each venue has a name, location, description, maximum guest count and a canvas page. Saves require a positive maximum guest count; photos are optional. Migration `20261102180000_flat_services_venues` preserves each venue's current published content and metadata, or archives the latest content if the venue has no published version. Existing archived venues stay archived; migrated records may have null capacity or no photos for reads. Back up before deployment if version history matters, and inspect all pending migrations. Published venues appear on `/` after packages and services, with detail previews and a View more overlay. Venues do not belong to packages. The cleanup migration removes package venue details and terms, including existing values; booking requests keep their independent preferred-location field. Google Maps pinning is deferred until a Maps API key is available.
-
-Catalog field names and the cleanup migration are documented in [catalog schema conventions](docs/CATALOG_SCHEMA.md). Packages and venues use `maxGuests` (`max_guests` in PostgreSQL); booking snapshots use `packageMaxGuests`. Package event types, venue categories/photo URLs, and service image IDs are removed.
+API routes are mounted under `/v1` in `apps/api/src/app.ts`. HTTP contracts and handlers belong in `controllers/<domain>/`, business operations in `services/<domain>/`, and Kysely queries in `data/<domain>/`. Shared helpers belong in `utils/`. The running API exposes its OpenAPI contract at `/openapi.json`.
 
 ## Local development
 
-Requires Node.js 22.22+, pnpm, and Docker (with Docker Compose).
+Requires Node.js 22.22+, pnpm (the version is pinned in `package.json`), and Docker with Docker Compose.
 
 ```sh
 pnpm install
+cp apps/web/.env.example apps/web/.env
 pnpm all
 ```
 
-`pnpm all` is the only command needed after installing dependencies. It:
+Copy the web environment file only when it does not already exist. `pnpm all` creates `apps/api/.env` from its example if missing, starts PostgreSQL and waits for its healthcheck, applies committed migrations, then starts the API and web servers. Local email/password sign-in works without Firebase configuration. Catalog uploads require R2 configuration.
 
-1. creates `apps/api/.env` from `apps/api/.env.example` if it does not exist,
-2. starts PostgreSQL using `apps/api/compose.yaml` and `apps/api/.env`, waiting for its healthcheck,
-3. applies any pending Prisma migrations with `pnpm db:deploy`,
-4. starts the API and web dev servers together with prefixed logs.
+**Existing databases:** review pending migrations and back up affected data before `pnpm all`, `pnpm dev:prepare`, or `pnpm db:deploy`; these commands apply migrations. See [migration impact](#migration-impact).
 
-Create the web environment file before the first run:
-
-```sh
-cp apps/web/.env.example apps/web/.env
-```
-
-Local email/password sign-in works without Firebase credentials. To enable Google and existing Firebase email/password sign-in, fill in the Firebase web app values in `apps/web/.env` and the Firebase Admin service-account values in `apps/api/.env`. See [Authentication](#authentication).
-
-The workspace and public site are at `http://localhost:4321/`. The public site previews published packages, services, and venues; View more opens the relevant catalog overlay. The API health route is at `http://localhost:3000/v1/health`, and the OpenAPI document is at `http://localhost:3000/openapi.json`.
-
-Press `Ctrl+C` to stop the API and web servers. PostgreSQL keeps running so restarts are fast; stop it with `pnpm db:down`.
-
-Useful variants:
-
-| Command | What it runs |
+| Service | Local URL |
 | --- | --- |
-| `pnpm all` (or `pnpm dev`) | PostgreSQL, migrations, API, and web |
-| `pnpm all:storybook` | The above plus Storybook at `http://localhost:6006` |
-| `pnpm all:web` | Web only (no Docker, API, or database) |
-| `pnpm dev:prepare` | Database setup and migrations only |
-| `pnpm db:reset` | Delete all data in the configured database and reapply migrations (prompts for confirmation) |
+| Website and workspaces | <http://localhost:4321/> |
+| API health | <http://localhost:3000/v1/health> |
+| OpenAPI | <http://localhost:3000/openapi.json> |
+| Storybook, when started | <http://localhost:6006/> |
 
-The frontend uses the shared component library from `@event-management/ui`, organized into `atoms/`, `molecules/`, `organisms/`, and `templates/`. Shared component styles live in `packages/ui/src/styles.css`; app-specific overrides are in `apps/web/src/styles/app.css`. Migrated screens live in `apps/web/src/components/app`, with page components in `app/pages` and the customer portal in `app/customer`. Fonts and images are vendored in `apps/web/public/fonts` and `apps/web/public/images`, so the app does not depend on external asset requests.
+| Command | Purpose |
+| --- | --- |
+| `pnpm all` or `pnpm dev` | Start PostgreSQL, apply migrations, and run API and web |
+| `pnpm all:storybook` | Start the full stack plus Storybook |
+| `pnpm all:web` | Run only the frontend |
+| `pnpm dev:prepare` | Prepare PostgreSQL and apply migrations |
+| `pnpm storybook` | Run only Storybook |
+| `pnpm db:up` / `pnpm db:down` | Start / stop PostgreSQL; stopping retains its volume |
+| `pnpm db:seed` | Insert local fixtures and sample catalog/conversation data |
 
-To browse the shared UI components, run `pnpm all:storybook` for the full stack plus Storybook, or `pnpm storybook` (also `pnpm sstorybook`) on its own, then open `http://localhost:6006`. Story files live beside components in `packages/ui/src`. Run `pnpm build:storybook` to verify the static Storybook build.
+`Ctrl+C` stops the development servers; PostgreSQL stays running until `pnpm db:down`. The seed is separate from startup and does not overwrite catalog edits or archives. See [database seed](docs/SEED.md) for coverage, collisions, and verification. Sample content and prices are not business-approved offers.
 
-`pnpm db:down` stops PostgreSQL but retains its named volume. The Compose username and password are local development defaults; use separate credentials outside local development.
+### Configuration
 
-Database settings live in `apps/api/.env`:
+Use the checked-in [API environment example](apps/api/.env.example) and [web environment example](apps/web/.env.example) for variable names. Keep `.env`, `.secrets/`, database values, session tokens, and service-account contents out of chat and commits.
 
-```dotenv
-DB_HOST="localhost"
-DB_PORT=5432
-DB_NAME="event_management"
-DB_USER="event_management"
-DB_PASSWORD="event_management"
-```
-
-Docker Compose uses these values for PostgreSQL, and the API, Prisma, and type generator build their connection URL from the same settings. You do not need to set `DATABASE_URL`. The Compose project name stays `event_management_v2` so the existing database volume is reused.
+- Database: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` configure the API, Prisma, and type generator. A separate `DATABASE_URL` is unnecessary. Compose reads `apps/api/.env`; its project name remains `event_management_v2` to reuse the existing volume.
+- Browser API: `PUBLIC_API_URL` points to the API including `/v1`.
+- Catalog media: configure the R2 variables in the API example before testing actual uploads. Built-in package sample photos do not require uploads.
+- Database clients such as DBeaver: use PostgreSQL on `localhost:5432` with the configured database name/user/password. The local defaults use no SSL. A containerized client may require `host.docker.internal` instead of `localhost`.
 
 ## Authentication
 
-New email/password accounts are created in PostgreSQL. Passwords are stored as salted Argon2id hashes (19 MiB memory, 2 iterations, 1 thread), never as readable passwords. New passwords must contain 8–128 characters. Google sign-in uses Firebase, and existing Firebase email/password accounts remain supported through **Use my existing Firebase email account** on the sign-in screen. New registrations always use the local account system.
+New registrations create local customer accounts with Argon2id password hashes; passwords must contain 8–128 characters. Google sign-in and existing Firebase email/password accounts are optional identity methods. Application roles always come from PostgreSQL.
 
-All methods use the same `users` table and server-side `em_session` cookie. A user can have a local `password_hash`, a unique `firebase_uid`, or both. Public registration always creates a customer; roles come from the database. Existing Firebase profiles and their roles are preserved by the migration.
+All methods use the `em_session` cookie and hashed sessions in PostgreSQL. The frontend restores the account with `GET /v1/me`. Sessions expire after `SESSION_TTL_DAYS` (default 7), rotate on successful sign-in/linking, and are deleted on logout. Cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` in production.
 
-On page load, the frontend restores the account from `GET /v1/me`, independently of Firebase browser state. Firebase credentials are used temporarily to prove identity and are cleared after exchange. Sessions are stored hashed in the `sessions` table, expire after `SESSION_TTL_DAYS` (default 7), and are deleted on logout. Successful sign-in and linking rotate the current session. If logout fails, the UI keeps the current account visible and shows an error.
+Account settings → Sign-in methods supports connecting Firebase to a local account after proving the current local password, or adding a local password after proving the connected Firebase identity. Firebase proof requires a verified email and a sign-in within five minutes. Matching emails never merge accounts automatically; linking preserves the database identity and role. Profile editing, local password reset, and local email-verification delivery are not implemented.
 
-### Connecting sign-in methods
+System Administrator access requires both database role `admin` and staff title `System Administrator`. This permits catalog administration, directory reads, admin messages, and request-status updates. Staff cannot perform these writes. Reload after changing database roles so the frontend refreshes its profile.
 
-Customers and admins open the user icon or user section and choose **Account settings → Sign-in methods**. The customer profile and sign-in methods live in Account settings, rather than a primary navigation tab. Account names and email addresses are currently shown read-only; profile editing is not connected to the API.
-
-- A local account can connect Google or an existing Firebase email account by providing its current local password and signing in to Firebase. The Firebase email must be verified and the sign-in must be within the last five minutes.
-- A Firebase account can add a local password by freshly signing in with its already connected Firebase identity. Its verified Firebase email must match the account email. This adds a password; it cannot replace an existing password.
-- Matching emails never link accounts automatically. A Firebase sign-in whose email is already registered locally returns a conflict with instructions to sign in using the existing method and connect Firebase from settings. Two already-created database accounts cannot be merged through this screen.
-- Linking preserves the database user ID, profile, and role. Firebase login never overwrites the account email or role, including if the Firebase email later changes.
-
-The API verifies Firebase ID tokens with revocation/disabled-user checks before exchanging them or changing sign-in methods. Password endpoints limit attempts per account to 10 per 15 minutes, limit request bodies to 16 KiB, and reject browser POST requests from origins outside `WEB_ORIGIN`. The basic attempt limiter is in memory and resets on API restart; deployments with multiple API processes need a shared gateway/store limit. The database also enforces email uniqueness ignoring case and surrounding whitespace; the migration rejects existing ambiguous email records rather than merging them.
-
-Local password reset and email-verification delivery are not implemented. Firebase-only users must verify their email through Firebase before adding a local password. Do not remove an existing sign-in method as part of linking.
+Password attempts are limited in memory per account; multiple API processes require a shared limiter. Browser writes must pass the configured `WEB_ORIGIN` check. See the [authentication reference](context-factory/api/reference/auth-and-sessions.md) and running OpenAPI contract for route details.
 
 ### Optional Firebase setup
 
-1. In the Firebase console, enable **Google** and keep **Email/Password** enabled for existing Firebase accounts.
-2. Add `localhost` to **Authentication → Settings → Authorized domains**.
-3. Copy the web app config into `apps/web/.env`:
+1. Enable Google and retain Email/Password for existing accounts in Firebase Authentication. Add `localhost` to authorized domains for local development.
+2. Fill in the `PUBLIC_FIREBASE_*` fields in `apps/web/.env` using the web app configuration.
+3. Configure `FIREBASE_PROJECT_ID` on the API and either `GOOGLE_APPLICATION_CREDENTIALS` pointing to a gitignored service-account JSON or `FIREBASE_CLIENT_EMAIL` plus `FIREBASE_PRIVATE_KEY`. Relative credential paths resolve from `apps/api`.
+4. For a Firebase-backed admin, run `pnpm db:seed-admin admin@example.com` after configuring Firebase. The command finds the Firebase user or creates one when `ADMIN_PASSWORD` is supplied, then assigns the database System Administrator role. For local-only fixtures, use `pnpm db:seed` instead.
 
-```sh
-PUBLIC_FIREBASE_API_KEY="..."
-PUBLIC_FIREBASE_AUTH_DOMAIN="<project>.firebaseapp.com"
-PUBLIC_FIREBASE_PROJECT_ID="<project>"
-PUBLIC_FIREBASE_STORAGE_BUCKET="<project>.firebasestorage.app"
-PUBLIC_FIREBASE_MESSAGING_SENDER_ID="..."
-PUBLIC_FIREBASE_APP_ID="..."
-PUBLIC_API_URL="http://localhost:3000/v1"
-```
+The API verifies Firebase ID tokens, including revocation/disabled-user checks, before identity exchange or linking. A Firebase token alone does not grant catalog administration.
 
-4. Add the Admin SDK service-account values to `apps/api/.env` from **Project settings → Service accounts**:
+## Catalogs and media
 
-```sh
-FIREBASE_PROJECT_ID="<project>"
-FIREBASE_CLIENT_EMAIL="firebase-adminsdk-...@<project>.iam.gserviceaccount.com"
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-```
+Packages, services, and venues are independent flat records, each with one canvas page. A System Administrator save publishes a complete record immediately; there is no draft/publish/version-history lifecycle or structured package-to-service/venue assignment. Updates require `expectedUpdatedAt`; stale or archived edits return `409`. Archive hides a record from public selection. A package referenced by a booking request cannot be deleted.
 
-Alternatively, download the service-account JSON, place it at `apps/api/.secrets/firebase-service-account.json` (gitignored), and point to it:
+| Catalog | Required save data |
+| --- | --- |
+| Package | Name, positive `maxGuests`, fixed total PHP price, and canvas sections; the catalog description is separate from Markdown widgets |
+| Service | Name, description, positive whole-peso `hourlyRatePesos`, and a canvas photo |
+| Venue | Name, location, description, and positive `maxGuests`; canvas photos are optional |
 
-```sh
-FIREBASE_PROJECT_ID="<project>"
-GOOGLE_APPLICATION_CREDENTIALS=".secrets/firebase-service-account.json"
-```
+Package prices are stored as whole pesos; the API uses `{ kind: "fixed", currency: "PHP", amountMinor }` in centavos divisible by 100. Booking snapshots use `packageName`, `packagePrice`, and `packageMaxGuests`. Migrated service rates and venue guest limits may be null on reads; saves enforce complete current input. Omitted service/venue canvas sections preserve saved content.
 
-Relative paths are resolved from `apps/api`, so this works regardless of where the repo lives.
+The shared editor uses photo, Markdown, and video widgets on a 12-column canvas. Media uploads go through `POST /v1/admin/catalog-media`, remain pending until a catalog save references them, and stream through `/v1/catalog-media/{id}`. JPEG/PNG/WebP images allow up to 10 MiB; MP4/WebM videos allow up to 25 MiB. Photo/video widgets accept uploads only, with built-in sample photos retained for seeded packages; external URLs and hosted-player embeds are rejected. Video autoplay is opt-in and uses muted inline playback on customer previews.
 
-The service account is required for the API to verify Firebase ID tokens. It is not used to set roles.
-
-5. Seed an admin after the Firebase user exists (or pass `ADMIN_PASSWORD` to create it):
-
-```sh
-pnpm db:seed-admin admin@example.com
-```
-
-Roles live in the `users` table, so you can also promote or demote an account directly:
-
-```sql
-update users set role = 'admin', staff_role = 'System Administrator' where email = 'admin@example.com';
-update users set role = 'customer' where email = 'admin@example.com';
-```
-
-Reload the app after changing a role so the client fetches the updated profile. The seed script is only a convenience.
-
-### Session API
-
-The auth API routes are:
-
-| Route | Auth | Purpose |
-| --- | --- | --- |
-| `POST /v1/auth/register` | None | Create a local customer account (`displayName`, `email`, `password`) and session |
-| `POST /v1/auth/login` | None | Check local `email` and `password`, start a session |
-| `POST /v1/auth/sync` | `Authorization: Bearer <Firebase ID token>` | Find/create the Firebase profile by UID and start a session; never merge by email |
-| `POST /v1/auth/link/firebase` | Cookie + fresh Firebase token | Connect Firebase after checking `currentPassword` |
-| `POST /v1/auth/password` | Cookie + fresh connected Firebase token | Add a local `password` to a Firebase-only account |
-| `GET /v1/me` | `em_session` cookie | Return the current profile |
-| `POST /v1/auth/logout` | `em_session` cookie | Delete the session and clear the cookie |
-
-Optional config in `apps/api/.env`:
-
-```sh
-SESSION_TTL_DAYS=7
-```
-
-With curl:
-
-```sh
-# Create a local account; the password below is only an example for local testing
-curl -c cookies.txt -X POST http://localhost:3000/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"displayName":"Local Customer","email":"customer@example.com","password":"a long example passphrase"}'
-
-# Or exchange a Firebase ID token for a session cookie
-curl -c cookies.txt -X POST http://localhost:3000/v1/auth/sync \
-  -H "Authorization: Bearer $FIREBASE_ID_TOKEN" \
-  -H "Content-Type: application/json" -d '{}'
-
-curl -b cookies.txt http://localhost:3000/v1/me
-curl -b cookies.txt -X POST http://localhost:3000/v1/auth/logout
-```
-
-The session cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` when `NODE_ENV=production`. The client can never set its own role.
-
-Only System Administrators can manage catalog records, the user directory, messages, and booking request statuses. Package, service, and venue saves publish directly; edits use `expectedUpdatedAt`, and archive hides a record from public reads. Staff can sign in to view booking requests and the published package and service catalog.
-
-### Seed local accounts and connected demo data
-
-Run this after the database migrations:
-
-```sh
-pnpm db:seed
-```
-
-This preserves the legacy local admin (`admin1@gmail.com`), five customers (`user1@gmail.com` through `user5@gmail.com`), 10 staff (`staff1@example.test` through `staff10@example.test`), 10 customers (`customer1@example.test` through `customer10@example.test`), three published sample packages, and 15 archived synthetic venue samples with null capacity. The sample packages are The Grand Celebration (₱185,000/150 guests), The Intimate Gathering (₱68,000/50 guests), and The Sweet Soirée (₱95,000/80 guests); each has sample photo and Markdown content and is not a business-approved offer. The seed also inserts a separate demo administrator and five customers, three published photo-free demo venues, and general customer-admin conversations. It does not seed services or booking inquiries. Newly created local fixtures use the password defined in the seed source. Use normal email/password sign-in; Firebase configuration is not required.
-
-The command is repeatable and insert-only for catalog rows: it preserves accounts, sessions, catalog edits, archives, and unrelated data. Stable IDs prevent duplicate seed rows; existing package, service, and venue content is not refreshed or republished on rerun. Email or ID collisions may leave a fixture or related content unavailable. `SEED_CLOCK` fixes connected demo timestamps for tests. The seed uses one PostgreSQL transaction and does not contact Firebase, email, or payment providers. See [database seed](docs/SEED.md) for entity coverage, rerun behavior, migration impact, and disposable-database verification.
-
-### Auth verification
-
-Run the workspace checks and integration suite:
-
-```sh
-pnpm check
-pnpm build
-pnpm --filter @event-management/api test:auth
-```
-
-The auth suite requires the Firebase CLI (`firebase-tools`) on PATH and a running local PostgreSQL instance configured in `apps/api/.env`. The database user needs permission to create a disposable test database. The command starts the Firebase Auth emulator using the `demo-event-management` project, creates a separate database, applies all committed migrations, tests the real routes and Firebase Admin verification, then drops only that test database and shuts down the emulator. It never creates real Firebase accounts or modifies the application database. Ports 9099, 4409, and 4509 must be free.
-
-Coverage includes local registration/login, password hashes, cookie/session persistence, expiry/logout, existing Firebase email accounts, emulated Google identities, conflicts, proof of both accounts for linking, password addition, concurrent linking, disabled Firebase users, validation, throttling, and OpenAPI routes. The emulator verifies the Firebase integration; it does not prove a production Google OAuth popup or production service-account configuration.
-
-## Customer and team messages
-
-Signed-in customers can start direct conversations with the Clemora team, including conversations linked to booking requests. The customer **Messages** tab and the admin **Messages** workspace read the same PostgreSQL records, refresh every five seconds, and show unread counts and each conversation's last update. Opening a thread marks the other side's messages as read. Both sides can send messages of up to 4,000 characters; the API enforces the account role, and a customer can only read their own conversations. A booking-linked thread shows its event type and opens the existing booking details dialog from an info icon. Customer booking details are read-only; System Administrators can update request status there.
-
-Customer and administrator messages retain their sender identity. Conversations are `active` or `closed`; closed history is read-only for staff, and a customer's new message reopens a closed general conversation. AI replies, guest chat import, handoff, and takeover are deferred.
-
-Conversations close 24 hours after the linked booking request’s event end when known, or 24 hours after conversation creation otherwise. An expired booking-linked conversation stays closed; a customer message can reopen a general conversation. Closed conversations keep their full message history; expiry is checked whenever conversations are read or written.
-
-A booking request creates its own linked conversation, whose package and event fields come from that request. General conversations have no package or event context. The public site has no guest chat or AI assistant; customers sign in to message the team.
-
-| Route | Auth | Purpose |
-| --- | --- | --- |
-| `GET /v1/messages/conversation` | Customer session | Load the signed-in customer's conversation, creating it on first use |
-| `POST /v1/messages/conversations` | Customer session | Start a customer conversation |
-| `GET /v1/messages/conversations` | Customer session | List the customer's conversations |
-| `GET /v1/messages/conversations/{id}` | Customer session | Read one owned conversation |
-| `POST /v1/messages/conversation/messages` | Customer session | Send a message; reopens a closed general conversation |
-| `GET /v1/admin/conversations` | Admin session | List all conversations, including empty ones, in pages of 15 ordered by latest update; accepts an optional `cursor` and returns `nextCursor`, status, last message, and unread count |
-| `GET /v1/admin/conversations/{id}` | Admin session | Load a customer conversation |
-| `POST /v1/admin/conversations/{id}/messages` | Admin session | Reply to a customer |
-| `GET /v1/booking-requests/{id}` | Customer session | Read one owned request with status history |
-| `GET /v1/admin/booking-requests/{id}` | Staff session | Read one request with status history |
-
-`pnpm --filter @event-management/api test:messages` runs the messaging behavior suite against a disposable local database, including ownership, sending, read state, and expiry. Apply the forward migration with `pnpm db:deploy` on an existing local database. The cleanup migrations remove automated assistant/handoff messages and AI routing state while preserving human messages and conversations. The redundant-column migration discards package terms and venue details, removes copied conversation context, and rejects fractional-peso package prices or mismatched conversation and booking-request owners until corrected.
+Public media streaming requires a reference from a published, non-archived catalog record. System Administrators can preview their own pending uploads and archived-record media. Removing uploaded media triggers cleanup only when no widget references it; storage failures can leave unreferenced assets for retry. See [catalog media](context-factory/api/reference/external-image-urls.md) for storage, cleanup, and migration details, and [shared limits](context-factory/limits/SKILL.md) for validation ownership.
 
 ## Database workflow
 
-Add models to `apps/api/prisma/schema.prisma`, then run:
+For schema changes, edit `apps/api/prisma/schema.prisma`, create and review the migration, then regenerate Kysely types:
 
 ```sh
 pnpm db:migrate
@@ -261,42 +155,43 @@ pnpm db:generate
 pnpm check
 ```
 
-`db:migrate` creates and applies a development migration. Use `pnpm db:deploy` to apply committed migrations in a deployed environment. Never edit `apps/api/src/db/types.ts` by hand; it is generated from the migrated database. The `users` migration creates the profile and role table used by authentication.
+`pnpm db:deploy` applies committed migrations; it does not create migrations. Never hand-edit generated `apps/api/src/db/types.ts`. Inspect both Prisma and SQL migrations because some database constraints extend beyond the Prisma model.
 
-### Inspecting data with DBeaver
+**`pnpm db:reset` deletes data without a confirmation prompt.** Its script forces a Prisma reset, reapplies migrations, and seeds the configured database. Check the target and use it only for a database whose contents may be discarded.
 
-PostgreSQL runs in Docker and is published on `127.0.0.1:5432`. Start it with `pnpm db:up` (or `pnpm all`), then create a DBeaver connection:
+### Migration impact
 
-| Setting | Value |
+Review all pending migrations before upgrading a populated database:
+
+- `20261102130000_package_canvas` removes existing packages, package versions and service assignments, booking requests and status history, and booking-linked conversations/messages. General conversations and messages remain.
+- `20261102180000_flat_services_venues` retains selected current content, or archives the latest content when none was published. It removes version tables and unselected canvas pages; uploaded storage objects are not deleted.
+- `20261102190000_cleanup_catalog_fields` renames guest limits to `maxGuests` / `max_guests` and snapshots to `packageMaxGuests` / `package_max_guests`. It discards package event types, venue categories/photo URLs, and legacy service-image references. Existing canvas content and inquiry snapshots remain. Legacy storage objects are not removed remotely.
+
+Back up affected records before deployment. Apply coordinated API/frontend contract changes with their migrations; do not edit applied migrations or reset a database to resolve drift. The [database guidance](context-factory/api/reference/database-and-migrations.md), [catalog media reference](context-factory/api/reference/external-image-urls.md), and [seed guide](docs/SEED.md) provide the related procedures.
+
+## Verification
+
+Run the checks matching the changed area:
+
+| Command | Checks |
 | --- | --- |
-| Driver | PostgreSQL |
-| Host | `localhost` |
-| Port | `5432` |
-| Database | `event_management` |
-| Username | `event_management` |
-| Password | `event_management` |
-| SSL | Off (local) |
+| `pnpm check` | Workspace types |
+| `pnpm build` | Web production bundle and API types |
+| `pnpm build:storybook` | Shared UI rendering build |
+| `pnpm db:validate` | Prisma schema |
+| `pnpm --filter @event-management/api test:auth` | Authentication and sessions with PostgreSQL and Firebase Auth emulator |
+| `pnpm --filter @event-management/api test:packages` | Package/service catalog and shared canvas behavior |
+| `pnpm --filter @event-management/api test:venues` | Venue catalog behavior |
+| `pnpm --filter @event-management/api test:booking-requests` | Inquiry creation, snapshots, access, and status behavior |
+| `pnpm --filter @event-management/api test:messages` | Conversation ownership, messages, read state, and expiry |
 
-These are the local defaults from `apps/api/.env.example`; configure them in `apps/api/.env`. If DBeaver runs on the same machine as Docker, no extra setup is needed. If DBeaver itself runs in a container, use `host.docker.internal` instead of `localhost`.
+Integration suites create disposable local PostgreSQL databases and require permission to create them. Auth also requires the Firebase CLI on `PATH` and ports 9099, 4409, and 4509 free; it uses an emulator rather than production Firebase. Media tests use a local S3-compatible fake rather than production R2. See [API verification](context-factory/api/reference/verification.md) and the [seed guide](docs/SEED.md) for additional focused suites.
 
-Useful queries:
+A passing build does not establish browser, persistence, or production-provider behavior. Verify affected customer/staff flows, permissions, reloads, and failure paths at the appropriate boundaries.
 
-```sql
-select id, email, display_name, role, created_at
-from users
-order by created_at;
+## Reference material
 
-select id, user_id, expires_at, created_at
-from sessions
-order by created_at desc;
-
-update users set role = 'admin', staff_role = 'System Administrator' where email = 'admin@example.com';
-```
-
-Reload the app after changing a role; the client caches the profile until the next page load or sign-in.
-
-## API routes and shared UI
-
-For a new API feature, define a Zod schema and `createRoute` with its typed handler in a verb–entity file under `apps/api/src/controllers/<domain>/`. Register the route in that domain's `index.ts` and mount it in `apps/api/src/app.ts`. Put business rules and transaction orchestration in `apps/api/src/services/<domain>/` and focused Kysely queries in `apps/api/src/data/<domain>/`. Shared helpers live in `apps/api/src/utils/`. Files use kebab-case and exported operations use `Route`, `RouteHandler`, `Service`, or `Data` suffixes. Existing API JSON field names remain unchanged.
-
-Theme tokens live in `packages/theme/src/theme.css`. Reusable React components and their styles live in `packages/ui`; the shared library includes the wordmark, buttons, badges, icons, stat cards, links, navigation, section counter, and inclusion strip. The workspace and public page layouts live in `apps/web/src`. Published package previews on `/` and in its View more overlays can start a booking request. Quotes, payments, and confirmed bookings are later work.
+- [Database seed](docs/SEED.md): fixtures, sample records, rerun behavior, and verification.
+- [Prevail interview summary](docs/PREVAIL_INTERVIEW_SUMMARY.md): timestamped findings and separate later scope decisions.
+- [Full transcription](transcriptions/full-transcription.md), [Video 1](transcriptions/video-1.md), and [Video 2](transcriptions/video-2.md): preserved interview source text.
+- [Repository guidance](AGENTS.md) and [agent index](context-factory/agents/README.md): contributor ownership, engineering/documentation workflows, and QA guidance.

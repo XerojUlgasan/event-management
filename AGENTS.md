@@ -1,29 +1,31 @@
 # Repository guidance
 
-This is the Clemora event-management pnpm workspace. Inspect the files involved in a task before changing them, follow the current pattern, keep edits scoped, and run the closest relevant check. Preserve unrelated working-tree changes.
+This is the Clemora event-management pnpm workspace. Before any change, including documentation, investigate the current implementation and understand the affected flow and constraints. Then make the scoped change and verify it with evidence appropriate to the claim. Existing docs and memory are discovery aids; check technical claims against current source, configuration, and scripts. Preserve unrelated working-tree changes. The [senior developer](context-factory/agents/senior-developer/AGENT.md#investigate-understand-change-and-verify) owns this engineering workflow; the documentation agent applies it to implementation claims in documents.
 
 ## Where work belongs
 
 | Area | Owner | Load |
 | --- | --- | --- |
 | HTTP routes, authentication, sessions, PostgreSQL schema or queries | `apps/api/` | [API skill](context-factory/api/SKILL.md) |
-| Astro pages, React application screens, client auth or API calls | `apps/web/` | [Frontend skill](context-factory/frontend/SKILL.md) |
+| Astro host, React application screens, client auth or API calls | `apps/web/` | [Frontend skill](context-factory/frontend/SKILL.md) |
 | Shared React components, Storybook, design tokens | `packages/ui/`, `packages/theme/` | [Packages skill](context-factory/packages/SKILL.md) |
 | Shared API and web limits, including upload size and field length contracts | `packages/contracts/` | [Limits skill](context-factory/limits/SKILL.md) |
 | Test accounts, authenticated API checks, and custom SQL inspection | `context-factory/QA/` | [QA skill](context-factory/QA/SKILL.md) |
 
 For a change crossing areas, read every applicable skill and its listed references. The files under `context-factory/` are repository guidance; inspect current code as the authority if guidance has drifted, then update the guidance in the same task.
 
-## Task skills
+## Agents
 
-Load the skill for the requested task alongside the relevant area guidance above.
+Load the agent for the requested work alongside the relevant area guidance above. The [agent index](context-factory/agents/README.md) lists the role entry points and their task references.
 
-| Task | Load |
+| Responsibility | Load |
 | --- | --- |
-| Review code, a diff, or a pull request for behavior and regressions | [Code review](context-factory/skills/code-review/SKILL.md) |
-| Create or rewrite implementation, bug, spike, or Epic tickets | [Ticket writing](context-factory/skills/ticket-writing/SKILL.md) |
+| Plan, implement, debug, review code, write engineering tickets, and verify behavior | [Senior developer](context-factory/agents/senior-developer/AGENT.md) |
+| Write, review, revise, or polish documentation, proposals, capstone papers, literature, or defense material | [Documentation](context-factory/agents/documentation/AGENT.md) |
 
-Keep reusable task skills in `context-factory/skills/<skill-name>/SKILL.md` and link new entries here. Put detailed templates or conditional guidance in the skill's `reference/` folder when needed.
+At the start and completion of each task, check whether its scope affects documentation. Follow affected references recursively through the root README, `docs/`, paper chapters, and relevant `context-factory/` guidance. When documentation is affected, load the documentation agent; it routes to the seven writing and research workflows by task. Update the affected current documents within the authorized scope, preserve historical sources, and report unresolved evidence or decisions. A paper-polishing task includes consistency, evidence, prose, and final-format checks across the relevant document, not just the edited paragraph.
+
+Keep role guidance in `context-factory/agents/<agent-name>/AGENT.md` and link new agents here and in the agent index. Read the selected agent's `memory.md` at the start of its work and maintain it at completion when there is lasting knowledge to record, following the [memory policy](context-factory/agents/README.md#memory). Keep task workflows, detailed templates, and conditional guidance in the owning agent's `reference/` folder. Area skills remain in their existing `context-factory/` folders.
 
 ## API file layout
 
@@ -36,9 +38,9 @@ Register each domain's routes in `controllers/<domain>/index.ts`; `src/app.ts` m
 ## Workspace facts
 
 - Use `pnpm`; workspace membership is declared in `pnpm-workspace.yaml`, and runnable commands are in each `package.json`.
-- `/` is `apps/web/src/pages/index.astro` and hosts the React Clemora app. Public catalog sections and their View more overlays live there; the old `/catalog` and 3D `/landing` routes have been removed. API routes are mounted under `/v1` in `apps/api/src/app.ts`; its OpenAPI document is `/openapi.json`.
+- Astro hosts and builds the React frontend. `/` is served by `apps/web/src/pages/index.astro`, which mounts `components/app/App.tsx`; React owns application screens and in-page view switching. Public catalog sections and their View more overlays live on `/`; the old `/catalog` and 3D `/landing` routes have been removed. API routes are mounted under `/v1` in `apps/api/src/app.ts`; its OpenAPI document is `/openapi.json`.
 - Package catalog cards and admin edits use the `/v1/packages` API and PostgreSQL. Customer-to-admin messages use `/v1/messages` and `/v1/admin/conversations` with PostgreSQL. Booking requests persist in PostgreSQL through `/v1/booking-requests` and `/v1/admin/booking-requests`; confirmed bookings, quotes, payments, and other business screens still use demo data. Trace each screen's API and persistence before describing it as a working backend workflow.
-- [Product scope](docs/FEATURES.md) describes the intended business workflow; [README](README.md) describes current setup and implemented behavior. Check both when implementing product behavior.
+- [README](README.md) owns product scope, open decisions, current implementation, and setup. Check its scope and implementation sections before changing product behavior.
 - Keep values from `.env`, `.secrets/`, and local databases out of chat, docs, and commits. Use the checked-in `.env.example` files when documentation needs variable names.
 
 ## Verification

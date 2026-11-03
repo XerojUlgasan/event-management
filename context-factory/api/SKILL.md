@@ -15,6 +15,6 @@ Use this skill for `apps/api/` changes. Read every reference below before editin
 - [Verification](reference/verification.md)
 - [Catalog media and image migrations](reference/external-image-urls.md)
 
-For a change involving the browser API contract or client auth flow, also load the [frontend skill](../frontend/SKILL.md). For product behavior, consult [`docs/FEATURES.md`](../../docs/FEATURES.md) and distinguish planned workflows from implemented endpoints.
+For a change involving the browser API contract or client auth flow, also load the [frontend skill](../frontend/SKILL.md). For product behavior, consult the root README's [product scope](../../README.md#product-scope) and [current implementation](../../README.md#current-implementation), and distinguish planned workflows from implemented endpoints.
 
 For shared field, file, or collection limits and the API's HTTP body caps, read the [shared limits guidance](../limits/SKILL.md).

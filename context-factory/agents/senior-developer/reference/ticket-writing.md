@@ -1,26 +1,23 @@
----
-name: ticket-writing
-description: Create or rewrite implementation, bug, spike, and Epic tickets with clear scope, business rules, evidence, and verifiable outcomes. Use when turning product needs, defects, or unresolved questions into actionable work for a project team.
----
-
 # Ticket writing
+
+Create or rewrite implementation, bug, spike, and Epic tickets with clear scope, business rules, evidence, and verifiable outcomes. Use when turning product needs, defects, or unresolved questions into actionable work for a project team.
 
 Write concise tickets that Product, Design, Engineering, and QA can use without reconstructing the original conversation.
 
 ## Repository context
 
-Read the root [repository guidance](../../../AGENTS.md) and the area skills relevant to the ticket. Use the [README](../../../README.md) for implemented behavior and setup, and [product scope](../../../docs/FEATURES.md) for intended workflows and unresolved business decisions. Verify current behavior in source; distinguish requested new behavior from existing capabilities and proposals.
+Read the root [repository guidance](../../../../AGENTS.md) and the area skills relevant to the ticket. Use the root README's [current implementation](../../../../README.md#current-implementation), setup, and [product scope](../../../../README.md#product-scope) for intended workflows and unresolved business decisions. Verify current behavior in source; distinguish requested new behavior from existing capabilities and proposals.
 
-Trace the actual screen, API, and persistence before describing a workflow as implemented. For authenticated reproduction or database evidence, use the [QA skill](../../QA/SKILL.md). Record which evidence was collected and which checks were unavailable; a demo screen or passing build alone does not prove a persisted workflow.
+Trace the actual screen, API, and persistence before describing a workflow as implemented. For authenticated reproduction or database evidence, use the [QA skill](../../../QA/SKILL.md). Record which evidence was collected and which checks were unavailable; a demo screen or passing build alone does not prove a persisted workflow.
 
 ## Choose the ticket type
 
 | Type | Use when | Required result |
 |---|---|---|
-| [Implementation](reference/implementation-ticket.md) | An agreed feature, enhancement, or behavior change is ready to build. | A defined capability with testable acceptance criteria. |
-| [Bug](reference/bug-ticket.md) | Existing behavior differs from an established expectation. | A reproducible failure and a clear definition of the restored behavior. |
-| [Spike](reference/spike-ticket.md) | Uncertainty prevents a product, design, or engineering decision. | Evidence, a recommendation, and identified follow-up work. |
-| [Epic](reference/epic-ticket.md) | One outcome needs multiple independently deliverable tickets. | Shared direction and scope, with related tickets grouped under it. |
+| [Implementation](tickets/implementation-ticket.md) | An agreed feature, enhancement, or behavior change is ready to build. | A defined capability with testable acceptance criteria. |
+| [Bug](tickets/bug-ticket.md) | Existing behavior differs from an established expectation. | A reproducible failure and a clear definition of the restored behavior. |
+| [Spike](tickets/spike-ticket.md) | Uncertainty prevents a product, design, or engineering decision. | Evidence, a recommendation, and identified follow-up work. |
+| [Epic](tickets/epic-ticket.md) | One outcome needs multiple independently deliverable tickets. | Shared direction and scope, with related tickets grouped under it. |
 
 Read only the guide for the selected ticket type before drafting. For mixed requests, read each applicable guide and create separate tickets using the appropriate formats. When an Epic needs child tickets, use the Epic format for the parent and the matching format for each child.
 

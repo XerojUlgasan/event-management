@@ -1,11 +1,13 @@
 ---
 name: event-management-frontend
-description: Repository guidance for Clemora Astro pages, React screens, app state, client authentication, API calls, and app styles in apps/web.
+description: Repository guidance for the Clemora Astro host, React screens, app state, client authentication, API calls, and app styles in apps/web.
 ---
 
 # Frontend
 
 Use this skill for `apps/web/` changes. Read every reference below before editing. Verify current behavior in the touched files and update these notes if they drift.
+
+Astro supplies the HTML host and frontend development/build tooling; React owns application screens and state. Investigate `apps/web/package.json`, the framework configuration, and the entry point before changing setup or architecture claims.
 
 ## Required references
 
