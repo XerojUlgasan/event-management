@@ -230,10 +230,11 @@ test("service canvas photos replace legacy image uploads and clean up removed me
 test("canvas saves publish atomically, protect concurrent edits, and remove version/service contracts", async () => {
   await read(await call('/admin/packages'),401);
   for(const cookie of [customerCookie,staffCookie,undesignatedAdminCookie]) await read(await call('/admin/packages','POST',data,cookie),403);
-  for(const patch of [{name:''},{price:null},{price:{...data.price,amountMinor:101}},{maxGuests:0},{services:[]},{eventTypes:['Birthday']},{guestMax:100}]) await read(await call('/admin/packages','POST',{...data,...patch},adminCookie),400);
+  for(const patch of [{name:''},{price:null},{price:{...data.price,amountMinor:101}},{maxGuests:0},{eventTypes:['Birthday']},{guestMax:100}]) await read(await call('/admin/packages','POST',{...data,...patch},adminCookie),400);
   const created=await read(await call('/admin/packages','POST',data,adminCookie),201);
   assert.equal(created.name,data.name);assert.equal(created.description,data.description);assert.equal(created.imageUrl,'/images/wedding.jpg');
-  for(const key of ['draft','published','versions','versionId','services','eventTypes','guestMax']) assert.equal(key in created,false);
+  for(const key of ['draft','published','versions','versionId','eventTypes','guestMax']) assert.equal(key in created,false);
+  assert.deepEqual(created.services,[]);
   const detail=await read(await call(`/packages/${created.id}`),200);assert.equal(detail.sections[0].widgets.length,2);
   const edits=await Promise.all(['First edit','Second edit'].map(name=>call(`/admin/packages/${created.id}`,'PATCH',{...data,name,expectedUpdatedAt:created.updatedAt},adminCookie)));
   assert.deepEqual(edits.map(r=>r.status).sort(),[200,409]);
@@ -250,6 +251,33 @@ test("canvas saves publish atomically, protect concurrent edits, and remove vers
   await read(await call(`/packages/${created.id}`),404);
   await read(await call(`/admin/packages/${created.id}`,'DELETE',undefined,adminCookie),204);
   assert.equal((await pool.query('SELECT count(*) FROM catalog_pages WHERE package_id=$1',[created.id])).rows[0].count,'0');
+});
+
+test("packages attach services as included or optional and follow archive rules", async () => {
+  const included = await createServiceWithPhoto({ name: "Photography", description: "Coverage", hourlyRatePesos: 800 });
+  const optional = await createServiceWithPhoto({ name: "Florals", description: "Styling", hourlyRatePesos: 400 });
+  const content = { ...data, name: "Services package", services: [{ serviceId: included.id, role: "included" }, { serviceId: optional.id, role: "optional" }] };
+  const created = await read(await call("/admin/packages", "POST", content, adminCookie), 201);
+  assert.deepEqual(created.services.map((service: any) => [service.serviceId, service.name, service.role, service.sortOrder]), [[included.id, "Photography", "included", 0], [optional.id, "Florals", "optional", 1]]);
+  const detail = await read(await call(`/packages/${created.id}`), 200);
+  assert.deepEqual(detail.services.map((service: any) => service.serviceId), [included.id, optional.id]);
+  for (const services of [
+    [{ serviceId: included.id, role: "included" }, { serviceId: included.id, role: "optional" }],
+    [{ serviceId: randomUUID(), role: "included" }],
+    [{ serviceId: included.id, role: "add_on" }],
+  ]) await read(await call(`/admin/packages/${created.id}`, "PATCH", { ...content, services, expectedUpdatedAt: created.updatedAt }, adminCookie), 400);
+  const reordered = await read(await call(`/admin/packages/${created.id}`, "PATCH", { ...content, services: [{ serviceId: optional.id, role: "included" }, { serviceId: included.id, role: "optional" }], expectedUpdatedAt: created.updatedAt }, adminCookie), 200);
+  assert.deepEqual(reordered.services.map((service: any) => [service.serviceId, service.role, service.sortOrder]), [[optional.id, "included", 0], [included.id, "optional", 1]]);
+  await read(await call(`/admin/services/${included.id}/archive`, "POST", undefined, adminCookie), 200);
+  assert.deepEqual((await read(await call(`/packages/${created.id}`), 200)).services.map((service: any) => service.serviceId), [optional.id]);
+  const adminAfter = await read(await call(`/admin/packages/${created.id}`, "GET", undefined, adminCookie), 200);
+  assert.ok(adminAfter.services.find((service: any) => service.serviceId === included.id)?.archivedAt);
+  const saved = await read(await call(`/admin/packages/${created.id}`, "PATCH", { ...content, services: reordered.services.map((service: any) => ({ serviceId: service.serviceId, role: service.role })), expectedUpdatedAt: reordered.updatedAt }, adminCookie), 200);
+  assert.equal(saved.services.length, 2);
+  await read(await call("/admin/packages", "POST", { ...data, name: "Other package", services: [{ serviceId: included.id, role: "included" }] }, adminCookie), 400);
+  await read(await call(`/admin/services/${included.id}`, "DELETE", undefined, adminCookie), 409);
+  await read(await call(`/admin/packages/${created.id}`, "DELETE", undefined, adminCookie), 204);
+  assert.equal((await pool.query("SELECT count(*) FROM package_services WHERE package_id=$1", [created.id])).rows[0].count, "0");
 });
 
 test("package descriptions are stored independently from canvas text and enforce catalog limits", async () => {

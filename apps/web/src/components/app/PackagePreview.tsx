@@ -1,14 +1,17 @@
 import { useEffect, useId, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import type { PackageContent, PackagePrice, PublicPackage } from "../../lib/api"
+import type { PackageContent, PackagePrice, PackageServiceView, PublicPackage } from "../../lib/api"
 import { CatalogSections } from "./CatalogSections"
 import { BookingRequestDialog } from "./BookingRequest"
 
 export function priceLabel(price: PackagePrice | null) {
   return price ? `${new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(price.amountMinor / 100)} total` : "Price on request"
 }
-export function PackageCanvas({ item }: { item: PackageContent }) {
-  return <main className="package-canvas-preview"><div className="canvas-intro"><span>THE CLEMORA COLLECTION</span><h1>{item.name || "Untitled package"}</h1><div><strong>{priceLabel(item.price)}</strong><strong>Up to {item.maxGuests} guests</strong></div></div><CatalogSections sections={item.sections} /></main>
+type CanvasPackage = Omit<PackageContent, "services"> & { services?: PackageServiceView[] }
+export function PackageCanvas({ item }: { item: CanvasPackage }) {
+  const named = (role: "included" | "optional") => (item.services ?? []).filter(service => service.role === role && service.name)
+  const included = named("included"), optional = named("optional")
+  return <main className="package-canvas-preview"><div className="canvas-intro"><span>THE CLEMORA COLLECTION</span><h1>{item.name || "Untitled package"}</h1><div><strong>{priceLabel(item.price)}</strong><strong>Up to {item.maxGuests} guests</strong></div></div>{included.length > 0 && <section className="package-services"><h2>Included services</h2><ul>{included.map(service => <li key={service.serviceId}>{service.name}{service.archivedAt && <small> (no longer available)</small>}</li>)}</ul></section>}{optional.length > 0 && <section className="package-services"><h2>Optional services</h2><ul>{optional.map(service => <li key={service.serviceId}>{service.name}{service.archivedAt && <small> (no longer available)</small>}</li>)}</ul></section>}<CatalogSections sections={item.sections} /></main>
 }
 export function PackagePreview({ item, loading = false, error = "", onClose, allowBooking = true }: { item: PublicPackage | null; loading?: boolean; error?: string; allowBooking?: boolean; onClose: () => void }) {
   const [booking, setBooking] = useState(false)

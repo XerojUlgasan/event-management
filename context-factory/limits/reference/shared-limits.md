@@ -11,7 +11,7 @@
 | `@event-management/contracts/limits/auth` | `MAX_EMAIL_LENGTH`, `MIN_PASSWORD_LENGTH`, `MAX_PASSWORD_LENGTH`, `MAX_DISPLAY_NAME_LENGTH` | 254 characters, 8 characters, 128 characters, and 120 characters respectively. |
 | `@event-management/contracts/limits/catalog` | `MAX_CATALOG_TEXT_LENGTH` | 4,000 characters for shared package, service, and venue catalog text fields. |
 
-The reusable catalog contract in `@event-management/contracts/catalog` also limits package, service, and venue pages to 20 sections, 100 widgets, a 12-column layout, and 20,000 characters per Markdown widget. Each service and venue has one page in the current flat catalog schema.
+The reusable catalog contract in `@event-management/contracts/catalog` also limits package, service, and venue pages to 20 sections, 100 widgets, a 12-column layout, and 20,000 characters per Markdown widget; a package may attach at most 50 services. Each service and venue has one page in the current flat catalog schema.
 
 ## API request-body caps
 

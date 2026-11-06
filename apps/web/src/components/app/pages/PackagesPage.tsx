@@ -2,24 +2,39 @@ import { CatalogCard, CatalogCardActions } from "./CatalogCard"
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog"
 import { CatalogEditor, newCatalogSection } from "./CatalogEditor"
 import { useCallback, useEffect, useState } from "react"
-import { archivePackage, createPackage, deletePackage, getAdminPackages, packageImageSrc, updatePackage } from "../../../lib/api"
-import type { AdminPackage, PackageContent } from "../../../lib/api"
+import { archivePackage, createPackage, deletePackage, getAdminPackages, getAdminServices, packageImageSrc, updatePackage } from "../../../lib/api"
+import type { AdminPackage, AdminService, PackageContent, PackageServiceRole } from "../../../lib/api"
+import { MAX_PACKAGE_SERVICES } from "@event-management/contracts/catalog"
 import { PackageCanvas, PackagePreview, priceLabel } from "../PackagePreview"
 import { photos } from "../data"
 import "../../../styles/package-editor.css"
 
-const blank = (): PackageContent => ({ name: "", description: "", maxGuests: 100, price: { kind: "fixed", currency: "PHP", amountMinor: 0 }, sections: [newCatalogSection()] })
+const blank = (): PackageContent => ({ name: "", description: "", maxGuests: 100, price: { kind: "fixed", currency: "PHP", amountMinor: 0 }, sections: [newCatalogSection()], services: [] })
 const message = (e: unknown) => e instanceof Error ? e.message : "Something went wrong."
 function cover(item: PackageContent) { return item.sections.flatMap(s => s.widgets).find(w => w.type === "photo" && w.media)?.media?.url || null }
 function Card({ item, action }: { item: PackageContent; action?: React.ReactNode }) {
   return <CatalogCard image={packageImageSrc(cover(item)) || photos.dinner} eyebrow="Event package" title={item.name || "Untitled package"} description={item.description} metadata={[{ label: "Package price", value: priceLabel(item.price).replace(/ total$/, "") }, { label: "Maximum guests", value: `Up to ${item.maxGuests} guests` }]} action={action} />
 }
 function Editor({ initial, onClose, onSaved }: { initial: AdminPackage | null; onClose: () => void; onSaved: () => void }) {
-  return <CatalogEditor initial={initial ? { name: initial.name, description: initial.description, maxGuests: initial.maxGuests, price: initial.price, sections: initial.sections } : blank()} entity="package" onClose={onClose} onSaved={onSaved}
+  const [services, setServices] = useState<AdminService[]>([]), [pick, setPick] = useState("")
+  useEffect(() => { getAdminServices().then(result => setServices(result.services)).catch(() => setServices([])) }, [])
+  const initialContent = (): PackageContent => initial ? { name: initial.name, description: initial.description, maxGuests: initial.maxGuests, price: initial.price, sections: initial.sections, services: initial.services.map(service => ({ serviceId: service.serviceId, role: service.role })) } : blank()
+  const serviceName = (id: string) => services.find(service => service.id === id)?.name ?? initial?.services.find(service => service.serviceId === id)?.name ?? "Service"
+  const isArchived = (id: string) => Boolean(services.find(service => service.id === id)?.archivedAt ?? initial?.services.find(service => service.serviceId === id)?.archivedAt)
+  return <CatalogEditor initial={initialContent()} entity="package" onClose={onClose} onSaved={onSaved}
     validate={content => !content.name.trim() || !Number.isInteger(content.maxGuests) || content.maxGuests < 1 || !Number.isInteger(content.price.amountMinor) || content.price.amountMinor < 1 || content.price.amountMinor % 100 !== 0 ? "Enter a package name, a positive whole number of guests, and a whole peso price." : undefined}
     onSave={async content => { if (initial) await updatePackage(initial.id, content, initial.updatedAt); else await createPackage(content) }}
-    renderDetails={(content, setContent) => <><label>Catalog description<textarea maxLength={MAX_CATALOG_TEXT_LENGTH} value={content.description} onChange={e => setContent({ ...content, description: e.target.value })} /></label><label>Maximum guests<input type="number" min="1" value={content.maxGuests || ""} onChange={e => setContent({ ...content, maxGuests: Number(e.target.value) })} /></label><label>Package price (PHP)<input type="number" min="1" step="1" value={content.price.amountMinor ? content.price.amountMinor / 100 : ""} onChange={e => setContent({ ...content, price: { ...content.price, amountMinor: Math.round(Number(e.target.value) * 100) } })} /></label></>}
-    renderPreview={(content, mode) => mode === "customer" ? <PackageCanvas item={content} /> : <div className="pe-card-preview"><Card item={content} /></div>} />
+    renderDetails={(content, setContent) => <><label>Catalog description<textarea maxLength={MAX_CATALOG_TEXT_LENGTH} value={content.description} onChange={e => setContent({ ...content, description: e.target.value })} /></label><label>Maximum guests<input type="number" min="1" value={content.maxGuests || ""} onChange={e => setContent({ ...content, maxGuests: Number(e.target.value) })} /></label><label>Package price (PHP)<input type="number" min="1" step="1" value={content.price.amountMinor ? content.price.amountMinor / 100 : ""} onChange={e => setContent({ ...content, price: { ...content.price, amountMinor: Math.round(Number(e.target.value) * 100) } })} /></label>
+      <fieldset className="pe-services"><legend>Package services</legend><p>Attach catalog services and mark each as included or optional.</p>
+        {content.services.map((entry, index) => <div className="pe-service-row" key={entry.serviceId}><span>{serviceName(entry.serviceId)}{isArchived(entry.serviceId) && <small> archived</small>}</span><select aria-label={`Role for ${serviceName(entry.serviceId)}`} value={entry.role} onChange={e => setContent(current => ({ ...current, services: current.services.map((item, itemIndex) => itemIndex === index ? { ...item, role: e.target.value as PackageServiceRole } : item) }))}><option value="included">Included</option><option value="optional">Optional</option></select><span className="pe-service-order"><button type="button" aria-label={`Move ${serviceName(entry.serviceId)} up`} disabled={index === 0} onClick={() => setContent(current => { const next = [...current.services]; [next[index - 1], next[index]] = [next[index]!, next[index - 1]!]; return { ...current, services: next } })}>↑</button><button type="button" aria-label={`Move ${serviceName(entry.serviceId)} down`} disabled={index === content.services.length - 1} onClick={() => setContent(current => { const next = [...current.services]; [next[index], next[index + 1]] = [next[index + 1]!, next[index]!]; return { ...current, services: next } })}>↓</button><button type="button" aria-label={`Remove ${serviceName(entry.serviceId)}`} onClick={() => setContent(current => ({ ...current, services: current.services.filter((_, itemIndex) => itemIndex !== index) }))}>×</button></span></div>)}
+        {!content.services.length && <p className="pe-services-empty">No services attached yet.</p>}
+        <div className="pe-service-add"><select aria-label="Service to add" value={pick} onChange={e => setPick(e.target.value)}><option value="">Choose a service…</option>{services.filter(service => !service.archivedAt && !content.services.some(entry => entry.serviceId === service.id)).map(service => <option key={service.id} value={service.id}>{service.name}</option>)}</select><button type="button" disabled={!pick || content.services.length >= MAX_PACKAGE_SERVICES} onClick={() => { setContent(current => ({ ...current, services: [...current.services, { serviceId: pick, role: "included" }] })); setPick("") }}>Add</button></div>
+      </fieldset></>}
+    renderPreview={(content, mode) => {
+      if (mode === "card") return <div className="pe-card-preview"><Card item={content} /></div>
+      const preview = { ...content, services: content.services.filter(entry => !isArchived(entry.serviceId)).map(entry => ({ ...entry, name: serviceName(entry.serviceId) })) }
+      return <PackageCanvas item={preview} />
+    }} />
 }
 export function PackagesPage() {
   const [rows, setRows] = useState<AdminPackage[]>([]), [search, setSearch] = useState(""), [archived, setArchived] = useState(false), [editing, setEditing] = useState<AdminPackage | "new" | null>(null), [preview, setPreview] = useState<AdminPackage | null>(null), [error, setError] = useState(""), [loading, setLoading] = useState(true)

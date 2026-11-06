@@ -30,7 +30,7 @@ Before implementing dependent work, confirm intake fields and real catalog conte
 
 | Area | Implemented boundary |
 | --- | --- |
-| Website and catalogs | `/` shows packages, services, and venues in that order. View more opens paged catalog overlays; cards open detail previews. All three catalogs persist in PostgreSQL and support direct saves, canvas content, and archives. |
+| Website and catalogs | `/` shows packages, services, and venues in that order. View more opens paged catalog overlays; cards open detail previews. All three catalogs persist in PostgreSQL and support direct saves, canvas content, and archives. Packages can attach catalog services as included or optional, and public package details list them. |
 | Identity | Local email/password and optional Firebase sign-in share database profiles, roles, and server-side sessions. |
 | Booking requests | Signed-in customers submit inquiries from published packages. PostgreSQL stores package snapshots, request details, status history, and a linked conversation. Signed-out drafts resume after sign-in for explicit review and submission. |
 | Messages | Customer-to-admin conversations persist in PostgreSQL, including request-linked conversations, unread counts, and read state. |

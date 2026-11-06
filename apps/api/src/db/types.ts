@@ -122,6 +122,15 @@ export interface Packages {
   updated_at: Generated<Timestamp>;
 }
 
+export interface PackageServices {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  package_id: string;
+  role: string;
+  service_id: string;
+  sort_order: number;
+}
+
 export interface Services {
   archived_at: Timestamp | null;
   created_at: Generated<Timestamp>;
@@ -174,6 +183,7 @@ export interface DB {
   conversations: Conversations;
   media_assets: MediaAssets;
   messages: Messages;
+  package_services: PackageServices;
   packages: Packages;
   services: Services;
   sessions: Sessions;

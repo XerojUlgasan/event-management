@@ -73,7 +73,7 @@ export const linkFirebase = (idToken: string, currentPassword: string) =>
 export const addPassword = (idToken: string, password: string) =>
   request<Profile>("/auth/password", { password }, idToken);
 
-export type { PackagePrice, PackageContent, CatalogMedia, CatalogWidget, CatalogSection } from "@event-management/contracts/catalog"
+export type { PackagePrice, PackageContent, CatalogMedia, CatalogWidget, CatalogSection, PackageServiceRole, PackageServiceInput, PackageService, PackageServiceView } from "@event-management/contracts/catalog"
 import type { PackageContent, PackagePrice, CatalogPackage, CatalogMedia, CatalogSection } from "@event-management/contracts/catalog"
 export type PublicPackage = CatalogPackage
 export type AdminPackage = CatalogPackage
