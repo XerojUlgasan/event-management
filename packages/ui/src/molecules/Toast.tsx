@@ -1,22 +1,27 @@
 import type { ReactNode } from "react";
 
-import { Icon } from "../atoms/Icon";
+import { Icon, type IconName } from "../atoms/Icon";
+
+export type ToastTone = "success" | "danger";
 
 export function Toast({
   children,
-  icon = "check",
+  icon,
+  tone = "success",
   className = "",
 }: {
   children: ReactNode;
-  icon?: string;
+  icon?: IconName;
+  tone?: ToastTone;
   className?: string;
 }) {
   return (
     <div
-      className={`toast-message${className ? ` ${className}` : ""}`}
-      role="status"
+      className={`toast-message toast-${tone}${className ? ` ${className}` : ""}`}
+      role={tone === "danger" ? "alert" : "status"}
+      aria-atomic="true"
     >
-      <Icon name={icon} />
+      <Icon name={icon ?? (tone === "danger" ? "alert" : "check")} />
       {children}
     </div>
   );

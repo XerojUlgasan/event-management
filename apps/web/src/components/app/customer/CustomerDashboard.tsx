@@ -1,13 +1,18 @@
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages"
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
+  Avatar,
   Brand,
   Button,
   Dialog,
   Icon,
+  type IconName,
   PageHeader,
   Panel,
+  Textarea,
+  FormField,
   Toast,
+  type ToastTone,
 } from "@event-management/ui"
 
 import { photos } from "../data"
@@ -53,6 +58,7 @@ export function CustomerDashboard({
   const accountTriggerRef = useRef<HTMLButtonElement>(null)
   const [conversationOpen, setConversationOpen] = useState(false)
   const [messageDraft, setMessageDraft] = useState("")
+  const messageInputRef = useRef<HTMLTextAreaElement>(null)
   const [dialogSending, setDialogSending] = useState(false)
   const [dialogError, setDialogError] = useState("")
   const [messageThread, setMessageThread] = useState<ChatThread | null>(null)
@@ -62,11 +68,26 @@ export function CustomerDashboard({
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesError, setMessagesError] = useState("")
   const [newChatBusy, setNewChatBusy] = useState(false)
-  const [toast, setToast] = useState("")
+  const [toast, setToast] = useState<{ message: string; tone: ToastTone } | null>(null)
+  const toastTimerRef = useRef<number | null>(null)
+  const mountedRef = useRef(true)
 
-  const notify = (message: string) => {
-    setToast(message)
-    window.setTimeout(() => setToast(""), 2600)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
+    }
+  }, [])
+
+  const notify = (message: string, tone: ToastTone = "success") => {
+    if (!mountedRef.current) return
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
+    setToast({ message, tone })
+    toastTimerRef.current = window.setTimeout(() => {
+      toastTimerRef.current = null
+      setToast(null)
+    }, 2600)
   }
 
   const refreshMessages = useCallback(async () => {
@@ -165,7 +186,7 @@ export function CustomerDashboard({
       setConversationOpen(true)
       notify("New chat started.")
     } catch (cause) {
-      notify(cause instanceof Error ? cause.message : "Unable to start a new chat.")
+      notify(cause instanceof Error ? cause.message : "Unable to start a new chat.", "danger")
     } finally {
       setNewChatBusy(false)
     }
@@ -229,7 +250,7 @@ export function CustomerDashboard({
       document.removeEventListener("keydown", closeOnEscape)
     }
   }, [accountMenuOpen])
-  const customerTabs: { label: CustomerTab; icon: string }[] = [
+  const customerTabs: { label: CustomerTab; icon: IconName }[] = [
     { label: "Home", icon: "grid" },
     { label: "My events", icon: "calendar" },
     { label: "Packages", icon: "box" },
@@ -239,24 +260,26 @@ export function CustomerDashboard({
   return (
     <div className="customer-shell">
       <header className="customer-header">
-        <button className="customer-brand-button" onClick={onPublic}>
+        <Button variant="plain" className="customer-brand-button" onClick={onPublic}>
           <Brand />
-        </button>
+        </Button>
         <nav className="customer-nav">
           {customerTabs.map((item) => (
-            <button
+            <Button
+              variant="plain"
               className={tab === item.label ? "active" : ""}
               key={item.label}
               onClick={() => setTab(item.label)}
             >
               <Icon name={item.icon} size={16} />
               {item.label}
-            </button>
+            </Button>
           ))}
         </nav>
         <div className="customer-header-actions">
           <div className="customer-account-menu" ref={accountMenuRef}>
-            <button
+            <Button
+              variant="plain"
               type="button"
               ref={accountTriggerRef}
               className="customer-profile account-menu-trigger"
@@ -265,16 +288,16 @@ export function CustomerDashboard({
               aria-controls="customer-account-menu"
               onClick={() => setAccountMenuOpen((open) => !open)}
             >
-              <span className="avatar">{initialsFromName(userName)}</span>
+              <Avatar initials={initialsFromName(userName)} />
               <span><strong>{userName}</strong><small>Customer</small></span>
               <Icon name="chevron" size={14} />
-            </button>
+            </Button>
             {accountMenuOpen && (
               <div className="account-menu" id="customer-account-menu">
-                <button type="button" onClick={() => { setTab("Profile"); setAccountMenuOpen(false) }}>
+                <Button variant="plain" type="button" onClick={() => { setTab("Profile"); setAccountMenuOpen(false) }}>
                   Account settings
-                </button>
-                <button type="button" onClick={onSignOut}>Sign out</button>
+                </Button>
+                <Button variant="plain" type="button" onClick={onSignOut}>Sign out</Button>
               </div>
             )}
           </div>
@@ -304,12 +327,10 @@ export function CustomerDashboard({
 
         {tab === "Profile" && (
           <div className="customer-content">
-            <div className="page-head">
-              <div>
-                <h1 className="page-title">Account settings</h1>
-                <p>View your account and manage sign-in methods.</p>
-              </div>
-            </div>
+            <PageHeader
+              title="Account settings"
+              description="View your account and manage sign-in methods."
+            />
             <Panel className="account-summary">
               <h2>Profile</h2>
               <dl>
@@ -357,6 +378,7 @@ export function CustomerDashboard({
       {messageOpen && (
         <Dialog
           onClose={() => setMessageOpen(false)}
+          initialFocus={messageInputRef}
           className="compact-modal"
           eyebrow="Message the Clemora team"
           title="How can we help?"
@@ -372,21 +394,20 @@ export function CustomerDashboard({
             </>
           }
         >
-            <label className="message-compose">
-              <span>Message</span>
-              <textarea
+            <FormField className="message-compose" label="Message">
+              <Textarea
                 value={messageDraft}
                 onChange={(event) => setMessageDraft(event.target.value)}
                 placeholder="Write a message"
                 maxLength={MAX_MESSAGE_BODY_LENGTH}
-                autoFocus
+                ref={messageInputRef}
               />
-            </label>
+            </FormField>
             {dialogError && <p className="messages-send-error" role="alert">{dialogError}</p>}
         </Dialog>
       )}
 
-      {toast && <Toast>{toast}</Toast>}
+      {toast && <Toast tone={toast.tone}>{toast.message}</Toast>}
     </div>
   )
 }

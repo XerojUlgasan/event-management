@@ -1,3 +1,4 @@
+import { Input, Select } from "@event-management/ui"
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@event-management/contracts/limits/auth"
 import { useState } from "react";
 import type { SubmitEvent } from "react";
@@ -85,7 +86,7 @@ export function SignInMethods() {
             <fieldset disabled={busy}>
               {profile.hasPassword ? (
                 <FormField label="Current account password">
-                  <input
+                  <Input
                     type="password"
                     autoComplete="current-password"
                     maxLength={MAX_PASSWORD_LENGTH}
@@ -97,7 +98,7 @@ export function SignInMethods() {
               ) : (
                 <>
                   <FormField label="New account password">
-                    <input
+                    <Input
                       type="password"
                       autoComplete="new-password"
                       minLength={MIN_PASSWORD_LENGTH}
@@ -109,7 +110,7 @@ export function SignInMethods() {
                     />
                   </FormField>
                   <FormField label="Confirm new password">
-                    <input
+                    <Input
                       type="password"
                       autoComplete="new-password"
                       minLength={MIN_PASSWORD_LENGTH}
@@ -124,7 +125,7 @@ export function SignInMethods() {
                 </>
               )}
               <FormField label="Firebase sign-in method">
-                <select
+                <Select
                   value={method}
                   onChange={(event) =>
                     setMethod(event.target.value as "google" | "password")
@@ -134,12 +135,12 @@ export function SignInMethods() {
                   <option value="password">
                     Existing Firebase email and password
                   </option>
-                </select>
+                </Select>
               </FormField>
               {method === "password" && (
                 <>
                   <FormField label="Firebase email address">
-                    <input
+                    <Input
                       type="email"
                       autoComplete="username"
                       value={firebaseEmail}
@@ -148,7 +149,7 @@ export function SignInMethods() {
                     />
                   </FormField>
                   <FormField label="Firebase password">
-                    <input
+                    <Input
                       type="password"
                       autoComplete="current-password"
                       value={firebasePassword}

@@ -1,10 +1,13 @@
 import { useState } from "react"
 import {
+  Input,
+  Select,
   Badge,
   Button,
   Dialog,
   FormField,
   Icon,
+  type IconName,
   PageHeader,
   Panel,
   SearchField,
@@ -22,9 +25,9 @@ export function ReportsPage() {
         description="Monitor booking health, event delivery, resources, feedback, and recorded team performance."
         actions={
           <div className="welcome-actions">
-            <select className="date-range-select" value={period} onChange={(event) => setPeriod(event.target.value)}>
+            <Select className="date-range-select" value={period} onChange={(event) => setPeriod(event.target.value)}>
               <option>Last 30 days</option><option>Last 3 months</option><option>Last 6 months</option><option>This year</option>
-            </select>
+            </Select>
             <Button icon="chart" onClick={() => setReportOpen(true)}>Export report</Button>
           </div>
         }
@@ -33,7 +36,7 @@ export function ReportsPage() {
       <div className="report-filter-note">
         <Icon name="calendar" />
         <span>Showing business activity from <strong>January 1–June 30, 2025</strong></span>
-        <button>Compare period</button>
+        <Button variant="secondary" size="small">Compare period</Button>
       </div>
 
       <div className="stats-grid">
@@ -85,7 +88,7 @@ export function ReportsPage() {
           className="performance-table-card"
           title="Event delivery performance"
           description="Based on recorded schedules, tasks, and incidents"
-          action={<button className="inline-link">View full report <Icon name="arrow" size={14} /></button>}
+          action={<Button variant="link" size="small" >View full report <Icon name="arrow" size={14} /></Button>}
         >
           <div className="performance-table">
             <div className="performance-row header"><span>Metric</span><span>Current</span><span>Target</span><span>Trend</span></div>
@@ -120,19 +123,19 @@ export function ReportsPage() {
         action={<SearchField compact placeholder="Search reports" />}
       >
         <div className="report-library-grid">
-          {[
+          {([
             ["Booking & quotation report", "Conversion, value, expiration, and sales activity", "chart", "Updated today"],
             ["Event completion report", "Delivery timing, tasks, delays, and completion", "clipboard", "Updated today"],
             ["Incident report", "Incident type, action, status, and resolution", "alert", "3 open incidents"],
             ["Resource utilization", "Allocation, availability, and equipment usage", "box", "Updated 2 hr ago"],
             ["Staff performance", "Recorded assignments and task completion only", "users", "Updated yesterday"],
             ["Customer feedback", "Ratings, published reviews, and recurring themes", "spark", "68 responses"],
-          ].map((report) => (
-            <button key={report[0]} onClick={() => setReportOpen(true)}>
+          ] satisfies [string, string, IconName, string][]).map((report) => (
+            <Button variant="plain" key={report[0]} onClick={() => setReportOpen(true)}>
               <span className="report-icon"><Icon name={report[2]} /></span>
               <span><strong>{report[0]}</strong><small>{report[1]}</small><em>{report[3]}</em></span>
               <Icon name="chevron" size={15} />
-            </button>
+            </Button>
           ))}
         </div>
       </Panel>
@@ -153,12 +156,12 @@ export function ReportsPage() {
         >
           <div className="report-section-options">
             {["Executive summary", "Bookings & quotations", "Event completion", "Resource utilization", "Customer feedback", "Staff performance"].map((item, index) => (
-              <label key={item}><input type="checkbox" defaultChecked={index < 4} /><span><strong>{item}</strong><small>{index === 5 ? "Uses recorded assignments and task completion data" : "Include current filtered period"}</small></span></label>
+              <label key={item}><Input variant="plain" type="checkbox" defaultChecked={index < 4} /><span><strong>{item}</strong><small>{index === 5 ? "Uses recorded assignments and task completion data" : "Include current filtered period"}</small></span></label>
             ))}
           </div>
           <div className="form-grid export-options">
-            <FormField label="Format"><select><option>PDF document</option><option>CSV spreadsheet</option></select></FormField>
-            <FormField label="Date range"><select value={period} onChange={(event) => setPeriod(event.target.value)}><option>Last 30 days</option><option>Last 3 months</option><option>Last 6 months</option><option>This year</option></select></FormField>
+            <FormField label="Format"><Select><option>PDF document</option><option>CSV spreadsheet</option></Select></FormField>
+            <FormField label="Date range"><Select value={period} onChange={(event) => setPeriod(event.target.value)}><option>Last 30 days</option><option>Last 3 months</option><option>Last 6 months</option><option>This year</option></Select></FormField>
           </div>
         </Dialog>
       )}

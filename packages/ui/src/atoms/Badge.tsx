@@ -1,12 +1,17 @@
-import type { ReactNode } from "react";
+import type { ComponentPropsWithoutRef } from "react";
+
+export type BadgeTone = "neutral" | "cream" | "light" | "gold" | "success" | "warning" | "danger" | "info" | "accent";
 
 export function Badge({
   children,
   tone = "neutral",
+  className = "",
+  variant = "pill",
+  ...props
 }: {
-  children: ReactNode
-  tone?: string
-}) {
-  return <span className={`badge badge-${tone}`}>{children}</span>
+  tone?: BadgeTone
+  variant?: "pill" | "counter"
+} & ComponentPropsWithoutRef<"span">) {
+  return <span {...props} className={`badge badge-${tone}${variant === "counter" ? " badge-counter" : ""}${className ? ` ${className}` : ""}`}>{children}</span>
 }
 

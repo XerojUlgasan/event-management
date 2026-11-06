@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Avatar } from "./Avatar";
+import { Avatar } from "@event-management/ui";
 
 const meta = {
   title: "Atoms/Avatar",
@@ -12,6 +12,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+export const Accent: Story = { args: { tone: "accent", initials: "C" } };
 export const Small: Story = { args: { size: "sm", initials: "AS" } };
 export const Large: Story = { args: { size: "lg", initials: "JB" } };
 export const Group: Story = {

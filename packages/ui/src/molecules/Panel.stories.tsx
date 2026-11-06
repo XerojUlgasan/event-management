@@ -1,8 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { Button } from "../atoms/Button";
-import { Badge } from "../atoms/Badge";
-import { Panel } from "./Panel";
+import { Badge, Button, Panel } from "@event-management/ui";
 
 const meta = {
   title: "Molecules/Panel",
@@ -18,6 +16,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+export const SemanticSection: Story = { args: { as: "section", "aria-label": "Assignments" } };
 export const WithAction: Story = {
   args: { action: <Button variant="secondary">View all</Button> },
 };

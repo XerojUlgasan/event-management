@@ -17,3 +17,11 @@ Moving task workflows into the agent's `reference/` folder changed the relative 
 **Evidence:** The current [code review](reference/code-review.md) and [ticket-writing](reference/ticket-writing.md) guides link to the shared guidance from their new locations. Verified by local Markdown link checks; this establishes guidance integrity only.
 
 **Why it matters:** Future reorganizations need to preserve access to area guidance and ticket templates.
+
+## 2026-11-06 — Shared UI modal and selection contracts
+
+The [Clemora UI skill](../../frontend/clemora-ui/SKILL.md) owns current component-selection guidance. Mounted `Dialog`/`Drawer` use native modal behavior and request dismissal through app callbacks; specialized `NativeDialog` callers retain their own lifecycle. Use `Dialog.initialFocus` for an initially focused field: React's `autoFocus` ran while the native surface was still hidden. A catalog menu must focus its visible summary before opening a modal so closing can restore a usable target. Catalog switches are filter groups; true tablists require linked item/panel IDs.
+
+**Evidence:** The [component follow-up ledger](reference/web-ui-refactor.md#component-contracts-follow-up-2026-11-06) records source review, checks, and Chromium/Storybook consumer journeys. Local response fixtures rejected writes; these results do not prove live authentication, persistence, or provider behavior.
+
+**Why it matters:** Preserve lifecycle ownership and verify focus in real consumers, where hidden menu items and native opening order affect behavior.

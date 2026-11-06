@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { Brand } from "../molecules/Brand";
-import { WorkspaceLayout } from "./WorkspaceLayout";
+import { Brand, WorkspaceLayout } from "@event-management/ui";
 
 const meta = {
   title: "Templates/WorkspaceLayout",

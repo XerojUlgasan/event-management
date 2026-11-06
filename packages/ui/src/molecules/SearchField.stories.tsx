@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { SearchField } from "./SearchField";
+import { SearchField } from "@event-management/ui";
 
 const meta = {
   title: "Molecules/SearchField",

@@ -1,3 +1,5 @@
+import { GoogleMark, InputGroup, Tabs } from "@event-management/ui"
+import { Input } from "@event-management/ui"
 import { MAX_DISPLAY_NAME_LENGTH, MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@event-management/contracts/limits/auth"
 import { useState } from "react";
 import type { SubmitEvent } from "react";
@@ -85,9 +87,9 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
       <div className="login-visual">
         <div className="login-photo"></div>
         <div className="login-photo-overlay"></div>
-        <button className="login-back" onClick={onBack}>
+        <Button variant="ghost" className="login-back" onClick={onBack}>
           <Icon name="arrow" size={16} /> Back to customer site
-        </button>
+        </Button>
         <div className="login-visual-content">
           <Brand light />
           <div className="login-quote">
@@ -106,24 +108,15 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
 
       <main className="login-main">
         <div className="login-form-wrap">
-          <div className="auth-mode-tabs">
-            <button
-              className={mode === "signin" ? "active" : ""}
-              disabled={submitting}
-              onClick={() => changeMode("signin")}
-              type="button"
-            >
-              Sign in
-            </button>
-            <button
-              className={mode === "register" ? "active" : ""}
-              disabled={submitting}
-              onClick={() => changeMode("register")}
-              type="button"
-            >
-              Create account
-            </button>
-          </div>
+          <Tabs
+            className="auth-mode-tabs"
+            variant="segmented"
+            role="group"
+            aria-label="Account access"
+            active={mode}
+            items={[{ value: "signin", label: "Sign in", disabled: submitting }, { value: "register", label: "Create account", disabled: submitting }]}
+            onChange={value => { if (value === "signin" || value === "register") changeMode(value) }}
+          />
           <span className="eyebrow">Clemora account</span>
           <div className="login-title">
             {mode === "register" ? "Create your account" : "Welcome back"}
@@ -137,9 +130,9 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
           <form className="login-form" onSubmit={submit}>
             {mode === "register" && (
               <FormField label="Full name">
-                <div className="login-input">
+                <InputGroup>
                   <Icon name="users" size={16} />
-                  <input
+                  <Input variant="plain"
                     autoComplete="name"
                     maxLength={MAX_DISPLAY_NAME_LENGTH}
                     value={name}
@@ -151,13 +144,13 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
                     placeholder="Your name"
                     required
                   />
-                </div>
+                </InputGroup>
               </FormField>
             )}
             <FormField label="Email address">
-              <div className="login-input">
+              <InputGroup>
                 <Icon name="users" size={16} />
-                <input
+                <Input variant="plain"
                   type="email"
                   autoComplete="email"
                   maxLength={MAX_EMAIL_LENGTH}
@@ -170,12 +163,12 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
                   placeholder="you@example.com"
                   required
                 />
-              </div>
+              </InputGroup>
             </FormField>
             <FormField label="Password">
-              <div className="login-input">
+              <InputGroup>
                 <Icon name="settings" size={16} />
-                <input
+                <Input variant="plain"
                   type={showPassword ? "text" : "password"}
                   autoComplete={
                     mode === "register" ? "new-password" : "current-password"
@@ -195,19 +188,19 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
                   }
                   required
                 />
-                <button
+                <Button size="small" variant="light"
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? "Hide" : "Show"}
-                </button>
-              </div>
+                </Button>
+              </InputGroup>
             </FormField>
             {mode === "register" && (
               <FormField label="Confirm password">
-                <div className="login-input">
+                <InputGroup>
                   <Icon name="settings" size={16} />
-                  <input
+                  <Input variant="plain"
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
                     maxLength={MAX_PASSWORD_LENGTH}
@@ -220,13 +213,13 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
                     placeholder="Repeat your password"
                     required
                   />
-                </div>
+                </InputGroup>
               </FormField>
             )}
 
             {mode === "signin" && firebaseConfigured && (
               <label className="auth-existing-account">
-                <input
+                <Input variant="plain"
                   type="checkbox"
                   checked={useFirebase}
                   disabled={submitting}
@@ -246,7 +239,7 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
               </div>
             )}
 
-            <Button
+            <Button variant="primary"
               type="submit"
               className="login-submit"
               disabled={submitting}
@@ -267,36 +260,15 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
                 <span>or continue with</span>
               </div>
 
-              <button
+              <Button variant="secondary"
                 type="button"
                 className="google-button"
                 onClick={continueWithGoogle}
                 disabled={submitting}
               >
-                <svg
-                  className="google-icon"
-                  viewBox="0 0 48 48"
-                  aria-hidden="true"
-                >
-                  <path
-                    fill="#4285F4"
-                    d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M11.69 28.18c-.44-1.32-.69-2.73-.69-4.18s.25-2.86.69-4.18v-5.7H4.34A21.99 21.99 0 0 0 2 24c0 3.55.85 6.91 2.34 9.88l7.35-5.7z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"
-                  />
-                </svg>
+                <GoogleMark className="google-icon" />
                 Continue with Google
-              </button>
+              </Button>
             </>
           )}
 

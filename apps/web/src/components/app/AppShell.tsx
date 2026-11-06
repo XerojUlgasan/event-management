@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
+  Button,
   Avatar,
   Icon,
   Panel,
@@ -54,7 +55,7 @@ function AccountMenu({ name, sidebar = false, onSettings, onSignOut }: {
 
   return (
     <div className={`account-menu-wrap ${sidebar ? "account-menu-sidebar" : ""}`} ref={container}>
-      <button
+      <Button variant="plain"
         type="button"
         ref={trigger}
         className="account-menu-trigger"
@@ -64,11 +65,11 @@ function AccountMenu({ name, sidebar = false, onSettings, onSignOut }: {
       >
         <Avatar initials={initialsFromName(name)} />
         {sidebar && <span>{name}</span>}
-      </button>
+      </Button>
       {open && (
         <div className="account-menu">
-          <button type="button" onClick={() => { setOpen(false); onSettings() }}>Account settings</button>
-          <button type="button" onClick={() => { setOpen(false); onSignOut() }}>Sign out</button>
+          <Button variant="plain" type="button" onClick={() => { setOpen(false); onSettings() }}>Account settings</Button>
+          <Button variant="plain" type="button" onClick={() => { setOpen(false); onSignOut() }}>Sign out</Button>
         </div>
       )}
     </div>
@@ -132,23 +133,23 @@ export function AppShell({
             }} onSignOut={onSignOut} />}
           />
           {sidebarOpen && (
-            <button
+            <Button variant="plain"
               className="sidebar-scrim"
               onClick={() => setSidebarOpen(false)}
               aria-label="Close sidebar"
-            ></button>
+            ></Button>
           )}
         </>
       }
       header={
         <header className="app-header">
-          <button
+          <Button variant="plain"
             className="icon-button app-menu"
             aria-label="Open sidebar"
             onClick={() => setSidebarOpen(true)}
           >
             <Icon name="menu" />
-          </button>
+          </Button>
           <div className="app-header-actions">
             <AccountMenu name={name} onSettings={() => setActive("Administration")} onSignOut={onSignOut} />
           </div>

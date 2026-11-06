@@ -100,29 +100,29 @@ export function CalendarPage() {
           <span className="schedule-dot attention"></span>
           <span><strong>2</strong> Conflicts to resolve</span>
         </div>
-        <button onClick={() => setConflictOpen(true)}>
+        <Button variant="light" size="small" onClick={() => setConflictOpen(true)}>
           Review conflicts <Icon name="arrow" size={14} />
-        </button>
+        </Button>
       </div>
 
       <div className="calendar-layout">
         <Panel className="calendar-panel">
           <div className="calendar-toolbar">
             <div className="month-selector">
-              <button aria-label="Previous month">‹</button>
+              <Button variant="secondary" size="small" aria-label="Previous month">‹</Button>
               <strong>June 2025</strong>
-              <button aria-label="Next month">›</button>
-              <button className="today-button">Today</button>
+              <Button variant="secondary" size="small" aria-label="Next month">›</Button>
+              <Button variant="secondary" size="small" className="today-button">Today</Button>
             </div>
             <div className="calendar-modes">
               {(["Month", "Week", "Day"] as const).map((item) => (
-                <button
+                <Button variant="plain"
                   className={mode === item ? "active" : ""}
                   onClick={() => setMode(item)}
                   key={item}
                 >
                   {item}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -141,24 +141,24 @@ export function CalendarPage() {
                 >
                   <span className="day-number">{day.day}</span>
                   {day.conflict && (
-                    <button
+                    <Button variant="plain"
                       className="conflict-indicator"
                       onClick={() => setConflictOpen(true)}
                       aria-label="View scheduling conflict"
                     >
                       <Icon name="alert" size={12} />
-                    </button>
+                    </Button>
                   )}
                   <div className="calendar-events">
                     {day.events?.map((event) => (
-                      <button
+                      <Button variant="plain"
                         className={`calendar-event ${event[1]}`}
                         key={event[0]}
                         onClick={() => setSelectedEvent(event[0])}
                       >
                         <i></i>
                         <span>{event[0]}</span>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -180,33 +180,33 @@ export function CalendarPage() {
                     <strong>{day}</strong>
                     {index === 0 && (
                       <>
-                        <button
+                        <Button variant="plain"
                           className="agenda-event event-one"
                           onClick={() => setSelectedEvent("Kitchen briefing")}
                         >
                           <span>9:00 AM</span>
                           <strong>Kitchen briefing</strong>
                           <small>Production kitchen</small>
-                        </button>
-                        <button
+                        </Button>
+                        <Button variant="plain"
                           className="agenda-event event-two"
                           onClick={() => setSelectedEvent("Venue walkthrough")}
                         >
                           <span>2:00 PM</span>
                           <strong>Venue walkthrough</strong>
                           <small>The Glass Garden</small>
-                        </button>
+                        </Button>
                       </>
                     )}
                     {index === 2 && (
-                      <button
+                      <Button variant="plain"
                         className="agenda-event event-three"
                         onClick={() => setConflictOpen(true)}
                       >
                         <span>3:30 PM</span>
                         <strong>Assignment conflict</strong>
                         <small>2 service captains</small>
-                      </button>
+                      </Button>
                     )}
                   </div>
                 ))}
@@ -218,30 +218,30 @@ export function CalendarPage() {
         <aside className="calendar-side">
           <Panel title="Monday, June 16" description="3 scheduled activities">
             <div className="day-agenda-list">
-              <button onClick={() => setSelectedEvent("Kitchen briefing")}>
+              <Button variant="plain" onClick={() => setSelectedEvent("Kitchen briefing")}>
                 <span className="agenda-time">9:00</span>
                 <span>
                   <strong>Kitchen briefing</strong>
                   <small>Production kitchen · 8 staff</small>
                 </span>
                 <Badge tone="neutral">Internal</Badge>
-              </button>
-              <button onClick={() => setSelectedEvent("Venue walkthrough")}>
+              </Button>
+              <Button variant="plain" onClick={() => setSelectedEvent("Venue walkthrough")}>
                 <span className="agenda-time">2:00</span>
                 <span>
                   <strong>Venue walkthrough</strong>
                   <small>The Glass Garden · Amina Santos</small>
                 </span>
                 <Badge tone="info">Visit</Badge>
-              </button>
-              <button onClick={() => setSelectedEvent("Supplier delivery")}>
+              </Button>
+              <Button variant="plain" onClick={() => setSelectedEvent("Supplier delivery")}>
                 <span className="agenda-time">4:30</span>
                 <span>
                   <strong>Supplier delivery</strong>
                   <small>Warehouse · Fresh produce</small>
                 </span>
                 <Badge tone="success">Confirmed</Badge>
-              </button>
+              </Button>
             </div>
           </Panel>
           <Panel
@@ -266,20 +266,20 @@ export function CalendarPage() {
               <span>Transport <strong>80% reserved</strong></span>
               <span>Warming units <strong>100% reserved</strong></span>
             </div>
-            <button className="inline-link">
+            <Button variant="link" size="small" >
               Review resource schedule <Icon name="arrow" size={14} />
-            </button>
+            </Button>
           </Panel>
         </aside>
       </div>
 
       {selectedEvent && (
         <Drawer
+          title={selectedEvent}
+          status={<Badge tone="info">Scheduled activity</Badge>}
           onClose={() => setSelectedEvent(null)}
           className="schedule-drawer"
         >
-            <Badge tone="info">Scheduled activity</Badge>
-            <div className="drawer-title">{selectedEvent}</div>
             <p>Monday, June 16, 2025</p>
             <div className="schedule-detail-time">
               <Icon name="calendar" />

@@ -1,3 +1,4 @@
+import { Button } from "@event-management/ui"
 import {
   createContext,
   useCallback,
@@ -209,9 +210,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {status === "signed-in" && error && (
         <div className="auth-status-error" role="alert">
           <span>{error}</span>
-          <button type="button" onClick={clearError}>
+          <Button variant="secondary" type="button" onClick={clearError}>
             Dismiss
-          </button>
+          </Button>
         </div>
       )}
       {children}

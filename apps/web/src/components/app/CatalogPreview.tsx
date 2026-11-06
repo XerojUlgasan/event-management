@@ -1,3 +1,4 @@
+import { Button, NativeDialog } from "@event-management/ui"
 import { useEffect, useRef } from "react"
 import type { ReactNode } from "react"
 import { createPortal } from "react-dom"
@@ -26,5 +27,5 @@ export function CatalogDetailPreview({ entity, children, onClose }: { entity: "s
     dialog?.querySelector<HTMLButtonElement>("button")?.focus()
     return () => { dialog?.close(); document.body.style.overflow = overflow; trigger?.focus() }
   }, [])
-  return createPortal(<dialog ref={dialogRef} className="package-preview" aria-label={title} onCancel={event => { event.preventDefault(); onClose() }}><header className="package-preview-bar"><button type="button" className="package-preview-close" aria-label={`Close ${entity} preview`} onClick={onClose}>×</button><span className="package-preview-brand">Clemora</span><span className="package-preview-divider" /><span className="package-preview-label">{title}</span></header><div className="package-preview-scroll">{children}</div></dialog>, document.body)
+  return createPortal(<NativeDialog ref={dialogRef} className="package-preview" aria-label={title} onCancel={event => { event.preventDefault(); onClose() }}><header className="package-preview-bar"><Button variant="plain" type="button" className="package-preview-close" aria-label={`Close ${entity} preview`} onClick={onClose}>×</Button><span className="package-preview-brand">Clemora</span><span className="package-preview-divider" /><span className="package-preview-label">{title}</span></header><div className="package-preview-scroll">{children}</div></NativeDialog>, document.body)
 }

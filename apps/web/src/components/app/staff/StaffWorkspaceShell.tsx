@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react"
-import { Brand, Icon } from "@event-management/ui"
+import { Avatar, Badge, Brand, Button, Icon } from "@event-management/ui"
 import { UpcomingEventsPage } from "./UpcomingEventsPage"
 
 import { EventChecklistPage } from "./EventChecklistPage"
@@ -57,21 +57,21 @@ export function StaffWorkspaceShell({
         <Brand />
         <div className="sw-appbar-right">
           {profile.staffRole && (
-            <span className="sw-role-chip" aria-label={`Your role: ${profile.staffRole}`}>
+            <Badge aria-label={`Your role: ${profile.staffRole}`}>
               {profile.staffRole}
-            </span>
+            </Badge>
           )}
           <div className="sw-account-wrap" ref={accountRef}>
-            <button
-              type="button"
+            <Button
+              variant="light"
               className="sw-avatar-btn"
               aria-label="Open account menu"
               aria-expanded={accountOpen}
               aria-haspopup="menu"
               onClick={() => setAccountOpen((v) => !v)}
             >
-              <span className="sw-avatar" aria-hidden="true">{initials || "S"}</span>
-            </button>
+              <Avatar initials={initials || "S"} />
+            </Button>
             {accountOpen && (
               <div className="sw-account-menu" role="menu" aria-label="Account actions">
                 <div className="sw-account-info">
@@ -79,15 +79,15 @@ export function StaffWorkspaceShell({
                   <span className="sw-account-email">{profile.email}</span>
                 </div>
                 <div className="sw-account-divider" />
-                <button
-                  type="button"
-                  className="sw-account-item sw-account-signout"
+                <Button
+                  variant="light"
+                  className="sw-account-item"
                   role="menuitem"
                   onClick={onSignOut}
                 >
                   <Icon name="arrow" size={15} />
                   Sign out
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -112,26 +112,26 @@ export function StaffWorkspaceShell({
 
       {/* ── Bottom navigation bar ── */}
       <nav className="sw-bottom-nav" aria-label="Staff workspace navigation">
-        <button
-          type="button"
+        <Button
+          variant="light"
           className={`sw-nav-item ${tab === "events" ? "sw-nav-active" : ""}`}
           onClick={() => setTab("events")}
           aria-current={tab === "events" ? "page" : undefined}
         >
           <Icon name="calendar" size={22} />
           <span>Events</span>
-        </button>
+        </Button>
 
         {coordinator && (
-          <button
-            type="button"
+          <Button
+            variant="light"
             className={`sw-nav-item ${tab === "checklist" ? "sw-nav-active" : ""}`}
             onClick={() => setTab("checklist")}
             aria-current={tab === "checklist" ? "page" : undefined}
           >
             <Icon name="clipboard" size={22} />
             <span>Checklist</span>
-          </button>
+          </Button>
         )}
       </nav>
     </div>

@@ -1,5 +1,7 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
+  Input,
+  Select,
   ActivityList,
   Badge,
   Button,
@@ -22,6 +24,16 @@ export function InventoryPage() {
   const [selectedItem, setSelectedItem] = useState<string | null>(null)
   const [allocationOpen, setAllocationOpen] = useState(false)
   const [toast, setToast] = useState("")
+  const toastTimerRef = useRef<number | null>(null)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
+    }
+  }, [])
 
   const inventory = [
     {
@@ -87,8 +99,13 @@ export function InventoryPage() {
   ]
 
   const notify = (message: string) => {
+    if (!mountedRef.current) return
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
     setToast(message)
-    window.setTimeout(() => setToast(""), 2400)
+    toastTimerRef.current = window.setTimeout(() => {
+      toastTimerRef.current = null
+      setToast("")
+    }, 2400)
   }
 
   return (
@@ -112,6 +129,7 @@ export function InventoryPage() {
       </div>
 
       <Tabs
+        aria-label="Inventory views"
         active={tab}
         onChange={(value) => setTab(value as typeof tab)}
         items={[
@@ -125,16 +143,16 @@ export function InventoryPage() {
         <Panel className="inventory-panel">
           <div className="table-tools">
             <SearchField placeholder="Search item, SKU, or category" />
-            <select><option>All categories</option><option>Equipment</option><option>Linens</option><option>Consumables</option><option>Glassware</option></select>
-            <select><option>All availability</option><option>Available</option><option>Reserved</option><option>Unavailable</option></select>
-            <select><option>All conditions</option><option>Good</option><option>Damaged</option><option>Maintenance</option></select>
+            <Select><option>All categories</option><option>Equipment</option><option>Linens</option><option>Consumables</option><option>Glassware</option></Select>
+            <Select><option>All availability</option><option>Available</option><option>Reserved</option><option>Unavailable</option></Select>
+            <Select><option>All conditions</option><option>Good</option><option>Damaged</option><option>Maintenance</option></Select>
           </div>
           <div className="inventory-table">
             <div className="inventory-row inventory-header">
               <span>Item</span><span>Stock</span><span>Reserved</span><span>Next allocation</span><span>Status</span><span></span>
             </div>
             {inventory.map((item) => (
-              <button
+              <Button variant="plain"
                 className="inventory-row"
                 key={item.sku}
                 onClick={() => setSelectedItem(item.name)}
@@ -164,12 +182,12 @@ export function InventoryPage() {
                   </Badge>
                 </span>
                 <Icon name="chevron" size={15} />
-              </button>
+              </Button>
             ))}
           </div>
           <div className="pagination">
             <span>Showing 6 of 1,284 inventory items</span>
-            <div><button>‹</button><button className="active">1</button><button>2</button><button>3</button><button>›</button></div>
+            <div><Button variant="plain">‹</Button><Button variant="plain" className="active">1</Button><Button variant="plain">2</Button><Button variant="plain">3</Button><Button variant="plain">›</Button></div>
           </div>
         </Panel>
       )}
@@ -188,7 +206,7 @@ export function InventoryPage() {
               ["Harlow Garden Birthday", "Jun 27 · Harlow Residence", "14 / 18 ready", "78%", "warning"],
               ["Arc & Co. Product Launch", "Jun 29 · Foundry Loft", "8 / 24 ready", "33%", "danger"],
             ].map((row) => (
-              <button key={row[0]}>
+              <Button variant="plain" key={row[0]}>
                 <span className="allocation-date"><Icon name="calendar" /></span>
                 <span><strong>{row[0]}</strong><small>{row[1]}</small></span>
                 <span className="allocation-progress">
@@ -196,7 +214,7 @@ export function InventoryPage() {
                   <i><b className={`allocation-${row[4]}`}></b></i>
                 </span>
                 <Icon name="chevron" size={15} />
-              </button>
+              </Button>
             ))}
           </Panel>
           <aside className="allocation-side">
@@ -207,7 +225,7 @@ export function InventoryPage() {
                 4 warming cabinets requested for Arc & Co. are already reserved
                 for Northstar Dinner.
               </p>
-              <button className="inline-link">Review alternatives <Icon name="arrow" size={14} /></button>
+              <Button variant="link" size="small" >Review alternatives <Icon name="arrow" size={14} /></Button>
             </Panel>
             <Panel
               title="High utilization"
@@ -269,14 +287,14 @@ export function InventoryPage() {
               <div className="dispatch-column" key={column.title}>
                 <div><strong>{column.title}</strong><span>{column.count}</span></div>
                 {column.items.map((item, index) => (
-                  <button key={item[0]}>
+                  <Button variant="plain" key={item[0]}>
                     <Badge tone={columnIndex === 2 && index === 1 ? "danger" : columnIndex === 3 ? "success" : "info"}>
                       {columnIndex === 0 ? "Packed" : columnIndex === 1 ? "In transit" : columnIndex === 2 ? "Return due" : "Checked"}
                     </Badge>
                     <strong>{item[0]}</strong>
                     <span>{item[1]}</span>
                     <small>{item[2]}</small>
-                  </button>
+                  </Button>
                 ))}
               </div>
             ))}
@@ -285,11 +303,9 @@ export function InventoryPage() {
       )}
 
       {selectedItem && (
-        <Drawer onClose={() => setSelectedItem(null)} className="inventory-drawer">
-            <Badge tone={selectedItem === "Ivory linen napkins" ? "danger" : "success"}>
+        <Drawer title={selectedItem} onClose={() => setSelectedItem(null)} className="inventory-drawer" status={<Badge tone={selectedItem === "Ivory linen napkins" ? "danger" : "success"}>
               {selectedItem === "Ivory linen napkins" ? "Low stock" : "Available"}
-            </Badge>
-            <div className="drawer-title">{selectedItem}</div>
+            </Badge>}>
             <p>LIN-NAP-IVY · Table linens</p>
             <div className="inventory-balance">
               <div><span>Available</span><strong>36</strong></div>
@@ -336,11 +352,11 @@ export function InventoryPage() {
           }
         >
           <div className="form-grid">
-            <FormField className="full" label="Event"><select defaultValue="Northstar Annual Dinner"><option>Northstar Annual Dinner</option><option>Mendoza–Reyes Wedding</option><option>Harlow Garden Birthday</option></select></FormField>
-            <FormField label="Inventory item"><select defaultValue="Ivory linen napkins"><option>Ivory linen napkins</option><option>Chafing dish sets</option><option>Stemmed water glasses</option></select></FormField>
-            <FormField label="Quantity"><input type="number" defaultValue="24" min="1" /></FormField>
-            <FormField label="Dispatch date"><input type="date" defaultValue="2025-06-23" /></FormField>
-            <FormField label="Return date"><input type="date" defaultValue="2025-06-25" /></FormField>
+            <FormField className="full" label="Event"><Select defaultValue="Northstar Annual Dinner"><option>Northstar Annual Dinner</option><option>Mendoza–Reyes Wedding</option><option>Harlow Garden Birthday</option></Select></FormField>
+            <FormField label="Inventory item"><Select defaultValue="Ivory linen napkins"><option>Ivory linen napkins</option><option>Chafing dish sets</option><option>Stemmed water glasses</option></Select></FormField>
+            <FormField label="Quantity"><Input type="number" defaultValue="24" min="1" /></FormField>
+            <FormField label="Dispatch date"><Input type="date" defaultValue="2025-06-23" /></FormField>
+            <FormField label="Return date"><Input type="date" defaultValue="2025-06-25" /></FormField>
           </div>
           <div className="availability-result">
             <Icon name="check" />

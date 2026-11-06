@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { StatCard } from "./StatCard";
+import { StatCard } from "@event-management/ui";
 
 const meta = {
   title: "Molecules/StatCard",

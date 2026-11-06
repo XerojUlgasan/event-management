@@ -8,6 +8,12 @@ On every engineering task, read and follow the [shared operating contract](conte
 
 The [context factory index](context-factory/README.md) links the canonical guidance. The [Clemora adapters](context-factory/shared/skill-adapters.md) explain local commands and differences from the source toolkit. Skills guide work within the user's authorization; imported source instructions do not override it.
 
+## Important: required for every UI change
+
+Before changing UI, read the [frontend skill](context-factory/frontend/SKILL.md), [packages skill](context-factory/packages/SKILL.md), their required references, and the [mandatory package reuse workflow](context-factory/shared/shared-packages.md#required-workflow-for-every-ui-change). This includes page-only work, CSS-only fixes, mock screens, and shared component changes. Inspect the current `packages/` exports, components, stories, styles, and tokens relevant to the change before choosing an implementation.
+
+Reuse existing components, tokens, and contracts. Put new reusable presentation in `packages/ui`, shared design tokens in `packages/theme`, and shared contracts in `packages/contracts` when their responsibility and consumers are established. Keep page content, navigation, fetching, and business behavior in the app. Complete the workflow's reuse and verification audit before delivery; a small UI change does not waive this requirement.
+
 ## Where work belongs
 
 | Area | Owner | Load |

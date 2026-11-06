@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Brand } from "./Brand";
+import { Brand } from "@event-management/ui";
 
 const meta = {
   title: "Molecules/Brand",

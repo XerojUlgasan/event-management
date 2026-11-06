@@ -34,14 +34,14 @@ Before implementing dependent work, confirm intake fields and real catalog conte
 | Identity | Local email/password and optional Firebase sign-in share database profiles, roles, and server-side sessions. |
 | Booking requests | Signed-in customers submit inquiries from published packages. PostgreSQL stores package snapshots, request details, status history, and a linked conversation. Signed-out drafts resume after sign-in for explicit review and submission. |
 | Messages | Customer-to-admin conversations persist in PostgreSQL, including request-linked conversations, unread counts, and read state. |
-| Directory and staff access | System Administrators have a read-only Staff & Customers directory. Ordinary staff have read-only booking requests and published package/service views. |
+| Directory and staff access | System Administrators have a read-only Staff & Customers directory. The current staff workspace shows mock event assignments and a mock checklist for staff titles containing “coordinator” or “head waiter”; its responses and checklist edits stay in local UI state. Staff can read booking requests through the API, and published catalogs are publicly readable, but the staff workspace does not currently expose those views. |
 | Remaining scope | Requirements-first inquiries, quotations, availability, confirmed bookings, full workforce management, AI replies/handoff, reports, and the managed showcase are not implemented. Other business screens may contain demo or local data. |
 
 ### Booking requests and messages
 
 The current intake requires a customer session and a published package. It collects event type (Birthday, Wedding, Corporate, or a custom choice), preferred date, estimated event length, contact name and phone, and optional notes. Length can be one through six days, one week, more than one week with an exact day count, or unspecified. Guest count, exact times, and venue/location are gathered in follow-up; the API also accepts an optional guest count.
 
-Creation snapshots the package name, price, and maximum guests. Later catalog edits do not change those snapshots. A supplied stale `packageUpdatedAt` returns `409`. Requests start as `under_review`; other statuses are `needs_details`, `accepted`, `declined`, and `cancelled`. Acceptance is for processing only. Customers can cancel their own open requests. Only System Administrators can update review status; ordinary staff can read requests. Preferred location is independent of the venue catalog.
+Creation snapshots the package name, price, and maximum guests. Later catalog edits do not change those snapshots. A supplied stale `packageUpdatedAt` returns `409`. Requests start as `under_review`; other statuses are `needs_details`, `accepted`, `declined`, and `cancelled`. Acceptance is for processing only. Customers can cancel their own open requests. Only System Administrators can update review status; the API permits staff to read requests, but the current staff workspace does not display that queue. Preferred location is independent of the venue catalog.
 
 Both message workspaces refresh every five seconds. Opening a conversation marks the other side's messages as read; messages allow up to 4,000 characters. Request-linked threads expose booking details, read-only for customers. Conversations expire 24 hours after the event end when known, or 24 hours after creation otherwise. Expired linked threads remain closed; a customer message can reopen a general conversation. Closed history is retained. There is no public guest chat or AI assistant.
 
@@ -176,6 +176,7 @@ Run the checks matching the changed area:
 | Command | Checks |
 | --- | --- |
 | `pnpm check` | Workspace types |
+| `pnpm check:design` | Web controls use shared UI exports; authored web/UI colors use theme tokens. Source checks do not establish visual or behavioral correctness. |
 | `pnpm build` | Web production bundle and API types |
 | `pnpm build:storybook` | Shared UI rendering build |
 | `pnpm db:validate` | Prisma schema |

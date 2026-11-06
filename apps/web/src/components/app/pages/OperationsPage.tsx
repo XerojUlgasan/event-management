@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Avatar, Badge, Button, Icon, Panel } from "@event-management/ui"
+import { Input, Avatar, Badge, Button, Icon, Panel } from "@event-management/ui"
 
 export function OperationsPage() {
   const [checked, setChecked] = useState([true, true, false, false])
@@ -30,7 +30,7 @@ export function OperationsPage() {
             setup.
           </span>
         </div>
-        <button>Review timeline</button>
+        <Button variant="secondary" size="small">Review timeline</Button>
       </div>
       <div className="ops-layout">
         <div className="ops-main">
@@ -111,7 +111,7 @@ export function OperationsPage() {
           <Panel
             title="Priority tasks"
             description="Items due before team briefing"
-            action={<button className="inline-link">View all 24 tasks</button>}
+            action={<Button variant="link" size="small" >View all 24 tasks</Button>}
           >
             <div className="task-list">
               {[
@@ -121,7 +121,7 @@ export function OperationsPage() {
                 "Brief service captains on table zones",
               ].map((task, index) => (
                 <label className="task-row" key={task}>
-                  <input
+                  <Input variant="plain"
                     type="checkbox"
                     checked={checked[index]}
                     onChange={() =>
@@ -159,11 +159,11 @@ export function OperationsPage() {
                 <strong>Amina Santos</strong>
                 <small>Lead coordinator</small>
               </span>
-              <button>•••</button>
+              <Button variant="secondary" size="icon" aria-label="More options"><Icon name="more" /></Button>
             </div>
             <div className="contact-row">
-              <button>Message</button>
-              <button>Call</button>
+              <Button variant="secondary" size="small">Message</Button>
+              <Button variant="secondary" size="small">Call</Button>
             </div>
           </Panel>
           <Panel
@@ -202,9 +202,9 @@ export function OperationsPage() {
                 <small>Reported 1:12 PM · Replacement dispatched</small>
               </span>
             </div>
-            <button className="inline-link">
+            <Button variant="link" size="small" >
               Open incident record <Icon name="arrow" size={14} />
-            </button>
+            </Button>
           </Panel>
           <Panel>
             <div className="panel-title">Resources</div>

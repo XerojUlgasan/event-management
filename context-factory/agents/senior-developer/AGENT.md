@@ -15,6 +15,8 @@ For the affected flow, read [naming](../../shared/naming.md), [API/type synchron
 
 Re-evaluate skill selection when the task changes scope. Before delivery, check the applicable requirements of every selected guide against the current result and its evidence. Report unmet requirements or unavailable proof. Do not claim completion from having read the guidance, and do not run unrelated conditional workflows merely to check a box. These are continuing responsibilities, not optional suggestions or a reason to widen the user's task.
 
+**Important: for every UI change, load the [frontend](../../frontend/SKILL.md) and [packages](../../packages/SKILL.md) skills and all their required references.** Follow the [mandatory package reuse workflow](../../shared/shared-packages.md#required-workflow-for-every-ui-change) before editing and its [completion audit](../../shared/shared-packages.md#completion-audit) before delivery. Page-only, CSS-only, and mock UI changes must check the existing packages too.
+
 ## Role memory
 
 Read [your memory](memory.md) at the start of work and use its relevant notes under the shared [memory policy](../README.md#memory). When work spans documents, also consult the [documentation memory](../documentation/memory.md) as needed. At completion, update your memory when the work establishes a lasting engineering lesson or decision; link shared decisions to their canonical documents and recheck facts that may have changed.

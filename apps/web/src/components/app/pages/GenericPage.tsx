@@ -128,7 +128,7 @@ export function GenericPage({ page }: { page: NavKey }) {
       >
         <div className="management-list">
           {adminRows.map((item, index) => (
-            <button key={item}>
+            <Button variant="plain" key={item}>
               <span className="management-icon">
                 <Icon
                   name={
@@ -177,7 +177,7 @@ export function GenericPage({ page }: { page: NavKey }) {
                 </Badge>
               )}
               <Icon name="chevron" />
-            </button>
+            </Button>
           ))}
         </div>
       </Panel>

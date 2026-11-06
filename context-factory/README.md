@@ -9,8 +9,11 @@ Start with [repository guidance](../AGENTS.md) and the selected [role](agents/RE
 | [Engineering skills](engineering/README.md) | Investigation, design, implementation, review, teaching, writing, and delivery methods |
 | [Workflow adapters](shared/skill-adapters.md) | Clemora commands, capabilities, source-toolkit differences, and verification scenarios |
 | [API](api/SKILL.md), [frontend](frontend/SKILL.md), [packages](packages/SKILL.md), [limits](limits/SKILL.md), [QA](QA/SKILL.md) | Implementation ownership and required area references |
+| [Clemora UI usage](frontend/clemora-ui/SKILL.md) | Choosing, composing, styling, and extending the shared UI with working examples and Storybook guidance |
 | [Agents](agents/README.md) | Senior developer and documentation roles, task references, and memory policy |
 
 The senior developer reads the operating contract, principle digest, and engineering index at the start of every task, then loads the full skills selected by their triggers. Shared conventions link to area owners rather than replacing them. The documentation agent owns document structure and evidence; technical writing complements that role.
+
+**Important: every UI change requires the [frontend](frontend/SKILL.md) and [packages](packages/SKILL.md) skills, their required references, and the [package reuse workflow](shared/shared-packages.md#required-workflow-for-every-ui-change).** Check the existing packages before editing, including for page-only, CSS-only, and mock UI work, and audit reuse before delivery.
 
 After changing guidance, run `pnpm check:guidance`. This checks navigation, skill metadata, and registration. It cannot prove that an agent followed instructions or that application behavior works; inspect technical claims against source and exercise the affected behavior separately.

@@ -1,3 +1,4 @@
+import { Badge, Button } from "@event-management/ui"
 import type { ReactNode } from "react"
 
 type CardStatus = { label: string; tone: "neutral" | "warning" | "success" }
@@ -29,8 +30,13 @@ export function CatalogCardActions({ name, status, actions = [], onEdit, disable
   disabled?: boolean
 }) {
   return <div className="pe-card-actions">
-    <span className="pe-status" data-tone={status.tone}>{status.label === "Published" ? "●  Published" : status.label}</span>
-    {actions.length > 0 && <details className="pe-actions-menu"><summary aria-label={`More actions for ${name}`} aria-disabled={disabled} onClick={event => { if (disabled) event.preventDefault() }}>⋯</summary><div>{actions.map(action => <button key={action.label} disabled={disabled} onClick={event => { event.currentTarget.closest("details")?.removeAttribute("open"); action.onSelect() }}>{action.label}</button>)}</div></details>}
-    {onEdit && <button disabled={disabled} onClick={onEdit}>Edit ↗</button>}
+    <Badge tone={status.tone}>{status.label}</Badge>
+    {actions.length > 0 && <details className="pe-actions-menu"><summary aria-label={`More actions for ${name}`} aria-disabled={disabled} onClick={event => { if (disabled) event.preventDefault() }}>⋯</summary><div>{actions.map(action => <Button variant="secondary" key={action.label} disabled={disabled} onClick={event => {
+      const menu = event.currentTarget.closest("details")
+      menu?.removeAttribute("open")
+      menu?.querySelector("summary")?.focus()
+      action.onSelect()
+    }}>{action.label}</Button>)}</div></details>}
+    {onEdit && <Button variant="secondary" disabled={disabled} onClick={onEdit}>Edit ↗</Button>}
   </div>
 }

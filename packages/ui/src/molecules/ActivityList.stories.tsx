@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { ActivityList } from "./ActivityList";
+import { ActivityList } from "@event-management/ui";
 
 const meta = {
   title: "Molecules/ActivityList",

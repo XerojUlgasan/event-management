@@ -1,6 +1,8 @@
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, HTMLInputTypeAttribute } from "react";
 
 import { Icon } from "../atoms/Icon";
+import { Input } from "../atoms/Input";
+import { InputGroup } from "./InputGroup";
 
 export function SearchField({
   value,
@@ -9,6 +11,7 @@ export function SearchField({
   compact = false,
   className = "",
   ariaLabel,
+  type = "text",
 }: {
   value?: string;
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -16,20 +19,23 @@ export function SearchField({
   compact?: boolean;
   className?: string;
   ariaLabel?: string;
+  type?: HTMLInputTypeAttribute;
 }) {
   return (
-    <div
+    <InputGroup
+      leading={<Icon name="search" />}
       className={`search-field${compact ? " compact" : ""}${
         className ? ` ${className}` : ""
       }`}
     >
-      <Icon name="search" />
-      <input
+      <Input
+        variant="plain"
+        type={type}
         value={value}
         onChange={onChange}
         placeholder={placeholder}
         aria-label={ariaLabel ?? placeholder}
       />
-    </div>
+    </InputGroup>
   );
 }

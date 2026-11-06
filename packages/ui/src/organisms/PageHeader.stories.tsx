@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { Button } from "../atoms/Button";
-import { PageHeader } from "./PageHeader";
+import { Button, PageHeader } from "@event-management/ui";
 
 const meta = {
   title: "Organisms/PageHeader",
@@ -25,6 +24,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+export const SectionHeading: Story = { args: { titleAs: "h2", title: "Upcoming events" } };
 export const WithEyebrow: Story = {
   args: {
     className: "welcome-row",

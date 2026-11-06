@@ -7,6 +7,6 @@
   body {
     color: var(--ink);
     font-family: var(--font-sans);
-    background: white;
+    background: var(--surface-base);
   }
 }

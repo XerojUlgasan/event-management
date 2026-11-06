@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
 import {
+  Button,
   ActivityList,
-  Badge,
+  Avatar,
   Drawer,
   Icon,
   PageHeader,
@@ -95,6 +96,7 @@ export function StaffCustomersPage() {
         description="View staff roles and customer profiles in one place."
       />
       <Tabs
+        aria-label="Directory views"
         className="staff-customers-tabs"
         active={tab}
         onChange={setTab}
@@ -140,13 +142,13 @@ export function StaffCustomersPage() {
                 <span></span>
               </div>
               {filteredStaff.map((person) => (
-                <button
+                <Button variant="plain"
                   className="staff-admin-row"
                   key={person.id}
                   onClick={() => setSelectedStaff(person)}
                 >
                   <span>
-                    <i aria-hidden="true">{initials(person.displayName)}</i>
+                    <span className="directory-avatar" aria-hidden="true"><Avatar initials={initials(person.displayName)} /></span>
                     <span>
                       <strong>{person.displayName ?? person.email}</strong>
                       <small>{person.email}</small>
@@ -155,7 +157,7 @@ export function StaffCustomersPage() {
                   <span>{person.staffRole ?? "—"}</span>
                   <span>—</span>
                   <Icon name="chevron" size={15} />
-                </button>
+                </Button>
               ))}
               {filteredStaff.length === 0 && (
                 <div className="empty-state">
@@ -199,13 +201,13 @@ export function StaffCustomersPage() {
                 <span></span>
               </div>
               {filteredCustomers.map((customer) => (
-                <button
+                <Button variant="plain"
                   className="customer-admin-row"
                   key={customer.id}
                   onClick={() => setSelectedCustomer(customer)}
                 >
                   <span>
-                    <i aria-hidden="true">{initials(customer.displayName)}</i>
+                    <span className="directory-avatar" aria-hidden="true"><Avatar initials={initials(customer.displayName)} /></span>
                     <span>
                       <strong>{customer.displayName ?? customer.email}</strong>
                       <small>{customer.email}</small>
@@ -213,7 +215,7 @@ export function StaffCustomersPage() {
                   </span>
                   <span>{customer.email}</span>
                   <Icon name="chevron" size={15} />
-                </button>
+                </Button>
               ))}
               {filteredCustomers.length === 0 && (
                 <div className="empty-state">
@@ -227,8 +229,7 @@ export function StaffCustomersPage() {
         </>
       )}
       {selectedStaff && (
-        <Drawer onClose={() => setSelectedStaff(null)}>
-          <div className="drawer-title">{selectedStaff.displayName ?? selectedStaff.email}</div>
+        <Drawer title={selectedStaff.displayName ?? selectedStaff.email} onClose={() => setSelectedStaff(null)}>
           <p>{selectedStaff.staffRole ?? "Staff"}</p>
           <div className="detail-grid">
             <div><span>Email</span><strong>{selectedStaff.email}</strong></div>
@@ -242,8 +243,7 @@ export function StaffCustomersPage() {
         </Drawer>
       )}
       {selectedCustomer && (
-        <Drawer onClose={() => setSelectedCustomer(null)}>
-          <div className="drawer-title">{selectedCustomer.displayName ?? selectedCustomer.email}</div>
+        <Drawer title={selectedCustomer.displayName ?? selectedCustomer.email} onClose={() => setSelectedCustomer(null)}>
           <p>Customer</p>
           <div className="detail-grid">
             <div><span>Email</span><strong>{selectedCustomer.email}</strong></div>

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { Toast } from "./Toast";
+import { Toast } from "@event-management/ui";
 
 const meta = {
   title: "Molecules/Toast",
@@ -12,6 +12,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Success: Story = {};
+export const Error: Story = { args: { tone: "danger", children: "Unable to start a conversation. Try again." } };
+export const LongMessage: Story = { args: { tone: "danger", children: "Unable to start a conversation because the connection was interrupted. Check your connection and try again." } };
 export const CustomIcon: Story = {
   args: { icon: "alert", children: "Something needs your attention" },
 };

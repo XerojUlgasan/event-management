@@ -1,32 +1,41 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
+import { Button } from "../atoms/Button";
 import { Icon } from "../atoms/Icon";
+import { ModalSurface } from "./ModalSurface";
 
 export function Drawer({
   onClose,
+  title,
+  status,
   children,
   className = "",
 }: {
   onClose: () => void;
+  title: ReactNode;
+  status?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
+  const titleId = useId();
   return (
-    <div className="drawer-backdrop" onMouseDown={onClose}>
-      <aside
+    <ModalSurface className="drawer-backdrop" onClose={onClose} aria-labelledby={titleId}>
+      <div
         className={`detail-drawer${className ? ` ${className}` : ""}`}
-        onMouseDown={(event) => event.stopPropagation()}
       >
-        <button
+        <Button
+          variant="plain"
           type="button"
           className="modal-close"
           onClick={onClose}
           aria-label="Close panel"
         >
           <Icon name="close" />
-        </button>
+        </Button>
+        {status}
+        <h2 className="drawer-title" id={titleId}>{title}</h2>
         {children}
-      </aside>
-    </div>
+      </div>
+    </ModalSurface>
   );
 }

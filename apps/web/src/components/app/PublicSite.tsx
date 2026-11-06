@@ -1,3 +1,4 @@
+import { ActionLink } from "@event-management/ui"
 import { useState } from "react"
 import { Badge, Brand, Button, Dialog, Icon } from "@event-management/ui"
 
@@ -23,17 +24,17 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
           <a href="#about">About us</a>
         </nav>
         <div className="header-actions">
-          <button className="text-button" onClick={onEnterCustomer}>
+          <Button variant="link"  onClick={onEnterCustomer}>
             Sign in
-          </button>
+          </Button>
           <Button onClick={onEnterCustomer}>Get started</Button>
-          <button
+          <Button variant="plain"
             className="icon-button mobile-menu"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Open navigation"
           >
             <Icon name={mobileOpen ? "close" : "menu"} />
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -142,9 +143,9 @@ export function PublicSite({ onEnterCustomer }: { onEnterCustomer: () => void })
               Clemora connects package discovery, booking requests, schedules,
               team updates, and event progress in one simple experience.
             </p>
-            <a className="inline-link" href="#packages">
-              How Clemora works <Icon name="arrow" size={16} />
-            </a>
+            <ActionLink href="#packages">
+              How Clemora works
+            </ActionLink>
           </div>
         </section>
 

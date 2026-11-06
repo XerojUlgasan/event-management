@@ -1,6 +1,6 @@
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages"
 import { Fragment, useEffect, useRef, useState, type SubmitEvent } from "react"
-import { Button, Icon } from "@event-management/ui"
+import { Avatar, Badge, Button, Icon, Input } from "@event-management/ui"
 
 import { getAdminBookingRequest, getMyBookingRequest, type BookingRequest, type ChatConversation, type ChatMessage } from "../../../lib/api"
 import { BookingDetails } from "../BookingList"
@@ -167,25 +167,24 @@ export function MessagesWorkspace({
         <div className="messages-sidebar-head">
           <h1>{title}</h1>
           {isTeam && onNewChat && (
-            <button type="button" className="message-action" onClick={onNewChat} disabled={newChatBusy}>
+            <Button variant="plain" type="button" className="message-action" onClick={onNewChat} disabled={newChatBusy}>
               {newChatBusy ? "Starting…" : "New chat"}
-            </button>
+            </Button>
           )}
         </div>
         {conversations.map((conversation) => {
           const name = isTeam ? "Clemora team" : conversation.customerName
           const conversationAvatar = isTeam ? "C" : initialsFromName(conversation.customerName)
           return (
-            <button
+            <Button
+              variant="plain"
               type="button"
               key={conversation.id}
               className={conversation.id === activeId ? "active" : ""}
               aria-pressed={conversation.id === activeId}
               onClick={() => onSelect(conversation.id)}
             >
-              <span className={`manager-avatar small ${isTeam ? "team-avatar" : ""}`}>
-                {conversationAvatar}
-              </span>
+              <Avatar tone={isTeam ? "accent" : "default"} initials={conversationAvatar} />
               <span>
                 <strong>{name}</strong>
                 {conversation.eventType && <em className="conversation-booking">{conversation.eventType}</em>}
@@ -196,12 +195,12 @@ export function MessagesWorkspace({
                     {dayKey(conversation.updatedAt) === dayKey(new Date().toISOString()) ? timeFormatter.format(new Date(conversation.updatedAt)) : `${dayLabel(conversation.updatedAt)} · ${timeFormatter.format(new Date(conversation.updatedAt))}`}
                   </time>
                   {conversation.unreadCount > 0 && (
-                    <span className="messages-unread" aria-label={`${conversation.unreadCount} unread messages`}>
+                    <Badge tone="accent" variant="counter" aria-label={`${conversation.unreadCount} unread messages`}>
                       {conversation.unreadCount > 9 ? "9+" : conversation.unreadCount}
-                    </span>
+                    </Badge>
                   )}
               </span>
-            </button>
+            </Button>
           )
         })}
         {!loading && conversations.length === 0 && (
@@ -209,9 +208,9 @@ export function MessagesWorkspace({
             <strong>{error ? "Could not load messages" : listEmpty.title}</strong>
             <p>{error || listEmpty.body}</p>
             {error && onRetry && (
-              <button type="button" className="messages-retry" onClick={onRetry}>
+              <Button variant="plain" type="button" className="messages-retry" onClick={onRetry}>
                 Try again
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -219,9 +218,9 @@ export function MessagesWorkspace({
         {loadMoreError && <p className="messages-list-status" role="alert">{loadMoreError}</p>}
         {hasMore && onLoadMore && (
           <div className="messages-list-footer">
-            <button type="button" className="messages-load-more" onClick={onLoadMore} disabled={loadingMore}>
+            <Button variant="plain" type="button" className="messages-load-more" onClick={onLoadMore} disabled={loadingMore}>
               {loadingMore ? "Loading…" : "Load more conversations"}
-            </button>
+            </Button>
           </div>
         )}
         {hasMore && <div ref={listEnd} aria-hidden="true" />}
@@ -230,7 +229,8 @@ export function MessagesWorkspace({
       <section>
         <div className="message-thread-head">
           {!singleConversation && (
-            <button
+            <Button
+              variant="plain"
               type="button"
               className="message-back"
               onClick={onBack}
@@ -238,38 +238,36 @@ export function MessagesWorkspace({
             >
               <Icon name="chevron" size={16} />
               <span>Back</span>
-            </button>
+            </Button>
           )}
-          <span className={`manager-avatar small ${isTeam ? "team-avatar" : ""}`}>
-            {avatar}
-          </span>
+          <Avatar tone={isTeam ? "accent" : "default"} initials={avatar} />
           <div className="message-thread-title">
             <span className="message-thread-name">
               <strong>{activeName}</strong>
-              {active?.status === "closed" && <span className="conversation-state closed">Closed</span>}
+              {active?.status === "closed" && <Badge tone="neutral">Closed</Badge>}
             </span>
             <small>{activeDetail}</small>
           </div>
           {active && (
             <div className="message-head-actions">
               {active.bookingRequestId && (
-                <button type="button" className="message-info" aria-label="View booking request details" title="View booking request details" onClick={() => void openBooking()} disabled={bookingLoading}>
-                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
-                </button>
+                <Button variant="plain" type="button" className="message-info" aria-label="View booking request details" title="View booking request details" onClick={() => void openBooking()} disabled={bookingLoading}>
+                  <Icon name="info" size={19} />
+                </Button>
               )}
 
             </div>
           )}
         </div>
 
-        {bookingError && <div className="messages-error" role="alert"><span>{bookingError}</span><button type="button" onClick={() => void openBooking()}>Try again</button></div>}
+        {bookingError && <div className="messages-error" role="alert"><span>{bookingError}</span><Button variant="plain" type="button" onClick={() => void openBooking()}>Try again</Button></div>}
         {error && (
           <div className="messages-error" role="alert">
             <span>{error}</span>
             {onRetry && (
-              <button type="button" onClick={onRetry}>
+              <Button variant="plain" type="button" onClick={onRetry}>
                 Try again
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -332,8 +330,9 @@ export function MessagesWorkspace({
         )}
 
         {!readOnly && !closedBookingForCustomer && (
-          <form className="thread-input" onSubmit={submit}>
-            <input
+          <form className="thread-input input-group" onSubmit={submit}>
+            <Input
+              variant="plain"
               aria-label="Write a message"
               placeholder={
                 closedForCustomer

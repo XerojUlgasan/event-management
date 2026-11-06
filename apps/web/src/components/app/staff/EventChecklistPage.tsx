@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Icon } from "@event-management/ui"
+import { Badge, Button, FormField, Icon, Textarea } from "@event-management/ui"
 import { mockChecklist, mockEvents, type ChecklistItem, type ChecklistStatus } from "./mockData"
 
 const ASSIGNED_EVENT = mockEvents[2]
@@ -35,32 +35,6 @@ function stagePipClass(items: ChecklistItem[]): string {
   return ""
 }
 
-function ClockIcon({ size = 12 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" />
-    </svg>
-  )
-}
-
-function AlertIcon({ size = 13 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-      <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-    </svg>
-  )
-}
-
-function CameraIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-      <circle cx="12" cy="13" r="4" />
-    </svg>
-  )
-}
-
 function StatusButton({
   current,
   next,
@@ -73,14 +47,14 @@ function StatusButton({
   onClick: () => void
 }) {
   return (
-    <button
-      type="button"
-      className={`cl-status-btn cl-status-${next} ${current === next ? "cl-status-active" : ""}`}
+    <Button
+      variant={current === next ? "primary" : "secondary"}
+      className="cl-checklist-status-button"
       onClick={onClick}
       aria-pressed={current === next}
     >
       {label}
-    </button>
+    </Button>
   )
 }
 
@@ -131,28 +105,19 @@ function ChecklistItemRow({
         <div className="cl-item-body">
           <div className="cl-item-row">
             <p className="cl-item-activity">{item.activity}</p>
-            <button
-              type="button"
-              className="cl-expand-btn"
+            <Button
+              variant="secondary"
+              className="cl-checklist-expand"
               aria-expanded={expanded}
               aria-label={expanded ? "Collapse details" : "Expand details"}
               onClick={() => setExpanded((v) => !v)}
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+              <Icon
+                name="chevron"
+                size={16}
                 style={{ transform: expanded ? "rotate(90deg)" : "none", transition: "transform .2s ease" }}
-              >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </button>
+              />
+            </Button>
           </div>
 
           {/* Time row */}
@@ -160,7 +125,7 @@ function ChecklistItemRow({
             <div className="cl-item-times">
               {item.plannedTime && (
                 <span className="cl-time-planned">
-                  <ClockIcon size={11} />
+                  <Icon name="clock" size={11} />
                   {item.plannedTime}
                 </span>
               )}
@@ -178,16 +143,16 @@ function ChecklistItemRow({
           {/* Blocker callout */}
           {item.status === "blocked" && item.blockerNote && (
             <p className="cl-blocker-note">
-              <AlertIcon size={13} />
+              <Icon name="alert" size={13} />
               {item.blockerNote}
             </p>
           )}
         </div>
 
         {/* Status badge */}
-        <span className={`cl-badge cl-badge-${item.status}`} aria-label={`Status: ${STATUS_LABEL[item.status]}`}>
+        <Badge tone={item.status === "done" ? "success" : item.status === "blocked" ? "danger" : "neutral"} aria-label={`Status: ${STATUS_LABEL[item.status]}`}>
           {STATUS_LABEL[item.status]}
-        </span>
+        </Badge>
       </div>
 
       {/* Expanded controls */}
@@ -201,11 +166,8 @@ function ChecklistItemRow({
           </div>
 
           {item.status === "blocked" && (
-            <div className="cl-field">
-              <label htmlFor={`blocker-${item.id}`} className="cl-field-label">
-                Blocker description
-              </label>
-              <textarea
+            <FormField className="cl-field" label={<span className="cl-field-label">Blocker description</span>}>
+              <Textarea
                 id={`blocker-${item.id}`}
                 className="cl-textarea"
                 value={blockerInput}
@@ -214,14 +176,11 @@ function ChecklistItemRow({
                 rows={2}
                 maxLength={400}
               />
-            </div>
+            </FormField>
           )}
 
-          <div className="cl-field">
-            <label htmlFor={`note-${item.id}`} className="cl-field-label">
-              Notes <span style={{ fontWeight: 400, color: "var(--muted)" }}>(optional)</span>
-            </label>
-            <textarea
+          <FormField className="cl-field" label={<span className="cl-field-label">Notes <span style={{ fontWeight: 400, color: "var(--muted)" }}>(optional)</span></span>}>
+            <Textarea
               id={`note-${item.id}`}
               className="cl-textarea"
               value={noteInput}
@@ -230,33 +189,31 @@ function ChecklistItemRow({
               rows={2}
               maxLength={400}
             />
-          </div>
+          </FormField>
 
           <div className="cl-field">
             <p className="cl-field-label">
               Photos <span style={{ fontWeight: 400, color: "var(--muted)" }}>(optional)</span>
             </p>
-            <button type="button" className="cl-photo-btn" aria-label="Add photo from camera or gallery">
-              <CameraIcon />
+            <Button variant="secondary" className="cl-checklist-photo" aria-label="Add photo from camera or gallery">
+              <Icon name="camera" size={16} />
               {item.photoCount
                 ? `${item.photoCount} photo${item.photoCount > 1 ? "s" : ""} — Add more`
                 : "Add photo"}
-            </button>
+            </Button>
             <p className="cl-field-hint">Adding a photo does not mark this item as done.</p>
           </div>
 
           <div className="cl-expanded-footer">
-            <button
-              type="button"
-              className="cl-save-btn"
+            <Button
               disabled={saving}
               onClick={() => { void handleSaveNote() }}
             >
               {saving ? "Saving…" : "Save changes"}
-            </button>
-            <button type="button" className="cl-cancel-btn" onClick={() => setExpanded(false)}>
+            </Button>
+            <Button variant="secondary" onClick={() => setExpanded(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -291,7 +248,7 @@ export function EventChecklistPage() {
             </span>
             <span className="cl-event-hero-dot" aria-hidden="true" />
             <span>
-              <ClockIcon size={13} />
+              <Icon name="clock" size={13} />
               {ASSIGNED_EVENT.time}
             </span>
             <span className="cl-event-hero-dot" aria-hidden="true" />
@@ -357,11 +314,9 @@ export function EventChecklistPage() {
                 <span className={`cl-stage-pip ${pipClass}`} aria-hidden="true" />
                 <h2 className={`cl-stage-title ${pipClass}`}>{stage}</h2>
               </div>
-              <span
-                className={`cl-stage-count ${stageItems.every((i) => i.status === "done") ? "is-done" : ""}`}
-              >
+              <Badge tone={stageItems.every((i) => i.status === "done") ? "success" : "neutral"}>
                 {stageItems.filter((i) => i.status === "done").length}/{stageItems.length}
-              </span>
+              </Badge>
             </div>
             <div className="cl-item-list">
               {stageItems.map((item, idx) => (

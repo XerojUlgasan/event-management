@@ -1,4 +1,5 @@
 import {
+  Select,
   Avatar,
   Badge,
   Button,
@@ -77,17 +78,17 @@ export function Overview({
           title="Upcoming events"
           description="Next 7 days · 12 scheduled"
           action={
-            <button
-              className="inline-link"
+            <Button variant="link" size="small"
+
               onClick={() => onNavigate("Calendar")}
             >
               View calendar <Icon name="arrow" size={15} />
-            </button>
+            </Button>
           }
         >
           <div className="event-list">
             {bookings.slice(0, 3).map((booking, index) => (
-              <button
+              <Button variant="plain"
                 className="event-row"
                 key={booking.id}
                 onClick={() => onNavigate("Bookings")}
@@ -110,7 +111,7 @@ export function Overview({
                   {booking.status}
                 </Badge>
                 <Icon name="chevron" size={16} />
-              </button>
+              </Button>
             ))}
           </div>
         </Panel>
@@ -122,7 +123,7 @@ export function Overview({
           action={<Badge tone="danger">3 urgent</Badge>}
         >
           <div className="attention-list">
-            <button>
+            <Button variant="plain">
               <span className="attention-icon danger">
                 <Icon name="alert" />
               </span>
@@ -131,8 +132,8 @@ export function Overview({
                 <small>Arc & Co. Product Launch needs review</small>
               </span>
               <Icon name="chevron" />
-            </button>
-            <button>
+            </Button>
+            <Button variant="plain">
               <span className="attention-icon warning">
                 <Icon name="box" />
               </span>
@@ -141,8 +142,8 @@ export function Overview({
                 <small>Mei Harlow has no contact phone number</small>
               </span>
               <Icon name="chevron" />
-            </button>
-            <button>
+            </Button>
+            <Button variant="plain">
               <span className="attention-icon info">
                 <Icon name="clipboard" />
               </span>
@@ -151,7 +152,7 @@ export function Overview({
                 <small>Harlow Birthday · expires tomorrow</small>
               </span>
               <Icon name="chevron" />
-            </button>
+            </Button>
           </div>
         </Panel>
       </div>
@@ -161,10 +162,10 @@ export function Overview({
           title="Booking activity"
           description="Confirmed bookings · Last 6 months"
           action={
-            <select>
+            <Select>
               <option>Last 6 months</option>
               <option>Last 12 months</option>
-            </select>
+            </Select>
           }
         >
           <div className="chart">

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
 export function Panel({
   title,
@@ -8,6 +8,8 @@ export function Panel({
   children,
   className = "",
   headClassName = "",
+  as: Component = "div",
+  ...props
 }: {
   title?: ReactNode;
   description?: ReactNode;
@@ -16,7 +18,8 @@ export function Panel({
   children?: ReactNode;
   className?: string;
   headClassName?: string;
-}) {
+  as?: "div" | "section" | "article";
+} & Omit<ComponentPropsWithoutRef<"div">, "title">) {
   const hasHeader =
     header !== undefined ||
     title !== undefined ||
@@ -24,7 +27,7 @@ export function Panel({
     action !== undefined;
 
   return (
-    <div className={`panel${className ? ` ${className}` : ""}`}>
+    <Component {...props} className={`panel${className ? ` ${className}` : ""}`}>
       {hasHeader && (
         <div className={`panel-head${headClassName ? ` ${headClassName}` : ""}`}>
           {header ?? (
@@ -37,6 +40,6 @@ export function Panel({
         </div>
       )}
       {children}
-    </div>
+    </Component>
   );
 }

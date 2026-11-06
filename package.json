@@ -15,6 +15,7 @@
     "build": "pnpm --filter @event-management/web build && pnpm --filter @event-management/api build",
     "check": "pnpm --filter @event-management/web check && pnpm --filter @event-management/api check && pnpm --filter @event-management/ui check",
     "check:guidance": "node context-factory/engineering/scripts/check-guidance.mjs",
+    "check:design": "node scripts/check-design.mjs",
     "db:up": "pnpm --filter @event-management/api db:up",
     "db:down": "pnpm --filter @event-management/api db:down",
     "db:validate": "pnpm --filter @event-management/api db:validate",
