@@ -1,5 +1,7 @@
 # Whole-web UI refactor ledger
 
+The [post-refactor functional QA report](../../../QA/reports/2026-11-06-ui-refactor.md) records the later live browser, API, database, and shared-component checks against commit `00c32ac`, including findings and proof limits. The earlier evidence below retains its original scope.
+
 ## Goal and boundary
 
 Centralize reusable web presentation in `packages/ui` and authored colors in `packages/theme`. Reuse shared controls across the web while preserving existing interaction, accessibility, responsive layout, and application behavior. Keep specialized layout and business logic in the app. The starting checkout was branch `staff-page` at `5c0c8b4`; the pre-refactor web stylesheet snapshot is under `/tmp/clemora-whole-web-baseline-5c0c8b4/` when available. This temporary snapshot is not a repository dependency.
