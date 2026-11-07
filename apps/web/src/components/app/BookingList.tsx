@@ -891,6 +891,7 @@ export function BookingDetails({
   onSaved: (item: BookingRequest) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const [tab, setTab] = useState<"overview" | "customizations" | "quotation" | "status">("overview");
   const [status, setStatus] = useState(item.status);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -899,6 +900,9 @@ export function BookingDetails({
     status === "needs_details" ||
     status === "declined" ||
     status === "cancelled";
+  const isAdmin = !customer && !readOnly;
+  const isTerminal = ["declined", "cancelled"].includes(item.status);
+
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
     dialog.current?.showModal();
@@ -907,6 +911,7 @@ export function BookingDetails({
       trigger?.focus();
     };
   }, []);
+
   const save = async () => {
     setBusy(true);
     setError("");
@@ -926,6 +931,14 @@ export function BookingDetails({
       setBusy(false);
     }
   };
+
+  const tabs = [
+    { key: "overview" as const, label: "Overview" },
+    ...(isAdmin ? [{ key: "customizations" as const, label: "Customizations", badge: item.pendingCustomizationRequests > 0 ? item.pendingCustomizationRequests : undefined }] : []),
+    ...(isAdmin ? [{ key: "quotation" as const, label: "Quotation" }] : []),
+    ...(isAdmin && !isTerminal ? [{ key: "status" as const, label: "Status" }] : []),
+  ];
+
   return createPortal(
     <dialog
       ref={dialog}
@@ -936,161 +949,140 @@ export function BookingDetails({
         onClose();
       }}
     >
-      <div className="booking-details-body">
-        <button
-          type="button"
-          className="booking-details-close"
-          aria-label="Close request details"
-          onClick={onClose}
-        >
-          ×
-        </button>
-        <h2 id="booking-details-title">Booking request {item.reference}</h2>
-        <BookingStatusBadge status={item.status} />
-        <div className="booking-details-grid">
-          <section>
-            <h3>Event details</h3>
-            <dl>
-              <div>
-                <dt>Event type</dt>
-                <dd>{item.arrangement?.eventType ?? item.eventType}</dd>
-              </div>
-              <div>
-                <dt>Package</dt>
-                <dd>{item.packageName}</dd>
-              </div>
-              <div>
-                <dt>Preferred date</dt>
-                <dd>
-                  {preferredDateLabel(
-                    item.arrangement?.preferredDate ?? item.preferredDate,
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt>Estimated length</dt>
-                <dd>
-                  {durationLabel(
-                    item.arrangement?.estimatedDuration ??
-                      item.estimatedDuration,
-                    item.arrangement?.estimatedDurationDays ??
-                      item.estimatedDurationDays,
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt>Start time</dt>
-                <dd>
-                  {dateLabel(
-                    item.arrangement?.startsAt ?? item.startsAt,
-                    item.timeZone,
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt>End time</dt>
-                <dd>
-                  {dateLabel(
-                    item.arrangement?.endsAt ?? item.endsAt,
-                    item.timeZone,
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt>Time zone</dt>
-                <dd>{item.timeZone}</dd>
-              </div>
-              <div>
-                <dt>Guest count</dt>
-                <dd>
-                  {item.arrangement?.guestCount ??
-                    item.guestCount ??
-                    "Not sure yet"}
-                </dd>
-              </div>
-              <div>
-                <dt>Preferred venue</dt>
-                <dd>
-                  {item.arrangement?.preferredVenueLocation ??
-                    item.preferredVenueLocation ??
-                    "To be confirmed"}
-                </dd>
-              </div>
-              {(item.arrangement?.outOfRange ?? item.outOfRange) && (
-                <div>
-                  <dt>Capacity</dt>
-                  <dd>
-                    Above the package maximum of {item.packageMaxGuests} guests
-                    (advisory only)
-                  </dd>
-                </div>
-              )}
-              {item.arrangement?.notes && (
-                <div>
-                  <dt>Internal notes</dt>
-                  <dd>{item.arrangement.notes}</dd>
-                </div>
-              )}
-            </dl>
-            {item.arrangement && (
-              <p className="booking-details-note">
-                Last edited by {item.arrangement.updatedByName} ·{" "}
-                {dateLabel(item.arrangement.updatedAt, item.timeZone)}
-              </p>
-            )}
-            <p className="booking-details-note">
-              Preferred date is not reserved.
-            </p>
-            {!readOnly && !customer && (
-              <ArrangementEditor item={item} onSaved={onSaved} />
-            )}
-          </section>
-          <section>
-            <h3>Contact</h3>
-            <dl>
-              <div>
-                <dt>Contact person</dt>
-                <dd>{item.contactName}</dd>
-              </div>
-              <div>
-                <dt>Phone number</dt>
-                <dd>{item.phoneNumber}</dd>
-              </div>
-              <div>
-                <dt>Special requests</dt>
-                <dd>{item.specialRequests || "None"}</dd>
-              </div>
-              <div>
-                <dt>Requested</dt>
-                <dd>{dateLabel(item.createdAt, item.timeZone)}</dd>
-              </div>
-            </dl>
-          </section>
+      {/* Sticky header */}
+      <div className="booking-details-header">
+        <div className="booking-details-header-top">
+          <div className="booking-details-header-title">
+            <h2 id="booking-details-title">{item.packageName}</h2>
+            <span className="booking-details-ref">Ref {item.reference}</span>
+          </div>
+          <div className="booking-details-header-right">
+            <BookingStatusBadge status={item.status} />
+            <button
+              type="button"
+              className="booking-details-close"
+              aria-label="Close request details"
+              onClick={onClose}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
         </div>
-        {
+        {tabs.length > 1 && (
+          <nav className="booking-details-tabs" aria-label="Booking sections">
+            {tabs.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.key}
+                className={`booking-details-tab${tab === t.key ? " active" : ""}`}
+                onClick={() => setTab(t.key)}
+              >
+                {t.label}
+                {t.badge != null && (
+                  <span className="booking-details-tab-badge">{t.badge}</span>
+                )}
+              </button>
+            ))}
+          </nav>
+        )}
+      </div>
+
+      {/* Scrollable body */}
+      <div className="booking-details-body">
+        {/* ── Overview tab ── */}
+        {tab === "overview" && (
+          <>
+            <div className="booking-details-grid">
+              <section>
+                <h3>Event details</h3>
+                <dl>
+                  <div><dt>Event type</dt><dd>{item.arrangement?.eventType ?? item.eventType}</dd></div>
+                  <div><dt>Package</dt><dd>{item.packageName}</dd></div>
+                  <div>
+                    <dt>Preferred date</dt>
+                    <dd>{preferredDateLabel(item.arrangement?.preferredDate ?? item.preferredDate)}</dd>
+                  </div>
+                  <div>
+                    <dt>Estimated length</dt>
+                    <dd>{durationLabel(item.arrangement?.estimatedDuration ?? item.estimatedDuration, item.arrangement?.estimatedDurationDays ?? item.estimatedDurationDays)}</dd>
+                  </div>
+                  <div>
+                    <dt>Start time</dt>
+                    <dd>{dateLabel(item.arrangement?.startsAt ?? item.startsAt, item.timeZone)}</dd>
+                  </div>
+                  <div>
+                    <dt>End time</dt>
+                    <dd>{dateLabel(item.arrangement?.endsAt ?? item.endsAt, item.timeZone)}</dd>
+                  </div>
+                  <div><dt>Time zone</dt><dd>{item.timeZone}</dd></div>
+                  <div>
+                    <dt>Guest count</dt>
+                    <dd>
+                      {item.arrangement?.guestCount ?? item.guestCount ?? "Not sure yet"}
+                      {(item.arrangement?.outOfRange ?? item.outOfRange) && (
+                        <span className="booking-details-warn"> · above package max ({item.packageMaxGuests})</span>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Preferred venue</dt>
+                    <dd>{item.arrangement?.preferredVenueLocation ?? item.preferredVenueLocation ?? "To be confirmed"}</dd>
+                  </div>
+                  {item.arrangement?.notes && (
+                    <div><dt>Internal notes</dt><dd>{item.arrangement.notes}</dd></div>
+                  )}
+                </dl>
+                {item.arrangement && (
+                  <p className="booking-details-meta">
+                    Last edited by {item.arrangement.updatedByName} · {dateLabel(item.arrangement.updatedAt, item.timeZone)}
+                  </p>
+                )}
+                <p className="booking-details-meta">Preferred date is not reserved.</p>
+                {isAdmin && <ArrangementEditor item={item} onSaved={onSaved} />}
+              </section>
+              <section>
+                <h3>Contact</h3>
+                <dl>
+                  <div><dt>Contact person</dt><dd>{item.contactName}</dd></div>
+                  <div><dt>Phone number</dt><dd>{item.phoneNumber}</dd></div>
+                  <div><dt>Special requests</dt><dd>{item.specialRequests || "None"}</dd></div>
+                  <div><dt>Submitted</dt><dd>{dateLabel(item.createdAt, item.timeZone)}</dd></div>
+                </dl>
+              </section>
+            </div>
+            <details className="booking-history">
+              <summary>Status history</summary>
+              <ul>
+                {item.statusHistory.map((entry, index) => (
+                  <li key={index}>
+                    {labels[entry.status]} · {new Date(entry.createdAt).toLocaleString()}
+                    {entry.reason ? ` — ${entry.reason}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </>
+        )}
+
+        {/* ── Customizations tab ── */}
+        {tab === "customizations" && isAdmin && (
           <CustomizationRequestsPanel
             item={item}
-            admin={!customer && !readOnly}
+            admin={true}
             conversationId={conversationId}
             onSaved={onSaved}
           />
-        }
-        {!customer && !readOnly && <QuotationBuilder item={item} />}
-        <details className="booking-history">
-          <summary>Status history</summary>
-          <ul>
-            {item.statusHistory.map((entry, index) => (
-              <li key={index}>
-                {labels[entry.status]} ·{" "}
-                {new Date(entry.createdAt).toLocaleString()}
-                {entry.reason ? ` — ${entry.reason}` : ""}
-              </li>
-            ))}
-          </ul>
-        </details>
-        {!readOnly &&
-          !customer &&
-          !["declined", "cancelled"].includes(item.status) && (
+        )}
+
+        {/* ── Quotation tab ── */}
+        {tab === "quotation" && isAdmin && (
+          <QuotationBuilder item={item} />
+        )}
+
+        {/* ── Status tab ── */}
+        {tab === "status" && isAdmin && !isTerminal && (
           <form
             className="booking-details-form"
             onSubmit={(event) => {
@@ -1099,21 +1091,18 @@ export function BookingDetails({
             }}
           >
             <h3>Update status</h3>
+            <p className="booking-details-meta">Change the review status of this booking request.</p>
             <label>
               Status
               <select
                 value={status}
-                onChange={(event) =>
-                  setStatus(event.target.value as BookingStatus)
-                }
+                onChange={(event) => setStatus(event.target.value as BookingStatus)}
               >
                 {Object.entries(labels).map(([value, label]) => (
                   <option
                     key={value}
                     value={value}
-                    disabled={
-                      value === "under_review" && item.status !== "under_review"
-                    }
+                    disabled={value === "under_review" && item.status !== "under_review"}
                   >
                     {label}
                   </option>
@@ -1129,18 +1118,12 @@ export function BookingDetails({
                 onChange={(event) => setReason(event.target.value)}
               />
             </label>
-            {error && <p role="alert">{error}</p>}
+            {error && <p role="alert" className="booking-details-error">{error}</p>}
             <div className="booking-actions">
-              <button type="button" onClick={onClose}>
-                Close
-              </button>
+              <button type="button" onClick={onClose}>Close</button>
               <button
                 type="submit"
-                disabled={
-                  busy ||
-                  status === item.status ||
-                  (reasonRequired && !reason.trim())
-                }
+                disabled={busy || status === item.status || (reasonRequired && !reason.trim())}
               >
                 {busy ? "Saving…" : "Update status"}
               </button>

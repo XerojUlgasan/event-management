@@ -385,6 +385,8 @@ export type CustomizationRequest = {
   messageId: string | null;
   type: CustomizationRequestType;
   description: string;
+  direction: "add" | "deduct" | null;
+  amountMinor: number | null;
   status: CustomizationRequestStatus;
   decisionReason: string | null;
   requestedBy: string;
@@ -417,6 +419,8 @@ export type ArrangementInput = {
 export type CustomizationRequestInput = {
   type: CustomizationRequestType;
   description: string;
+  direction?: "add" | "deduct";
+  amountMinor?: number;
   conversationId?: string;
   messageId?: string;
 };

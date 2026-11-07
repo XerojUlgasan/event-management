@@ -275,6 +275,8 @@ model CustomizationRequest {
   messageId String? @map("message_id") @db.Uuid
   type String
   description String
+  direction String? 
+  amountMinor Int? @map("amount_minor")
   status String @default("requested")
   decisionReason String? @map("decision_reason")
   requestedBy String @map("requested_by") @db.Uuid

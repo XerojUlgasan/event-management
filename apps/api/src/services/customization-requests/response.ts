@@ -15,6 +15,8 @@ export function customizationRequestDto(row: CustomizationRequestRow) {
     messageId: row.message_id,
     type: row.type as CustomizationRequestType,
     description: row.description,
+    direction: (row.direction ?? null) as "add" | "deduct" | null,
+    amountMinor: row.amount_minor ?? null,
     status: row.status as CustomizationRequestStatus,
     decisionReason: row.decision_reason,
     requestedBy: row.requested_by,

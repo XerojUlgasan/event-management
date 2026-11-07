@@ -20,6 +20,7 @@ export const CUSTOMIZATION_REQUEST_TYPES = [
   "add_event_hours",
   "change_venue",
   "special_requirements",
+  "other",
 ] as const;
 export type CustomizationRequestType = (typeof CUSTOMIZATION_REQUEST_TYPES)[number];
 

@@ -24,7 +24,7 @@ import {
   type CustomizationRequest,
 } from "../../lib/api";
 
-const typeLabels: Record<CustomizationRequestType, string> = {
+const typeLabels: Record<CustomizationRequestType | "other", string> = {
   add_inclusions: "Add inclusions or items",
   remove_inclusions: "Remove package inclusions",
   substitute_inclusions: "Substitute inclusions",
@@ -33,6 +33,7 @@ const typeLabels: Record<CustomizationRequestType, string> = {
   add_event_hours: "Add event hours",
   change_venue: "Change venue",
   special_requirements: "Special requirements",
+  other: "Other",
 };
 
 const statusLabels: Record<CustomizationRequestStatus, string> = {
@@ -362,6 +363,8 @@ export function CustomizationRequestsPanel({
 }) {
   const [type, setType] = useState<CustomizationRequestType>("add_inclusions");
   const [description, setDescription] = useState("");
+  const [direction, setDirection] = useState<"add" | "deduct" | "">("");
+  const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const terminal = ["declined", "cancelled"].includes(item.status);
@@ -369,19 +372,27 @@ export function CustomizationRequestsPanel({
   const record = async () => {
     if (!description.trim())
       return setError("Describe the recorded customization.");
+    if (direction && !amount)
+      return setError("Enter an amount for the price adjustment.");
+    if (!direction && amount)
+      return setError("Select a direction (add or deduct) for the amount.");
     setBusy(true);
     setError("");
     try {
       const create = admin
         ? createCustomizationRequest
         : createCustomerCustomizationRequest;
+      const amountMinor = amount ? Math.round(Number(amount) * 100) : undefined;
       const result = await create(item.id, {
         type,
         description: description.trim(),
+        ...(direction && amountMinor ? { direction, amountMinor } : {}),
         ...(conversationId ? { conversationId } : {}),
       });
       onSaved(result.bookingRequest);
       setDescription("");
+      setDirection("");
+      setAmount("");
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -440,6 +451,14 @@ export function CustomizationRequestsPanel({
                 </Badge>
               </div>
               <p>{request.description}</p>
+              {request.direction != null && request.amountMinor != null && (
+                <p className="booking-customization-price">
+                  <span className={`booking-customization-direction booking-customization-direction-${request.direction}`}>
+                    {request.direction === "add" ? "+" : "−"}
+                  </span>
+                  {new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format(request.amountMinor / 100)}
+                </p>
+              )}
               <small>
                 {request.requestedByName} · {timestamp(request.createdAt)}
               </small>
@@ -494,6 +513,36 @@ export function CustomizationRequestsPanel({
               onChange={(event) => setDescription(event.target.value)}
             />
           </label>
+          {admin && (
+            <div className="booking-customization-price-row">
+              <label>
+                Price adjustment
+                <select
+                  value={direction}
+                  onChange={(event) =>
+                    setDirection(event.target.value as "add" | "deduct" | "")
+                  }
+                >
+                  <option value="">No price change</option>
+                  <option value="add">Add (+)</option>
+                  <option value="deduct">Deduct (−)</option>
+                </select>
+              </label>
+              {direction && (
+                <label>
+                  Amount (PHP)
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={amount}
+                    placeholder="0.00"
+                    onChange={(event) => setAmount(event.target.value)}
+                  />
+                </label>
+              )}
+            </div>
+          )}
           {error && <p role="alert">{error}</p>}
           <div className="booking-actions">
             <button type="button" disabled={busy} onClick={() => void record()}>

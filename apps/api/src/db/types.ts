@@ -130,6 +130,7 @@ export interface Conversations {
 }
 
 export interface CustomizationRequests {
+  amount_minor: number | null;
   booking_request_id: string;
   conversation_id: string | null;
   created_at: Generated<Timestamp>;
@@ -137,6 +138,7 @@ export interface CustomizationRequests {
   decided_by: string | null;
   decision_reason: string | null;
   description: string;
+  direction: string | null;
   id: Generated<string>;
   message_id: string | null;
   requested_by: string;

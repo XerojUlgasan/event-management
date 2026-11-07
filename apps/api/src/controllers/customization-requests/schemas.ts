@@ -12,6 +12,7 @@ export const customizationRequestTypeSchema = z.enum(
 export const customizationRequestStatusSchema = z.enum(
   CUSTOMIZATION_REQUEST_STATUSES,
 );
+export const customizationDirectionSchema = z.enum(["add", "deduct"]);
 
 export const customizationRequestSchema = z.object({
   id: z.string().uuid(),
@@ -20,6 +21,8 @@ export const customizationRequestSchema = z.object({
   messageId: z.string().uuid().nullable(),
   type: customizationRequestTypeSchema,
   description: z.string(),
+  direction: customizationDirectionSchema.nullable(),
+  amountMinor: z.number().int().positive().nullable(),
   status: customizationRequestStatusSchema,
   decisionReason: z.string().nullable(),
   requestedBy: z.string().uuid(),
@@ -50,10 +53,20 @@ export const createCustomizationRequestSchema = z
         MAX_CUSTOMIZATION_REQUEST_DESCRIPTION_LENGTH,
         `Describe the customization in ${MAX_CUSTOMIZATION_REQUEST_DESCRIPTION_LENGTH} characters or fewer`,
       ),
+    direction: customizationDirectionSchema.optional(),
+    amountMinor: z.number().int().positive().optional(),
     conversationId: z.string().uuid().optional(),
     messageId: z.string().uuid().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (value) =>
+      (value.direction == null) === (value.amountMinor == null),
+    {
+      message: "direction and amountMinor must both be set or both be absent",
+      path: ["direction"],
+    },
+  );
 
 export const decideCustomizationRequestSchema = z
   .object({

@@ -65,6 +65,8 @@ export async function createCustomizationRequestService(
       message_id: input.messageId ?? null,
       type: input.type,
       description: input.description,
+      direction: input.direction ?? null,
+      amount_minor: input.amountMinor ?? null,
       status: "requested",
       decision_reason: null,
       requested_by: booking.customer_id,
