@@ -1,13 +1,13 @@
 import { sql, type Kysely, type Transaction } from "kysely";
 import type { DB, BookingRequests } from "../../db/types.js";
-import type { Insertable } from "kysely";
+import type { Insertable, Updateable } from "kysely";
 type Database = Kysely<DB> | Transaction<DB>;
-export const findAvailablePackageData = (db: Transaction<DB>, packageId: string) => db.selectFrom("packages").selectAll().where("id", "=", packageId).where("archived_at", "is", null).forUpdate().executeTakeFirst();
+export const findAvailablePackageData = (db: Transaction<DB>, packageId: string) => db.selectFrom("packages").selectAll().where("id", "=", packageId).where("archived_at", "is", null).where("package_type", "=", "catalog").forUpdate().executeTakeFirst();
 export const createBookingRequestData = (db: Transaction<DB>, values: Insertable<BookingRequests>) => db.insertInto("booking_requests").values(values).returningAll().executeTakeFirstOrThrow();
 export const createBookingConversationData = (db: Transaction<DB>, values: { customer_id: string; booking_request_id: string }) => db.insertInto("conversations").values(values).execute();
 export const addStatusHistoryData = (db: Transaction<DB>, bookingRequestId: string, status: string, changedBy: string, reason: string | null) => db.insertInto("booking_request_status_history").values({ booking_request_id: bookingRequestId, status, changed_by: changedBy, reason }).execute();
 export const lockBookingRequestData = (db: Transaction<DB>, id: string) => db.selectFrom("booking_requests").selectAll().where("id", "=", id).forUpdate().executeTakeFirst();
-export const updateBookingStatusData = (db: Transaction<DB>, id: string, status: string) => db.updateTable("booking_requests").set({ status, updated_at: new Date() }).where("id", "=", id).returningAll().executeTakeFirstOrThrow();
+export const updateBookingStatusData = (db: Transaction<DB>, id: string, status: string, currentUpdatedAt: Date) => db.updateTable("booking_requests").set({ status, updated_at: new Date(Math.max(Date.now(), currentUpdatedAt.getTime() + 1)) }).where("id", "=", id).returningAll().executeTakeFirstOrThrow();
 export const listBookingRequestsData = (db: Database, customerId?: string) => { let query = db.selectFrom("booking_requests").selectAll(); if (customerId) query = query.where("customer_id", "=", customerId); return query.orderBy("created_at", "desc").orderBy("id", "desc").execute(); };
 export const listAdminBookingRequestsPageData = (db: Database, input: { status?: string; preferredDate?: string; cursor?: string; limit: number }) => {
   let query = db.selectFrom("booking_requests").selectAll();
@@ -32,3 +32,9 @@ export const findBookingRequestData = (db: Database, id: string, customerId?: st
   if (customerId) query = query.where("customer_id", "=", customerId);
   return query.executeTakeFirst();
 };
+
+export const findLinkedPackageData = (db: Database, id: string) => db.selectFrom("packages").selectAll().where("id", "=", id).executeTakeFirstOrThrow();
+export const updateBookingDetailsData = (db: Transaction<DB>, id: string, values: Updateable<BookingRequests>) => db.updateTable("booking_requests").set(values).where("id", "=", id).returningAll().executeTakeFirstOrThrow();
+
+export const listBookingPackagesData = (db: Database, ids: string[]) => ids.length ? db.selectFrom("packages").select(["id", "name", "price", "max_guests", "package_type", "updated_at"]).where("id", "in", ids).execute() : Promise.resolve([]);
+export const listBookingEditorsData = (db: Database, ids: string[]) => ids.length ? db.selectFrom("users").select(["id", "display_name", "email"]).where("id", "in", ids).execute() : Promise.resolve([]);

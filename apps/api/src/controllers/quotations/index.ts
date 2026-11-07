@@ -69,12 +69,21 @@ const revisionRoute = createRoute({
   responses: { 201: { content: resultSchema, description: "Quotation revision draft created" }, ...errors },
 });
 
+const adminRevisionRoute = createRoute({
+  method: "post" as const,
+  path: "/admin/quotations/{id}/revision" as const,
+  tags: ["Quotations"],
+  request: { params: quotationIdParams, body: body(revisionBody) },
+  responses: { 201: { content: resultSchema, description: "Quotation revision draft created" }, ...errors },
+});
+
 routes.openapi(createQuotationRoute, async c => { const result = await createQuotationService(c.get("db"), c.req.valid("param").id, c.get("session").user.id); if ("message" in result) return c.json({ error: result.message }, result.status); return c.json({ quotation: result }, 201); });
 routes.openapi(listRoute, async c => { const result = await listQuotationsService(c.get("db"), c.req.valid("param").id, c.get("session").user.id, false); if ("message" in result) return c.json({ error: result.message }, result.status); return c.json({ quotations: result }, 200); });
 routes.openapi(updateRoute, async c => { const input = c.req.valid("json"); const result = await updateQuotationService(c.get("db"), c.req.valid("param").id, c.get("session").user.id, input.items, input.expectedUpdatedAt); if ("message" in result) return c.json({ error: result.message }, result.status); return c.json({ quotation: result }, 200); });
 routes.openapi(sendRoute, async c => { const result = await sendQuotationService(c.get("db"), c.req.valid("param").id, c.get("session").user.id); if ("message" in result) return c.json({ error: result.message }, result.status); return c.json({ quotation: result }, 200); });
 routes.openapi(latestRoute, async c => { const rows = await listQuotationsService(c.get("db"), c.req.valid("param").id, c.get("session").user.id, true); if ("message" in rows) return c.json({ error: rows.message }, rows.status); const quotation = rows.find(row => row.status === "sent" || row.status === "accepted"); return quotation ? c.json({ quotation }, 200) : c.json({ error: "Quotation not found" }, 404); });
 routes.openapi(acceptRoute, async c => { const result = await acceptQuotationService(c.get("db"), c.req.valid("param").id, c.get("session").user.id); if ("message" in result) return c.json({ error: result.message }, result.status); return c.json({ quotation: result }, 200); });
+routes.openapi(adminRevisionRoute, async c => { const result = await requestQuotationRevisionService(c.get("db"), c.req.valid("param").id, c.get("session").user.id, c.req.valid("json").reason, true); if ("message" in result) return c.json({ error: result.message }, result.status); return c.json({ quotation: result }, 201); });
 routes.openapi(revisionRoute, async c => { const result = await requestQuotationRevisionService(c.get("db"), c.req.valid("param").id, c.get("session").user.id, c.req.valid("json").reason); if ("message" in result) return c.json({ error: result.message }, result.status); return c.json({ quotation: result }, 201); });
 
 export default routes;

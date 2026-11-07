@@ -4,6 +4,7 @@ import { after, before, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
+import { dropTestDatabase } from "./helpers/drop-test-database.js";
 import { sql } from "kysely";
 import { hashSessionToken } from "../src/utils/session.js";
 
@@ -109,8 +110,11 @@ after(async () => {
   await db?.destroy();
   await pool?.end();
   if (admin) {
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
-    await admin.end();
+    try {
+      await dropTestDatabase(admin, database);
+    } finally {
+      await admin.end();
+    }
   }
 });
 
@@ -273,7 +277,7 @@ test("general threads have no booking context and can reopen after expiry", asyn
 test("booking conversations derive context and remain closed after expiry", async () => {
   const booking = (await read(await call("/booking-requests", "POST", {
     packageId, eventType: "Wedding", preferredDate: "2099-01-02",
-    estimatedDuration: "8_hours", timeZone: "Asia/Manila", guestCount: 80, contactName: "Customer", phoneNumber: "123",
+    estimatedDuration: "8_hours", guestCount: 80, contactName: "Customer", phoneNumber: "123",
   }, chatCustomerCookie), 201)).bookingRequest;
   assert.equal(booking.packageName, "Garden Wedding");
   assert.deepEqual(booking.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });
@@ -291,12 +295,7 @@ test("booking conversations derive context and remain closed after expiry", asyn
   assert.equal(activeOverdue.conversation.expiresAt, null);
   const endsAt = new Date(Date.now() - 25 * 60 * 60 * 1000);
   const startsAt = new Date(endsAt.getTime() - 60 * 60 * 1000);
-  await db.updateTable("booking_arrangements").set({ event_type: "Reception", guest_count: 90, starts_at: startsAt, ends_at: endsAt }).where("booking_request_id", "=", booking.id).execute();
-  const pending = await db.insertInto("customization_requests").values({ booking_request_id: booking.id, type: "change_venue", description: "Move indoors", requested_by: chatCustomerId }).returning("id").executeTakeFirstOrThrow();
-  const openWhilePending = await read(await call(`/messages/conversations/${linked.id}`, "GET", undefined, chatCustomerCookie), 200);
-  assert.equal(openWhilePending.conversation.status, "active");
-  assert.equal(openWhilePending.conversation.expiresAt, null);
-  await db.deleteFrom("customization_requests").where("id", "=", pending.id).execute();
+  await db.updateTable("booking_requests").set({ event_type: "Reception", guest_count: 90, starts_at: startsAt, ends_at: endsAt }).where("id", "=", booking.id).execute();
   const expired = await read(await call(`/messages/conversations/${linked.id}`, "GET", undefined, chatCustomerCookie), 200);
   assert.equal(expired.conversation.eventType, "Reception");
   assert.equal(expired.conversation.guestCount, 90);

@@ -79,13 +79,14 @@ export function CustomerDashboard({
         ? selectedConversationId
         : conversations[0]?.id ?? null
       setSelectedConversationId(targetId)
+      if (pendingBookingReference && targetId) setPendingBookingReference(null)
       if (targetId) {
         const thread = await getMyConversationById(targetId)
         setMessageThread((current) => mergeThread(current, thread))
       } else {
         setMessageThread(null)
       }
-      setMessagesError("")
+      setMessagesError(pendingBookingReference && !targetId ? "The conversation for this request could not be found. Select another conversation or try again." : "")
     } catch (cause) {
       setMessagesError(cause instanceof Error ? cause.message : "Unable to load your messages.")
     } finally {
@@ -172,6 +173,7 @@ export function CustomerDashboard({
   }
 
   const selectConversation = async (id: string) => {
+    setPendingBookingReference(null)
     setSelectedConversationId(id)
     setConversationOpen(true)
     setMessagesLoading(true)
@@ -289,7 +291,7 @@ export function CustomerDashboard({
             <section className="customer-grid"><Panel title="Your requests" description="See the latest status of your event requests."><p>Preferred dates and final prices are reviewed by our team.</p><Button variant="secondary" onClick={() => setTab("My events")}>View my events</Button></Panel><Panel className="customer-manager-card" title="Talk with our team" description="Have a question about your plans?"><p>Send us a message and we’ll continue the conversation in your workspace.</p><Button variant="secondary" className="full-button" onClick={() => setMessageOpen(true)}>Send a message</Button></Panel></section>
           </div>
         )}
-        {tab === "My events" && <div className="customer-content"><BookingList onExplore={() => setTab("Packages")} onOpenChat={(reference: string) => { setPendingBookingReference(reference); setTab("Messages") }} /></div>}
+        {tab === "My events" && <div className="customer-content"><BookingList onExplore={() => setTab("Packages")} onOpenChat={(reference: string) => { setPendingBookingReference(reference); setConversationOpen(true); setTab("Messages") }} /></div>}
 
         {tab === "Packages" && (
           <div className="customer-content">

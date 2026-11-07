@@ -52,5 +52,7 @@ export type CatalogPackage = Omit<PackageContent, "services"> & {
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  publishedAt: string;
+  packageType: "catalog" | "custom";
+  customForBookingRequestId: string | null;
+  publishedAt: string | null;
 };

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Kysely, Transaction } from "kysely";
+import { sql, type Kysely, type Transaction } from "kysely";
 import type { Content } from "../../controllers/packages/schemas.js";
 import type { DB } from "../../db/types.js";
 export type Database = Kysely<DB> | Transaction<DB>;
@@ -141,6 +141,9 @@ export async function replaceCatalogSectionsData(
       throw new InvalidPackageMedia(
         "Uploaded media already belongs to another catalog page",
       );
+    const quotationReferences = await db.selectFrom("quotations as q").select("q.offered_package_id").where(sql<boolean>`jsonb_path_exists(q.offered_package_terms, '$.package.sections[*].widgets[*].media.id ? (@ == $id)', jsonb_build_object('id', ${id}::text))`).execute();
+    if (quotationReferences.some(reference => owner.kind !== "package" || reference.offered_package_id !== owner.id))
+      throw new InvalidPackageMedia("Uploaded media belongs to another package offer");
     const requested = content.sections
       .flatMap((section) => section.widgets)
       .filter(

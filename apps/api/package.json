@@ -22,7 +22,6 @@
     "test:packages": "tsx --test tests/packages.test.ts",
     "test:messages": "tsx --test tests/messages.test.ts",
     "test:booking-requests": "tsx --test tests/booking-requests.test.ts",
-    "test:customization-requests": "tsx --test tests/customization-requests.test.ts",
     "test:quotations": "tsx --test tests/quotations.test.ts",
     "test:venues": "tsx --test tests/venues.test.ts"
   },

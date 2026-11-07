@@ -18,23 +18,16 @@ export async function expireConversationsData(db: Database) {
       OR EXISTS (
         SELECT 1
         FROM booking_requests br
-        LEFT JOIN booking_arrangements ba ON ba.booking_request_id = br.id
         WHERE br.id = conversations.booking_request_id
           AND (
             (
               br.status IN ('declined', 'cancelled')
-              AND coalesce(ba.ends_at, br.ends_at, conversations.created_at) <= ${cutoff}
+              AND coalesce(br.ends_at, conversations.created_at) <= ${cutoff}
             )
             OR (
               br.status NOT IN ('declined', 'cancelled')
-              AND coalesce(ba.ends_at, br.ends_at) IS NOT NULL
-              AND coalesce(ba.ends_at, br.ends_at) <= ${cutoff}
-              AND NOT EXISTS (
-                SELECT 1
-                FROM customization_requests cr
-                WHERE cr.booking_request_id = br.id
-                  AND cr.status = 'requested'
-              )
+              AND br.ends_at IS NOT NULL
+              AND br.ends_at <= ${cutoff}
             )
           )
       )

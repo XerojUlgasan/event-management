@@ -12,15 +12,13 @@ model User {
   staffRole    String?   @map("staff_role")
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  bookingRequests BookingRequest[]
+  bookingRequests BookingRequest[] @relation("BookingCustomer")
+  editedBookingRequests BookingRequest[] @relation("BookingEditor")
   bookingStatusChanges BookingRequestStatusHistory[]
   sessions     Session[]
   conversations Conversation[] @relation("CustomerConversations")
   sentMessages Message[]     @relation("MessageSender")
   mediaAssets MediaAsset[]
-  bookingArrangements BookingArrangement[]
-  customizationRequests CustomizationRequest[] @relation("CustomizationRequester")
-  customizationDecisions CustomizationRequest[] @relation("CustomizationDecider")
   auditEvents AuditEvent[]
   quotations Quotation[]
 
@@ -38,7 +36,6 @@ model Conversation {
   customer        User      @relation("CustomerConversations", fields: [customerId], references: [id], onDelete: Cascade)
   bookingRequest  BookingRequest? @relation("BookingRequestConversation", fields: [bookingRequestId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   messages        Message[]
-  customizationRequests CustomizationRequest[]
 
   @@index([status])
   @@index([customerId, createdAt])
@@ -56,7 +53,6 @@ model Message {
   readAt         DateTime?    @map("read_at") @db.Timestamptz(6)
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
-  customizationRequests CustomizationRequest[]
 
   @@index([conversationId, createdAt])
   @@map("messages")
@@ -83,7 +79,10 @@ model Package {
   description     String            @default("")
   maxGuests       Int               @map("max_guests")
   price           Int
-  publishedAt     DateTime          @default(now()) @map("published_at") @db.Timestamptz(6)
+  publishedAt     DateTime?         @default(now()) @map("published_at") @db.Timestamptz(6)
+  packageType     String            @default("catalog") @map("package_type")
+  customForBookingRequestId String? @unique @map("custom_for_booking_request_id") @db.Uuid
+  customForBookingRequest BookingRequest? @relation("CustomPackageOwner", fields: [customForBookingRequestId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   bookingRequests BookingRequest[]
   services        PackageService[]
   page            CatalogPage?
@@ -202,32 +201,29 @@ model BookingRequest {
   reference String @unique
   customerId String @map("customer_id") @db.Uuid
   packageId String @map("package_id") @db.Uuid
-  packageName String @map("package_name")
-  packagePrice Int @map("package_price")
-  packageMaxGuests Int @map("package_max_guests")
   eventType String @map("event_type")
   preferredDate String @map("preferred_date")
   estimatedDuration String @default("undecided") @map("estimated_duration")
   estimatedDurationDays Int? @map("estimated_duration_days")
   startsAt DateTime? @map("starts_at") @db.Timestamptz(6)
   endsAt DateTime? @map("ends_at") @db.Timestamptz(6)
-  timeZone String @map("time_zone")
   guestCount Int? @map("guest_count")
   contactName String @map("contact_name")
   phoneNumber String @map("phone_number")
   preferredVenueLocation String? @map("preferred_venue_location")
-  packageInclusionsSnapshot Json? @map("package_inclusions_snapshot")
   specialRequests String? @map("special_requests")
+  notes String?
+  updatedBy String? @map("updated_by") @db.Uuid
   status String @default("under_review")
   outOfRange Boolean @map("out_of_range")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-  customer User @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  editor User? @relation("BookingEditor", fields: [updatedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  customer User @relation("BookingCustomer", fields: [customerId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  customPackage Package? @relation("CustomPackageOwner")
   package Package @relation(fields: [packageId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   history BookingRequestStatusHistory[]
   conversation Conversation? @relation("BookingRequestConversation")
-  arrangement BookingArrangement?
-  customizationRequests CustomizationRequest[]
   quotations Quotation[]
   @@index([customerId, createdAt])
   @@map("booking_requests")
@@ -244,55 +240,6 @@ model BookingRequestStatusHistory {
   actor User @relation(fields: [changedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
   @@index([bookingRequestId, createdAt])
   @@map("booking_request_status_history")
-}
-
-model BookingArrangement {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  bookingRequestId String @unique @map("booking_request_id") @db.Uuid
-  eventType String @map("event_type")
-  preferredDate String @map("preferred_date")
-  estimatedDuration String @default("undecided") @map("estimated_duration")
-  estimatedDurationDays Int? @map("estimated_duration_days")
-  startsAt DateTime? @map("starts_at") @db.Timestamptz(6)
-  endsAt DateTime? @map("ends_at") @db.Timestamptz(6)
-  timeZone String @map("time_zone")
-  guestCount Int? @map("guest_count")
-  preferredVenueLocation String? @map("preferred_venue_location")
-  notes String?
-  updatedBy String @map("updated_by") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  bookingRequest BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  editor User @relation(fields: [updatedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  @@index([updatedBy])
-  @@map("booking_arrangements")
-}
-
-model CustomizationRequest {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  bookingRequestId String @map("booking_request_id") @db.Uuid
-  conversationId String? @map("conversation_id") @db.Uuid
-  messageId String? @map("message_id") @db.Uuid
-  type String
-  description String
-  direction String? 
-  amountMinor Int? @map("amount_minor")
-  status String @default("requested")
-  decisionReason String? @map("decision_reason")
-  requestedBy String @map("requested_by") @db.Uuid
-  decidedBy String? @map("decided_by") @db.Uuid
-  decidedAt DateTime? @map("decided_at") @db.Timestamptz(6)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  bookingRequest BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  message Message? @relation(fields: [messageId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  requester User @relation("CustomizationRequester", fields: [requestedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  decider User? @relation("CustomizationDecider", fields: [decidedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  quotationItems QuotationItem[]
-  @@index([bookingRequestId, createdAt])
-  @@index([status, createdAt])
-  @@map("customization_requests")
 }
 
 model AuditEvent {
@@ -313,6 +260,10 @@ model Quotation {
   bookingRequestId String @map("booking_request_id") @db.Uuid
   version Int
   currency String @default("PHP")
+  offeredPackageId String? @map("offered_package_id") @db.Uuid
+  offeredPackageUpdatedAt DateTime? @map("offered_package_updated_at") @db.Timestamptz(6)
+  offeredPackageTerms Json? @map("offered_package_terms") @db.JsonB
+  adjustmentsReviewed Boolean @default(true) @map("adjustments_reviewed")
   baseAmountMinor Int @map("base_amount_minor")
   totalAmountMinor Int @map("total_amount_minor")
   status String @default("draft")
@@ -338,13 +289,10 @@ model QuotationItem {
   description String
   amountMinor Int @map("amount_minor")
   serviceId String? @map("service_id") @db.Uuid
-  customizationRequestId String? @map("customization_request_id") @db.Uuid
   sortOrder Int @map("sort_order")
   quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   service Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  customizationRequest CustomizationRequest? @relation(fields: [customizationRequestId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   @@unique([quotationId, sortOrder])
   @@index([serviceId])
-  @@index([customizationRequestId])
   @@map("quotation_items")
 }

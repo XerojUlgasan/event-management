@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import {
   getAdminQuotations,
+  getAdminBookingRequest,
   getAdminServices,
   createQuotation,
   updateQuotation,
   sendQuotation,
+  reviseAdminQuotation,
   type AdminService,
   type BookingRequest,
   type Quotation,
@@ -29,7 +31,6 @@ const toDraft = (quote: Quotation): DraftLine[] =>
     description: item.description,
     amountMinor: item.amountMinor,
     serviceId: item.serviceId,
-    customizationRequestId: item.customizationRequestId,
   }));
 
 // ── Context panel ─────────────────────────────────────────────────────────────
@@ -43,11 +44,7 @@ function QuotationContext({
   services: AdminService[];
   onUseRate: (service: AdminService) => void;
 }) {
-  const arrangement = item.arrangement;
-  const inclusions = item.packageInclusionsSnapshot ?? [];
-  const approvedRequests = item.customizationRequests.filter(
-    (r) => r.status === "approved",
-  );
+  const inclusions = item.packageInclusions ?? [];
 
   return (
     <div className="quotation-context">
@@ -56,26 +53,26 @@ function QuotationContext({
         <dl className="quotation-context-dl">
           <div><dt>Package</dt><dd>{item.packageName}</dd></div>
           <div>
-            <dt>Base price</dt>
-            <dd><strong>{money(item.packagePrice.amountMinor)}</strong></dd>
+            <dt>Current package price</dt>
+            <dd><strong>{item.packagePrice ? money(item.packagePrice.amountMinor) : "Private package"}</strong></dd>
           </div>
           <div>
             <dt>Event type</dt>
-            <dd>{arrangement?.eventType ?? item.eventType}</dd>
+            <dd>{item.eventType}</dd>
           </div>
           <div>
             <dt>Preferred date</dt>
-            <dd>{arrangement?.preferredDate ?? item.preferredDate ?? "Not set"}</dd>
+            <dd>{item.preferredDate ?? "Not set"}</dd>
           </div>
           <div>
             <dt>Guest count</dt>
             <dd>
-              {(arrangement?.guestCount ?? item.guestCount) != null
-                ? String(arrangement?.guestCount ?? item.guestCount)
+              {(item.guestCount) != null
+                ? String(item.guestCount)
                 : "Not sure yet"}
-              {(arrangement?.outOfRange ?? item.outOfRange) && (
+              {item.outOfRange && item.packageMaxGuests !== null && (
                 <span className="quotation-context-badge quotation-context-badge-warn">
-                  {" "}over package max ({item.packageMaxGuests})
+                  {" "}over current package max ({item.packageMaxGuests})
                 </span>
               )}
             </dd>
@@ -83,20 +80,19 @@ function QuotationContext({
           <div>
             <dt>Venue</dt>
             <dd>
-              {arrangement?.preferredVenueLocation ??
-                item.preferredVenueLocation ??
+              {item.preferredVenueLocation ??
                 "To be confirmed"}
             </dd>
           </div>
-          {arrangement?.notes && (
-            <div><dt>Internal notes</dt><dd>{arrangement.notes}</dd></div>
+          {item.notes && (
+            <div><dt>Internal notes</dt><dd>{item.notes}</dd></div>
           )}
         </dl>
       </div>
 
       {inclusions.length > 0 && (
         <div className="quotation-context-section">
-          <h4 className="quotation-context-heading">Package inclusions</h4>
+          <h4 className="quotation-context-heading">Current package services</h4>
           <ul className="quotation-context-list">
             {inclusions.map((inc) => (
               <li key={inc.serviceId} className="quotation-context-inclusion">
@@ -104,28 +100,6 @@ function QuotationContext({
                 <span className={`quotation-context-badge ${inc.role === "included" ? "quotation-context-badge-included" : "quotation-context-badge-optional"}`}>
                   {inc.role}
                 </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {approvedRequests.length > 0 && (
-        <div className="quotation-context-section">
-          <h4 className="quotation-context-heading">
-            Approved customizations ({approvedRequests.length})
-          </h4>
-          <ul className="quotation-context-list">
-            {approvedRequests.map((req) => (
-              <li key={req.id} className="quotation-context-customization">
-                <div className="quotation-context-customization-head">
-                  <span className="quotation-context-badge quotation-context-badge-approved">
-                    {req.type.replace(/_/g, " ")}
-                  </span>
-                  <small>by {req.requestedByName}</small>
-                </div>
-                <p>{req.description}</p>
-                {req.decisionReason && <small>Note: {req.decisionReason}</small>}
               </li>
             ))}
           </ul>
@@ -206,13 +180,14 @@ function QuotationPreview({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export function QuotationBuilder({ item }: { item: BookingRequest }) {
+export function QuotationBuilder({ item, onBookingRefreshed }: { item: BookingRequest; onBookingRefreshed?: (item: BookingRequest) => void }) {
   const [quotes, setQuotes] = useState<Quotation[]>([]);
   const [draft, setDraft] = useState<Quotation | null>(null);
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [services, setServices] = useState<AdminService[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [revisionReason, setRevisionReason] = useState("");
 
   // New-line input state
   const [newDesc, setNewDesc] = useState("");
@@ -222,19 +197,19 @@ export function QuotationBuilder({ item }: { item: BookingRequest }) {
   const load = async () => {
     setError("");
     try {
-      const [quotationResult, serviceResult] = await Promise.all([
+      const [quotationResult, serviceResult, bookingResult] = await Promise.all([
         getAdminQuotations(item.id),
         getAdminServices(),
+        getAdminBookingRequest(item.id),
       ]);
+      onBookingRefreshed?.(bookingResult.bookingRequest);
       setQuotes(quotationResult.quotations);
       setServices(serviceResult.services);
       const current = quotationResult.quotations.find(
         (q) => q.status === "draft",
       );
-      if (current) {
-        setDraft(current);
-        setLines(toDraft(current));
-      }
+      setDraft(current ?? null);
+      setLines(current ? toDraft(current) : []);
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Unable to load quotations.",
@@ -261,6 +236,17 @@ export function QuotationBuilder({ item }: { item: BookingRequest }) {
     } finally {
       setBusy(false);
     }
+  };
+
+  const revise = async (quote: Quotation) => {
+    if (!revisionReason.trim()) { setError("Enter a reason for the revision."); return; }
+    setBusy(true); setError("");
+    try {
+      const result = await reviseAdminQuotation(quote.id, revisionReason.trim());
+      setDraft(result.quotation); setLines(toDraft(result.quotation)); setRevisionReason("");
+      await load();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to revise quotation."); }
+    finally { setBusy(false); }
   };
 
   const save = async () => {
@@ -305,6 +291,7 @@ export function QuotationBuilder({ item }: { item: BookingRequest }) {
       setQuotes((current) =>
         current.map((q) => (q.id === result.quotation.id ? result.quotation : q)),
       );
+      await load();
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Unable to send quotation.",
@@ -348,7 +335,9 @@ export function QuotationBuilder({ item }: { item: BookingRequest }) {
     ]);
   };
 
-  const base = draft?.baseAmountMinor ?? item.packagePrice.amountMinor;
+  const changed = draft ? JSON.stringify(lines.map(({ localId: _localId, ...line }) => line)) !== JSON.stringify(toDraft(draft).map(({ localId: _localId, ...line }) => line)) : false;
+  const stale = draft && !draft.basisCurrent;
+  const base = draft?.baseAmountMinor ?? item.packagePrice?.amountMinor ?? 0;
 
   return (
     <section
@@ -367,8 +356,11 @@ export function QuotationBuilder({ item }: { item: BookingRequest }) {
         )}
       </div>
 
-      {error && <p role="alert" className="quotation-error">{error}</p>}
+      {error && <p role="alert" className="quotation-error">{error} <button type="button" onClick={() => void load()}>Refresh quotations</button></p>}
 
+      {draft && !draft.basisCurrent && <p role="status">This draft uses an earlier package or event details. Revise it before sending.</p>}
+      {draft && draft.basisCurrent && !draft.adjustmentsReviewed && <p role="status">Review the carried-over adjustments, then save the draft to confirm your review.</p>}
+      {draft && !draft.basisCurrent && <div className="quotation-builder-actions"><label>Reason for revision <input maxLength={1000} value={revisionReason} onChange={e => setRevisionReason(e.target.value)} /></label><button type="button" disabled={busy || !revisionReason.trim()} onClick={() => void revise(draft)}>Revise quotation</button></div>}
       {/* Context reference panel */}
       <QuotationContext item={item} services={services} onUseRate={useServiceRate} />
 
@@ -510,10 +502,10 @@ export function QuotationBuilder({ item }: { item: BookingRequest }) {
           </div>
 
           <div className="quotation-builder-actions">
-            <button type="button" disabled={busy} onClick={() => void save()}>
-              Save draft
+            <button type="button" disabled={busy || !!stale} onClick={() => void save()}>
+              {draft.adjustmentsReviewed ? "Save draft" : "Confirm adjustments and save"}
             </button>
-            <button type="button" disabled={busy} onClick={() => void send()}>
+            <button type="button" disabled={busy || !!stale || !draft.adjustmentsReviewed || changed} onClick={() => void send()}>
               Send quotation
             </button>
           </div>
@@ -526,7 +518,8 @@ export function QuotationBuilder({ item }: { item: BookingRequest }) {
           <ul>
             {quotes.map((q) => (
               <li key={q.id}>
-                v{q.version} · {q.status} · {money(q.totalAmountMinor)}
+                v{q.version} · {q.status} · {money(q.totalAmountMinor)}{!q.basisCurrent && " · Previous package or event details"}
+                {!draft && !q.basisCurrent && (q.status === "sent" || q.status === "accepted") && <div><label>Reason for revision <input maxLength={1000} value={revisionReason} onChange={e => setRevisionReason(e.target.value)} /></label><button type="button" disabled={busy || !revisionReason.trim()} onClick={() => void revise(q)}>Revise quotation</button></div>}
               </li>
             ))}
           </ul>

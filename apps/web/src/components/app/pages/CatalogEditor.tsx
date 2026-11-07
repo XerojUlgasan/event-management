@@ -3,12 +3,13 @@ import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/cata
 import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images"
 import { MAX_VIDEO_SIZE_BYTES } from "@event-management/contracts/limits/videos"
 import { useEffect, useRef, useState } from "react"
+import { Button, Dialog } from "@event-management/ui"
 import type { Dispatch, ReactNode, SetStateAction } from "react"
 import { createPortal } from "react-dom"
 import GridLayout from "react-grid-layout/legacy"
 import MDEditor from "@uiw/react-md-editor"
 import rehypeSanitize from "rehype-sanitize"
-import { deleteCatalogMedia, uploadCatalogMedia } from "../../../lib/api"
+import { ApiError, deleteCatalogMedia, uploadCatalogMedia } from "../../../lib/api"
 import type { CatalogSection, CatalogWidget } from "../../../lib/api"
 import { WidgetContent } from "../CatalogSections"
 import { PackageMediaSettings } from "./PackageMediaSettings"
@@ -28,7 +29,7 @@ function MediaWidget({ widget, onSelectFile }: { widget: CatalogWidget; onSelect
   </div>
 }
 type CanvasContent = { name: string; sections: CatalogSection[] }
-export function CatalogEditor<T extends CanvasContent>({ initial, entity, onClose, onSaved, onSave, validate, renderDetails, renderPreview, saveLabel = "Save changes", nameMaxLength = MAX_CATALOG_TEXT_LENGTH }: {
+export function CatalogEditor<T extends CanvasContent>({ initial, entity, onClose, onSaved, onSave, validate, renderDetails, renderPreview, saveLabel = "Save changes", onRefresh, badge, returnFocus, nameMaxLength = MAX_CATALOG_TEXT_LENGTH }: {
   initial: T
   entity: "package" | "service" | "venue"
   onClose: () => void
@@ -39,13 +40,20 @@ export function CatalogEditor<T extends CanvasContent>({ initial, entity, onClos
   renderPreview: (content: T, mode: "customer" | "card") => ReactNode
   nameMaxLength?: number
   saveLabel?: string
+  onRefresh?: () => void
+  badge?: string
+  returnFocus?: HTMLElement | null
 }) {
   const title = entity[0].toUpperCase() + entity.slice(1)
   const [content, setContent] = useState<T>(() => structuredClone(initial))
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const confirmRef = useRef<HTMLDivElement>(null)
+  const confirmTrigger = useRef<HTMLElement | null>(null)
+  const [confirmAction, setConfirmAction] = useState<"discard" | "refresh" | null>(null)
   const [markdownPreview, setMarkdownPreview] = useState<Record<string, boolean>>({})
   const [targetSection, setTargetSection] = useState(0)
   const [settings, setSettings] = useState(false), [preview, setPreview] = useState(false), [mode, setMode] = useState<"customer" | "card">("customer"), [error, setError] = useState(""), [busy, setBusy] = useState(false)
+  const [conflict, setConflict] = useState(false)
   const [files, setFiles] = useState<Record<string, File>>({})
   const [localUrls, setLocalUrls] = useState<Record<string, string>>({})
   const [mediaEditing, setMediaEditing] = useState<{ sectionId: string; widgetId: string } | null>(null)
@@ -78,20 +86,55 @@ export function CatalogEditor<T extends CanvasContent>({ initial, entity, onClos
     setSection(section.id, s => ({ ...s, widgets }))
   }
   const selectFile = (sid: string, w: CatalogWidget, file?: File): string | undefined => { if (!file) return; const max = w.type === "photo" ? MAX_IMAGE_SIZE_BYTES : MAX_VIDEO_SIZE_BYTES; const types = w.type === "photo" ? ["image/jpeg", "image/png", "image/webp"] : ["video/mp4", "video/webm"]; if (!types.includes(file.type)) return w.type === "photo" ? "Choose a JPEG, PNG, or WebP image." : "Choose an MP4 or WebM video."; if (!file.size || file.size > max) return `File must be ${Math.floor(max / 1024 / 1024)} MiB or smaller.`; const url = URL.createObjectURL(file); objectUrls.current.push(url); setLocalUrls(f => ({ ...f, [w.id]: url })); setFiles(f => ({ ...f, [w.id]: file })); changeWidget(sid, w.id, { media: { kind: w.type === "photo" ? "image" : "video", source: "upload", url } }) }
-  const cancel = () => { if (busy || !window.confirm("Discard unsaved changes?")) return; void Promise.allSettled(pending.current.map(deleteCatalogMedia)); onClose() }
+  const askConfirmation = (action: "discard" | "refresh") => {
+    if (busy) return
+    confirmTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    setConfirmAction(action)
+  }
+  const cancel = () => askConfirmation("discard")
+  const confirm = () => {
+    void Promise.allSettled(pending.current.map(deleteCatalogMedia))
+    pending.current = []
+    if (confirmAction === "refresh") onRefresh?.()
+    else onClose()
+  }
   useEffect(() => {
-    const trigger = document.activeElement as HTMLElement | null
+    if (!confirmAction) return
+    confirmRef.current?.querySelector<HTMLButtonElement>(".confirm-keep-editing")?.focus()
+    return () => { if (dialogRef.current?.isConnected) confirmTrigger.current?.focus() }
+  }, [confirmAction])
+  useEffect(() => {
+    const trigger = returnFocus ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = "hidden"
-    dialogRef.current?.showModal()
-    document.querySelector<HTMLInputElement>(".pe-name input")?.focus()
-    return () => { dialogRef.current?.close(); document.body.style.overflow = previousOverflow; trigger?.focus() }
+    const dialog = dialogRef.current
+    dialog?.showModal()
+    dialog?.querySelector<HTMLInputElement>(".pe-name input")?.focus()
+    return () => {
+      dialog?.close()
+      document.body.style.overflow = previousOverflow
+      queueMicrotask(() => {
+        if (!trigger?.isConnected) return
+        if (!(trigger instanceof HTMLButtonElement) || !trigger.disabled) { trigger.focus(); return }
+        const observer = new MutationObserver(() => {
+          if (!trigger.isConnected || !trigger.disabled) {
+            observer.disconnect()
+            if (trigger.isConnected && document.activeElement === document.body) trigger.focus()
+          }
+        })
+        observer.observe(trigger, { attributes: true, attributeFilter: ["disabled"] })
+        window.setTimeout(() => observer.disconnect(), 10000)
+      })
+    }
   }, [])
   useEffect(() => {
     const dialog = dialogRef.current
     const trap = (event: KeyboardEvent) => {
-      if (event.key !== "Tab" || !dialog) return
-      const controls = [...dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]')].filter(el => el.getClientRects().length > 0)
+      if (!dialog) return
+      if (confirmRef.current && event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setConfirmAction(null); return }
+      if (event.key !== "Tab") return
+      const scope = confirmRef.current ?? dialog
+      const controls = [...scope.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]')].filter(el => el.getClientRects().length > 0)
       if (!controls.length) { event.preventDefault(); return }
       const first = controls[0], last = controls[controls.length - 1]
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
@@ -103,7 +146,7 @@ export function CatalogEditor<T extends CanvasContent>({ initial, entity, onClos
   const save = async () => {
     const validationError = validate?.(content)
     if (validationError) { setError(validationError); setSettings(true); return }
-    setBusy(true); setError("")
+    setBusy(true); setError(""); setConflict(false)
     try {
       const next = structuredClone(content)
       for (const section of next.sections) for (const w of section.widgets) if (files[w.id]) {
@@ -116,11 +159,11 @@ export function CatalogEditor<T extends CanvasContent>({ initial, entity, onClos
       const usedIds = new Set(next.sections.flatMap(s => s.widgets).map(w => w.media?.id).filter(Boolean))
       void Promise.allSettled(pending.current.filter(id => !usedIds.has(id)).map(deleteCatalogMedia))
       pending.current = []; onSaved()
-    } catch (e) { setError(message(e)) } finally { setBusy(false) }
+    } catch (e) { setError(message(e)); setConflict(e instanceof ApiError && e.status === 409) } finally { setBusy(false) }
   }
-  return createPortal(<dialog ref={dialogRef} className="pe-overlay" aria-label={`${title} editor`} onCancel={event => { event.preventDefault(); if (settings) setSettings(false); else cancel() }}><fieldset disabled={busy} className="pe-editor-fields"><header className="pe-bar"><button className="pe-back" onClick={cancel} aria-label={`Back to ${entity}s`}>←</button><label className="pe-name"><small>{title.toUpperCase()} NAME</small><input aria-label={`${title} name`} maxLength={nameMaxLength} value={content.name} placeholder={`Untitled ${entity}`} onChange={e => setContent({ ...content, name: e.target.value })} /></label><div className="pe-bar-actions"><button onClick={() => setSettings(!settings)} aria-expanded={settings}>⚙ &nbsp; {title} details</button><button onClick={() => { setPreview(!preview); setSettings(false) }}>{preview ? "✎  Back to editor" : "◉  Preview"}</button><button onClick={cancel} disabled={busy}>Cancel</button><button className="pe-primary" onClick={() => void save()} disabled={busy}>{busy ? "Saving…" : saveLabel}</button></div></header>
+  return createPortal(<dialog ref={dialogRef} className="pe-overlay" aria-label={`${title} editor`} onCancel={event => { event.preventDefault(); if (confirmAction) setConfirmAction(null); else if (settings) setSettings(false); else cancel() }}><fieldset disabled={busy} className="pe-editor-fields"><header className="pe-bar"><button className="pe-back" onClick={cancel} aria-label={`Back to ${entity}s`}>←</button><label className="pe-name"><small>{title.toUpperCase()} NAME</small><input aria-label={`${title} name`} maxLength={nameMaxLength} value={content.name} placeholder={`Untitled ${entity}`} onChange={e => setContent({ ...content, name: e.target.value })} /></label>{badge && <span>{badge}</span>}<div className="pe-bar-actions"><button onClick={() => setSettings(!settings)} aria-expanded={settings}>⚙ &nbsp; {title} details</button><button onClick={() => { setPreview(!preview); setSettings(false) }}>{preview ? "✎  Back to editor" : "◉  Preview"}</button><button onClick={cancel} disabled={busy}>Cancel</button><button className="pe-primary" onClick={() => void save()} disabled={busy}>{busy ? "Saving…" : saveLabel}</button></div></header>
     {settings && <div className="pe-settings"><h2>{title} details</h2>{renderDetails(content, setContent)}<button onClick={() => setSettings(false)}>Done</button></div>}
-    {error && <p className="pe-error" role="alert">{error}</p>}
+    {error && <p className="pe-error" role="alert">{error} {conflict && onRefresh && <button type="button" onClick={() => askConfirmation("refresh")}>Refresh booking</button>}</p>}
     {preview ? <div className="pe-preview-area"><div className="pe-preview-switch"><button aria-pressed={mode === "customer"} onClick={() => setMode("customer")}>Customer page</button><button aria-pressed={mode === "card"} onClick={() => setMode("card")}>Admin card</button></div>{renderPreview(displayContent, mode)}</div> : <div className="pe-workspace"><aside className="pe-sidebar"><small>BUILD YOUR PAGE</small><h2>Tell the story</h2><p>Arrange content to give clients a feel for this {entity}.</p><small>ADD A WIDGET</small>{content.sections.length > 1 && <label className="pe-target">Add to section<select value={Math.min(targetSection, content.sections.length - 1)} onChange={e => setTargetSection(Number(e.target.value))}>{content.sections.map((s, i) => <option key={s.id} value={i}>{s.title || `Section ${i + 1}`}</option>)}</select></label>}{(["photo", "markdown", "video"] as const).map(t => <button key={t} disabled={content.sections.reduce((n, s) => n + s.widgets.length, 0) >= MAX_CATALOG_WIDGETS} onClick={() => { const sid = content.sections[Math.min(targetSection, content.sections.length - 1)]?.id; if (sid) setSection(sid, s => ({ ...s, widgets: [...s.widgets, widget(t, Math.max(0, ...s.widgets.map(w => w.y + w.h)))] })) }}><b>{t === "photo" ? "▧" : t === "markdown" ? "T" : "▷"}</b><span><strong>{t === "markdown" ? "Markdown" : t[0].toUpperCase() + t.slice(1)}</strong><small>{t === "photo" ? "Set the scene" : t === "markdown" ? "Share the details" : "Bring it to life"}</small></span></button>)}<p className="pe-tip"><strong>Make it yours.</strong><br />{width < 520 ? "Use the arrows to reorder. Open the editor on a wider screen to drag and resize widgets." : "Drag widgets by their header and resize from the corner. Widgets snap to the grid."}</p></aside><div className="pe-canvas-area" ref={gridContainer}><div className="pe-canvas-heading"><div><small>YOUR CANVAS</small><h2>{title} content</h2><p>Add, reorder, and resize your content.</p>{width < 520 && <p>Use the arrows to reorder. Drag and resize on a wider screen.</p>}</div><span>▦ &nbsp; 12-column layout · widgets snap to grid</span></div>
-    {content.sections.map((section, index) => <section key={section.id} className="pe-editor-section"><div className="pe-section-bar"><input aria-label={`Section ${index + 1} title`} maxLength={MAX_CATALOG_TEXT_LENGTH} placeholder={`Section ${index + 1} title (optional)`} value={section.title} onChange={e => setSection(section.id, s => ({ ...s, title: e.target.value }))} /><button disabled={index === 0} onClick={() => setContent(c => { const sections = [...c.sections]; [sections[index - 1], sections[index]] = [sections[index], sections[index - 1]]; return { ...c, sections } })}>↑</button><button disabled={index === content.sections.length - 1} onClick={() => setContent(c => { const sections = [...c.sections]; [sections[index], sections[index + 1]] = [sections[index + 1], sections[index]]; return { ...c, sections } })}>↓</button><button onClick={() => setContent(c => ({ ...c, sections: c.sections.filter(s => s.id !== section.id) }))} disabled={content.sections.length === 1}>Remove section</button></div><div className="pe-grid"><GridLayout width={Math.max(0, width - 2)} cols={CATALOG_COLUMNS} isDraggable={!busy && width >= 520} isResizable={!busy && width >= 520} rowHeight={52} margin={[12, 12]} draggableHandle=".pe-widget-handle" draggableCancel="button, input, textarea, select, video" layout={width < 520 ? [...section.widgets].sort((a, b) => a.y - b.y || a.x - b.x).map((w, i, sorted) => ({ i: w.id, x: 0, y: sorted.slice(0, i).reduce((total, item) => total + item.h, 0), w: CATALOG_COLUMNS, h: w.h, minW: CATALOG_COLUMNS, maxW: CATALOG_COLUMNS, minH: 4 })) : section.widgets.map(w => ({ i: w.id, x: w.x, y: w.y, w: w.w, h: w.h, minW: 3, minH: 4 }))} onDragStop={layout => setSection(section.id, s => ({ ...s, widgets: s.widgets.map(w => ({ ...w, ...(({ x, y, w: width, h }) => ({ x, y, w: width, h }))(layout.find(l => l.i === w.id) || w) })) }))} onResizeStop={layout => setSection(section.id, s => ({ ...s, widgets: s.widgets.map(w => ({ ...w, ...(({ x, y, w: width, h }) => ({ x, y, w: width, h }))(layout.find(l => l.i === w.id) || w) })) }))}>{section.widgets.map(w => <div key={w.id} className={`pe-widget ${w.type === "markdown" ? "pe-markdown-widget" : "pe-media-widget"}`}><div className="pe-widget-handle" tabIndex={0} role="group" aria-label={width < 520 ? `${w.type} widget` : `${w.type} position. Use arrow keys to move, Shift and arrow keys to resize.`} onKeyDown={event => keyboardLayout(section, w, event)}><span>⠿ &nbsp; {w.type === "markdown" ? "Markdown" : w.type[0].toUpperCase() + w.type.slice(1)}</span>{width < 520 && <span className="pe-widget-order"><button type="button" aria-label={`Move ${w.type} up`} onClick={() => reorderMobile(section, w.id, -1)}>↑</button><button type="button" aria-label={`Move ${w.type} down`} onClick={() => reorderMobile(section, w.id, 1)}>↓</button></span>}{w.type !== "markdown" && <button className="pe-widget-settings" type="button" aria-label={`${w.type === "photo" ? "Photo" : "Video"} settings`} aria-haspopup="dialog" onClick={() => setMediaEditing({ sectionId: section.id, widgetId: w.id })}><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg></button>}{w.type === "markdown" && <button className="pe-markdown-toggle" type="button" aria-pressed={!!markdownPreview[w.id]} onClick={() => setMarkdownPreview(v => ({ ...v, [w.id]: !v[w.id] }))}>{markdownPreview[w.id] ? "Edit Markdown" : "Preview Markdown"}</button>}<button aria-label={`Remove ${w.type}`} onClick={() => setSection(section.id, s => ({ ...s, widgets: s.widgets.filter(item => item.id !== w.id) }))}>×</button></div><div className="pe-widget-body">{w.type === "markdown" ? <div className="pe-markdown-editor" data-color-mode="light"><MDEditor textareaProps={{ "aria-label": "Markdown content" }} value={w.markdown} onChange={value => changeWidget(section.id, w.id, { markdown: (value || "").slice(0, MAX_WIDGET_MARKDOWN_LENGTH) })} preview={markdownPreview[w.id] ? "preview" : "edit"} height="100%" minHeight={0} visibleDragbar={false} previewOptions={{ rehypePlugins: [rehypeSanitize] }} /></div> : <MediaWidget widget={displayContent.sections.find(s => s.id === section.id)?.widgets.find(item => item.id === w.id) || w} onSelectFile={file => { if (file) setError(selectFile(section.id, w, file) || "") }} />}</div></div>)}</GridLayout>{!section.widgets.length && <p className="pe-grid-empty">Add a widget to start building this section.</p>}</div></section>)}<button className="pe-add-section" disabled={content.sections.length >= MAX_CATALOG_SECTIONS} onClick={() => { setTargetSection(content.sections.length); setContent(c => ({ ...c, sections: [...c.sections, newSection()] })) }}>+ Add section</button></div></div>}</fieldset>{mediaEditing && editingMedia && <PackageMediaSettings entity={entity} widget={editingMedia} fileName={files[editingMedia.id]?.name} onChange={patch => changeWidget(mediaEditing.sectionId, editingMedia.id, patch)} onSelectFile={file => selectFile(mediaEditing.sectionId, editingMedia, file)} onClose={() => setMediaEditing(null)} />}</dialog>, document.body)
+    {content.sections.map((section, index) => <section key={section.id} className="pe-editor-section"><div className="pe-section-bar"><input aria-label={`Section ${index + 1} title`} maxLength={MAX_CATALOG_TEXT_LENGTH} placeholder={`Section ${index + 1} title (optional)`} value={section.title} onChange={e => setSection(section.id, s => ({ ...s, title: e.target.value }))} /><button disabled={index === 0} onClick={() => setContent(c => { const sections = [...c.sections]; [sections[index - 1], sections[index]] = [sections[index], sections[index - 1]]; return { ...c, sections } })}>↑</button><button disabled={index === content.sections.length - 1} onClick={() => setContent(c => { const sections = [...c.sections]; [sections[index], sections[index + 1]] = [sections[index + 1], sections[index]]; return { ...c, sections } })}>↓</button><button onClick={() => setContent(c => ({ ...c, sections: c.sections.filter(s => s.id !== section.id) }))} disabled={content.sections.length === 1}>Remove section</button></div><div className="pe-grid"><GridLayout width={Math.max(0, width - 2)} cols={CATALOG_COLUMNS} isDraggable={!busy && width >= 520} isResizable={!busy && width >= 520} rowHeight={52} margin={[12, 12]} draggableHandle=".pe-widget-handle" draggableCancel="button, input, textarea, select, video" layout={width < 520 ? [...section.widgets].sort((a, b) => a.y - b.y || a.x - b.x).map((w, i, sorted) => ({ i: w.id, x: 0, y: sorted.slice(0, i).reduce((total, item) => total + item.h, 0), w: CATALOG_COLUMNS, h: w.h, minW: CATALOG_COLUMNS, maxW: CATALOG_COLUMNS, minH: 4 })) : section.widgets.map(w => ({ i: w.id, x: w.x, y: w.y, w: w.w, h: w.h, minW: 3, minH: 4 }))} onDragStop={layout => setSection(section.id, s => ({ ...s, widgets: s.widgets.map(w => ({ ...w, ...(({ x, y, w: width, h }) => ({ x, y, w: width, h }))(layout.find(l => l.i === w.id) || w) })) }))} onResizeStop={layout => setSection(section.id, s => ({ ...s, widgets: s.widgets.map(w => ({ ...w, ...(({ x, y, w: width, h }) => ({ x, y, w: width, h }))(layout.find(l => l.i === w.id) || w) })) }))}>{section.widgets.map(w => <div key={w.id} className={`pe-widget ${w.type === "markdown" ? "pe-markdown-widget" : "pe-media-widget"}`}><div className="pe-widget-handle" tabIndex={0} role="group" aria-label={width < 520 ? `${w.type} widget` : `${w.type} position. Use arrow keys to move, Shift and arrow keys to resize.`} onKeyDown={event => keyboardLayout(section, w, event)}><span>⠿ &nbsp; {w.type === "markdown" ? "Markdown" : w.type[0].toUpperCase() + w.type.slice(1)}</span>{width < 520 && <span className="pe-widget-order"><button type="button" aria-label={`Move ${w.type} up`} onClick={() => reorderMobile(section, w.id, -1)}>↑</button><button type="button" aria-label={`Move ${w.type} down`} onClick={() => reorderMobile(section, w.id, 1)}>↓</button></span>}{w.type !== "markdown" && <button className="pe-widget-settings" type="button" aria-label={`${w.type === "photo" ? "Photo" : "Video"} settings`} aria-haspopup="dialog" onClick={() => setMediaEditing({ sectionId: section.id, widgetId: w.id })}><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg></button>}{w.type === "markdown" && <button className="pe-markdown-toggle" type="button" aria-pressed={!!markdownPreview[w.id]} onClick={() => setMarkdownPreview(v => ({ ...v, [w.id]: !v[w.id] }))}>{markdownPreview[w.id] ? "Edit Markdown" : "Preview Markdown"}</button>}<button aria-label={`Remove ${w.type}`} onClick={() => setSection(section.id, s => ({ ...s, widgets: s.widgets.filter(item => item.id !== w.id) }))}>×</button></div><div className="pe-widget-body">{w.type === "markdown" ? <div className="pe-markdown-editor" data-color-mode="light"><MDEditor textareaProps={{ "aria-label": "Markdown content" }} value={w.markdown} onChange={value => changeWidget(section.id, w.id, { markdown: (value || "").slice(0, MAX_WIDGET_MARKDOWN_LENGTH) })} preview={markdownPreview[w.id] ? "preview" : "edit"} height="100%" minHeight={0} visibleDragbar={false} previewOptions={{ rehypePlugins: [rehypeSanitize] }} /></div> : <MediaWidget widget={displayContent.sections.find(s => s.id === section.id)?.widgets.find(item => item.id === w.id) || w} onSelectFile={file => { if (file) setError(selectFile(section.id, w, file) || "") }} />}</div></div>)}</GridLayout>{!section.widgets.length && <p className="pe-grid-empty">Add a widget to start building this section.</p>}</div></section>)}<button className="pe-add-section" disabled={content.sections.length >= MAX_CATALOG_SECTIONS} onClick={() => { setTargetSection(content.sections.length); setContent(c => ({ ...c, sections: [...c.sections, newSection()] })) }}>+ Add section</button></div></div>}</fieldset>{confirmAction && <div ref={confirmRef}><Dialog title={confirmAction === "refresh" ? "Refresh booking?" : "Discard unsaved changes?"} intro={confirmAction === "refresh" ? "Refreshing will discard your unsaved editor changes." : "Your changes have not been saved."} onClose={() => setConfirmAction(null)} actions={<><Button className="confirm-keep-editing" variant="secondary" onClick={() => setConfirmAction(null)}>Keep editing</Button><Button onClick={confirm}>{confirmAction === "refresh" ? "Discard and refresh" : "Discard changes"}</Button></>} /></div>}{mediaEditing && editingMedia && <PackageMediaSettings entity={entity} widget={editingMedia} fileName={files[editingMedia.id]?.name} onChange={patch => changeWidget(mediaEditing.sectionId, editingMedia.id, patch)} onSelectFile={file => selectFile(mediaEditing.sectionId, editingMedia, file)} onClose={() => setMediaEditing(null)} />}</dialog>, document.body)
 }

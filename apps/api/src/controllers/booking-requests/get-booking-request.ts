@@ -22,7 +22,7 @@ export const getAdminBookingRequestRoute = createRoute({
   request: { params: idParams }, responses,
 });
 export const getAdminBookingRequestRouteHandler: AppRouteHandler<typeof getAdminBookingRequestRoute> = async (c) => {
-  const bookingRequest = await getBookingRequestService(c.get("db"), c.req.valid("param").id);
+  const bookingRequest = await getBookingRequestService(c.get("db"), c.req.valid("param").id, undefined, c.get("session").user.role === "admin" && c.get("session").user.staff_role === "System Administrator");
   if (!bookingRequest) return c.json({ error: "Booking request not found" }, 404);
   return c.json({ bookingRequest }, 200);
 };

@@ -11,12 +11,10 @@ export type ConversationWithCustomer = ConversationRow & {
   booking_request_reference: string | null;
   booking_request_status: string | null;
   package_id: string | null;
-  arrangement_id: string | null;
-  arrangement_event_type: string | null;
-  arrangement_starts_at: Date | null;
-  arrangement_ends_at: Date | null;
-  arrangement_guest_count: number | null;
-  has_pending_customization: boolean;
+  event_type: string | null;
+  event_starts_at: Date | null;
+  event_ends_at: Date | null;
+  event_guest_count: number | null;
 };
 
 export type MessageWithSender = Selectable<Messages> & {

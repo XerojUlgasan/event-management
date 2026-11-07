@@ -56,7 +56,7 @@ export function conversationDto(
     !["declined", "cancelled"].includes(row.booking_request_status ?? "");
   const keepOpen =
     activeBooking &&
-    (!row.arrangement_ends_at || row.has_pending_customization);
+    !row.event_ends_at;
   return {
     id: row.id,
     customerId: row.customer_id,
@@ -66,19 +66,19 @@ export function conversationDto(
     packageName: row.package_name,
     bookingRequestId: row.booking_request_id,
     bookingRequestReference: row.booking_request_reference,
-    eventType: row.arrangement_event_type,
-    eventStartsAt: row.arrangement_starts_at
-      ? new Date(row.arrangement_starts_at).toISOString()
+    eventType: row.event_type,
+    eventStartsAt: row.event_starts_at
+      ? new Date(row.event_starts_at).toISOString()
       : null,
-    eventEndsAt: row.arrangement_ends_at
-      ? new Date(row.arrangement_ends_at).toISOString()
+    eventEndsAt: row.event_ends_at
+      ? new Date(row.event_ends_at).toISOString()
       : null,
-    guestCount: row.arrangement_guest_count,
+    guestCount: row.event_guest_count,
     status: row.status as ConversationDto["status"],
     closedAt: row.closed_at ? new Date(row.closed_at).toISOString() : null,
     expiresAt:
       conversationExpiresAt(
-        row.arrangement_ends_at,
+        row.event_ends_at,
         row.created_at,
         { keepOpen },
       )?.toISOString() ?? null,

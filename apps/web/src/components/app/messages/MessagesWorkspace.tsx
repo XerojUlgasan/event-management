@@ -360,7 +360,6 @@ export function MessagesWorkspace({
           item={booking}
           readOnly={isTeam}
           customer={isTeam}
-          conversationId={active?.id}
           onClose={() => setBooking(null)}
           onSaved={setBooking}
         />

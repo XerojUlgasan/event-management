@@ -1,7 +1,5 @@
 import type {
   BookingEstimatedDuration,
-  CustomizationRequestStatus,
-  CustomizationRequestType,
 } from "@event-management/contracts/limits/booking-requests";
 
 export type Profile = {
@@ -31,7 +29,7 @@ async function request<T>(
   path: string,
   body?: unknown,
   idToken?: string,
-  method?: "GET" | "POST" | "PATCH" | "DELETE",
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
 ): Promise<T> {
   const response = await fetch(`${apiUrl}${path}`, {
     method: method ?? (body === undefined ? "GET" : "POST"),
@@ -346,83 +344,29 @@ export type BookingRequestInput = {
   preferredDate: string;
   estimatedDuration: BookingEstimatedDuration;
   estimatedDurationDays?: number;
-  timeZone: string;
   guestCount?: number | null;
   contactName: string;
   phoneNumber: string;
   preferredVenueLocation?: string | null;
   specialRequests?: string;
 };
-export type BookingInclusionSnapshot = {
+export type BookingInclusion = {
   serviceId: string;
   name: string;
   role: PackageServiceRole;
   sortOrder: number;
 };
-export type BookingArrangement = {
-  id: string;
-  bookingRequestId: string;
-  eventType: string;
-  preferredDate: string;
-  estimatedDuration: BookingEstimatedDuration;
-  estimatedDurationDays: number | null;
-  startsAt: string | null;
-  endsAt: string | null;
-  timeZone: string;
-  guestCount: number | null;
-  preferredVenueLocation: string | null;
-  notes: string | null;
-  updatedBy: string;
-  updatedByName: string;
-  outOfRange: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-export type CustomizationRequest = {
-  id: string;
-  bookingRequestId: string;
-  conversationId: string | null;
-  messageId: string | null;
-  type: CustomizationRequestType;
-  description: string;
-  direction: "add" | "deduct" | null;
-  amountMinor: number | null;
-  status: CustomizationRequestStatus;
-  decisionReason: string | null;
-  requestedBy: string;
-  requestedByName: string;
-  decidedBy: string | null;
-  decidedByName: string | null;
-  decidedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-export type AdminCustomizationRequest = CustomizationRequest & {
-  bookingRequestReference: string;
-  customerName: string;
-  packageName: string;
-  eventType: string;
-};
-export type ArrangementInput = {
-  expectedUpdatedAt?: string;
+export type BookingDetailsInput = {
+  expectedUpdatedAt: string;
   eventType?: string;
   preferredDate?: string;
   estimatedDuration?: BookingEstimatedDuration;
   estimatedDurationDays?: number | null;
   startsAt?: string | null;
   endsAt?: string | null;
-  timeZone?: string;
   guestCount?: number | null;
   preferredVenueLocation?: string | null;
   notes?: string | null;
-};
-export type CustomizationRequestInput = {
-  type: CustomizationRequestType;
-  description: string;
-  direction?: "add" | "deduct";
-  amountMinor?: number;
-  conversationId?: string;
-  messageId?: string;
 };
 export type BookingRequest = Omit<
   BookingRequestInput,
@@ -438,19 +382,21 @@ export type BookingRequest = Omit<
   startsAt: string | null;
   endsAt: string | null;
   preferredVenueLocation: string | null;
-  packageInclusionsSnapshot: BookingInclusionSnapshot[] | null;
+  packageInclusions: BookingInclusion[];
   specialRequests: string | null;
   id: string;
   reference: string;
   customerId: string;
   packageName: string;
-  packagePrice: PackagePrice;
-  packageMaxGuests: number;
+  packageType: "catalog" | "custom";
+  packageUpdatedAt: string;
+  packagePrice: PackagePrice | null;
+  packageMaxGuests: number | null;
   status: BookingStatus;
   outOfRange: boolean;
-  arrangement: BookingArrangement | null;
-  customizationRequests: CustomizationRequest[];
-  pendingCustomizationRequests: number;
+  notes: string | null;
+  updatedBy: string | null;
+  updatedByName: string | null;
   createdAt: string;
   updatedAt: string;
   statusHistory: {
@@ -520,81 +466,30 @@ export const cancelMyBookingRequest = (id: string, reason: string) =>
     "PATCH",
   );
 
-export const updateBookingArrangement = (
-  id: string,
-  input: ArrangementInput,
-) =>
-  request<{ bookingRequest: BookingRequest }>(
-    `/admin/booking-requests/${encodeURIComponent(id)}/arrangement`,
-    input,
-    undefined,
-    "PATCH",
+export const getBookingPackage = (id: string, admin: boolean) =>
+  request<{ package: AdminPackage; bookingUpdatedAt: string }>(
+    `${admin ? "/admin" : ""}/booking-requests/${encodeURIComponent(id)}/package`,
+  );
+export const saveBookingCustomPackage = (id: string, content: PackageContent, versions: { expectedBookingUpdatedAt: string; expectedUpdatedAt: string }, existing: boolean) =>
+  request<{ package: AdminPackage; bookingRequest: BookingRequest }>(
+    `/admin/booking-requests/${encodeURIComponent(id)}/custom-package`,
+    { ...content, ...versions }, undefined, existing ? "PUT" : "POST",
   );
 
-export const createCustomizationRequest = (
-  bookingId: string,
-  input: CustomizationRequestInput,
-) =>
+export const updateBookingDetails = (id: string, input: BookingDetailsInput) =>
   request<{ bookingRequest: BookingRequest }>(
-    `/admin/booking-requests/${encodeURIComponent(bookingId)}/customization-requests`,
-    input,
+    `/admin/booking-requests/${encodeURIComponent(id)}/details`, input, undefined, "PATCH",
   );
-
-export const createCustomerCustomizationRequest = (
-  bookingId: string,
-  input: CustomizationRequestInput,
-) =>
-  request<{ bookingRequest: BookingRequest }>(
-    `/booking-requests/${encodeURIComponent(bookingId)}/customization-requests`,
-    input,
-  );
-
-export const withdrawCustomizationRequest = (id: string) =>
-  request<{ bookingRequest: BookingRequest }>(
-    `/customization-requests/${encodeURIComponent(id)}/withdraw`,
-    undefined,
-    undefined,
-    "PATCH",
-  );
-
-export const decideCustomizationRequest = (
-  id: string,
-  decision: "approved" | "rejected",
-  reason?: string,
-) =>
-  request<{ bookingRequest: BookingRequest }>(
-    `/admin/customization-requests/${encodeURIComponent(id)}`,
-    { decision, ...(reason ? { reason } : {}) },
-    undefined,
-    "PATCH",
-  );
-
-export type CustomizationRequestFilters = {
-  status?: CustomizationRequestStatus;
-  cursor?: string;
-  limit?: number;
-};
-export const getAdminCustomizationRequests = (
-  filters: CustomizationRequestFilters = {},
-) => {
-  const query = new URLSearchParams();
-  if (filters.status) query.set("status", filters.status);
-  if (filters.cursor) query.set("cursor", filters.cursor);
-  if (filters.limit) query.set("limit", String(filters.limit));
-  const search = query.toString();
-  return request<{
-    requests: AdminCustomizationRequest[];
-    nextCursor: string | null;
-  }>(`/admin/customization-requests${search ? `?${search}` : ""}`);
-};
 
 export type QuotationStatus = "draft" | "sent" | "accepted" | "superseded";
 export type QuotationDirection = "add" | "deduct";
 export type QuotationKind = "addition" | "deduction" | "substitution" | "adjustment";
-export type QuotationItemInput = { direction: QuotationDirection; kind: QuotationKind; description: string; amountMinor: number; serviceId?: string | null; customizationRequestId?: string | null };
+export type QuotationItemInput = { direction: QuotationDirection; kind: QuotationKind; description: string; amountMinor: number; serviceId?: string | null };
 export type QuotationItem = QuotationItemInput & { id: string; sortOrder: number };
-export type Quotation = { id: string; bookingRequestId: string; version: number; currency: "PHP"; baseAmountMinor: number; totalAmountMinor: number; status: QuotationStatus; createdBy: string; createdAt: string; updatedAt: string; sentAt: string | null; acceptedAt: string | null; supersededAt: string | null; items: QuotationItem[] };
+export type Quotation = { basisCurrent: boolean; adjustmentsReviewed: boolean; offeredPackageId: string | null; offeredPackageUpdatedAt: string | null; offeredPackageTerms: unknown | null; id: string; bookingRequestId: string; version: number; currency: "PHP"; baseAmountMinor: number; totalAmountMinor: number; status: QuotationStatus; createdBy: string; createdAt: string; updatedAt: string; sentAt: string | null; acceptedAt: string | null; supersededAt: string | null; items: QuotationItem[] };
 export const getAdminQuotations = (bookingId: string) => request<{ quotations: Quotation[] }>(`/admin/booking-requests/${encodeURIComponent(bookingId)}/quotations`);
 export const createQuotation = (bookingId: string) => request<{ quotation: Quotation }>(`/admin/booking-requests/${encodeURIComponent(bookingId)}/quotations`, {});
 export const updateQuotation = (id: string, items: QuotationItemInput[], expectedUpdatedAt?: string) => request<{ quotation: Quotation }>(`/admin/quotations/${encodeURIComponent(id)}`, { items, ...(expectedUpdatedAt ? { expectedUpdatedAt } : {}) }, undefined, "PATCH");
 export const sendQuotation = (id: string) => request<{ quotation: Quotation }>(`/admin/quotations/${encodeURIComponent(id)}/send`, {}, undefined, "POST");
+
+export const reviseAdminQuotation = (id: string, reason: string) => request<{ quotation: Quotation }>(`/admin/quotations/${encodeURIComponent(id)}/revision`, { reason });

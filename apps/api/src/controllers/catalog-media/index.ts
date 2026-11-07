@@ -2,7 +2,7 @@ import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import { uploadCatalogMediaService, removePendingCatalogMediaService } from "../../services/catalog-media/catalog-media.js";
-import { findPublicCatalogMediaData, findAdminCatalogMediaData } from "../../data/catalog-media/catalog-media.js";
+import { findPublicCatalogMediaData, findAdminCatalogMediaData, findCustomerCatalogMediaData } from "../../data/catalog-media/catalog-media.js";
 import { getCatalogMedia } from "../../utils/catalog-media-storage.js";
 import { getCookie } from "hono/cookie";
 import { SESSION_COOKIE } from "../../utils/session.js";
@@ -41,6 +41,9 @@ routes.get("/catalog-media/:id", async c => {
       const resolved = await resolveSessionService(c.get("db"), token);
       if (resolved.kind === "ok" && resolved.session.user.role === "admin" && resolved.session.user.staff_role === "System Administrator") {
         media = await findAdminCatalogMediaData(c.get("db"), id, resolved.session.user.id);
+        adminView = !!media;
+      } else if (resolved.kind === "ok" && resolved.session.user.role === "customer") {
+        media = await findCustomerCatalogMediaData(c.get("db"), id, resolved.session.user.id);
         adminView = !!media;
       }
     }

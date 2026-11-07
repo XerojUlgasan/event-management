@@ -3,11 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Badge, Button, Icon, PageHeader } from "@event-management/ui";
 import { durationLabel } from "./BookingRequest";
-import {
-  ArrangementEditor,
-  CustomizationQueue,
-  CustomizationRequestsPanel,
-} from "./BookingCustomization";
+import { BookingPackage } from "./BookingPackage";
+import { BookingDetailsEditor } from "./BookingDetailsEditor";
 import { QuotationBuilder } from "./QuotationBuilder";
 import {
   cancelMyBookingRequest,
@@ -27,13 +24,13 @@ const labels: Record<BookingStatus, string> = {
   declined: "Declined",
   cancelled: "Cancelled",
 };
-function dateLabel(value: string | null, timeZone: string) {
+function dateLabel(value: string | null) {
   if (!value) return "To be confirmed";
   try {
     return new Intl.DateTimeFormat("en-PH", {
       dateStyle: "medium",
       timeStyle: "short",
-      timeZone,
+      timeZone: "Asia/Manila",
     }).format(new Date(value));
   } catch {
     return "To be confirmed";
@@ -199,16 +196,17 @@ function BookingCards({
               <p>Request {item.reference}</p>
             </div>
           </div>
+          {!admin && <BookingPackage item={item} admin={false} onMessage={onOpenChat ? () => onOpenChat(item.reference) : undefined} />}
           <div className="event-record-details">
             <span>
               <small>Event type</small>
-              <strong>{item.arrangement?.eventType ?? item.eventType}</strong>
+              <strong>{item.eventType}</strong>
             </span>
             <span>
               <small>Preferred date</small>
               <strong>
                 {preferredDateLabel(
-                  item.arrangement?.preferredDate ?? item.preferredDate,
+                  item.preferredDate,
                 )}
               </strong>
             </span>
@@ -216,48 +214,40 @@ function BookingCards({
               <small>Estimated event length</small>
               <strong>
                 {durationLabel(
-                  item.arrangement?.estimatedDuration ??
-                    item.estimatedDuration,
-                  item.arrangement?.estimatedDurationDays ??
-                    item.estimatedDurationDays,
+                  item.estimatedDuration,
+                  item.estimatedDurationDays,
                 )}
               </strong>
             </span>
             <span>
               <small>Start time</small>
               <strong>
-                {dateLabel(
-                  item.arrangement?.startsAt ?? item.startsAt,
-                  item.timeZone,
-                )}
+                {dateLabel(item.startsAt)}
               </strong>
             </span>
             <span>
               <small>End time</small>
               <strong>
-                {dateLabel(
-                  item.arrangement?.endsAt ?? item.endsAt,
-                  item.timeZone,
-                )}
+                {dateLabel(item.endsAt)}
               </strong>
             </span>
             <span>
               <small>Preferred venue</small>
               <strong>
-                {item.arrangement?.preferredVenueLocation ??
-                  item.preferredVenueLocation ??
+                {item.preferredVenueLocation ??
                   "To be confirmed"}
               </strong>
             </span>
             <span>
               <small>Guest count</small>
               <strong>
-                {item.arrangement?.guestCount ?? item.guestCount ?? "Not sure yet"}
+                {item.guestCount ?? "Not sure yet"}
+                {item.outOfRange && item.packageMaxGuests !== null && ` · above current package max (${item.packageMaxGuests})`}
               </strong>
             </span>
             <span>
               <small>Time zone</small>
-              <strong>{item.timeZone}</strong>
+              <strong>Asia/Manila</strong>
             </span>
             {admin && (
               <>
@@ -309,17 +299,6 @@ function BookingCards({
                 onUpdate={update}
               />
             )}
-          {!admin && onOpenChat && (
-            <div className="booking-cancel">
-              <Button
-                variant="secondary"
-                icon="users"
-                onClick={() => onOpenChat(item.reference)}
-              >
-                Open chat
-              </Button>
-            </div>
-          )}
           {!admin && !["declined", "cancelled"].includes(item.status) && (
             <CancelForm item={item} busy={busy === item.id} onCancel={cancel} />
           )}
@@ -646,7 +625,6 @@ function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
         title="Booking requests"
         description="Review requests and follow up on event details."
       />
-      <CustomizationQueue revision={revision} onOpen={setSelected} />
       <div
         className="booking-filter"
         role="group"
@@ -778,7 +756,6 @@ function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
                   <th>Reference</th>
                   <th>Event / package</th>
                   <th>Contact person</th>
-                  <th>Changes</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -806,15 +783,6 @@ function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
                       <small>{item.packageName}</small>
                     </td>
                     <td>{item.contactName}</td>
-                    <td>
-                      {item.pendingCustomizationRequests > 0 ? (
-                        <Badge tone="warning">
-                          {item.pendingCustomizationRequests} pending
-                        </Badge>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
                     <td>
                       <BookingStatusBadge status={item.status} />
                     </td>
@@ -879,19 +847,17 @@ export function BookingDetails({
   item,
   readOnly,
   customer = false,
-  conversationId,
   onClose,
   onSaved,
 }: {
   item: BookingRequest;
   readOnly: boolean;
   customer?: boolean;
-  conversationId?: string;
   onClose: () => void;
   onSaved: (item: BookingRequest) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [tab, setTab] = useState<"overview" | "customizations" | "quotation" | "status">("overview");
+  const [tab, setTab] = useState<"overview" | "quotation" | "status">("overview");
   const [status, setStatus] = useState(item.status);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -901,6 +867,7 @@ export function BookingDetails({
     status === "declined" ||
     status === "cancelled";
   const isAdmin = !customer && !readOnly;
+  const packageRestricted = !isAdmin && !customer && item.packageType === "custom";
   const isTerminal = ["declined", "cancelled"].includes(item.status);
 
   useEffect(() => {
@@ -934,7 +901,6 @@ export function BookingDetails({
 
   const tabs = [
     { key: "overview" as const, label: "Overview" },
-    ...(isAdmin ? [{ key: "customizations" as const, label: "Customizations", badge: item.pendingCustomizationRequests > 0 ? item.pendingCustomizationRequests : undefined }] : []),
     ...(isAdmin ? [{ key: "quotation" as const, label: "Quotation" }] : []),
     ...(isAdmin && !isTerminal ? [{ key: "status" as const, label: "Status" }] : []),
   ];
@@ -980,9 +946,6 @@ export function BookingDetails({
                 onClick={() => setTab(t.key)}
               >
                 {t.label}
-                {t.badge != null && (
-                  <span className="booking-details-tab-badge">{t.badge}</span>
-                )}
               </button>
             ))}
           </nav>
@@ -994,53 +957,59 @@ export function BookingDetails({
         {/* ── Overview tab ── */}
         {tab === "overview" && (
           <>
+            {(isAdmin || customer) && <BookingPackage item={item} admin={isAdmin} onSaved={onSaved} onMessage={customer ? onClose : undefined} />}
             <div className="booking-details-grid">
               <section>
                 <h3>Event details</h3>
                 <dl>
-                  <div><dt>Event type</dt><dd>{item.arrangement?.eventType ?? item.eventType}</dd></div>
-                  <div><dt>Package</dt><dd>{item.packageName}</dd></div>
+                  <div><dt>Event type</dt><dd>{item.eventType}</dd></div>
+                  <div><dt>Current package</dt><dd>{item.packageName}</dd></div>
+                  {packageRestricted ? <div><dt>Package access</dt><dd>Private package details are available to the customer and System Administrator.</dd></div> : <>
+                    <div><dt>Current package price</dt><dd>{item.packagePrice ? new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(item.packagePrice.amountMinor / 100) : "Private package"}</dd></div>
+                    <div><dt>Current package services</dt><dd>{item.packageInclusions.length ? item.packageInclusions.map((service) => `${service.name} (${service.role})`).join(", ") : "None"}</dd></div>
+                  </>}
                   <div>
                     <dt>Preferred date</dt>
-                    <dd>{preferredDateLabel(item.arrangement?.preferredDate ?? item.preferredDate)}</dd>
+                    <dd>{preferredDateLabel(item.preferredDate)}</dd>
                   </div>
                   <div>
                     <dt>Estimated length</dt>
-                    <dd>{durationLabel(item.arrangement?.estimatedDuration ?? item.estimatedDuration, item.arrangement?.estimatedDurationDays ?? item.estimatedDurationDays)}</dd>
+                    <dd>{durationLabel(item.estimatedDuration, item.estimatedDurationDays)}</dd>
                   </div>
                   <div>
                     <dt>Start time</dt>
-                    <dd>{dateLabel(item.arrangement?.startsAt ?? item.startsAt, item.timeZone)}</dd>
+                    <dd>{dateLabel(item.startsAt)}</dd>
                   </div>
                   <div>
                     <dt>End time</dt>
-                    <dd>{dateLabel(item.arrangement?.endsAt ?? item.endsAt, item.timeZone)}</dd>
+                    <dd>{dateLabel(item.endsAt)}</dd>
                   </div>
-                  <div><dt>Time zone</dt><dd>{item.timeZone}</dd></div>
+                  <div><dt>Time zone</dt><dd>Asia/Manila</dd></div>
                   <div>
                     <dt>Guest count</dt>
                     <dd>
-                      {item.arrangement?.guestCount ?? item.guestCount ?? "Not sure yet"}
-                      {(item.arrangement?.outOfRange ?? item.outOfRange) && (
-                        <span className="booking-details-warn"> · above package max ({item.packageMaxGuests})</span>
+                      {item.guestCount ?? "Not sure yet"}
+                      {!packageRestricted && item.outOfRange && item.packageMaxGuests !== null && (
+                        <span className="booking-details-warn"> · above current package max ({item.packageMaxGuests})</span>
                       )}
                     </dd>
                   </div>
                   <div>
                     <dt>Preferred venue</dt>
-                    <dd>{item.arrangement?.preferredVenueLocation ?? item.preferredVenueLocation ?? "To be confirmed"}</dd>
+                    <dd>{item.preferredVenueLocation ?? "To be confirmed"}</dd>
                   </div>
-                  {item.arrangement?.notes && (
-                    <div><dt>Internal notes</dt><dd>{item.arrangement.notes}</dd></div>
+                  {item.notes && (
+                    <div><dt>Internal notes</dt><dd>{item.notes}</dd></div>
                   )}
                 </dl>
-                {item.arrangement && (
+                {item.updatedByName && (
                   <p className="booking-details-meta">
-                    Last edited by {item.arrangement.updatedByName} · {dateLabel(item.arrangement.updatedAt, item.timeZone)}
+                    Details last edited by {item.updatedByName}
                   </p>
                 )}
                 <p className="booking-details-meta">Preferred date is not reserved.</p>
-                {isAdmin && <ArrangementEditor item={item} onSaved={onSaved} />}
+                {customer && <p className="booking-details-meta">To discuss changes, close these details and message the team in this conversation.</p>}
+                {isAdmin && !isTerminal && <BookingDetailsEditor item={item} onSaved={onSaved} />}
               </section>
               <section>
                 <h3>Contact</h3>
@@ -1048,7 +1017,7 @@ export function BookingDetails({
                   <div><dt>Contact person</dt><dd>{item.contactName}</dd></div>
                   <div><dt>Phone number</dt><dd>{item.phoneNumber}</dd></div>
                   <div><dt>Special requests</dt><dd>{item.specialRequests || "None"}</dd></div>
-                  <div><dt>Submitted</dt><dd>{dateLabel(item.createdAt, item.timeZone)}</dd></div>
+                  <div><dt>Submitted</dt><dd>{dateLabel(item.createdAt)}</dd></div>
                 </dl>
               </section>
             </div>
@@ -1066,19 +1035,9 @@ export function BookingDetails({
           </>
         )}
 
-        {/* ── Customizations tab ── */}
-        {tab === "customizations" && isAdmin && (
-          <CustomizationRequestsPanel
-            item={item}
-            admin={true}
-            conversationId={conversationId}
-            onSaved={onSaved}
-          />
-        )}
-
         {/* ── Quotation tab ── */}
         {tab === "quotation" && isAdmin && (
-          <QuotationBuilder item={item} />
+          <QuotationBuilder item={item} onBookingRefreshed={onSaved} />
         )}
 
         {/* ── Status tab ── */}

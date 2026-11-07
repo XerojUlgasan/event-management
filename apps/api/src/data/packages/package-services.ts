@@ -48,6 +48,8 @@ export async function validatePackageServicesData(
     .selectFrom("services")
     .select(["id", "archived_at"])
     .where("id", "in", ids)
+    .orderBy("id")
+    .forUpdate()
     .execute();
   const found = new Map(rows.map((row) => [row.id, row]));
   if (ids.some((id) => !found.has(id)))

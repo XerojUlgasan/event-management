@@ -69,7 +69,7 @@ type Fields = {
   phoneNumber: string;
   specialRequests: string;
 };
-type Draft = { item: PublicPackage; fields: Fields; timeZone: string };
+type Draft = { item: PublicPackage; fields: Fields };
 type Errors = Partial<Record<keyof Fields, string>>;
 export function readBookingDraft(): Draft | null {
   try {
@@ -89,8 +89,10 @@ export function readBookingDraft(): Draft | null {
 export function clearBookingDraft() {
   sessionStorage.removeItem(KEY);
 }
-function localDate(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+function manilaDate(date: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(date);
 }
 function validate(fields: Fields, requireName = true): Errors {
   const errors: Errors = {};
@@ -103,7 +105,7 @@ function validate(fields: Fields, requireName = true): Errors {
   else if (eventType.length > MAX_EVENT_TYPE_LENGTH)
     errors[fields.eventType === OTHER ? "customEventType" : "eventType"] =
       `Use ${MAX_EVENT_TYPE_LENGTH} characters or fewer.`;
-  if (!fields.date || fields.date < localDate(new Date()))
+  if (!fields.date || fields.date < manilaDate(new Date()))
     errors.date = "Choose today or a future date.";
   if (fields.estimatedDuration === "more_than_1_week") {
     const days = Number(fields.estimatedDurationDays);
@@ -190,7 +192,6 @@ export function BookingRequestDialog({
         typeof old?.specialRequests === "string" ? old.specialRequests : "",
     };
   });
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [review, setReview] = useState(!!saved);
   const [touched, setTouched] = useState<
     Partial<Record<keyof Fields, boolean>>
@@ -200,11 +201,7 @@ export function BookingRequestDialog({
   >("loading");
   const [busy, setBusy] = useState(false);
   const [noteOpen, setNoteOpen] = useState(() => !!fields.specialRequests);
-  const [error, setError] = useState(
-    saved && saved.timeZone !== timeZone
-      ? "Your time zone changed. Please check your preferred date before submitting."
-      : "",
-  );
+  const [error, setError] = useState("");
   const [reference, setReference] = useState("");
   const dialog = useRef<HTMLDialogElement>(null),
     summary = useRef<HTMLDivElement>(null),
@@ -287,7 +284,6 @@ export function BookingRequestDialog({
         ...(fields.estimatedDuration === "more_than_1_week"
           ? { estimatedDurationDays: Number(fields.estimatedDurationDays) }
           : {}),
-        timeZone,
         ...(fields.guestCount.trim()
           ? { guestCount: Number(fields.guestCount) }
           : {}),
@@ -326,7 +322,7 @@ export function BookingRequestDialog({
       return;
     }
     if (auth === "signed-out") {
-      sessionStorage.setItem(KEY, JSON.stringify({ item, fields, timeZone }));
+      sessionStorage.setItem(KEY, JSON.stringify({ item, fields }));
       window.location.assign("/?booking=resume");
     } else if (auth === "customer") void submit();
   };
@@ -560,7 +556,7 @@ export function BookingRequestDialog({
                 <input
                   {...props("date")}
                   type="date"
-                  min={localDate(new Date())}
+                  min={manilaDate(new Date())}
                 />,
               )}
               {field(

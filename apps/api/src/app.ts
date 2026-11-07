@@ -4,7 +4,6 @@ import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { db } from "./db/client.js";
 import bookingRequestRoutes from "./controllers/booking-requests/index.js";
-import customizationRequestRoutes from "./controllers/customization-requests/index.js";
 import quotationRoutes from "./controllers/quotations/index.js";
 import authRoutes from "./controllers/auth/index.js";
 import messageRoutes from "./controllers/messages/index.js";
@@ -31,7 +30,7 @@ app.use(
       origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
     credentials: true,
     allowHeaders: ["Authorization", "Content-Type"],
-    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   }),
 );
 
@@ -64,12 +63,10 @@ app.route("/v1", packageRoutes);
 app.route("/v1", venueRoutes);
 app.use("/v1/booking-requests", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/booking-requests/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/admin/booking-requests/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/admin/customization-requests/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/admin/booking-requests/*", (c, next) => bodyLimit({ maxSize: /^\/v1\/admin\/booking-requests\/[^/]+\/custom-package$/.test(c.req.path) ? CATALOG_JSON_BODY_LIMIT_BYTES : SMALL_JSON_BODY_LIMIT_BYTES })(c, next));
 app.use("/v1/admin/quotations/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/quotations/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.route("/v1", bookingRequestRoutes);
-app.route("/v1", customizationRequestRoutes);
 app.route("/v1", quotationRoutes);
 app.route("/v1", messageRoutes);
 app.route("/v1", authRoutes);

@@ -33,24 +33,6 @@ export interface AuditEvents {
   metadata: Generated<Json>;
 }
 
-export interface BookingArrangements {
-  booking_request_id: string;
-  created_at: Generated<Timestamp>;
-  ends_at: Timestamp | null;
-  estimated_duration: Generated<string>;
-  estimated_duration_days: number | null;
-  event_type: string;
-  guest_count: number | null;
-  id: Generated<string>;
-  notes: string | null;
-  preferred_date: string;
-  preferred_venue_location: string | null;
-  starts_at: Timestamp | null;
-  time_zone: string;
-  updated_at: Generated<Timestamp>;
-  updated_by: string;
-}
-
 export interface BookingRequests {
   contact_name: string;
   created_at: Generated<Timestamp>;
@@ -61,12 +43,9 @@ export interface BookingRequests {
   event_type: string;
   guest_count: number | null;
   id: Generated<string>;
+  notes: string | null;
   out_of_range: boolean;
   package_id: string;
-  package_inclusions_snapshot: Json | null;
-  package_max_guests: number;
-  package_name: string;
-  package_price: number;
   phone_number: string;
   preferred_date: string;
   preferred_venue_location: string | null;
@@ -74,8 +53,8 @@ export interface BookingRequests {
   special_requests: string | null;
   starts_at: Timestamp | null;
   status: Generated<string>;
-  time_zone: string;
   updated_at: Generated<Timestamp>;
+  updated_by: string | null;
 }
 
 export interface BookingRequestStatusHistory {
@@ -129,24 +108,6 @@ export interface Conversations {
   updated_at: Generated<Timestamp>;
 }
 
-export interface CustomizationRequests {
-  amount_minor: number | null;
-  booking_request_id: string;
-  conversation_id: string | null;
-  created_at: Generated<Timestamp>;
-  decided_at: Timestamp | null;
-  decided_by: string | null;
-  decision_reason: string | null;
-  description: string;
-  direction: string | null;
-  id: Generated<string>;
-  message_id: string | null;
-  requested_by: string;
-  status: Generated<string>;
-  type: string;
-  updated_at: Generated<Timestamp>;
-}
-
 export interface MediaAssets {
   byte_size: number | null;
   created_at: Generated<Timestamp>;
@@ -172,12 +133,14 @@ export interface Messages {
 export interface Packages {
   archived_at: Timestamp | null;
   created_at: Generated<Timestamp>;
+  custom_for_booking_request_id: string | null;
   description: Generated<string>;
   id: Generated<string>;
   max_guests: number;
   name: string;
+  package_type: Generated<string>;
   price: number;
-  published_at: Generated<Timestamp>;
+  published_at: Generated<Timestamp | null>;
   updated_at: Generated<Timestamp>;
 }
 
@@ -192,7 +155,6 @@ export interface PackageServices {
 
 export interface QuotationItems {
   amount_minor: number;
-  customization_request_id: string | null;
   description: string;
   direction: string;
   id: Generated<string>;
@@ -204,12 +166,16 @@ export interface QuotationItems {
 
 export interface Quotations {
   accepted_at: Timestamp | null;
+  adjustments_reviewed: Generated<boolean>;
   base_amount_minor: number;
   booking_request_id: string;
   created_at: Generated<Timestamp>;
   created_by: string;
   currency: Generated<string>;
   id: Generated<string>;
+  offered_package_id: string | null;
+  offered_package_terms: Json | null;
+  offered_package_updated_at: Timestamp | null;
   sent_at: Timestamp | null;
   status: Generated<string>;
   superseded_at: Timestamp | null;
@@ -263,14 +229,12 @@ export interface Venues {
 
 export interface DB {
   audit_events: AuditEvents;
-  booking_arrangements: BookingArrangements;
   booking_request_status_history: BookingRequestStatusHistory;
   booking_requests: BookingRequests;
   catalog_pages: CatalogPages;
   catalog_sections: CatalogSections;
   catalog_widgets: CatalogWidgets;
   conversations: Conversations;
-  customization_requests: CustomizationRequests;
   media_assets: MediaAssets;
   messages: Messages;
   package_services: PackageServices;

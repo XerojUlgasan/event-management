@@ -10,7 +10,6 @@ export const quotationItemInputSchema = z.object({
   description: z.string().trim().min(1).max(MAX_QUOTATION_DESCRIPTION_LENGTH),
   amountMinor: z.number().int().positive().max(2147483647),
   serviceId: z.string().uuid().nullable().optional(),
-  customizationRequestId: z.string().uuid().nullable().optional(),
 }).strict();
 export const quotationItemSchema = quotationItemInputSchema.extend({
   id: z.string().uuid(),
@@ -22,7 +21,7 @@ export const quotationSchema = z.object({
   version: z.number().int().positive(),
   currency: z.literal("PHP"),
   baseAmountMinor: z.number().int().positive(),
-  totalAmountMinor: z.number().int().nonnegative(),
+  totalAmountMinor: z.number().int(),
   status: quotationStatusSchema,
   createdBy: z.string().uuid(),
   createdAt: z.string(),
@@ -30,6 +29,11 @@ export const quotationSchema = z.object({
   sentAt: z.string().nullable(),
   acceptedAt: z.string().nullable(),
   supersededAt: z.string().nullable(),
+  offeredPackageId: z.string().uuid().nullable(),
+  offeredPackageUpdatedAt: z.string().nullable(),
+  offeredPackageTerms: z.record(z.string(), z.unknown()).nullable(),
+  basisCurrent: z.boolean(),
+  adjustmentsReviewed: z.boolean(),
   items: z.array(quotationItemSchema),
 });
 export const quotationIdParams = z.object({ id: z.string().uuid() });

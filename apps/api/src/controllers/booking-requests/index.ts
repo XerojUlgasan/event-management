@@ -8,7 +8,8 @@ import { cancelBookingRequestRoute, cancelBookingRequestRouteHandler } from "./c
 import { updateBookingStatusRoute, updateBookingStatusRouteHandler } from "./update-booking-status.js";
 import { getBookingCalendarRoute, getBookingCalendarRouteHandler } from "./get-booking-calendar.js";
 import { getMyBookingRequestRoute, getMyBookingRequestRouteHandler, getAdminBookingRequestRoute, getAdminBookingRequestRouteHandler } from "./get-booking-request.js";
-import { updateArrangementRoute, updateArrangementRouteHandler } from "./update-arrangement.js";
+import { updateDetailsRoute, updateDetailsRouteHandler } from "./update-details.js";
+import { getMyBookingPackageRoute, getMyBookingPackageRouteHandler, getAdminBookingPackageRoute, getAdminBookingPackageRouteHandler, createBookingCustomPackageRoute, createBookingCustomPackageRouteHandler, updateBookingCustomPackageRoute, updateBookingCustomPackageRouteHandler } from "./custom-package.js";
 const routes = new OpenAPIHono<HonoEnv>({defaultHook:(result,c) => { if (!result.success) return c.json({error:result.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; ")},400); }});
 const customer = createMiddleware<HonoEnv>(async (c,next) => { if(c.get("session").user.role !== "customer") return c.json({error:"Customer access required"},403); await next(); });
 const bookingReader = createMiddleware<HonoEnv>(async (c,next) => { if(!["admin", "staff"].includes(c.get("session").user.role)) return c.json({error:"Staff access required"},403); await next(); });
@@ -18,7 +19,6 @@ routes.use("/admin/booking-requests",requireSession,bookingReader);
 // Staff can read requests; only System Administrators can update them.
 routes.use("/admin/booking-requests/*",requireSession,createMiddleware<HonoEnv>(async (c, next) => {
   if (c.req.method === "GET") return bookingReader(c, next);
-  if (c.req.method === "POST" && c.req.path.endsWith("/customization-requests") && c.get("session").user.role === "customer") return next();
   return requireSystemAdmin(c, next);
 }));
 routes.openapi(createBookingRequestRoute,createBookingRequestRouteHandler);
@@ -29,5 +29,9 @@ routes.openapi(getBookingCalendarRoute,getBookingCalendarRouteHandler);
 routes.openapi(getMyBookingRequestRoute,getMyBookingRequestRouteHandler);
 routes.openapi(getAdminBookingRequestRoute,getAdminBookingRequestRouteHandler);
 routes.openapi(updateBookingStatusRoute,updateBookingStatusRouteHandler);
-routes.openapi(updateArrangementRoute,updateArrangementRouteHandler);
+routes.openapi(updateDetailsRoute,updateDetailsRouteHandler);
+routes.openapi(getMyBookingPackageRoute, getMyBookingPackageRouteHandler);
+routes.openapi(getAdminBookingPackageRoute, getAdminBookingPackageRouteHandler);
+routes.openapi(createBookingCustomPackageRoute, createBookingCustomPackageRouteHandler);
+routes.openapi(updateBookingCustomPackageRoute, updateBookingCustomPackageRouteHandler);
 export default routes;

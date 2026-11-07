@@ -5,6 +5,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { Pool } from "pg";
+import { dropTestDatabase } from "./helpers/drop-test-database.js";
 import { hashSessionToken } from "../src/utils/session.js";
 
 const database = `em_packages_test_${randomUUID().replaceAll("-", "")}`;
@@ -126,8 +127,11 @@ after(async () => {
   await db?.destroy();
   await pool?.end();
   if (admin) {
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
-    await admin.end();
+    try {
+      await dropTestDatabase(admin, database);
+    } finally {
+      await admin.end();
+    }
   }
 });
 function call(
@@ -459,4 +463,194 @@ test("service and venue canvases save rich content directly and enforce media ow
   assert.deepEqual(venueEdit.sections, []);
   assert.equal((await call(`/catalog-media/${venuePhoto.id}`)).status, 404);
   for (const media of [venuePhoto, venueVideo]) assert.equal((await pool.query("SELECT id FROM media_assets WHERE id=$1", [media.id])).rowCount, 0);
+});
+
+test("private booking packages replace atomically, copy bytes independently, and stay private on every access path", async () => {
+  const upload = await read(await uploadCanvas(new Uint8Array([137,80,78,71,13,10,26,10,1,2,3]), "image/png"), 201);
+  const content = { ...data, sections: [{ id: randomUUID(), title: "Private gallery", widgets: [{ id: randomUUID(), type: "photo", x: 0, y: 0, w: 12, h: 6, markdown: "", media: upload, alt: "Original", caption: "", autoplay: false }] }] };
+  const source = await read(await call("/admin/packages", "POST", content, adminCookie), 201);
+  const inquiry = { packageId: source.id, eventType: "Wedding", preferredDate: "2099-11-07", contactName: "Owner", phoneNumber: "09123456789" };
+  const first = (await read(await call("/booking-requests", "POST", inquiry, customerCookie), 201)).bookingRequest;
+  const other = (await read(await call("/booking-requests", "POST", inquiry, customerCookie), 201)).bookingRequest;
+  const edit = { ...content, name: "Private celebration", expectedBookingUpdatedAt: first.updatedAt, expectedUpdatedAt: source.updatedAt };
+  const preview = await read(await call(`/admin/booking-requests/${first.id}/package`, "GET", undefined, adminCookie), 200);
+  assert.equal(preview.package.id, source.id);
+  assert.equal((await pool.query("SELECT id FROM packages WHERE custom_for_booking_request_id=$1", [first.id])).rowCount, 0, "opening/cancelling preview creates no package");
+  for (const cookie of [staffCookie, undesignatedAdminCookie]) await read(await call(`/admin/booking-requests/${first.id}/package`, "GET", undefined, cookie), 404);
+  await read(await call(`/admin/booking-requests/${first.id}/custom-package`, "POST", edit, customerCookie), 403);
+  const responses = await Promise.all([call(`/admin/booking-requests/${first.id}/custom-package`, "POST", edit, adminCookie), call(`/admin/booking-requests/${first.id}/custom-package`, "POST", edit, adminCookie)]);
+  assert.deepEqual(responses.map(response => response.status).sort(), [200, 409]);
+  const saved = await responses.find(response => response.status === 200)!.json();
+  const pkg = saved.package;
+  assert.equal(pkg.packageType, "custom");
+  assert.equal(pkg.publishedAt, null);
+  assert.equal(pkg.customForBookingRequestId, first.id);
+  assert.equal(saved.bookingRequest.packageId, pkg.id);
+  const media = pkg.sections[0].widgets[0].media;
+  assert.notEqual(media.id, upload.id);
+  assert.equal((await call(`/catalog-media/${media.id}`)).status, 404);
+  assert.equal((await call(`/catalog-media/${media.id}`, "GET", undefined, staffCookie)).status, 404);
+  const privateStream = await call(`/catalog-media/${media.id}`, "GET", undefined, customerCookie);
+  assert.equal(privateStream.status, 200);
+  assert.equal(privateStream.headers.get("cache-control"), "private, no-store");
+  assert.deepEqual(Buffer.from(await privateStream.arrayBuffer()), Buffer.from([137,80,78,71,13,10,26,10,1,2,3]));
+  await read(await call(`/packages/${pkg.id}`), 404);
+  await read(await call(`/admin/packages/${pkg.id}`, "GET", undefined, adminCookie), 404);
+  await read(await call(`/admin/packages/${pkg.id}`, "PATCH", { ...content, expectedUpdatedAt: pkg.updatedAt }, adminCookie), 404);
+  await read(await call(`/admin/packages/${pkg.id}/archive`, "POST", undefined, adminCookie), 404);
+  for (const path of ["/packages", "/admin/packages"]) {
+    const response = await read(await call(path, "GET", undefined, path.startsWith("/admin") ? adminCookie : undefined), 200);
+    assert.equal(JSON.stringify(response).includes(pkg.id), false);
+  }
+  await read(await call("/booking-requests", "POST", { ...inquiry, packageId: pkg.id }, customerCookie), 409);
+  const original = await read(await call(`/packages/${source.id}`), 200);
+  assert.equal(original.name, source.name);
+  assert.equal(original.sections[0].widgets[0].media.id, upload.id);
+  assert.equal((await read(await call(`/booking-requests/${other.id}`, "GET", undefined, customerCookie), 200)).bookingRequest.packageId, source.id);
+  assert.equal((await read(await call(`/booking-requests/${first.id}/package`, "GET", undefined, customerCookie), 200)).package.name, "Private celebration");
+  const staffBooking = (await read(await call(`/admin/booking-requests/${first.id}`, "GET", undefined, staffCookie), 200)).bookingRequest;
+  for (const path of ["/admin/booking-requests", "/admin/booking-requests?limit=50"]) {
+    const staffList = await read(await call(path, "GET", undefined, staffCookie), 200);
+    const listed = staffList.bookingRequests.find((item: { id: string }) => item.id === first.id);
+    assert.equal(listed.packageName, "Private custom package");
+    assert.equal(listed.packagePrice, null);
+  }
+  const linkedConversation = await db.selectFrom("conversations").select("id").where("booking_request_id", "=", first.id).executeTakeFirstOrThrow();
+  const thread = await read(await call(`/messages/conversations/${linkedConversation.id}`, "GET", undefined, customerCookie), 200);
+  assert.equal(thread.conversation.packageName, "Private celebration");
+  assert.equal(staffBooking.packageName, "Private custom package");
+  assert.equal(staffBooking.packagePrice, null);
+  assert.deepEqual(staffBooking.packageInclusions, []);
+  const customer = await db.insertInto("users").values({ email: `${randomUUID()}@example.test`, role: "customer", password_hash: "unused" }).returning("id").executeTakeFirstOrThrow();
+  const token = randomUUID();
+  await db.insertInto("sessions").values({ user_id: customer.id, token_hash: hashSessionToken(token), expires_at: new Date(Date.now()+3600000) }).execute();
+  const outsider = `em_session=${token}`;
+  await read(await call(`/booking-requests/${first.id}/package`, "GET", undefined, outsider), 404);
+  await read(await call(`/messages/conversations/${linkedConversation.id}`, "GET", undefined, outsider), 404);
+  await read(await call(`/messages/conversations/${linkedConversation.id}`, "GET", undefined, staffCookie), 403);
+  await read(await call(`/catalog-media/${media.id}`, "GET", undefined, outsider), 404);
+  const update = { ...content, sections: pkg.sections, name: "Revised private package", expectedBookingUpdatedAt: saved.bookingRequest.updatedAt, expectedUpdatedAt: pkg.updatedAt };
+  const concurrentUpdates = await Promise.all([
+    call(`/admin/booking-requests/${first.id}/custom-package`, "PUT", update, adminCookie),
+    call(`/admin/booking-requests/${first.id}/custom-package`, "PUT", { ...update, name: "Competing private package" }, adminCookie),
+  ]);
+  assert.deepEqual(concurrentUpdates.map(response => response.status).sort(), [200, 409]);
+  const winningResponse = concurrentUpdates.find(response => response.status === 200);
+  assert.ok(winningResponse);
+  const revised = await read(winningResponse, 200);
+  const afterConcurrentUpdates = await read(await call(`/booking-requests/${first.id}/package`, "GET", undefined, customerCookie), 200);
+  assert.equal(afterConcurrentUpdates.package.name, revised.package.name, "the losing concurrent save cannot overwrite the winning package content");
+  assert.equal(afterConcurrentUpdates.package.updatedAt, revised.package.updatedAt);
+  assert.equal(revised.package.id, pkg.id);
+  assert.equal(revised.package.sections[0].widgets[0].media.id, media.id);
+  assert.notEqual(revised.package.updatedAt, pkg.updatedAt);
+  await read(await call(`/admin/booking-requests/${first.id}/custom-package`, "PUT", update, adminCookie), 409);
+  assert.equal((await pool.query("SELECT id FROM packages WHERE custom_for_booking_request_id=$1", [first.id])).rowCount, 1);
+  assert.equal((await pool.query("SELECT id FROM audit_events WHERE entity_id=$1 AND action LIKE 'booking.custom_package_%'", [first.id])).rowCount, 2);
+  // Removing the original uploaded bytes leaves the independently copied asset intact.
+  await read(await call(`/admin/packages/${source.id}`, "PATCH", { ...content, sections: [], expectedUpdatedAt: source.updatedAt }, adminCookie), 200);
+  assert.equal((await call(`/catalog-media/${upload.id}`)).status, 404);
+  assert.equal((await call(`/catalog-media/${media.id}`, "GET", undefined, customerCookie)).status, 200);
+});
+
+test("failed source-media staging, invalid services, stale or archived sources, and closed bookings leave no private package", async () => {
+  const upload = await read(await uploadCanvas(new Uint8Array([137,80,78,71,13,10,26,10,1]), "image/png"), 201);
+  const content = { ...data, sections: [{ id: randomUUID(), title: "", widgets: [{ id: randomUUID(), type: "photo", x: 0, y: 0, w: 12, h: 6, markdown: "", media: upload, alt: "", caption: "", autoplay: false }] }] };
+  const source = await read(await call("/admin/packages", "POST", content, adminCookie), 201);
+  const booking = (await read(await call("/booking-requests", "POST", { packageId: source.id, eventType: "Wedding", preferredDate: "2099-11-07", contactName: "Owner", phoneNumber: "09123456789" }, customerCookie), 201)).bookingRequest;
+  const save = { ...content, expectedUpdatedAt: source.updatedAt, expectedBookingUpdatedAt: booking.updatedAt };
+  const beforeCount = Number((await pool.query("SELECT count(*) FROM media_assets")).rows[0].count);
+  await read(await call(`/admin/booking-requests/${booking.id}/custom-package`, "POST", { ...save, services: [{ serviceId: randomUUID(), role: "included" }] }, adminCookie), 400);
+  assert.equal(Number((await pool.query("SELECT count(*) FROM media_assets")).rows[0].count), beforeCount, "failed DB validation cleans staged copies");
+  const foreignUpload = await read(await uploadCanvas(new Uint8Array([137,80,78,71,13,10,26,10,2]), "image/png"), 201);
+  await read(await call("/admin/packages", "POST", { ...content, sections: [{ ...content.sections[0], widgets: [{ ...content.sections[0]!.widgets[0], media: foreignUpload }] }] }, adminCookie), 201);
+  const forbiddenContent = { ...save, sections: [{ ...content.sections[0], widgets: [...content.sections[0]!.widgets, { ...content.sections[0]!.widgets[0], id: randomUUID(), media: foreignUpload }] }] };
+  await read(await call(`/admin/booking-requests/${booking.id}/custom-package`, "POST", forbiddenContent, adminCookie), 400);
+  assert.equal((await pool.query("SELECT id FROM packages WHERE custom_for_booking_request_id=$1", [booking.id])).rowCount, 0, "ownership failure after package insertion rolls back the entire replacement");
+  const retainedCount = beforeCount + 1;
+  // A missing source object simulates provider failure while the database reference remains.
+  const key = (await pool.query("SELECT storage_key FROM media_assets WHERE id=$1", [upload.id])).rows[0].storage_key;
+  const storedPath = `/test/${key}`;
+  const bytes = storedImages.get(storedPath);
+  assert.ok(bytes);
+  storedImages.delete(storedPath);
+  await read(await call(`/admin/booking-requests/${booking.id}/custom-package`, "POST", save, adminCookie), 502);
+  storedImages.set(storedPath, bytes);
+  assert.equal(Number((await pool.query("SELECT count(*) FROM media_assets")).rows[0].count), retainedCount);
+  assert.equal((await pool.query("SELECT package_id FROM booking_requests WHERE id=$1", [booking.id])).rows[0].package_id, source.id);
+  await read(await call(`/admin/packages/${source.id}`, "PATCH", { ...content, name: "New source", expectedUpdatedAt: source.updatedAt }, adminCookie), 200);
+  await read(await call(`/admin/booking-requests/${booking.id}/custom-package`, "POST", save, adminCookie), 409);
+  const fresh = await read(await call(`/admin/booking-requests/${booking.id}/package`, "GET", undefined, adminCookie), 200);
+  const archived = await read(await call(`/admin/packages/${source.id}/archive`, "POST", undefined, adminCookie), 200);
+  const archivedSave = { ...save, expectedUpdatedAt: archived.updatedAt, expectedBookingUpdatedAt: fresh.bookingUpdatedAt };
+  const archivedFailure = await read(await call(`/admin/booking-requests/${booking.id}/custom-package`, "POST", archivedSave, adminCookie), 409);
+  assert.match(archivedFailure.error, /Archived packages/);
+  assert.equal((await pool.query("SELECT package_id FROM booking_requests WHERE id=$1", [booking.id])).rows[0].package_id, source.id);
+  await pool.query("UPDATE booking_requests SET status='cancelled' WHERE id=$1", [booking.id]);
+  const closedFailure = await read(await call(`/admin/booking-requests/${booking.id}/custom-package`, "POST", archivedSave, adminCookie), 409);
+  assert.match(closedFailure.error, /Closed booking requests/);
+  assert.equal((await pool.query("SELECT id FROM packages WHERE custom_for_booking_request_id=$1", [booking.id])).rowCount, 0);
+});
+
+test("quotation snapshots retain removed private photo/video bytes without allowing catalog reuse", async () => {
+  const photo = await read(await uploadCanvas(new Uint8Array([137,80,78,71,13,10,26,10,1]), "image/png"), 201);
+  const video = await read(await uploadCanvas(new Uint8Array([0,0,0,20,102,116,121,112,105,115,111,109,0,0,0,0]), "video/mp4"), 201);
+  const content = { ...data, sections: [{ id: randomUUID(), title: "", widgets: [
+    { id: randomUUID(), type: "photo", x: 0, y: 0, w: 6, h: 6, markdown: "", media: photo, alt: "", caption: "", autoplay: false },
+    { id: randomUUID(), type: "video", x: 6, y: 0, w: 6, h: 6, markdown: "", media: video, alt: "", caption: "", autoplay: false },
+  ] }] };
+  const source = await read(await call("/admin/packages", "POST", { ...content, sections: [] }, adminCookie), 201);
+  const booking = (await read(await call("/booking-requests", "POST", { packageId: source.id, eventType: "Wedding", preferredDate: "2099-11-07", contactName: "Owner", phoneNumber: "09123456789" }, customerCookie), 201)).bookingRequest;
+  // These fresh pending uploads belong directly to the custom package on creation.
+  const created = await read(await call(`/admin/booking-requests/${booking.id}/custom-package`, "POST", { ...content, expectedBookingUpdatedAt: booking.updatedAt, expectedUpdatedAt: source.updatedAt }, adminCookie), 200);
+  const quote = (await read(await call(`/admin/booking-requests/${booking.id}/quotations`, "POST", undefined, adminCookie), 201)).quotation;
+  assert.deepEqual(quote.offeredPackageTerms.package.sections[0].widgets.map((widget: { media: { id: string } }) => widget.media.id), [photo.id, video.id]);
+  await read(await call(`/admin/booking-requests/${booking.id}/custom-package`, "PUT", { ...content, sections: [], expectedBookingUpdatedAt: created.bookingRequest.updatedAt, expectedUpdatedAt: created.package.updatedAt }, adminCookie), 200);
+  const other = await db.insertInto("users").values({ email: `${randomUUID()}@example.test`, role: "customer", password_hash: "unused" }).returning("id").executeTakeFirstOrThrow();
+  const token = randomUUID();
+  await db.insertInto("sessions").values({ user_id: other.id, token_hash: hashSessionToken(token), expires_at: new Date(Date.now()+3600000) }).execute();
+  await read(await call(`/catalog-media/${randomUUID()}`, "GET", undefined, customerCookie), 404);
+  for (const media of [photo, video]) {
+    assert.equal((await pool.query("SELECT id FROM media_assets WHERE id=$1", [media.id])).rowCount, 1);
+    const ownerRead = await call(`/catalog-media/${media.id}`, "GET", undefined, customerCookie);
+    assert.equal(ownerRead.status, 200);
+    assert.equal(ownerRead.headers.get("cache-control"), "private, no-store");
+    assert.equal((await call(`/catalog-media/${media.id}`, "GET", undefined, adminCookie)).status, 200);
+    for (const cookie of [undefined, staffCookie, `em_session=${token}`]) await read(await call(`/catalog-media/${media.id}`, "GET", undefined, cookie), 404);
+    await read(await call(`/admin/catalog-media/${media.id}`, "DELETE", undefined, adminCookie), 409);
+  }
+  // Snapshot references are durable ownership too; removing live widgets cannot make private bytes reusable publicly.
+  await read(await call(`/admin/packages/${source.id}`, "PATCH", { ...content, expectedUpdatedAt: source.updatedAt }, adminCookie), 400);
+  await pool.query("UPDATE media_assets SET created_at=now()-interval '2 days' WHERE id=ANY($1::uuid[])", [[photo.id, video.id]]);
+  const { cleanupStaleCatalogMediaService } = await import("../src/services/catalog-media/catalog-media.js");
+  await cleanupStaleCatalogMediaService(db);
+  for (const media of [photo, video]) assert.equal((await pool.query("SELECT id FROM media_assets WHERE id=$1", [media.id])).rowCount, 1);
+});
+
+test("a service archived concurrently with customization cannot be newly assigned", async () => {
+  const service = await createServiceWithPhoto({ name: "Concurrent service", description: "Coverage", hourlyRatePesos: 500 });
+  const source = await read(await call("/admin/packages", "POST", data, adminCookie), 201);
+  const booking = (await read(await call("/booking-requests", "POST", { packageId: source.id, eventType: "Wedding", preferredDate: "2099-11-07", contactName: "Owner", phoneNumber: "09123456789" }, customerCookie), 201)).bookingRequest;
+  const connection = await pool.connect();
+  let pending: Promise<Response> | undefined;
+  try {
+    await connection.query("BEGIN");
+    await connection.query("UPDATE services SET archived_at=now(), updated_at=now() WHERE id=$1", [service.id]);
+    pending = Promise.resolve(call(`/admin/booking-requests/${booking.id}/custom-package`, "POST", { ...data, services: [{ serviceId: service.id, role: "included" }], expectedBookingUpdatedAt: booking.updatedAt, expectedUpdatedAt: source.updatedAt }, adminCookie));
+    let waited = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const waiting = await pool.query("SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query ILIKE '%from \"services\"%' LIMIT 1");
+      if (waiting.rowCount) { waited = true; break; }
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    assert.equal(waited, true, "customization waits for the concurrent service archive decision");
+    await connection.query("COMMIT");
+    await read(await pending, 400);
+    assert.equal((await pool.query("SELECT package_id FROM booking_requests WHERE id=$1", [booking.id])).rows[0].package_id, source.id);
+    assert.equal((await pool.query("SELECT id FROM packages WHERE custom_for_booking_request_id=$1", [booking.id])).rowCount, 0);
+  } finally {
+    await connection.query("ROLLBACK");
+    connection.release();
+    if (pending) await pending;
+  }
 });

@@ -156,7 +156,9 @@ export const publicSchema = z.object({
   archivedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  publishedAt: z.string(),
+  packageType: z.enum(["catalog", "custom"]),
+  customForBookingRequestId: z.string().uuid().nullable(),
+  publishedAt: z.string().nullable(),
 });
 export const adminSchema = publicSchema;
 export const errorSchema = z.object({ error: z.string() });

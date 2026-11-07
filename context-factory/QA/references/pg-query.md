@@ -20,7 +20,7 @@ SQL
 
 The helper executes one statement through PostgreSQL's extended protocol inside `BEGIN READ ONLY`, then rolls back. It sets a 10-second statement timeout and a 5-second connection timeout. Writes and multiple statements are rejected. This is a transaction boundary, not a sandbox for untrusted SQL functions or external side effects. Use task-appropriate SQL and inspect functions before invoking them.
 
-For task-authorized data changes, use the existing API/Kysely workflow; schema changes belong in Prisma migrations. This skill does not grant additional mutation permission. Do not add a generic write bypass just to run an inspection query.
+For task-authorized data changes, use the existing API/Kysely workflow; schema changes belong in Prisma migrations. The [QA operational permissions](../SKILL.md#operational-permissions) allow scripts, deployments, migrations, and service startup/restarts, but this query helper remains read-only. Do not add a generic write bypass just to run an inspection query.
 
 ## Discover current tables and columns
 

@@ -34,7 +34,7 @@ export const replaceQuotationItemsData = async (db: Transaction<DB>, quotationId
 };
 
 export const findBookingForQuotationData = (db: Database, quotationId: string) =>
-  db.selectFrom("quotations as q").innerJoin("booking_requests as br", "br.id", "q.booking_request_id").select(["q.id", "q.booking_request_id", "q.status", "br.customer_id", "br.package_price", "br.status as booking_status"]).where("q.id", "=", quotationId).executeTakeFirst();
+  db.selectFrom("quotations as q").innerJoin("booking_requests as br", "br.id", "q.booking_request_id").select(["q.id", "q.booking_request_id", "q.status", "br.customer_id", "br.status as booking_status"]).where("q.id", "=", quotationId).executeTakeFirst();
 
 export const findBookingData = (db: Database, bookingRequestId: string) =>
-  db.selectFrom("booking_requests").select(["id", "customer_id", "package_price", "status"]).where("id", "=", bookingRequestId).executeTakeFirst();
+  db.selectFrom("booking_requests").select(["id", "customer_id", "status"]).where("id", "=", bookingRequestId).executeTakeFirst();

@@ -2,6 +2,14 @@
 
 Durable engineering notes for this role. Read and maintain them under the shared [memory policy](../README.md#memory).
 
+## 2026-11-07 — Private booking packages and quotation media
+
+Private custom packages use the existing package/canvas system and are managed through their owning booking. Quotation snapshots retain offered media and assigned-service revisions; cleanup and authorization must account for those historical references. Capture focus targets before disabling asynchronous editor triggers.
+
+**Evidence:** The [verification record](reference/private-packages-verification.md) links the migration, source, 39 passing behavior/migration tests, browser role/mobile checks, and separate actual R2 photo/video checks. The [README](../../../README.md#booking-requests-and-messages) owns the product contract; hosted deployment and customer quotation delivery remain outside this proof.
+
+**Why it matters:** Current canvas references and package timestamps alone are insufficient for historical offer retention, privacy, and service-change reapproval. Integration test teardown waits for the exact test database's connections instead of force-disconnecting them.
+
 ## 2026-11-03 — Engineering and shared toolkit ownership
 
 The [engineering index](../../engineering/README.md) and [Clemora adapters](../../shared/skill-adapters.md) own the local adaptation of the inspected Upskwela engineering/shared toolkit. Root guidance and this role's entry point require the operating contract, principle digest, and engineering index on every task, full applicable skills, and a completion audit. Implementation detail remains with the existing area skills.

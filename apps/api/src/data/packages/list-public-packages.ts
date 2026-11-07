@@ -6,7 +6,7 @@ export function listPublicPackagesData(
 ) {
   let query = db
     .selectFrom("packages")
-    .selectAll()
+    .selectAll().where("package_type", "=", "catalog")
     .where("archived_at", "is", null);
   if (id) query = query.where("id", "=", id);
   if (page) query = query.limit(page.limit).offset(page.offset);

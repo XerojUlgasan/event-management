@@ -10,6 +10,6 @@ const querySchema = z.object({ status: statusSchema.optional(), preferredDate: z
 export const listAdminBookingRequestsRoute = createRoute({method:"get",path:"/admin/booking-requests",tags:["Booking requests"],request:{query:querySchema},responses:{...responses,200:{content:json(z.object({bookingRequests:z.array(bookingSchema),nextCursor:z.string().uuid().nullable().optional()})),description:"Booking requests"},400:errors[400]}});
 export const listAdminBookingRequestsRouteHandler: AppRouteHandler<typeof listAdminBookingRequestsRoute> = async c => {
   const query = c.req.valid("query");
-  if (!Object.keys(query).length) return c.json({bookingRequests:await listBookingRequestsService(c.get("db"))},200);
-  return c.json(await listAdminBookingRequestsPageService(c.get("db"), {...query,limit:query.limit ? Number(query.limit) : 50}),200);
+  if (!Object.keys(query).length) return c.json({bookingRequests:await listBookingRequestsService(c.get("db"), undefined, c.get("session").user.role === "admin" && c.get("session").user.staff_role === "System Administrator")},200);
+  return c.json(await listAdminBookingRequestsPageService(c.get("db"), {...query,limit:query.limit ? Number(query.limit) : 50}, c.get("session").user.role === "admin" && c.get("session").user.staff_role === "System Administrator"),200);
 };

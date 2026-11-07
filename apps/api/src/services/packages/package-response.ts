@@ -18,6 +18,8 @@ export async function packageDto(
   const widgets = sections.flatMap((section) => section.widgets);
   return {
     id: row.id,
+    packageType: row.package_type as "catalog" | "custom",
+    customForBookingRequestId: row.custom_for_booking_request_id,
     name: row.name,
     maxGuests: row.max_guests,
     price: { kind: "fixed", currency: "PHP", amountMinor: row.price * 100 },
@@ -41,6 +43,6 @@ export async function packageDto(
     archivedAt: row.archived_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
-    publishedAt: row.published_at.toISOString(),
+    publishedAt: row.published_at?.toISOString() ?? null,
   };
 }
