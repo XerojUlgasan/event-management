@@ -159,7 +159,9 @@ test("requests enforce roles, published package availability, snapshots, ownersh
     max_guests: 100,
     price: 150_000,
   }).returningAll().executeTakeFirstOrThrow();
-  let input = {packageId:pkg.id,packageUpdatedAt:pkg.updated_at.toISOString(),eventType:"Wedding",preferredDate:"2099-01-02",estimatedDuration:"8_hours",timeZone:"Asia/Manila",guestCount:120,contactName:"Customer",phoneNumber:"123",specialRequests:"Music"};
+  const service = await db.insertInto("services").values({ name: "Photography", description: "Event photography" }).returningAll().executeTakeFirstOrThrow();
+  await db.insertInto("package_services").values({ package_id: pkg.id, service_id: service.id, role: "included", sort_order: 0 }).execute();
+  let input = {packageId:pkg.id,packageUpdatedAt:pkg.updated_at.toISOString(),eventType:"Wedding",preferredDate:"2099-01-02",estimatedDuration:"8_hours",timeZone:"Asia/Manila",guestCount:120,contactName:"Customer",phoneNumber:"123",preferredVenueLocation:"Garden Hall",specialRequests:"Music"};
   await read(await call("/booking-requests","POST",input),401);
   await read(await call("/booking-requests","POST",input,adminCookie),403);
   await read(await call("/admin/booking-requests","GET",undefined,customerCookie),403);
@@ -167,6 +169,8 @@ test("requests enforce roles, published package availability, snapshots, ownersh
     await read(await call("/booking-requests","POST",{...input,preferredDate},customerCookie),400);
   await read(await call("/booking-requests","POST",{...input,estimatedDuration:"3_hours"},customerCookie),400);
   await read(await call("/booking-requests","POST",{...input,contactName:" "},customerCookie),400);
+  await read(await call("/booking-requests","POST",{...input,preferredVenueLocation:"x".repeat(1001)},customerCookie),400);
+  await read(await call("/booking-requests","POST",{...input,guestCount:null},customerCookie),201);
   await read(await call("/booking-requests","POST",{...input,timeZone:"Wrong/Zone"},customerCookie),400);
   await read(await call("/booking-requests","POST",{...input,packageId:randomUUID()},customerCookie),409);
   await read(await call("/booking-requests","POST",{...input,packageUpdatedAt:"2000-01-01T00:00:00.000Z"},customerCookie),409);
@@ -189,6 +193,9 @@ test("requests enforce roles, published package availability, snapshots, ownersh
   const created = (await read(await call("/booking-requests","POST",input,customerCookie),201)).bookingRequest;
   assert.equal(created.preferredDate, input.preferredDate); assert.equal(created.estimatedDuration, "8_hours");
   assert.equal(created.packageName, "Garden");
+  assert.equal(created.guestCount, 120);
+  assert.equal(created.preferredVenueLocation, "Garden Hall");
+  assert.deepEqual(created.packageInclusionsSnapshot, [{ serviceId: service.id, name: "Photography", role: "included", sortOrder: 0 }]);
   assert.deepEqual(created.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });
   assert.equal(created.packageMaxGuests, 100);
   assert.equal("packageVersionId" in created, false);
@@ -234,7 +241,7 @@ test("requests enforce roles, published package availability, snapshots, ownersh
   await read(await call(`/booking-requests/${randomUUID()}`, "GET", undefined, customerCookie), 404);
   await read(await call(`/admin/booking-requests/${randomUUID()}`, "GET", undefined, adminCookie), 404);
   await read(await call(`/booking-requests/invalid`, "GET", undefined, customerCookie), 400);
-  assert.equal(created.startsAt, null); assert.equal(created.endsAt, null); assert.equal(created.preferredVenueLocation, null);
+  assert.equal(created.startsAt, null); assert.equal(created.endsAt, null);
   assert.equal(created.customerId,customerId); assert.equal(created.outOfRange,true); assert.equal(created.status,"under_review"); assert.equal(created.statusHistory.length,1);
   const linkedConversation = await db.selectFrom("conversations").selectAll().where("booking_request_id", "=", created.id).executeTakeFirst();
   assert.ok(linkedConversation);
@@ -287,10 +294,12 @@ test("requests enforce roles, published package availability, snapshots, ownersh
     price: 200_000,
     updated_at: new Date(),
   }).where("id", "=", pkg.id).returningAll().executeTakeFirstOrThrow();
+  await db.updateTable("services").set({ name: "Renamed Photography" }).where("id", "=", service.id).execute();
   const persistedSnapshot = (await read(await call(`/booking-requests/${created.id}`, "GET", undefined, customerCookie), 200)).bookingRequest;
   assert.equal(persistedSnapshot.packageName, "Garden");
   assert.deepEqual(persistedSnapshot.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });
   assert.equal(persistedSnapshot.packageMaxGuests, 100);
+  assert.deepEqual(persistedSnapshot.packageInclusionsSnapshot, [{ serviceId: service.id, name: "Photography", role: "included", sortOrder: 0 }]);
   assert.deepEqual(
     (await pool.query("SELECT package_price, package_max_guests FROM booking_requests WHERE id = $1", [created.id])).rows[0],
     { package_price: 150_000, package_max_guests: 100 },

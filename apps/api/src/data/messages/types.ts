@@ -9,11 +9,14 @@ export type ConversationWithCustomer = ConversationRow & {
   package_name: string | null;
   booking_request_id: string | null;
   booking_request_reference: string | null;
+  booking_request_status: string | null;
   package_id: string | null;
-  event_type: string | null;
-  event_starts_at: Date | null;
-  event_ends_at: Date | null;
-  guest_count: number | null;
+  arrangement_id: string | null;
+  arrangement_event_type: string | null;
+  arrangement_starts_at: Date | null;
+  arrangement_ends_at: Date | null;
+  arrangement_guest_count: number | null;
+  has_pending_customization: boolean;
 };
 
 export type MessageWithSender = Selectable<Messages> & {

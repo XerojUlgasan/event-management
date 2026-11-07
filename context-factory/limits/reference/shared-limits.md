@@ -7,7 +7,7 @@
 | `@event-management/contracts/limits/images` | `MAX_IMAGE_SIZE_BYTES` | 10 MiB (`10 * 1024 * 1024`) per uploaded catalog-canvas image. |
 | `@event-management/contracts/limits/videos` | `MAX_VIDEO_SIZE_BYTES` | 25 MiB (`25 * 1024 * 1024`) per uploaded catalog-canvas video. |
 | `@event-management/contracts/limits/messages` | `MAX_MESSAGE_BODY_LENGTH` | 4,000 characters per message body. |
-| `@event-management/contracts/limits/booking-requests` | `MAX_EVENT_TYPE_LENGTH`, `MAX_TIME_ZONE_LENGTH`, `MAX_CONTACT_NAME_LENGTH`, `MAX_PHONE_NUMBER_LENGTH`, `MAX_PREFERRED_VENUE_LOCATION_LENGTH`, `MAX_SPECIAL_REQUESTS_LENGTH`, `MAX_BOOKING_REASON_LENGTH`, `BOOKING_ESTIMATED_DURATIONS` | Text limits are 200, 100, 200, 100, 1,000, 4,000, and 1,000 characters respectively. The booking reason limit is used for cancellation and status-change reasons. Accepted durations are historical `4_hours`, `8_hours`, `12_hours`, plus `1_day` through `6_days`, `1_week`, `more_than_1_week`, and `undecided`. New forms show the day and week choices; `more_than_1_week` also requires an exact day count of at least 8. |
+| `@event-management/contracts/limits/booking-requests` | `MAX_EVENT_TYPE_LENGTH`, `MAX_TIME_ZONE_LENGTH`, `MAX_CONTACT_NAME_LENGTH`, `MAX_PHONE_NUMBER_LENGTH`, `MAX_PREFERRED_VENUE_LOCATION_LENGTH`, `MAX_SPECIAL_REQUESTS_LENGTH`, `MAX_BOOKING_REASON_LENGTH`, `MAX_CUSTOMIZATION_REQUEST_DESCRIPTION_LENGTH`, `MAX_ARRANGEMENT_NOTES_LENGTH`, `BOOKING_ESTIMATED_DURATIONS`, `CUSTOMIZATION_REQUEST_TYPES`, `CUSTOMIZATION_REQUEST_STATUSES` | Text limits are 200, 100, 200, 100, 1,000, 4,000, 1,000, 4,000, and 4,000 characters respectively. The booking reason limit is used for cancellation, status-change, and customization decision reasons. Arrangement notes and customization descriptions share the 4,000-character bound. Accepted durations are historical `4_hours`, `8_hours`, `12_hours`, plus `1_day` through `6_days`, `1_week`, `more_than_1_week`, and `undecided`. New forms show the day and week choices; `more_than_1_week` also requires an exact day count of at least 8. Customization types and statuses are the eight contract values and `requested`, `approved`, `rejected`, `withdrawn`. |
 | `@event-management/contracts/limits/auth` | `MAX_EMAIL_LENGTH`, `MIN_PASSWORD_LENGTH`, `MAX_PASSWORD_LENGTH`, `MAX_DISPLAY_NAME_LENGTH` | 254 characters, 8 characters, 128 characters, and 120 characters respectively. |
 | `@event-management/contracts/limits/catalog` | `MAX_CATALOG_TEXT_LENGTH` | 4,000 characters for shared package, service, and venue catalog text fields. |
 
@@ -19,7 +19,7 @@ These are transport limits enforced only by the API in `apps/api/src/constants/h
 
 | API constant | Current cap | Applied to |
 | --- | --- | --- |
-| `SMALL_JSON_BODY_LIMIT_BYTES` | 16 KiB | Auth, customer and admin conversations, and booking-request API paths. |
+| `SMALL_JSON_BODY_LIMIT_BYTES` | 16 KiB | Auth, customer and admin conversations, booking-request, and customization-request API paths. |
 | `CATALOG_JSON_BODY_LIMIT_BYTES` | 3 MiB | Admin package, service, and venue catalog JSON paths. |
 | `MAX_VIDEO_SIZE_BYTES` + `MEDIA_UPLOAD_BODY_OVERHEAD_BYTES` | 25 MiB + 64 KiB | Multipart package-catalog media upload path (`/v1/admin/catalog-media`). Per-file image uploads remain limited to 10 MiB. |
 

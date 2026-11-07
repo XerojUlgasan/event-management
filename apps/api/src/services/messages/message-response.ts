@@ -26,7 +26,7 @@ export type ConversationDto = {
   guestCount: number | null;
   status: "active" | "closed";
   closedAt: string | null;
-  expiresAt: string;
+  expiresAt: string | null;
   lastMessage: MessageDto | null;
   unreadCount: number;
   updatedAt: string;
@@ -51,6 +51,12 @@ export function conversationDto(
   lastMessage: MessageDto | null,
   unreadCount: number,
 ): ConversationDto {
+  const activeBooking =
+    row.booking_request_id !== null &&
+    !["declined", "cancelled"].includes(row.booking_request_status ?? "");
+  const keepOpen =
+    activeBooking &&
+    (!row.arrangement_ends_at || row.has_pending_customization);
   return {
     id: row.id,
     customerId: row.customer_id,
@@ -60,18 +66,22 @@ export function conversationDto(
     packageName: row.package_name,
     bookingRequestId: row.booking_request_id,
     bookingRequestReference: row.booking_request_reference,
-    eventType: row.event_type,
-    eventStartsAt: row.event_starts_at
-      ? new Date(row.event_starts_at).toISOString()
+    eventType: row.arrangement_event_type,
+    eventStartsAt: row.arrangement_starts_at
+      ? new Date(row.arrangement_starts_at).toISOString()
       : null,
-    eventEndsAt: row.event_ends_at ? new Date(row.event_ends_at).toISOString() : null,
-    guestCount: row.guest_count,
+    eventEndsAt: row.arrangement_ends_at
+      ? new Date(row.arrangement_ends_at).toISOString()
+      : null,
+    guestCount: row.arrangement_guest_count,
     status: row.status as ConversationDto["status"],
     closedAt: row.closed_at ? new Date(row.closed_at).toISOString() : null,
-    expiresAt: conversationExpiresAt(
-      row.event_ends_at,
-      row.created_at,
-    ).toISOString(),
+    expiresAt:
+      conversationExpiresAt(
+        row.arrangement_ends_at,
+        row.created_at,
+        { keepOpen },
+      )?.toISOString() ?? null,
     lastMessage,
     unreadCount,
     updatedAt: row.updated_at.toISOString(),

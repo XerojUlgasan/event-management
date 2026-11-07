@@ -40,7 +40,7 @@ export const conversationSchema = z.object({
   guestCount: z.number().int().positive().nullable(),
   status: conversationStatusSchema,
   closedAt: z.string().nullable(),
-  expiresAt: z.string(),
+  expiresAt: z.string().nullable(),
   lastMessage: messageSchema.nullable(),
   unreadCount: z.number().int().nonnegative(),
   updatedAt: z.string(),
