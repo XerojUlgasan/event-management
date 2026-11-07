@@ -18,6 +18,8 @@ model User {
   conversations Conversation[] @relation("CustomerConversations")
   sentMessages Message[]     @relation("MessageSender")
   mediaAssets MediaAsset[]
+  coordinatorChecklists EventChecklist[] @relation("CoordinatorChecklists")
+  staffAssignments      EventStaffAssignment[] @relation("StaffAssignments")
 
   @@map("users")
 }
@@ -199,8 +201,61 @@ model BookingRequest {
   package Package @relation(fields: [packageId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   history BookingRequestStatusHistory[]
   conversation Conversation? @relation("BookingRequestConversation")
+  checklist    EventChecklist?
+  assignments  EventStaffAssignment[]
   @@index([customerId, createdAt])
   @@map("booking_requests")
+}
+
+model EventChecklist {
+  id                String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingRequestId  String               @unique @map("booking_request_id") @db.Uuid
+  coordinatorId     String               @map("coordinator_id") @db.Uuid
+  responseDeadline  DateTime?            @map("response_deadline") @db.Date
+  teamPublished     Boolean              @default(false) @map("team_published")
+  staffDescription  String?              @map("staff_description")
+  createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  bookingRequest    BookingRequest       @relation(fields: [bookingRequestId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  coordinator       User                 @relation("CoordinatorChecklists", fields: [coordinatorId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  items             EventChecklistItem[]
+  @@index([coordinatorId])
+  @@map("event_checklists")
+}
+
+model EventChecklistItem {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  checklistId  String         @map("checklist_id") @db.Uuid
+  stage        String
+  sortOrder    Int            @default(0) @map("sort_order")
+  activity     String
+  plannedTime  String?        @map("planned_time")
+  status       String         @default("todo")
+  actualTime   String?        @map("actual_time")
+  blockerNote  String?        @map("blocker_note")
+  notes        String?
+  photoCount   Int            @default(0) @map("photo_count")
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  checklist    EventChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@index([checklistId, stage, sortOrder])
+  @@map("event_checklist_items")
+}
+
+model EventStaffAssignment {
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingRequestId  String         @map("booking_request_id") @db.Uuid
+  staffId           String         @map("staff_id") @db.Uuid
+  response          String?
+  selectedAt        DateTime?      @map("selected_at") @db.Timestamptz(6)
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  bookingRequest    BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  staff             User           @relation("StaffAssignments", fields: [staffId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@unique([bookingRequestId, staffId])
+  @@index([bookingRequestId])
+  @@index([staffId])
+  @@map("event_staff_assignments")
 }
 
 model BookingRequestStatusHistory {

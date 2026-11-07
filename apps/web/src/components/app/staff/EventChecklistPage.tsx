@@ -1,17 +1,13 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Badge, Button, FormField, Icon, Textarea } from "@event-management/ui"
-import { mockChecklist, mockEvents, type ChecklistItem, type ChecklistStatus } from "./mockData"
+import { mockChecklist, mockEvents } from "./mockData"
+import type { ChecklistItem, ChecklistStatus } from "./mockData"
+import { getChecklist, updateChecklistItem, ApiError } from "../../../lib/api"
+import type { Checklist } from "../../../lib/api"
 
-const ASSIGNED_EVENT = mockEvents[2]
+import { CHECKLIST_STAGES } from "@event-management/contracts/limits/checklists"
 
-const STAGE_ORDER = [
-  "Preparation & packing",
-  "Travel & arrival",
-  "Venue setup",
-  "Final readiness",
-  "Event proper",
-  "Cleanup & closeout",
-]
+const STAGE_ORDER = CHECKLIST_STAGES as readonly string[]
 
 const STATUS_LABEL: Record<ChecklistStatus, string> = {
   todo: "To do",
@@ -74,8 +70,6 @@ function ChecklistItemRow({
 
   const handleStatus = async (status: ChecklistStatus) => {
     if (status === item.status) return
-    setSaving(true)
-    await new Promise((r) => setTimeout(r, 500))
     onUpdate(item.id, {
       status,
       actualTime:
@@ -83,12 +77,10 @@ function ChecklistItemRow({
           ? new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
           : undefined,
     })
-    setSaving(false)
   }
 
   const handleSaveNote = async () => {
     setSaving(true)
-    await new Promise((r) => setTimeout(r, 400))
     onUpdate(item.id, { notes: noteInput, blockerNote: blockerInput })
     setSaving(false)
   }
@@ -221,11 +213,82 @@ function ChecklistItemRow({
   )
 }
 
-export function EventChecklistPage() {
-  const [items, setItems] = useState<ChecklistItem[]>(mockChecklist)
+/** Map a real API ChecklistItem to the local ChecklistItem shape used by the UI. */
+function fromApiItem(apiItem: Checklist["items"][number]): ChecklistItem {
+  return {
+    id: apiItem.id,
+    stage: apiItem.stage,
+    activity: apiItem.activity,
+    plannedTime: apiItem.plannedTime ?? undefined,
+    actualTime: apiItem.actualTime ?? undefined,
+    status: apiItem.status as ChecklistStatus,
+    blockerNote: apiItem.blockerNote ?? undefined,
+    notes: apiItem.notes ?? undefined,
+    photoCount: apiItem.photoCount,
+  }
+}
+
+export function EventChecklistPage({
+  bookingRequestId,
+  eventTitle: eventTitleProp,
+}: {
+  bookingRequestId?: string
+  eventTitle?: string
+}) {
+  const [items, setItems] = useState<ChecklistItem[]>([])
+  const [eventTitle, setEventTitle] = useState<string>(eventTitleProp ?? "")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Real assigned event (mock fallback when no bookingRequestId is provided)
+  const ASSIGNED_EVENT = mockEvents[2]
+
+  useEffect(() => {
+    if (!bookingRequestId) {
+      // No booking request yet — fall back to mock data
+      setItems(mockChecklist)
+      setEventTitle(ASSIGNED_EVENT.title)
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    getChecklist(bookingRequestId)
+      .then(({ checklist }) => {
+        setItems(checklist.items.map(fromApiItem))
+        // Event title will be provided by the parent when available;
+        // clear any stale mock title so displayTitle falls through correctly.
+        setEventTitle("")
+        setLoading(false)
+      })
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 404) {
+          setItems([])
+        } else {
+          setError("Could not load checklist. Please try again.")
+        }
+        setLoading(false)
+      })
+  }, [bookingRequestId])
 
   const handleUpdate = (id: string, patch: Partial<ChecklistItem>) => {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
+    // Capture snapshot before the optimistic update so we can revert on failure.
+    setItems((prev) => {
+      const snapshot = prev
+      const next = prev.map((i) => (i.id === id ? { ...i, ...patch } : i))
+
+      if (bookingRequestId) {
+        void updateChecklistItem(bookingRequestId, id, {
+          status: patch.status,
+          actualTime: patch.actualTime ?? null,
+          blockerNote: patch.blockerNote ?? null,
+          notes: patch.notes ?? null,
+        }).catch(() => setItems(snapshot))
+      }
+
+      return next
+    })
   }
 
   const groups = groupByStage(items)
@@ -234,27 +297,52 @@ export function EventChecklistPage() {
   const totalCount = items.length
   const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
 
+  const displayTitle = eventTitle || ASSIGNED_EVENT.title
+  const displayDate = ASSIGNED_EVENT.date
+  const displayTime = ASSIGNED_EVENT.time
+  const displayLocation = ASSIGNED_EVENT.location
+
+  if (loading) {
+    return (
+      <div className="cl-page">
+        <div className="se-empty">
+          <p>Loading checklist…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="cl-page">
+        <div className="se-empty">
+          <Icon name="alert" size={26} />
+          <p>{error}</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="cl-page">
       {/* ── Event hero ── */}
       <div className="cl-event-hero" aria-label="Assigned event">
         <div className="cl-event-hero-inner">
           <p className="cl-event-hero-label">Assigned event</p>
-          <h1 className="cl-event-hero-title">{ASSIGNED_EVENT.title}</h1>
+          <h1 className="cl-event-hero-title">{displayTitle}</h1>
           <div className="cl-event-hero-meta">
             <span>
               <Icon name="calendar" size={13} />
-              {ASSIGNED_EVENT.date}
+              {displayDate}
             </span>
             <span className="cl-event-hero-dot" aria-hidden="true" />
             <span>
               <Icon name="clock" size={13} />
-              {ASSIGNED_EVENT.time}
+              {displayTime}
             </span>
             <span className="cl-event-hero-dot" aria-hidden="true" />
-            <span>{ASSIGNED_EVENT.location}</span>
+            <span>{displayLocation}</span>
           </div>
-
         </div>
       </div>
 
@@ -300,7 +388,6 @@ export function EventChecklistPage() {
             style={{ width: `${pct}%` }}
           />
         </div>
-
       </div>
 
       {/* Stages */}

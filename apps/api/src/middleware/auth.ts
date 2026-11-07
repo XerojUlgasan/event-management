@@ -77,3 +77,11 @@ export const requireSystemAdmin = createMiddleware<HonoEnv>(async (c, next) => {
     return c.json({ error: "Admin access required" }, 403);
   await next();
 });
+
+// Staff members and admins can access staff-facing routes.
+export const requireStaffOrAdmin = createMiddleware<HonoEnv>(async (c, next) => {
+  const role = c.get("session").user.role;
+  if (!["admin", "staff"].includes(role))
+    return c.json({ error: "Staff access required" }, 403);
+  await next();
+});

@@ -11,6 +11,8 @@ import packageRoutes from "./controllers/packages/index.js";
 import venueRoutes from "./controllers/venues/index.js";
 import healthRoutes from "./controllers/health/index.js";
 import userRoutes from "./controllers/users/index.js";
+import checklistRoutes from "./controllers/checklist/index.js";
+import eventRoutes from "./controllers/events/index.js";
 import catalogMediaRoutes from "./controllers/catalog-media/index.js";
 import { MAX_VIDEO_SIZE_BYTES } from "@event-management/contracts/limits/videos";
 import type { HonoEnv } from "./types/hono.js";
@@ -67,6 +69,13 @@ app.route("/v1", bookingRequestRoutes);
 app.route("/v1", messageRoutes);
 app.route("/v1", authRoutes);
 app.route("/v1", userRoutes);
+app.use("/v1/admin/booking-requests/:bookingRequestId/checklist", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/checklists/:bookingRequestId", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/checklists/:bookingRequestId/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.route("/v1", checklistRoutes);
+app.use("/v1/staff/events", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/staff/events/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.route("/v1", eventRoutes);
 
 app.doc("/openapi.json", {
   openapi: "3.0.0",

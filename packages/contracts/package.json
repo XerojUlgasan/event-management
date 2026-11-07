@@ -9,6 +9,8 @@
     "./limits/messages": "./src/limits/messages.ts",
     "./limits/auth": "./src/limits/auth.ts",
     "./limits/booking-requests": "./src/limits/booking-requests.ts",
-    "./limits/catalog": "./src/limits/catalog.ts"
+    "./limits/catalog": "./src/limits/catalog.ts",
+    "./limits/checklists": "./src/limits/checklists.ts",
+    "./limits/events": "./src/limits/events.ts"
   }
 }

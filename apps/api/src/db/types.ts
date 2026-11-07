@@ -88,6 +88,43 @@ export interface Conversations {
   updated_at: Generated<Timestamp>;
 }
 
+export interface EventChecklistItems {
+  activity: string;
+  actual_time: string | null;
+  blocker_note: string | null;
+  checklist_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  notes: string | null;
+  photo_count: Generated<number>;
+  planned_time: string | null;
+  sort_order: Generated<number>;
+  stage: string;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface EventChecklists {
+  booking_request_id: string;
+  coordinator_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  response_deadline: Timestamp | null;
+  staff_description: string | null;
+  team_published: Generated<boolean>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface EventStaffAssignments {
+  booking_request_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  response: string | null;
+  selected_at: Timestamp | null;
+  staff_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface MediaAssets {
   byte_size: number | null;
   created_at: Generated<Timestamp>;
@@ -172,6 +209,9 @@ export interface DB {
   catalog_sections: CatalogSections;
   catalog_widgets: CatalogWidgets;
   conversations: Conversations;
+  event_checklist_items: EventChecklistItems;
+  event_checklists: EventChecklists;
+  event_staff_assignments: EventStaffAssignments;
   media_assets: MediaAssets;
   messages: Messages;
   packages: Packages;

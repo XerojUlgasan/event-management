@@ -204,3 +204,110 @@ export const getBookingRequestCalendar = (month: string, status?: BookingStatus)
 export const updateBookingRequestStatus = (id: string, status: BookingStatus, reason?: string) => request<{ bookingRequest: BookingRequest }>(`/admin/booking-requests/${encodeURIComponent(id)}/status`, { status, ...(reason ? { reason } : {}) }, undefined, "PATCH")
 
 export const cancelMyBookingRequest = (id: string, reason: string) => request<{ bookingRequest: BookingRequest }>(`/booking-requests/${encodeURIComponent(id)}/cancel`, { reason }, undefined, "PATCH")
+
+// ─── Checklists ───────────────────────────────────────────────────────────────
+
+export type ChecklistStatus = "todo" | "done" | "blocked"
+
+export type ChecklistItem = {
+  id: string
+  checklistId: string
+  stage: string
+  sortOrder: number
+  activity: string
+  plannedTime: string | null
+  status: ChecklistStatus
+  actualTime: string | null
+  blockerNote: string | null
+  notes: string | null
+  photoCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type Checklist = {
+  id: string
+  bookingRequestId: string
+  coordinatorId: string
+  createdAt: string
+  updatedAt: string
+  items: ChecklistItem[]
+}
+
+export type CreateChecklistItemInput = {
+  stage: string
+  sortOrder?: number
+  activity: string
+  plannedTime?: string | null
+}
+
+export type UpdateChecklistItemInput = {
+  status?: ChecklistStatus
+  actualTime?: string | null
+  blockerNote?: string | null
+  notes?: string | null
+}
+
+export const getChecklist = (bookingRequestId: string) =>
+  request<{ checklist: Checklist }>(`/checklists/${encodeURIComponent(bookingRequestId)}`)
+
+export const createChecklist = (
+  bookingRequestId: string,
+  coordinatorId: string,
+  items: CreateChecklistItemInput[],
+) =>
+  request<{ checklist: Checklist }>(
+    `/admin/booking-requests/${encodeURIComponent(bookingRequestId)}/checklist`,
+    { coordinatorId, items },
+  )
+
+export const updateChecklistItem = (
+  bookingRequestId: string,
+  itemId: string,
+  patch: UpdateChecklistItemInput,
+) =>
+  request<{ item: ChecklistItem }>(
+    `/checklists/${encodeURIComponent(bookingRequestId)}/items/${encodeURIComponent(itemId)}`,
+    patch,
+    undefined,
+    "PATCH",
+  )
+
+// ─── Staff events ─────────────────────────────────────────────────────────────
+
+export type AssignmentResponse = "available" | "unavailable"
+
+export type StaffEventData = {
+  id: string
+  eventType: string
+  preferredDate: string
+  startsAt: string | null
+  endsAt: string | null
+  timeZone: string
+  location: string | null
+  guestCount: number | null
+  status: string
+  specialRequests: string | null
+  coordinatorId: string
+  coordinatorName: string | null
+  responseDeadline: string | null
+  teamPublished: boolean
+  staffDescription: string | null
+  assignmentId: string | null
+  response: AssignmentResponse | null
+  selectedAt: string | null
+}
+
+export const getStaffEvents = () =>
+  request<{ events: StaffEventData[] }>("/staff/events")
+
+export const respondToEvent = (
+  bookingRequestId: string,
+  response: AssignmentResponse | null,
+) =>
+  request<{ response: AssignmentResponse | null }>(
+    `/staff/events/${encodeURIComponent(bookingRequestId)}/response`,
+    { response },
+    undefined,
+    "PATCH",
+  )

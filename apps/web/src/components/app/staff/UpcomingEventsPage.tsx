@@ -1,10 +1,62 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Badge, Button, Icon, type BadgeTone } from "@event-management/ui"
-import {
-  mockEvents,
-  type AvailabilityResponse,
-  type StaffEvent,
-} from "./mockData"
+import { getStaffEvents, respondToEvent, ApiError } from "../../../lib/api"
+import type { StaffEventData, AssignmentResponse } from "../../../lib/api"
+import type { StaffEvent, AvailabilityResponse } from "./mockData"
+
+// ─── API → UI shape mapper ─────────────────────────────────────────────────
+
+function formatDate(iso: string | null, fallback: string): string {
+  if (!iso) return fallback
+  const d = new Date(iso)
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+}
+
+function formatTime(startsAt: string | null, endsAt: string | null): string {
+  if (!startsAt) return ""
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+  return endsAt ? `${fmt(startsAt)} – ${fmt(endsAt)}` : fmt(startsAt)
+}
+
+function formatDeadline(dateStr: string | null): string {
+  if (!dateStr) return ""
+  const d = new Date(dateStr)
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
+// booking_requests.status "accepted" is the confirmed event state for staff.
+// Map any unexpected value through as-is so the UI degrades gracefully.
+const STATUS_MAP: Record<string, StaffEvent["status"]> = {
+  accepted: "confirmed",
+  tentative: "tentative",
+  cancelled: "cancelled",
+  rescheduled: "rescheduled",
+}
+
+function fromApiEvent(e: StaffEventData): StaffEvent {
+  const teamPublished = e.teamPublished
+  const isSelected = teamPublished && e.selectedAt !== null
+
+  return {
+    id: e.id,
+    title: e.eventType,
+    date: formatDate(e.startsAt, e.preferredDate),
+    time: formatTime(e.startsAt, e.endsAt),
+    location: e.location ?? "",
+    deadline: formatDeadline(e.responseDeadline),
+    status: STATUS_MAP[e.status] ?? "confirmed",
+    myResponse: e.response as AvailabilityResponse,
+    teamStatus: teamPublished ? "published" : "pending",
+    teamResult: teamPublished
+      ? isSelected ? "selected" : "not-selected"
+      : undefined,
+    coordinator: e.coordinatorName ?? undefined,
+    description: e.staffDescription ?? undefined,
+  }
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────
 
 const STATUS_LABEL: Record<StaffEvent["status"], string> = {
   confirmed: "Confirmed",
@@ -106,7 +158,7 @@ function DutyBanner({ event }: { event: StaffEvent }) {
   )
 }
 
-// ─── Vote row (flat list item) ─────────────────────────────────────────────
+// ─── Vote row ──────────────────────────────────────────────────────────────
 
 function EventCard({
   event,
@@ -118,9 +170,8 @@ function EventCard({
   const [saving, setSaving] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
 
-  const handleRespond = async (response: AvailabilityResponse) => {
+  const handleRespond = (response: AvailabilityResponse) => {
     setSaving(true)
-    await new Promise((r) => setTimeout(r, 600))
     onRespond(event.id, response)
     setSaving(false)
   }
@@ -156,25 +207,29 @@ function EventCard({
         </div>
 
         {/* Deadline + details toggle */}
-        <div className="se-meta-footer">
-          <span className="se-meta-deadline-muted">
-            <Icon name="alert" size={15} />
-            Respond by {event.deadline}
-          </span>
-          {hasDetails && (
-            <Button
-              type="button"
-              variant="light"
-              className="se-detail-action"
-              aria-expanded={detailsOpen}
-              aria-controls={detailsId}
-              onClick={() => setDetailsOpen((v) => !v)}
-            >
-              {detailsOpen ? "Less" : "More details"}
-              <Icon name="chevron" size={12} style={{ transition: "transform .2s ease", transform: detailsOpen ? "rotate(-90deg)" : "rotate(90deg)" }} />
-            </Button>
-          )}
-        </div>
+        {(event.deadline || hasDetails) && (
+          <div className="se-meta-footer">
+            {event.deadline && (
+              <span className="se-meta-deadline-muted">
+                <Icon name="alert" size={15} />
+                Respond by {event.deadline}
+              </span>
+            )}
+            {hasDetails && (
+              <Button
+                type="button"
+                variant="light"
+                className="se-detail-action"
+                aria-expanded={detailsOpen}
+                aria-controls={detailsId}
+                onClick={() => setDetailsOpen((v) => !v)}
+              >
+                {detailsOpen ? "Less" : "More details"}
+                <Icon name="chevron" size={12} style={{ transition: "transform .2s ease", transform: detailsOpen ? "rotate(-90deg)" : "rotate(90deg)" }} />
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Collapsible description */}
         {hasDetails && (
@@ -199,7 +254,7 @@ function EventCard({
                       type="button"
                       className="se-vote-action"
                       disabled={saving}
-                      onClick={() => { void handleRespond("available") }}
+                      onClick={() => handleRespond("available")}
                       aria-label="Mark yourself as available for this event"
                     >
                       <Icon name="check" size={17} />
@@ -210,7 +265,7 @@ function EventCard({
                       variant="secondary"
                       className="se-vote-action"
                       disabled={saving}
-                      onClick={() => { void handleRespond("unavailable") }}
+                      onClick={() => handleRespond("unavailable")}
                       aria-label="Mark yourself as unavailable for this event"
                     >
                       <Icon name="close" size={17} />
@@ -237,7 +292,7 @@ function EventCard({
                     variant="secondary"
                     className="se-change-action"
                     disabled={saving}
-                    onClick={() => { void handleRespond(null) }}
+                    onClick={() => handleRespond(null)}
                   >
                     Change
                   </Button>
@@ -295,24 +350,69 @@ function EventCard({
 // ─── Page ──────────────────────────────────────────────────────────────────
 
 export function UpcomingEventsPage({ displayName: _displayName }: { displayName?: string }) {
-  const [events, setEvents] = useState<StaffEvent[]>(mockEvents)
+  const [events, setEvents] = useState<StaffEvent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    getStaffEvents()
+      .then(({ events: apiEvents }) => {
+        setEvents(apiEvents.map(fromApiEvent))
+        setLoading(false)
+      })
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 404) {
+          setEvents([])
+        } else {
+          setFetchError("Could not load events. Please try again.")
+        }
+        setLoading(false)
+      })
+  }, [])
 
   const handleRespond = (id: string, response: AvailabilityResponse) => {
-    setEvents((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, myResponse: response } : e)),
-    )
+    // Capture snapshot for revert on failure.
+    setEvents((prev) => {
+      const snapshot = prev
+      const next = prev.map((e) => (e.id === id ? { ...e, myResponse: response } : e))
+
+      void respondToEvent(id, response as AssignmentResponse | null)
+        .catch(() => setEvents(snapshot))
+
+      return next
+    })
   }
 
-  // Duty = admin published the team and selected this staff member
   const dutyEvents = events.filter(
     (e) => e.teamStatus === "published" && e.teamResult === "selected",
   )
-  // Voting pool excludes duty events
   const votingEvents = events.filter(
     (e) => !(e.teamStatus === "published" && e.teamResult === "selected"),
   )
   const unanswered = votingEvents.filter((e) => e.myResponse === null && e.status !== "cancelled")
   const answered = votingEvents.filter((e) => e.myResponse !== null || e.status === "cancelled")
+
+  if (loading) {
+    return (
+      <div className="se-page">
+        <div className="se-empty">
+          <p>Loading events…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (fetchError) {
+    return (
+      <div className="se-page">
+        <div className="se-empty">
+          <Icon name="alert" size={26} />
+          <p>{fetchError}</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="se-page">
