@@ -112,6 +112,16 @@ export function StaffWorkspaceShell({
 
       {/* ── Bottom navigation bar ── */}
       <nav className="sw-bottom-nav" aria-label="Staff workspace navigation">
+        {/* Sidebar header — visible only at ≥1024px desktop layout */}
+        <div className="sw-sidebar-header" aria-hidden="true">
+          <Brand />
+          {profile.staffRole && (
+            <Badge aria-label={`Your role: ${profile.staffRole}`}>
+              {profile.staffRole}
+            </Badge>
+          )}
+        </div>
+
         <Button
           variant="light"
           className={`sw-nav-item ${tab === "events" ? "sw-nav-active" : ""}`}

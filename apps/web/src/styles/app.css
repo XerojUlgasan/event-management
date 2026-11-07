@@ -2534,9 +2534,17 @@
   .sw-nav-item.sw-nav-active::before { display: none; }
   .sw-content {
     padding-bottom: 0;
+    padding-top: 24px;
   }
   .sw-shell {
     flex-direction: column;
+  }
+  /* Duty stage no longer needs edge-bleed negative margins at this width */
+  .se-duty-stage {
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+    border-radius: 10px;
   }
   .cl-event-banner { padding: 28px 32px 26px; }
   .cl-stage-header { padding: 10px 32px 8px; top: 114px; }
@@ -2567,6 +2575,7 @@
     overflow: hidden;
   }
   .sw-nav-item {
+    flex: none;
     flex-direction: row;
     justify-content: flex-start;
     gap: 10px;
@@ -2584,6 +2593,41 @@
   .sw-nav-item.sw-nav-active::before { display: none; }
   .sw-content { flex: 1; overflow-y: auto; }
   .cl-stage-header { top: 0; }
+}
+
+/* ── Sidebar header (Brand + role badge shown at desktop, hidden elsewhere) ── */
+.sw-sidebar-header {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .sw-sidebar-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+}
+
+/* ── sw-content breathing room on tablet and desktop ── */
+@media (min-width: 768px) {
+  .sw-content {
+    padding-inline: 24px;
+  }
+}
+
+/* ── Vote buttons side-by-side at tablet+ ── */
+@media (min-width: 768px) {
+  .se-vote-buttons {
+    flex-direction: row;
+  }
+  .se-vote-action {
+    width: auto;
+    flex: 1;
+  }
 }
 
 /* Context-specific sizing for shared controls. */
