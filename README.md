@@ -174,6 +174,8 @@ pnpm check
 
 `pnpm db:deploy` applies committed migrations; it does not create migrations. Never hand-edit generated `apps/api/src/db/types.ts`. Inspect both Prisma and SQL migrations because some database constraints extend beyond the Prisma model.
 
+Migration `20261109140000_enable_application_rls` enables row-level security on application tables and Prisma's migration history. It removes table grants from `PUBLIC` and, when present, Supabase's `anon` and `authenticated` roles. Clients access records through Clemora's session-aware API; there are no direct-client RLS policies. The server database role must own the tables or have `BYPASSRLS`. Future table-creation migrations must explicitly enable RLS and remove unused client grants too; this migration does not install an automatic trigger. These SQL-only access settings do not change Prisma models or generated Kysely types.
+
 **`pnpm db:reset` deletes data without a confirmation prompt.** Its script forces a Prisma reset, reapplies migrations, and seeds the configured database. Check the target and use it only for a database whose contents may be discarded.
 
 ### Migration impact
@@ -183,6 +185,7 @@ Review all pending migrations before upgrading a populated database:
 - `20261102130000_package_canvas` removes existing packages, package versions and service assignments, booking requests and status history, and booking-linked conversations/messages. General conversations and messages remain.
 - `20261102180000_flat_services_venues` retains selected current content, or archives the latest content when none was published. It removes version tables and unselected canvas pages; uploaded storage objects are not deleted.
 - `20261102190000_cleanup_catalog_fields` renames guest limits to `maxGuests` / `max_guests` and snapshots to `packageMaxGuests` / `package_max_guests`. It discards package event types, venue categories/photo URLs, and legacy service-image references. Existing canvas content and inquiry snapshots remain. Legacy storage objects are not removed remotely.
+- `20261109140000_enable_application_rls` preserves records and blocks direct table access for Supabase client roles. Apply it as the table owner and verify the API database role before deployment. `pnpm db:deploy` targets the database configured for the API; creating this migration does not apply it to the separate local Supabase stack.
 
 Back up affected records before deployment. Apply coordinated API/frontend contract changes with their migrations; do not edit applied migrations or reset a database to resolve drift. The [database guidance](context-factory/api/reference/database-and-migrations.md), [catalog media reference](context-factory/api/reference/external-image-urls.md), and [seed guide](docs/SEED.md) provide the related procedures.
 

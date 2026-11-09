@@ -9,3 +9,5 @@
 - `pnpm --filter @event-management/api exec tsx --test tests/flat-catalog-migration.test.ts` applies migrations to a disposable database and checks published-content selection, draft-only archives, selected canvas/media retention, owner constraints, and removal of service/venue version tables.
 
 - `pnpm --filter @event-management/api exec tsx --test tests/catalog-cleanup-migration.test.ts` proves the catalog-field cleanup preserves retained records, guest limits, snapshots, messages, and canvas media while removing obsolete columns.
+
+- `pnpm --filter @event-management/api test:rls` applies migrations to a disposable local database and checks RLS coverage, retained data, server access, and removal of `PUBLIC` table grants. When `anon` and `authenticated` exist, it also proves read and `TRUNCATE` denial for both roles. Those subtests explicitly skip on ordinary Compose databases without Supabase roles; run against the local Supabase connection to cover them. The suite does not alter the configured application database or create shared roles.
