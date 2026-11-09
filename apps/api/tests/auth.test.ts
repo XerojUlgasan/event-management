@@ -15,9 +15,9 @@ const password = "testpass";
 const firebasePassword = "firebase-test-password";
 let app: typeof import("../src/app.js").app;
 let db: typeof import("../src/db/client.js").db;
-let firebase: ReturnType<
+let firebase: Awaited<ReturnType<
   typeof import("../src/utils/firebase-admin.js").getFirebaseAuth
->;
+>>;
 let admin: Pool;
 let pool: Pool;
 
@@ -55,7 +55,7 @@ before(async () => {
   process.env.DB_NAME = database;
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
-  firebase = (await import("../src/utils/firebase-admin.js")).getFirebaseAuth();
+  firebase = await (await import("../src/utils/firebase-admin.js")).getFirebaseAuth();
 });
 
 after(async () => {

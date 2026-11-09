@@ -16,7 +16,7 @@ The command runs `apps/api/src/db/seed.ts` in one PostgreSQL transaction. It doe
   - The Intimate Gathering — ₱68,000; maximum 50 guests.
   - The Sweet Soirée — ₱95,000; maximum 80 guests.
 
-  These are synthetic demonstration records, not business-approved prices or content. Their photo widgets reference checked-in sample images; the seed does not upload files to R2.
+  These are synthetic demonstration records, not business-approved prices or content. Their photo widgets reference checked-in sample images; the seed does not upload files to Supabase Storage.
 - **Venue samples:** 15 legacy synthetic venue samples are created as archived rows with null capacity. Three demo venues are inserted directly as published records, with valid capacity/content and no photos. The published demos have descriptions that say availability has not been checked.
 - **Connected demo conversations:** one demo administrator and five customers under `demo.*@clemora.example.test`, with one general conversation and two messages per customer.
 

@@ -8,7 +8,7 @@ import {
 } from "@event-management/ui"
 
 import type { NavKey } from "./types"
-import { firstName, initialsFromName } from "../../lib/name"
+import { firstName, initialsFromName } from "../../lib/utils/name"
 import { BookingsPage } from "./pages/BookingsPage"
 import { CalendarPage } from "./pages/CalendarPage"
 import { GenericPage } from "./pages/GenericPage"

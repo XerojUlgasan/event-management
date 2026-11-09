@@ -1,12 +1,14 @@
 import { Button, NativeDialog } from "@event-management/ui"
 import { useEffect, useId, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import type { PackageContent, PackagePrice, PublicPackage } from "../../lib/api"
+import type { PackageContent, PackagePrice } from "@event-management/contracts/catalog"
+import type { PublicPackage } from "../../lib/data/packages"
+import { centavosToPesos } from "../../lib/utils/money"
 import { CatalogSections } from "./CatalogSections"
 import { BookingRequestDialog } from "./BookingRequest"
 
 export function priceLabel(price: PackagePrice | null) {
-  return price ? `${new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(price.amountMinor / 100)} total` : "Price on request"
+  return price ? `${new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(centavosToPesos(price.amountMinor))} total` : "Price on request"
 }
 export function PackageCanvas({ item }: { item: PackageContent }) {
   return <main className="package-canvas-preview"><div className="canvas-intro"><span>THE CLEMORA COLLECTION</span><h1>{item.name || "Untitled package"}</h1><div><strong>{priceLabel(item.price)}</strong><strong>Up to {item.maxGuests} guests</strong></div></div><CatalogSections sections={item.sections} /></main>

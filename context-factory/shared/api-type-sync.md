@@ -1,6 +1,6 @@
 # API and type synchronization
 
-Clemora has no generated browser API client or `gen:data` command. The HTTP wrapper, endpoint calls, and several handwritten DTOs live in [apps/web/src/lib/api.ts](../../apps/web/src/lib/api.ts). Reusable catalog types and shared limits live in [packages/contracts](../../packages/contracts/package.json). OpenAPI route schemas and handlers in `apps/api/src/controllers/` own the HTTP contract.
+Clemora has no generated browser API client or `gen:data` command. The HTTP wrapper lives in [apps/web/src/lib/http.ts](../../apps/web/src/lib/http.ts). Endpoint calls and several handwritten DTOs live under `apps/web/src/lib/data/`. [Client layers](../frontend/reference/client-layers.md) is the placement rule for those calls. Reusable catalog types and shared limits live in [packages/contracts](../../packages/contracts/package.json). OpenAPI route schemas and handlers in `apps/api/src/controllers/` own the HTTP contract.
 
 When a route, payload, status, nullability, pagination field, or shared limit changes:
 

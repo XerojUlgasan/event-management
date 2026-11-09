@@ -61,9 +61,8 @@ routes.get("/catalog-media/:id", async c => {
     headers["Content-Length"] = String(end - start + 1);
   } else headers["Content-Length"] = String(media.byte_size);
   try {
-    const object = await getCatalogMedia(media.storage_key, range);
-    if (!object.Body) return c.json({ error: "Media not found." }, 404);
-    return new Response(object.Body.transformToWebStream(), { status: range ? 206 : 200, headers });
+    const body = await getCatalogMedia(media.storage_key, range);
+    return new Response(body, { status: range ? 206 : 200, headers });
   } catch { return c.json({ error: "Media unavailable. Try again." }, 502); }
 });
 export default routes;

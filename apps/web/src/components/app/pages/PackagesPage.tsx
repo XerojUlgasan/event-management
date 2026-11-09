@@ -10,6 +10,7 @@ import { CatalogCard, CatalogCardActions } from "./CatalogCard";
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 import { CatalogEditor, newCatalogSection } from "./CatalogEditor";
 import { useCallback, useEffect, useState } from "react";
+import type { PackageContent } from "@event-management/contracts/catalog";
 import {
   archivePackage,
   createPackage,
@@ -17,8 +18,9 @@ import {
   getAdminPackages,
   packageImageSrc,
   updatePackage,
-} from "../../../lib/api";
-import type { AdminPackage, PackageContent } from "../../../lib/api";
+  type AdminPackage,
+} from "../../../lib/data/packages";
+import { centavosToPesos, pesosToCentavos } from "../../../lib/utils/money";
 import { PackageCanvas, PackagePreview, priceLabel } from "../PackagePreview";
 import { photos } from "../data";
 import "../../../styles/package-editor.css";
@@ -133,14 +135,14 @@ function Editor({
               min="1"
               step="1"
               value={
-                content.price.amountMinor ? content.price.amountMinor / 100 : ""
+                content.price.amountMinor ? centavosToPesos(content.price.amountMinor) : ""
               }
               onChange={(e) =>
                 setContent({
                   ...content,
                   price: {
                     ...content.price,
-                    amountMinor: Math.round(Number(e.target.value) * 100),
+                    amountMinor: pesosToCentavos(Number(e.target.value)),
                   },
                 })
               }

@@ -4,7 +4,7 @@ import { createPortal } from "react-dom"
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog"
 import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images"
 import { MAX_VIDEO_SIZE_BYTES } from "@event-management/contracts/limits/videos"
-import type { CatalogWidget } from "../../../lib/api"
+import type { CatalogWidget } from "@event-management/contracts/catalog"
 import { WidgetContent } from "../CatalogSections"
 
 export function PackageMediaSettings({ widget, fileName, onChange, onSelectFile, onClose, entity = "package" }: {

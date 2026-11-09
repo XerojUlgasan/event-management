@@ -10,8 +10,10 @@
 | Customer workspace | `apps/web/src/components/app/customer/` |
 | Shared message workspace | `apps/web/src/components/app/messages/` |
 | Public catalog sections | `apps/web/src/components/PublicCatalog.tsx`, `PublicServiceCatalog.tsx`, and app catalog components |
-| HTTP calls, session state, optional Firebase client | `apps/web/src/lib/api.ts`, `auth.tsx`, and `firebase.ts` |
+| HTTP transport and `/v1` calls | `apps/web/src/lib/http.ts` and `apps/web/src/lib/data/`. Screens import the data functions. See [client layers](../frontend/reference/client-layers.md) |
+| Multi-step client sequences and pure helpers | `apps/web/src/lib/services/` and `apps/web/src/lib/utils/` |
+| Session state, optional Firebase client | `apps/web/src/lib/auth.tsx` and `firebase.ts` |
 | App styling and assets | `apps/web/src/styles/` and `apps/web/public/` |
 | Reusable presentation and tokens | `packages/ui/` and `packages/theme/` |
 
-Follow nearby patterns and [pages and structure](../frontend/reference/pages-and-structure.md). Do not add a parallel `src/routes` or feature-folder framework to mirror the source toolkit. Public catalogs use sections and overlays on `/`; a workspace view is not automatically a separate URL route. [Client data and auth](../frontend/reference/data-and-auth.md) distinguishes persisted flows from demo data.
+Follow nearby patterns, [client layers](../frontend/reference/client-layers.md), and [pages and structure](../frontend/reference/pages-and-structure.md). Do not add `apps/web` controllers or a parallel `src/routes` or feature-folder framework to mirror the source toolkit. Public catalogs use sections and overlays on `/`; a workspace view is not automatically a separate URL route. [Client data and auth](../frontend/reference/data-and-auth.md) distinguishes persisted flows from demo data.

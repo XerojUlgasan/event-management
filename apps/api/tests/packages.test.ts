@@ -46,7 +46,7 @@ before(async () => {
   }
   storageServer = createServer(async (req, res) => {
     const path = req.url!.split("?")[0]!;
-    if (req.method === "PUT") {
+    if (req.method === "POST" || req.method === "PUT") {
       const chunks: Buffer[] = [];
       for await (const chunk of req) chunks.push(Buffer.from(chunk));
       storedImages.set(path, {
@@ -59,7 +59,16 @@ before(async () => {
         res.statusCode = 403;
         res.end();
       } else {
-        storedImages.delete(path);
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(Buffer.from(chunk));
+        const payload = Buffer.concat(chunks).toString();
+        if (payload) {
+          const prefixes = (JSON.parse(payload) as { prefixes?: string[] }).prefixes ?? [];
+          for (const prefix of prefixes) {
+            const encoded = prefix.split("/").map((segment) => encodeURIComponent(segment)).join("/");
+            storedImages.delete(`${path}/${encoded}`);
+          }
+        } else storedImages.delete(path);
         res.statusCode = 204;
         res.end();
       }
@@ -84,10 +93,9 @@ before(async () => {
   );
   const address = storageServer.address();
   assert.ok(address && typeof address !== "string");
-  process.env.R2_ENDPOINT = `http://127.0.0.1:${address.port}`;
-  process.env.R2_BUCKET_NAME = "test";
-  process.env.R2_ACCESS_KEY_ID = "test";
-  process.env.R2_SECRET_ACCESS_KEY = "test";
+  process.env.SUPABASE_URL = `http://127.0.0.1:${address.port}`;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test";
+  process.env.SUPABASE_STORAGE_BUCKET = "test";
   process.env.DB_NAME = database;
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));

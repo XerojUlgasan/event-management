@@ -2,9 +2,10 @@ import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/mess
 import { Fragment, useEffect, useRef, useState, type SubmitEvent } from "react"
 import { Avatar, Badge, Button, Icon, Input } from "@event-management/ui"
 
-import { getAdminBookingRequest, getMyBookingRequest, type BookingRequest, type ChatConversation, type ChatMessage } from "../../../lib/api"
+import { getAdminBookingRequest, getMyBookingRequest, type BookingRequest } from "../../../lib/data/booking-requests"
+import type { ChatConversation, ChatMessage } from "../../../lib/data/messages"
 import { BookingDetails } from "../BookingList"
-import { initialsFromName } from "../../../lib/name"
+import { initialsFromName } from "../../../lib/utils/name"
 
 const dayFormatter = new Intl.DateTimeFormat("en-PH", {
   month: "short",

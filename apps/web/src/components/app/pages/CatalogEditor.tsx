@@ -9,8 +9,9 @@ import { createPortal } from "react-dom"
 import GridLayout from "react-grid-layout/legacy"
 import MDEditor from "@uiw/react-md-editor"
 import rehypeSanitize from "rehype-sanitize"
-import { deleteCatalogMedia, uploadCatalogMedia } from "../../../lib/api"
-import type { CatalogSection, CatalogWidget } from "../../../lib/api"
+import type { CatalogSection, CatalogWidget } from "@event-management/contracts/catalog"
+import { deleteCatalogMedia } from "../../../lib/data/catalog-media"
+import { unreferencedUploadIds, uploadPendingCatalogMedia } from "../../../lib/services/save-catalog-media"
 import { WidgetContent } from "../CatalogSections"
 import { PackageMediaSettings } from "./PackageMediaSettings"
 import "react-grid-layout/css/styles.css"
@@ -106,16 +107,13 @@ export function CatalogEditor<T extends CanvasContent>({ initial, entity, onClos
     if (validationError) { setError(validationError); setSettings(true); return }
     setBusy(true); setError("")
     try {
-      const next = structuredClone(content)
-      for (const section of next.sections) for (const w of section.widgets) if (files[w.id]) {
-        const uploaded = await uploadCatalogMedia(files[w.id]); if (uploaded.id) pending.current.push(uploaded.id); w.media = uploaded
-        setContent(c => ({ ...c, sections: c.sections.map(s => ({ ...s, widgets: s.widgets.map(old => old.id === w.id ? { ...old, media: uploaded } : old) })) }))
-        setFiles(f => { const copy = { ...f }; delete copy[w.id]; return copy })
-      }
-      next.name = next.name.trim()
+      const next = await uploadPendingCatalogMedia(content, files, (widgetId, uploaded) => {
+        if (uploaded.id) pending.current.push(uploaded.id)
+        setContent(c => ({ ...c, sections: c.sections.map(s => ({ ...s, widgets: s.widgets.map(old => old.id === widgetId ? { ...old, media: uploaded } : old) })) }))
+        setFiles(f => { const copy = { ...f }; delete copy[widgetId]; return copy })
+      })
       await onSave(next)
-      const usedIds = new Set(next.sections.flatMap(s => s.widgets).map(w => w.media?.id).filter(Boolean))
-      void Promise.allSettled(pending.current.filter(id => !usedIds.has(id)).map(deleteCatalogMedia))
+      void Promise.allSettled(unreferencedUploadIds(next.sections, pending.current).map(deleteCatalogMedia))
       pending.current = []; onSaved()
     } catch (e) { setError(message(e)) } finally { setBusy(false) }
   }

@@ -18,10 +18,10 @@ import {
 import { photos } from "../data"
 import { BookingList } from "./BookingList"
 import { PackageCatalog } from "../PackageCatalog"
-import { initialsFromName } from "../../../lib/name"
+import { initialsFromName } from "../../../lib/utils/name"
 import { SignInMethods } from "../SignInMethods"
 import { MessagesWorkspace } from "../messages/MessagesWorkspace"
-import { mergeThread } from "../messages/thread"
+import { mergeThread } from "../../../lib/services/merge-thread"
 import {
   createMyConversation,
   getMyConversations,
@@ -31,7 +31,7 @@ import {
   type ChatMessage,
   type ChatConversation,
   type ChatThread,
-} from "../../../lib/api"
+} from "../../../lib/data/messages"
 
 type CustomerTab =
   | "Home"

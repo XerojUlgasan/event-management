@@ -21,4 +21,4 @@ Check each question with run evidence:
 
 A user-requested rough ballpark can use one run if correctness and completed work are checked and the result is labeled as one run. A choice between options needs the full comparison.
 
-Report faster, slower, no measurable difference, or inconclusive with units, run count, spread, limiter, and retained evidence. Missing correctness/work proof or an untuned side makes a decision inconclusive. An API test using fake storage does not measure production R2. Keep a PR's primary claim concise and link the detailed runs.
+Report faster, slower, no measurable difference, or inconclusive with units, run count, spread, limiter, and retained evidence. Missing correctness/work proof or an untuned side makes a decision inconclusive. An API test using fake storage does not measure production Supabase Storage. Keep a PR's primary claim concise and link the detailed runs.

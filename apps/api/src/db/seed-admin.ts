@@ -10,7 +10,7 @@ if (!email) {
   process.exit(1);
 }
 
-const firebaseAuth = getFirebaseAuth();
+const firebaseAuth = await getFirebaseAuth();
 const fallbackName = email.split("@")[0] ?? "Admin";
 
 let user;

@@ -12,17 +12,18 @@ import {
   Tabs,
   Textarea,
 } from "@event-management/ui";
+import { ApiError } from "../../../lib/http";
+import { catalogMediaSrc } from "../../../lib/data/catalog-media";
 import {
-  ApiError,
   archiveService,
-  catalogMediaSrc,
   createService,
   deleteService,
   getAdminService,
   getAdminServices,
   updateService,
-} from "../../../lib/api";
-import type { AdminService, ServiceContent } from "../../../lib/api";
+  type AdminService,
+  type ServiceContent,
+} from "../../../lib/data/services";
 import {
   CatalogDetailPreview,
   ServiceCanvas,

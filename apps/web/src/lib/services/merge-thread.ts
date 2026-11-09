@@ -1,4 +1,4 @@
-import type { ChatThread } from "../../../lib/api"
+import type { ChatThread } from "../data/messages"
 
 // Keep locally confirmed messages if a poll that started before the send returns without them.
 export function mergeThread(current: ChatThread | null, next: ChatThread): ChatThread {

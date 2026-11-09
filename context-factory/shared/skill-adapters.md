@@ -30,7 +30,7 @@ Walk these scenarios from the root `AGENTS.md` through the senior-developer entr
 | Scenario | Required route and boundary |
 | --- | --- |
 | Raise a message field limit | Standing guides → API, frontend, packages, limits → package reuse, API synchronization, and blast radius. Follow the canonical constant, route schema, form hint, and behavior suite; keep HTTP caps separate. |
-| Explain package saving without edits | Standing guides → how; why only for rationale → API/frontend source. Explain controller/service/data and browser state without editing or inventing automatic client generation. |
+| Explain package saving without edits | Standing guides → how; why only for rationale → API/frontend source, including [client layers](../frontend/reference/client-layers.md). Explain the API controller/service/data path and the browser `lib/data` call without editing or inventing automatic client generation. |
 | Review a booking-request status or migration diff | Standing guides → interrogate → existing code-review reference, API, relevant frontend/QA, blast radius. Stay read-only; acceptance is not a reservation, and absent policy is a question. |
 | Fix a narrow TypeScript bug | Standing guides → TypeScript, root-cause and behavior-test principles, owning area. Use TDD only with a practical reproduction/test path or an explicit request. |
 | Add or edit a page, including a mock staff screen | Standing guides → frontend and packages with all required references → [Clemora UI usage](../frontend/clemora-ui/SKILL.md) and mandatory package reuse. Inspect current exports, props, stories, and tokens; compose existing primitives and keep page behavior in the app. Audit reuse even when package files stay unchanged. |

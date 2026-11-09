@@ -22,7 +22,7 @@ The [senior developer](../agents/senior-developer/AGENT.md) owns the complete us
 
 Choose proof that could expose the claimed mistake. Identify the command or journey, outcome, checkout/revision, relevant dirty changes, environment, and account role when those affect reproducibility. Keep private values out of reports and committed artifacts. [QA](../QA/SKILL.md) owns session and read-only SQL procedures.
 
-Keep source, tests, API, database, browser, and external-provider evidence distinct. A passing type check is not browser proof. A local storage fake is not R2 proof. Skipped tests and checks on an older revision remain gaps. Reuse earlier evidence only after checking that it covers the current artifact.
+Keep source, tests, API, database, browser, and external-provider evidence distinct. A passing type check is not browser proof. A local storage fake is not Supabase Storage proof. Skipped tests and checks on an older revision remain gaps. Reuse earlier evidence only after checking that it covers the current artifact.
 
 For work spanning sessions, keep a compact sanitized decision and evidence record in an existing task note or the owning role's references when useful. Record the intended result, current state, decisions, checks, unresolved questions, and next step. Do not create a parallel product overview or commit session logs, credentials, or private fixture values.
 

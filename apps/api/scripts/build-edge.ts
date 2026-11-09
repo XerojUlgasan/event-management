@@ -33,7 +33,20 @@ const result = await build({
   chunkNames: "chunks/[name]-[hash]",
   metafile: true,
   conditions: ["import", "module", "default"],
-  plugins: [externalPostgres],
+  plugins: [externalPostgres, {
+    name: "edge-environment",
+    setup(configured) {
+      // Supabase injects the function environment; dotenv/config would read .env synchronously.
+      configured.onResolve({ filter: /^dotenv\/config$/ }, () => ({
+        path: "dotenv/config",
+        namespace: "edge-environment",
+      }));
+      configured.onLoad({ filter: /.*/, namespace: "edge-environment" }, () => ({
+        contents: "",
+        loader: "js",
+      }));
+    },
+  }],
 });
 
 const metafile = result.metafile;

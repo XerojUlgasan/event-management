@@ -76,7 +76,7 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` starts the local Supabase stack, serves the edge function, and starts the website at <http://localhost:4321/>. `pnpm all` remains the Compose PostgreSQL path: it creates `apps/api/.env` from its example if missing, starts PostgreSQL and waits for its healthcheck, applies committed migrations, then starts the Node API and web servers. Local email/password sign-in works without Firebase configuration. Catalog uploads require R2 configuration.
+`pnpm dev` starts the local Supabase stack, serves the edge function, and starts the website at <http://localhost:4321/>. `pnpm all` remains the Compose PostgreSQL path: it creates `apps/api/.env` from its example if missing, starts PostgreSQL and waits for its healthcheck, applies committed migrations, then starts the Node API and web servers. Local email/password sign-in works without Firebase configuration. Catalog uploads use the private Supabase Storage bucket `event-management`; object keys stay `catalog-media/<id>`. The edge runtime supplies its own Storage URL and service role. The Node API needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from the API example.
 
 **Existing databases:** review pending migrations and back up affected data before `pnpm all`, `pnpm dev:prepare`, or `pnpm db:deploy`; these commands apply migrations. See [migration impact](#migration-impact).
 
@@ -108,7 +108,7 @@ pnpm dev
 
 ### Local Supabase
 
-`apps/supabase` is the local Supabase CLI project, pinned to CLI 3.0.0. `pnpm supabase:start` requires Docker and starts its own Postgres 17, Studio, and Storage. Postgres listens on `127.0.0.1:54322`, the API gateway on `54321`, and Studio on `54323`. This stack can run beside `pnpm db:up`.
+`apps/supabase` is the local Supabase CLI project, pinned to CLI 3.0.0. `pnpm supabase:start` requires Docker and starts its own Postgres 17, Studio, and Storage. Postgres listens on `127.0.0.1:54322`, the API gateway on `54321`, and Studio on `54323`. This stack can run beside `pnpm db:up`. Local Storage declares the private `event-management` bucket in `apps/supabase/config.toml`. Restart the stack after pulling that bucket so Storage creates it. New catalog objects use the key `catalog-media/<id>`; this change does not copy objects already stored elsewhere.
 
 The Node API, Prisma, seeds, and integration tests still use Compose PostgreSQL from `apps/api/compose.yaml` on port 5432. Do not point that API's `DB_HOST` at the Supabase database until that cutover is explicit. Supabase Auth is not the application sign-in.
 
@@ -120,7 +120,7 @@ Use the checked-in [API environment example](apps/api/.env.example) and [web env
 
 - Database: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` configure the API, Prisma, and type generator. A separate `DATABASE_URL` is unnecessary. Compose reads `apps/api/.env`; its project name remains `event_management_v2` to reuse the existing volume.
 - Browser API: `PUBLIC_API_URL` points to the API including `/v1`. `pnpm dev` sets it to `/v1` on the website origin. `pnpm all` uses the web environment value, which defaults to `http://localhost:3000/v1`.
-- Catalog media: configure the R2 variables in the API example before testing actual uploads. Built-in package sample photos do not require uploads.
+- Catalog media: set the Supabase Storage variables in the API example before testing Node API uploads. Built-in package sample photos do not require uploads. Existing stored files are left in place.
 - Database clients such as DBeaver: use PostgreSQL on `localhost:5432` with the configured database name/user/password. The local defaults use no SSL. A containerized client may require `host.docker.internal` instead of `localhost`.
 
 ## Authentication
@@ -207,7 +207,7 @@ Run the checks matching the changed area:
 | `pnpm --filter @event-management/api test:booking-requests` | Inquiry creation, snapshots, access, and status behavior |
 | `pnpm --filter @event-management/api test:messages` | Conversation ownership, messages, read state, and expiry |
 
-Integration suites create disposable local PostgreSQL databases and require permission to create them. Auth also requires the Firebase CLI on `PATH` and ports 9099, 4409, and 4509 free; it uses an emulator rather than production Firebase. Media tests use a local S3-compatible fake rather than production R2. See [API verification](context-factory/api/reference/verification.md) and the [seed guide](docs/SEED.md) for additional focused suites.
+Integration suites create disposable local PostgreSQL databases and require permission to create them. Auth also requires the Firebase CLI on `PATH` and ports 9099, 4409, and 4509 free; it uses an emulator rather than production Firebase. Media tests use a local Storage API fake rather than production Supabase Storage. See [API verification](context-factory/api/reference/verification.md) and the [seed guide](docs/SEED.md) for additional focused suites.
 
 A passing build does not establish browser, persistence, or production-provider behavior. Verify affected customer/staff flows, permissions, reloads, and failure paths at the appropriate boundaries.
 

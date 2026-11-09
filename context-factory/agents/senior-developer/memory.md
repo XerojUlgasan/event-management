@@ -2,6 +2,22 @@
 
 Durable engineering notes for this role. Read and maintain them under the shared [memory policy](../README.md#memory).
 
+## 2026-11-09 — Web API calls go through lib/http and lib/data
+
+`apps/web` reaches `/v1` only through `src/lib/http.ts`. Domain endpoint functions live in `src/lib/data/`. `src/lib/services/` owns catalog upload-then-save, the signed-out booking draft, and message-thread merge. `src/lib/utils/` owns name and peso display helpers. There is no `lib/api.ts` barrel.
+
+**Evidence:** `apps/web/src/lib/http.ts` is the only `fetch` in `apps/web/src`. `pnpm --filter @event-management/web check` passed after the move. [Client layers](../../frontend/reference/client-layers.md) owns where a browser API call, client sequence, or pure helper goes. The [frontend structure guide](../../shared/frontend-project-structure.md) keeps the short placement table.
+
+**Why it matters:** Do not add a second fetch wrapper or a browser copy of the API's controllers, services, and SQL modules. A new `/v1` call belongs in the matching `lib/data` module.
+
+## 2026-11-09 — Catalog media uses Supabase Storage
+
+`putCatalogMedia`, `deleteCatalogMedia`, and `getCatalogMedia` call the Supabase Storage REST API. The private bucket is `event-management`. Object keys remain `catalog-media/<id>`, which is the value stored in `media_assets.storage_key`. The hosted Prevail project has that empty bucket. Local `config.toml` declares the same bucket; a running stack needs a restart before Storage creates it. Existing R2 objects are not copied. The package tests fake the Storage API and do not prove a live bucket.
+
+**Evidence:** `apps/api/src/utils/catalog-media-storage.ts`, `apps/api/src/services/catalog-media/catalog-media.ts`, and `apps/supabase/config.toml`. The [catalog media reference](../../api/reference/external-image-urls.md) owns the current route and cleanup behavior.
+
+**Why it matters:** Keep the object key format when changing buckets. Do not send the service role to the browser. The API still proxies bytes through `/v1/catalog-media/{id}`, including byte ranges.
+
 ## 2026-11-09 — `pnpm dev` serves the edge function with the website
 
 `pnpm dev` starts the local Supabase stack, builds the edge bundle, serves `functions/api`, and starts the website with `PUBLIC_API_URL=/v1`. The Astro dev server proxies `/v1` to `http://127.0.0.1:54321/functions/v1/api` because Kong answers with `Access-Control-Allow-Origin: *` and handles OPTIONS itself. Credentialed browser calls, including the `em_session` cookie, cannot use that wildcard. `pnpm all` still starts Compose PostgreSQL and the Node API. The function env file is the gitignored `apps/supabase/.env.functions`; its database host is `db` inside the function container.

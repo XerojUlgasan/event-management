@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { applicationDefault, cert, getApps, initializeApp } from "firebase-admin/app";
@@ -15,7 +15,7 @@ type ServiceAccount = {
   private_key?: string;
 };
 
-function initialize() {
+async function initialize() {
   const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n").trim();
@@ -41,7 +41,7 @@ function initialize() {
       : resolve(apiRoot, credentialsPath);
 
     const serviceAccount = JSON.parse(
-      readFileSync(credentialsFile, "utf8"),
+      await readFile(credentialsFile, "utf8"),
     ) as ServiceAccount;
 
     if (!serviceAccount.client_email || !serviceAccount.private_key) {
@@ -70,9 +70,14 @@ function initialize() {
   throw new Error(configurationError);
 }
 
-export function getFirebaseAuth() {
+let initialization: Promise<void> | undefined;
+
+export async function getFirebaseAuth() {
   if (!getApps().length) {
-    initialize();
+    initialization ??= initialize().finally(() => {
+      initialization = undefined;
+    });
+    await initialization;
   }
 
   return getAuth();

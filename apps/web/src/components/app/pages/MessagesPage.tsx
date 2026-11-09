@@ -6,9 +6,9 @@ import {
   sendAdminMessage,
   type ChatConversation,
   type ChatThread,
-} from "../../../lib/api"
+} from "../../../lib/data/messages"
 import { MessagesWorkspace } from "../messages/MessagesWorkspace"
-import { mergeThread } from "../messages/thread"
+import { mergeThread } from "../../../lib/services/merge-thread"
 
 function mergeConversations(current: ChatConversation[], incoming: ChatConversation[], newestFirst: boolean) {
   const incomingIds = new Set(incoming.map((conversation) => conversation.id))

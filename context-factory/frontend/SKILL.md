@@ -9,6 +9,8 @@ Use this skill for `apps/web/` changes. Read every reference below before editin
 
 Astro supplies the HTML host and frontend development/build tooling; React owns application screens and state. Investigate `apps/web/package.json`, the framework configuration, and the entry point before changing setup or architecture claims.
 
+Screens communicate with the API by importing functions from `apps/web/src/lib/data/`. Those functions call `request` in `src/lib/http.ts`. Read [client layers](reference/client-layers.md) before adding a request, a client-only sequence, or a pure helper. Leave route handlers, business services, and SQL in `apps/api`.
+
 ## Important: package reuse is mandatory for every UI change
 
 Load the [packages skill](../packages/SKILL.md) and all its required references before any UI edit, even when the expected change stays entirely in `apps/web`. Follow the [required package reuse workflow](../shared/shared-packages.md#required-workflow-for-every-ui-change): inspect current exports and relevant implementations, reuse or extend the owning package, then audit the result. Page-only components, CSS-only fixes, mock screens, and redesigns all follow this rule.
@@ -17,6 +19,7 @@ Use `@event-management/ui` for existing presentation components, theme tokens fo
 
 ## Required references
 
+- [Client layers](reference/client-layers.md)
 - [Pages and application structure](reference/pages-and-structure.md)
 - [Client data and authentication](reference/data-and-auth.md)
 - [Styling and verification](reference/styling-and-verification.md)

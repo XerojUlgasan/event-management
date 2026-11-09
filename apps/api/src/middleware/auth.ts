@@ -17,7 +17,7 @@ export const requireFirebaseAuth = createMiddleware<HonoEnv>(async (c, next) => 
 
   let auth;
   try {
-    auth = getFirebaseAuth();
+    auth = await getFirebaseAuth();
   } catch (error) {
     return c.json(
       { error: error instanceof Error ? error.message : "Firebase Admin is not configured" },

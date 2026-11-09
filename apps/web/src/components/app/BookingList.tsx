@@ -13,7 +13,7 @@ import {
   updateBookingRequestStatus,
   type BookingRequest,
   type BookingStatus,
-} from "../../lib/api";
+} from "../../lib/data/booking-requests";
 
 const labels: Record<BookingStatus, string> = {
   under_review: "Under review",

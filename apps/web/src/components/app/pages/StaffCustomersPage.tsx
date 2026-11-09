@@ -11,7 +11,7 @@ import {
   StatCard,
   Tabs,
 } from "@event-management/ui"
-import { getAdminUsers, type AdminUser } from "../../../lib/api"
+import { getAdminUsers, type AdminUser } from "../../../lib/data/users"
 
 type LoadState = "loading" | "ready" | "error"
 

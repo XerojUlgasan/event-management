@@ -8,17 +8,17 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
+import { ApiError } from "./http";
 import {
   addPassword,
-  ApiError,
   endSession,
   getMe,
   linkFirebase,
   login,
   register,
   syncSession,
-} from "./api";
-import type { Profile } from "./api";
+} from "./data/auth";
+import type { Profile } from "./data/auth";
 
 type Status = "loading" | "signed-out" | "signed-in";
 type FirebaseMethod = "google" | "password";

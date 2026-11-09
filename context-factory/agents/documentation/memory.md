@@ -2,6 +2,14 @@
 
 Durable documentation notes for this role. Read and maintain them under the shared [memory policy](../README.md#memory).
 
+## 2026-11-09 — Browser API calls are a frontend reference
+
+The rule for how `apps/web` calls `/v1` lives in [client layers](../../frontend/reference/client-layers.md). The frontend skill lists it as a required reference. [Client data and authentication](../../frontend/reference/data-and-auth.md) keeps persisted-flow facts and points at that reference for placement. The shared [frontend structure](../../shared/frontend-project-structure.md) table stays a short index.
+
+**Evidence:** `apps/web/src/lib/http.ts` is the only `fetch` under `apps/web/src`. Domain calls are in `src/lib/data/`. There is no `apps/web` controller folder. This records documentation ownership, not a new runtime check.
+
+**Why it matters:** Put a change to that call path in the frontend reference and the skill's required list. Do not describe the website as a second controller/service/data stack.
+
 ## 2026-11-03 — Engineering prose and shared guidance
 
 Use [technical writing](../../engineering/technical-writing/SKILL.md) with this role's artifact and recursive-review workflows for engineering documents. The [context factory index](../../README.md) and [adapters](../../shared/skill-adapters.md) identify canonical shared/engineering guidance and differences from the source toolkit; keep codebase detail with its area owner.

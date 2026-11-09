@@ -1,7 +1,7 @@
 import MarkdownPreview from "@uiw/react-markdown-preview"
 import rehypeSanitize from "rehype-sanitize"
-import type { CatalogSection, CatalogWidget } from "../../lib/api"
-import { catalogMediaSrc } from "../../lib/api"
+import type { CatalogSection, CatalogWidget } from "@event-management/contracts/catalog"
+import { catalogMediaSrc } from "../../lib/data/catalog-media"
 
 export function WidgetContent({ widget, editor = false }: { widget: CatalogWidget; editor?: boolean }) {
   const url = widget.media?.url ? catalogMediaSrc(widget.media.url) : ""
