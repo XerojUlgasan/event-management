@@ -14,6 +14,7 @@ import {
   getMe,
   type PublicPackage,
 } from "../../lib/api";
+import { useVenueOptions } from "../../lib/venues";
 
 const KEY = "clemora-booking-draft";
 const OTHER = "__other__";
@@ -202,6 +203,11 @@ export function BookingRequestDialog({
   const [busy, setBusy] = useState(false);
   const [noteOpen, setNoteOpen] = useState(() => !!fields.specialRequests);
   const [error, setError] = useState("");
+  const {
+    options: venueOptions,
+    loading: venuesLoading,
+    error: venuesError,
+  } = useVenueOptions();
   const [reference, setReference] = useState("");
   const dialog = useRef<HTMLDialogElement>(null),
     summary = useRef<HTMLDivElement>(null),
@@ -326,6 +332,17 @@ export function BookingRequestDialog({
       window.location.assign("/?booking=resume");
     } else if (auth === "customer") void submit();
   };
+  const venueValue = fields.preferredVenueLocation.trim();
+  const venueInOptions = venueOptions.some(
+    (option) => option.value === venueValue,
+  );
+  const venuePlaceholder = venuesLoading
+    ? "Loading venues…"
+    : venuesError
+      ? "Unable to load venues"
+      : venueOptions.length
+        ? "No preference / To be confirmed"
+        : "No venues available yet";
   const field = (
     key: keyof Fields,
     label: string,
@@ -371,11 +388,22 @@ export function BookingRequestDialog({
           {field(
             "preferredVenueLocation",
             "Preferred venue (optional)",
-            <input
+            <select
               {...props("preferredVenueLocation")}
-              maxLength={MAX_PREFERRED_VENUE_LOCATION_LENGTH}
-              placeholder="Tell us where you would like to celebrate"
-            />,
+              disabled={
+                venuesLoading || (!venueOptions.length && !venueValue)
+              }
+            >
+              <option value="">{venuePlaceholder}</option>
+              {venueValue && !venueInOptions && (
+                <option value={venueValue}>{venueValue} (current)</option>
+              )}
+              {venueOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>,
           )}
         </>
       )}

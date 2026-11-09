@@ -956,18 +956,21 @@ export function BookingDetails({
       <div className="booking-details-body">
         {/* ── Overview tab ── */}
         {tab === "overview" && (
-          <>
-            {(isAdmin || customer) && <BookingPackage item={item} admin={isAdmin} onSaved={onSaved} onMessage={customer ? onClose : undefined} />}
+          <div className="booking-overview">
+            {(isAdmin || customer) && (
+              <BookingPackage
+                item={item}
+                admin={isAdmin}
+                restricted={packageRestricted}
+                onSaved={onSaved}
+                onMessage={customer ? onClose : undefined}
+              />
+            )}
             <div className="booking-details-grid">
-              <section>
+              <section className="booking-details-card">
                 <h3>Event details</h3>
-                <dl>
+                <dl className="booking-details-facts">
                   <div><dt>Event type</dt><dd>{item.eventType}</dd></div>
-                  <div><dt>Current package</dt><dd>{item.packageName}</dd></div>
-                  {packageRestricted ? <div><dt>Package access</dt><dd>Private package details are available to the customer and System Administrator.</dd></div> : <>
-                    <div><dt>Current package price</dt><dd>{item.packagePrice ? new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(item.packagePrice.amountMinor / 100) : "Private package"}</dd></div>
-                    <div><dt>Current package services</dt><dd>{item.packageInclusions.length ? item.packageInclusions.map((service) => `${service.name} (${service.role})`).join(", ") : "None"}</dd></div>
-                  </>}
                   <div>
                     <dt>Preferred date</dt>
                     <dd>{preferredDateLabel(item.preferredDate)}</dd>
@@ -990,7 +993,7 @@ export function BookingDetails({
                     <dd>
                       {item.guestCount ?? "Not sure yet"}
                       {!packageRestricted && item.outOfRange && item.packageMaxGuests !== null && (
-                        <span className="booking-details-warn"> · above current package max ({item.packageMaxGuests})</span>
+                        <span className="booking-details-warn">Above current package max ({item.packageMaxGuests})</span>
                       )}
                     </dd>
                   </div>
@@ -998,30 +1001,38 @@ export function BookingDetails({
                     <dt>Preferred venue</dt>
                     <dd>{item.preferredVenueLocation ?? "To be confirmed"}</dd>
                   </div>
-                  {item.notes && (
-                    <div><dt>Internal notes</dt><dd>{item.notes}</dd></div>
-                  )}
                 </dl>
-                {item.updatedByName && (
-                  <p className="booking-details-meta">
-                    Details last edited by {item.updatedByName}
-                  </p>
+                {item.notes && (
+                  <div className="booking-details-note">
+                    <h4>Internal notes</h4>
+                    <p>{item.notes}</p>
+                  </div>
                 )}
-                <p className="booking-details-meta">Preferred date is not reserved.</p>
-                {customer && <p className="booking-details-meta">To discuss changes, close these details and message the team in this conversation.</p>}
+                <div className="booking-details-meta-list">
+                  {item.updatedByName && (
+                    <p className="booking-details-meta">
+                      Details last edited by {item.updatedByName}
+                    </p>
+                  )}
+                  <p className="booking-details-meta">Preferred date is not reserved.</p>
+                  {customer && <p className="booking-details-meta">To discuss changes, close these details and message the team in this conversation.</p>}
+                </div>
                 {isAdmin && !isTerminal && <BookingDetailsEditor item={item} onSaved={onSaved} />}
               </section>
-              <section>
+              <section className="booking-details-card">
                 <h3>Contact</h3>
-                <dl>
+                <dl className="booking-details-facts booking-details-facts-single">
                   <div><dt>Contact person</dt><dd>{item.contactName}</dd></div>
                   <div><dt>Phone number</dt><dd>{item.phoneNumber}</dd></div>
-                  <div><dt>Special requests</dt><dd>{item.specialRequests || "None"}</dd></div>
                   <div><dt>Submitted</dt><dd>{dateLabel(item.createdAt)}</dd></div>
                 </dl>
+                <div className="booking-details-note">
+                  <h4>Special requests</h4>
+                  <p>{item.specialRequests || "None"}</p>
+                </div>
               </section>
             </div>
-            <details className="booking-history">
+            <details className="booking-details-card booking-history">
               <summary>Status history</summary>
               <ul>
                 {item.statusHistory.map((entry, index) => (
@@ -1032,7 +1043,7 @@ export function BookingDetails({
                 ))}
               </ul>
             </details>
-          </>
+          </div>
         )}
 
         {/* ── Quotation tab ── */}

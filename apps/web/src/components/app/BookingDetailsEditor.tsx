@@ -1,6 +1,7 @@
-import { MAX_BOOKING_NOTES_LENGTH, MAX_EVENT_TYPE_LENGTH, MAX_PREFERRED_VENUE_LOCATION_LENGTH, type BookingEstimatedDuration } from "@event-management/contracts/limits/booking-requests";
+import { MAX_BOOKING_NOTES_LENGTH, MAX_EVENT_TYPE_LENGTH, type BookingEstimatedDuration } from "@event-management/contracts/limits/booking-requests";
 import { useState } from "react";
 import { ApiError, getAdminBookingRequest, updateBookingDetails, type BookingRequest } from "../../lib/api";
+import { useVenueOptions } from "../../lib/venues";
 
 // Manila is UTC+08:00 for the event dates supported by this application.
 const localInputValue = (value: string | null) => {
@@ -33,6 +34,22 @@ export function BookingDetailsEditor({ item, onSaved }: {
   const [conflict, setConflict] = useState(false);
   const [expectedUpdatedAt, setExpectedUpdatedAt] = useState(item.updatedAt);
   const [fields, setFields] = useState(() => fieldsFromItem(item));
+  const {
+    options: venueOptions,
+    loading: venuesLoading,
+    error: venuesError,
+  } = useVenueOptions(true);
+  const venueValue = fields.venue.trim();
+  const venueInOptions = venueOptions.some(
+    (option) => option.value === venueValue,
+  );
+  const venuePlaceholder = venuesLoading
+    ? "Loading venues…"
+    : venuesError
+      ? "Unable to load venues"
+      : venueOptions.length
+        ? "No preference / To be confirmed"
+        : "No venues available yet";
   const startEditing = (latest: BookingRequest) => {
     setFields(fieldsFromItem(latest));
     setExpectedUpdatedAt(latest.updatedAt);
@@ -211,11 +228,21 @@ export function BookingDetailsEditor({ item, onSaved }: {
       </label>
       <label>
         Preferred venue (optional)
-        <input
+        <select
           value={fields.venue}
-          maxLength={MAX_PREFERRED_VENUE_LOCATION_LENGTH}
+          disabled={venuesLoading || (!venueOptions.length && !venueValue)}
           onChange={(event) => change("venue", event.target.value)}
-        />
+        >
+          <option value="">{venuePlaceholder}</option>
+          {venueValue && !venueInOptions && (
+            <option value={venueValue}>{venueValue} (current)</option>
+          )}
+          {venueOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </label>
       <label>
         Internal notes (optional)
