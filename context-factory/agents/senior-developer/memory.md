@@ -2,6 +2,14 @@
 
 Durable engineering notes for this role. Read and maintain them under the shared [memory policy](../README.md#memory).
 
+## 2026-11-09 — Booking quotation delivery through chat
+
+Sending a quotation writes an administrator message to its booking conversation. Customer acceptance and customer-requested revision write customer messages in the same transaction as the quotation transition. The customer Messages view loads the latest sent or accepted quotation for the linked booking and uses the existing owner-only quotation endpoints for the actions.
+
+**Evidence:** [Quotation service](../../../apps/api/src/services/quotations/quotations.ts) and [Messages workspace](../../../apps/web/src/components/app/messages/MessagesWorkspace.tsx). The root [README](../../../README.md#booking-requests-and-messages) owns the current product behavior.
+
+**Why it matters:** Chat text is an event record for the already-authorized quotation transition. It does not change package content, quotation totals, booking status, confirmation, or availability.
+
 ## 2026-11-07 — Private booking packages and quotation media
 
 Private custom packages use the existing package/canvas system and are managed through their owning booking. Quotation snapshots retain offered media and assigned-service revisions; cleanup and authorization must account for those historical references. Capture focus targets before disabling asynchronous editor triggers.

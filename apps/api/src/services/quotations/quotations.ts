@@ -3,6 +3,7 @@ import type { BookingRequests, DB, Quotations } from "../../db/types.js";
 import type { QuotationItemInput, QuotationStatus } from "../../controllers/quotations/schemas.js";
 import { createAuditEventData } from "../../data/audit/audit-events.js";
 import { lockBookingRequestData } from "../../data/booking-requests/booking-requests.js";
+import { createBookingMessageData } from "../../data/messages/create-message.js";
 import { createQuotationData, findBookingData, findQuotationData, listQuotationItemsData, listQuotationsData, lockQuotationData, nextQuotationVersionData, replaceQuotationItemsData, updateQuotationData } from "../../data/quotations/quotations.js";
 
 import { readPackageSectionsData } from "../../data/packages/catalog-page.js";
@@ -54,6 +55,7 @@ async function lockQuoteAndBooking(trx: Transaction<DB>, id: string) {
 const error = (message: string, status: 400 | 403 | 404 | 409) => ({ message, status });
 const total = (baseAmountMinor: number, items: QuotationItemInput[]) => baseAmountMinor + items.reduce((sum, item) => sum + (item.direction === "add" ? item.amountMinor : -item.amountMinor), 0);
 const itemRows = (quotationId: string, items: QuotationItemInput[]) => items.map((item, index) => ({ quotation_id: quotationId, direction: item.direction, kind: item.kind, description: item.description, amount_minor: item.amountMinor, service_id: item.serviceId ?? null, sort_order: index }));
+const formatPesos = (amountMinor: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(amountMinor / 100);
 
 async function quotationDto(db: Kysely<DB>, row: Selectable<Quotations>) {
   const [items, booking] = await Promise.all([listQuotationItemsData(db, [row.id]), db.selectFrom("booking_requests").selectAll().where("id", "=", row.booking_request_id).executeTakeFirstOrThrow()]);
@@ -115,6 +117,7 @@ export async function sendQuotationService(db: Kysely<DB>, id: string, actorId: 
     const sentAt = new Date();
     await trx.updateTable("quotations").set({ status: "superseded", superseded_at: sentAt, updated_at: sentAt }).where("booking_request_id", "=", row.booking_request_id).where("status", "in", ["sent", "accepted"]).execute();
     const updated = await updateQuotationData(trx, id, { status: "sent", sent_at: sentAt, updated_at: sentAt });
+    await createBookingMessageData(trx, booking.id, booking.customer_id, actorId, "admin", `Quotation #${updated.version} is ready for your review. Total: ${formatPesos(updated.total_amount_minor)}. You can accept it or request a revision here.`);
     await createAuditEventData(trx, { actor_id: actorId, action: "quotation.sent", entity_type: "quotation", entity_id: id, metadata: JSON.stringify({ version: row.version }) });
     return quotationDto(trx, updated);
   });
@@ -132,6 +135,7 @@ export async function acceptQuotationService(db: Kysely<DB>, id: string, custome
     const active = await trx.selectFrom("quotations").select("id").where("booking_request_id", "=", row.booking_request_id).where("status", "=", "sent").executeTakeFirst();
     if (!active || active.id !== id) return error("Only the latest sent quotation can be accepted", 409);
     const updated = await updateQuotationData(trx, id, { status: "accepted", accepted_at: new Date(), updated_at: new Date() });
+    await createBookingMessageData(trx, booking.id, booking.customer_id, customerId, "customer", `I accepted quotation #${updated.version}.`);
     await createAuditEventData(trx, { actor_id: customerId, action: "quotation.accepted", entity_type: "quotation", entity_id: id, metadata: JSON.stringify({ bookingRequestId: row.booking_request_id }) });
     return quotationDto(trx, updated);
   });
@@ -155,6 +159,7 @@ export async function requestQuotationRevisionService(db: Kysely<DB>, id: string
     await updateQuotationData(trx, id, { status: "superseded", superseded_at: now, updated_at: now });
     const draft = await createQuotationData(trx, { booking_request_id: row.booking_request_id, version, currency: "PHP", base_amount_minor: base, total_amount_minor: amount, status: "draft", created_by: row.created_by, offered_package_id: pkg.id, offered_package_updated_at: pkg.updated_at, offered_package_terms: JSON.stringify(terms), adjustments_reviewed: false });
     await replaceQuotationItemsData(trx, draft.id, itemRows(draft.id, items));
+    if (!admin) await createBookingMessageData(trx, booking.id, booking.customer_id, actorId, "customer", `I requested a revision for quotation #${row.version}: ${reason}`);
     await createAuditEventData(trx, { actor_id: actorId, action: "quotation.revised", entity_type: "quotation", entity_id: draft.id, metadata: JSON.stringify({ previousQuotationId: id, reason }) });
     return quotationDto(trx, draft);
   });

@@ -493,3 +493,6 @@ export const updateQuotation = (id: string, items: QuotationItemInput[], expecte
 export const sendQuotation = (id: string) => request<{ quotation: Quotation }>(`/admin/quotations/${encodeURIComponent(id)}/send`, {}, undefined, "POST");
 
 export const reviseAdminQuotation = (id: string, reason: string) => request<{ quotation: Quotation }>(`/admin/quotations/${encodeURIComponent(id)}/revision`, { reason });
+export const getMyBookingQuotation = (bookingId: string) => request<{ quotation: Quotation }>(`/booking-requests/${encodeURIComponent(bookingId)}/quotation`);
+export const acceptMyQuotation = (id: string) => request<{ quotation: Quotation }>(`/quotations/${encodeURIComponent(id)}/accept`, {});
+export const requestMyQuotationRevision = (id: string, reason: string) => request<{ quotation: Quotation }>(`/quotations/${encodeURIComponent(id)}/revision`, { reason });

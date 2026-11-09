@@ -1,8 +1,9 @@
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages"
+import { MAX_BOOKING_REASON_LENGTH } from "@event-management/contracts/limits/booking-requests"
 import { Fragment, useEffect, useRef, useState, type SubmitEvent } from "react"
 import { Button, Icon } from "@event-management/ui"
 
-import { getAdminBookingRequest, getMyBookingRequest, type BookingRequest, type ChatConversation, type ChatMessage } from "../../../lib/api"
+import { acceptMyQuotation, ApiError, getAdminBookingRequest, getMyBookingQuotation, getMyBookingRequest, requestMyQuotationRevision, type BookingRequest, type ChatConversation, type ChatMessage, type Quotation } from "../../../lib/api"
 import { BookingDetails } from "../BookingList"
 import { initialsFromName } from "../../../lib/name"
 
@@ -87,7 +88,14 @@ export function MessagesWorkspace({
   const [booking, setBooking] = useState<BookingRequest | null>(null)
   const [bookingLoading, setBookingLoading] = useState(false)
   const [bookingError, setBookingError] = useState("")
+  const [quotation, setQuotation] = useState<Quotation | null>(null)
+  const [quotationLoading, setQuotationLoading] = useState(false)
+  const [quotationError, setQuotationError] = useState("")
+  const [quotationBusy, setQuotationBusy] = useState(false)
+  const [revisionOpen, setRevisionOpen] = useState(false)
+  const [revisionReason, setRevisionReason] = useState("")
   const bookingLoad = useRef(0)
+  const quotationLoad = useRef(0)
   const thread = useRef<HTMLDivElement>(null)
   const sidebar = useRef<HTMLElement>(null)
   const listEnd = useRef<HTMLDivElement>(null)
@@ -109,7 +117,35 @@ export function MessagesWorkspace({
     setBookingError("")
     setBookingLoading(false)
     bookingLoad.current++
+    setQuotation(null)
+    setQuotationError("")
+    setQuotationLoading(false)
+    setRevisionOpen(false)
+    setRevisionReason("")
+    quotationLoad.current++
   }, [activeId])
+
+  useEffect(() => {
+    if (viewerRole !== "customer" || !active?.bookingRequestId) return
+    const request = ++quotationLoad.current
+    setQuotationLoading(true)
+    setQuotationError("")
+    void getMyBookingQuotation(active.bookingRequestId)
+      .then((result) => {
+        if (request === quotationLoad.current) setQuotation(result.quotation)
+      })
+      .catch((cause) => {
+        if (request !== quotationLoad.current) return
+        if (cause instanceof ApiError && cause.status === 404) {
+          setQuotation(null)
+          return
+        }
+        setQuotationError(cause instanceof Error ? cause.message : "Unable to load the quotation.")
+      })
+      .finally(() => {
+        if (request === quotationLoad.current) setQuotationLoading(false)
+      })
+  }, [active?.bookingRequestId, messages.length, viewerRole])
 
   useEffect(() => {
     const element = thread.current
@@ -156,6 +192,37 @@ export function MessagesWorkspace({
       setSendError(cause instanceof Error ? cause.message : "Unable to send your message. Please try again.")
     } finally {
       setSending(false)
+    }
+  }
+
+  async function acceptQuotation() {
+    if (!quotation || quotationBusy) return
+    setQuotationBusy(true)
+    setQuotationError("")
+    try {
+      setQuotation((await acceptMyQuotation(quotation.id)).quotation)
+      onRetry?.()
+    } catch (cause) {
+      setQuotationError(cause instanceof Error ? cause.message : "Unable to accept this quotation.")
+    } finally {
+      setQuotationBusy(false)
+    }
+  }
+
+  async function requestRevision() {
+    if (!quotation || quotationBusy || !revisionReason.trim()) return
+    setQuotationBusy(true)
+    setQuotationError("")
+    try {
+      await requestMyQuotationRevision(quotation.id, revisionReason.trim())
+      setQuotation(null)
+      setRevisionOpen(false)
+      setRevisionReason("")
+      onRetry?.()
+    } catch (cause) {
+      setQuotationError(cause instanceof Error ? cause.message : "Unable to request a revision.")
+    } finally {
+      setQuotationBusy(false)
     }
   }
 
@@ -306,6 +373,42 @@ export function MessagesWorkspace({
               </Fragment>
             )
           })}
+          {isTeam && active?.bookingRequestId && (
+            <section className="chat-quotation" aria-live="polite">
+              {quotationLoading && <p>Loading quotation…</p>}
+              {quotationError && <p className="chat-quotation-error" role="alert">{quotationError}</p>}
+              {quotation && <>
+                <span>Quotation #{quotation.version}</span>
+                <strong>{new Intl.NumberFormat("en-PH", { style: "currency", currency: quotation.currency }).format(quotation.totalAmountMinor / 100)}</strong>
+                <small>{quotation.items.length} adjustment{quotation.items.length === 1 ? "" : "s"} · Base {new Intl.NumberFormat("en-PH", { style: "currency", currency: quotation.currency }).format(quotation.baseAmountMinor / 100)}</small>
+                <ul className="chat-quotation-items">
+                  {quotation.items.map((item) => <li key={item.id}>
+                    <span>{item.description}<small>{item.kind}</small></span>
+                    <strong>{item.direction === "add" ? "+" : "−"}{new Intl.NumberFormat("en-PH", { style: "currency", currency: quotation.currency }).format(item.amountMinor / 100)}</strong>
+                  </li>)}
+                </ul>
+                {!quotation.basisCurrent && quotation.status === "sent" && <p>This quotation needs an updated basis before it can be accepted.</p>}
+                {quotation.status === "accepted" && <p>This quotation has been accepted. The team has been notified in this conversation.</p>}
+                {quotation.status === "sent" && <div className="chat-quotation-actions">
+                  <Button type="button" onClick={() => void acceptQuotation()} disabled={quotationBusy || !quotation.basisCurrent}>
+                    {quotationBusy ? "Saving…" : "Accept quotation"}
+                  </Button>
+                  <Button type="button" variant="secondary" onClick={() => setRevisionOpen((open) => !open)} disabled={quotationBusy}>
+                    Request revision
+                  </Button>
+                </div>}
+                {quotation.status === "sent" && revisionOpen && <div className="chat-quotation-revision">
+                  <label>
+                    Tell the team what needs to change
+                    <textarea value={revisionReason} maxLength={MAX_BOOKING_REASON_LENGTH} onChange={(event) => setRevisionReason(event.target.value)} disabled={quotationBusy} />
+                  </label>
+                  <Button type="button" variant="secondary" onClick={() => void requestRevision()} disabled={quotationBusy || !revisionReason.trim()}>
+                    {quotationBusy ? "Sending…" : "Send revision request"}
+                  </Button>
+                </div>}
+              </>}
+            </section>
+          )}
         </div>
 
         {sendError && (
