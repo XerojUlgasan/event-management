@@ -73,6 +73,7 @@ model Package {
   updatedAt       DateTime          @default(now()) @map("updated_at") @db.Timestamptz(6)
   archivedAt      DateTime?         @map("archived_at") @db.Timestamptz(6)
   name            String
+  slug            String            @unique
   description     String            @default("")
   maxGuests       Int               @map("max_guests")
   price           Int
@@ -89,6 +90,7 @@ model Venue {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
   name String
+  slug String @unique
   location String
   description String
   maxGuests Int? @map("max_guests")
@@ -103,6 +105,7 @@ model Service {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
   name String
+  slug String @unique
   description String
   hourlyRatePesos Int? @map("hourly_rate_pesos")
   publishedAt DateTime @default(now()) @map("published_at") @db.Timestamptz(6)

@@ -156,6 +156,7 @@ async function read(response: Response, status: number): Promise<any> {
 test("requests enforce roles, published package availability, snapshots, ownership and status history", async () => {
   const pkg = await db.insertInto("packages").values({
     name: "Garden",
+    slug: "garden",
     max_guests: 100,
     price: 150_000,
   }).returningAll().executeTakeFirstOrThrow();

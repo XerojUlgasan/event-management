@@ -6,5 +6,5 @@ export const contentSchema = z.object({ name: text, hourlyRatePesos: z.number().
 export type ServiceContent = z.infer<typeof contentSchema>;
 export const serviceInputSchema = contentSchema.strict();
 export const serviceEditSchema = serviceInputSchema.extend({ expectedUpdatedAt: z.string().datetime() }).strict();
-export const adminSchema = z.object({ id: z.string().uuid(), name: z.string(), hourlyRatePesos: z.number().int().nullable(), description: z.string(), imageUrl: z.string().nullable(), sections: sectionsSchema, createdAt: z.string(), updatedAt: z.string(), archivedAt: z.string().nullable(), publishedAt: z.string() });
+export const adminSchema = z.object({ id: z.string().uuid(), slug: z.string(), name: z.string(), hourlyRatePesos: z.number().int().nullable(), description: z.string(), imageUrl: z.string().nullable(), sections: sectionsSchema, createdAt: z.string(), updatedAt: z.string(), archivedAt: z.string().nullable(), publishedAt: z.string() });
 export const publicSchema = adminSchema;

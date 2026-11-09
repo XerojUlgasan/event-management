@@ -1,0 +1,59 @@
+---
+import "../styles/app.css"
+import { Brand, Icon } from "@event-management/ui"
+
+interface Props {
+  title: string
+  description: string
+}
+
+const { title, description } = Astro.props
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <link rel="canonical" href={Astro.url.href} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <div class="public-site">
+      <header class="public-header">
+        <a href="/" aria-label="Clemora home"><Brand /></a>
+        <input id="public-menu" class="public-menu-toggle" type="checkbox" />
+        <nav class="public-nav" aria-label="Primary">
+          <a href="/packages">Packages</a>
+          <a href="/services">Services</a>
+          <a href="/venues">Venues</a>
+          <a href="/about">About us</a>
+        </nav>
+        <div class="header-actions">
+          <a class="button button-link" href="/login">Sign in</a>
+          <a class="button button-primary" href="/login?mode=register">Get started</a>
+          <label class="icon-button mobile-menu" for="public-menu" aria-label="Open navigation">
+            <span class="menu-open"><Icon name="menu" /></span>
+            <span class="menu-close"><Icon name="close" /></span>
+          </label>
+        </div>
+      </header>
+      <main>
+        <slot />
+      </main>
+      <footer class="public-footer">
+        <Brand light />
+        <p>Thoughtful event planning and calm coordination, from first idea to final update.</p>
+        <div>
+          <a href="/packages">Packages</a>
+          <a href="/services">Services</a>
+          <a href="/venues">Venues</a>
+          <a href="/about">About us</a>
+        </div>
+        <span>© 2025 Clemora Catering</span>
+      </footer>
+    </div>
+  </body>
+</html>

@@ -10,5 +10,9 @@ export const uploadCatalogMedia = (file: File) => {
 export const deleteCatalogMedia = (id: string) =>
   request<void>(`/admin/catalog-media/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
 
-export const catalogMediaSrc = (url: string) =>
-  url.startsWith("/v1/") ? new URL(url, `${apiBase()}/`).href : url
+export const catalogMediaSrc = (url: string) => {
+  if (!url.startsWith("/v1/")) return url
+  const base = apiBase()
+  if (!/^https?:\/\//.test(base)) return url
+  return new URL(url, `${base}/`).href
+}

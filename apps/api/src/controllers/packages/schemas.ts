@@ -125,6 +125,7 @@ export const publicSchema = z.object({
   price: priceSchema,
   sections: z.array(sectionSchema),
   id: z.string().uuid(),
+  slug: z.string(),
   description: z.string(),
   imageUrl: z.string().nullable(),
   archivedAt: z.string().nullable(),

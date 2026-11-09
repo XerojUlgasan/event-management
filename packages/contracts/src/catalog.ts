@@ -34,6 +34,7 @@ export type PackageContent = {
 };
 export type CatalogPackage = PackageContent & {
   id: string;
+  slug: string;
   imageUrl: string | null;
   archivedAt: string | null;
   createdAt: string;

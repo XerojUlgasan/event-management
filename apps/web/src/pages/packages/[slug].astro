@@ -1,0 +1,25 @@
+---
+import PublicDocument from "../../layouts/PublicDocument.astro"
+import { PublicPackageDetail } from "../../components/public/PublicPackageDetail"
+import type { PublicPackage } from "../../lib/data/packages"
+import { loadPackage } from "../../lib/server/catalog"
+
+const slug = Astro.params.slug ?? ""
+let item: PublicPackage | null = null
+let unavailable = false
+try {
+  item = await loadPackage(slug)
+} catch {
+  unavailable = true
+}
+if (!unavailable && !item) Astro.response.status = 404
+const title = item ? `${item.name} | Clemora` : "Package not found | Clemora"
+const description = item?.description || "This package is not available."
+---
+
+<PublicDocument title={title} description={description}>
+  <p class="section-back"><a href="/packages">All packages</a></p>
+  {unavailable && <p class="catalog-status" role="alert">The catalog is unavailable right now.</p>}
+  {!unavailable && !item && <p class="catalog-status">This package is not available.</p>}
+  {item && <PublicPackageDetail item={item} />}
+</PublicDocument>

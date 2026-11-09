@@ -1,3 +1,4 @@
+import { catalogSlug } from "@event-management/contracts/catalog-slug";
 import { randomUUID } from "node:crypto";
 import type { Transaction } from "kysely";
 import type { DB } from "./types.js";
@@ -10,7 +11,7 @@ export async function seedSamplePackages(db: Transaction<DB>) {
   ];
   let count = 0;
   for (const sample of samples) {
-    const row = await db.insertInto("packages").values({ id: sample.id, name: sample.name, description: `${sample.heading} ${sample.text}`, max_guests: sample.guests, price: sample.price }).onConflict(c => c.column("id").doNothing()).returning("id").executeTakeFirst();
+    const row = await db.insertInto("packages").values({ id: sample.id, name: sample.name, slug: catalogSlug(sample.name), description: `${sample.heading} ${sample.text}`, max_guests: sample.guests, price: sample.price }).onConflict(c => c.column("id").doNothing()).returning("id").executeTakeFirst();
     if (!row) continue;
     const pageId = randomUUID(), sectionId = randomUUID(), mediaId = randomUUID();
     await db.insertInto("catalog_pages").values({ id: pageId, package_id: row.id }).execute();

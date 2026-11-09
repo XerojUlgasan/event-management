@@ -1,0 +1,25 @@
+---
+import PublicDocument from "../../layouts/PublicDocument.astro"
+import { PackageCards } from "../../components/public/CatalogCards"
+import { loadPackages } from "../../lib/server/catalog"
+import type { PublicPackage } from "../../lib/data/packages"
+
+let packages: PublicPackage[] = []
+let unavailable = false
+try {
+  packages = await loadPackages()
+} catch {
+  unavailable = true
+}
+---
+
+<PublicDocument title="Packages | Clemora" description="Published event packages from Clemora.">
+  <section class="section">
+    <span class="eyebrow">The Clemora collection</span>
+    <h1 class="section-title small">All packages</h1>
+    <p>Explore packages for your gathering.</p>
+    {unavailable && <p class="catalog-status" role="alert">The catalog is unavailable right now.</p>}
+    {!unavailable && packages.length === 0 && <p class="catalog-status">No packages are published yet.</p>}
+    {packages.length > 0 && <PackageCards items={packages} />}
+  </section>
+</PublicDocument>

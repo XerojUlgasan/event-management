@@ -6,11 +6,12 @@ export function updatePackageData(
   db: Transaction<DB>,
   id: string,
   content: Content,
+  slug: string,
   now: Date,
 ) {
   return db
     .updateTable("packages")
-    .set({ ...packageColumns(content), updated_at: now })
+    .set({ ...packageColumns(content, slug), updated_at: now })
     .where("id", "=", id)
     .returningAll()
     .executeTakeFirstOrThrow();

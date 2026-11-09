@@ -1,3 +1,4 @@
+import { catalogSlug } from "@event-management/contracts/catalog-slug";
 import "dotenv/config";
 import { sql } from "kysely";
 import { db } from "./client.js";
@@ -47,7 +48,7 @@ try {
     let venueCount = 0;
     for (const venue of venues) {
       const inserted = await db.insertInto("venues")
-        .values({ ...venue, max_guests: null, archived_at: new Date() })
+        .values({ ...venue, slug: catalogSlug(venue.name), max_guests: null, archived_at: new Date() })
         .onConflict((conflict) => conflict.column("id").doNothing())
         .returning("id").executeTakeFirst();
       if (inserted) venueCount++;

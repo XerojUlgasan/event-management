@@ -1,0 +1,25 @@
+---
+import PublicDocument from "../../layouts/PublicDocument.astro"
+import { PublicVenueDetail } from "../../components/public/PublicCatalogDetail"
+import type { Venue } from "../../lib/data/venues"
+import { loadVenue } from "../../lib/server/catalog"
+
+const slug = Astro.params.slug ?? ""
+let item: Venue | null = null
+let unavailable = false
+try {
+  item = await loadVenue(slug)
+} catch {
+  unavailable = true
+}
+if (!unavailable && !item) Astro.response.status = 404
+const title = item ? `${item.name} | Clemora` : "Venue not found | Clemora"
+const description = item?.description || "This venue is not available."
+---
+
+<PublicDocument title={title} description={description}>
+  <p class="section-back"><a href="/venues">All venues</a></p>
+  {unavailable && <p class="catalog-status" role="alert">The catalog is unavailable right now.</p>}
+  {!unavailable && !item && <p class="catalog-status">This venue is not available.</p>}
+  {item && <PublicVenueDetail item={item} />}
+</PublicDocument>

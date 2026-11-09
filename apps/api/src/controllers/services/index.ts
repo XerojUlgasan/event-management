@@ -6,6 +6,10 @@ import {
   listPublicServicesRouteHandler,
 } from "./list-public-services.js";
 import {
+  getPublicServiceBySlugRoute,
+  getPublicServiceBySlugRouteHandler,
+} from "./get-public-service-by-slug.js";
+import {
   getPublicServiceRoute,
   getPublicServiceRouteHandler,
 } from "./get-public-service.js";
@@ -50,6 +54,7 @@ const admin = requireSystemAdmin;
 routes.use("/admin/services", requireSession, admin);
 routes.use("/admin/services/*", requireSession, admin);
 routes.openapi(listPublicServicesRoute, listPublicServicesRouteHandler);
+routes.openapi(getPublicServiceBySlugRoute, getPublicServiceBySlugRouteHandler);
 routes.openapi(getPublicServiceRoute, getPublicServiceRouteHandler);
 routes.openapi(listAdminServicesRoute, listAdminServicesRouteHandler);
 routes.openapi(getAdminServiceRoute, getAdminServiceRouteHandler);

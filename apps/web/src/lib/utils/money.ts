@@ -5,3 +5,9 @@ export function pesosToCentavos(pesos: number) {
 export function centavosToPesos(amountMinor: number) {
   return amountMinor / 100
 }
+
+export function priceLabel(price: { amountMinor: number } | null) {
+  return price
+    ? `${new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(centavosToPesos(price.amountMinor))} total`
+    : "Price on request"
+}

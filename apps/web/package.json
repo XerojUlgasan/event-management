@@ -9,6 +9,7 @@
     "check": "astro check"
   },
   "dependencies": {
+    "@astrojs/node": "^11.1.11",
     "@astrojs/react": "^7.1.0",
     "@event-management/contracts": "workspace:*",
     "@event-management/theme": "workspace:*",

@@ -11,6 +11,7 @@ export type ServiceContent = {
 export type PublicService = ServiceContent & {
   imageUrl: string | null
   id: string
+  slug: string
   archivedAt: string | null
   createdAt: string
   updatedAt: string

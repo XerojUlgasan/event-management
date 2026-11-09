@@ -8,6 +8,7 @@ import {
 } from "../../data/packages/catalog-page.js";
 import { packageDto } from "./package-response.js";
 import { error } from "./package-rules.js";
+import { duplicateTitle, reserveCatalogTitle } from "../../utils/catalog-title.js";
 export async function createPackageService(
   db: Kysely<DB>,
   content: Content,
@@ -15,12 +16,16 @@ export async function createPackageService(
 ) {
   try {
     return await db.transaction().execute(async (trx) => {
+      const title = await reserveCatalogTitle(trx, "packages", content.name);
+      if (!title) return error("A package with this title already exists", 409);
       const now = new Date();
-      const row = await createPackageData(trx, content, now);
+      const row = await createPackageData(trx, content, title.slug, now);
       await replacePackageSectionsData(trx, row.id, content, actorId, now);
       return packageDto(trx, row);
     });
   } catch (cause) {
+    const duplicate = duplicateTitle(cause, "A package with this title already exists");
+    if (duplicate) return duplicate;
     if (cause instanceof InvalidPackageMedia) return error(cause.message, 400);
     throw cause;
   }

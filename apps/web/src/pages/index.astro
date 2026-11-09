@@ -1,21 +1,100 @@
 ---
-import App from "../components/app/App";
-import "../styles/app.css";
+import PublicDocument from "../layouts/PublicDocument.astro"
+import { PackageCards, ServiceCards, VenueCards } from "../components/public/CatalogCards"
+import { ActionLink, Badge } from "@event-management/ui"
+import { loadPackages, loadServices, loadVenues } from "../lib/server/catalog"
+import type { PublicPackage } from "../lib/data/packages"
+import type { PublicService } from "../lib/data/services"
+import type { Venue } from "../lib/data/venues"
+
+let packages: PublicPackage[] = []
+let services: PublicService[] = []
+let venues: Venue[] = []
+let unavailable = false
+try {
+  ;[packages, services, venues] = await Promise.all([loadPackages(3), loadServices(3), loadVenues(3)])
+} catch {
+  unavailable = true
+}
+const description = "Clemora connects event planning, customer bookings, and catering operations in one workspace."
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="Clemora connects event planning, customer bookings, and catering operations in one workspace."
-    />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <title>Clemora | Event management</title>
-  </head>
-  <body>
-    <App client:only="react" />
-  </body>
-</html>
+<PublicDocument title="Clemora | Event management" description={description}>
+  <section class="hero">
+    <div class="hero-image" aria-label="Elegant outdoor catered dinner table"></div>
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <Badge tone="cream">Events, beautifully managed</Badge>
+      <div class="display-title">Gather well.<br />We’ll handle the rest.</div>
+      <p>Plan celebrations, team gatherings, and milestone occasions with clear packages, shared updates, and seamless coordination.</p>
+      <div class="hero-actions">
+        <a class="button button-light" href="/about">Explore planning <span aria-hidden="true">→</span></a>
+        <a class="button button-ghost" href="/packages">Explore packages</a>
+      </div>
+    </div>
+    <div class="hero-trust">
+      <div><strong>4.9</strong><span>average guest rating</span></div>
+      <div><strong>420+</strong><span>events served with care</span></div>
+      <div><strong>12 yrs</strong><span>of trusted experience</span></div>
+    </div>
+  </section>
+
+  <section class="packages section" id="packages">
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">Curated experiences</span>
+        <h2 class="section-title small">A thoughtful place to begin</h2>
+      </div>
+      <p>Every package can be tailored to your menu, setting, guest count, and service needs.</p>
+    </div>
+    {unavailable && <p class="catalog-status" role="alert">The catalog is unavailable right now.</p>}
+    {!unavailable && packages.length === 0 && <p class="catalog-status">No packages are published yet.</p>}
+    {packages.length > 0 && <PackageCards items={packages} />}
+    <a class="button button-secondary catalog-view-more" href="/packages">View more packages <span aria-hidden="true">↗</span></a>
+  </section>
+
+  <section class="public-services section" id="services" aria-labelledby="services-title">
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">Make it yours</span>
+        <h2 class="section-title small" id="services-title">Explore our services</h2>
+      </div>
+      <p>Discover services for your celebration and discuss the details with our team.</p>
+    </div>
+    {!unavailable && services.length === 0 && <p class="catalog-status">Our service catalog is being prepared. Please check back soon.</p>}
+    {services.length > 0 && <ServiceCards items={services} />}
+    <a class="button button-secondary catalog-view-more" href="/services">View more services <span aria-hidden="true">↗</span></a>
+  </section>
+
+  <section class="public-venues section" id="venues" aria-labelledby="venues-title">
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">Find your setting</span>
+        <h2 class="section-title small" id="venues-title">Explore our venues</h2>
+      </div>
+      <p>Discover published venues and their details. Availability is confirmed by our team when reviewing your request.</p>
+    </div>
+    {!unavailable && venues.length === 0 && <p class="catalog-status">No venues are available yet.</p>}
+    {venues.length > 0 && <VenueCards items={venues} />}
+    <a class="button button-secondary catalog-view-more" href="/venues">View more venues <span aria-hidden="true">↗</span></a>
+  </section>
+
+  <section class="intro section" id="intro">
+    <div>
+      <span class="eyebrow">Your occasion, considered</span>
+      <div class="section-title">More than a checklist.<br />One place for every event detail.</div>
+    </div>
+    <div class="intro-copy">
+      <p>Clemora connects package discovery, booking requests, schedules, team updates, and event progress in one simple experience.</p>
+      <ActionLink href="/about">How Clemora works</ActionLink>
+    </div>
+  </section>
+
+  <section class="cta section">
+    <div>
+      <span class="eyebrow light">Let’s create something memorable</span>
+      <div class="section-title">Your table is waiting.</div>
+    </div>
+    <a class="button button-light" href="/about">Tell us about your event <span aria-hidden="true">→</span></a>
+  </section>
+</PublicDocument>

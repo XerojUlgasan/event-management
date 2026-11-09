@@ -18,6 +18,7 @@ function isCoordinator(staffRole: string | null) {
 
 export function StaffWorkspaceShell({
   profile,
+  path,
   onSignOut,
 }: {
   profile: {
@@ -25,10 +26,11 @@ export function StaffWorkspaceShell({
     email: string
     staffRole: string | null
   }
+  path: string
   onSignOut: () => void
 }) {
   const coordinator = isCoordinator(profile.staffRole)
-  const [tab, setTab] = useState<StaffTab>("events")
+  const tab: StaffTab = path === "/app/checklist" ? "checklist" : "events"
   const [accountOpen, setAccountOpen] = useState(false)
   const accountRef = useRef<HTMLDivElement>(null)
 
@@ -115,7 +117,7 @@ export function StaffWorkspaceShell({
         <Button
           variant="light"
           className={`sw-nav-item ${tab === "events" ? "sw-nav-active" : ""}`}
-          onClick={() => setTab("events")}
+          onClick={() => { window.location.assign("/app/events") }}
           aria-current={tab === "events" ? "page" : undefined}
         >
           <Icon name="calendar" size={22} />
@@ -126,7 +128,7 @@ export function StaffWorkspaceShell({
           <Button
             variant="light"
             className={`sw-nav-item ${tab === "checklist" ? "sw-nav-active" : ""}`}
-            onClick={() => setTab("checklist")}
+            onClick={() => { window.location.assign("/app/checklist") }}
             aria-current={tab === "checklist" ? "page" : undefined}
           >
             <Icon name="clipboard" size={22} />

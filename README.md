@@ -30,7 +30,7 @@ Before implementing dependent work, confirm intake fields and real catalog conte
 
 | Area | Implemented boundary |
 | --- | --- |
-| Website and catalogs | `/` shows packages, services, and venues in that order. View more opens paged catalog overlays; cards open detail previews. All three catalogs persist in PostgreSQL and support direct saves, canvas content, and archives. |
+| Website and catalogs | `/`, `/about`, `/packages`, `/services`, `/venues`, and their `/{slug}` pages are server-rendered HTML. Cards and View more are links. A catalog title is unique, and its slug is the public address. Book now sits under the package price and guest count and continues at `/login`. `/login` and `/app` stay client-rendered; catalog overlays remain inside `/app`. All three catalogs persist in PostgreSQL and support direct saves, canvas content, and archives. |
 | Identity | Local email/password and optional Firebase sign-in share database profiles, roles, and server-side sessions. |
 | Booking requests | Signed-in customers submit inquiries from published packages. PostgreSQL stores package snapshots, request details, status history, and a linked conversation. Signed-out drafts resume after sign-in for explicit review and submission. |
 | Messages | Customer-to-admin conversations persist in PostgreSQL, including request-linked conversations, unread counts, and read state. |
@@ -63,7 +63,7 @@ docs/                  Seed guide and interview summary
 transcriptions/        Individual and combined interview transcripts
 ```
 
-Astro serves the HTML shell in `apps/web/src/pages/index.astro` and provides frontend development and build tooling. The shell mounts `components/app/App.tsx`; React owns the application screens, authentication state, and in-page view switching. Shared UI uses atomic layers and exports from `packages/ui/src/index.ts`. Theme tokens live in `packages/theme/src/theme.css`; app styles live in `apps/web/src/styles/`.
+Astro runs as a Node server. Public pages under `apps/web/src/pages` are rendered on each request. `/login` and `/app` mount `components/app/App.tsx` with `client:only="react"`; React owns authentication and the role workspaces. `GET /me` chooses the admin, staff, or customer shell, and each role keeps only its own `/app` paths. Shared UI uses atomic layers and exports from `packages/ui/src/index.ts`. Theme tokens live in `packages/theme/src/theme.css`; app styles live in `apps/web/src/styles/`.
 
 API routes are mounted under `/v1` in `apps/api/src/app.ts`. HTTP contracts and handlers belong in `controllers/<domain>/`, business operations in `services/<domain>/`, and Kysely queries in `data/<domain>/`. Shared helpers belong in `utils/`. The running API exposes its OpenAPI contract at `/openapi.json`.
 

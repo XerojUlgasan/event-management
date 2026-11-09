@@ -1,3 +1,4 @@
+import { catalogSlug } from "@event-management/contracts/catalog-slug";
 import { createHash } from "node:crypto";
 import type { Transaction } from "kysely";
 import type { DB } from "./types.js";
@@ -59,7 +60,7 @@ export async function seedDemo(db: SeedDb) {
 
   for (const venue of venues) {
     const inserted = await db.insertInto("venues").values({
-      id: seedId(`venue:${venue.key}`), name: venue.name, location: venue.location,
+      id: seedId(`venue:${venue.key}`), name: venue.name, slug: catalogSlug(venue.name), location: venue.location,
       description: venue.description.replace("venue draft", "venue"),
       max_guests: venue.maxGuests,
       created_at: now, updated_at: now, published_at: now,

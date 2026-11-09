@@ -11,6 +11,8 @@ export const getPackages = (page?: { limit: number; offset?: number }) =>
   request<{ packages: PublicPackage[]; nextOffset: number | null }>(`/packages${pageQuery(page)}`)
 export const getPackage = (id: string) =>
   request<PublicPackage>(`/packages/${encodeURIComponent(id)}`)
+export const getPackageBySlug = (slug: string) =>
+  request<PublicPackage>(`/packages/slug/${encodeURIComponent(slug)}`)
 export const getAdminPackages = () => request<{ packages: AdminPackage[] }>("/admin/packages")
 export const getAdminPackage = (id: string) =>
   request<AdminPackage>(`/admin/packages/${encodeURIComponent(id)}`)

@@ -10,5 +10,6 @@ export const errors = {
   409: { content: json(errorSchema), description: "Package state conflict" },
 };
 export const idParams = z.object({ id: z.string().uuid() });
+export const slugParams = z.object({ slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/) });
 export const body = <T extends z.ZodType>(schema: T) => ({ required: true as const, content: json(schema) });
 export const result = { content: json(adminSchema), description: "Saved package" };

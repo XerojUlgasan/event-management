@@ -13,6 +13,7 @@ export async function packageDto(
   const widgets = sections.flatMap((section) => section.widgets);
   return {
     id: row.id,
+    slug: row.slug,
     name: row.name,
     maxGuests: row.max_guests,
     price: { kind: "fixed", currency: "PHP", amountMinor: row.price * 100 },

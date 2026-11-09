@@ -7,7 +7,7 @@ import { Brand, Button, FormField, Icon } from "@event-management/ui";
 
 import { firebaseConfigured, useAuth } from "../../lib/auth";
 
-export function AuthPage({ onBack }: { onBack: () => void }) {
+export function AuthPage({ onBack, initialMode = "signin" }: { onBack: () => void; initialMode?: "signin" | "register" }) {
   const {
     signIn,
     signUp,
@@ -17,7 +17,7 @@ export function AuthPage({ onBack }: { onBack: () => void }) {
     clearError,
   } = useAuth();
   const [useFirebase, setUseFirebase] = useState(false);
-  const [mode, setMode] = useState<"signin" | "register">("signin");
+  const [mode, setMode] = useState<"signin" | "register">(initialMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

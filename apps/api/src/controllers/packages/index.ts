@@ -2,6 +2,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import { listPublicPackagesRoute, listPublicPackagesRouteHandler } from "./list-public-packages.js";
+import { getPublicPackageBySlugRoute, getPublicPackageBySlugRouteHandler } from "./get-public-package-by-slug.js";
 import { getPublicPackageRoute, getPublicPackageRouteHandler } from "./get-public-package.js";
 import { listAdminPackagesRoute, listAdminPackagesRouteHandler } from "./list-admin-packages.js";
 import { getAdminPackageRoute, getAdminPackageRouteHandler } from "./get-admin-package.js";
@@ -21,6 +22,7 @@ routes.use("/admin/packages", requireSession, admin);
 routes.use("/admin/packages/*", requireSession, admin);
 
 routes.openapi(listPublicPackagesRoute, listPublicPackagesRouteHandler);
+routes.openapi(getPublicPackageBySlugRoute, getPublicPackageBySlugRouteHandler);
 routes.openapi(getPublicPackageRoute, getPublicPackageRouteHandler);
 routes.openapi(listAdminPackagesRoute, listAdminPackagesRouteHandler);
 routes.openapi(getAdminPackageRoute, getAdminPackageRouteHandler);

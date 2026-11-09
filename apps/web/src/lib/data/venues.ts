@@ -11,6 +11,7 @@ export type VenueContent = {
 }
 export type Venue = VenueContent & {
   id: string
+  slug: string
   publishedAt: string
   createdAt: string
   updatedAt: string

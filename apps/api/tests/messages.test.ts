@@ -99,6 +99,7 @@ before(async () => {
 
   const pkg = await db.insertInto("packages").values({
     name: "Garden Wedding",
+    slug: "garden-wedding",
     max_guests: 100,
     price: 150_000,
   }).returning("id").executeTakeFirstOrThrow();

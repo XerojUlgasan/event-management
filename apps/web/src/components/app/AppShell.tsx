@@ -23,6 +23,7 @@ import { ReportsPage } from "./pages/ReportsPage"
 import { StaffCustomersPage } from "./pages/StaffCustomersPage"
 import { Sidebar } from "./Sidebar"
 import { SignInMethods } from "./SignInMethods"
+import { adminPaths } from "./routes"
 
 function AccountMenu({ name, sidebar = false, onSettings, onSignOut }: {
   name: string
@@ -79,17 +80,19 @@ function AccountMenu({ name, sidebar = false, onSettings, onSignOut }: {
 export function AppShell({
   profile,
   onSignOut,
+  active,
 }: {
   profile: { displayName: string | null; email: string }
   onSignOut: () => void
+  active: NavKey
 }) {
   const name = profile.displayName ?? profile.email
-  const [active, setActive] = useState<NavKey>("Overview")
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const go = (key: NavKey) => { window.location.assign(adminPaths[key]) }
 
   const body = useMemo(() => {
     if (active === "Overview")
-      return <Overview firstName={firstName(name)} onNavigate={setActive} />
+      return <Overview firstName={firstName(name)} onNavigate={go} />
     if (active === "Bookings") return <BookingsPage />
     if (active === "Messages") return <MessagesPage />
     if (active === "StaffCustomers") return <StaffCustomersPage />
@@ -124,11 +127,11 @@ export function AppShell({
         <>
           <Sidebar
             active={active}
-            onNavigate={setActive}
+            onNavigate={go}
             collapsed={!sidebarOpen}
             onClose={() => setSidebarOpen(false)}
             accountMenu={<AccountMenu name={name} sidebar onSettings={() => {
-              setActive("Administration")
+              go("Administration")
               setSidebarOpen(false)
             }} onSignOut={onSignOut} />}
           />
@@ -151,7 +154,7 @@ export function AppShell({
             <Icon name="menu" />
           </Button>
           <div className="app-header-actions">
-            <AccountMenu name={name} onSettings={() => setActive("Administration")} onSignOut={onSignOut} />
+            <AccountMenu name={name} onSettings={() => go("Administration")} onSignOut={onSignOut} />
           </div>
         </header>
       }

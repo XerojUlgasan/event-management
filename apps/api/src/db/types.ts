@@ -118,6 +118,7 @@ export interface Packages {
   max_guests: number;
   name: string;
   price: number;
+  slug: string;
   published_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }
@@ -130,6 +131,7 @@ export interface Services {
   id: Generated<string>;
   name: string;
   published_at: Generated<Timestamp>;
+  slug: string;
   updated_at: Generated<Timestamp>;
 }
 
@@ -162,6 +164,7 @@ export interface Venues {
   max_guests: number | null;
   name: string;
   published_at: Generated<Timestamp>;
+  slug: string;
   updated_at: Generated<Timestamp>;
 }
 

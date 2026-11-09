@@ -1,39 +1,62 @@
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { Brand } from "@event-management/ui"
 
 import { AuthProvider, useAuth } from "../../lib/auth"
-import type { View } from "./types"
 import { AppShell } from "./AppShell"
 import { AuthPage } from "./AuthPage"
 import { CustomerDashboard } from "./customer/CustomerDashboard"
-import { BookingRequestDialog } from "./BookingRequest"
-import { clearBookingDraft, readBookingDraft } from "../../lib/services/booking-draft"
 import { StaffWorkspaceShell } from "./staff/StaffWorkspaceShell"
-import { PublicSite } from "./PublicSite"
+import { adminKey, appHome, customerPaths, isStaffWorkspace, isSystemAdmin, normalizePath } from "./routes"
 
-export default function App() {
+function isCoordinator(staffRole: string | null) {
+  if (!staffRole) return false
+  const role = staffRole.toLowerCase()
+  return role.includes("coordinator") || role.includes("head waiter")
+}
+
+function allowedPath(profile: { role: string; staffRole: string | null }, path: string) {
+  if (profile.role === "customer") return (Object.values(customerPaths) as string[]).includes(path)
+  if (isStaffWorkspace(profile)) {
+    if (path === "/app/events") return true
+    return path === "/app/checklist" && isCoordinator(profile.staffRole)
+  }
+  return adminKey(path) !== null
+}
+
+export default function App({ initialPath, initialSearch }: { initialPath: string; initialSearch: string }) {
   return (
     <AuthProvider>
-      <AppContent />
+      <Workspace path={normalizePath(initialPath)} search={initialSearch} />
     </AuthProvider>
   )
 }
 
-function AppContent() {
+function Workspace({ path, search }: { path: string; search: string }) {
   const { status, profile, signOut } = useAuth()
-  const [view, setView] = useState<View>(() => new URLSearchParams(window.location.search).get("booking") === "resume" ? "login" : "public")
-  const [draft, setDraft] = useState(() => new URLSearchParams(window.location.search).get("booking") === "resume" ? readBookingDraft() : null)
+  const mode = new URLSearchParams(search).get("mode") === "register" ? "register" : "signin"
 
   useEffect(() => {
-    if (status === "signed-in" && profile) {
-      setView(profile.role !== "customer" ? "app" : "customer")
+    if (status !== "signed-in" || !profile) return
+    const home = appHome(profile)
+    const params = new URLSearchParams(search)
+    const book = params.get("book")
+    const resume = params.get("booking") === "resume"
+    if (path === "/login") {
+      if (profile.role === "customer" && (book || resume)) {
+        const next = new URLSearchParams()
+        if (book) next.set("book", book)
+        if (resume) next.set("booking", "resume")
+        window.location.replace(`/app/home?${next}`)
+      } else window.location.replace(home)
+      return
     }
-  }, [status, profile])
+    if (path === "/app" || !allowedPath(profile, path)) window.location.replace(home)
+  }, [status, profile, path, search])
 
   const handleSignOut = async () => {
     try {
       await signOut()
-      setView("login")
+      window.location.assign("/login")
     } catch {
       // Keep the current account visible until the API confirms logout.
     }
@@ -48,34 +71,42 @@ function AppContent() {
     )
   }
 
-  if (status === "signed-in" && profile) {
-    const displayName = profile.displayName ?? profile.email
-
-    if (view === "login" || view === "app" || view === "customer") {
-      if (profile.role === "staff" || (profile.role === "admin" && profile.staffRole !== "System Administrator")) return <StaffWorkspaceShell profile={profile} onSignOut={handleSignOut} />
-      if (profile.role === "admin") {
-        return (
-          <AppShell
-            profile={profile}
-            onSignOut={handleSignOut}
-          />
-        )
-      }
-
+  if (status !== "signed-in" || !profile) {
+    if (path !== "/login") {
+      const next = `${path}${search}`
+      window.location.replace(`/login?next=${encodeURIComponent(next)}`)
       return (
-        <> <CustomerDashboard
-          onPublic={() => setView("public")}
-          userName={displayName}
-          userEmail={profile.email}
-          onSignOut={handleSignOut}
-        />{draft && <BookingRequestDialog item={draft.item} resume onClose={() => { setDraft(null); window.history.replaceState({}, "", "/") }} />}</>
+        <div className="auth-splash">
+          <Brand />
+          <span>Loading your workspace…</span>
+        </div>
       )
     }
+    return <AuthPage initialMode={mode} onBack={() => { window.location.assign("/") }} />
   }
 
-  if (view === "login" || view === "app" || view === "customer") {
-    return <AuthPage onBack={() => { clearBookingDraft(); setDraft(null); window.history.replaceState({}, "", "/"); setView("public") }} />
+  if (path === "/login" || path === "/app" || !allowedPath(profile, path)) {
+    return (
+      <div className="auth-splash">
+        <Brand />
+        <span>Loading your workspace…</span>
+      </div>
+    )
   }
 
-  return <PublicSite onEnterCustomer={() => setView("login")} />
+  if (isStaffWorkspace(profile)) return <StaffWorkspaceShell profile={profile} path={path} onSignOut={handleSignOut} />
+  if (isSystemAdmin(profile)) {
+    const active = adminKey(path)
+    return active ? <AppShell profile={profile} active={active} onSignOut={handleSignOut} /> : null
+  }
+  return (
+    <CustomerDashboard
+      path={path}
+      search={search}
+      onPublic={() => { window.location.assign("/") }}
+      userName={profile.displayName ?? profile.email}
+      userEmail={profile.email}
+      onSignOut={handleSignOut}
+    />
+  )
 }

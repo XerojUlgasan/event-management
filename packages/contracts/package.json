@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     "./catalog": "./src/catalog.ts",
+    "./catalog-slug": "./src/catalog-slug.ts",
     "./limits/images": "./src/limits/images.ts",
     "./limits/videos": "./src/limits/videos.ts",
     "./limits/messages": "./src/limits/messages.ts",

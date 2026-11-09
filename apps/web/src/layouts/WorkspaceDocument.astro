@@ -1,0 +1,18 @@
+---
+import "../styles/app.css"
+import App from "../components/app/App.tsx"
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>Clemora</title>
+  </head>
+  <body>
+    <App client:only="react" initialPath={Astro.url.pathname} initialSearch={Astro.url.search} />
+  </body>
+</html>

@@ -18,10 +18,13 @@ import {
 import { photos } from "../data"
 import { BookingList } from "./BookingList"
 import { PackageCatalog } from "../PackageCatalog"
+import { BookingRequestDialog } from "../BookingRequest"
 import { initialsFromName } from "../../../lib/utils/name"
 import { SignInMethods } from "../SignInMethods"
 import { MessagesWorkspace } from "../messages/MessagesWorkspace"
 import { mergeThread } from "../../../lib/services/merge-thread"
+import { readBookingDraft } from "../../../lib/services/booking-draft"
+import { getPackageBySlug, type PublicPackage } from "../../../lib/data/packages"
 import {
   createMyConversation,
   getMyConversations,
@@ -33,25 +36,25 @@ import {
   type ChatThread,
 } from "../../../lib/data/messages"
 
-type CustomerTab =
-  | "Home"
-  | "My events"
-  | "Packages"
-  | "Messages"
-  | "Profile"
+import { customerPaths, customerTab, type CustomerTab } from "../routes"
 
 export function CustomerDashboard({
+  path,
+  search,
   onPublic,
   userName,
   userEmail,
   onSignOut,
 }: {
+  path: string
+  search: string
   onPublic: () => void
   userName: string
   userEmail: string
   onSignOut: () => void
 }) {
-  const [tab, setTab] = useState<CustomerTab>("Home")
+  const tab = customerTab(path)
+  const go = (next: CustomerTab) => { window.location.assign(customerPaths[next]) }
   const [messageOpen, setMessageOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement>(null)
@@ -64,7 +67,9 @@ export function CustomerDashboard({
   const [messageThread, setMessageThread] = useState<ChatThread | null>(null)
   const [messageConversations, setMessageConversations] = useState<ChatConversation[]>([])
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
-  const [pendingBookingReference, setPendingBookingReference] = useState<string | null>(null)
+  const pendingBookingReference = new URLSearchParams(search).get("request")
+  const [bookingItem, setBookingItem] = useState<PublicPackage | null>(() => new URLSearchParams(search).get("booking") === "resume" ? readBookingDraft()?.item ?? null : null)
+  const [bookingResume, setBookingResume] = useState(() => new URLSearchParams(search).get("booking") === "resume")
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesError, setMessagesError] = useState("")
   const [newChatBusy, setNewChatBusy] = useState(false)
@@ -79,6 +84,14 @@ export function CustomerDashboard({
       if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    const slug = new URLSearchParams(search).get("book")
+    if (!slug) return
+    let active = true
+    getPackageBySlug(slug).then(item => { if (active) { setBookingItem(item); setBookingResume(false) } }).catch(() => { if (active) setBookingItem(null) })
+    return () => { active = false }
+  }, [search])
 
   const notify = (message: string, tone: ToastTone = "success") => {
     if (!mountedRef.current) return
@@ -223,7 +236,7 @@ export function CustomerDashboard({
       setMessageDraft("")
       setMessageOpen(false)
       setConversationOpen(true)
-      setTab("Messages")
+      go("Messages")
       notify("Message sent. Our team is notified and will reply here.")
     } catch (cause) {
       setDialogError(cause instanceof Error ? cause.message : "Unable to send your message.")
@@ -269,7 +282,7 @@ export function CustomerDashboard({
               variant="plain"
               className={tab === item.label ? "active" : ""}
               key={item.label}
-              onClick={() => setTab(item.label)}
+              onClick={() => go(item.label)}
             >
               <Icon name={item.icon} size={16} />
               {item.label}
@@ -294,7 +307,7 @@ export function CustomerDashboard({
             </Button>
             {accountMenuOpen && (
               <div className="account-menu" id="customer-account-menu">
-                <Button variant="plain" type="button" onClick={() => { setTab("Profile"); setAccountMenuOpen(false) }}>
+                <Button variant="plain" type="button" onClick={() => { go("Profile"); setAccountMenuOpen(false) }}>
                   Account settings
                 </Button>
                 <Button variant="plain" type="button" onClick={onSignOut}>Sign out</Button>
@@ -308,11 +321,11 @@ export function CustomerDashboard({
         {tab === "Home" && (
           <div className="customer-content">
             <section className="customer-welcome"><div><span className="eyebrow">Your Clemora workspace</span><h1 className="page-title">Welcome back, {userName}</h1><p>Plan an event and keep in touch with our team.</p></div></section>
-            <section className="customer-event-hero"><div className="customer-event-photo"><img src={photos.wedding} alt="Elegant event table setting" /></div><div className="customer-event-summary"><div className="event-kicker">Your next celebration</div><h2 className="customer-event-title">Let’s bring your plans together</h2><p>Explore our packages, share your event details, and follow your request as our team reviews it.</p><div className="customer-event-actions"><Button onClick={() => setTab("Packages")}>Explore packages</Button><Button variant="secondary" onClick={() => setTab("My events")}>My events</Button></div></div></section>
-            <section className="customer-grid"><Panel title="Your requests" description="See the latest status of your event requests."><p>Preferred dates and final prices are reviewed by our team.</p><Button variant="secondary" onClick={() => setTab("My events")}>View my events</Button></Panel><Panel className="customer-manager-card" title="Talk with our team" description="Have a question about your plans?"><p>Send us a message and we’ll continue the conversation in your workspace.</p><Button variant="secondary" className="full-button" onClick={() => setMessageOpen(true)}>Send a message</Button></Panel></section>
+            <section className="customer-event-hero"><div className="customer-event-photo"><img src={photos.wedding} alt="Elegant event table setting" /></div><div className="customer-event-summary"><div className="event-kicker">Your next celebration</div><h2 className="customer-event-title">Let’s bring your plans together</h2><p>Explore our packages, share your event details, and follow your request as our team reviews it.</p><div className="customer-event-actions"><Button onClick={() => go("Packages")}>Explore packages</Button><Button variant="secondary" onClick={() => go("My events")}>My events</Button></div></div></section>
+            <section className="customer-grid"><Panel title="Your requests" description="See the latest status of your event requests."><p>Preferred dates and final prices are reviewed by our team.</p><Button variant="secondary" onClick={() => go("My events")}>View my events</Button></Panel><Panel className="customer-manager-card" title="Talk with our team" description="Have a question about your plans?"><p>Send us a message and we’ll continue the conversation in your workspace.</p><Button variant="secondary" className="full-button" onClick={() => setMessageOpen(true)}>Send a message</Button></Panel></section>
           </div>
         )}
-        {tab === "My events" && <div className="customer-content"><BookingList onExplore={() => setTab("Packages")} onOpenChat={(reference: string) => { setPendingBookingReference(reference); setTab("Messages") }} /></div>}
+        {tab === "My events" && <div className="customer-content"><BookingList onExplore={() => go("Packages")} onOpenChat={(reference: string) => { window.location.assign(`/app/messages?request=${encodeURIComponent(reference)}`) }} /></div>}
 
         {tab === "Packages" && (
           <div className="customer-content">
@@ -406,6 +419,8 @@ export function CustomerDashboard({
             {dialogError && <p className="messages-send-error" role="alert">{dialogError}</p>}
         </Dialog>
       )}
+
+      {bookingItem && <BookingRequestDialog item={bookingItem} resume={bookingResume} onClose={() => { setBookingItem(null); window.history.replaceState({}, "", path) }} />}
 
       {toast && <Toast tone={toast.tone}>{toast.message}</Toast>}
     </div>

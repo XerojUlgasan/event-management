@@ -10,6 +10,7 @@ import {
 import { cleanupCatalogMediaService } from "../catalog-media/catalog-media.js";
 import { packageDto } from "./package-response.js";
 import { error, nextUpdate } from "./package-rules.js";
+import { duplicateTitle, reserveCatalogTitle } from "../../utils/catalog-title.js";
 export async function updatePackageService(
   db: Kysely<DB>,
   id: string,
@@ -25,8 +26,10 @@ export async function updatePackageService(
         return error("Archived packages cannot be edited", 409);
       if (current.updated_at.toISOString() !== content.expectedUpdatedAt)
         return error("Package changed. Refresh and try again", 409);
+      const title = await reserveCatalogTitle(trx, "packages", content.name, id);
+      if (!title) return error("A package with this title already exists", 409);
       const now = nextUpdate(current.updated_at);
-      const row = await updatePackageData(trx, id, content, now);
+      const row = await updatePackageData(trx, id, content, title.slug, now);
       previousMediaIds = await replacePackageSectionsData(
         trx,
         id,
@@ -40,6 +43,8 @@ export async function updatePackageService(
       await cleanupCatalogMediaService(db, previousMediaIds);
     return outcome;
   } catch (cause) {
+    const duplicate = duplicateTitle(cause, "A package with this title already exists");
+    if (duplicate) return duplicate;
     if (cause instanceof InvalidPackageMedia) return error(cause.message, 400);
     throw cause;
   }
