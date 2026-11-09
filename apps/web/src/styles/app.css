@@ -847,13 +847,15 @@
 .customer-message { margin-left: auto; color: white; border-radius: 13px 4px 13px 13px; border-color: var(--wine); background: var(--wine); }
 .chat-quotation { width: min(100%, 430px); margin: 16px 0 4px; padding: 16px; display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 10px; background: white; box-shadow: 0 2px 10px rgba(67, 49, 43, .05); }
 .chat-quotation > span { color: var(--wine); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
-.chat-quotation > strong { color: var(--ink); font-family: var(--font-serif); font-size: 27px; line-height: 1; }
+.chat-quotation > strong { color: var(--wine); font-family: var(--font-serif); font-size: 27px; line-height: 1; }
 .chat-quotation > small, .chat-quotation > p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .chat-quotation-items { margin: 5px 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); list-style: none; }
 .chat-quotation-items li { padding: 8px 0; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); font-size: 12px; }
 .chat-quotation-items li > span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .chat-quotation-items li small { color: var(--muted); font-size: 10px; text-transform: capitalize; }
 .chat-quotation-items li strong { flex: none; color: var(--ink); font-size: 12px; }
+.chat-quotation-items li strong.chat-quotation-amount.add { color: #1e5c2e; }
+.chat-quotation-items li strong.chat-quotation-amount.deduct { color: #8d1c2b; }
 .chat-quotation-error { color: #9e3737 !important; }
 .chat-quotation-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
 .chat-quotation-actions .button, .chat-quotation-revision .button { min-height: 36px; font-size: 11px; }

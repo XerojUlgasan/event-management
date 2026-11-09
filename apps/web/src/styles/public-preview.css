@@ -238,6 +238,7 @@
 .quotation-preview-label { display: block; padding: 6px 14px 2px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #77717c; }
 .quotation-preview-desc { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #37354a; }
 .quotation-preview-desc em { color: #a09aaa; font-style: normal; }
+.quotation-preview-desc small { color: #77717c; font-size: 10px; text-transform: capitalize; }
 .quotation-preview-amount { white-space: nowrap; font-weight: 600; }
 .quotation-preview-amount-add { color: #1e5c2e; }
 .quotation-preview-amount-deduct { color: #8d1c2b; }
@@ -245,6 +246,13 @@
 .quotation-preview-total strong { font-family: var(--font-serif, Georgia, serif); font-size: 18px; color: #510b19; }
 .quotation-preview-total-error { background: #fff0f0; }
 .quotation-preview-total-error strong { color: #8d1c2b; }
+.booking-quotation-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.booking-quotation-actions .button { min-height: 38px; font-size: 12px; }
+.booking-quotation-revision { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.booking-quotation-revision label { display: flex; flex-direction: column; gap: 6px; color: #37354a; font-size: 12px; font-weight: 700; }
+.booking-quotation-revision textarea { min-height: 72px; resize: vertical; padding: 9px; border: 1px solid #d8d4d8; border-radius: 7px; color: #37354a; font: inherit; font-weight: 400; }
+.booking-quotation-revision textarea:focus-visible { outline: 2px solid #510b19; outline-offset: 1px; }
+@media (max-width: 700px) { .booking-quotation-actions { flex-direction: column; } .booking-quotation-actions .button { width: 100%; } }
 /* Line list (existing editable lines) */
 .quotation-line-list { display: grid; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
 .quotation-line-item { display: flex; align-items: center; gap: 8px; }

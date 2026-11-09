@@ -7,14 +7,19 @@ import { BookingPackage } from "./BookingPackage";
 import { BookingDetailsEditor } from "./BookingDetailsEditor";
 import { QuotationBuilder } from "./QuotationBuilder";
 import {
+  acceptMyQuotation,
+  ApiError,
   cancelMyBookingRequest,
   getAdminBookingRequests,
   getAdminBookingRequestsPage,
   getBookingRequestCalendar,
+  getMyBookingQuotation,
   getMyBookingRequests,
+  requestMyQuotationRevision,
   updateBookingRequestStatus,
   type BookingRequest,
   type BookingStatus,
+  type Quotation,
 } from "../../lib/api";
 
 const labels: Record<BookingStatus, string> = {
@@ -843,18 +848,253 @@ function BookingStatusBadge({ status }: { status: BookingStatus }) {
     </span>
   );
 }
+const quotationStatusLabel: Record<Quotation["status"], string> = {
+  draft: "Draft",
+  sent: "Awaiting your response",
+  accepted: "Accepted",
+  superseded: "Replaced",
+};
+
+function CustomerQuotationPreview({
+  bookingId,
+  onAccepted,
+  onRevisionRequested,
+}: {
+  bookingId: string;
+  onAccepted?: (quotation: Quotation) => void;
+  onRevisionRequested?: () => void;
+}) {
+  const [quotation, setQuotation] = useState<Quotation | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  const [revisionReason, setRevisionReason] = useState("");
+  const [revisionRequested, setRevisionRequested] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setLoadError("");
+    setActionError("");
+    setRevisionRequested(false);
+    void getMyBookingQuotation(bookingId)
+      .then((result) => {
+        if (active) setQuotation(result.quotation);
+      })
+      .catch((cause) => {
+        if (!active) return;
+        if (cause instanceof ApiError && cause.status === 404) {
+          setQuotation(null);
+          return;
+        }
+        setLoadError(
+          cause instanceof Error
+            ? cause.message
+            : "Unable to load the latest quotation.",
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [bookingId]);
+
+  async function accept() {
+    if (!quotation || busy) return;
+    setBusy(true);
+    setActionError("");
+    try {
+      const result = await acceptMyQuotation(quotation.id);
+      setQuotation(result.quotation);
+      onAccepted?.(result.quotation);
+    } catch (cause) {
+      setActionError(
+        cause instanceof Error
+          ? cause.message
+          : "Unable to accept this quotation.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function requestRevision() {
+    if (!quotation || busy || !revisionReason.trim()) return;
+    setBusy(true);
+    setActionError("");
+    try {
+      await requestMyQuotationRevision(quotation.id, revisionReason.trim());
+      setQuotation(null);
+      setRevisionOpen(false);
+      setRevisionReason("");
+      setRevisionRequested(true);
+      onRevisionRequested?.();
+    } catch (cause) {
+      setActionError(
+        cause instanceof Error
+          ? cause.message
+          : "Unable to request a revision.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <section className="booking-details-card">
+        <h3>Latest quotation</h3>
+        <p className="booking-details-meta">Loading latest quotation…</p>
+      </section>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <section className="booking-details-card">
+        <h3>Latest quotation</h3>
+        <p className="booking-details-warn" role="alert">
+          {loadError}
+        </p>
+      </section>
+    );
+  }
+
+  if (revisionRequested) {
+    return (
+      <section className="booking-details-card">
+        <h3>Latest quotation</h3>
+        <p className="booking-details-meta">
+          Revision requested. The team will send an updated quotation in your
+          conversation.
+        </p>
+      </section>
+    );
+  }
+
+  if (!quotation) return null;
+
+  const money = (amountMinor: number) =>
+    new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency: quotation.currency,
+    }).format(amountMinor / 100);
+
+  return (
+    <section className="booking-details-card">
+      <h3>Latest quotation</h3>
+      <p className="booking-details-meta">
+        Quotation #{quotation.version} ·{" "}
+        {quotationStatusLabel[quotation.status]}
+      </p>
+      <div className="quotation-preview">
+        <div className="quotation-preview-row quotation-preview-base">
+          <span>Package base price</span>
+          <span>{money(quotation.baseAmountMinor)}</span>
+        </div>
+        {quotation.items.length > 0 && (
+          <div className="quotation-preview-adjustments">
+            <span className="quotation-preview-label">Adjustments</span>
+            {quotation.items.map((line) => (
+              <div key={line.id} className="quotation-preview-row">
+                <span className="quotation-preview-desc">
+                  {line.description} <small>{line.kind}</small>
+                </span>
+                <span
+                  className={`quotation-preview-amount quotation-preview-amount-${line.direction}`}
+                >
+                  {line.direction === "add" ? "+" : "−"}
+                  {money(line.amountMinor)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="quotation-preview-row quotation-preview-total">
+          <span>Estimated total</span>
+          <strong>{money(quotation.totalAmountMinor)}</strong>
+        </div>
+      </div>
+      {!quotation.basisCurrent && quotation.status === "sent" && (
+        <p className="booking-details-warn">
+          This quotation needs an updated basis before it can be accepted.
+        </p>
+      )}
+      {quotation.status === "accepted" && (
+        <p className="booking-details-meta">
+          You accepted this quotation. The team has been notified in the
+          conversation.
+        </p>
+      )}
+      {actionError && (
+        <p className="booking-details-warn" role="alert">
+          {actionError}
+        </p>
+      )}
+      {quotation.status === "sent" && (
+        <div className="booking-quotation-actions">
+          <Button
+            type="button"
+            onClick={() => void accept()}
+            disabled={busy || !quotation.basisCurrent}
+          >
+            {busy ? "Saving…" : "Accept quotation"}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setRevisionOpen((open) => !open)}
+            disabled={busy}
+          >
+            Request revision
+          </Button>
+        </div>
+      )}
+      {quotation.status === "sent" && revisionOpen && (
+        <div className="booking-quotation-revision">
+          <label>
+            Tell the team what needs to change
+            <textarea
+              value={revisionReason}
+              maxLength={MAX_BOOKING_REASON_LENGTH}
+              onChange={(event) => setRevisionReason(event.target.value)}
+              disabled={busy}
+            />
+          </label>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => void requestRevision()}
+            disabled={busy || !revisionReason.trim()}
+          >
+            {busy ? "Sending…" : "Send revision request"}
+          </Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function BookingDetails({
   item,
   readOnly,
   customer = false,
   onClose,
   onSaved,
+  onQuotationAccepted,
+  onQuotationRevisionRequested,
 }: {
   item: BookingRequest;
   readOnly: boolean;
   customer?: boolean;
   onClose: () => void;
   onSaved: (item: BookingRequest) => void;
+  onQuotationAccepted?: (quotation: Quotation) => void;
+  onQuotationRevisionRequested?: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [tab, setTab] = useState<"overview" | "quotation" | "status">("overview");
@@ -964,6 +1204,13 @@ export function BookingDetails({
                 restricted={packageRestricted}
                 onSaved={onSaved}
                 onMessage={customer ? onClose : undefined}
+              />
+            )}
+            {customer && (
+              <CustomerQuotationPreview
+                bookingId={item.id}
+                onAccepted={onQuotationAccepted}
+                onRevisionRequested={onQuotationRevisionRequested}
               />
             )}
             <div className="booking-details-grid">

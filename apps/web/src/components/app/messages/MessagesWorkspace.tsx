@@ -384,7 +384,7 @@ export function MessagesWorkspace({
                 <ul className="chat-quotation-items">
                   {quotation.items.map((item) => <li key={item.id}>
                     <span>{item.description}<small>{item.kind}</small></span>
-                    <strong>{item.direction === "add" ? "+" : "−"}{new Intl.NumberFormat("en-PH", { style: "currency", currency: quotation.currency }).format(item.amountMinor / 100)}</strong>
+                    <strong className={`chat-quotation-amount ${item.direction}`}>{item.direction === "add" ? "+" : "−"}{new Intl.NumberFormat("en-PH", { style: "currency", currency: quotation.currency }).format(item.amountMinor / 100)}</strong>
                   </li>)}
                 </ul>
                 {!quotation.basisCurrent && quotation.status === "sent" && <p>This quotation needs an updated basis before it can be accepted.</p>}
@@ -465,6 +465,14 @@ export function MessagesWorkspace({
           customer={isTeam}
           onClose={() => setBooking(null)}
           onSaved={setBooking}
+          onQuotationAccepted={(next) => {
+            setQuotation(next)
+            onRetry?.()
+          }}
+          onQuotationRevisionRequested={() => {
+            setQuotation(null)
+            onRetry?.()
+          }}
         />
       )}
     </div>
