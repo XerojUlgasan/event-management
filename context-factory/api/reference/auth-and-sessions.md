@@ -7,6 +7,7 @@ Current paths are registered in `apps/api/src/controllers/auth/index.ts`. Read t
 - `src/controllers/auth/profile.ts` owns the API profile schema and row-to-response mapping. If the shape changes, update its browser consumers in `apps/web/src/lib/api.ts` and `apps/web/src/lib/auth.tsx`.
 - `src/controllers/auth/register-user.ts`, `login-user.ts`, `sync-firebase-profile.ts`, `link-firebase.ts`, and `add-password.ts` define the HTTP contracts. Corresponding service and data operation files own the business checks and Kysely queries. Password hashing is in `src/utils/password.ts`, Firebase setup in `src/utils/firebase-admin.ts`, and attempt limiting in `src/utils/auth-limit.ts`.
 - Public registration creates customers. Roles come from database state; the browser must not assign or promote them. Matching email addresses do not automatically merge local and Firebase accounts.
+- Password hashing uses `hash-wasm` Argon2id so the same helper works in Node and Supabase Edge without native bindings. Preserve the encoded hash parameters and timing-safe digest comparison when changing verification; existing native-generated Argon2id hashes must still authenticate. `test:password` covers synthetic legacy fixtures and `test:auth` covers login with a persisted legacy hash. `test:edge` requires the current bundle to be served locally and exercises the actual Edge runtime.
 
 Auth field bounds are shared through `@event-management/contracts/limits/auth`; consult the [shared limits guidance](../../limits/SKILL.md) when changing API schemas or client hints.
 

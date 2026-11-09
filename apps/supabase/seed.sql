@@ -1,0 +1,1 @@
+-- Local Supabase seed. Application fixtures stay in the API seed and are not loaded here.

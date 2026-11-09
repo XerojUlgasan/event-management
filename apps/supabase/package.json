@@ -1,0 +1,13 @@
+{
+  "name": "@event-management/supabase",
+  "private": true,
+  "scripts": {
+    "start": "supabase start",
+    "stop": "supabase stop",
+    "status": "supabase status",
+    "functions:serve": "supabase functions serve api --env-file .env.functions"
+  },
+  "devDependencies": {
+    "supabase": "3.0.0"
+  }
+}

@@ -12,7 +12,14 @@ export type Profile = {
   updatedAt: string;
 };
 
-const apiUrl = import.meta.env.PUBLIC_API_URL ?? "http://localhost:3000/v1";
+const configuredApiUrl = import.meta.env.PUBLIC_API_URL ?? "http://localhost:3000/v1";
+
+function apiBase() {
+  const trimmed = configuredApiUrl.replace(/\/$/, "");
+  if (/^https?:\/\//.test(trimmed)) return trimmed;
+  if (typeof window === "undefined") return trimmed;
+  return new URL(trimmed.replace(/^\//, ""), `${window.location.origin}/`).href.replace(/\/$/, "");
+}
 
 export class ApiError extends Error {
   constructor(
@@ -29,7 +36,7 @@ async function request<T>(
   idToken?: string,
   method?: "GET" | "POST" | "PATCH" | "DELETE",
 ): Promise<T> {
-  const response = await fetch(`${apiUrl}${path}`, {
+  const response = await fetch(`${apiBase()}${path}`, {
     method: method ?? (body === undefined ? "GET" : "POST"),
     credentials: "include",
     headers: {
@@ -91,7 +98,7 @@ export const archivePackage = (id: string) => request<AdminPackage>(`/admin/pack
 export const deletePackage = (id: string) => request<void>(`/admin/packages/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
 export const uploadCatalogMedia = (file: File) => { const body = new FormData(); body.set("file", file); return request<CatalogMedia>("/admin/catalog-media", body) }
 export const deleteCatalogMedia = (id: string) => request<void>(`/admin/catalog-media/${encodeURIComponent(id)}`, undefined, undefined, "DELETE")
-export const catalogMediaSrc = (url: string) => url.startsWith("/v1/") ? new URL(url, apiUrl).href : url
+export const catalogMediaSrc = (url: string) => url.startsWith("/v1/") ? new URL(url, `${apiBase()}/`).href : url
 
 export const getAdminServices = () => request<{ services: AdminService[] }>("/admin/services")
 export const getServices = (page?: { limit: number; offset?: number }) => request<{ services: PublicService[]; nextOffset: number | null }>(`/services${pageQuery(page)}`)

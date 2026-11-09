@@ -52,6 +52,7 @@ apps/
   web/                 Astro host, React screens, client auth and API calls
   api/                 Hono controllers, services, data queries, Prisma and tests
     compose.yaml       Local PostgreSQL service
+  supabase/            Local Supabase CLI project; not the API database
 packages/
   contracts/           Shared field, file and collection limits
   theme/               Design tokens and CSS variables
@@ -72,45 +73,61 @@ Requires Node.js 22.22+, pnpm (the version is pinned in `package.json`), and Doc
 
 ```sh
 pnpm install
-cp apps/web/.env.example apps/web/.env
-pnpm all
+pnpm dev
 ```
 
-Copy the web environment file only when it does not already exist. `pnpm all` creates `apps/api/.env` from its example if missing, starts PostgreSQL and waits for its healthcheck, applies committed migrations, then starts the API and web servers. Local email/password sign-in works without Firebase configuration. Catalog uploads require R2 configuration.
+`pnpm dev` starts the local Supabase stack, serves the edge function, and starts the website at <http://localhost:4321/>. `pnpm all` remains the Compose PostgreSQL path: it creates `apps/api/.env` from its example if missing, starts PostgreSQL and waits for its healthcheck, applies committed migrations, then starts the Node API and web servers. Local email/password sign-in works without Firebase configuration. Catalog uploads require R2 configuration.
 
 **Existing databases:** review pending migrations and back up affected data before `pnpm all`, `pnpm dev:prepare`, or `pnpm db:deploy`; these commands apply migrations. See [migration impact](#migration-impact).
 
 | Service | Local URL |
 | --- | --- |
 | Website and workspaces | <http://localhost:4321/> |
-| API health | <http://localhost:3000/v1/health> |
-| OpenAPI | <http://localhost:3000/openapi.json> |
+| Edge function health, from `pnpm dev` | <http://127.0.0.1:54321/functions/v1/api/v1/health> |
+| Node API health, from `pnpm all` | <http://localhost:3000/v1/health> |
+| Node OpenAPI, from `pnpm all` | <http://localhost:3000/openapi.json> |
 | Storybook, when started | <http://localhost:6006/> |
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm all` or `pnpm dev` | Start PostgreSQL, apply migrations, and run API and web |
-| `pnpm all:storybook` | Start the full stack plus Storybook |
+| `pnpm dev` | Start the local Supabase stack, serve the edge function, and run the website |
+| `pnpm all` | Start Compose PostgreSQL, apply migrations, and run the Node API and web |
+| `pnpm all:storybook` | Start the Compose stack, Node API, web, and Storybook |
 | `pnpm all:web` | Run only the frontend |
 | `pnpm dev:prepare` | Prepare PostgreSQL and apply migrations |
 | `pnpm storybook` | Run only Storybook |
 | `pnpm db:up` / `pnpm db:down` | Start / stop PostgreSQL; stopping retains its volume |
 | `pnpm db:seed` | Insert local fixtures and sample catalog/conversation data |
+| `pnpm supabase:start` / `pnpm supabase:stop` | Start / stop the local Supabase stack in `apps/supabase` |
+| `pnpm supabase:status` | Show local Supabase URLs |
+| `pnpm agents:sync` | Sync additions across `.agents`, `.agent`, `.claude`, and `.cursor` |
 
-`Ctrl+C` stops the development servers; PostgreSQL stays running until `pnpm db:down`. The seed is separate from startup and does not overwrite catalog edits or archives. See [database seed](docs/SEED.md) for coverage, collisions, and verification. Sample content and prices are not business-approved offers.
+`pnpm agents:sync` runs once and copies missing entries from any of the four folders into the others, including hidden files, subfolders, and symbolic links. It creates missing folders and preserves existing files. Conflicting contents or entry types at the same relative path are reported and skipped, including descendants of conflicting paths; the command exits with status 1 after syncing unambiguous additions. It does not propagate edits or deletions: a file removed from one folder is restored from another on the next run. Rerun it after adding files to any folder.
+
+`Ctrl+C` in `pnpm all` stops the Node API and website; Compose PostgreSQL stays running until `pnpm db:down`. The seed is separate from startup and does not overwrite catalog edits or archives. See [database seed](docs/SEED.md) for coverage, collisions, and verification. Sample content and prices are not business-approved offers.
+
+### Local Supabase
+
+`apps/supabase` is the local Supabase CLI project, pinned to CLI 3.0.0. `pnpm supabase:start` requires Docker and starts its own Postgres 17, Studio, and Storage. Postgres listens on `127.0.0.1:54322`, the API gateway on `54321`, and Studio on `54323`. This stack can run beside `pnpm db:up`.
+
+The Node API, Prisma, seeds, and integration tests still use Compose PostgreSQL from `apps/api/compose.yaml` on port 5432. Do not point that API's `DB_HOST` at the Supabase database until that cutover is explicit. Supabase Auth is not the application sign-in.
+
+`pnpm dev` starts this stack when it is not already running, bundles the Hono routers into one Edge Function at `apps/supabase/functions/api`, and serves that function with the website. A request loads only the matching route family. The browser calls the website origin at `/v1`. The Astro dev server proxies that path to `http://127.0.0.1:54321/functions/v1/api`. The Supabase gateway sends `Access-Control-Allow-Origin: *` and answers preflight itself; browsers reject that header when a request includes the session cookie, so the page does not call the gateway directly. Direct checks, such as the health URL in the service table, can still use the gateway. The function reads `apps/supabase/.env.functions`, which `pnpm dev` creates when missing. Inside the function container the database host is `db` on port `5432`. That host is the Supabase database, not Compose. The local edge runtime uses `oneshot` mode so a bundle rebuild does not hot-reload the container. Restart `pnpm dev` after `pnpm build:edge` to load a new bundle. If the function server exits, `pnpm dev` starts it again and leaves the website running. `Ctrl+C` stops both; the Supabase stack stays up until `pnpm supabase:stop`.
 
 ### Configuration
 
 Use the checked-in [API environment example](apps/api/.env.example) and [web environment example](apps/web/.env.example) for variable names. Keep `.env`, `.secrets/`, database values, session tokens, and service-account contents out of chat and commits.
 
 - Database: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` configure the API, Prisma, and type generator. A separate `DATABASE_URL` is unnecessary. Compose reads `apps/api/.env`; its project name remains `event_management_v2` to reuse the existing volume.
-- Browser API: `PUBLIC_API_URL` points to the API including `/v1`.
+- Browser API: `PUBLIC_API_URL` points to the API including `/v1`. `pnpm dev` sets it to `/v1` on the website origin. `pnpm all` uses the web environment value, which defaults to `http://localhost:3000/v1`.
 - Catalog media: configure the R2 variables in the API example before testing actual uploads. Built-in package sample photos do not require uploads.
 - Database clients such as DBeaver: use PostgreSQL on `localhost:5432` with the configured database name/user/password. The local defaults use no SSL. A containerized client may require `host.docker.internal` instead of `localhost`.
 
 ## Authentication
 
-New registrations create local customer accounts with Argon2id password hashes; passwords must contain 8–128 characters. Google sign-in and existing Firebase email/password accounts are optional identity methods. Application roles always come from PostgreSQL.
+New registrations create local customer accounts with Argon2id password hashes; passwords must contain 8–128 characters. Password hashing uses WebAssembly through `hash-wasm` in both Node and the Edge Function, with 19 MiB of memory, two passes, and parallelism one. Existing Argon2id hashes remain valid; no password reset or database migration is needed. Google sign-in and existing Firebase email/password accounts are optional identity methods. Application roles always come from PostgreSQL.
+
+Run `pnpm --filter @event-management/api test:password` for password compatibility checks. With the current Edge bundle served by `pnpm dev` or `pnpm dev:edge`, run `pnpm --filter @event-management/api test:edge` to check session rejection, unknown-account password verification, route matching, and OpenAPI loading in the local runtime. After changing API code, rebuild with `pnpm build:edge` and restart the function server before running those runtime checks.
 
 All methods use the `em_session` cookie and hashed sessions in PostgreSQL. The frontend restores the account with `GET /v1/me`. Sessions expire after `SESSION_TTL_DAYS` (default 7), rotate on successful sign-in/linking, and are deleted on logout. Cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` in production.
 

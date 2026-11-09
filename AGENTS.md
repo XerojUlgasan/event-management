@@ -50,6 +50,7 @@ Register each domain's routes in `controllers/<domain>/index.ts`; `src/app.ts` m
 ## Workspace facts
 
 - Use `pnpm`; workspace membership is declared in `pnpm-workspace.yaml`, and runnable commands are in each `package.json`.
+- Local Supabase CLI configuration lives in `apps/supabase`. The API, Prisma migrations, seeds, and integration tests still use Compose PostgreSQL from `apps/api/compose.yaml`.
 - Astro hosts and builds the React frontend. `/` is served by `apps/web/src/pages/index.astro`, which mounts `components/app/App.tsx`; React owns application screens and in-page view switching. Public catalog sections and their View more overlays live on `/`; the old `/catalog` and 3D `/landing` routes have been removed. API routes are mounted under `/v1` in `apps/api/src/app.ts`; its OpenAPI document is `/openapi.json`.
 - Package catalog cards and admin edits use the `/v1/packages` API and PostgreSQL. Customer-to-admin messages use `/v1/messages` and `/v1/admin/conversations` with PostgreSQL. Booking requests persist in PostgreSQL through `/v1/booking-requests` and `/v1/admin/booking-requests`; confirmed bookings, quotes, payments, and other business screens still use demo data. Trace each screen's API and persistence before describing it as a working backend workflow.
 - [README](README.md) owns product scope, open decisions, current implementation, and setup. Check its scope and implementation sections before changing product behavior.

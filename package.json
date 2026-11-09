@@ -3,7 +3,8 @@
   "private": true,
   "packageManager": "pnpm@11.21.0",
   "scripts": {
-    "dev": "pnpm all",
+    "dev": "node scripts/dev-supabase.mjs && pnpm build:edge && concurrently --names edge,web --prefix-colors blue,green \"node scripts/dev-edge.mjs\" \"cross-env PUBLIC_API_URL=/v1 API_PROXY_TARGET=http://127.0.0.1:54321 ASTRO_DEV_BACKGROUND=0 pnpm dev:web\"",
+    "dev:edge": "pnpm --filter @event-management/supabase functions:serve",
     "all": "pnpm dev:prepare && concurrently --kill-others-on-fail --names api,web --prefix-colors blue,green \"pnpm dev:api\" \"cross-env ASTRO_DEV_BACKGROUND=0 pnpm dev:web\"",
     "all:storybook": "pnpm dev:prepare && concurrently --kill-others-on-fail --names api,web,storybook --prefix-colors blue,green,magenta \"pnpm dev:api\" \"cross-env ASTRO_DEV_BACKGROUND=0 pnpm dev:web\" \"pnpm storybook\"",
     "all:web": "pnpm dev:web",
@@ -16,6 +17,7 @@
     "check": "pnpm --filter @event-management/web check && pnpm --filter @event-management/api check && pnpm --filter @event-management/ui check",
     "check:guidance": "node context-factory/engineering/scripts/check-guidance.mjs",
     "check:design": "node scripts/check-design.mjs",
+    "agents:sync": "node scripts/sync-agents.mjs",
     "db:up": "pnpm --filter @event-management/api db:up",
     "db:down": "pnpm --filter @event-management/api db:down",
     "db:validate": "pnpm --filter @event-management/api db:validate",
@@ -25,7 +27,11 @@
     "db:generate": "pnpm --filter @event-management/api db:generate",
     "db:check": "pnpm --filter @event-management/api db:check",
     "db:seed": "pnpm --filter @event-management/api db:seed",
-    "db:seed-admin": "pnpm --filter @event-management/api db:seed-admin"
+    "db:seed-admin": "pnpm --filter @event-management/api db:seed-admin",
+    "supabase:start": "pnpm --filter @event-management/supabase start",
+    "supabase:stop": "pnpm --filter @event-management/supabase stop",
+    "supabase:status": "pnpm --filter @event-management/supabase status",
+    "build:edge": "pnpm --filter @event-management/api build:edge"
   },
   "devDependencies": {
     "concurrently": "^10.0.6",

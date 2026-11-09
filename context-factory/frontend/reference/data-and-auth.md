@@ -6,6 +6,6 @@
 - `src/lib/auth.tsx` owns `AuthProvider`, session restoration through `GET /me`, and sign-in/sign-out state. `src/lib/firebase.ts` configures optional Firebase browser sign-in with in-memory persistence. Read `AuthPage.tsx` and `SignInMethods.tsx` when changing login or linking UI.
 - Browser forms may mirror shared field and photo-count constraints for timely feedback, but the API route schemas enforce accepted values. Use `@event-management/contracts/limits/*` for mirrored constants and keep HTTP request-body caps server-side; see the [shared limits guidance](../../limits/SKILL.md).
 - The database profile and role returned by the API determine whether the app shows the System Administrator, staff, or customer area. UI state is not authorization; protected API operations must check access server-side.
-- `PUBLIC_API_URL` and optional Firebase browser variables are described in `apps/web/.env.example`. Keep secret service-account values on the API side.
+- `PUBLIC_API_URL` and optional Firebase browser variables are described in `apps/web/.env.example`. Keep secret service-account values on the API side. `pnpm dev` sets `PUBLIC_API_URL` to the same-origin path `/v1`; the Astro dev server proxies it to the Supabase gateway because that gateway's wildcard CORS header cannot be used with the session cookie. A relative `PUBLIC_API_URL` is resolved against the page origin in the browser.
 
 For auth changes, trace the user action through UI, client request, API route, session, and restored page state. Test failure paths as well as the successful path.
