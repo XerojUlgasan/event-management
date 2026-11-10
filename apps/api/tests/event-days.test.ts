@@ -1,3 +1,4 @@
+import { responseDeadlineForDay, RESPONSE_DEADLINE_DAYS, type ResponseDeadlineDays } from "@event-management/contracts/event-days";
 import "dotenv/config";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
@@ -30,7 +31,7 @@ type Schedule = {
   startsAt: string;
   endsAt: string;
   staffingStatus: "draft" | "open";
-  availabilityDeadline: string | null;
+  daysBefore?: ResponseDeadlineDays | null;
 };
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -101,7 +102,7 @@ function schedule(overrides: Partial<Schedule> = {}): Schedule {
     startsAt: "2099-05-20T10:00:00+08:00",
     endsAt: "2099-05-20T12:00:00+08:00",
     staffingStatus: "draft",
-    availabilityDeadline: null,
+    daysBefore: null,
     ...overrides,
   };
 }
@@ -117,12 +118,12 @@ async function createEventDay(bookingRequestId: string, input: Partial<Schedule>
 async function setStaffing(
   id: string,
   staffingStatus: "open" | "closed",
-  availabilityDeadline?: string,
+  daysBefore?: ResponseDeadlineDays,
 ): Promise<JsonRecord> {
   return eventDay(await read(
     await call(`/admin/event-days/${id}/staffing`, "PATCH", {
       staffingStatus,
-      ...(availabilityDeadline === undefined ? {} : { availabilityDeadline }),
+      ...(daysBefore === undefined ? {} : { daysBefore }),
     }, adminCookie),
     200,
   ));
@@ -200,7 +201,7 @@ async function listBookingEventDays(bookingRequestId: string): Promise<JsonRecor
   ));
 }
 
-async function updateBookingStatus(bookingRequestId: string, status: "needs_details" | "cancelled", reason: string): Promise<JsonRecord> {
+async function updateBookingStatus(bookingRequestId: string, status: "needs_details" | "cancelled" | "accepted", reason?: string): Promise<JsonRecord> {
   const body = await read(
     await call(`/admin/booking-requests/${bookingRequestId}/status`, "PATCH", { status, reason }, adminCookie),
     200,
@@ -323,11 +324,11 @@ test("permissions, accepted bookings, local event days, deadlines, and staff red
   }
   await expectError(await call("/admin/event-days", "POST", {
     bookingRequestId: acceptedBooking,
-    ...schedule({ staffingStatus: "open", availabilityDeadline: null }),
+    ...schedule({ staffingStatus: "open", daysBefore: null }),
   }, adminCookie), 400);
   await expectError(await call("/admin/event-days", "POST", {
     bookingRequestId: acceptedBooking,
-    ...schedule({ staffingStatus: "open", availabilityDeadline: "2000-01-01T00:00:00.000Z" }),
+    ...schedule({ staffingStatus: "open" }), daysBefore: 5,
   }, adminCookie), 400);
 
   const draft = await createEventDay(acceptedBooking, valid);
@@ -345,7 +346,7 @@ test("permissions, accepted bookings, local event days, deadlines, and staff red
     startsAt: "2099-05-21T10:00:00+08:00",
     endsAt: "2099-05-21T12:00:00+08:00",
     staffingStatus: "open",
-    availabilityDeadline: futureDeadline(),
+    daysBefore: 2,
   }));
   const openedId = dayId(opened);
   const staffOpenDays = eventDays(await read(await call("/staff/event-days", "GET", undefined, staffOneCookie), 200));
@@ -356,7 +357,7 @@ test("permissions, accepted bookings, local event days, deadlines, and staff red
   assert.deepEqual(staffView.eligibleStaff, []);
   assert.equal(staffView.ownAvailability, null);
   assert.equal(staffView.ownAssignment, null);
-  for (const privateField of ["customerId", "contactName", "phoneNumber", "specialRequests", "packageName", "statusHistory", "bookingRequest"]) {
+  for (const privateField of ["customerId", "contactName", "phoneNumber", "specialRequests", "statusHistory", "bookingRequest"]) {
     assert.equal(privateField in staffView, false, `staff event day must omit ${privateField}`);
   }
   assert.equal((await rowCount("SELECT id FROM events_day WHERE id = $1 AND booking_request_id = $2", [openedId, acceptedBooking])), 1);
@@ -381,7 +382,7 @@ test("availability is distinct and repeatable, and only available staff can be a
   await expectError(await call(`/staff/event-days/${id}/availability`, "PUT", { response: "available" }, staffOneCookie), 409);
   await expectError(await call(`/admin/event-days/${id}/assignments/${staffOneId}`, "PUT", { role: "helper", status: "confirmed" }, adminCookie), 409);
 
-  await setStaffing(id, "open", futureDeadline());
+  await setStaffing(id, "open", 2);
   const firstResponse = await respond(id, "available", staffOneCookie);
   assert.equal(firstResponse.ownAvailability, "available");
   await respond(id, "available", staffOneCookie);
@@ -418,13 +419,13 @@ test("availability is distinct and repeatable, and only available staff can be a
   await assign(id, staffOneId, "helper");
   assert.equal(await rowCount("SELECT id FROM event_staffs WHERE event_day_id = $1 AND staff_id = $2", [id, staffOneId]), 1);
 
-  await setStaffing(id, "open", futureDeadline());
+  await setStaffing(id, "open", 2);
   await expectError(await call(`/staff/event-days/${id}/availability`, "PUT", { response: "available" }, staffOneCookie), 409);
   await setStaffing(id, "closed");
   await assign(id, staffOneId, "helper", "cancelled");
   assert.equal(await rowCount("SELECT id FROM event_staffs WHERE event_day_id = $1 AND staff_id = $2 AND status = 'cancelled'", [id, staffOneId]), 1);
 
-  await setStaffing(id, "open", futureDeadline());
+  await setStaffing(id, "open", 2);
   const availableAgain = await respond(id, "available", staffOneCookie);
   assert.equal(availableAgain.ownAvailability, "available");
   await respond(id, "available", staffTwoCookie);
@@ -468,7 +469,7 @@ test("overlapping assignments serialize for one staff member while adjacent rang
   assert.notEqual(first.bookingRequestId, second.bookingRequestId);
 
   for (const id of [firstId, secondId]) {
-    await setStaffing(id, "open", futureDeadline());
+    await setStaffing(id, "open", 2);
     await respond(id, "available", staffOneCookie);
     await setStaffing(id, "closed");
   }
@@ -497,7 +498,7 @@ test("overlapping assignments serialize for one staff member while adjacent rang
   }));
   const adjacentIds = [dayId(adjacentOne), dayId(adjacentTwo)];
   for (const id of adjacentIds) {
-    await setStaffing(id, "open", futureDeadline());
+    await setStaffing(id, "open", 2);
     await respond(id, "available", staffTwoCookie);
     await setStaffing(id, "closed");
     await assign(id, staffTwoId, "helper");
@@ -512,13 +513,13 @@ test("cancellation closes the day and retains responses while movement links one
     startsAt: "2099-06-10T10:00:00+08:00",
     endsAt: "2099-06-10T12:00:00+08:00",
     staffingStatus: "open",
-    availabilityDeadline: futureDeadline(),
+    daysBefore: 2,
   }));
   const cancellableId = dayId(cancellable);
   await respond(cancellableId, "available", staffOneCookie);
   await setStaffing(cancellableId, "closed");
   await assign(cancellableId, staffOneId, "coordinator");
-  await setStaffing(cancellableId, "open", futureDeadline());
+  await setStaffing(cancellableId, "open", 2);
 
   const cancelled = eventDay(await read(await call(`/admin/event-days/${cancellableId}/cancel`, "POST", undefined, adminCookie), 200));
   assert.equal(cancelled.status, "cancelled");
@@ -535,7 +536,7 @@ test("cancellation closes the day and retains responses while movement links one
   assert.equal(asRecord(cancelledStaffDay.ownAssignment, "own cancelled assignment").status, "cancelled");
   assert.deepEqual(cancelledStaffDay.availability, []);
   assert.equal(asRecord(arrayField(cancelledStaffDay, "assignments")[0], "visible cancelled assignment").status, "cancelled");
-  await expectError(await call(`/admin/event-days/${cancellableId}/staffing`, "PATCH", { staffingStatus: "open", availabilityDeadline: futureDeadline() }, adminCookie), 409);
+  await expectError(await call(`/admin/event-days/${cancellableId}/staffing`, "PATCH", { staffingStatus: "open", daysBefore: 2 }, adminCookie), 409);
 
   const moveBookingId = await createBooking();
   const original = await createEventDay(moveBookingId, schedule({
@@ -543,13 +544,13 @@ test("cancellation closes the day and retains responses while movement links one
     startsAt: "2099-06-11T10:00:00+08:00",
     endsAt: "2099-06-11T12:00:00+08:00",
     staffingStatus: "open",
-    availabilityDeadline: futureDeadline(),
+    daysBefore: 2,
   }));
   const originalId = dayId(original);
   await respond(originalId, "available", staffTwoCookie);
   await setStaffing(originalId, "closed");
   await assign(originalId, staffTwoId, "helper");
-  await setStaffing(originalId, "open", futureDeadline());
+  await setStaffing(originalId, "open", 2);
   const replacementSchedule = schedule({
     day: "2099-06-12",
     startsAt: "2099-06-12T10:00:00+08:00",
@@ -597,7 +598,7 @@ test("customer and admin booking cancellation end every scheduled day and releas
     startsAt: "2099-07-01T10:00:00+08:00",
     endsAt: "2099-07-01T12:00:00+08:00",
     staffingStatus: "open",
-    availabilityDeadline: futureDeadline(),
+    daysBefore: 2,
   }));
   const customerDayOneId = dayId(customerDayOne);
   await respond(customerDayOneId, "available", staffOneCookie);
@@ -609,7 +610,7 @@ test("customer and admin booking cancellation end every scheduled day and releas
     startsAt: "2099-07-02T10:00:00+08:00",
     endsAt: "2099-07-02T12:00:00+08:00",
     staffingStatus: "open",
-    availabilityDeadline: futureDeadline(),
+    daysBefore: 2,
   }));
   const customerDayTwoId = dayId(customerDayTwo);
   await respond(customerDayTwoId, "unavailable", staffTwoCookie);
@@ -641,7 +642,7 @@ test("customer and admin booking cancellation end every scheduled day and releas
     startsAt: "2099-07-05T10:00:00+08:00",
     endsAt: "2099-07-05T12:00:00+08:00",
     staffingStatus: "open",
-    availabilityDeadline: futureDeadline(),
+    daysBefore: 2,
   }));
   const movedSourceId = dayId(movedSource);
   await respond(movedSourceId, "available", staffTwoCookie);
@@ -653,7 +654,7 @@ test("customer and admin booking cancellation end every scheduled day and releas
     endsAt: "2099-07-06T12:00:00+08:00",
   }), adminCookie), 200));
   const replacementId = dayId(replacement);
-  await setStaffing(replacementId, "open", futureDeadline());
+  await setStaffing(replacementId, "open", 2);
   await respond(replacementId, "available", staffThreeCookie);
   await setStaffing(replacementId, "closed");
   await assign(replacementId, staffThreeId, "helper");
@@ -663,7 +664,7 @@ test("customer and admin booking cancellation end every scheduled day and releas
     startsAt: "2099-07-07T10:00:00+08:00",
     endsAt: "2099-07-07T12:00:00+08:00",
     staffingStatus: "open",
-    availabilityDeadline: futureDeadline(),
+    daysBefore: 2,
   }));
   const adminDayId = dayId(adminDay);
   await respond(adminDayId, "available", staffOneCookie);
@@ -704,7 +705,7 @@ test("a needs-details booking allows staffing cleanup while rejecting new schedu
     startsAt: "2099-08-01T10:00:00+08:00",
     endsAt: "2099-08-01T12:00:00+08:00",
     staffingStatus: "open",
-    availabilityDeadline: futureDeadline(),
+    daysBefore: 2,
   }));
   const assignmentDayId = dayId(assignmentDay);
   await respond(assignmentDayId, "available", formerStaff.cookie);
@@ -716,7 +717,7 @@ test("a needs-details booking allows staffing cleanup while rejecting new schedu
     startsAt: "2099-08-02T10:00:00+08:00",
     endsAt: "2099-08-02T12:00:00+08:00",
     staffingStatus: "open",
-    availabilityDeadline: futureDeadline(),
+    daysBefore: 2,
   }));
   const cancelDayId = dayId(cancelDay);
   await respond(cancelDayId, "available", staffOneCookie);
@@ -735,7 +736,7 @@ test("a needs-details booking allows staffing cleanup while rejecting new schedu
   assert.equal(cleanedDay.staffingStatus, "closed");
   assert.equal(asRecord(arrayField(cleanedDay, "assignments")[0], "cleaned assignment").status, "cancelled");
 
-  await expectError(await call(`/admin/event-days/${cancelDayId}/staffing`, "PATCH", { staffingStatus: "open", availabilityDeadline: futureDeadline() }, adminCookie), 409);
+  await expectError(await call(`/admin/event-days/${cancelDayId}/staffing`, "PATCH", { staffingStatus: "open", daysBefore: 2 }, adminCookie), 409);
   await expectError(await call(`/staff/event-days/${cancelDayId}/availability`, "PUT", { response: "available" }, staffOneCookie), 409);
   await expectError(await call(`/admin/event-days/${cancelDayId}/assignments/${staffOneId}`, "PUT", { role: "helper", status: "confirmed" }, adminCookie), 409);
   await expectError(await call(`/admin/event-days/${cancelDayId}/move`, "POST", schedule({
@@ -768,9 +769,10 @@ test("availability rechecks its deadline after waiting for the staff row lock", 
     startsAt: "2099-09-01T10:00:00+08:00",
     endsAt: "2099-09-01T12:00:00+08:00",
     staffingStatus: "open",
-    availabilityDeadline: deadline,
+    daysBefore: 2,
   }));
   const id = dayId(day);
+  await pool?.query("UPDATE events_day SET availability_deadline=$2 WHERE id=$1", [id, deadline]);
   const deadlineAt = Date.parse(deadline);
   assert.ok(Date.now() < deadlineAt, "the response request must begin before its deadline");
 
@@ -814,6 +816,7 @@ test("event-day routes are present in the generated OpenAPI document", async () 
   const expectedMethods: ReadonlyArray<readonly [string, string]> = [
     ["/v1/admin/event-days", "get"],
     ["/v1/admin/event-days", "post"],
+    ["/v1/admin/event-days/apply-response-deadlines", "post"],
     ["/v1/staff/event-days", "get"],
     ["/v1/staff/assignments", "get"],
     ["/v1/staff/event-days/{id}/availability", "put"],
@@ -829,3 +832,233 @@ test("event-day routes are present in the generated OpenAPI document", async () 
   }
 });
 
+
+async function requestedBooking(status: "accepted" | "under_review" = "accepted") {
+  const bookingId = await createBooking(status);
+  assert.ok(pool);
+  await pool.query("UPDATE booking_requests SET requested_days=$2::jsonb WHERE id=$1",[bookingId,JSON.stringify([
+    {date:"2099-05-20",startsAt:null,endsAt:null},
+    {date:"2099-05-22",startsAt:null,endsAt:null},
+  ])]);
+  return bookingId;
+}
+async function getRequestedBooking(id: string) {
+  return asRecord(asRecord(await read(await call(`/booking-requests/${id}`,"GET",undefined,customerCookie),200),"response").bookingRequest,"booking");
+}
+async function saveRequestedTimes(id: string, revision: string, overrides: Partial<Schedule> = {}) {
+  const input = schedule(overrides);
+  return call(`/booking-requests/${id}/requested-days/${input.day}/times`,"PATCH",{
+    startsAt:input.startsAt,endsAt:input.endsAt,expectedUpdatedAt:revision,
+  },customerCookie);
+}
+
+function applyDeadlines(bookingRequestId: string, expectedUpdatedAt: string, daysBefore: ResponseDeadlineDays = 2) {
+  return call("/admin/event-days/apply-response-deadlines", "POST", { bookingRequestId, daysBefore, expectedUpdatedAt }, adminCookie);
+}
+async function saveTimesFor(id: string, day: string, start = "10:00:00", end = "12:00:00") {
+  const booking = await getRequestedBooking(id);
+  return read(await saveRequestedTimes(id, stringField(booking, "updatedAt"), {
+    day, startsAt: `${day}T${start}+08:00`, endsAt: `${day}T${end}+08:00`,
+  }), 200);
+}
+
+test("batch deadlines use saved times, skip missing times, reject stale writes and retain moved and cancelled origins", async () => {
+  const id = await requestedBooking("under_review");
+  let booking = await getRequestedBooking(id);
+  await expectError(await applyDeadlines(id, stringField(booking, "updatedAt")), 409);
+  await saveTimesFor(id, "2099-05-20");
+  booking = await getRequestedBooking(id);
+  const beforeAccept = stringField(booking, "updatedAt");
+  await updateBookingStatus(id, "accepted", undefined);
+  await expectError(await applyDeadlines(id, beforeAccept), 409);
+  booking = await getRequestedBooking(id);
+  const revision = stringField(booking, "updatedAt");
+  await expectError(await call("/admin/event-days", "POST", { bookingRequestId: id, ...schedule() }, adminCookie), 409);
+  const simultaneous = await Promise.all([applyDeadlines(id, revision), applyDeadlines(id, revision)]);
+  assert.deepEqual(simultaneous.map(response => response.status).sort(), [200, 409]);
+  const success = simultaneous.find(response => response.status === 200); assert.ok(success);
+  const [original] = eventDays(await read(success, 200)); assert.ok(original);
+  const originalId = dayId(original);
+  assert.equal(original.startsAt, "2099-05-20T02:00:00.000Z");
+  assert.equal(original.endsAt, "2099-05-20T04:00:00.000Z");
+  assert.equal(original.availabilityDeadline, "2099-05-18T15:59:59.999Z");
+  assert.equal(original.staffingStatus, "open");
+  booking = await getRequestedBooking(id);
+  const requested = arrayField(booking, "requestedDays").map(value => asRecord(value, "requested day"));
+  assert.equal(requested[0]?.eventDayId, originalId);
+  assert.equal(requested[1]?.eventDayId, undefined);
+  await expectError(await saveRequestedTimes(id, stringField(booking, "updatedAt")), 409);
+  const moved = eventDay(await read(await call(`/admin/event-days/${originalId}/move`, "POST", schedule({
+    day: "2099-05-21", startsAt: "2099-05-21T10:00:00+08:00", endsAt: "2099-05-21T12:00:00+08:00",
+  }), adminCookie), 200));
+  booking = await getRequestedBooking(id);
+  await read(await applyDeadlines(id, stringField(booking, "updatedAt"), 3), 200);
+  const days = await listBookingEventDays(id);
+  assert.equal(days.find(day => day.id === originalId)?.availabilityDeadline, original.availabilityDeadline);
+  assert.equal(days.find(day => day.id === dayId(moved))?.availabilityDeadline, "2099-05-18T15:59:59.999Z");
+  assert.equal(days.find(day => day.id === dayId(moved))?.staffingStatus, "draft");
+  booking = await getRequestedBooking(id);
+  const linked = asRecord(arrayField(booking, "requestedDays")[0], "requested day");
+  assert.equal(linked.eventDayId, originalId);
+  assert.equal(asRecord(linked.operationalSchedule, "schedule").id, dayId(moved));
+  await read(await call(`/admin/event-days/${dayId(moved)}/cancel`, "POST", undefined, adminCookie), 200);
+  booking = await getRequestedBooking(id);
+  await expectError(await applyDeadlines(id, stringField(booking, "updatedAt")), 409);
+  assert.equal(await rowCount("SELECT id FROM events_day WHERE booking_request_id=$1", [id]), 2);
+});
+
+test("customer time saves and batch deadlines serialize without consuming stale times", async () => {
+  const id = await requestedBooking();
+  await saveTimesFor(id, "2099-05-20");
+  const revision = stringField(await getRequestedBooking(id), "updatedAt");
+  const results = await Promise.all([
+    saveRequestedTimes(id, revision, { startsAt: "2099-05-20T11:00:00+08:00", endsAt: "2099-05-20T13:00:00+08:00" }),
+    applyDeadlines(id, revision),
+  ]);
+  assert.deepEqual(results.map(response => response.status).sort(), [200, 409]);
+  const booking = await getRequestedBooking(id);
+  const saved = asRecord(arrayField(booking, "requestedDays")[0], "requested day");
+  const days = await listBookingEventDays(id);
+  if (days.length) {
+    assert.equal(saved.eventDayId, days[0]?.id);
+    assert.equal(saved.startsAt, days[0]?.startsAt);
+  } else {
+    assert.equal(saved.startsAt, "2099-05-20T03:00:00.000Z");
+    await expectError(await applyDeadlines(id, revision), 409);
+  }
+});
+
+test("acceptance and saved times do not create operational days before applying deadlines", async () => {
+  const id = await requestedBooking();
+  let booking = await getRequestedBooking(id);
+  await expectError(await applyDeadlines(id, stringField(booking, "updatedAt")), 409);
+  await saveTimesFor(id, "2099-05-20");
+  for (const path of ["/staff/event-days", "/staff/assignments"]) {
+    const visible = eventDays(await read(await call(path, "GET", undefined, staffOneCookie), 200));
+    assert.ok(!visible.some(day => day.bookingRequestId === id));
+  }
+  assert.equal(await rowCount("SELECT id FROM events_day WHERE booking_request_id=$1", [id]), 0);
+});
+
+test("cancellation and batch deadlines cannot leave scheduled days or consume stale revisions", async () => {
+  const id = await requestedBooking();
+  await saveTimesFor(id, "2099-05-20");
+  const revision = stringField(await getRequestedBooking(id), "updatedAt");
+  const [creation, cancellation] = await Promise.all([
+    applyDeadlines(id, revision), call(`/booking-requests/${id}/cancel`, "PATCH", { reason: "Customer cancelled" }, customerCookie),
+  ]);
+  assert.ok([200, 409].includes(creation.status)); await read(cancellation, 200);
+  assert.ok((await listBookingEventDays(id)).every(day => day.status === "cancelled"));
+  assert.equal(await rowCount("SELECT id FROM events_day WHERE booking_request_id=$1 AND status='scheduled'", [id]), 0);
+});
+
+test("batch input and every opening route reject raw timestamps and unsupported offsets", async () => {
+  const id = await requestedBooking();
+  const revision = stringField(await getRequestedBooking(id), "updatedAt");
+  const body = { bookingRequestId: id, daysBefore: 2, expectedUpdatedAt: revision };
+  const path = "/admin/event-days/apply-response-deadlines";
+  for (const [cookie, status] of [[undefined, 401], [customerCookie, 403], [staffOneCookie, 403], [otherAdminCookie, 403]] as const)
+    await expectError(await call(path, "POST", body, cookie), status);
+  for (const invalid of [
+    { ...body, startsAt: schedule().startsAt }, { ...body, requestedDate: "2099-05-20" },
+    { ...body, availabilityDeadline: futureDeadline() }, { ...body, expectedUpdatedAt: undefined },
+    ...[0, 5, 1.5, "2", null].map(daysBefore => ({ ...body, daysBefore })),
+  ]) await expectError(await call(path, "POST", invalid, adminCookie), 400);
+  await expectError(await call(path, "POST", { ...body, bookingRequestId: randomUUID() }, adminCookie), 404);
+  const legacy = await createBooking();
+  const day = await createEventDay(legacy);
+  await expectError(await call("/admin/event-days", "POST", { bookingRequestId: legacy, ...schedule(), availabilityDeadline: futureDeadline() }, adminCookie), 400);
+  await expectError(await call(`/admin/event-days/${dayId(day)}/move`, "POST", { ...schedule(), availabilityDeadline: futureDeadline() }, adminCookie), 400);
+  await expectError(await call(`/admin/event-days/${dayId(day)}/staffing`, "PATCH", { staffingStatus: "open", availabilityDeadline: futureDeadline() }, adminCookie), 400);
+  await expectError(await call(`/admin/event-days/${dayId(day)}/staffing`, "PATCH", { staffingStatus: "open", daysBefore: 5 }, adminCookie), 400);
+  assert.equal((await call("/admin/event-days/from-requested-day", "POST", body, adminCookie)).status, 404);
+});
+
+test("one batch offset applies to all ready dates, preserves closed windows, and advances revisions", async () => {
+  const id = await requestedBooking();
+  await saveTimesFor(id, "2099-05-20");
+  const bookingBefore = await getRequestedBooking(id);
+  await read(await saveRequestedTimes(id, stringField(bookingBefore, "updatedAt"), {
+    day: "2099-05-22", startsAt: "2099-05-22T23:00:00+08:00", endsAt: "2099-05-23T02:00:00+08:00",
+  }), 200);
+  let booking = await getRequestedBooking(id);
+  let days = eventDays(await read(await applyDeadlines(id, stringField(booking, "updatedAt")), 200));
+  assert.equal(days.length, 2);
+  assert.equal(days.find(day => day.day === "2099-05-22")?.endsAt, "2099-05-22T18:00:00.000Z");
+  const closed = days[0], expired = days[1]; assert.ok(closed && expired);
+  await setStaffing(dayId(closed), "closed");
+  await pool?.query("UPDATE events_day SET availability_deadline=now()-interval '1 second' WHERE id=$1", [dayId(expired)]);
+  booking = await getRequestedBooking(id);
+  const revision = stringField(booking, "updatedAt");
+  days = eventDays(await read(await applyDeadlines(id, revision, 4), 200));
+  assert.ok(days.every(day => day.staffingStatus === "closed"));
+  assert.equal(days.find(day => day.day === "2099-05-20")?.availabilityDeadline, "2099-05-16T15:59:59.999Z");
+  assert.equal(days.find(day => day.day === "2099-05-22")?.availabilityDeadline, "2099-05-18T15:59:59.999Z");
+  assert.notEqual((await getRequestedBooking(id)).updatedAt, revision);
+  await expectError(await applyDeadlines(id, revision), 409);
+  booking = await getRequestedBooking(id);
+  await setStaffing(dayId(expired), "open", 1);
+  await expectError(await applyDeadlines(id, stringField(booking, "updatedAt")), 409);
+});
+
+test("calendar deadline helper covers January examples, every choice, leap dates, DST, and skipped local dates", () => {
+  assert.deepEqual(["2027-01-01", "2027-01-10", "2027-01-15"].map(day => responseDeadlineForDay(day, 2, "Asia/Manila")), [
+    "2026-12-30T15:59:59.999Z", "2027-01-08T15:59:59.999Z", "2027-01-13T15:59:59.999Z",
+  ]);
+  for (const daysBefore of RESPONSE_DEADLINE_DAYS)
+    assert.equal(responseDeadlineForDay("2027-01-10", daysBefore, "Asia/Manila"), `2027-01-0${10 - daysBefore}T15:59:59.999Z`);
+  assert.equal(responseDeadlineForDay("2028-03-01", 1, "UTC"), "2028-02-29T23:59:59.999Z");
+  assert.equal(responseDeadlineForDay("2027-03-01", 1, "UTC"), "2027-02-28T23:59:59.999Z");
+  assert.equal(responseDeadlineForDay("2027-03-15", 1, "America/New_York"), "2027-03-15T03:59:59.999Z");
+  assert.equal(responseDeadlineForDay("2027-11-08", 1, "America/New_York"), "2027-11-08T04:59:59.999Z");
+  assert.throws(() => responseDeadlineForDay("2011-12-31", 1, "Pacific/Apia"), /valid local end time/);
+  assert.throws(() => responseDeadlineForDay("2027-02-30", 1, "UTC"), /Invalid event date/);
+});
+
+test("a batch with an expired new opening rolls back every day and link", async () => {
+  const id = await requestedBooking();
+  assert.ok(pool);
+  await pool.query("UPDATE booking_requests SET requested_days=$2::jsonb WHERE id=$1", [id, JSON.stringify([
+    { date: "2099-05-20", startsAt: "2099-05-20T02:00:00Z", endsAt: "2099-05-20T04:00:00Z" },
+    { date: "2000-01-10", startsAt: "2000-01-10T02:00:00Z", endsAt: "2000-01-10T04:00:00Z" },
+  ])]);
+  const before = await getRequestedBooking(id);
+  assert.match(await expectError(await applyDeadlines(id, stringField(before, "updatedAt")), 400), /2000-01-10/);
+  const after = await getRequestedBooking(id);
+  assert.deepEqual(after.requestedDays, before.requestedDays);
+  assert.equal(after.updatedAt, before.updatedAt);
+  assert.equal(await rowCount("SELECT id FROM events_day WHERE booking_request_id=$1", [id]), 0);
+});
+
+
+test("batch computes one calendar offset for three January dates and updates open windows without duplicates", async () => {
+  const id = await requestedBooking();
+  assert.ok(pool);
+  await pool.query("UPDATE booking_requests SET requested_days=$2::jsonb WHERE id=$1", [id, JSON.stringify(
+    ["2099-01-01", "2099-01-10", "2099-01-15"].map(date => ({ date, startsAt: `${date}T02:00:00Z`, endsAt: `${date}T04:00:00Z` })),
+  )]);
+  let booking = await getRequestedBooking(id);
+  let days = eventDays(await read(await applyDeadlines(id, stringField(booking, "updatedAt"), 2), 200));
+  assert.deepEqual(days.map(day => day.availabilityDeadline), ["2098-12-30T15:59:59.999Z", "2099-01-08T15:59:59.999Z", "2099-01-13T15:59:59.999Z"]);
+  booking = await getRequestedBooking(id);
+  days = eventDays(await read(await applyDeadlines(id, stringField(booking, "updatedAt"), 3), 200));
+  assert.equal(days.length, 3);
+  assert.ok(days.every(day => day.staffingStatus === "open"));
+  assert.deepEqual(days.map(day => day.availabilityDeadline), ["2098-12-29T15:59:59.999Z", "2099-01-07T15:59:59.999Z", "2099-01-12T15:59:59.999Z"]);
+});
+
+test("an expired recomputation for an open day aborts pending creation and preserves every stored deadline", async () => {
+  const id = await requestedBooking();
+  await saveTimesFor(id, "2099-05-20");
+  let booking = await getRequestedBooking(id);
+  const [existing] = eventDays(await read(await applyDeadlines(id, stringField(booking, "updatedAt")), 200)); assert.ok(existing);
+  await saveTimesFor(id, "2099-05-22");
+  assert.ok(pool);
+  await pool.query("UPDATE events_day SET day='2000-01-10', starts_at='2000-01-10T02:00:00Z', ends_at='2000-01-10T04:00:00Z' WHERE id=$1", [dayId(existing)]);
+  booking = await getRequestedBooking(id);
+  const before = await listBookingEventDays(id);
+  await expectError(await applyDeadlines(id, stringField(booking, "updatedAt"), 4), 400);
+  assert.deepEqual(await listBookingEventDays(id), before);
+  assert.deepEqual((await getRequestedBooking(id)).requestedDays, booking.requestedDays);
+  assert.equal((await getRequestedBooking(id)).updatedAt, booking.updatedAt);
+});

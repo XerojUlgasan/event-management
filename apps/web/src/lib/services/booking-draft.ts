@@ -1,4 +1,3 @@
-import type { BookingEstimatedDuration } from "@event-management/contracts/limits/booking-requests"
 import type { PublicPackage } from "../data/packages"
 
 const KEY = "clemora-booking-draft"
@@ -6,9 +5,8 @@ const KEY = "clemora-booking-draft"
 export type BookingDraftFields = {
   eventType: string
   customEventType: string
-  date: string
-  estimatedDuration: BookingEstimatedDuration
-  estimatedDurationDays: string
+  durationMode: "one_day" | "multi_day"
+  dates: string[]
   contactName: string
   phoneNumber: string
   specialRequests: string

@@ -1,3 +1,4 @@
+import { responseDeadlineForDay, type ResponseDeadlineDays } from "@event-management/contracts/event-days";
 import type { Transaction } from "kysely";
 import type { DayRow } from "../../data/event-days/types.js";
 import type { Database } from "../../data/event-days/types.js";
@@ -14,7 +15,7 @@ export type Schedule = {
   startsAt: string;
   endsAt: string;
   staffingStatus: "draft" | "open";
-  availabilityDeadline: string | null;
+  daysBefore?: ResponseDeadlineDays | null;
 };
 export class EventDayError extends Error {
   constructor(
@@ -27,6 +28,10 @@ export class EventDayError extends Error {
 export const fail = (message: string, status: 400 | 404 | 409): never => {
   throw new EventDayError(message, status);
 };
+export function deadlineForDay(day: string, daysBefore: ResponseDeadlineDays, timeZone: string) {
+  try { return responseDeadlineForDay(day, daysBefore, timeZone); }
+  catch (error) { return fail(error instanceof Error ? error.message : "Invalid response deadline", 400); }
+}
 export function validateSchedule(input: Schedule, timeZone: string) {
   const start = new Date(input.startsAt),
     end = new Date(input.endsAt);
@@ -40,12 +45,14 @@ export function validateSchedule(input: Schedule, timeZone: string) {
   if (`${part("year")}-${part("month")}-${part("day")}` !== input.day)
     fail("Day must match the start date in the booking time zone", 400);
   if (end <= start) fail("End must be after start", 400);
+  const availabilityDeadline = input.daysBefore ? deadlineForDay(input.day, input.daysBefore, timeZone) : null;
   if (
     input.staffingStatus === "open" &&
-    (!input.availabilityDeadline ||
-      new Date(input.availabilityDeadline) <= new Date())
+    (!availabilityDeadline || new Date(availabilityDeadline) <= new Date())
   )
-    fail("An open staffing deadline must be in the future", 400);
+    fail(`The response deadline for ${input.day} must be in the future`, 400);
+  const { daysBefore: _daysBefore, ...schedule } = input;
+  return { ...schedule, availabilityDeadline };
 }
 export function effectiveStatus(day: DayRow) {
   if (day.booking_status !== "accepted") return "closed";
@@ -73,6 +80,8 @@ export async function responses(
     return {
       id: day.id,
       bookingRequestId: day.booking_request_id,
+      bookingReference: day.booking_reference,
+      packageName: day.package_name,
       eventType: day.event_type,
       timezone: day.time_zone,
       day: day.day,

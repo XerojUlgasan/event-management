@@ -12,9 +12,8 @@ export type BookingRequestInput = {
   packageId: string;
   packageUpdatedAt?: string;
   eventType: string;
-  preferredDate: string;
-  estimatedDuration: BookingEstimatedDuration;
-  estimatedDurationDays?: number;
+  durationMode: "one_day" | "multi_day";
+  requestedDays: { date: string }[];
   timeZone: string;
   contactName: string;
   phoneNumber: string;
@@ -26,7 +25,12 @@ export type BookingRequest = Omit<
   | "preferredDate"
   | "estimatedDuration"
   | "estimatedDurationDays"
+  | "durationMode"
+  | "requestedDays"
 > & {
+  requestedDays: { date: string; startsAt: string | null; endsAt: string | null; eventDayId?: string; operationalSchedule: { id: string; day: string; startsAt: string; endsAt: string; timeZone: string; status: string } | null }[] | null;
+  durationMode: "one_day" | "multi_day" | null;
+  requestedDayCount: number | null;
   preferredDate: string | null;
   estimatedDuration: BookingEstimatedDuration | null;
   estimatedDurationDays: number | null;
@@ -111,3 +115,6 @@ export const cancelMyBookingRequest = (id: string, reason: string) =>
     undefined,
     "PATCH",
   );
+
+export const updateRequestedDayTimes = (id: string, date: string, body: { startsAt: string; endsAt: string; expectedUpdatedAt: string }) =>
+  request<{ bookingRequest: BookingRequest }>(`/booking-requests/${encodeURIComponent(id)}/requested-days/${encodeURIComponent(date)}/times`, body, undefined, "PATCH");

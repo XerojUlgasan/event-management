@@ -20,8 +20,9 @@ export async function createBookingRequestService(
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-  if (input.preferredDate < today)
+  if (input.requestedDays.some(day => day.date < today))
     return error("Choose today or a future date", 400);
+  const requestedDays = input.requestedDays.map(({ date }) => ({ date, startsAt: null, endsAt: null })).sort((a, b) => a.date.localeCompare(b.date));
   return db.transaction().execute(async (trx) => {
     const pkg = await findAvailablePackageData(trx, input.packageId);
     if (!pkg)
@@ -42,9 +43,10 @@ export async function createBookingRequestService(
       package_price: pkg.price,
       package_max_guests: pkg.max_guests,
       event_type: input.eventType,
-      preferred_date: input.preferredDate,
-      estimated_duration: input.estimatedDuration,
-      estimated_duration_days: input.estimatedDurationDays ?? null,
+      preferred_date: requestedDays[0]!.date,
+      requested_days: JSON.stringify(requestedDays),
+      estimated_duration: "undecided",
+      estimated_duration_days: null,
       starts_at: null,
       ends_at: null,
       time_zone: input.timeZone,

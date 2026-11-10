@@ -355,7 +355,7 @@ export function MessagesWorkspace({
           </form>
         )}
       </section>
-      {booking && <BookingDetails item={booking} readOnly={isTeam} onClose={() => setBooking(null)} onSaved={setBooking} />}
+      {booking && <BookingDetails item={booking} readOnly={isTeam} customerCanEditTimes={isTeam} onClose={() => setBooking(null)} onSaved={setBooking} />}
     </div>
   )
 }

@@ -1,7 +1,10 @@
+import type { ResponseDeadlineDays } from "@event-management/contracts/event-days";
 import { request } from "../http";
 export type EventDay = {
   id: string;
   bookingRequestId: string;
+  bookingReference: string;
+  packageName: string;
   eventType: string;
   timezone: string;
   day: string;
@@ -39,7 +42,7 @@ export type EventDaySchedule = {
   startsAt: string;
   endsAt: string;
   staffingStatus: "draft" | "open";
-  availabilityDeadline: string | null;
+  daysBefore?: ResponseDeadlineDays;
 };
 const path = (id: string) => encodeURIComponent(id);
 export const getAdminEventDays = (bookingRequestId: string) =>
@@ -53,6 +56,8 @@ export const createEventDay = (
   request<{
     eventDay: EventDay;
   }>("/admin/event-days", { bookingRequestId, ...body });
+export const applyResponseDeadlines = (body: { bookingRequestId: string; daysBefore: ResponseDeadlineDays; expectedUpdatedAt: string }) =>
+  request<{ eventDays: EventDay[] }>("/admin/event-days/apply-response-deadlines", body);
 export const getStaffEventDays = () =>
   request<{
     eventDays: EventDay[];
@@ -76,7 +81,7 @@ export const respondToEventDay = (
 export const updateStaffing = (
   id: string,
   staffingStatus: "open" | "closed",
-  availabilityDeadline?: string | null,
+  daysBefore?: ResponseDeadlineDays,
 ) =>
   request<{
     eventDay: EventDay;
@@ -84,7 +89,7 @@ export const updateStaffing = (
     `/admin/event-days/${path(id)}/staffing`,
     {
       staffingStatus,
-      ...(availabilityDeadline !== undefined ? { availabilityDeadline } : {}),
+      ...(daysBefore !== undefined ? { daysBefore } : {}),
     },
     undefined,
     "PATCH",

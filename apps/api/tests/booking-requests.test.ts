@@ -19,6 +19,8 @@ let customerId: string;
 let otherCustomerId: string;
 let resetBookingConversationId: string | undefined;
 let preservedGeneralConversationId: string | undefined;
+let dayMigrationSnapshot: unknown;
+let dayMigrationBookingId: string;
 
 before(async () => {
   assert.ok(
@@ -69,7 +71,23 @@ before(async () => {
         [preservedGeneralConversationId, legacy.rows[0].customer_id],
       );
     }
+    if (entry.name === "20261111120000_booking_requested_days") {
+      const user = (await pool.query("INSERT INTO users(email,role,password_hash) VALUES ('days-legacy@example.test','customer','unused') RETURNING id")).rows[0].id;
+      const pkg = (await pool.query("INSERT INTO packages(slug,name,max_guests,price) VALUES ('days-legacy','Days legacy',100,1000) RETURNING id")).rows[0].id;
+      dayMigrationBookingId = (await pool.query(`INSERT INTO booking_requests(reference,customer_id,package_id,package_name,package_price,package_max_guests,event_type,preferred_date,estimated_duration,estimated_duration_days,starts_at,ends_at,time_zone,contact_name,phone_number,status,out_of_range)
+        VALUES ('DAYS-LEGACY',$1,$2,'Original snapshot',1000,100,'Wedding','2099-01-01','more_than_1_week',9,'2099-01-01T10:00:00Z','2099-01-01T12:00:00Z','Asia/Manila','Legacy','123','accepted',false) RETURNING id`,[user,pkg])).rows[0].id;
+      await pool.query("INSERT INTO booking_request_status_history(booking_request_id,status,changed_by) VALUES ($1,'accepted',$2)",[dayMigrationBookingId,user]);
+      const conversation=(await pool.query("INSERT INTO conversations(customer_id,booking_request_id) VALUES($1,$2) RETURNING id",[user,dayMigrationBookingId])).rows[0].id;
+      await pool.query("INSERT INTO messages(conversation_id,sender_id,sender_role,body) VALUES($1,$2,'customer','Preserved transcript')",[conversation,user]);
+      await pool.query("INSERT INTO events_day(booking_request_id,day,starts_at,ends_at) VALUES($1,'2099-01-01','2099-01-01T10:00:00Z','2099-01-01T12:00:00Z')",[dayMigrationBookingId]);
+      dayMigrationSnapshot=(await pool.query("SELECT to_jsonb(br) AS booking, (SELECT jsonb_agg(h) FROM booking_request_status_history h WHERE h.booking_request_id=br.id) AS history, (SELECT jsonb_agg(d) FROM events_day d WHERE d.booking_request_id=br.id) AS days, (SELECT jsonb_agg(c) FROM conversations c WHERE c.booking_request_id=br.id) AS conversations FROM booking_requests br WHERE br.id=$1",[dayMigrationBookingId])).rows[0];
+    }
     await pool.query(await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"));
+    if (entry.name === "20261111120000_booking_requested_days") {
+      const after=(await pool.query("SELECT to_jsonb(br)-'requested_days' AS booking, (SELECT jsonb_agg(h) FROM booking_request_status_history h WHERE h.booking_request_id=br.id) AS history, (SELECT jsonb_agg(d) FROM events_day d WHERE d.booking_request_id=br.id) AS days, (SELECT jsonb_agg(c) FROM conversations c WHERE c.booking_request_id=br.id) AS conversations FROM booking_requests br WHERE br.id=$1",[dayMigrationBookingId])).rows[0];
+      assert.deepEqual(after,dayMigrationSnapshot);
+      assert.equal((await pool.query("SELECT requested_days FROM booking_requests WHERE id=$1",[dayMigrationBookingId])).rows[0].requested_days,null);
+    }
     if (entry.name === "20261101100000_short_booking_intake") {
       const legacy = await pool.query("SELECT preferred_date, estimated_duration, starts_at, ends_at, preferred_venue_location FROM booking_requests WHERE reference = 'LEGACY'");
       assert.equal(legacy.rows[0].preferred_date, "2027-01-02");
@@ -160,12 +178,12 @@ test("requests enforce roles, published package availability, snapshots, ownersh
     max_guests: 100,
     price: 150_000,
   }).returningAll().executeTakeFirstOrThrow();
-  let input = {packageId:pkg.id,packageUpdatedAt:pkg.updated_at.toISOString(),eventType:"Wedding",preferredDate:"2099-01-02",estimatedDuration:"8_hours",timeZone:"Asia/Manila",guestCount:120,contactName:"Customer",phoneNumber:"123",specialRequests:"Music"};
+  let input = {packageId:pkg.id,packageUpdatedAt:pkg.updated_at.toISOString(),eventType:"Wedding",durationMode:"one_day",requestedDays:[{date:"2099-01-02"}],timeZone:"Asia/Manila",guestCount:120,contactName:"Customer",phoneNumber:"123",specialRequests:"Music"};
   await read(await call("/booking-requests","POST",input),401);
   await read(await call("/booking-requests","POST",input,adminCookie),403);
   await read(await call("/admin/booking-requests","GET",undefined,customerCookie),403);
   for (const preferredDate of ["2020-01-01", "2027-02-29", "0000-01-01", "2099-13-01", "01-02-2099"])
-    await read(await call("/booking-requests","POST",{...input,preferredDate},customerCookie),400);
+    await read(await call("/booking-requests","POST",{...input,requestedDays:[{date:preferredDate}]},customerCookie),400);
   await read(await call("/booking-requests","POST",{...input,estimatedDuration:"3_hours"},customerCookie),400);
   await read(await call("/booking-requests","POST",{...input,contactName:" "},customerCookie),400);
   await read(await call("/booking-requests","POST",{...input,timeZone:"Wrong/Zone"},customerCookie),400);
@@ -188,7 +206,9 @@ test("requests enforce roles, published package availability, snapshots, ownersh
   await read(await call("/packages", "GET", undefined, staffCookie), 200);
   await read(await call("/services", "GET", undefined, staffCookie), 200);
   const created = (await read(await call("/booking-requests","POST",input,customerCookie),201)).bookingRequest;
-  assert.equal(created.preferredDate, input.preferredDate); assert.equal(created.estimatedDuration, "8_hours");
+  assert.equal(created.preferredDate, input.requestedDays[0]!.date); assert.equal(created.estimatedDuration, "undecided");
+  assert.deepEqual(created.requestedDays,[{date:"2099-01-02",startsAt:null,endsAt:null,operationalSchedule:null}]);
+  assert.equal(created.durationMode,"one_day"); assert.equal(created.requestedDayCount,1);
   assert.equal(created.packageName, "Garden");
   assert.deepEqual(created.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });
   assert.equal(created.packageMaxGuests, 100);
@@ -202,26 +222,12 @@ test("requests enforce roles, published package availability, snapshots, ownersh
   assert.equal(atMaximum.outOfRange, false);
   assert.equal(belowPreviousMinimum.outOfRange, false);
   const { guestCount: _guestCount, ...withoutGuestCount } = input;
-  for (const estimatedDuration of ["3_days", "4_days", "5_days", "6_days", "1_week", "more_than_1_week"]) {
-    const estimatedDurationDays = estimatedDuration === "more_than_1_week" ? 8 : null;
-    const request = (await read(await call("/booking-requests", "POST", { ...withoutGuestCount, estimatedDuration, ...(estimatedDurationDays === null ? {} : { estimatedDurationDays }) }, customerCookie), 201)).bookingRequest;
-    assert.equal(request.estimatedDuration, estimatedDuration);
-    assert.equal(request.estimatedDurationDays, estimatedDurationDays);
-    assert.equal(request.guestCount, null);
-    assert.equal(request.outOfRange, false);
-    const saved = await pool.query("SELECT estimated_duration, estimated_duration_days, guest_count, out_of_range FROM booking_requests WHERE id = $1", [request.id]);
-    assert.deepEqual(saved.rows[0], { estimated_duration: estimatedDuration, estimated_duration_days: estimatedDurationDays, guest_count: null, out_of_range: false });
-    const fetched = (await read(await call(`/booking-requests/${request.id}`, "GET", undefined, customerCookie), 200)).bookingRequest;
-    assert.equal(fetched.estimatedDuration, estimatedDuration);
-    assert.equal(fetched.estimatedDurationDays, estimatedDurationDays);
-    assert.equal(fetched.guestCount, null);
-    assert.equal(fetched.outOfRange, false);
+  for (const requestedDays of [[], [{date:"2099-01-02"},{date:"2099-01-02"}]]) {
+    await read(await call("/booking-requests", "POST", { ...input, requestedDays }, customerCookie), 400);
   }
-  for (const estimatedDurationDays of [undefined, 7, 8.5]) {
-    await read(await call("/booking-requests", "POST", { ...input, estimatedDuration: "more_than_1_week", estimatedDurationDays }, customerCookie), 400);
-  }
-  for (const estimatedDuration of ["4_hours", "8_hours", "12_hours", "1_day", "2_days", "3_days", "4_days", "5_days", "6_days", "1_week", "undecided"]) {
-    await read(await call("/booking-requests", "POST", { ...input, estimatedDuration, estimatedDurationDays: 8 }, customerCookie), 400);
+  await read(await call("/booking-requests", "POST", { ...input, durationMode:"multi_day" }, customerCookie), 400);
+  for (const forbidden of [{startsAt:"2099-01-02T00:00:00Z"}, {eventDayId:randomUUID()}]) {
+    await read(await call("/booking-requests", "POST", { ...input, requestedDays:[{date:"2099-01-02",...forbidden}] }, customerCookie),400);
   }
   const detail = (await read(await call(`/booking-requests/${created.id}`, "GET", undefined, customerCookie), 200)).bookingRequest;
   assert.deepEqual(detail, created);
@@ -266,7 +272,7 @@ test("requests enforce roles, published package availability, snapshots, ownersh
   for (const status of ["needs_details", "declined", "cancelled"]) await read(await call(`/admin/booking-requests/${created.id}/status`,"PATCH",{status, reason:"  "},adminCookie),400);
   await read(await call(`/admin/booking-requests/${created.id}/status`,"PATCH",{status:"declined", reason:"Unavailable"},adminCookie),200);
   await read(await call(`/booking-requests/${created.id}/cancel`,"PATCH",{reason:"Change of plans"},customerCookie),409);
-  const { estimatedDuration: _duration, ...withoutDuration } = input;
+  const withoutDuration = input;
   const another = (await read(await call("/booking-requests","POST",withoutDuration,customerCookie),201)).bookingRequest;
   assert.equal(another.estimatedDuration, "undecided");
   await read(await call(`/booking-requests/${another.id}/cancel`,"PATCH",{reason:"Change of plans"},otherCustomerCookie),404);
@@ -280,8 +286,8 @@ test("requests enforce roles, published package availability, snapshots, ownersh
   await read(await call(`/booking-requests/${another.id}/cancel`,"PATCH",{reason:"Change of plans"},customerCookie),409);
   await read(await call(`/admin/booking-requests/${created.id}/status`,"PATCH",{status:"accepted"},adminCookie),409);
   const todayInManila = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const todayRequest = (await read(await call("/booking-requests", "POST", { ...input, preferredDate: todayInManila, estimatedDuration: "1_day" }, customerCookie), 201)).bookingRequest;
-  assert.equal(todayRequest.preferredDate, todayInManila); assert.equal(todayRequest.estimatedDuration, "1_day");
+  const todayRequest = (await read(await call("/booking-requests", "POST", { ...input, requestedDays:[{date:todayInManila}] }, customerCookie), 201)).bookingRequest;
+  assert.equal(todayRequest.preferredDate, todayInManila); assert.equal(todayRequest.estimatedDuration, "undecided");
   const updatedPackage = await db.updateTable("packages").set({
     name: "Updated Garden",
     max_guests: 200,
@@ -309,9 +315,10 @@ test("requests enforce roles, published package availability, snapshots, ownersh
   assert.equal(original.statusHistory.length,3);
   const spec:any = await (await app.request("/openapi.json")).json();
   assert.ok(spec.paths["/v1/booking-requests/{id}"].get);
+  assert.ok(spec.paths["/v1/booking-requests/{id}/requested-days/{date}/times"].patch);
   assert.ok(spec.paths["/v1/admin/booking-requests/{id}"].get);
   const requestSchema = spec.paths["/v1/booking-requests"].post.requestBody.content["application/json"].schema;
-  assert.ok(requestSchema.required.includes("preferredDate"));
+  assert.ok(requestSchema.required.includes("requestedDays"));
   assert.ok(!requestSchema.required.includes("guestCount"));
   assert.ok(!requestSchema.required.includes("startsAt"));
   assert.ok(!("packageVersionId" in requestSchema.properties));
@@ -321,7 +328,7 @@ test("requests enforce roles, published package availability, snapshots, ownersh
 
 test("admin request filters, cursor pages and calendar counts use preferred dates", async () => {
   const packageId = (await pool.query(
-    "INSERT INTO packages (name, max_guests, price) VALUES ('Filter fixture', 100, 1000) RETURNING id",
+    "INSERT INTO packages (slug, name, max_guests, price) VALUES ('filter-fixture', 'Filter fixture', 100, 1000) RETURNING id",
   )).rows[0].id;
   const ids = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()].sort().reverse();
   const rows = [
@@ -350,14 +357,15 @@ test("admin request filters, cursor pages and calendar counts use preferred date
 
 test("booking request pagination crosses the 50-item boundary without duplicates", async () => {
   const packageId = (await pool.query(
-    "INSERT INTO packages (name, max_guests, price) VALUES ('Pagination fixture', 100, 1000) RETURNING id",
+    "INSERT INTO packages (slug, name, max_guests, price) VALUES ('pagination-fixture', 'Pagination fixture', 100, 1000) RETURNING id",
   )).rows[0].id;
   await pool.query(`INSERT INTO booking_requests (reference, customer_id, package_id, package_name, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, package_price, package_max_guests, created_at)
     SELECT 'PAGE-' || n, $1, $2, 'Fixture', 'Wedding', '2097-05-10', 'undecided', 'Asia/Manila', 20, 'Customer', '123', 'under_review', false, 1000, 100,
       '2097-01-01T00:00:00.123456Z'::timestamptz + (n / 4) * interval '1 second'
     FROM generate_series(1, 53) AS n`, [customerId, packageId]);
   const expected = (await pool.query("SELECT id FROM booking_requests WHERE preferred_date = '2097-05-10' AND status = 'under_review' ORDER BY created_at DESC, id DESC")).rows.map(row => row.id);
-  const base = "/admin/booking-requests?status=under_review&preferredDate=2097-05-10&limit=50";
+  await pool.query(`UPDATE booking_requests SET requested_days='[{"date":"2097-05-11","startsAt":null,"endsAt":null},{"date":"2097-05-12","startsAt":null,"endsAt":null},{"date":"2097-05-12","startsAt":null,"endsAt":null}]'::jsonb WHERE preferred_date='2097-05-10'`);
+  const base = "/admin/booking-requests?status=under_review&preferredDate=2097-05-12&limit=50";
   const first = await read(await call(base, "GET", undefined, adminCookie), 200);
   assert.equal(first.bookingRequests.length, 50);
   assert.ok(first.nextCursor);
@@ -367,4 +375,103 @@ test("booking request pagination crosses the 50-item boundary without duplicates
   const actual = [...first.bookingRequests, ...second.bookingRequests].map((row: any) => row.id);
   assert.equal(new Set(actual).size, 53);
   assert.deepEqual(actual, expected);
+  const calendar=await read(await call("/admin/booking-requests/calendar?month=2097-05&status=under_review","GET",undefined,adminCookie),200);
+  assert.deepEqual(calendar.dailyCounts,[{preferredDate:"2097-05-11",count:53},{preferredDate:"2097-05-12",count:53}]);
+  const ignoredPreferred=await read(await call("/admin/booking-requests?preferredDate=2097-05-10","GET",undefined,adminCookie),200);
+  assert.equal(ignoredPreferred.bookingRequests.length,0);
+});
+
+async function createDatesBooking(dates = ["2099-12-05", "2099-12-07", "2099-12-08"], timeZone = "Asia/Manila") {
+  const pkg = await db.insertInto("packages").values({ slug:`dates-${randomUUID()}`, name:`Dates fixture ${randomUUID()}`, max_guests:100, price:1000 }).returning("id").executeTakeFirstOrThrow();
+  return (await read(await call("/booking-requests", "POST", {
+    packageId:pkg.id,eventType:"Wedding",durationMode:dates.length === 1 ? "one_day" : "multi_day",
+    requestedDays:dates.map(date => ({date})),timeZone,contactName:"Customer",phoneNumber:"123",
+  }, customerCookie),201)).bookingRequest;
+}
+const timesPath = (id: string, date: string) => `/booking-requests/${id}/requested-days/${date}/times`;
+const sampleTimes = {startsAt:"2099-12-05T23:00:00+08:00",endsAt:"2099-12-06T02:00:00+08:00"};
+
+test("nonconsecutive dates create atomically in order, appear on every calendar day and preserve conversation policy", async () => {
+  const booking = await createDatesBooking(["2099-12-08","2099-12-05","2099-12-07"]);
+  assert.deepEqual(booking.requestedDays.map((day: {date:string})=>day.date),["2099-12-05","2099-12-07","2099-12-08"]);
+  assert.equal(booking.preferredDate,"2099-12-05");assert.equal(booking.requestedDayCount,3);assert.equal(booking.durationMode,"multi_day");
+  assert.equal(booking.statusHistory.length,1);
+  const conversation = await pool.query("SELECT id FROM conversations WHERE booking_request_id=$1",[booking.id]);
+  assert.equal(conversation.rowCount,1);
+  const calendar = await read(await call("/admin/booking-requests/calendar?month=2099-12&status=under_review","GET",undefined,adminCookie),200);
+  for(const date of ["2099-12-05","2099-12-07","2099-12-08"]) {
+    assert.ok(calendar.dailyCounts.some((day: {preferredDate:string,count:number})=>day.preferredDate===date && day.count>=1));
+    const page = await read(await call(`/admin/booking-requests?preferredDate=${date}&status=under_review&limit=1`,"GET",undefined,adminCookie),200);
+    assert.equal(page.bookingRequests[0].id,booking.id);
+  }
+  const absent = await read(await call("/admin/booking-requests?preferredDate=2099-12-06","GET",undefined,adminCookie),200);
+  assert.ok(!absent.bookingRequests.some((r:{id:string})=>r.id===booking.id));
+  const saved = (await read(await call(timesPath(booking.id,"2099-12-05"),"PATCH",{...sampleTimes,expectedUpdatedAt:booking.updatedAt},customerCookie),200)).bookingRequest;
+  assert.equal(saved.startsAt,null);assert.equal(saved.endsAt,null);
+  assert.deepEqual((await pool.query("SELECT starts_at,ends_at FROM booking_requests WHERE id=$1",[booking.id])).rows[0],{starts_at:null,ends_at:null});
+  await read(await call(`/admin/booking-requests/${booking.id}/status`,"PATCH",{status:"accepted"},adminCookie),200);
+  const filtered=await read(await call("/admin/booking-requests/calendar?month=2099-12&status=under_review","GET",undefined,adminCookie),200);
+  assert.deepEqual(filtered.dailyCounts,[]);
+  const accepted=await read(await call("/admin/booking-requests/calendar?month=2099-12&status=accepted","GET",undefined,adminCookie),200);
+  assert.deepEqual(accepted.dailyCounts,[{preferredDate:"2099-12-05",count:1},{preferredDate:"2099-12-07",count:1},{preferredDate:"2099-12-08",count:1}]);
+});
+
+test("owner saves independent per-day times with exact revisions; roles, state and invalid ranges reject without writes", async () => {
+  const booking = await createDatesBooking();
+  const path=timesPath(booking.id,"2099-12-05"),input={...sampleTimes,expectedUpdatedAt:booking.updatedAt};
+  await read(await call(path,"PATCH",input),401);
+  for(const cookie of [adminCookie,staffCookie]) await read(await call(path,"PATCH",input,cookie),403);
+  await read(await call(path,"PATCH",input,otherCustomerCookie),404);
+  for(const invalid of [{endsAt:undefined},{endsAt:sampleTimes.startsAt},{startsAt:"2099-12-04T23:00:00+08:00"},{endsAt:"2099-12-07T02:00:00+08:00"},{eventDayId:randomUUID()}])
+    await read(await call(path,"PATCH",{...input,...invalid},customerCookie),400);
+  await read(await call(timesPath(booking.id,"2099-12-06"),"PATCH",input,customerCookie),404);
+  assert.deepEqual((await read(await call(`/booking-requests/${booking.id}`,"GET",undefined,customerCookie),200)).bookingRequest,booking);
+  // A real database microsecond revision must survive DTO serialization and stale comparison.
+  await pool.query("UPDATE booking_requests SET updated_at='2090-01-01T00:00:00.123456Z' WHERE id=$1",[booking.id]);
+  const revision=(await read(await call(`/booking-requests/${booking.id}`,"GET",undefined,customerCookie),200)).bookingRequest.updatedAt;
+  assert.equal(revision,"2090-01-01T00:00:00.123456Z");
+  await read(await call(path,"PATCH",{...input,expectedUpdatedAt:"2090-01-01T00:00:00.123Z"},customerCookie),409);
+  const saved=(await read(await call(path,"PATCH",{...input,expectedUpdatedAt:revision},customerCookie),200)).bookingRequest;
+  assert.notEqual(saved.updatedAt,revision);
+  assert.deepEqual(saved.requestedDays[0],{date:"2099-12-05",startsAt:"2099-12-05T15:00:00.000Z",endsAt:"2099-12-05T18:00:00.000Z",operationalSchedule:null});
+  assert.equal(saved.requestedDays[1].startsAt,null);
+  await read(await call(path,"PATCH",{...input,expectedUpdatedAt:revision},customerCookie),409);
+  const second=(await read(await call(timesPath(booking.id,"2099-12-07"),"PATCH",{startsAt:"2099-12-07T10:00:00+08:00",endsAt:"2099-12-07T12:00:00+08:00",expectedUpdatedAt:saved.updatedAt},customerCookie),200)).bookingRequest;
+  assert.deepEqual(second.requestedDays[0],saved.requestedDays[0]);assert.equal(second.requestedDays[2].startsAt,null);
+  const needs=(await read(await call(`/admin/booking-requests/${booking.id}/status`,"PATCH",{status:"needs_details",reason:"Details"},adminCookie),200)).bookingRequest;
+  await read(await call(path,"PATCH",{...input,expectedUpdatedAt:second.updatedAt},customerCookie),409);
+  const editable=(await read(await call(path,"PATCH",{...input,expectedUpdatedAt:needs.updatedAt},customerCookie),200)).bookingRequest;
+  assert.equal(editable.status,"needs_details");
+  for(const status of ["declined","cancelled"]) {
+    const terminal=await createDatesBooking();
+    const result=(await read(await call(`/admin/booking-requests/${terminal.id}/status`,"PATCH",{status,reason:"Terminal"},adminCookie),200)).bookingRequest;
+    await read(await call(timesPath(terminal.id,"2099-12-05"),"PATCH",{...input,expectedUpdatedAt:result.updatedAt},customerCookie),409);
+  }
+});
+
+test("repeated DST local times are rejected while unambiguous offset and overnight times persist",async()=>{
+  const booking=await createDatesBooking(["2027-11-07"],"America/New_York");
+  const path=timesPath(booking.id,"2027-11-07");
+  for(const startsAt of ["2027-11-07T01:30:00-04:00","2027-11-07T01:30:00-05:00"])
+    await read(await call(path,"PATCH",{startsAt,endsAt:"2027-11-07T03:00:00-05:00",expectedUpdatedAt:booking.updatedAt},customerCookie),400);
+  const saved=(await read(await call(path,"PATCH",{startsAt:"2027-11-07T03:00:00-05:00",endsAt:"2027-11-08T01:00:00-05:00",expectedUpdatedAt:booking.updatedAt},customerCookie),200)).bookingRequest;
+  assert.equal(saved.requestedDays[0].startsAt,"2027-11-07T08:00:00.000Z");
+});
+
+test("concurrent per-day saves reject one stale writer and retain every other entry",async()=>{
+  const booking=await createDatesBooking();
+  const results=await Promise.all(["2099-12-05","2099-12-07"].map(date=>call(timesPath(booking.id,date),"PATCH",{startsAt:`${date}T10:00:00+08:00`,endsAt:`${date}T12:00:00+08:00`,expectedUpdatedAt:booking.updatedAt},customerCookie)));
+  assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);
+  const saved=(await read(await call(`/booking-requests/${booking.id}`,"GET",undefined,customerCookie),200)).bookingRequest;
+  assert.equal(saved.requestedDays.filter((day:{startsAt:string|null})=>day.startsAt!==null).length,1);
+});
+
+
+test("migration keeps legacy estimates, timestamps and related operational data without inventing requested days",async()=>{
+  const booking=(await read(await call(`/admin/booking-requests/${dayMigrationBookingId}`,"GET",undefined,adminCookie),200)).bookingRequest;
+  assert.equal(booking.requestedDays,null);assert.equal(booking.durationMode,null);assert.equal(booking.requestedDayCount,null);
+  assert.equal(booking.estimatedDuration,"more_than_1_week");assert.equal(booking.estimatedDurationDays,9);
+  assert.equal(booking.startsAt,"2099-01-01T10:00:00.000Z");assert.equal(booking.endsAt,"2099-01-01T12:00:00.000Z");
+  assert.equal(booking.packageName,"Original snapshot");
+  assert.equal((await pool.query("SELECT m.id FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE c.booking_request_id=$1 AND m.body='Preserved transcript'",[dayMigrationBookingId])).rowCount,1);
 });

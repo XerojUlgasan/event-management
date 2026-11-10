@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | Reusable React presentation, component styles, and stories | [UI exports](../../packages/ui/src/index.ts), [package exports](../../packages/ui/package.json), [atomic layers](../../packages/ui/README.md), and the relevant component, story, and [styles](../../packages/ui/src/styles.css) | `@event-management/ui` and `@event-management/ui/styles.css` |
 | Shared design tokens | [Theme source](../../packages/theme/src/theme.css) and [package exports](../../packages/theme/package.json) | `@event-management/theme/theme.css` and its existing CSS variables or Tailwind tokens |
-| Shared catalog types and domain limits | [Contract exports](../../packages/contracts/package.json) and the relevant source | `@event-management/contracts/catalog` and the explicit `@event-management/contracts/limits/*` subpaths |
+| Shared catalog types, domain limits, and event-day deadline policy | [Contract exports](../../packages/contracts/package.json) and the relevant source | `@event-management/contracts/catalog`, the explicit `@event-management/contracts/limits/*` subpaths, and `@event-management/contracts/event-days` |
 
 The web app loads theme and UI styles through [app.css](../../apps/web/src/styles/app.css); Storybook loads them through its [preview CSS](../../packages/ui/.storybook/preview.css). Check those consumers before changing shared styles. API schemas enforce accepted domain values; browser hints consume the shared limits, while server HTTP body caps remain in the API. Load the [limits skill](../limits/SKILL.md) when changing a mirrored constraint or its consumers.
 

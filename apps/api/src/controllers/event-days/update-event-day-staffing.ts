@@ -2,7 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import * as service from "../../services/event-days/update-event-day-staffing.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { body } from "../booking-requests/http.js";
-import { errorResponse, instant, params, response, tags } from "./schemas.js";
+import { daysBefore, errorResponse, params, response, tags } from "./schemas.js";
 export const updateEventDayStaffingRoute = createRoute({
   method: "patch",
   path: "/admin/event-days/{id}/staffing",
@@ -10,10 +10,10 @@ export const updateEventDayStaffingRoute = createRoute({
   request: {
     params,
     body: body(
-      z.object({
-        staffingStatus: z.enum(["open", "closed"]),
-        availabilityDeadline: instant.optional(),
-      }),
+      z.discriminatedUnion("staffingStatus", [
+        z.strictObject({ staffingStatus: z.literal("open"), daysBefore }),
+        z.strictObject({ staffingStatus: z.literal("closed") }),
+      ]),
     ),
   },
   responses: response,

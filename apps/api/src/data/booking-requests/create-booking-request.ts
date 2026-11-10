@@ -1,3 +1,4 @@
+import { bookingRevision } from "./booking-revision.js";
 import type { Transaction, Insertable } from "kysely";
 import type { DB, BookingRequests } from "../../db/types.js";
 
@@ -8,5 +9,5 @@ export const createBookingRequestData = (
   db
     .insertInto("booking_requests")
     .values(values)
-    .returningAll()
+    .returningAll().returning(bookingRevision.as("revision"))
     .executeTakeFirstOrThrow();

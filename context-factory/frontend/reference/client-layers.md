@@ -20,9 +20,9 @@ Domain modules under `apps/web/src/lib/data/` are the functions screens use for 
 | `venues.ts` | Public and admin venue reads, create, update, archive, and delete |
 | `catalog-media.ts` | Admin catalog upload and delete, plus resolving a stored media path to a browser URL |
 | `messages.ts` | Customer and admin conversation reads and sends |
-| `booking-requests.ts` | Customer and admin booking-request reads, create, cancel, and status update |
+| `booking-requests.ts` | Customer and admin booking-request reads, create, per-day time saves, cancel and status update, plus admin date counts and filtered pages |
 | `users.ts` | Admin user directory read |
-| `event-days.ts` | Admin event-day staffing, staff availability responses, and own assignments |
+| `event-days.ts` | Admin event-day reads and team operations, request-level deadline application that creates requested-date days and updates current scheduled deadlines from one 1–4-day choice, legacy manual creation and move/reopen deadline choices, staff availability responses, and own assignments |
 | `page-query.ts` | `limit` and `offset` query string used by public list functions. It performs no HTTP |
 
 Call shape on `request(path, body?, idToken?, method?)`:
@@ -42,7 +42,7 @@ Encode ids in the path with `encodeURIComponent`. Package content types come fro
 | Kind of code | Owner | Current examples |
 | --- | --- | --- |
 | One HTTP operation | `src/lib/data/<domain>.ts` | `createPackage`, `getMe`, `uploadCatalogMedia` |
-| More than one client step, browser storage, or combining responses without a new route | `src/lib/services/` | `uploadPendingCatalogMedia` calls `uploadCatalogMedia` for each pending file. `booking-draft.ts` stores a signed-out inquiry in `sessionStorage`. `mergeThread` keeps a message that a poll started before the send has not returned yet |
+| More than one client step, browser storage, or combining responses without a new route | `src/lib/services/` | `uploadPendingCatalogMedia` calls `uploadCatalogMedia` for each pending file. `booking-draft.ts` stores a signed-out inquiry, including date mode, date rows, and timezone, in `sessionStorage`. `mergeThread` keeps a message that a poll started before the send has not returned yet |
 | Pure conversion with no network and no storage | `src/lib/utils/` | `pesosToCentavos`, `centavosToPesos`, `initialsFromName`, `firstName` |
 | Signed-in React state | `src/lib/auth.tsx` | `AuthProvider` and `useAuth` call `lib/data/auth.ts` for sign-in, sign-out, and session restore. A screen may still call `getMe` when it needs a fresh profile, as the public booking dialog does |
 | Firebase browser SDK | `src/lib/firebase.ts` | Optional Google and Firebase password sign-in. Identity still reaches the API through `lib/data/auth.ts` |

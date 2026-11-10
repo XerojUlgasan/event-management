@@ -273,8 +273,8 @@ test("general threads have no booking context and can reopen after expiry", asyn
 
 test("booking conversations derive context and remain closed after expiry", async () => {
   const booking = (await read(await call("/booking-requests", "POST", {
-    packageId, eventType: "Wedding", preferredDate: "2099-01-02",
-    estimatedDuration: "8_hours", timeZone: "Asia/Manila", guestCount: 80, contactName: "Customer", phoneNumber: "123",
+    packageId, eventType: "Wedding", durationMode: "one_day", requestedDays: [{ date: "2099-01-02" }],
+    timeZone: "Asia/Manila", guestCount: 80, contactName: "Customer", phoneNumber: "123",
   }, chatCustomerCookie), 201)).bookingRequest;
   assert.equal(booking.packageName, "Garden Wedding");
   assert.deepEqual(booking.packagePrice, { kind: "fixed", currency: "PHP", amountMinor: 15_000_000 });

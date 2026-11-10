@@ -187,6 +187,7 @@ model BookingRequest {
   packageMaxGuests Int @map("package_max_guests")
   eventType String @map("event_type")
   preferredDate String @map("preferred_date")
+  requestedDays Json? @map("requested_days") @db.JsonB
   estimatedDuration String @default("undecided") @map("estimated_duration")
   estimatedDurationDays Int? @map("estimated_duration_days")
   startsAt DateTime? @map("starts_at") @db.Timestamptz(6)

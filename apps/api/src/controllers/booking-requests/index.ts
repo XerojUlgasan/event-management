@@ -1,3 +1,4 @@
+import { saveRequestedDayTimesRoute, saveRequestedDayTimesRouteHandler } from "./save-requested-day-times.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
@@ -19,6 +20,7 @@ routes.use("/admin/booking-requests/*",requireSession,createMiddleware<HonoEnv>(
   if (c.req.method === "GET") return bookingReader(c, next);
   return requireSystemAdmin(c, next);
 }));
+routes.openapi(saveRequestedDayTimesRoute, saveRequestedDayTimesRouteHandler);
 routes.openapi(createBookingRequestRoute,createBookingRequestRouteHandler);
 routes.openapi(cancelBookingRequestRoute,cancelBookingRequestRouteHandler);
 routes.openapi(listMyBookingRequestsRoute,listMyBookingRequestsRouteHandler);

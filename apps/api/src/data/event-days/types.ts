@@ -20,6 +20,8 @@ export type DayRow = Pick<
   | "replacement_event_day_id"
 > &
   Pick<Selectable<BookingRequests>, "event_type" | "time_zone"> & {
+    booking_reference: string;
+    package_name: string;
     day: string;
     booking_status: string;
   };

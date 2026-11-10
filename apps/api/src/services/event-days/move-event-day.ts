@@ -1,3 +1,4 @@
+import { touchBookingRevisionData } from "../../data/booking-requests/booking-revision.js";
 import type { Kysely } from "kysely";
 import { createEventDayData } from "../../data/event-days/create-event-day.js";
 import { endEventDayData } from "../../data/event-days/end-event-day.js";
@@ -15,13 +16,14 @@ export async function moveEventDayService(
 ) {
   return db.transaction().execute(async (trx) => {
     const day = await lockExisting(trx, id);
-    validateSchedule(input, day.time_zone);
+    const schedule = validateSchedule(input, day.time_zone);
     const replacement = await createEventDayData(
       trx,
       day.booking_request_id,
-      input,
+      schedule,
     );
     await endEventDayData(trx, id, "moved", replacement);
+    await touchBookingRevisionData(trx, day.booking_request_id);
     return one(trx, replacement);
   });
 }

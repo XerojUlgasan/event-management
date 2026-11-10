@@ -9,6 +9,18 @@ export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S, I | undefined, U>
   : ColumnType<T, T | undefined, T>;
 
+export type Json = JsonValue;
+
+export type JsonArray = JsonValue[];
+
+export type JsonObject = {
+  [x: string]: JsonValue | undefined;
+};
+
+export type JsonPrimitive = boolean | number | string | null;
+
+export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
+
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface BookingRequests {
@@ -30,6 +42,7 @@ export interface BookingRequests {
   preferred_date: string;
   preferred_venue_location: string | null;
   reference: string;
+  requested_days: Json | null;
   special_requests: string | null;
   starts_at: Timestamp | null;
   status: Generated<string>;

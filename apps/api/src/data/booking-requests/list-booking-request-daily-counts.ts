@@ -1,27 +1,20 @@
-import type { Kysely, Transaction } from "kysely";
+import { sql, type Kysely, type Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 type Database = Kysely<DB> | Transaction<DB>;
 
-export const listBookingRequestDailyCountsData = (
-  db: Database,
-  month: string,
-  status?: string,
-) => {
-  const [year, monthNumber] = month.split("-").map(Number) as [number, number];
-  const nextMonth =
-    monthNumber === 12
-      ? `${String(year + 1).padStart(4, "0")}-01`
-      : `${year.toString().padStart(4, "0")}-${String(monthNumber + 1).padStart(2, "0")}`;
-  let query = db
-    .selectFrom("booking_requests")
-    .select("preferred_date")
-    .select(db.fn.countAll<string>().as("count"))
-    .where("preferred_date", ">=", `${month}-01`);
-  if (month !== "9999-12")
-    query = query.where("preferred_date", "<", `${nextMonth}-01`);
-  if (status) query = query.where("status", "=", status);
-  return query
-    .groupBy("preferred_date")
-    .orderBy("preferred_date", "asc")
-    .execute();
-};
+export async function listBookingRequestDailyCountsData(db: Database, month: string, status?: string) {
+  // DISTINCT keeps each request count once per date, including historical malformed duplicates.
+  const result = await sql<{ preferred_date: string; count: string }>`
+    SELECT dates.preferred_date, count(DISTINCT br.id)::text AS count
+    FROM booking_requests br
+    CROSS JOIN LATERAL (
+      SELECT br.preferred_date WHERE br.requested_days IS NULL
+      UNION
+      SELECT day->>'date' FROM jsonb_array_elements(br.requested_days) AS requested(day)
+    ) AS dates(preferred_date)
+    WHERE dates.preferred_date LIKE ${month + "-%"}
+      ${status ? sql`AND br.status = ${status}` : sql``}
+    GROUP BY dates.preferred_date ORDER BY dates.preferred_date ASC
+  `.execute(db);
+  return result.rows;
+}

@@ -1,12 +1,17 @@
+import { ApiError } from "../../lib/http";
+import { getMyBookingRequest } from "../../lib/data/booking-requests";
 import { AdminEventDays } from "./staff/AdminEventDays";
-import { Input, NativeDialog, Select, Textarea } from "@event-management/ui"
+import { localInput, zonedInstant } from "../../lib/utils/event-day-time";
+import { FormField, Input, NativeDialog, Select, Textarea } from "@event-management/ui"
 import { MAX_BOOKING_REASON_LENGTH } from "@event-management/contracts/limits/booking-requests";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Badge, Button, Icon, PageHeader, Panel, Tabs } from "@event-management/ui";
+import { Badge, Button, Icon, MonthCalendar, PageHeader, Panel, Tabs } from "@event-management/ui";
 import { durationLabel } from "./BookingRequest";
 import {
   cancelMyBookingRequest,
+  getAdminBookingRequest,
+  updateRequestedDayTimes,
   getAdminBookingRequests,
   getAdminBookingRequestsPage,
   getBookingRequestCalendar,
@@ -57,6 +62,14 @@ export function BookingList(props: {
     <BookingCards {...props} />
   );
 }
+function requestedSummary(item: BookingRequest) { return item.requestedDays ? `${preferredDateLabel(item.requestedDays[0]?.date ?? null)}${item.requestedDays.length > 1 ? ` + ${item.requestedDays.length - 1} more` : ""}` : preferredDateLabel(item.preferredDate); }
+function OperationalSchedule({ day }: { day: NonNullable<BookingRequest["requestedDays"]>[number] }) {
+  const schedule = day.operationalSchedule;
+  if (!schedule) return <span>{day.eventDayId ? "Operational schedule unavailable" : "Not scheduled"}</span>;
+  const moved = schedule.id !== day.eventDayId;
+  const status = schedule.status === "cancelled" ? "Cancelled" : schedule.status === "scheduled" ? "Scheduled" : schedule.status;
+  return <span>{moved ? `Moved · ${status}` : status}: {preferredDateLabel(schedule.day)} · {dateLabel(schedule.startsAt, schedule.timeZone)} – {dateLabel(schedule.endsAt, schedule.timeZone)} ({schedule.timeZone})</span>;
+}
 function BookingCards({
   admin = false,
   readOnly = false,
@@ -69,6 +82,7 @@ function BookingCards({
   onOpenChat?: (reference: string) => void;
 }) {
   const [items, setItems] = useState<BookingRequest[]>([]);
+  const [selected, setSelected] = useState<BookingRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
@@ -200,27 +214,8 @@ function BookingCards({
               <small>Event type</small>
               <strong>{item.eventType}</strong>
             </span>
-            <span>
-              <small>Preferred date</small>
-              <strong>{preferredDateLabel(item.preferredDate)}</strong>
-            </span>
-            <span>
-              <small>Estimated event length</small>
-              <strong>
-                {durationLabel(
-                  item.estimatedDuration,
-                  item.estimatedDurationDays,
-                )}
-              </strong>
-            </span>
-            <span>
-              <small>Start time</small>
-              <strong>{dateLabel(item.startsAt, item.timeZone)}</strong>
-            </span>
-            <span>
-              <small>End time</small>
-              <strong>{dateLabel(item.endsAt, item.timeZone)}</strong>
-            </span>
+            <span><small>Requested dates</small><strong>{requestedSummary(item)}</strong></span>
+            {item.requestedDays ? item.requestedDays.map(day => <span key={day.date}><small>Requested {preferredDateLabel(day.date)}</small><strong>{day.startsAt && day.endsAt ? `${dateLabel(day.startsAt, item.timeZone)} – ${dateLabel(day.endsAt, item.timeZone)} (${item.timeZone})` : "Time to be confirmed"}</strong><small>Operational schedule</small><OperationalSchedule day={day} /></span>) : <span><small>Estimated event length</small><strong>{durationLabel(item.estimatedDuration, item.estimatedDurationDays)}</strong></span>}
             <span>
               <small>Preferred venue</small>
               <strong>
@@ -281,6 +276,7 @@ function BookingCards({
                 onUpdate={update}
               />
             )}
+          {!admin && <Button variant="secondary" onClick={() => setSelected(item)}>View details and times</Button>}
           {!admin && onOpenChat && (
             <div className="booking-cancel">
               <Button
@@ -297,6 +293,7 @@ function BookingCards({
           )}
         </Panel>
       ))}
+      {selected && <BookingDetails item={selected} readOnly customerCanEditTimes onClose={() => setSelected(null)} onSaved={updated => { setSelected(updated); setItems(rows => rows.map(row => row.id === updated.id ? updated : row)); }} />}
     </div>
   );
 }
@@ -450,6 +447,7 @@ function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [calendarError, setCalendarError] = useState("");
+  const [calendarLoading, setCalendarLoading] = useState(true);
   const [selected, setSelected] = useState<BookingRequest | null>(null);
   const [revision, setRevision] = useState(0);
   const generation = useRef(0);
@@ -518,6 +516,7 @@ function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
   useEffect(() => {
     let active = true;
     setCalendarError("");
+    setCalendarLoading(true);
     setCounts({});
     getBookingRequestCalendar(monthKey, statusFilter)
       .then((result) => {
@@ -536,7 +535,8 @@ function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
           setCalendarError(
             cause instanceof Error ? cause.message : "Unable to load calendar.",
           );
-      });
+      })
+      .finally(() => { if (active) setCalendarLoading(false); });
     return () => {
       active = false;
     };
@@ -605,13 +605,6 @@ function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
     observer.observe(sentinel.current);
     return () => observer.disconnect();
   }, [cursor, error, loadMore]);
-  const firstDay = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
-  const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-  const moveMonth = (offset: number) =>
-    setMonth(
-      (current) =>
-        new Date(current.getFullYear(), current.getMonth() + offset, 1),
-    );
   return (
     <div className="booking-admin">
       <PageHeader
@@ -627,88 +620,21 @@ function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
         active={status}
         onChange={value => setStatus(value as BookingStatus | "all")}
       />
-      <Panel as="section"
+      <MonthCalendar
         className="booking-calendar"
-        aria-labelledby="booking-calendar-title"
-      >
-        <div className="booking-calendar-head">
-          <div className="booking-month">
-            <Button size="icon" variant="light"
-              type="button"
-              aria-label="Previous month"
-              onClick={() => moveMonth(-1)}
-            >
-              ‹
-            </Button>
-            <h2 id="booking-calendar-title">
-              {new Intl.DateTimeFormat("en-PH", {
-                month: "long",
-                year: "numeric",
-              }).format(month)}
-            </h2>
-            <Button size="icon" variant="light"
-              type="button"
-              aria-label="Next month"
-              onClick={() => moveMonth(1)}
-            >
-              ›
-            </Button>
-          </div>
-          <div className="booking-legend">
-            <span>Fewer requests</span>
-            {[0, 1, 2, 3, 4].map((level) => (
-              <i key={level} className={`booking-heat-${level}`} />
-            ))}
-            <span>More requests</span>
-          </div>
-        </div>
-        <p className="booking-calendar-caption">
-          Requests by preferred event date
-          {statusFilter ? ` · ${labels[statusFilter]}` : ""}
-        </p>
-        {calendarError && (
-          <p role="alert">
-            {calendarError}{" "}
-            <Button variant="secondary"
-              type="button"
-              onClick={() => setRevision((value) => value + 1)}
-            >
-              Try again
-            </Button>
-          </p>
-        )}
-        <div className="booking-calendar-grid">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((name) => (
-            <div className="booking-weekday" key={name}>
-              {name}
-            </div>
-          ))}
-          {Array.from({ length: firstDay }, (_, index) => (
-            <div className="booking-day-blank" key={`blank-${index}`} />
-          ))}
-          {Array.from({ length: days }, (_, index) => {
-            const date = dateKey(
-              month.getFullYear(),
-              month.getMonth(),
-              index + 1,
-            );
-            const count = counts[date] || 0;
-            return (
-              <Button variant="plain"
-                key={date}
-                type="button"
-                className={`booking-day booking-heat-${Math.min(count, 4)}`}
-                aria-pressed={day === date}
-                aria-label={`${preferredDateLabel(date)}, ${count} ${count === 1 ? "request" : "requests"}`}
-                onClick={() => setDay(day === date ? undefined : date)}
-              >
-                <span>{index + 1}</span>
-                <strong>{count}</strong>
-              </Button>
-            );
-          })}
-        </div>
-      </Panel>
+        month={monthKey}
+        onMonthChange={(value) => {
+          const [year, monthNumber] = value.split("-").map(Number);
+          setMonth(new Date(year, monthNumber - 1, 1));
+        }}
+        selectedDate={day}
+        onDateSelect={(date) => setDay(current => current === date ? undefined : date)}
+        counts={counts}
+        countLabel="request"
+        loading={calendarLoading}
+        caption={<>Requests by requested event date{statusFilter ? ` · ${labels[statusFilter]}` : ""}</>}
+        error={calendarError && <>{calendarError} <Button variant="secondary" onClick={() => setRevision(value => value + 1)}>Try again</Button></>}
+      />
       <Panel as="section"
         className="booking-table-panel"
         aria-labelledby="booking-requests-title"
@@ -738,7 +664,7 @@ function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
               <thead>
                 <tr>
                   <th>Requested ↓</th>
-                  <th>Preferred date</th>
+                  <th>Requested dates</th>
                   <th>Reference</th>
                   <th>Event / package</th>
                   <th>Contact person</th>
@@ -762,7 +688,7 @@ function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
                         <span aria-hidden="true">↗</span>
                       </Button>
                     </td>
-                    <td>{preferredDateLabel(item.preferredDate)}</td>
+                    <td>{requestedSummary(item)}</td>
                     <td>{item.reference}</td>
                     <td>
                       {item.eventType}
@@ -832,11 +758,13 @@ function BookingStatusBadge({ status }: { status: BookingStatus }) {
 export function BookingDetails({
   item,
   readOnly,
+  customerCanEditTimes = false,
   onClose,
   onSaved,
 }: {
   item: BookingRequest;
   readOnly: boolean;
+  customerCanEditTimes?: boolean;
   onClose: () => void;
   onSaved: (item: BookingRequest) => void;
 }) {
@@ -909,19 +837,7 @@ export function BookingDetails({
                 <dt>Package</dt>
                 <dd>{item.packageName}</dd>
               </div>
-              <div>
-                <dt>Preferred date</dt>
-                <dd>{preferredDateLabel(item.preferredDate)}</dd>
-              </div>
-              <div>
-                <dt>Estimated length</dt>
-                <dd>
-                  {durationLabel(
-                    item.estimatedDuration,
-                    item.estimatedDurationDays,
-                  )}
-                </dd>
-              </div>
+              {item.requestedDays ? <div><dt>Requested dates</dt><dd>{item.requestedDays.length} {item.requestedDays.length === 1 ? "day" : "days"}</dd></div> : <><div><dt>Preferred date</dt><dd>{preferredDateLabel(item.preferredDate)}</dd></div><div><dt>Estimated length</dt><dd>{durationLabel(item.estimatedDuration, item.estimatedDurationDays)}</dd></div></>}
               {item.startsAt && (
                 <div>
                   <dt>Start time</dt>
@@ -973,7 +889,8 @@ export function BookingDetails({
             </dl>
           </section>
         </div>
-        {!readOnly && <AdminEventDays booking={item} />}
+        {item.requestedDays && <section><h3>Requested days</h3><p>Times use {item.timeZone}. Dates are not reserved.</p>{item.requestedDays.map(day => <RequestedDay key={day.date} item={item} day={day} editable={customerCanEditTimes && !["declined", "cancelled"].includes(item.status) && !day.eventDayId} onSaved={onSaved} />)}</section>}
+        {!readOnly && <AdminEventDays booking={item} onBookingChanged={async () => { const result = await getAdminBookingRequest(item.id); onSaved(result.bookingRequest); }} />}
         <details className="booking-history">
           <summary>Status history</summary>
           <ul>
@@ -1047,4 +964,49 @@ export function BookingDetails({
     </NativeDialog>,
     document.body,
   );
+}
+
+function RequestedDay({ item, day, editable, onSaved }: { item: BookingRequest; day: NonNullable<BookingRequest["requestedDays"]>[number]; editable: boolean; onSaved: (item: BookingRequest) => void }) {
+  const initialStart = localInput(day.startsAt, item.timeZone), initialEnd = localInput(day.endsAt, item.timeZone);
+  const [start, setStart] = useState(initialStart.slice(11));
+  const [end, setEnd] = useState(initialEnd.slice(11));
+  const [nextDay, setNextDay] = useState(!!initialEnd && initialEnd.slice(0, 10) !== day.date);
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const [stale, setStale] = useState(false);
+  const dirty = useRef(false);
+  const resetTimes = (saved: typeof day) => {
+    const savedStart = localInput(saved.startsAt, item.timeZone), savedEnd = localInput(saved.endsAt, item.timeZone);
+    setStart(savedStart.slice(11)); setEnd(savedEnd.slice(11)); setNextDay(!!savedEnd && savedEnd.slice(0, 10) !== saved.date);
+    dirty.current = false;
+  };
+  useEffect(() => { if (!dirty.current) resetTimes(day); }, [day.startsAt, day.endsAt, day.date, item.timeZone]);
+  async function save(event: React.SubmitEvent<HTMLFormElement>) {
+    event.preventDefault(); setError(""); setStale(false); setBusy(true);
+    try {
+      if (!start || !end) throw new Error("Enter both start and end times.");
+      const date = new Date(`${day.date}T00:00:00Z`); if (nextDay) date.setUTCDate(date.getUTCDate() + 1);
+      const startsAt = zonedInstant(`${day.date}T${start}`, item.timeZone), endsAt = zonedInstant(`${date.toISOString().slice(0, 10)}T${end}`, item.timeZone);
+      if (endsAt <= startsAt) throw new Error("End time must be after start time. Select next day for an overnight event.");
+      const result = await updateRequestedDayTimes(item.id, day.date, { startsAt, endsAt, expectedUpdatedAt: item.updatedAt }); dirty.current = false; onSaved(result.bookingRequest);
+    } catch (cause) { setStale(cause instanceof ApiError && cause.status === 409); setError(cause instanceof Error ? cause.message : "Unable to save times."); } finally { setBusy(false); }
+  }
+  return <Panel as="article" className="requested-day">
+    <h4>{preferredDateLabel(day.date)}</h4>
+    <p>Requested time: {day.startsAt && day.endsAt ? `${dateLabel(day.startsAt, item.timeZone)} – ${dateLabel(day.endsAt, item.timeZone)} (${item.timeZone})` : "Time to be confirmed"}</p>
+    <p>Operational schedule: <OperationalSchedule day={day} /></p>
+    {editable && <form className="requested-day-form" onSubmit={save}>
+      <fieldset disabled={busy}>
+        <div className="requested-day-times">
+          <FormField label="Start time">{props => <Input {...props} type="time" required value={start} onChange={e => { dirty.current = true; setStart(e.target.value); }} />}</FormField>
+          <FormField label="End time">{props => <Input {...props} type="time" required value={end} onChange={e => { dirty.current = true; setEnd(e.target.value); }} />}</FormField>
+        </div>
+        <label className="requested-day-next"><Input variant="plain" type="checkbox" checked={nextDay} onChange={e => { dirty.current = true; setNextDay(e.target.checked); }} /> <span>End on the next day</span></label>
+        {error && <p role="alert">{error}</p>}
+        <div className="requested-day-actions">
+          {stale && <Button type="button" variant="secondary" onClick={async () => { try { const result = await getMyBookingRequest(item.id); const refreshed = result.bookingRequest.requestedDays?.find(entry => entry.date === day.date); if (refreshed) resetTimes(refreshed); onSaved(result.bookingRequest); setStale(false); setError(""); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to refresh request."); } }}>Refresh saved times</Button>}
+          <Button type="submit" disabled={stale}>{busy ? "Saving…" : "Save times"}</Button>
+        </div>
+      </fieldset>
+    </form>}
+  </Panel>;
 }

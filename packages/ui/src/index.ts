@@ -33,6 +33,8 @@ export { InclusionStrip } from "./molecules/InclusionStrip";
 
 // Organisms
 export { PageHeader } from "./organisms/PageHeader";
+export { MonthCalendar } from "./organisms/MonthCalendar";
+export type { MonthCalendarProps } from "./organisms/MonthCalendar";
 export { Dialog } from "./organisms/Dialog";
 export { NativeDialog } from "./organisms/NativeDialog";
 export { Drawer } from "./organisms/Drawer";

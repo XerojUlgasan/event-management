@@ -1,4 +1,5 @@
-import { useEffect, useState, type SubmitEvent } from "react";
+import { RESPONSE_DEADLINE_DAYS, responseDeadlineForDay, type ResponseDeadlineDays } from "@event-management/contracts/event-days";
+import { useEffect, useRef, useState, type SubmitEvent } from "react";
 import {
   Badge,
   Button,
@@ -7,90 +8,30 @@ import {
   Panel,
   Select,
 } from "@event-management/ui";
+import { ApiError } from "../../../lib/http";
 import type { BookingRequest } from "../../../lib/data/booking-requests";
 import {
   cancelEventDay,
   createEventDay,
   getAdminEventDays,
   moveEventDay,
+  applyResponseDeadlines,
   setAssignment,
   updateStaffing,
   type EventDay,
   type EventDaySchedule,
 } from "../../../lib/data/event-days";
-import { formatEventTime } from "../../../lib/utils/event-day-time";
-// Interpret wall-clock values in the booking zone, never in the administrator's browser zone.
-function zonedInstant(value: string, zone: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
-  if (!match) throw new Error("Enter a complete date and time.");
-  const desired = Date.UTC(
-    +match[1],
-    +match[2] - 1,
-    +match[3],
-    +match[4],
-    +match[5],
-  );
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: zone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  });
-  let instant = desired;
-  for (let i = 0; i < 4; i++) {
-    const parts = Object.fromEntries(
-      formatter
-        .formatToParts(new Date(instant))
-        .map((part) => [part.type, part.value]),
-    );
-    const observed = Date.UTC(
-      +parts.year,
-      +parts.month - 1,
-      +parts.day,
-      +parts.hour,
-      +parts.minute,
-    );
-    if (observed === desired) {
-      // Reject repeated local times at daylight-saving transitions instead of
-      // silently choosing one of the two possible instants.
-      const target = formatter.format(new Date(instant));
-      for (let minutes = -180; minutes <= 180; minutes += 15) {
-        if (
-          minutes !== 0 &&
-          formatter.format(new Date(instant + minutes * 60_000)) === target
-        ) {
-          throw new Error(
-            `That local time occurs twice in ${zone}. Choose an unambiguous time.`,
-          );
-        }
-      }
-      return new Date(instant).toISOString();
-    }
-    instant += desired - observed;
-  }
-  throw new Error(
-    `That local time does not exist in ${zone}. Choose another time.`,
-  );
+import { formatEventTime, zonedInstant, localInput } from "../../../lib/utils/event-day-time";
+function asDays(value: string): ResponseDeadlineDays | null {
+  return RESPONSE_DEADLINE_DAYS.find(days => String(days) === value) ?? null;
 }
-function localInput(value: string | null, zone: string) {
-  if (!value) return "";
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-CA", {
-      timeZone: zone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    })
-      .formatToParts(new Date(value))
-      .map((part) => [part.type, part.value]),
-  );
-  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+function DeadlineChoice({ value, onChange, label = "Response deadline", disabled = false }: { value: ResponseDeadlineDays | null; onChange: (value: ResponseDeadlineDays | null) => void; label?: string; disabled?: boolean }) {
+  return <FormField label={label}>{props => <Select {...props} value={value ?? ""} disabled={disabled} onChange={event => onChange(asDays(event.target.value))}><option value="">Select days before event</option>{RESPONSE_DEADLINE_DAYS.map(days => <option key={days} value={days}>{days} {days === 1 ? "day" : "days"} before</option>)}</Select>}</FormField>;
+}
+function deadlinePreview(day: string, daysBefore: ResponseDeadlineDays | null, zone: string) {
+  if (!daysBefore || !day) return "";
+  try { const instant = responseDeadlineForDay(day, daysBefore, zone); return `${formatEventTime(instant, zone)} (${zone})${Date.parse(instant) <= Date.now() ? " · Passed" : ""}`; }
+  catch { return "Unable to calculate deadline for this date."; }
 }
 function ScheduleForm({
   booking,
@@ -106,28 +47,25 @@ function ScheduleForm({
   busy: boolean;
 }) {
   const zone = booking.timeZone;
-  const [day, setDay] = useState(
-    initial?.day ?? booking.preferredDate?.slice(0, 10) ?? "",
-  );
+  const [day, setDay] = useState(initial?.day ?? booking.preferredDate?.slice(0, 10) ?? "");
   const [start, setStart] = useState(
     localInput(initial?.startsAt ?? booking.startsAt, zone),
   );
   const [end, setEnd] = useState(
     localInput(initial?.endsAt ?? booking.endsAt, zone),
   );
-  const [deadline, setDeadline] = useState("");
+  const [deadline, setDeadline] = useState<ResponseDeadlineDays | null>(null);
   const [status, setStatus] = useState<"draft" | "open">("draft");
   const [error, setError] = useState("");
   const onSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     try {
-      if (!day || start.slice(0, 10) !== day)
-        throw new Error("The start date must match the event day.");
+
       if (status === "open" && !deadline)
         throw new Error("Set a response deadline when opening staffing.");
-      const startsAt = zonedInstant(start, zone),
-        endsAt = zonedInstant(end, zone);
+      if (!day || start.slice(0, 10) !== day) throw new Error("The start date must match the event day.");
+      const startsAt = zonedInstant(start, zone), endsAt = zonedInstant(end, zone);
       if (endsAt <= startsAt)
         throw new Error("End time must be after start time.");
       submit({
@@ -135,7 +73,7 @@ function ScheduleForm({
         startsAt,
         endsAt,
         staffingStatus: status,
-        availabilityDeadline: deadline ? zonedInstant(deadline, zone) : null,
+        ...(status === "open" && deadline ? { daysBefore: deadline } : {}),
       });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Check the schedule.");
@@ -145,39 +83,9 @@ function ScheduleForm({
     <form className="staffing-form" onSubmit={onSubmit}>
       <p>All times use {zone}. An end time may fall on the next day.</p>
       <div className="staffing-fields">
-        <FormField label="Event day">
-          {(props) => (
-            <Input
-              {...props}
-              required
-              type="date"
-              value={day}
-              onChange={(e) => setDay(e.target.value)}
-            />
-          )}
-        </FormField>
-        <FormField label="Start">
-          {(props) => (
-            <Input
-              {...props}
-              required
-              type="datetime-local"
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-            />
-          )}
-        </FormField>
-        <FormField label="End">
-          {(props) => (
-            <Input
-              {...props}
-              required
-              type="datetime-local"
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
-            />
-          )}
-        </FormField>
+        <FormField label="Event day">{props => <Input {...props} required type="date" value={day} onChange={e => setDay(e.target.value)} />}</FormField>
+        <FormField label="Start">{props => <Input {...props} required type="datetime-local" value={start} onChange={e => setStart(e.target.value)} />}</FormField>
+        <FormField label="End">{props => <Input {...props} required type="datetime-local" value={end} onChange={e => setEnd(e.target.value)} />}</FormField>
         <FormField label="Staffing">
           {(props) => (
             <Select
@@ -192,16 +100,8 @@ function ScheduleForm({
             </Select>
           )}
         </FormField>
-        <FormField label="Response deadline (required when open)">
-          {(props) => (
-            <Input
-              {...props}
-              type="datetime-local"
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-            />
-          )}
-        </FormField>
+        {status === "open" && <DeadlineChoice value={deadline} onChange={setDeadline} />}
+        {status === "open" && deadline && <p>Deadline: {deadlinePreview(day, deadline, zone)}</p>}
       </div>
       {error && <p role="alert">{error}</p>}
       <Button type="submit" disabled={busy}>
@@ -210,16 +110,19 @@ function ScheduleForm({
     </form>
   );
 }
-export function AdminEventDays({ booking }: { booking: BookingRequest }) {
+export function AdminEventDays({ booking, onBookingChanged }: { booking: BookingRequest; onBookingChanged: () => Promise<void> }) {
   const [days, setDays] = useState<EventDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [stale, setStale] = useState(false);
   const [moving, setMoving] = useState("");
   const [roles, setRoles] = useState<Record<string, "coordinator" | "helper">>(
     {},
   );
-  const [deadlines, setDeadlines] = useState<Record<string, string>>({});
+  const [deadlines, setDeadlines] = useState<Record<string, ResponseDeadlineDays | null>>({});
+  const [batchDays, setBatchDays] = useState<ResponseDeadlineDays | null>(null);
+  const batchEdited = useRef(false);
   const load = async () => {
     const result = await getAdminEventDays(booking.id);
     setDays(result.eventDays);
@@ -238,14 +141,27 @@ export function AdminEventDays({ booking }: { booking: BookingRequest }) {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [booking.id, booking.status, booking.updatedAt]);
+  useEffect(() => {
+    if (batchEdited.current || loading) return;
+    const active = days.filter(day => day.status === "scheduled" && day.availabilityDeadline);
+    if (!active.length) { setBatchDays(null); return; }
+    const matching = RESPONSE_DEADLINE_DAYS.filter(choice => active.every(day => {
+      try { return Date.parse(responseDeadlineForDay(day.day, choice, day.timezone)) === Date.parse(day.availabilityDeadline ?? ""); }
+      catch { return false; }
+    }));
+    setBatchDays(matching.length === 1 ? matching[0] ?? null : null);
+  }, [days, loading]);
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
     setError("");
+    setStale(false);
     try {
       await action();
+      await onBookingChanged();
       await load();
       setMoving("");
     } catch (cause) {
+      setStale(cause instanceof ApiError && cause.status === 409);
       setError(
         cause instanceof Error ? cause.message : "Unable to update staffing.",
       );
@@ -254,14 +170,20 @@ export function AdminEventDays({ booking }: { booking: BookingRequest }) {
     }
   };
   const accepted = booking.status === "accepted";
-  if (!accepted && !loading && !error && !days.length) return null;
+  if (!booking.requestedDays && !accepted && !loading && !error && !days.length) return null;
   return (
     <section className="staffing-admin">
       <h3>Event days and staffing</h3>
       <p>Staffing an event day does not confirm this booking request.</p>
       {loading && <p role="status">Loading event days…</p>}
       {error && <p role="alert">{error}</p>}
-      {accepted && (
+      {stale && <Button variant="secondary" onClick={() => void run(async () => {})}>Refresh request and days</Button>}
+      {(booking.requestedDays || days.some(day => day.status === "scheduled")) && <div className="staffing-form">
+        <div className="staffing-fields"><DeadlineChoice value={batchDays} onChange={value => { batchEdited.current = true; setBatchDays(value); }} disabled={busy || stale} /></div>
+        <p>Responses close at the end of each calculated date in {booking.timeZone}. {booking.requestedDays && "Apply again after the customer saves missing times. "}Closed staffing windows stay closed.</p>
+        <Button disabled={!accepted || !batchDays || busy || stale || loading} onClick={() => { if (batchDays) void run(() => applyResponseDeadlines({ bookingRequestId: booking.id, daysBefore: batchDays, expectedUpdatedAt: booking.updatedAt })); }}>Apply deadlines</Button>
+      </div>}
+      {accepted && !booking.requestedDays && (
         <details>
           <summary>Add an event day</summary>
           <ScheduleForm
@@ -272,8 +194,11 @@ export function AdminEventDays({ booking }: { booking: BookingRequest }) {
           />
         </details>
       )}
-      {!loading && !error && !days.length && <p>No event days yet.</p>}
+      {!loading && !error && !days.length && !booking.requestedDays && <p>No event days yet.</p>}
       <div className="staffing-list">
+        {booking.requestedDays?.filter(day => !day.eventDayId).map(day => (
+          <RequestedDayStaffing key={day.date} booking={booking} day={day} accepted={accepted} daysBefore={batchDays} />
+        ))}
         {days.map((day) => (
           <Panel as="article" className="staffing-card" key={day.id}>
             <div className="staffing-card-heading">
@@ -282,10 +207,12 @@ export function AdminEventDays({ booking }: { booking: BookingRequest }) {
                 {day.status} · {day.staffingStatus}
               </Badge>
             </div>
+            {booking.requestedDays?.filter(requested => requested.eventDayId === day.id || (requested.operationalSchedule?.id === day.id && requested.eventDayId !== day.id)).map(requested => <p key={requested.date}>Requested date: {requested.date}</p>)}
             <p>
               {formatEventTime(day.startsAt, day.timezone)} –{" "}
               {formatEventTime(day.endsAt, day.timezone)} ({day.timezone})
             </p>
+            {day.status === "scheduled" && batchDays && <p>Calculated deadline: {deadlinePreview(day.day, batchDays, day.timezone)}</p>}
             {day.availabilityDeadline && (
               <p>
                 Deadline:{" "}
@@ -416,49 +343,9 @@ export function AdminEventDays({ booking }: { booking: BookingRequest }) {
                       </Button>
                     ) : (
                       <>
-                        <FormField label="New deadline (required to open)">
-                          {(props) => (
-                            <Input
-                              {...props}
-                              type="datetime-local"
-                              value={deadlines[day.id] ?? ""}
-                              onChange={(e) =>
-                                setDeadlines((previous) => ({
-                                  ...previous,
-                                  [day.id]: e.target.value,
-                                }))
-                              }
-                            />
-                          )}
-                        </FormField>
-                        <Button
-                          variant="secondary"
-                          disabled={busy}
-                          onClick={() => {
-                            try {
-                              const value = deadlines[day.id];
-                              if (!value)
-                                throw new Error(
-                                  "Set a future response deadline to open staffing.",
-                                );
-                              void run(() =>
-                                updateStaffing(
-                                  day.id,
-                                  "open",
-                                  zonedInstant(value, day.timezone),
-                                ),
-                              );
-                            } catch (cause) {
-                              setError(
-                                cause instanceof Error
-                                  ? cause.message
-                                  : "Invalid deadline.",
-                              );
-                            }
-                          }}
-                        >
-                          Open responses
-                        </Button>
+                        <DeadlineChoice label="Response deadline to reopen" value={deadlines[day.id] ?? null} onChange={value => setDeadlines(previous => ({ ...previous, [day.id]: value }))} disabled={busy} />
+                        {deadlines[day.id] && <p>Deadline: {deadlinePreview(day.day, deadlines[day.id], day.timezone)}</p>}
+                        <Button variant="secondary" disabled={busy || !deadlines[day.id]} onClick={() => { const value = deadlines[day.id]; if (value) void run(() => updateStaffing(day.id, "open", value)); }}>Open responses</Button>
                       </>
                     ))}
                   {accepted && (
@@ -503,4 +390,20 @@ export function AdminEventDays({ booking }: { booking: BookingRequest }) {
       </div>
     </section>
   );
+}
+
+function RequestedDayStaffing({ booking, day, accepted, daysBefore }: {
+  booking: BookingRequest;
+  day: NonNullable<BookingRequest["requestedDays"]>[number];
+  accepted: boolean;
+  daysBefore: ResponseDeadlineDays | null;
+}) {
+  const ready = !!day.startsAt && !!day.endsAt;
+  return <Panel as="article" className="staffing-card">
+    <div className="staffing-card-heading"><h4>{day.date}</h4><Badge>{ready ? "Not opened" : "Waiting for customer times"}</Badge></div>
+    <p>{day.startsAt && day.endsAt ? `${formatEventTime(day.startsAt, booking.timeZone)} – ${formatEventTime(day.endsAt, booking.timeZone)} (${booking.timeZone})` : "Time to be confirmed"}</p>
+    {daysBefore && <p>Calculated deadline: {deadlinePreview(day.date, daysBefore, booking.timeZone)}</p>}
+    {!ready && <p>Apply deadlines again after the customer saves times for this date.</p>}
+    {!accepted && <p>Accept this request before applying deadlines.</p>}
+  </Panel>;
 }

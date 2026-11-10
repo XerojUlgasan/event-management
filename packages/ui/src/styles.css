@@ -250,3 +250,33 @@ textarea.ui-control { min-height: 85px; resize: vertical; }
   .button { transition: none; }
   .button:hover:not(:disabled) { transform: none; }
 }
+
+/* Controlled monthly calendar, shared by workspace lists. */
+.ui-month-calendar { min-width: 0; padding: 20px; container-type: inline-size; }
+.ui-month-calendar-head { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.ui-month-calendar-head h2 { margin: 0; flex: 1; color: var(--text-primary); font-family: var(--font-serif, Georgia, serif); font-size: 22px; text-align: center; }
+.ui-month-calendar-previous { transform: rotate(180deg); }
+.ui-month-calendar-caption, .ui-month-calendar-status { margin: 8px 0 14px; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
+.ui-month-calendar-status[role="alert"] { color: var(--status-danger-dark); }
+.ui-month-calendar-legend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin: 8px 0; color: var(--text-muted); font-size: 11px; }
+.ui-month-calendar-legend i { width: 14px; height: 14px; border-radius: 3px; }
+.ui-month-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.ui-month-calendar-weekday { padding: 10px 2px; color: var(--text-muted); font-size: 12px; font-weight: 600; text-align: center; }
+.ui-month-calendar-day, .ui-month-calendar-blank { min-width: 0; min-height: 53px; }
+.ui-month-calendar-day { display: flex; justify-content: space-between; align-items: flex-start; gap: 2px; padding: 8px; border: 0; border-radius: 6px; color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; }
+.ui-month-calendar-day strong { display: grid; place-items: center; min-width: 22px; min-height: 22px; border-radius: 50%; background: color-mix(in srgb, var(--wine-dark) 12%, var(--transparent)); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ui-month-calendar-heat-0 { background: var(--surface-subtle); }
+.ui-month-calendar-heat-1 { background: var(--accent-faint); }
+.ui-month-calendar-heat-2 { background: var(--accent-border); }
+.ui-month-calendar-heat-3 { background: var(--status-danger-border-strong); }
+.ui-month-calendar-heat-4 { color: var(--surface-base); background: var(--wine); }
+.ui-month-calendar-heat-4 strong { background: color-mix(in srgb, var(--surface-base) 20%, var(--transparent)); }
+.ui-month-calendar-day:hover { box-shadow: inset 0 0 0 2px var(--wine); }
+.ui-month-calendar-day[aria-pressed="true"] { box-shadow: inset 0 0 0 3px var(--accent-deep); }
+.ui-month-calendar-heat-4:hover, .ui-month-calendar-heat-4[aria-pressed="true"] { box-shadow: inset 0 0 0 3px var(--surface-base); }
+.ui-month-calendar-day[aria-current="date"] > span { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.ui-month-calendar-day:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--wine); outline-offset: 2px; }
+@container (max-width: 400px) {
+  .ui-month-calendar-day { min-height: 48px; padding: 5px; flex-direction: column; align-items: center; }
+  .ui-month-calendar-day strong { min-width: 18px; min-height: 18px; font-size: 11px; }
+}

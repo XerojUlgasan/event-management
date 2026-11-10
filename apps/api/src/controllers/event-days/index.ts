@@ -10,6 +10,7 @@ import {
   createEventDayRoute,
   createEventDayRouteHandler,
 } from "./create-event-day.js";
+import { applyResponseDeadlinesRoute, applyResponseDeadlinesRouteHandler } from "./apply-response-deadlines.js";
 import {
   listAdminEventDaysRoute,
   listAdminEventDaysRouteHandler,
@@ -63,6 +64,7 @@ routes.use("/staff/event-days/*", requireSession, staff);
 routes.use("/staff/assignments", requireSession, staff);
 routes.openapi(listAdminEventDaysRoute, listAdminEventDaysRouteHandler);
 routes.openapi(createEventDayRoute, createEventDayRouteHandler);
+routes.openapi(applyResponseDeadlinesRoute, applyResponseDeadlinesRouteHandler);
 routes.openapi(listStaffEventDaysRoute, listStaffEventDaysRouteHandler);
 routes.openapi(listStaffAssignmentsRoute, listStaffAssignmentsRouteHandler);
 routes.openapi(

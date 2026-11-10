@@ -113,22 +113,14 @@
 /* Booking request queue */
 .booking-admin { color: var(--text-primary); }
 .booking-filter { margin: 18px 0; }
-.booking-calendar, .booking-table-panel { padding: 20px; margin: 16px 0; }
-.booking-calendar-head, .booking-month, .booking-legend, .booking-table-head, .booking-table-footer { display: flex; align-items: center; gap: 12px; }
-.booking-calendar-head, .booking-table-head, .booking-table-footer { justify-content: space-between; }
+.booking-calendar { margin: 16px 0; }
+.booking-table-panel { padding: 20px; margin: 16px 0; }
+.booking-table-head, .booking-table-footer { display: flex; align-items: center; gap: 12px; }
+.booking-table-head, .booking-table-footer { justify-content: space-between; }
 .booking-admin h2, .booking-details-body h2, .booking-details-body h3 { margin: 0; font-family: var(--font-serif, Georgia, serif); }
 .booking-admin h2 { font-size: 25px; }
-.booking-month button, .booking-details-close { font-size: 26px; line-height: 1; min-width: 36px; min-height: 36px; }
-.booking-legend { color: var(--accent-violet-text); font-size: 12px; }
-.booking-legend i { width: 20px; height: 20px; border-radius: 3px; }
-.booking-calendar-caption, .booking-table-head p { margin: 6px 0 14px; color: var(--accent-violet-muted); font-size: 13px; }
-.booking-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 7px; }
-.booking-weekday { padding: 10px; text-align: center; font-size: 12px; background: var(--surface-subtle); }
-.booking-day, .booking-day-blank { min-height: 53px; border: 1px solid var(--surface-base); }
-.booking-day { display: flex; justify-content: space-between; align-items: flex-start; padding: 9px; color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; }
-.booking-day strong { padding: 3px 8px; border-radius: 50%; background: color-mix(in srgb, var(--wine-dark) 12%, var(--transparent)); font-size: 12px; }
-.booking-heat-0 { background: var(--status-danger-subtle); } .booking-heat-1 { background: var(--accent-soft); } .booking-heat-2 { background: var(--status-danger-border-strong); } .booking-heat-3 { background: var(--text-faint); } .booking-heat-4 { background: var(--wine); color: var(--surface-base); }
-.booking-day[aria-pressed="true"] { outline: 3px solid var(--accent-deep); outline-offset: -4px; }
+.booking-details-close { font-size: 26px; line-height: 1; min-width: 36px; min-height: 36px; }
+.booking-table-head p { margin: 6px 0 14px; color: var(--accent-violet-muted); font-size: 13px; }
 .booking-table-scroll { overflow-x: auto; }
 .booking-table-panel table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
 .booking-table-panel th, .booking-table-panel td { padding: 12px 10px; border-bottom: 1px solid var(--surface-raised); white-space: nowrap; }
@@ -153,4 +145,4 @@
 .booking-details-form select, .booking-details-form textarea { width: 100%; padding: 10px; border: 1px solid var(--border-default); border-radius: 6px; font: inherit; }
 .booking-details-form textarea { min-height: 80px; }
 .booking-admin :focus-visible, .booking-details-dialog :focus-visible { outline: 3px solid var(--status-warning-muted); outline-offset: 2px; }
-@media (max-width: 700px) { .booking-calendar, .booking-table-panel { padding: 14px; } .booking-calendar-head, .booking-table-footer { align-items: flex-start; flex-direction: column; } .booking-day { min-height: 48px; padding: 5px; flex-direction: column; } .booking-weekday { padding: 8px 2px; } .booking-details-grid { grid-template-columns: 1fr; } .booking-details-grid section + section { border-left: 0; border-top: 1px solid var(--border-subtle); padding: 20px 0 0; } .booking-details-body { padding: 20px; } }
+@media (max-width: 700px) { .booking-calendar, .booking-table-panel { padding: 14px; } .booking-table-footer { align-items: flex-start; flex-direction: column; } .booking-details-grid { grid-template-columns: 1fr; } .booking-details-grid section + section { border-left: 0; border-top: 1px solid var(--border-subtle); padding: 20px 0 0; } .booking-details-body { padding: 20px; } }

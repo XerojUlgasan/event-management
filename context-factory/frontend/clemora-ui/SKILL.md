@@ -26,6 +26,7 @@ Choose the local API rather than a similarly named upstream component:
 | Adorned control or search | `InputGroup` with `leading`/`trailing` content, or `SearchField` for the existing search interaction. |
 | Surface or workspace structure | `Panel`, `PageHeader`, and `WorkspaceLayout`; page navigation and content stay in the app. `PageHeader` supplies an `h1` by default, with `titleAs="h2"`/`"h3"` for nested sections. Pass heading content, not another heading element. |
 | Status and icons | `Badge.tone` uses exported `BadgeTone`; `Icon.name`, `Button.icon`, and `Toast.icon` use exported `IconName`. The spinner icon respects reduced motion. Icon-only buttons need an accessible name. |
+| Monthly date counts and filtering | `MonthCalendar` receives `month` as `YYYY-MM`, optional date-keyed `counts`, `selectedDate`, and change callbacks. The app owns count aggregation, fetching, date toggling, selected-date reset, and domain labels. Staff use operational event-day dates; booking views use every requested date, with `preferred_date` fallback for legacy requests. It renders a date filter rather than an event scheduler. |
 | Loading, empty, or error feedback | Use `Toast` for brief success (`tone="success"`, status) or failure (`tone="danger"`, alert) feedback. Its caller owns timing and cleanup. Keep form errors inline and reuse established empty/loading compositions; the library does not export `Alert`, `Empty`, or `Skeleton`. |
 
 For example, let the app supply submission and validation feedback:
