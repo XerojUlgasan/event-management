@@ -4,7 +4,7 @@ import { deletePackageData } from "../../data/packages/delete-package.js";
 import { lockPackageData } from "../../data/packages/lock-package.js";
 import { hasPackageBookingReferenceData } from "../../data/packages/has-booking-reference.js";
 import { listPackageMediaIdsData } from "../../data/packages/catalog-page.js";
-import { cleanupCatalogMediaService } from "../catalog-media/catalog-media.js";
+import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
 import { error } from "./package-rules.js";
 export async function deletePackageService(db: Kysely<DB>, id: string) {
   try {

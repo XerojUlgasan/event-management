@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
-import { getBookingRequestService } from "../../services/booking-requests/booking-requests.js";
+import { getBookingRequestService } from "../../services/booking-requests/get-booking-request.js";
 import { bookingSchema, idParams } from "./schemas.js";
 import { errors, json } from "./http.js";
 

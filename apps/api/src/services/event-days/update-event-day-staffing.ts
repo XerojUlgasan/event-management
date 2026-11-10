@@ -1,5 +1,5 @@
 import type { Kysely } from "kysely";
-import * as data from "../../data/event-days/event-days.js";
+import { updateEventDayStaffingData } from "../../data/event-days/update-event-day-staffing.js";
 import type { DB } from "../../db/types.js";
 import { fail, lockExisting, one } from "./event-days.js";
 export async function staffingEventDayService(
@@ -18,7 +18,7 @@ export async function staffingEventDayService(
       (!deadline || new Date(deadline) <= new Date())
     )
       return fail("An open staffing deadline must be in the future", 400);
-    await data.setStaffingData(trx, id, input.staffingStatus, deadline);
+    await updateEventDayStaffingData(trx, id, input.staffingStatus, deadline);
     return one(trx, id);
   });
 }

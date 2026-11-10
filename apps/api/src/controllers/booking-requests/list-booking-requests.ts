@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
-import { listBookingRequestsService, listAdminBookingRequestsPageService } from "../../services/booking-requests/booking-requests.js";
+import { listBookingRequestsService } from "../../services/booking-requests/list-booking-requests.js";
+import { listAdminBookingRequestsPageService } from "../../services/booking-requests/list-admin-booking-requests-page.js";
 import { bookingSchema, statusSchema } from "./schemas.js";
 import { errors, json } from "./http.js";
 const responses = {200:{content:json(z.object({bookingRequests:z.array(bookingSchema)})),description:"Booking requests"},401:errors[401],403:errors[403]};

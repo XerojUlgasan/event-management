@@ -1,5 +1,6 @@
 import type { Kysely } from "kysely";
-import * as data from "../../data/event-days/event-days.js";
+import { lockBookingRequestData } from "../../data/event-days/lock-booking-request.js";
+import { createEventDayData } from "../../data/event-days/create-event-day.js";
 import type { DB } from "../../db/types.js";
 import { fail, one, validateSchedule, type Schedule } from "./event-days.js";
 export async function createEventDayService(
@@ -8,11 +9,11 @@ export async function createEventDayService(
   input: Schedule,
 ) {
   return db.transaction().execute(async (trx) => {
-    const booking = await data.lockBookingData(trx, bookingId);
+    const booking = await lockBookingRequestData(trx, bookingId);
     if (!booking) return fail("Booking request not found", 404);
     if (booking.status !== "accepted")
       return fail("Booking request must be accepted", 409);
     validateSchedule(input, booking.time_zone);
-    return one(trx, await data.createDayData(trx, bookingId, input));
+    return one(trx, await createEventDayData(trx, bookingId, input));
   });
 }

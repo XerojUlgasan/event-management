@@ -1,5 +1,12 @@
 import type { Transaction } from "kysely";
-import * as data from "../../data/event-days/event-days.js";
+import type { DayRow } from "../../data/event-days/types.js";
+import type { Database } from "../../data/event-days/types.js";
+import { listEventDayResponsesData } from "../../data/event-days/list-event-day-responses.js";
+import { listEligibleStaffData } from "../../data/event-days/list-eligible-staff.js";
+import { getEventDayData } from "../../data/event-days/get-event-day.js";
+import { findEventDayBookingData } from "../../data/event-days/find-event-day-booking.js";
+import { lockBookingRequestData } from "../../data/event-days/lock-booking-request.js";
+import { lockEventDayData } from "../../data/event-days/lock-event-day.js";
 import type { DB } from "../../db/types.js";
 
 export type Schedule = {
@@ -40,7 +47,7 @@ export function validateSchedule(input: Schedule, timeZone: string) {
   )
     fail("An open staffing deadline must be in the future", 400);
 }
-export function effectiveStatus(day: data.DayRow) {
+export function effectiveStatus(day: DayRow) {
   if (day.booking_status !== "accepted") return "closed";
   return day.staffing_status === "open" &&
     day.availability_deadline &&
@@ -49,15 +56,15 @@ export function effectiveStatus(day: data.DayRow) {
     : day.staffing_status;
 }
 export async function responses(
-  db: data.Database,
-  days: data.DayRow[],
+  db: Database,
+  days: DayRow[],
   staffId?: string,
 ) {
-  const { availability, assignments } = await data.relatedData(
+  const { availability, assignments } = await listEventDayResponsesData(
     db,
     days.map((d) => d.id),
   );
-  const staff = staffId ? [] : await data.eligibleStaffData(db);
+  const staff = staffId ? [] : await listEligibleStaffData(db);
   return days.map((day) => {
     const a = availability.filter((x) => x.event_day_id === day.id),
       s = assignments.filter((x) => x.event_day_id === day.id);
@@ -100,8 +107,8 @@ export async function responses(
     };
   });
 }
-export async function one(db: data.Database, id: string, staffId?: string) {
-  const day = await data.getDayData(db, id);
+export async function one(db: Database, id: string, staffId?: string) {
+  const day = await getEventDayData(db, id);
   if (!day) return fail("Event day not found", 404);
   const result = (await responses(db, [day], staffId))[0];
   if (!result) throw new Error("Event day response missing");
@@ -112,12 +119,12 @@ export async function lockExisting(
   id: string,
   requireAccepted = true,
 ) {
-  const ref = await data.lockDayData(trx, id);
+  const ref = await findEventDayBookingData(trx, id);
   if (!ref) return fail("Event day not found", 404);
-  const booking = await data.lockBookingData(trx, ref.booking_request_id);
+  const booking = await lockBookingRequestData(trx, ref.booking_request_id);
   if (!booking || (requireAccepted && booking.status !== "accepted"))
     return fail("Booking request must be accepted", 409);
-  const day = await data.lockDayRowData(trx, id);
+  const day = await lockEventDayData(trx, id);
   if (!day) return fail("Event day not found", 404);
   if (day.status !== "scheduled")
     return fail("Event day is no longer scheduled", 409);

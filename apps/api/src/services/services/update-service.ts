@@ -6,7 +6,7 @@ import { updateServiceData } from "../../data/services/update-service.js";
 import { error, nextUpdate } from "../packages/package-rules.js";
 import { serviceAdminDto } from "./service-response.js";
 import { InvalidPackageMedia, readCatalogSectionsData, replaceCatalogSectionsData } from "../../data/packages/catalog-page.js";
-import { cleanupCatalogMediaService } from "../catalog-media/catalog-media.js";
+import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
 import { duplicateTitle, reserveCatalogTitle } from "../../utils/catalog-title.js";
 export async function updateServiceService(db: Kysely<DB>, id: string, data: ServiceContent & { expectedUpdatedAt: string }, actorId: string) {
  let previousMedia: string[] = [];

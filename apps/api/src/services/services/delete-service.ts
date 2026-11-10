@@ -4,7 +4,7 @@ import { deleteServiceData } from "../../data/services/delete-service.js";
 import { lockServiceData } from "../../data/services/lock-service.js";
 import { error } from "../packages/package-rules.js";
 import { listCatalogMediaIdsData } from "../../data/packages/catalog-page.js";
-import { cleanupCatalogMediaService } from "../catalog-media/catalog-media.js";
+import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
 export async function deleteServiceService(db: Kysely<DB>, id: string) {
  let media: string[] = [];
  try { const outcome = await db.transaction().execute(async trx => {

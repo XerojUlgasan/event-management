@@ -1,5 +1,6 @@
 import type { Kysely } from "kysely";
-import * as data from "../../data/event-days/event-days.js";
+import { createEventDayData } from "../../data/event-days/create-event-day.js";
+import { endEventDayData } from "../../data/event-days/end-event-day.js";
 import type { DB } from "../../db/types.js";
 import {
   lockExisting,
@@ -15,12 +16,12 @@ export async function moveEventDayService(
   return db.transaction().execute(async (trx) => {
     const day = await lockExisting(trx, id);
     validateSchedule(input, day.time_zone);
-    const replacement = await data.createDayData(
+    const replacement = await createEventDayData(
       trx,
       day.booking_request_id,
       input,
     );
-    await data.endDayData(trx, id, "moved", replacement);
+    await endEventDayData(trx, id, "moved", replacement);
     return one(trx, replacement);
   });
 }

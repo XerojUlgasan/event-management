@@ -7,7 +7,7 @@ import {
   InvalidPackageMedia,
   replacePackageSectionsData,
 } from "../../data/packages/catalog-page.js";
-import { cleanupCatalogMediaService } from "../catalog-media/catalog-media.js";
+import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
 import { packageDto } from "./package-response.js";
 import { error, nextUpdate } from "./package-rules.js";
 import { duplicateTitle, reserveCatalogTitle } from "../../utils/catalog-title.js";

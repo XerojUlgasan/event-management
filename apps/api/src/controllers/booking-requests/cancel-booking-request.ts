@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
-import { cancelBookingRequestService } from "../../services/booking-requests/booking-requests.js";
+import { cancelBookingRequestService } from "../../services/booking-requests/cancel-booking-request.js";
 import { bookingSchema, cancelSchema, idParams } from "./schemas.js";
 import { body, errors, json } from "./http.js";
 export const cancelBookingRequestRoute = createRoute({ method: "patch", path: "/booking-requests/{id}/cancel", tags: ["Booking requests"], request: { params: idParams, body: body(cancelSchema) }, responses: { 200: { content: json(z.object({ bookingRequest: bookingSchema })), description: "Request cancelled" }, ...errors } });

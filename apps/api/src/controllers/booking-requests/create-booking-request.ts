@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
-import { createBookingRequestService } from "../../services/booking-requests/booking-requests.js";
+import { createBookingRequestService } from "../../services/booking-requests/create-booking-request.js";
 import { bookingSchema, createSchema } from "./schemas.js";
 import { body, errors, json } from "./http.js";
 export const createBookingRequestRoute = createRoute({ method:"post", path:"/booking-requests", tags:["Booking requests"], request:{body:body(createSchema)}, responses:{201:{content:json(z.object({bookingRequest:bookingSchema})),description:"Request submitted"},...errors} });

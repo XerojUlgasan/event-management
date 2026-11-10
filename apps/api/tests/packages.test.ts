@@ -303,6 +303,65 @@ test("catalog validates widget sources, bounds, counts and paginates direct pack
 });
 
 async function uploadCanvas(bytes:Uint8Array,mime:string,cookie=adminCookie){const form=new FormData();form.set('file',new Blob([Buffer.from(bytes)],{type:mime}),'media');return app.request('/v1/admin/catalog-media',{method:'POST',headers:{Cookie:cookie},body:form});}
+
+test("catalog media retains validation, streaming, permissions, and OpenAPI contracts", async () => {
+  assert.deepEqual(await read(await call("/catalog-media/not-a-uuid"), 404), { error: "Media not found." });
+  assert.deepEqual(await read(await call("/admin/catalog-media/not-a-uuid", "DELETE", undefined, adminCookie), 404), { error: "Media not found." });
+  await read(await call("/admin/catalog-media/not-a-uuid", "DELETE"), 401);
+  assert.deepEqual(await read(await call("/admin/catalog-media", "POST", {}, adminCookie), 400), { error: "Invalid multipart form." });
+
+  const missing = new FormData();
+  const duplicate = new FormData();
+  duplicate.append("file", new Blob(["first"], { type: "image/png" }), "first.png");
+  duplicate.append("file", new Blob(["second"], { type: "image/png" }), "second.png");
+  for (const form of [missing, duplicate]) {
+    const response = await app.request("/v1/admin/catalog-media", { method: "POST", headers: { Cookie: adminCookie }, body: form });
+    assert.deepEqual(await read(response, 400), { error: "Choose one media file." });
+  }
+
+  const bytes = new Uint8Array([0,0,0,20,102,116,121,112,105,115,111,109,0,0,0,0,105,115,111,109]);
+  const media = await read(await uploadCanvas(bytes, "video/mp4"), 201);
+  await read(await app.request(media.url), 404);
+  await read(await app.request(media.url, { headers: { Cookie: customerCookie } }), 404);
+  const preview = await app.request(media.url, { headers: { Cookie: adminCookie } });
+  assert.equal(preview.status, 200);
+  assert.equal(preview.headers.get("cache-control"), "private, no-store");
+  assert.deepEqual(new Uint8Array(await preview.arrayBuffer()), bytes);
+
+  const saved = await read(await call("/admin/packages", "POST", {
+    ...data, name: "Media route regression",
+    sections: [{ id: randomUUID(), title: "Film", widgets: [
+      { id: randomUUID(), type: "video", x: 0, y: 0, w: 12, h: 6, markdown: "", media, alt: "", caption: "" },
+    ] }],
+  }, adminCookie), 201);
+  const stream = await app.request(media.url);
+  assert.equal(stream.status, 200);
+  assert.equal(stream.headers.get("cache-control"), "public, max-age=300");
+  assert.equal(stream.headers.get("content-type"), "video/mp4");
+  assert.equal(stream.headers.get("accept-ranges"), "bytes");
+  assert.deepEqual(new Uint8Array(await stream.arrayBuffer()), bytes);
+  const partial = await app.request(media.url, { headers: { Range: "bytes=4-7" } });
+  assert.equal(partial.status, 206);
+  assert.equal(partial.headers.get("content-range"), `bytes 4-7/${bytes.length}`);
+  assert.equal(await partial.text(), "ftyp");
+  assert.equal((await app.request(media.url, { headers: { Range: "bytes=100-200" } })).status, 416);
+  await read(await call(`/admin/catalog-media/${media.id}`, "DELETE", undefined, adminCookie), 409);
+  await read(await call(`/admin/packages/${saved.id}/archive`, "POST", undefined, adminCookie), 200);
+  await read(await app.request(media.url), 404);
+  await read(await call(`/admin/packages/${saved.id}`, "DELETE", undefined, adminCookie), 204);
+  const pending = await read(await uploadCanvas(bytes, "video/mp4"), 201);
+  await read(await call(`/admin/catalog-media/${pending.id}`, "DELETE", undefined, customerCookie), 403);
+  await read(await call(`/admin/catalog-media/${pending.id}`, "DELETE", undefined, adminCookie), 204);
+  await read(await app.request(pending.url, { headers: { Cookie: adminCookie } }), 404);
+
+  const spec = await (await app.request("/openapi.json")).json();
+  assert.deepEqual(spec.paths["/v1/admin/catalog-media"].post.requestBody.content["multipart/form-data"].schema, {
+    type: "object", required: ["file"], properties: { file: { type: "string", format: "binary" } },
+  });
+  assert.ok(spec.paths["/v1/admin/catalog-media/{id}"].delete);
+  assert.ok(spec.paths["/v1/catalog-media/{id}"].get.responses[206]);
+  assert.ok(spec.paths["/v1/catalog-media/{id}"].get.responses[416]);
+});
 test("video autoplay is opt-in, persists on public reads, and cannot be enabled for other widgets", async () => {
   const ordinary = await read(await call('/admin/packages', 'POST', data, adminCookie), 201);
   assert.ok(ordinary.sections[0].widgets.every((widget: { autoplay: boolean }) => widget.autoplay === false));
@@ -351,7 +410,7 @@ test('stale pending uploads can be swept while referenced media survives',async(
   const png=new Uint8Array([137,80,78,71,13,10,26,10,0]);
   const old=await read(await uploadCanvas(png,'image/png'),201);
   await pool.query("UPDATE media_assets SET created_at=now()-interval '2 days' WHERE id=$1",[old.id]);
-  const {cleanupStaleCatalogMediaService}=await import('../src/services/catalog-media/catalog-media.js');
+  const {cleanupStaleCatalogMediaService}=await import('../src/services/catalog-media/cleanup-stale-catalog-media.js');
   await cleanupStaleCatalogMediaService(db);
   assert.equal((await pool.query('SELECT count(*) FROM media_assets WHERE id=$1',[old.id])).rows[0].count,'0');
   const media=await read(await uploadCanvas(png,'image/png'),201);

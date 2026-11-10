@@ -1,5 +1,5 @@
 import { InvalidPackageMedia, listCatalogMediaIdsData, replaceCatalogSectionsData } from "../../data/packages/catalog-page.js";
-import { cleanupCatalogMediaService } from "../catalog-media/catalog-media.js";
+import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 import type { VenueContent } from "../../controllers/venues/schemas.js";
