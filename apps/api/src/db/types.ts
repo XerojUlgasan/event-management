@@ -88,6 +88,40 @@ export interface Conversations {
   updated_at: Generated<Timestamp>;
 }
 
+export interface EventsDay {
+  availability_deadline: Timestamp | null;
+  booking_request_id: string;
+  created_at: Generated<Timestamp>;
+  day: Timestamp;
+  ends_at: Timestamp;
+  id: Generated<string>;
+  replacement_event_day_id: string | null;
+  staffing_status: Generated<string>;
+  starts_at: Timestamp;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface EventStaffAvailability {
+  event_day_id: string;
+  id: Generated<string>;
+  responded_at: Generated<Timestamp>;
+  response: string;
+  staff_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface EventStaffs {
+  assigned_at: Generated<Timestamp>;
+  assigned_by: string;
+  event_day_id: string;
+  id: Generated<string>;
+  role: string;
+  staff_id: string;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface MediaAssets {
   byte_size: number | null;
   created_at: Generated<Timestamp>;
@@ -118,8 +152,8 @@ export interface Packages {
   max_guests: number;
   name: string;
   price: number;
-  slug: string;
   published_at: Generated<Timestamp>;
+  slug: string;
   updated_at: Generated<Timestamp>;
 }
 
@@ -175,6 +209,9 @@ export interface DB {
   catalog_sections: CatalogSections;
   catalog_widgets: CatalogWidgets;
   conversations: Conversations;
+  event_staff_availability: EventStaffAvailability;
+  event_staffs: EventStaffs;
+  events_day: EventsDay;
   media_assets: MediaAssets;
   messages: Messages;
   packages: Packages;

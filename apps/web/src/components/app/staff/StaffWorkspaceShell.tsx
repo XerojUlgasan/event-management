@@ -1,20 +1,8 @@
 import { useState, useRef, useEffect } from "react"
 import { Avatar, Badge, Brand, Button, Icon } from "@event-management/ui"
-import { UpcomingEventsPage } from "./UpcomingEventsPage"
+import { StaffEventDays } from "./StaffEventDays"
 
-import { EventChecklistPage } from "./EventChecklistPage"
-
-type StaffTab = "events" | "checklist"
-
-/** Detect whether this staff account has coordinator access.
- *  In production, the server controls this. Here we check staffRole
- *  for any value that signals coordinator privileges.
- */
-function isCoordinator(staffRole: string | null) {
-  if (!staffRole) return false
-  const r = staffRole.toLowerCase()
-  return r.includes("coordinator") || r.includes("head waiter")
-}
+type StaffTab = "events" | "assignments"
 
 export function StaffWorkspaceShell({
   profile,
@@ -29,8 +17,7 @@ export function StaffWorkspaceShell({
   path: string
   onSignOut: () => void
 }) {
-  const coordinator = isCoordinator(profile.staffRole)
-  const tab: StaffTab = path === "/app/checklist" ? "checklist" : "events"
+  const tab: StaffTab = path === "/app/assignments" ? "assignments" : "events"
   const [accountOpen, setAccountOpen] = useState(false)
   const accountRef = useRef<HTMLDivElement>(null)
 
@@ -98,18 +85,7 @@ export function StaffWorkspaceShell({
 
       {/* ── Main content ── */}
       <main className="sw-content" id="sw-main" tabIndex={-1}>
-        {tab === "events" && <UpcomingEventsPage displayName={name} />}
-        {tab === "checklist" && coordinator && <EventChecklistPage />}
-        {tab === "checklist" && !coordinator && (
-          <div className="sw-access-denied">
-            <Icon name="alert" size={36} />
-            <h2>Coordinator access required</h2>
-            <p>
-              The event checklist is only available to the assigned coordinator.
-              Contact your administrator if you believe this is an error.
-            </p>
-          </div>
-        )}
+        <StaffEventDays assignments={tab === "assignments"} />
       </main>
 
       {/* ── Bottom navigation bar ── */}
@@ -121,20 +97,12 @@ export function StaffWorkspaceShell({
           aria-current={tab === "events" ? "page" : undefined}
         >
           <Icon name="calendar" size={22} />
-          <span>Events</span>
+          <span>Event days</span>
         </Button>
 
-        {coordinator && (
-          <Button
-            variant="light"
-            className={`sw-nav-item ${tab === "checklist" ? "sw-nav-active" : ""}`}
-            onClick={() => { window.location.assign("/app/checklist") }}
-            aria-current={tab === "checklist" ? "page" : undefined}
-          >
-            <Icon name="clipboard" size={22} />
-            <span>Checklist</span>
-          </Button>
-        )}
+        <Button variant="light" className={`sw-nav-item ${tab === "assignments" ? "sw-nav-active" : ""}`} onClick={() => { window.location.assign("/app/assignments") }} aria-current={tab === "assignments" ? "page" : undefined}>
+          <Icon name="clipboard" size={22} /><span>Assigned to me</span>
+        </Button>
       </nav>
     </div>
   )

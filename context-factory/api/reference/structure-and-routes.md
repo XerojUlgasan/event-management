@@ -1,5 +1,13 @@
 # API structure and routes
 
+## Event-day staffing
+
+`controllers/event-days/`, `services/event-days/`, and `data/event-days/` own day staffing. Node and Edge mount the same routes. System Administrators list/create through `/v1/admin/event-days`, open/close responses through `/{id}/staffing`, confirm/cancel staff through `/{id}/assignments/{staffId}`, and cancel/move days through `/{id}/cancel` and `/{id}/move`. Staff list openings at `/v1/staff/event-days`, list their assignments at `/v1/staff/assignments`, and put their response at `/v1/staff/event-days/{id}/availability`.
+
+Writes lock current state; creating/opening staffing, responding, confirming assignments, and moving days require an accepted booking request. Cancellation remains available to clean up existing staffing after a request leaves accepted status. Cancelling a booking request cancels its scheduled days and confirmed assignments in the same transaction. Opening requires a future response deadline; expired openings are returned as closed and reject responses. Event-day dates must match the start in the booking timezone; full timestamp ranges support overnight schedules. Staff eligibility uses database role `staff`. Confirming requires a closed response window and an available response, checks full-range overlaps under a staff lock, and permits only one confirmed coordinator per day. A staff member already confirmed on the same day record cannot respond available until that assignment is cancelled. Day cancellation/movement cancels assignments transactionally and preserves history; movement links a fresh replacement under the same booking. None of these actions confirms a booking.
+
+## Existing domains
+
 Catalog widgets expose `autoplay` as a boolean defaulting to false. Only video widgets can set it true; request validation and the `catalog_widgets_video_autoplay` database constraint enforce this. Package section reads and direct saves include the field.
 
 - `apps/api/src/index.ts` starts the Node server. `src/app.ts` builds the `OpenAPIHono<HonoEnv>` app, configures CORS and request guards, injects `db`, mounts controller groups at `/v1`, and serves `/openapi.json`.

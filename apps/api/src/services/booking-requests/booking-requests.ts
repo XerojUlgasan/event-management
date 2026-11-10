@@ -4,6 +4,7 @@ import type { DB, BookingRequests } from "../../db/types.js";
 import type { BookingEstimatedDuration } from "@event-management/contracts/limits/booking-requests";
 import type { CreateInput, Status } from "../../controllers/booking-requests/schemas.js";
 import { findAvailablePackageData, createBookingRequestData, createBookingConversationData, addStatusHistoryData, lockBookingRequestData, updateBookingStatusData, listBookingRequestsData, listAdminBookingRequestsPageData, listBookingRequestDailyCountsData, listStatusHistoryData, findBookingRequestData } from "../../data/booking-requests/booking-requests.js";
+import { endDayData, lockScheduledDaysData } from "../../data/event-days/event-days.js";
 type Database = Kysely<DB> | Transaction<DB>;
 const error = (message: string, status: 400 | 404 | 409) => ({ message, status });
 async function response(db: Database, rows: Selectable<BookingRequests>[]) {
@@ -32,11 +33,16 @@ export async function listAdminBookingRequestsPageService(db: Kysely<DB>, input:
 export async function listBookingRequestDailyCountsService(db: Kysely<DB>, month: string, status?: Status) {
   return (await listBookingRequestDailyCountsData(db, month, status)).map(row => ({ preferredDate: row.preferred_date, count: Number(row.count) }));
 }
+async function cancelScheduledEventDays(trx: Transaction<DB>, bookingId: string) {
+  const days = await lockScheduledDaysData(trx, bookingId);
+  for (const day of days) await endDayData(trx, day.id, "cancelled", null);
+}
 export async function updateBookingStatusService(db: Kysely<DB>, id: string, actorId: string, status: Status, reason?: string | null) {
   return db.transaction().execute(async trx => {
     const row = await lockBookingRequestData(trx, id);
     if (!row) return error("Booking request not found", 404);
     if (["declined", "cancelled"].includes(row.status) || row.status === status || status === "under_review") return error("Invalid status transition", 409);
+    if (status === "cancelled") await cancelScheduledEventDays(trx, id);
     const updated = await updateBookingStatusData(trx, id, status);
     await addStatusHistoryData(trx, id, status, actorId, reason || null);
     return (await response(trx, [updated]))[0]!;
@@ -48,6 +54,7 @@ export async function cancelBookingRequestService(db: Kysely<DB>, id: string, cu
     const row = await lockBookingRequestData(trx, id);
     if (!row || row.customer_id !== customerId) return error("Booking request not found", 404);
     if (!["under_review", "needs_details", "accepted"].includes(row.status)) return error("Invalid status transition", 409);
+    await cancelScheduledEventDays(trx, id);
     const updated = await updateBookingStatusData(trx, id, "cancelled");
     await addStatusHistoryData(trx, id, "cancelled", customerId, reason || null);
     return (await response(trx, [updated]))[0]!;

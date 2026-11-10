@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import { Brand } from "@event-management/ui"
+import { Brand, Button } from "@event-management/ui"
 
 import { AuthProvider, useAuth } from "../../lib/auth"
 import { AppShell } from "./AppShell"
@@ -8,17 +8,10 @@ import { CustomerDashboard } from "./customer/CustomerDashboard"
 import { StaffWorkspaceShell } from "./staff/StaffWorkspaceShell"
 import { adminKey, appHome, customerPaths, isStaffWorkspace, isSystemAdmin, normalizePath } from "./routes"
 
-function isCoordinator(staffRole: string | null) {
-  if (!staffRole) return false
-  const role = staffRole.toLowerCase()
-  return role.includes("coordinator") || role.includes("head waiter")
-}
-
 function allowedPath(profile: { role: string; staffRole: string | null }, path: string) {
   if (profile.role === "customer") return (Object.values(customerPaths) as string[]).includes(path)
   if (isStaffWorkspace(profile)) {
-    if (path === "/app/events") return true
-    return path === "/app/checklist" && isCoordinator(profile.staffRole)
+    return path === "/app/events" || path === "/app/assignments"
   }
   return adminKey(path) !== null
 }
@@ -94,7 +87,19 @@ function Workspace({ path, search }: { path: string; search: string }) {
     )
   }
 
-  if (isStaffWorkspace(profile)) return <StaffWorkspaceShell profile={profile} path={path} onSignOut={handleSignOut} />
+  if (isStaffWorkspace(profile)) {
+    if (profile.role !== "staff") {
+      return (
+        <main className="auth-splash">
+          <Brand />
+          <h1>Staff access required</h1>
+          <p>Ask a System Administrator to review your account role before using event staffing.</p>
+          <Button onClick={handleSignOut}>Sign out</Button>
+        </main>
+      )
+    }
+    return <StaffWorkspaceShell profile={profile} path={path} onSignOut={handleSignOut} />
+  }
   if (isSystemAdmin(profile)) {
     const active = adminKey(path)
     return active ? <AppShell profile={profile} active={active} onSignOut={handleSignOut} /> : null

@@ -20,7 +20,7 @@ export async function request<T>(
   path: string,
   body?: unknown,
   idToken?: string,
-  method?: "GET" | "POST" | "PATCH" | "DELETE",
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
 ): Promise<T> {
   const response = await fetch(`${apiBase()}${path}`, {
     method: method ?? (body === undefined ? "GET" : "POST"),

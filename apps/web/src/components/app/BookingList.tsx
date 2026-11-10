@@ -1,3 +1,4 @@
+import { AdminEventDays } from "./staff/AdminEventDays";
 import { Input, NativeDialog, Select, Textarea } from "@event-management/ui"
 import { MAX_BOOKING_REASON_LENGTH } from "@event-management/contracts/limits/booking-requests";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -972,6 +973,7 @@ export function BookingDetails({
             </dl>
           </section>
         </div>
+        {!readOnly && <AdminEventDays booking={item} />}
         <details className="booking-history">
           <summary>Status history</summary>
           <ul>

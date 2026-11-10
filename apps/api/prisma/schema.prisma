@@ -18,6 +18,9 @@ model User {
   conversations Conversation[] @relation("CustomerConversations")
   sentMessages Message[]     @relation("MessageSender")
   mediaAssets MediaAsset[]
+  eventAvailability EventStaffAvailability[]
+  eventAssignments EventStaff[] @relation("EventStaffMember")
+  assignedEventStaff EventStaff[] @relation("EventStaffAssigner")
 
   @@map("users")
 }
@@ -202,6 +205,7 @@ model BookingRequest {
   package Package @relation(fields: [packageId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   history BookingRequestStatusHistory[]
   conversation Conversation? @relation("BookingRequestConversation")
+  eventDays EventDay[]
   @@index([customerId, createdAt])
   @@map("booking_requests")
 }
@@ -217,4 +221,63 @@ model BookingRequestStatusHistory {
   actor User @relation(fields: [changedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
   @@index([bookingRequestId, createdAt])
   @@map("booking_request_status_history")
+}
+
+// Status checks, RLS, and the confirmed-coordinator partial index live in SQL.
+model EventDay {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingRequestId String @map("booking_request_id") @db.Uuid
+  day DateTime @db.Date
+  startsAt DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt DateTime @map("ends_at") @db.Timestamptz(6)
+  status String @default("scheduled")
+  staffingStatus String @default("draft") @map("staffing_status")
+  availabilityDeadline DateTime? @map("availability_deadline") @db.Timestamptz(6)
+  replacementEventDayId String? @map("replacement_event_day_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  bookingRequest BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  replacementEventDay EventDay? @relation("EventDayReplacement", fields: [replacementEventDayId, bookingRequestId], references: [id, bookingRequestId], onDelete: Restrict, onUpdate: NoAction, map: "events_day_replacement_same_booking_fkey")
+  replacedEventDays EventDay[] @relation("EventDayReplacement")
+  availability EventStaffAvailability[]
+  staff EventStaff[]
+
+  @@unique([id, bookingRequestId])
+  @@index([bookingRequestId, day])
+  @@index([replacementEventDayId, bookingRequestId])
+  @@map("events_day")
+}
+
+model EventStaffAvailability {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventDayId String @map("event_day_id") @db.Uuid
+  staffId String @map("staff_id") @db.Uuid
+  response String
+  respondedAt DateTime @default(now()) @map("responded_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  eventDay EventDay @relation(fields: [eventDayId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  staff User @relation(fields: [staffId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@unique([eventDayId, staffId])
+  @@index([staffId])
+  @@map("event_staff_availability")
+}
+
+model EventStaff {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventDayId String @map("event_day_id") @db.Uuid
+  staffId String @map("staff_id") @db.Uuid
+  role String
+  status String @default("confirmed")
+  assignedBy String @map("assigned_by") @db.Uuid
+  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  eventDay EventDay @relation(fields: [eventDayId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  staff User @relation("EventStaffMember", fields: [staffId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  assigner User @relation("EventStaffAssigner", fields: [assignedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@unique([eventDayId, staffId])
+  @@index([staffId, status])
+  @@index([assignedBy])
+  @@map("event_staffs")
 }

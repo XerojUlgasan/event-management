@@ -22,6 +22,7 @@ Domain modules under `apps/web/src/lib/data/` are the functions screens use for 
 | `messages.ts` | Customer and admin conversation reads and sends |
 | `booking-requests.ts` | Customer and admin booking-request reads, create, cancel, and status update |
 | `users.ts` | Admin user directory read |
+| `event-days.ts` | Admin event-day staffing, staff availability responses, and own assignments |
 | `page-query.ts` | `limit` and `offset` query string used by public list functions. It performs no HTTP |
 
 Call shape on `request(path, body?, idToken?, method?)`:

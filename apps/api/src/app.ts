@@ -3,6 +3,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { db } from "./db/client.js";
+import eventDayRoutes from "./controllers/event-days/index.js";
 import bookingRequestRoutes from "./controllers/booking-requests/index.js";
 import authRoutes from "./controllers/auth/index.js";
 import messageRoutes from "./controllers/messages/index.js";
@@ -29,7 +30,7 @@ app.use(
       origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
     credentials: true,
     allowHeaders: ["Authorization", "Content-Type"],
-    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   }),
 );
 
@@ -64,6 +65,10 @@ app.use("/v1/booking-requests", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES
 app.use("/v1/booking-requests/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/admin/booking-requests/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.route("/v1", bookingRequestRoutes);
+app.use("/v1/admin/event-days", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/admin/event-days/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/staff/event-days/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.route("/v1", eventDayRoutes);
 app.route("/v1", messageRoutes);
 app.route("/v1", authRoutes);
 app.route("/v1", userRoutes);

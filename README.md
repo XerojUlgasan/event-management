@@ -34,8 +34,8 @@ Before implementing dependent work, confirm intake fields and real catalog conte
 | Identity | Local email/password and optional Firebase sign-in share database profiles, roles, and server-side sessions. |
 | Booking requests | Signed-in customers submit inquiries from published packages. PostgreSQL stores package snapshots, request details, status history, and a linked conversation. Signed-out drafts resume after sign-in for explicit review and submission. |
 | Messages | Customer-to-admin conversations persist in PostgreSQL, including request-linked conversations, unread counts, and read state. |
-| Directory and staff access | System Administrators have a read-only Staff & Customers directory. The current staff workspace shows mock event assignments and a mock checklist for staff titles containing “coordinator” or “head waiter”; its responses and checklist edits stay in local UI state. Staff can read booking requests through the API, and published catalogs are publicly readable, but the staff workspace does not currently expose those views. |
-| Remaining scope | Requirements-first inquiries, quotations, availability, confirmed bookings, full workforce management, AI replies/handoff, reports, and the managed showcase are not implemented. Other business screens may contain demo or local data. |
+| Directory and staff access | System Administrators have a read-only Staff & Customers directory. Staff use Event days to respond to staffing openings and Assigned to me to see their persisted day assignments. Administrators manage event-day staffing from accepted booking-request details. |
+| Remaining scope | Requirements-first inquiries, quotations, booking confirmation and date holds, workforce checklists/notifications, AI replies/handoff, reports, and the managed showcase are not implemented. Other business screens may contain demo or local data. |
 
 ### Booking requests and messages
 
@@ -44,6 +44,14 @@ The current intake requires a customer session and a published package. It colle
 Creation snapshots the package name, price, and maximum guests. Later catalog edits do not change those snapshots. A supplied stale `packageUpdatedAt` returns `409`. Requests start as `under_review`; other statuses are `needs_details`, `accepted`, `declined`, and `cancelled`. Acceptance is for processing only. Customers can cancel their own open requests. Only System Administrators can update review status; the API permits staff to read requests, but the current staff workspace does not display that queue. Preferred location is independent of the venue catalog.
 
 Both message workspaces refresh every five seconds. Opening a conversation marks the other side's messages as read; messages allow up to 4,000 characters. Request-linked threads expose booking details, read-only for customers. Conversations expire 24 hours after the event end when known, or 24 hours after creation otherwise. Expired linked threads remain closed; a customer message can reopen a general conversation. Closed history is retained. There is no public guest chat or AI assistant.
+
+### Day-based event staffing
+
+An accepted booking request can have multiple event days, each with its own date, full start/end timestamps, staffing opening, response deadline, and team. Times use the booking's timezone and may run overnight. Event-day status is `scheduled`, `cancelled`, or `moved`; staffing status is `draft`, `open`, or `closed`. Reopening staffing uses the existing day.
+
+Staff respond `available` or `unavailable` while responses are open and before the deadline. No response remains distinct from unavailable. A confirmed assignment on that same event day blocks another available response; a cancelled assignment allows it. After responses close, a System Administrator selects available staff as coordinator or helper. Confirmation checks overlapping assignments across full timestamp ranges, and each day allows at most one confirmed coordinator. Availability and assignments remain separate, with one record per staff member and event day in each table.
+
+Cancelling a day closes staffing and cancels its assignments. Cancelling the parent booking request also cancels all its scheduled days and confirmed assignments in the same transaction. Moving it creates a replacement under the same booking with empty responses and assignments; the original is marked moved, linked to its replacement, and retained with cancelled assignments. Staff must respond and be selected again. Accepting a request and confirming staff assignments do not confirm the booking or reserve its date.
 
 ## Workspace layout
 
@@ -174,6 +182,8 @@ pnpm check
 
 `pnpm db:deploy` applies committed migrations; it does not create migrations. Never hand-edit generated `apps/api/src/db/types.ts`. Inspect both Prisma and SQL migrations because some database constraints extend beyond the Prisma model.
 
+The type generator includes application tables in `public` only, excluding Supabase's internal schemas. Migration `20261110141853_event_day_staffing` adds `events_day`, `event_staff_availability`, and `event_staffs` without backfilling existing bookings or staff; the API owns deadlines, eligibility, timezone validation, overlap checks, and transactional movement/cancellation.
+
 Migration `20261109140000_enable_application_rls` enables row-level security on application tables and Prisma's migration history. It removes table grants from `PUBLIC` and, when present, Supabase's `anon` and `authenticated` roles. Clients access records through Clemora's session-aware API; there are no direct-client RLS policies. The server database role must own the tables or have `BYPASSRLS`. Future table-creation migrations must explicitly enable RLS and remove unused client grants too; this migration does not install an automatic trigger. These SQL-only access settings do not change Prisma models or generated Kysely types.
 
 **`pnpm db:reset` deletes data without a confirmation prompt.** Its script forces a Prisma reset, reapplies migrations, and seeds the configured database. Check the target and use it only for a database whose contents may be discarded.
@@ -205,6 +215,7 @@ Run the checks matching the changed area:
 | `pnpm --filter @event-management/api test:packages` | Package/service catalog and shared canvas behavior |
 | `pnpm --filter @event-management/api test:venues` | Venue catalog behavior |
 | `pnpm --filter @event-management/api test:booking-requests` | Inquiry creation, snapshots, access, and status behavior |
+| `pnpm --filter @event-management/api test:event-days` | Day staffing, availability, assignments, deadlines, permissions, overlap protection, and movement/cancellation |
 | `pnpm --filter @event-management/api test:messages` | Conversation ownership, messages, read state, and expiry |
 
 Integration suites create disposable local PostgreSQL databases and require permission to create them. Auth also requires the Firebase CLI on `PATH` and ports 9099, 4409, and 4509 free; it uses an emulator rather than production Firebase. Media tests use a local Storage API fake rather than production Supabase Storage. See [API verification](context-factory/api/reference/verification.md) and the [seed guide](docs/SEED.md) for additional focused suites.

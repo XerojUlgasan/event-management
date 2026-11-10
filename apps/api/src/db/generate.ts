@@ -6,6 +6,7 @@ await new Cli().run({
   config: {
     url: databaseUrl,
     outFile: "src/db/types.ts",
+    includePattern: "public.*",
     excludePattern: "_prisma_migrations",
   },
 });

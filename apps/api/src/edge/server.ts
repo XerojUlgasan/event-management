@@ -22,12 +22,18 @@ const loaders = {
   packages: () => import("../controllers/packages/index.js"),
   venues: () => import("../controllers/venues/index.js"),
   "booking-requests": () => import("../controllers/booking-requests/index.js"),
+  "event-days": () => import("../controllers/event-days/index.js"),
   messages: () => import("../controllers/messages/index.js"),
   auth: () => import("../controllers/auth/index.js"),
   users: () => import("../controllers/users/index.js"),
 } satisfies Record<RouteFamilyId, () => Promise<{ default: OpenAPIHono<HonoEnv> }>>;
 
 const bodyLimits: Partial<Record<RouteFamilyId, ReadonlyArray<{ path: string; maxSize: number }>>> = {
+  "event-days": [
+    { path: "/admin/event-days", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
+    { path: "/admin/event-days/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
+    { path: "/staff/event-days/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
+  ],
   auth: [{ path: "/auth/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES }],
   messages: [
     { path: "/messages/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
@@ -121,7 +127,7 @@ app.use(
     origin: (origin) => (origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0]),
     credentials: true,
     allowHeaders: ["Authorization", "Content-Type"],
-    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   }),
 );
 
