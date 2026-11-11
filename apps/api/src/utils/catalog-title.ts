@@ -16,7 +16,8 @@ export async function reserveCatalogTitle(
   let query = db
     .selectFrom(table)
     .select("id")
-    .where(sql<SqlBool>`lower(name) = ${trimmed.toLowerCase()} or slug = ${slug}`);
+    .where(sql<SqlBool>`(lower(name) = ${trimmed.toLowerCase()} or slug = ${slug})`);
+  if (table === "packages") query = query.where(sql<SqlBool>`package_type = 'catalog'`);
   if (exceptId) query = query.where("id", "!=", exceptId);
   const existing = await query.executeTakeFirst();
   return existing ? null : { name: trimmed, slug };

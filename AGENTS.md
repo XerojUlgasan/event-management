@@ -24,7 +24,7 @@ Reuse existing components, tokens, and contracts. Put new reusable presentation 
 | Astro host, React application screens, client auth or API calls | `apps/web/` | [Frontend skill](context-factory/frontend/SKILL.md) |
 | Shared React components, Storybook, design tokens | `packages/ui/`, `packages/theme/` | [Packages skill](context-factory/packages/SKILL.md) |
 | Shared API and web limits, including upload size and field length contracts | `packages/contracts/` | [Limits skill](context-factory/limits/SKILL.md) |
-| Test accounts, authenticated API checks, and custom SQL inspection | `context-factory/QA/` | [QA skill](context-factory/QA/SKILL.md) |
+| Test accounts, authenticated API checks, custom SQL inspection, and adding seeded rows for one table | `context-factory/QA/` | [QA skill](context-factory/QA/SKILL.md), [Seed one table](context-factory/QA/seed-a-table/SKILL.md) |
 
 For a change crossing areas, read every applicable skill and its listed references. The files under `context-factory/` are repository guidance; inspect current code as the authority if guidance has drifted, then update the guidance in the same task.
 
@@ -54,7 +54,7 @@ Register each domain's routes in `controllers/<domain>/index.ts`; `src/app.ts` m
 - Use `pnpm`; workspace membership is declared in `pnpm-workspace.yaml`, and runnable commands are in each `package.json`.
 - Local Supabase CLI configuration lives in `apps/supabase`. The API, Prisma migrations, seeds, and integration tests still use Compose PostgreSQL from `apps/api/compose.yaml`.
 - Astro runs as a Node server. Public pages are server-rendered from `apps/web/src/pages`; `/login` and `/app` mount `components/app/App.tsx` with `client:only="react"`. `GET /me` chooses the admin, staff, or customer workspace, and each role keeps only its own `/app` paths. Public catalog cards link to `/packages`, `/services`, `/venues`, and `/{slug}` detail pages. Catalog overlays remain inside `/app`. The old `/catalog` and 3D `/landing` routes have been removed. API routes are mounted under `/v1` in `apps/api/src/app.ts`; its OpenAPI document is `/openapi.json`.
-- Package catalog cards and admin edits use the `/v1/packages` API and PostgreSQL. Customer-to-admin messages use `/v1/messages` and `/v1/admin/conversations` with PostgreSQL. Booking requests persist in PostgreSQL through `/v1/booking-requests` and `/v1/admin/booking-requests`; confirmed bookings, quotes, payments, and other business screens still use demo data. Trace each screen's API and persistence before describing it as a working backend workflow.
+- Package catalog cards and admin edits use the `/v1/packages` API and PostgreSQL. Customer-to-admin messages use `/v1/messages` and `/v1/admin/conversations` with PostgreSQL. Booking requests persist in PostgreSQL through `/v1/booking-requests` and `/v1/admin/booking-requests`; Private custom packages, package-service inclusions, quotations, and version-linked quotation messages also persist in PostgreSQL. Confirmed bookings, payments, and other business screens still use demo data. Trace each screen's API and persistence before describing it as a working backend workflow.
 - [README](README.md) owns product scope, open decisions, current implementation, and setup. Check its scope and implementation sections before changing product behavior.
 - Keep values from `.env`, `.secrets/`, and local databases out of chat, docs, and commits. Use the checked-in `.env.example` files when documentation needs variable names.
 

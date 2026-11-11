@@ -1,9 +1,10 @@
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages"
 import { Fragment, useEffect, useRef, useState, type SubmitEvent } from "react"
-import { Avatar, Badge, Button, Icon, Input } from "@event-management/ui"
+import { Avatar, Badge, Button, Dialog, Icon, Input } from "@event-management/ui"
 
 import { getMyBookingRequest, type BookingRequest } from "../../../lib/data/booking-requests"
 import type { ChatConversation, ChatMessage } from "../../../lib/data/messages"
+import { Quotations } from "../Quotations"
 import { BookingDetails } from "../BookingList"
 import { adminBookingRequestPath } from "../routes"
 import { initialsFromName } from "../../../lib/utils/name"
@@ -83,6 +84,7 @@ export function MessagesWorkspace({
   newChatBusy?: boolean
   readOnly?: boolean
 }) {
+  const [quotationId, setQuotationId] = useState<string | null>(null)
   const [draft, setDraft] = useState("")
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState("")
@@ -108,6 +110,7 @@ export function MessagesWorkspace({
     setDraft("")
     setSendError("")
     setBooking(null)
+    setQuotationId(null)
     setBookingError("")
     setBookingLoading(false)
     bookingLoad.current++
@@ -299,6 +302,7 @@ export function MessagesWorkspace({
                 {showDay && <span className="chat-time">{dayLabel(message.createdAt)}</span>}
                 <div className={`message ${mine ? "customer-message" : "bot"}`}>
                   {message.body}
+                  {message.quotationId && <Button variant="secondary" onClick={() => setQuotationId(message.quotationId)}>View quotation</Button>}
                   <small className="message-meta">
                     {!mine && `${message.senderName} · `}
                     {timeFormatter.format(new Date(message.createdAt))}
@@ -357,6 +361,11 @@ export function MessagesWorkspace({
           </form>
         )}
       </section>
+      {quotationId && (
+        <Dialog title="Quotation" onClose={() => setQuotationId(null)}>
+          <Quotations key={quotationId} quotationId={quotationId} bookingId={active?.bookingRequestId ?? undefined} admin={!isTeam} />
+        </Dialog>
+      )}
       {booking && isTeam && <BookingDetails item={booking} customerCanEditTimes onClose={() => setBooking(null)} onSaved={setBooking} />}
     </div>
   )

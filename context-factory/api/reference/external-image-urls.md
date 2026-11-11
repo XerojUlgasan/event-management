@@ -8,9 +8,17 @@ Uploaded canvas images must be JPEG, PNG, or WebP and at most 10 MiB. Videos mus
 
 Photo and video widgets accept uploads only. External image/video URLs and hosted YouTube/Vimeo embeds are rejected. Sample image media uses the checked-in paths allowed by the catalog schema. Migration `20261102140000_upload_only_catalog_media` enforces this in PostgreSQL and refuses to proceed if external media rows remain, preserving those rows for deliberate replacement with uploads.
 
-When a catalog save removes or replaces uploaded media, the API deletes the Storage object and media row only if no catalog widget still references it. Cleanup runs after the database save; a failed Storage deletion leaves the unreferenced record and does not undo the saved catalog record. Each new upload also retries cleanup for up to 10 unreferenced assets older than 24 hours. `pnpm --filter @event-management/api media:cleanup` retries up to 100 unreferenced catalog assets older than 24 hours.
+When a catalog save removes or replaces uploaded media, the API deletes the Storage object and media row only if no current catalog widget references it. Cleanup runs after the database save; a failed Storage deletion leaves the unreferenced record and does not undo the saved catalog record. Each new upload also retries cleanup for up to 10 unreferenced assets older than 24 hours. `pnpm --filter @event-management/api media:cleanup` retries up to 100 unreferenced catalog assets older than 24 hours.
 
 Public requests can stream media referenced by published, non-archived catalog records. A signed-in System Administrator also has a private, no-store fallback for that administrator's pending uploads and uploads referenced by archived records.
+
+## Private proposal and quotation media
+
+Uploaded catalog media is copied to independent pending media IDs and Storage keys before a custom proposal is attached. The booking transaction rechecks booking/package revisions and validates references; failed or interrupted staging is recoverable through cleanup. A custom save never shares an uploaded Storage key with its source catalog page.
+
+Public streaming requires a catalog package, not merely a nonarchived package row. The owner can stream uploads currently referenced by its custom proposal; System Administrators have the protected preview path. Private streams use `private, no-store`, including byte ranges. Quotations neither retain media snapshots nor grant customer media access.
+
+Reference checks and stale cleanup use current widgets. Removing or replacing the last widget reference makes an upload eligible for cleanup, even when an old quotation referred to that package. A fake Storage API test establishes local copy/cleanup behavior, not live Supabase Storage success.
 
 ## Services and venues
 

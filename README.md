@@ -20,15 +20,15 @@ Scope recorded on 2026-11-03, with identity responsibilities and booking-linked 
 
 The [identity reference](context-factory/business-logic/references/identity.md) defines these intended role responsibilities. Admin means the System Administrator; coordinator is an event responsibility assigned to staff.
 
-The [messages reference](context-factory/business-logic/references/messages.md) describes intended booking-linked communication. Transaction types, steps, and approval rules remain to be defined within the scope boundaries below.
+The [messages reference](context-factory/business-logic/references/messages.md) describes intended booking-linked communication. Quotations are the implemented booking-related transaction; other transaction types remain undefined within the scope boundaries below.
 
 A request does not reserve a date, establish a final price, or confirm a booking. Confirmation rules remain to be agreed and must not be inferred from payment.
 
 **Outside scope:** all payment responsibilities, including gateways, proof uploads, verification, payment records/status, balances, fee calculation or crediting, and receipts; equipment/inventory management; and supplier management or coordination. Existing demo screens do not establish requirements.
 
-**Later work:** custom package/service combination configuration, menus, policies, terms, and AI knowledge maintenance. The staff delivery platform is undecided.
+**Later work:** menus, additional policy/term configuration, and AI knowledge maintenance. The staff delivery platform is undecided.
 
-Before implementing dependent work, confirm intake fields and real catalog content/prices; quotation format, approvals and revisions; availability, confirmation, cancellation and event-change rules; workforce permissions and notifications; assistant sources and handoff ownership; and report/showcase definitions. Meta and other channel integrations require separate decisions.
+Before implementing dependent work, confirm intake fields and real catalog content/prices; any further quotation format or approval policy changes; availability, confirmation, cancellation and event-change rules; workforce permissions and notifications; assistant sources and handoff ownership; and report/showcase definitions. Meta and other channel integrations require separate decisions.
 
 ## Current implementation
 
@@ -37,9 +37,10 @@ Before implementing dependent work, confirm intake fields and real catalog conte
 | Website and catalogs | `/`, `/about`, `/packages`, `/services`, `/venues`, and their `/{slug}` pages are server-rendered HTML. Cards and View more are links. A catalog title is unique, and its slug is the public address. Book now sits under the package price and guest count and continues at `/login`. `/login` and `/app` stay client-rendered; catalog overlays remain inside `/app`. All three catalogs persist in PostgreSQL and support direct saves, canvas content, and archives. |
 | Identity | Local email/password and optional Firebase sign-in share database profiles, roles, and server-side sessions. Sign-in returns to a requested workspace path only when it is local and allowed for the signed-in role. |
 | Booking requests | Signed-in customers submit package inquiries for one or more requested dates. PostgreSQL stores ordered per-day date and time entries, package snapshots, request details, status history, and a linked conversation. Customers supply times after submission; for an accepted request, a System Administrator selects one response-deadline offset for the request and applies it to create operational days from every ready requested date and update current scheduled days. Signed-out drafts resume after sign-in for explicit review and submission. |
-| Messages | Customer-to-admin conversations persist in PostgreSQL, including request-linked conversations, unread counts, and read state. Transaction creation within conversations is not implemented. |
+| Messages | Customer-to-admin conversations persist in PostgreSQL, including request-linked conversations, unread counts, and read state. Sent quotations appear as exact-version messages; other booking-related transaction types are not implemented. |
 | Directory and staff access | System Administrators have a read-only Staff & Customers directory. Staff Event days combines a monthly calendar, searchable table, response filters, and persisted availability controls. Assigned to me shows assignment cards with schedule, role/status, and a details drawer containing the confirmed team. System Administrators review request status and manage event-day staffing on `/app/bookings/{id}`, opened from Admin Bookings or a linked admin conversation. |
-| Remaining scope | Requirements-first inquiries, quotations, booking confirmation and date holds, workforce checklists/notifications, AI replies/handoff, reports, and the managed showcase are not implemented. Other business screens may contain demo or local data. |
+| Quotations | System Administrators prepare booking-owned private packages and versioned PHP quotations. Customers review saved prices and itemized adjustments, accept or request revisions, and receive sent versions in the linked conversation. Acceptance does not reserve dates or confirm a booking. |
+| Remaining scope | Requirements-first inquiries, booking confirmation and date holds, workforce checklists/notifications, AI replies/handoff, reports, and the managed showcase are not implemented. Other business screens may contain demo or local data. |
 
 ### Booking requests and messages
 
@@ -54,6 +55,16 @@ On `/app/bookings/{id}`, requested-date rows appear in the Event days section, i
 Creation snapshots the package name, price, and maximum guests. Later catalog edits do not change those snapshots. A supplied stale `packageUpdatedAt` returns `409`. Requests start as `under_review`; other statuses are `needs_details`, `accepted`, `declined`, and `cancelled`. Acceptance is for processing only. Customers can cancel their own open requests. Only System Administrators can update review status; the API permits staff to read requests, but the current staff workspace does not display that queue. Preferred location is independent of the venue catalog.
 
 Both message workspaces refresh every five seconds. Opening a conversation marks the other side's messages as read; messages allow up to 4,000 characters. Customers open request details from linked customer conversations in a modal and can enter times for their eligible unscheduled days. From a linked conversation in the admin Messages workspace, the info icon opens `/app/bookings/{id}`, where request review and event-day controls live. Conversations still expire 24 hours after the parent request's end time when known, or 24 hours after creation otherwise. Per-day requested times do not create a continuous parent interval or change the parent's `ends_at`; a new request with no parent end time therefore expires from its creation time. Expired linked threads remain closed; a customer message can reopen a general conversation. Closed history is retained. There is no public guest chat or AI assistant.
+
+### Private packages and quotations
+
+The inquiry retains its original catalog `package_id` and name, price and guest-limit snapshots. Its current proposal is the private package identified by `custom_for_booking_request_id`, falling back to the original catalog record when no custom package exists. Admins select a catalog base, copy its content and uploads independently, and edit that booking’s custom package thereafter. Private packages are excluded from public catalogs, public slugs and new inquiry selection. Catalog title/address behavior is preserved; private copies may retain the same title.
+
+From the admin booking page, System Administrators create a quotation draft from the current proposal, save ordered manual additions/deductions, and send the saved version. Empty adjustment lists are valid. The server validates every item and optional service reference and atomically saves JSONB items with the computed integer-centavo total. Each version retains its package ID, base amount, adjustments and computed total. Package content, services and event details remain on the booking and current proposal; quotations do not copy or automatically compare them. Later edits do not change saved quotation amounts or block sending/acceptance. An administrator explicitly starts a revision when a new offer is needed; the revision uses the current proposal price and copies prior adjustments for review.
+
+Sending atomically records the quotation, audit event and a version-linked conversation message. A closed or expired linked conversation blocks sending; sending does not reopen it. Quotations have no automatic expiry. Any System Administrator can edit, revise or send, with audit attribution. A revision immediately supersedes the prior active agreement, copies adjustments for review, and requires fresh customer acceptance. Customers see sent history and can accept or request revisions from booking details or the linked quotation message. Internal drafts remain hidden. Acceptance never confirms a booking, reserves dates or creates event days.
+
+The additive `20261111130000_private_packages_quotations` migration creates service links, JSONB quotations and audit events, adds private ownership and message references, and applies constraints, RLS and restricted grants. It does not replay err12’s booking simplification or remove inquiry snapshots/timezones. The follow-up `20261111150000_simplify_quotation_offers` migration removes the package timestamp and full terms snapshot from quotations while retaining financial values, version/status history, audit events and message links. Apply pending migrations to the intended database before using these screens; generating types or passing tests against disposable databases does not migrate an application database.
 
 ### Day-based event staffing
 
@@ -168,7 +179,7 @@ The API verifies Firebase ID tokens, including revocation/disabled-user checks, 
 
 ## Catalogs and media
 
-Packages, services, and venues are independent flat records, each with one canvas page. A System Administrator save publishes a complete record immediately; there is no draft/publish/version-history lifecycle or structured package-to-service/venue assignment. Updates require `expectedUpdatedAt`; stale or archived edits return `409`. Archive hides a record from public selection. A package referenced by a booking request cannot be deleted.
+Catalog packages, services, and venues are flat records, each with one canvas page. A System Administrator catalog save publishes a complete record immediately. Packages can include ordered service links marked included or optional; these links do not calculate price or establish availability. Venues remain independent. Booking-owned custom packages are private and have a separate edit/audit flow. Updates require `expectedUpdatedAt`; stale or archived edits return `409`. Archive hides a record from public selection. A package referenced by a booking request cannot be deleted.
 
 | Catalog | Required save data |
 | --- | --- |
@@ -180,7 +191,7 @@ Package prices are stored as whole pesos; the API uses `{ kind: "fixed", currenc
 
 The shared editor uses photo, Markdown, and video widgets on a 12-column canvas. Media uploads go through `POST /v1/admin/catalog-media`, remain pending until a catalog save references them, and stream through `/v1/catalog-media/{id}`. JPEG/PNG/WebP images allow up to 10 MiB; MP4/WebM videos allow up to 25 MiB. Photo/video widgets accept uploads only, with built-in sample photos retained for seeded packages; external URLs and hosted-player embeds are rejected. Video autoplay is opt-in and uses muted inline playback on customer previews.
 
-Public media streaming requires a reference from a published, non-archived catalog record. System Administrators can preview their own pending uploads and archived-record media. Removing uploaded media triggers cleanup only when no widget references it; storage failures can leave unreferenced assets for retry. See [catalog media](context-factory/api/reference/external-image-urls.md) for storage, cleanup, and migration details, and [shared limits](context-factory/limits/SKILL.md) for validation ownership.
+Public media streaming requires a reference from a published, non-archived catalog record. System Administrators can preview pending uploads and saved private media under the API access rules. Owners can preview media currently referenced by their private package; private responses use no-store caching. Quotations do not retain historical media or grant media access. Removing uploaded media triggers cleanup only when no current widget references it; storage failures can leave unreferenced assets for retry. See [catalog media](context-factory/api/reference/external-image-urls.md) for storage, cleanup, and migration details, and [shared limits](context-factory/limits/SKILL.md) for validation ownership.
 
 ## Database workflow
 
@@ -197,6 +208,8 @@ pnpm check
 The type generator includes application tables in `public` only, excluding Supabase's internal schemas. Migration `20261110141853_event_day_staffing` adds `events_day`, `event_staff_availability`, and `event_staffs` without backfilling existing bookings or staff; the API owns deadlines, eligibility, timezone validation, overlap checks, and transactional movement/cancellation.
 
 Migration `20261109140000_enable_application_rls` enables row-level security on application tables and Prisma's migration history. It removes table grants from `PUBLIC` and, when present, Supabase's `anon` and `authenticated` roles. Clients access records through Clemora's session-aware API; there are no direct-client RLS policies. The server database role must own the tables or have `BYPASSRLS`. Future table-creation migrations must explicitly enable RLS and remove unused client grants too; this migration does not install an automatic trigger. These SQL-only access settings do not change Prisma models or generated Kysely types.
+
+Migration `20261111150000_simplify_quotation_offers` deliberately discards quotation package timestamps and full package/event-term snapshots. It preserves quotation IDs, package references, amounts/items, status and acceptance timestamps, revision links, audit events, and quotation messages. It does not delete Storage objects; normal cleanup can remove uploads that no current widget references. Deploy the matching API and web changes together with this migration.
 
 Migration `20261111120000_booking_requested_days` adds nullable JSONB `booking_requests.requested_days` with a check that non-NULL values are nonempty arrays. SQL `NULL` identifies requests created before customers selected a complete date list. The migration does not backfill dates or rewrite the legacy estimate, timestamps, snapshots, conversations, or operational event days.
 
@@ -231,6 +244,8 @@ Run the checks matching the changed area:
 | `pnpm --filter @event-management/api test:venues` | Venue catalog behavior |
 | `pnpm --filter @event-management/api test:booking-requests` | Inquiry creation and legacy preservation; requested-date validation, per-day time saves, stale writes, calendar counts, status filters, and duplicate-free pagination |
 | `pnpm --filter @event-management/api test:event-days` | Day staffing, availability, assignments, deadlines, permissions, overlap protection, requested-day scheduling links, and movement/cancellation |
+| `pnpm --filter @event-management/api test:quotations` | Quotation lifecycle, JSONB amounts, permissions, stale writes and atomic conversation delivery |
+| `pnpm --filter @event-management/api test:proposal-migration` | Populated baseline preservation, ownership, JSONB arithmetic, message linkage and RLS/grants |
 | `pnpm --filter @event-management/api test:messages` | Conversation ownership, messages, read state, and expiry |
 
 Integration suites create disposable local PostgreSQL databases and require permission to create them. Auth also requires the Firebase CLI on `PATH` and ports 9099, 4409, and 4509 free; it uses an emulator rather than production Firebase. Media tests use a local Storage API fake rather than production Supabase Storage. See [API verification](context-factory/api/reference/verification.md) and the [seed guide](docs/SEED.md) for additional focused suites.

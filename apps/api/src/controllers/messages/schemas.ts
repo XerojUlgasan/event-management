@@ -13,6 +13,7 @@ export const messageBodySchema = z.object({
 export const messageSchema = z.object({
   id: z.string().uuid(),
   body: z.string(),
+  quotationId: z.string().uuid().nullable(),
   senderId: z.string().uuid(),
   senderRole: z.enum(["admin", "customer"]),
   senderName: z.string(),

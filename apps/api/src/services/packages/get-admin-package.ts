@@ -8,6 +8,6 @@ export async function getAdminPackageService(db: Kysely<DB>, id: string) {
     .setIsolationLevel("repeatable read")
     .execute(async (trx) => {
       const row = await findPackageData(trx, id);
-      return row ? packageDto(trx, row) : null;
+      return row ? packageDto(trx, row, { includeArchivedServices: true }) : null;
     });
 }

@@ -4,6 +4,7 @@ export type ConversationStatus = "active" | "closed"
 
 export type ChatMessage = {
   id: string
+  quotationId: string | null
   body: string
   senderId: string
   senderRole: "admin" | "customer"

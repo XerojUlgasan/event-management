@@ -4,7 +4,7 @@ export const routeFamilies = [
   { id: "services", prefixes: ["/v1/admin/services", "/v1/services"] },
   { id: "packages", prefixes: ["/v1/admin/packages", "/v1/packages"] },
   { id: "venues", prefixes: ["/v1/admin/venues", "/v1/venues"] },
-  { id: "booking-requests", prefixes: ["/v1/admin/booking-requests", "/v1/booking-requests"] },
+  { id: "booking-requests", prefixes: ["/v1/admin/booking-requests", "/v1/booking-requests", "/v1/admin/quotations", "/v1/quotations"] },
   { id: "event-days", prefixes: ["/v1/admin/event-days", "/v1/staff/event-days", "/v1/staff/assignments"] },
   { id: "messages", prefixes: ["/v1/admin/conversations", "/v1/messages"] },
   { id: "auth", prefixes: ["/v1/auth", "/v1/me"] },

@@ -16,11 +16,11 @@ The customer and admin use the conversation to communicate and create transactio
 1. The customer submits a [booking request](booking-requests.md).
 2. Clemora automatically creates a conversation linked to that specific request. The customer does not need to start a separate chat for it.
 3. The customer and admin exchange messages there as the admin reviews the request and follows up on the customer's needs.
-4. They use that same conversation for booking-related transactions. The transaction types, steps, and approval rules remain to be defined.
+4. They use that same conversation for booking-related transactions. Sent quotations are delivered there as exact-version messages with customer review controls; see [quotations](quotations.md). Other transaction types remain undefined.
 
 ## Rules and boundaries
 
 - The conversation and its booking-related transactions belong to the specific request being discussed.
 - Conversation creation happens on request submission; it does not wait for acceptance or booking confirmation.
 - Submitting a request and creating its conversation do not reserve a date, establish a final price, or confirm a booking.
-- “Transactions” expresses an intended capability, not a defined payment workflow. The [product scope](../../../README.md#product-scope) still governs payment exclusions and other commitments; define transaction details before implementing them.
+- Quotations are an implemented transaction type; this does not define a payment workflow. The [product scope](../../../README.md#product-scope) still governs payment exclusions and other commitments; define transaction details before implementing them.

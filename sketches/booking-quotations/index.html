@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sketch · Quotation tab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,500&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Workspace">
+        <div class="brand"><span class="brand-mark">C</span> Clemora</div>
+        <p class="workspace-label">Workspace</p>
+        <nav class="side-nav">
+          <span>Overview</span>
+          <span class="active">Bookings</span>
+          <span>Messages</span>
+          <span>Staff &amp; Customers</span>
+          <span>Packages</span>
+          <span>Services</span>
+          <span>Venues</span>
+        </nav>
+      </aside>
+      <div class="app-area">
+        <main class="app-content">
+          <div class="prototype-bar" role="region" aria-label="Sketch controls">
+            <p class="prototype-note">Sample only. Nothing here is saved to the booking. Use the arrows to compare layouts.</p>
+            <div class="prototype-controls">
+              <button type="button" class="prototype-arrow" data-cycle="-1" aria-label="Previous layout">←</button>
+              <div class="prototype-current">
+                <strong id="layout-label"></strong>
+                <span id="layout-hint"></span>
+              </div>
+              <button type="button" class="prototype-arrow" data-cycle="1" aria-label="Next layout">→</button>
+              <div class="prototype-scenes" role="group" aria-label="Sample situation">
+                <button type="button" data-scene="sent">Sent offer</button>
+                <button type="button" data-scene="draft">Draft revision</button>
+                <button type="button" data-scene="empty">No quotation</button>
+              </div>
+            </div>
+          </div>
+          <div class="booking-request-page">
+            <p class="back">← Back to booking requests</p>
+            <header class="booking-request-heading">
+              <div>
+                <h1>Booking request</h1>
+                <p>Sample · Wedding reception</p>
+              </div>
+              <span class="badge badge-warning">Under review</span>
+            </header>
+            <div class="page-tabs" role="tablist" aria-label="Booking sections">
+              <button type="button" role="tab" id="tab-details" aria-controls="panel" data-page-tab="details">Details</button>
+              <button type="button" role="tab" id="tab-quotation" aria-controls="panel" data-page-tab="quotation">Quotation</button>
+            </div>
+            <div id="panel" role="tabpanel" tabindex="0"></div>
+          </div>
+        </main>
+      </div>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

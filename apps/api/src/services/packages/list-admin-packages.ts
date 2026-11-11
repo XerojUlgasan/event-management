@@ -8,7 +8,7 @@ export async function listAdminPackagesService(db: Kysely<DB>) {
     .setIsolationLevel("repeatable read")
     .execute(async (trx) =>
       Promise.all(
-        (await listPackagesData(trx)).map((row) => packageDto(trx, row)),
+        (await listPackagesData(trx)).map((row) => packageDto(trx, row, { includeArchivedServices: true })),
       ),
     );
 }

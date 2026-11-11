@@ -1,169 +1,26 @@
 import {
   Button,
-  Input,
   PageHeader,
   SearchField,
   Tabs,
-  Textarea,
 } from "@event-management/ui";
-import { CatalogCard, CatalogCardActions } from "./CatalogCard";
-import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
-import { CatalogEditor, newCatalogSection } from "./CatalogEditor";
+import { PackageCard, PackageEditor } from "./PackageEditor";
+import { getAdminServices } from "../../../lib/data/services";
+import { CatalogCardActions } from "./CatalogCard";
 import { useCallback, useEffect, useState } from "react";
-import type { PackageContent } from "@event-management/contracts/catalog";
 import {
   archivePackage,
-  createPackage,
   deletePackage,
   getAdminPackages,
-  packageImageSrc,
-  updatePackage,
   type AdminPackage,
 } from "../../../lib/data/packages";
-import { centavosToPesos, pesosToCentavos } from "../../../lib/utils/money";
-import { PackageCanvas, PackagePreview, priceLabel } from "../PackagePreview";
-import { photos } from "../data";
+import { PackagePreview } from "../PackagePreview";
 import "../../../styles/package-editor.css";
 
-const blank = (): PackageContent => ({
-  name: "",
-  description: "",
-  maxGuests: 100,
-  price: { kind: "fixed", currency: "PHP", amountMinor: 0 },
-  sections: [newCatalogSection()],
-});
-const message = (e: unknown) =>
-  e instanceof Error ? e.message : "Something went wrong.";
-function cover(item: PackageContent) {
-  return (
-    item.sections
-      .flatMap((s) => s.widgets)
-      .find((w) => w.type === "photo" && w.media)?.media?.url || null
-  );
-}
-function Card({
-  item,
-  action,
-}: {
-  item: PackageContent;
-  action?: React.ReactNode;
-}) {
-  return (
-    <CatalogCard
-      image={packageImageSrc(cover(item)) || photos.dinner}
-      eyebrow="Event package"
-      title={item.name || "Untitled package"}
-      description={item.description}
-      metadata={[
-        {
-          label: "Package price",
-          value: priceLabel(item.price).replace(/ total$/, ""),
-        },
-        { label: "Maximum guests", value: `Up to ${item.maxGuests} guests` },
-      ]}
-      action={action}
-    />
-  );
-}
-function Editor({
-  initial,
-  onClose,
-  onSaved,
-}: {
-  initial: AdminPackage | null;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  return (
-    <CatalogEditor
-      initial={
-        initial
-          ? {
-              name: initial.name,
-              description: initial.description,
-              maxGuests: initial.maxGuests,
-              price: initial.price,
-              sections: initial.sections,
-            }
-          : blank()
-      }
-      entity="package"
-      onClose={onClose}
-      onSaved={onSaved}
-      validate={(content) =>
-        !content.name.trim() ||
-        !Number.isInteger(content.maxGuests) ||
-        content.maxGuests < 1 ||
-        !Number.isInteger(content.price.amountMinor) ||
-        content.price.amountMinor < 1 ||
-        content.price.amountMinor % 100 !== 0
-          ? "Enter a package name, a positive whole number of guests, and a whole peso price."
-          : undefined
-      }
-      onSave={async (content) => {
-        if (initial)
-          await updatePackage(initial.id, content, initial.updatedAt);
-        else await createPackage(content);
-      }}
-      renderDetails={(content, setContent) => (
-        <>
-          <label>
-            Catalog description
-            <Textarea
-              maxLength={MAX_CATALOG_TEXT_LENGTH}
-              value={content.description}
-              onChange={(e) =>
-                setContent({ ...content, description: e.target.value })
-              }
-            />
-          </label>
-          <label>
-            Maximum guests
-            <Input
-              type="number"
-              min="1"
-              value={content.maxGuests || ""}
-              onChange={(e) =>
-                setContent({ ...content, maxGuests: Number(e.target.value) })
-              }
-            />
-          </label>
-          <label>
-            Package price (PHP)
-            <Input
-              type="number"
-              min="1"
-              step="1"
-              value={
-                content.price.amountMinor ? centavosToPesos(content.price.amountMinor) : ""
-              }
-              onChange={(e) =>
-                setContent({
-                  ...content,
-                  price: {
-                    ...content.price,
-                    amountMinor: pesosToCentavos(Number(e.target.value)),
-                  },
-                })
-              }
-            />
-          </label>
-        </>
-      )}
-      renderPreview={(content, mode) =>
-        mode === "customer" ? (
-          <PackageCanvas item={content} />
-        ) : (
-          <div className="pe-card-preview">
-            <Card item={content} />
-          </div>
-        )
-      }
-    />
-  );
-}
+const message = (e: unknown) => e instanceof Error ? e.message : "Something went wrong.";
 export function PackagesPage() {
   const [rows, setRows] = useState<AdminPackage[]>([]),
+    [serviceOptions, setServiceOptions] = useState<import("../../../lib/data/services").AdminService[]>([]),
     [search, setSearch] = useState(""),
     [archived, setArchived] = useState(false),
     [editing, setEditing] = useState<AdminPackage | "new" | null>(null),
@@ -174,7 +31,8 @@ export function PackagesPage() {
     setLoading(true);
     setError("");
     try {
-      setRows((await getAdminPackages()).packages);
+      const [packages, services] = await Promise.all([getAdminPackages(), getAdminServices()]);
+      setRows(packages.packages); setServiceOptions(services.services);
     } catch (e) {
       setError(message(e));
     } finally {
@@ -251,7 +109,7 @@ export function PackagesPage() {
       {error && <p role="alert">{error}</p>}
       <div className="pe-cards">
         {visible.map((item) => (
-          <Card
+          <PackageCard
             key={item.id}
             item={item}
             action={
@@ -277,7 +135,8 @@ export function PackagesPage() {
       </div>
       {!loading && !visible.length && <p>No packages found.</p>}
       {editing && (
-        <Editor
+        <PackageEditor
+          serviceOptions={serviceOptions}
           initial={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={() => {

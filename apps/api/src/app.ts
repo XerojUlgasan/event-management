@@ -1,4 +1,4 @@
-import { SMALL_JSON_BODY_LIMIT_BYTES, CATALOG_JSON_BODY_LIMIT_BYTES, MEDIA_UPLOAD_BODY_OVERHEAD_BYTES } from "./constants/http.js";
+import { SMALL_JSON_BODY_LIMIT_BYTES, CATALOG_JSON_BODY_LIMIT_BYTES, MEDIA_UPLOAD_BODY_OVERHEAD_BYTES, QUOTATION_JSON_BODY_LIMIT_BYTES, bookingBodyLimit } from "./constants/http.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
@@ -63,7 +63,9 @@ app.route("/v1", packageRoutes);
 app.route("/v1", venueRoutes);
 app.use("/v1/booking-requests", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/booking-requests/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/admin/booking-requests/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/admin/booking-requests/*", (c, next) => bodyLimit({ maxSize: bookingBodyLimit(c.req.path) })(c, next));
+app.use("/v1/admin/quotations/*", bodyLimit({ maxSize: QUOTATION_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/quotations/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.route("/v1", bookingRequestRoutes);
 app.use("/v1/admin/event-days", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/admin/event-days/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));

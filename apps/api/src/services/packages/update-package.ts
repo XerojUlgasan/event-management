@@ -8,6 +8,7 @@ import {
   replacePackageSectionsData,
 } from "../../data/packages/catalog-page.js";
 import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
+import { validatePackageServicesData, replacePackageServicesData } from "../../data/packages/package-services.js";
 import { packageDto } from "./package-response.js";
 import { error, nextUpdate } from "./package-rules.js";
 import { duplicateTitle, reserveCatalogTitle } from "../../utils/catalog-title.js";
@@ -26,6 +27,8 @@ export async function updatePackageService(
         return error("Archived packages cannot be edited", 409);
       if (current.updated_at.toISOString() !== content.expectedUpdatedAt)
         return error("Package changed. Refresh and try again", 409);
+      const invalid = await validatePackageServicesData(trx, id, content.services);
+      if (invalid) return invalid;
       const title = await reserveCatalogTitle(trx, "packages", content.name, id);
       if (!title) return error("A package with this title already exists", 409);
       const now = nextUpdate(current.updated_at);
@@ -37,7 +40,8 @@ export async function updatePackageService(
         actorId,
         now,
       );
-      return packageDto(trx, row);
+      await replacePackageServicesData(trx, id, content.services);
+      return packageDto(trx, row, { includeArchivedServices: true });
     });
     if (!("status" in outcome))
       await cleanupCatalogMediaService(db, previousMediaIds);

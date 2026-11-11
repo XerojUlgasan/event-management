@@ -11,6 +11,7 @@ import {
   Icon,
   PageHeader,
   Select,
+  Tabs,
   Textarea,
 } from "@event-management/ui";
 import { MAX_BOOKING_REASON_LENGTH } from "@event-management/contracts/limits/booking-requests";
@@ -27,6 +28,8 @@ import {
   bookingStatusLabels,
   BookingStatusBadge,
 } from "../booking-request-display";
+import { BookingPackage } from "../BookingPackage";
+import { Quotations } from "../Quotations";
 import { AdminEventDays } from "../staff/AdminEventDays";
 
 function RequestStatusForm({
@@ -176,8 +179,12 @@ export function BookingRequestPage({
   const [editStatus, setEditStatus] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [savingDay, setSavingDay] = useState(false);
+  const [proposalRevision, setProposalRevision] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [notice, setNotice] = useState("");
+  const [pageTab, setPageTab] = useState("details");
+  const detailsPanelId = "booking-request-details-panel";
+  const quotationPanelId = "booking-request-quotation-panel";
   const generation = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -213,6 +220,7 @@ export function BookingRequestPage({
   useEffect(() => {
     setItem(null);
     setNotice("");
+    setPageTab("details");
     void refresh().catch(() => {});
     return () => {
       generation.current++;
@@ -273,6 +281,35 @@ export function BookingRequestPage({
               {notice}
             </p>
           )}
+          <Tabs
+            role="tablist"
+            variant="underline"
+            className="booking-request-tabs"
+            active={pageTab}
+            onChange={setPageTab}
+            aria-label="Booking sections"
+            items={[
+              {
+                value: "details",
+                label: "Details",
+                id: "booking-tab-details",
+                panelId: detailsPanelId,
+              },
+              {
+                value: "quotation",
+                label: "Quotation",
+                id: "booking-tab-quotation",
+                panelId: quotationPanelId,
+              },
+            ]}
+          />
+          {pageTab === "details" && (
+          <div
+            id={detailsPanelId}
+            role="tabpanel"
+            tabIndex={0}
+            aria-labelledby="booking-tab-details"
+          >
           <section
             className="booking-request-overview"
             aria-labelledby="request-overview-title"
@@ -300,8 +337,8 @@ export function BookingRequestPage({
                   <dd>{item.eventType}</dd>
                 </div>
                 <div>
-                  <dt>Package</dt>
-                  <dd>{item.packageName}</dd>
+                  <dt>Original inquiry package</dt>
+                  <dd>{item.packageName} · {new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(item.packagePrice.amountMinor / 100)} · up to {item.packageMaxGuests} guests</dd>
                 </div>
                 {item.requestedDays ? (
                   <div>
@@ -410,6 +447,7 @@ export function BookingRequestPage({
               </div>
             )}
           </section>
+          <BookingPackage id={item.id} admin editable={!["declined", "cancelled"].includes(item.status)} onChanged={() => setProposalRevision(value => value + 1)} />
           <div
             inert={savingStatus || refreshing || undefined}
             aria-busy={savingStatus || refreshing}
@@ -422,6 +460,22 @@ export function BookingRequestPage({
               onBusyChange={setSavingDay}
             />
           </div>
+          </div>
+          )}
+          {pageTab === "quotation" && (
+            <div
+              id={quotationPanelId}
+              role="tabpanel"
+              tabIndex={0}
+              aria-labelledby="booking-tab-quotation"
+            >
+              <Quotations
+                key={`${item.id}:${proposalRevision}`}
+                bookingId={item.id}
+                admin
+              />
+            </div>
+          )}
         </>
       )}
     </div>

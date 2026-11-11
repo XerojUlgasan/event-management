@@ -4,6 +4,7 @@ import { conversationExpiresAt } from "../../utils/conversation-expiry.js";
 export type MessageDto = {
   id: string;
   body: string;
+  quotationId: string | null;
   senderId: string;
   senderRole: "admin" | "customer";
   senderName: string;
@@ -38,6 +39,7 @@ export function messageDto(row: MessageWithSender): MessageDto {
   return {
     id: row.id,
     body: row.body,
+    quotationId: row.quotation_id,
     senderId: row.sender_id,
     senderRole: role,
     senderName: row.sender_display_name ?? row.sender_email ?? "Clemora team",

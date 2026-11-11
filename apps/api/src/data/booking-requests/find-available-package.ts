@@ -9,6 +9,7 @@ export const findAvailablePackageData = (
     .selectFrom("packages")
     .selectAll()
     .where("id", "=", packageId)
+    .where("package_type", "=", "catalog")
     .where("archived_at", "is", null)
     .forUpdate()
     .executeTakeFirst();

@@ -6,6 +6,8 @@ There is no `apps/web/src/controllers` folder and no `src/lib/api.ts` barrel. Do
 
 ## What talks to the API
 
+Private proposal reads/saves and audit history live in `lib/data/booking-packages.ts`; quotation draft/save/send/history/customer actions live in `lib/data/quotations.ts`. Reuse the shared quotation/catalog contracts. Message DTOs include a nullable quotation reference; render the exact referenced version through the authorized quotation endpoint rather than treating message text as an offer or resolving the latest version silently.
+
 `request` in `apps/web/src/lib/http.ts` builds the URL from `PUBLIC_API_URL`, which already ends in `/v1`. Pass the path after that prefix, such as `/packages` or `/admin/packages`. The wrapper sends `credentials: "include"`. It sets `Content-Type: application/json` unless the body is `FormData`. It sends `Authorization: Bearer` only when the caller passes an identity token, which current auth exchanges do for Firebase. A failed response throws `ApiError`. A `204` response returns `undefined`. `request<T>` asserts the JSON type. It does not check that the server returned `T`. Compare a changed payload with the route schema, as [API synchronization](../../shared/api-type-sync.md) describes.
 
 `apiBase()` resolves a relative `PUBLIC_API_URL` against the page origin in the browser. `pnpm dev` sets that value to `/v1` and proxies it. See [client data and authentication](data-and-auth.md) for the proxy reason and the variable names in `apps/web/.env.example`.

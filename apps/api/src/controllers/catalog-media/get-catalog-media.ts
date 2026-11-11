@@ -1,6 +1,7 @@
 import { createRoute } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { findPublicCatalogMediaData } from "../../data/catalog-media/find-public-catalog-media.js";
+import { findCustomerCatalogMediaData } from "../../data/catalog-media/find-customer-catalog-media.js";
 import { findAdminCatalogMediaData } from "../../data/catalog-media/find-admin-catalog-media.js";
 import { getCatalogMedia } from "../../utils/catalog-media-storage.js";
 import { getCookie } from "hono/cookie";
@@ -42,6 +43,9 @@ export const getCatalogMediaRouteHandler: AppRouteHandler<
           id,
           resolved.session.user.id,
         );
+        adminView = !!media;
+      } else if (resolved.kind === "ok" && resolved.session.user.role === "customer") {
+        media = await findCustomerCatalogMediaData(c.get("db"), id, resolved.session.user.id);
         adminView = !!media;
       }
     }

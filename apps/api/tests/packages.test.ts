@@ -235,13 +235,13 @@ test("service canvas photos replace legacy image uploads and clean up removed me
   assert.equal("imageId" in output.properties, false);
 });
 
-test("canvas saves publish atomically, protect concurrent edits, and remove version/service contracts", async () => {
+test("canvas saves publish atomically and protect concurrent edits", async () => {
   await read(await call('/admin/packages'),401);
   for(const cookie of [customerCookie,staffCookie,undesignatedAdminCookie]) await read(await call('/admin/packages','POST',data,cookie),403);
-  for(const patch of [{name:''},{price:null},{price:{...data.price,amountMinor:101}},{maxGuests:0},{services:[]},{eventTypes:['Birthday']},{guestMax:100}]) await read(await call('/admin/packages','POST',{...data,...patch},adminCookie),400);
+  for(const patch of [{name:''},{price:null},{price:{...data.price,amountMinor:101}},{maxGuests:0},{eventTypes:['Birthday']},{guestMax:100}]) await read(await call('/admin/packages','POST',{...data,...patch},adminCookie),400);
   const created=await read(await call('/admin/packages','POST',data,adminCookie),201);
   assert.equal(created.name,data.name);assert.equal(created.description,data.description);assert.equal(created.imageUrl,'/images/wedding.jpg');
-  for(const key of ['draft','published','versions','versionId','services','eventTypes','guestMax']) assert.equal(key in created,false);
+  for(const key of ['draft','published','versions','versionId','eventTypes','guestMax']) assert.equal(key in created,false);
   const detail=await read(await call(`/packages/${created.id}`),200);assert.equal(detail.sections[0].widgets.length,2);
   const edits=await Promise.all(['First edit','Second edit'].map(name=>call(`/admin/packages/${created.id}`,'PATCH',{...data,name,expectedUpdatedAt:created.updatedAt},adminCookie)));
   assert.deepEqual(edits.map(r=>r.status).sort(),[200,409]);
@@ -278,10 +278,12 @@ test("package descriptions are stored independently from canvas text and enforce
   const cleared = await read(await call(`/admin/packages/${created.id}`, "PATCH", { ...data, description: "", expectedUpdatedAt: boundary.updatedAt }, adminCookie), 200);
   assert.equal(cleared.description, "");
   assert.equal((await read(await call(`/packages/${created.id}`), 200)).description, "");
-  const textOnly = await read(await call("/admin/packages", "POST", { ...data, description: "Card text without canvas widgets", sections: [] }, adminCookie), 201);
+  const textOnly = await read(await call("/admin/packages", "POST", { ...data, name: "Text-only package", description: "Card text without canvas widgets", sections: [] }, adminCookie), 201);
   assert.equal(textOnly.description, "Card text without canvas widgets");
   await read(await call("/admin/packages", "POST", { ...data, description: limit + "x" }, adminCookie), 400);
   await read(await call("/admin/packages", "POST", { ...data, description: null }, adminCookie), 400);
+  await read(await call(`/admin/packages/${created.id}`, "DELETE", undefined, adminCookie), 204);
+  await read(await call(`/admin/packages/${textOnly.id}`, "DELETE", undefined, adminCookie), 204);
 });
 
 test("catalog validates widget sources, bounds, counts and paginates direct packages",async()=>{
@@ -374,7 +376,7 @@ test("video autoplay is opt-in, persists on public reads, and cannot be enabled 
   const mp4 = new Uint8Array([0,0,0,20,102,116,121,112,105,115,111,109,0,0,0,0,105,115,111,109]);
   const media = await read(await uploadCanvas(mp4, 'video/mp4'), 201);
   const video = { id: randomUUID(), type: 'video', x: 0, y: 0, w: 12, h: 6, markdown: '', media, alt: '', caption: 'Event film', autoplay: true };
-  const content = { ...data, sections: [{ id: randomUUID(), title: 'Film', widgets: [video] }] };
+  const content = { ...data, name: 'Autoplay film', sections: [{ id: randomUUID(), title: 'Film', widgets: [video] }] };
   const created = await read(await call('/admin/packages', 'POST', content, adminCookie), 201);
   const published = await read(await call(`/packages/${created.id}`), 200);
   assert.equal(published.sections[0].widgets[0].autoplay, true);
@@ -385,6 +387,8 @@ test("video autoplay is opt-in, persists on public reads, and cannot be enabled 
   const edited = await read(await call(`/admin/packages/${created.id}`, 'PATCH', { ...content, sections: [{ ...content.sections[0], widgets: [{ ...video, autoplay: false }] }], expectedUpdatedAt: created.updatedAt }, adminCookie), 200);
   assert.equal(edited.sections[0].widgets[0].autoplay, false);
   assert.equal((await read(await call(`/packages/${created.id}`), 200)).sections[0].widgets[0].autoplay, false);
+  await read(await call(`/admin/packages/${ordinary.id}`, 'DELETE', undefined, adminCookie), 204);
+  await read(await call(`/admin/packages/${created.id}`, 'DELETE', undefined, adminCookie), 204);
 });
 test("pending media stays private, published video streams ranges, and cleanup preserves saved assets",async()=>{
   const mp4=new Uint8Array([0,0,0,20,102,116,121,112,105,115,111,109,0,0,0,0,105,115,111,109]);
@@ -404,6 +408,7 @@ test("pending media stays private, published video streams ranges, and cleanup p
   await read(await call(`/admin/catalog-media/${pending.id}`,'DELETE',undefined,customerCookie),403);
   await read(await call(`/admin/catalog-media/${pending.id}`,'DELETE',undefined,adminCookie),204);
   const spec:any=await(await app.request('/openapi.json')).json();assert.ok(spec.paths['/v1/admin/packages/{id}'].patch);assert.equal(spec.paths['/v1/admin/packages/{id}/publish'],undefined);
+  await read(await call(`/admin/packages/${saved.id}`, 'DELETE', undefined, adminCookie), 204);
 });
 
 test('stale pending uploads can be swept while referenced media survives',async()=>{
@@ -415,10 +420,11 @@ test('stale pending uploads can be swept while referenced media survives',async(
   assert.equal((await pool.query('SELECT count(*) FROM media_assets WHERE id=$1',[old.id])).rows[0].count,'0');
   const media=await read(await uploadCanvas(png,'image/png'),201);
   const c=structuredClone(data);c.sections[0].widgets[0].media=media;
-  await read(await call('/admin/packages','POST',c,adminCookie),201);
+  const saved = await read(await call('/admin/packages','POST',c,adminCookie),201);
   await pool.query("UPDATE media_assets SET created_at=now()-interval '2 days' WHERE id=$1",[media.id]);
   await cleanupStaleCatalogMediaService(db);
   assert.equal((await app.request(media.url)).status,200);
+  await read(await call(`/admin/packages/${saved.id}`, 'DELETE', undefined, adminCookie), 204);
 });
 
 test('admin archived media is private and unclaimed uploads cannot be taken by another admin',async()=>{
@@ -498,4 +504,76 @@ test("service and venue canvases save rich content directly and enforce media ow
   assert.deepEqual(venueEdit.sections, []);
   assert.equal((await call(`/catalog-media/${venuePhoto.id}`)).status, 404);
   for (const media of [venuePhoto, venueVideo]) assert.equal((await pool.query("SELECT id FROM media_assets WHERE id=$1", [media.id])).rowCount, 0);
+});
+
+test("booking-owned packages retain the inquiry and isolate copied media", async () => {
+  const png = new Uint8Array([137,80,78,71,13,10,26,10,0]);
+  const media = await read(await uploadCanvas(png, "image/png"), 201);
+  const includedService = await createServiceWithPhoto({ name: `Included ${randomUUID()}`, description: "Coverage", hourlyRatePesos: 500 });
+  const content = { ...data, name: `Original ${randomUUID()}`, services: [{ serviceId: includedService.id, role: "included" }], sections: [{ id: randomUUID(), title: "", widgets: [{ id: randomUUID(), type: "photo", x: 0, y: 0, w: 12, h: 6, markdown: "", media, alt: "", caption: "" }] }] };
+  const original = await read(await call("/admin/packages", "POST", content, adminCookie), 201);
+  const bookingInput = { packageId: original.id, packageUpdatedAt: original.updatedAt, eventType: "Wedding", durationMode: "one_day", requestedDays: [{ date: "2099-01-02" }], timeZone: "Asia/Manila", guestCount: 50, contactName: "Customer", phoneNumber: "123" };
+  const booking = (await read(await call("/booking-requests", "POST", bookingInput, customerCookie), 201)).bookingRequest;
+  const before = await read(await call(`/admin/booking-requests/${booking.id}/package`, "GET", undefined, adminCookie), 200);
+  await read(await call(`/admin/booking-requests/${booking.id}/package`, "GET", undefined, staffCookie), 404);
+  const save = { ...content, expectedUpdatedAt: before.package.updatedAt, expectedBookingUpdatedAt: before.bookingUpdatedAt };
+  const saved = await read(await call(`/admin/booking-requests/${booking.id}/custom-package`, "POST", save, adminCookie), 200);
+  const custom = saved.package;
+  assert.notEqual(custom.id, original.id);
+  assert.equal(custom.name, original.name);
+  assert.equal(custom.packageType, "custom");
+  assert.equal(custom.services[0].serviceId, includedService.id);
+  assert.equal(custom.services[0].role, "included");
+  assert.equal(custom.customForBookingRequestId, booking.id);
+  assert.equal(saved.bookingRequest.packageId, original.id);
+  assert.equal(saved.bookingRequest.packageName, original.name);
+  assert.equal(saved.bookingRequest.packagePrice.amountMinor, original.price.amountMinor);
+  assert.notEqual(custom.imageUrl, media.url);
+  assert.equal((await app.request(custom.imageUrl)).status, 404);
+  const otherToken = randomUUID();
+  const other = await db.insertInto("users").values({ email: `${randomUUID()}@example.test`, password_hash: "unused", role: "customer" }).returning("id").executeTakeFirstOrThrow();
+  await db.insertInto("sessions").values({ user_id: other.id, token_hash: hashSessionToken(otherToken), expires_at: new Date(Date.now() + 3600000) }).execute();
+  const otherCookie = `em_session=${otherToken}`;
+  await read(await call(`/booking-requests/${booking.id}/package`, "GET", undefined, otherCookie), 404);
+  assert.equal((await app.request(custom.imageUrl, { headers: { Cookie: otherCookie } })).status, 404);
+  const privateMedia = await app.request(custom.imageUrl, { headers: { Cookie: customerCookie, Range: "bytes=0-3" } });
+  assert.equal(privateMedia.status, 206);
+  assert.equal(privateMedia.headers.get("cache-control"), "private, no-store");
+  assert.deepEqual(new Uint8Array(await privateMedia.arrayBuffer()), png.slice(0, 4));
+  await read(await call(`/packages/${custom.id}`), 404);
+  await read(await call(`/admin/packages/${custom.id}`, "GET", undefined, adminCookie), 404);
+  await read(await call("/booking-requests", "POST", { ...bookingInput, packageId: custom.id }, customerCookie), 409);
+  await read(await call(`/admin/booking-requests/${booking.id}/custom-package`, "POST", save, adminCookie), 409);
+  await read(await call(`/admin/booking-requests/${booking.id}/custom-package`, "PATCH", { ...content, name: "Changed", sections: custom.sections, expectedUpdatedAt: custom.updatedAt, expectedBookingUpdatedAt: before.bookingUpdatedAt }, adminCookie), 409);
+  const edit = await read(await call(`/admin/booking-requests/${booking.id}/custom-package`, "PATCH", { ...content, name: "Changed", sections: custom.sections, expectedUpdatedAt: custom.updatedAt, expectedBookingUpdatedAt: saved.bookingRequest.updatedAt }, adminCookie), 200);
+  assert.equal(edit.package.name, "Changed");
+  const historyResponse = await call(`/admin/booking-requests/${booking.id}/package-history`, "GET", undefined, adminCookie);
+  assert.equal(historyResponse.headers.get("cache-control"), "private, no-store");
+  const history = (await read(historyResponse, 200)).history;
+  assert.equal(history.length, 2);
+  assert.equal(history[0].before.name, original.name);
+  assert.equal(history[0].after.name, "Changed");
+  await read(await call(`/admin/booking-requests/${booking.id}/package-history`, "GET", undefined, staffCookie), 404);
+  assert.equal((await read(await call(`/packages/${original.id}`), 200)).name, original.name);
+  await read(await call(`/admin/packages/${original.id}`, "PATCH", { ...content, sections: [], expectedUpdatedAt: original.updatedAt }, adminCookie), 200);
+  assert.equal((await app.request(media.url)).status, 404);
+  assert.deepEqual(new Uint8Array(await (await app.request(edit.package.imageUrl, { headers: { Cookie: customerCookie } })).arrayBuffer()), png);
+});
+
+test("quotations do not retain removed package media or grant historical media access", async () => {
+  const { cleanupStaleCatalogMediaService } = await import("../src/services/catalog-media/cleanup-stale-catalog-media.js");
+  const media = await read(await uploadCanvas(new Uint8Array([137,80,78,71,13,10,26,10,0]), "image/png"), 201);
+  const content = { ...data, name: `Quotation media ${randomUUID()}`, services: [], sections: [{ id: randomUUID(), title: "Current image", widgets: [{ id: randomUUID(), type: "photo", x: 0, y: 0, w: 12, h: 6, markdown: "", media, alt: "Current photo", caption: "" }] }] };
+  const pkg = await read(await call("/admin/packages", "POST", content, adminCookie), 201);
+  const booking = (await read(await call("/booking-requests", "POST", { packageId: pkg.id, packageUpdatedAt: pkg.updatedAt, eventType: "Wedding", durationMode: "one_day", requestedDays: [{ date: "2099-01-02" }], timeZone: "Asia/Manila", contactName: "Customer", phoneNumber: "123" }, customerCookie), 201)).bookingRequest;
+  const draft = (await read(await call(`/admin/booking-requests/${booking.id}/quotations`, "POST", { expectedUpdatedAt: booking.updatedAt }, adminCookie), 201)).quotation;
+  const sent = (await read(await call(`/admin/quotations/${draft.id}/send`, "POST", { expectedUpdatedAt: draft.updatedAt }, adminCookie), 200)).quotation;
+  assert.equal((await app.request(media.url, { headers: { Cookie: customerCookie } })).status, 200);
+  await read(await call(`/admin/packages/${pkg.id}`, "PATCH", { ...content, sections: [], expectedUpdatedAt: pkg.updatedAt }, adminCookie), 200);
+  await cleanupStaleCatalogMediaService(db);
+  assert.equal((await pool.query("SELECT count(*)::int AS count FROM media_assets WHERE id=$1", [media.id])).rows[0].count, 0);
+  for (const cookie of [customerCookie, adminCookie, staffCookie]) assert.equal((await app.request(media.url, { headers: { Cookie: cookie } })).status, 404);
+  const history = (await read(await call(`/booking-requests/${booking.id}/quotations`, "GET", undefined, customerCookie), 200)).quotations;
+  assert.equal(history[0].id, sent.id);
+  assert.equal(history[0].totalAmountMinor, sent.totalAmountMinor);
 });

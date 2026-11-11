@@ -2,6 +2,14 @@
 
 Durable documentation notes for this role. Read and maintain them under the shared [memory policy](../README.md#memory).
 
+## 2026-11-11 — Seeding one table has its own procedure
+
+[Seed one table](../../QA/seed-a-table/SKILL.md) is the agent procedure for adding rows to `pnpm db:seed`. [Database seed](../../../docs/SEED.md) remains the coverage reference: which fixtures exist, the date window, and rerun behavior. The QA skill points at the procedure and still owns accounts, sessions, and read-only SQL.
+
+**Evidence:** The procedure names the current orchestrator in `apps/api/src/db/seed/scenario/index.ts` and the helpers in `apps/api/src/db/seed/context.ts`. `pnpm check:guidance` checks the new links. This records documentation ownership, not a new seed run.
+
+**Why it matters:** Put a change to the seeding steps in the procedure. Put a change to what the seed inserts in `docs/SEED.md`.
+
 ## 2026-11-11 — Business responsibilities have a domain reference
 
 The [business-logic skill](../../business-logic/SKILL.md) routes role and workflow work to the [identity reference](../../business-logic/references/identity.md). It records the user's intended responsibilities: admins own customer communication and event decisions; staff volunteer; admins select teams and coordinators; coordinators track timed checklists. The [README](../../../README.md#current-implementation) retains implementation status. This is business direction, not proof that all described workflows are implemented.

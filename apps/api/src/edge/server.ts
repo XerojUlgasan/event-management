@@ -6,6 +6,8 @@ import {
   CATALOG_JSON_BODY_LIMIT_BYTES,
   MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
   SMALL_JSON_BODY_LIMIT_BYTES,
+  QUOTATION_JSON_BODY_LIMIT_BYTES,
+  bookingBodyLimit,
 } from "../constants/http.js";
 import type { HonoEnv } from "../types/hono.js";
 import { matchRouteFamily, routeFamilies, type RouteFamilyId } from "./match-route.js";
@@ -55,7 +57,8 @@ const bodyLimits: Partial<Record<RouteFamilyId, ReadonlyArray<{ path: string; ma
   "booking-requests": [
     { path: "/booking-requests", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
     { path: "/booking-requests/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
-    { path: "/admin/booking-requests/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
+    { path: "/admin/quotations/*", maxSize: QUOTATION_JSON_BODY_LIMIT_BYTES },
+    { path: "/quotations/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
   ],
 };
 
@@ -79,6 +82,7 @@ async function createFamilyApp(id: RouteFamilyId) {
     await next();
   });
   for (const limit of bodyLimits[id] ?? []) family.use(limit.path, bodyLimit({ maxSize: limit.maxSize }));
+  if (id === "booking-requests") family.use("/admin/booking-requests/*", (c, next) => bodyLimit({ maxSize: bookingBodyLimit(c.req.path) })(c, next));
   family.route("/", routes);
   return family;
 }

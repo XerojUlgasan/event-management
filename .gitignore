@@ -9,6 +9,8 @@ storybook-static/
 *-debug.log
 .DS_Store
 
+.scratch
+
 # Firebase service account keys (never commit)
 apps/api/.secrets/
 /.secrets/

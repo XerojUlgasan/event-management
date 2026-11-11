@@ -3,6 +3,7 @@ import {
   CATALOG_COLUMNS,
   MAX_CATALOG_SECTIONS,
   MAX_CATALOG_WIDGETS,
+  MAX_PACKAGE_SERVICES,
   MAX_WIDGET_MARKDOWN_LENGTH,
 } from "@event-management/contracts/catalog";
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
@@ -112,10 +113,14 @@ export const sectionsSchema = z.array(sectionSchema).max(MAX_CATALOG_SECTIONS).s
   if (widgetIds.length > MAX_CATALOG_WIDGETS)
     ctx.addIssue({ code: "custom", message: `Use at most ${MAX_CATALOG_WIDGETS} widgets` });
 });
+export const packageServicesSchema = z.array(z.object({ serviceId: z.string().uuid(), role: z.enum(["included", "optional"]) }).strict()).max(MAX_PACKAGE_SERVICES).superRefine((services, ctx) => {
+  if (new Set(services.map(service => service.serviceId)).size !== services.length) ctx.addIssue({ code: "custom", message: "Each service can only be added once" });
+});
 export const contentSchema = z.object({
   name: text.min(1), description: text.optional(),
   maxGuests: z.number().int().positive().max(2147483647), price: packagePriceSchema,
   sections: sectionsSchema,
+  services: packageServicesSchema.default([]),
 }).strict();
 export type Content = z.infer<typeof contentSchema>;
 // Response schemas include the stored description and derived cover image.
@@ -131,7 +136,10 @@ export const publicSchema = z.object({
   archivedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  publishedAt: z.string(),
+  publishedAt: z.string().nullable(),
+  packageType: z.enum(["catalog", "custom"]),
+  customForBookingRequestId: z.string().uuid().nullable(),
+  services: z.array(z.object({ serviceId: z.string().uuid(), name: z.string(), role: z.enum(["included", "optional"]), sortOrder: z.number(), archivedAt: z.string().nullable() })),
 });
 export const adminSchema = publicSchema;
 export const errorSchema = z.object({ error: z.string() });

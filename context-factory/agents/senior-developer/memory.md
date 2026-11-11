@@ -2,11 +2,27 @@
 
 Durable engineering notes for this role. Read and maintain them under the shared [memory policy](../README.md#memory).
 
+## 2026-11-11 — Quotations retain financial history without package snapshots
+
+The user approved removing quotation `offered_package_updated_at` and `offered_package_terms`. The follow-up `20261111150000_simplify_quotation_offers` migration drops those columns and their shape constraint; it preserves financial values, package identity, revision/status history, audit events and message links. Quotation amounts remain saved per version. Package/event edits no longer automatically block sending or acceptance. Explicit revisions use the current proposal price and copy adjustments for review. The [quotation policy](../../business-logic/references/quotations.md) owns this simpler flow.
+
+**Evidence:** Quotation 9/9, package/media 14/14 and populated-migration 5/5 suites passed on disposable databases. Workspace checks, schema validation, web/API builds, Edge bundle build and guidance checks passed. Browser QA exercised send, acceptance after a package-price edit, explicit repricing, saved deduction, fresh acceptance and exact-version messages; booking inquiry snapshots/status and zero event days remained unchanged. The design checker still reports two existing findings in untouched files.
+
+**Why it matters:** This supersedes the earlier quotation snapshot/media-retention guidance below. Media permissions and cleanup use current widgets only; old quotations do not keep removed photos alive. The migration was verified in disposable databases; it has not been applied to the configured application or hosted database. Existing inquiry snapshots remain separate and unchanged.
+
+## 2026-11-11 — Inquiry snapshots and quotation proposals have separate owners
+
+The booking's `package_id`, `package_name`, `package_price`, and `package_max_guests` remain its original inquiry snapshot. Resolve its current proposal through the unique custom package owner, falling back to the original catalog package. [Quotation policy](../../business-logic/references/quotations.md) owns expiry, revision, administrator access, and conversation-delivery decisions. Quotation items are ordered JSONB; validate the full list and service references, calculate centavo totals on the server, and save both under the quotation revision guard.
+
+**Evidence:** The additive private-package/quotation migration, package and quotation integration suites, populated-migration tests, and local Node/Edge Storage flows passed. The configured application database and hosted environment were not migrated. [Current implementation](../../../README.md#private-packages-and-quotations) records the supported flow.
+
+**Why it matters:** Do not replace the inquiry snapshot with a proposal or treat quotation acceptance as booking confirmation. Snapshot media must remain referenced during cleanup; regenerated canvas layout IDs do not by themselves change commercial terms.
+
 ## 2026-11-11 — Seed scenario is insert-only and separate from required fixtures
 
-`pnpm db:seed` keeps the named local accounts, three canvas packages, archived venue samples, and `demo.*` conversations, then runs `apps/api/src/db/seed/scenario/`. That module adds 100 interconnected rows to every application table inside the same transaction. Scenario IDs come from `clemora-scenario-v1` keys. Reruns do not update existing rows. `SEED_RANDOM_SEED` only changes the status shuffle for rows that have not been inserted yet. [Database seed](../../../docs/SEED.md) owns the account bands, counts, and rerun rules.
+`pnpm db:seed` keeps the named local accounts, three canvas packages, archived venue samples, and `demo.*` conversations, then runs `apps/api/src/db/seed/scenario/`. That module adds 100 interconnected rows to each of the original 16 scenario tables inside the same transaction, then adds 100 quotations across 50 stored scenario bookings with delivery messages and lifecycle audits. Private packages and package-service links are not seeded. Scenario IDs come from `clemora-scenario-v1` keys. Reruns do not update existing rows. `SEED_RANDOM_SEED` only changes the status shuffle for rows that have not been inserted yet. [Database seed](../../../docs/SEED.md) owns the account bands, counts, and rerun rules.
 
-**Evidence:** `pnpm --filter @event-management/api exec tsx --test tests/seed.test.ts` passed on 2026-11-11 against a disposable migrated database. The test checked scenario counts, booking and event-day distributions, relationship invariants, public catalog reads, password login, and a second run that preserved edited prices and unrelated rows.
+**Evidence:** `pnpm --filter @event-management/api exec tsx --test tests/seed.test.ts` passed on 2026-11-11 against a disposable migrated database. It checked scenario counts, booking/event-day relationships, quotation centavo totals and revision links, delivery/audit actors, customer draft visibility, public catalog reads, password login, and preservation of edited quotations/prices and closed parents on rerun. The quotation module reads persisted parent state so a replanned status shuffle cannot select closed requests.
 
 **Why it matters:** Do not fold the named fixtures into the 100-row scenario. Confirmed staff assignments belong on accepted bookings whose event day is still scheduled and closed, with an available response. Video scenario rows store metadata only and do not upload bytes.
 

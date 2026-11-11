@@ -58,7 +58,7 @@ async function runSeed(target = database) {
   });
 }
 
-const tables = ["users", "sessions", "packages", "catalog_pages", "catalog_sections", "catalog_widgets", "media_assets", "services", "venues", "booking_requests", "booking_request_status_history", "conversations", "messages", "events_day", "event_staff_availability", "event_staffs"] as const;
+const tables = ["users", "sessions", "packages", "catalog_pages", "catalog_sections", "catalog_widgets", "media_assets", "services", "venues", "booking_requests", "booking_request_status_history", "conversations", "messages", "events_day", "event_staff_availability", "event_staffs", "quotations", "audit_events"] as const;
 async function ids() {
   const snapshot: Record<string, string[]> = {};
   for (const table of tables) {
@@ -111,7 +111,7 @@ test("seed creates demo users, venues, and conversations while preserving unrela
     (SELECT count(*)::int FROM booking_requests WHERE reference LIKE 'SCN-%') AS bookings,
     (SELECT count(*)::int FROM booking_request_status_history h JOIN booking_requests b ON b.id = h.booking_request_id WHERE b.reference LIKE 'SCN-%') AS history,
     (SELECT count(*)::int FROM conversations c JOIN booking_requests b ON b.id = c.booking_request_id WHERE b.reference LIKE 'SCN-%') AS booking_conversations,
-    (SELECT count(*)::int FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN booking_requests b ON b.id = c.booking_request_id WHERE b.reference LIKE 'SCN-%') AS booking_messages,
+    (SELECT count(*)::int FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN booking_requests b ON b.id = c.booking_request_id WHERE b.reference LIKE 'SCN-%' AND m.quotation_id IS NULL) AS booking_messages,
     (SELECT count(*)::int FROM events_day d JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%') AS event_days,
     (SELECT count(*)::int FROM event_staff_availability a JOIN events_day d ON d.id = a.event_day_id JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%') AS availability,
     (SELECT count(*)::int FROM event_staffs s JOIN events_day d ON d.id = s.event_day_id JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%') AS assignments`);
@@ -121,6 +121,65 @@ test("seed creates demo users, venues, and conversations while preserving unrela
     bookings: 100, history: 100, booking_conversations: 100, booking_messages: 100,
     event_days: 100, availability: 100, assignments: 100,
   });
+  const quotationCoverage = await pool.query(`SELECT
+    count(*)::int AS quotations, count(DISTINCT q.booking_request_id)::int AS bookings,
+    count(*) FILTER (WHERE q.status = 'draft')::int AS drafts,
+    count(*) FILTER (WHERE q.status = 'sent')::int AS sent,
+    count(*) FILTER (WHERE q.status = 'accepted')::int AS accepted,
+    count(*) FILTER (WHERE q.status = 'superseded')::int AS superseded,
+    count(*) FILTER (WHERE jsonb_array_length(q.items) = 0)::int AS base_only,
+    count(*) FILTER (WHERE q.sent_at IS NOT NULL)::int AS delivered,
+    (SELECT count(*)::int FROM audit_events WHERE entity_type = 'quotation') AS audit_events
+    FROM quotations q JOIN booking_requests b ON b.id = q.booking_request_id WHERE b.reference LIKE 'SCN-%'`);
+  assert.deepEqual(quotationCoverage.rows[0], {
+    quotations: 100, bookings: 50, drafts: 17, sent: 17, accepted: 16, superseded: 50,
+    base_only: 26, delivered: 83, audit_events: 269,
+  });
+  const quotationViolations = await pool.query(`SELECT q.id FROM quotations q
+    JOIN booking_requests b ON b.id = q.booking_request_id
+    JOIN users creator ON creator.id = q.created_by
+    LEFT JOIN packages p ON p.id = q.offered_package_id
+    LEFT JOIN quotations previous ON previous.id = q.previous_quotation_id
+    LEFT JOIN messages m ON m.quotation_id = q.id
+    LEFT JOIN conversations c ON c.id = m.conversation_id
+    WHERE b.reference LIKE 'SCN-%' AND (
+      creator.role <> 'admin' OR creator.staff_role IS DISTINCT FROM 'System Administrator'
+      OR b.status IN ('declined', 'cancelled') OR p.id IS NULL
+      OR p.id <> b.package_id OR q.base_amount_minor <> p.price * 100 OR q.currency <> 'PHP'
+      OR NOT clemora_quotation_items_valid(q.items)
+      OR q.total_amount_minor <> clemora_quotation_total(q.base_amount_minor, q.items)
+      OR q.total_amount_minor < 0 OR q.created_at > q.updated_at
+      OR (q.status = 'draft' AND (q.sent_at IS NOT NULL OR q.adjustments_reviewed))
+      OR (q.status <> 'draft' AND (q.sent_at IS NULL OR NOT q.adjustments_reviewed))
+      OR (q.status = 'accepted') IS DISTINCT FROM (q.accepted_at IS NOT NULL)
+      OR (q.status = 'superseded') IS DISTINCT FROM (q.superseded_at IS NOT NULL)
+      OR (q.version = 1 AND q.previous_quotation_id IS NOT NULL)
+      OR (q.version = 2 AND (previous.id IS NULL OR previous.booking_request_id <> q.booking_request_id
+        OR previous.version <> 1 OR previous.status <> 'superseded' OR q.revision_reason IS NULL
+        OR previous.superseded_at <> q.created_at OR previous.items <> q.items))
+      OR (q.sent_at IS NOT NULL AND (m.id IS NULL OR c.booking_request_id <> b.id
+        OR c.status <> 'active' OR m.sender_id <> q.created_by OR m.sender_role <> 'admin'
+        OR m.created_at <> q.sent_at OR q.sent_at < q.created_at
+        OR q.sent_at >= coalesce(b.ends_at, c.created_at) + interval '24 hours'))
+      OR (q.sent_at IS NULL AND m.id IS NOT NULL)
+      OR NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.entity_id = q.id
+        AND a.action = CASE WHEN q.version = 1 THEN 'quotation.created' ELSE 'quotation.revised' END
+        AND a.actor_id = q.created_by)
+      OR (q.sent_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM audit_events a
+        WHERE a.entity_id = q.id AND a.action = 'quotation.sent' AND a.actor_id = q.created_by))
+      OR (q.accepted_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM audit_events a
+        WHERE a.entity_id = q.id AND a.action = 'quotation.accepted' AND a.actor_id = b.customer_id))
+    )`);
+  assert.deepEqual(quotationViolations.rows, []);
+  const activeDuplicates = await pool.query(`SELECT booking_request_id FROM quotations
+    WHERE status IN ('draft', 'sent', 'accepted') GROUP BY booking_request_id HAVING count(*) > 1`);
+  assert.deepEqual(activeDuplicates.rows, []);
+  const sampleQuotation = await pool.query<{ id: string; booking_request_id: string; email: string }>(`
+    SELECT q.id, q.booking_request_id, u.email FROM quotations q
+    JOIN booking_requests b ON b.id = q.booking_request_id JOIN users u ON u.id = b.customer_id
+    WHERE q.status = 'draft' ORDER BY q.id LIMIT 1`);
+  const quotation = sampleQuotation.rows[0];
+  assert.ok(quotation);
   const violations = await pool.query(`SELECT
     (SELECT count(*)::int FROM booking_requests b JOIN users u ON u.id = b.customer_id WHERE b.reference LIKE 'SCN-%' AND u.role <> 'customer') AS non_customer_bookings,
     (SELECT count(*)::int FROM booking_requests WHERE reference LIKE 'SCN-%' AND out_of_range IS DISTINCT FROM (guest_count IS NOT NULL AND guest_count > package_max_guests)) AS range_mismatches,
@@ -220,10 +279,20 @@ test("seed creates demo users, venues, and conversations while preserving unrela
   const scenarioPackage = await pool.query("SELECT id FROM packages WHERE name = 'Scenario Celebration 002'");
   assert.equal(scenarioPackage.rowCount, 1);
   await pool.query("UPDATE packages SET price = 12345 WHERE id = $1", [scenarioPackage.rows[0].id]);
+  await pool.query("UPDATE quotations SET base_amount_minor = base_amount_minor + 123, total_amount_minor = total_amount_minor + 123, revision_reason = 'Edited draft' WHERE id = $1", [quotation.id]);
+  // Closing a parent after seeding must not replace its quotations with a different booking.
+  await pool.query("UPDATE booking_requests SET status = 'cancelled' WHERE id = $1", [quotation.booking_request_id]);
+  await pool.query("UPDATE conversations SET status = 'closed', closed_at = now() WHERE booking_request_id = $1", [quotation.booking_request_id]);
+  const quotationsBeforeRerun = await pool.query("SELECT * FROM quotations ORDER BY id");
+  const auditsBeforeRerun = await pool.query("SELECT * FROM audit_events ORDER BY id");
+  const messagesBeforeRerun = await pool.query("SELECT * FROM messages WHERE quotation_id IS NOT NULL ORDER BY id");
   const unrelated = await pool.query("INSERT INTO users (email, display_name, role, password_hash) VALUES ($1, $2, 'customer', 'unused') RETURNING id", ["unrelated-seed-test@example.test", "Unrelated person"]);
   const beforeRerun = await ids();
   await runSeed();
   assert.deepEqual(await ids(), beforeRerun);
+  assert.deepEqual((await pool.query("SELECT * FROM quotations ORDER BY id")).rows, quotationsBeforeRerun.rows);
+  assert.deepEqual((await pool.query("SELECT * FROM audit_events ORDER BY id")).rows, auditsBeforeRerun.rows);
+  assert.deepEqual((await pool.query("SELECT * FROM messages WHERE quotation_id IS NOT NULL ORDER BY id")).rows, messagesBeforeRerun.rows);
   assert.equal((await pool.query("SELECT description FROM venues WHERE id = $1", [demoVenues.rows[0].id])).rows[0].description, "Edited description");
   assert.equal((await pool.query("SELECT name FROM venues WHERE id = $1", [demoVenues.rows[1].id])).rows[0].name, "Edited demo venue");
   assert.ok((await pool.query("SELECT archived_at FROM venues WHERE id = $1", [demoVenues.rows[2].id])).rows[0].archived_at);
@@ -249,4 +318,14 @@ test("seed creates demo users, venues, and conversations while preserving unrela
   assert.equal((await read("/me", scenarioAdmin)).role, "admin");
   assert.equal((await read("/me", scenarioAdmin)).staffRole, "System Administrator");
   assert.ok((await read("/admin/conversations", adminCookie)).conversations.some((row: any) => row.id === conversation.rows[0].id));
+  const quotationCustomerCookie = await login(quotation.email);
+  const adminQuotations = (await read(`/admin/booking-requests/${quotation.booking_request_id}/quotations`, scenarioAdmin)).quotations;
+  const customerQuotations = (await read(`/booking-requests/${quotation.booking_request_id}/quotations`, quotationCustomerCookie)).quotations;
+  assert.equal(adminQuotations.length, 2);
+  assert.equal(customerQuotations.length, 1);
+  assert.equal(customerQuotations[0].status, "superseded");
+  assert.ok(!customerQuotations.some((row: { id: string }) => row.id === quotation.id));
+  const offeredQuotation = (await read(`/quotations/${customerQuotations[0].id}`, quotationCustomerCookie)).quotation;
+  assert.equal(offeredQuotation.id, customerQuotations[0].id);
+  assert.deepEqual(offeredQuotation.items, customerQuotations[0].items);
 });

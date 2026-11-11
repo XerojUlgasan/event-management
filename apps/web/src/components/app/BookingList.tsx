@@ -1,3 +1,5 @@
+import { BookingPackage } from "./BookingPackage";
+import { Quotations } from "./Quotations";
 import { ApiError } from "../../lib/http";
 import { getMyBookingRequest } from "../../lib/data/booking-requests";
 import { localInput, zonedInstant } from "../../lib/utils/event-day-time";
@@ -759,8 +761,8 @@ export function BookingDetails({
                 <dd>{item.eventType}</dd>
               </div>
               <div>
-                <dt>Package</dt>
-                <dd>{item.packageName}</dd>
+                <dt>Original inquiry package</dt>
+                <dd>{item.packageName} · {new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(item.packagePrice.amountMinor / 100)} · up to {item.packageMaxGuests} guests</dd>
               </div>
               {item.requestedDays ? <div><dt>Requested dates</dt><dd>{item.requestedDays.length} {item.requestedDays.length === 1 ? "day" : "days"}</dd></div> : <><div><dt>Preferred date</dt><dd>{preferredDateLabel(item.preferredDate)}</dd></div><div><dt>Estimated length</dt><dd>{durationLabel(item.estimatedDuration, item.estimatedDurationDays)}</dd></div></>}
               {item.startsAt && (
@@ -815,6 +817,8 @@ export function BookingDetails({
           </section>
         </div>
         {item.requestedDays && <section><h3>Requested days</h3><p>Times use {item.timeZone}. Dates are not reserved.</p>{item.requestedDays.map(day => <RequestedDay key={day.date} item={item} day={day} editable={customerCanEditTimes && !["declined", "cancelled"].includes(item.status) && !day.eventDayId} onSaved={onSaved} />)}</section>}
+        <BookingPackage id={item.id} admin={false} />
+        <Quotations bookingId={item.id} admin={false} />
         <details className="booking-history">
           <summary>Status history</summary>
           <ul>

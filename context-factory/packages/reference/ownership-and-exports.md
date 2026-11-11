@@ -6,3 +6,5 @@
 - Keep app routing, data fetching, auth state, business rules, and page-only content in `apps/web/`. Move UI into `packages/ui` when a reusable presentation need is established; update `src/index.ts` if it should be public.
 - `packages/theme` exports `./theme.css` and owns shared design tokens. It has no React components. Inspect both its `package.json` and the importing styles before changing token names.
 - `packages/contracts` exposes catalog types through `@event-management/contracts/catalog`, shared domain limits through explicit `@event-management/contracts/limits/*` subpath exports, and the shared event-day deadline choices/calculator through `@event-management/contracts/event-days`. Reuse those exports rather than duplicating shapes or values. These contracts are separate from UI components and theme tokens; see the [shared limits guidance](../../limits/SKILL.md).
+
+Quotation item/terms/response types and shared quotation limits are exported through `@event-management/contracts/quotations`. The API parses HTTP and persisted JSON; the browser imports these types without treating TypeScript assertions as validation.

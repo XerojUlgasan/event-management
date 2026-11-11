@@ -23,6 +23,16 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface AuditEvents {
+  action: string;
+  actor_id: string | null;
+  created_at: Generated<Timestamp>;
+  entity_id: string;
+  entity_type: string;
+  id: Generated<string>;
+  metadata: Generated<Json>;
+}
+
 export interface BookingRequests {
   contact_name: string;
   created_at: Generated<Timestamp>;
@@ -152,6 +162,7 @@ export interface Messages {
   conversation_id: string;
   created_at: Generated<Timestamp>;
   id: Generated<string>;
+  quotation_id: string | null;
   read_at: Timestamp | null;
   sender_id: string;
   sender_role: Generated<string>;
@@ -160,14 +171,55 @@ export interface Messages {
 export interface Packages {
   archived_at: Timestamp | null;
   created_at: Generated<Timestamp>;
+  custom_for_booking_request_id: string | null;
   description: Generated<string>;
   id: Generated<string>;
   max_guests: number;
   name: string;
+  package_type: Generated<string>;
   price: number;
-  published_at: Generated<Timestamp>;
+  published_at: Generated<Timestamp | null>;
   slug: string;
   updated_at: Generated<Timestamp>;
+}
+
+export interface PackageServices {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  package_id: string;
+  role: string;
+  service_id: string;
+  sort_order: number;
+}
+
+export interface PackageVenues {
+  created_at: Generated<Timestamp>;
+  details: Generated<string>;
+  id: Generated<string>;
+  package_id: string;
+  sort_order: number;
+  venue_id: string;
+}
+
+export interface Quotations {
+  accepted_at: Timestamp | null;
+  adjustments_reviewed: Generated<boolean>;
+  base_amount_minor: number;
+  booking_request_id: string;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  currency: Generated<string>;
+  id: Generated<string>;
+  items: Generated<Json>;
+  offered_package_id: string;
+  previous_quotation_id: string | null;
+  revision_reason: string | null;
+  sent_at: Timestamp | null;
+  status: Generated<string>;
+  superseded_at: Timestamp | null;
+  total_amount_minor: number;
+  updated_at: Generated<Timestamp>;
+  version: number;
 }
 
 export interface Services {
@@ -216,6 +268,7 @@ export interface Venues {
 }
 
 export interface DB {
+  audit_events: AuditEvents;
   booking_request_status_history: BookingRequestStatusHistory;
   booking_requests: BookingRequests;
   catalog_pages: CatalogPages;
@@ -227,7 +280,10 @@ export interface DB {
   events_day: EventsDay;
   media_assets: MediaAssets;
   messages: Messages;
+  package_services: PackageServices;
+  package_venues: PackageVenues;
   packages: Packages;
+  quotations: Quotations;
   services: Services;
   sessions: Sessions;
   users: Users;
