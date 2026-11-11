@@ -81,10 +81,12 @@ export function AppShell({
   profile,
   onSignOut,
   active,
+  bookingRequestId,
 }: {
   profile: { displayName: string | null; email: string }
   onSignOut: () => void
   active: NavKey
+  bookingRequestId?: string
 }) {
   const name = profile.displayName ?? profile.email
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -93,7 +95,7 @@ export function AppShell({
   const body = useMemo(() => {
     if (active === "Overview")
       return <Overview firstName={firstName(name)} onNavigate={go} />
-    if (active === "Bookings") return <BookingsPage />
+    if (active === "Bookings") return <BookingsPage bookingRequestId={bookingRequestId} />
     if (active === "Messages") return <MessagesPage />
     if (active === "StaffCustomers") return <StaffCustomersPage />
     if (active === "Calendar") return <CalendarPage />
@@ -119,7 +121,7 @@ export function AppShell({
       </section>
     )
     return <GenericPage page={active} />
-  }, [active, name, profile.email])
+  }, [active, name, profile.email, bookingRequestId])
 
   return (
     <WorkspaceLayout

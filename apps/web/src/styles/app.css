@@ -4,6 +4,8 @@
 @import "./public-preview.css";
 @import "./public-catalog.css";
 @import "./staff-workspace.css";
+@import "./booking-request.css";
+@import "./admin-event-days.css";
 
 @layer base {
   * {

@@ -1,6 +1,5 @@
 import { ApiError } from "../../lib/http";
 import { getMyBookingRequest } from "../../lib/data/booking-requests";
-import { AdminEventDays } from "./staff/AdminEventDays";
 import { localInput, zonedInstant } from "../../lib/utils/event-day-time";
 import { FormField, Input, NativeDialog, Select, Textarea } from "@event-management/ui"
 import { MAX_BOOKING_REASON_LENGTH } from "@event-management/contracts/limits/booking-requests";
@@ -10,7 +9,6 @@ import { Badge, Button, Icon, MonthCalendar, PageHeader, Panel, Tabs } from "@ev
 import { durationLabel } from "./BookingRequest";
 import {
   cancelMyBookingRequest,
-  getAdminBookingRequest,
   updateRequestedDayTimes,
   getAdminBookingRequests,
   getAdminBookingRequestsPage,
@@ -21,35 +19,9 @@ import {
   type BookingStatus,
 } from "../../lib/data/booking-requests";
 
-const labels: Record<BookingStatus, string> = {
-  under_review: "Under review",
-  needs_details: "Needs details",
-  accepted: "Accepted for processing",
-  declined: "Declined",
-  cancelled: "Cancelled",
-};
-function dateLabel(value: string | null, timeZone: string) {
-  if (!value) return "To be confirmed";
-  try {
-    return new Intl.DateTimeFormat("en-PH", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone,
-    }).format(new Date(value));
-  } catch {
-    return "To be confirmed";
-  }
-}
-function preferredDateLabel(value: string | null) {
-  if (!value) return "To be confirmed";
-  const date = new Date(`${value}T00:00:00Z`);
-  return Number.isNaN(date.getTime())
-    ? "To be confirmed"
-    : new Intl.DateTimeFormat("en-PH", {
-        dateStyle: "medium",
-        timeZone: "UTC",
-      }).format(date);
-}
+import { bookingStatusLabels as labels, bookingDateTime as dateLabel, bookingDate as preferredDateLabel, BookingStatusBadge } from "./booking-request-display";
+import { adminBookingRequestPath } from "./routes";
+
 export function BookingList(props: {
   admin?: boolean;
   readOnly?: boolean;
@@ -57,7 +29,7 @@ export function BookingList(props: {
   onOpenChat?: (reference: string) => void;
 }) {
   return props.admin ? (
-    <AdminBookingList readOnly={props.readOnly} />
+    <AdminBookingList />
   ) : (
     <BookingCards {...props} />
   );
@@ -293,7 +265,7 @@ function BookingCards({
           )}
         </Panel>
       ))}
-      {selected && <BookingDetails item={selected} readOnly customerCanEditTimes onClose={() => setSelected(null)} onSaved={updated => { setSelected(updated); setItems(rows => rows.map(row => row.id === updated.id ? updated : row)); }} />}
+      {selected && <BookingDetails item={selected} customerCanEditTimes onClose={() => setSelected(null)} onSaved={updated => { setSelected(updated); setItems(rows => rows.map(row => row.id === updated.id ? updated : row)); }} />}
     </div>
   );
 }
@@ -430,7 +402,7 @@ const shortDate = (value: string) =>
     new Date(value),
   );
 
-function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
+function AdminBookingList() {
   const [status, setStatus] = useState<BookingStatus | "all">("all");
   const [month, setMonth] = useState(() => {
     const now = new Date();
@@ -448,7 +420,6 @@ function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
   const [error, setError] = useState("");
   const [calendarError, setCalendarError] = useState("");
   const [calendarLoading, setCalendarLoading] = useState(true);
-  const [selected, setSelected] = useState<BookingRequest | null>(null);
   const [revision, setRevision] = useState(0);
   const generation = useRef(0);
   const moreBusy = useRef(false);
@@ -673,14 +644,14 @@ function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
               </thead>
               <tbody>
                 {items.map((item) => (
-                  <tr key={item.id} onClick={() => setSelected(item)}>
+                  <tr key={item.id} onClick={() => window.location.assign(adminBookingRequestPath(item.id))}>
                     <td>
                       <Button variant="secondary"
                         type="button"
                         className="booking-row-button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          setSelected(item);
+                          window.location.assign(adminBookingRequestPath(item.id));
                         }}
                         aria-label={`View request ${item.reference}`}
                       >
@@ -734,49 +705,22 @@ function AdminBookingList({ readOnly = false }: { readOnly?: boolean }) {
         </div>
         <div ref={sentinel} aria-hidden="true" />
       </Panel>
-      {selected && (
-        <BookingDetails
-          item={selected}
-          readOnly={readOnly}
-          onClose={() => setSelected(null)}
-          onSaved={(item) => {
-            setSelected(item);
-            setRevision((value) => value + 1);
-          }}
-        />
-      )}
+
     </div>
-  );
-}
-function BookingStatusBadge({ status }: { status: BookingStatus }) {
-  return (
-    <Badge tone={status === "accepted" ? "success" : status === "declined" || status === "cancelled" ? "danger" : "warning"}>
-      {labels[status]}
-    </Badge>
   );
 }
 export function BookingDetails({
   item,
-  readOnly,
   customerCanEditTimes = false,
   onClose,
   onSaved,
 }: {
   item: BookingRequest;
-  readOnly: boolean;
   customerCanEditTimes?: boolean;
   onClose: () => void;
   onSaved: (item: BookingRequest) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [status, setStatus] = useState(item.status);
-  const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const reasonRequired =
-    status === "needs_details" ||
-    status === "declined" ||
-    status === "cancelled";
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
     dialog.current?.showModal();
@@ -785,25 +729,6 @@ export function BookingDetails({
       trigger?.focus();
     };
   }, []);
-  const save = async () => {
-    setBusy(true);
-    setError("");
-    try {
-      const result = await updateBookingRequestStatus(
-        item.id,
-        status,
-        reason.trim() || undefined,
-      );
-      onSaved(result.bookingRequest);
-      setReason("");
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Unable to update request.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
   return createPortal(
     <NativeDialog
       ref={dialog}
@@ -890,7 +815,6 @@ export function BookingDetails({
           </section>
         </div>
         {item.requestedDays && <section><h3>Requested days</h3><p>Times use {item.timeZone}. Dates are not reserved.</p>{item.requestedDays.map(day => <RequestedDay key={day.date} item={item} day={day} editable={customerCanEditTimes && !["declined", "cancelled"].includes(item.status) && !day.eventDayId} onSaved={onSaved} />)}</section>}
-        {!readOnly && <AdminEventDays booking={item} onBookingChanged={async () => { const result = await getAdminBookingRequest(item.id); onSaved(result.bookingRequest); }} />}
         <details className="booking-history">
           <summary>Status history</summary>
           <ul>
@@ -903,63 +827,7 @@ export function BookingDetails({
             ))}
           </ul>
         </details>
-        {!readOnly && !["declined", "cancelled"].includes(item.status) && (
-          <form
-            className="booking-details-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!reasonRequired || reason.trim()) void save();
-            }}
-          >
-            <h3>Update status</h3>
-            <label>
-              Status
-              <Select
-                value={status}
-                onChange={(event) =>
-                  setStatus(event.target.value as BookingStatus)
-                }
-              >
-                {Object.entries(labels).map(([value, label]) => (
-                  <option
-                    key={value}
-                    value={value}
-                    disabled={
-                      value === "under_review" && item.status !== "under_review"
-                    }
-                  >
-                    {label}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label>
-              Reason {reasonRequired ? "(required)" : "(optional)"}
-              <Textarea
-                value={reason}
-                maxLength={MAX_BOOKING_REASON_LENGTH}
-                required={reasonRequired}
-                onChange={(event) => setReason(event.target.value)}
-              />
-            </label>
-            {error && <p role="alert">{error}</p>}
-            <div className="booking-actions">
-              <Button variant="secondary" type="button" onClick={onClose}>
-                Close
-              </Button>
-              <Button variant="primary"
-                type="submit"
-                disabled={
-                  busy ||
-                  status === item.status ||
-                  (reasonRequired && !reason.trim())
-                }
-              >
-                {busy ? "Saving…" : "Update status"}
-              </Button>
-            </div>
-          </form>
-        )}
+
       </div>
     </NativeDialog>,
     document.body,

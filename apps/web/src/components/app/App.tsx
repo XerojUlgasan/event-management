@@ -6,15 +6,7 @@ import { AppShell } from "./AppShell"
 import { AuthPage } from "./AuthPage"
 import { CustomerDashboard } from "./customer/CustomerDashboard"
 import { StaffWorkspaceShell } from "./staff/StaffWorkspaceShell"
-import { adminKey, appHome, customerPaths, isStaffWorkspace, isSystemAdmin, normalizePath } from "./routes"
-
-function allowedPath(profile: { role: string; staffRole: string | null }, path: string) {
-  if (profile.role === "customer") return (Object.values(customerPaths) as string[]).includes(path)
-  if (isStaffWorkspace(profile)) {
-    return path === "/app/events" || path === "/app/assignments"
-  }
-  return adminKey(path) !== null
-}
+import { adminBookingRequestId, adminKey, allowedWorkspacePath, appHome, isStaffWorkspace, isSystemAdmin, normalizePath, workspaceReturnPath } from "./routes"
 
 export default function App({ initialPath, initialSearch }: { initialPath: string; initialSearch: string }) {
   return (
@@ -40,10 +32,10 @@ function Workspace({ path, search }: { path: string; search: string }) {
         if (book) next.set("book", book)
         if (resume) next.set("booking", "resume")
         window.location.replace(`/app/home?${next}`)
-      } else window.location.replace(home)
+      } else window.location.replace(workspaceReturnPath(profile, params.get("next")) ?? home)
       return
     }
-    if (path === "/app" || !allowedPath(profile, path)) window.location.replace(home)
+    if (path === "/app" || !allowedWorkspacePath(profile, path)) window.location.replace(home)
   }, [status, profile, path, search])
 
   const handleSignOut = async () => {
@@ -78,7 +70,7 @@ function Workspace({ path, search }: { path: string; search: string }) {
     return <AuthPage initialMode={mode} onBack={() => { window.location.assign("/") }} />
   }
 
-  if (path === "/login" || path === "/app" || !allowedPath(profile, path)) {
+  if (path === "/login" || path === "/app" || !allowedWorkspacePath(profile, path)) {
     return (
       <div className="auth-splash">
         <Brand />
@@ -102,7 +94,7 @@ function Workspace({ path, search }: { path: string; search: string }) {
   }
   if (isSystemAdmin(profile)) {
     const active = adminKey(path)
-    return active ? <AppShell profile={profile} active={active} onSignOut={handleSignOut} /> : null
+    return active ? <AppShell profile={profile} active={active} bookingRequestId={adminBookingRequestId(path) ?? undefined} onSignOut={handleSignOut} /> : null
   }
   return (
     <CustomerDashboard

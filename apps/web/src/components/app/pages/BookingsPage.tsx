@@ -1,2 +1,5 @@
 import { BookingList } from "../BookingList"
-export function BookingsPage() { return <div className="content-stack"><BookingList admin /></div> }
+import { BookingRequestPage } from "./BookingRequestPage"
+export function BookingsPage({ bookingRequestId }: { bookingRequestId?: string }) {
+  return bookingRequestId ? <BookingRequestPage bookingRequestId={bookingRequestId} /> : <div className="content-stack"><BookingList admin /></div>
+}

@@ -2,9 +2,10 @@ import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/mess
 import { Fragment, useEffect, useRef, useState, type SubmitEvent } from "react"
 import { Avatar, Badge, Button, Icon, Input } from "@event-management/ui"
 
-import { getAdminBookingRequest, getMyBookingRequest, type BookingRequest } from "../../../lib/data/booking-requests"
+import { getMyBookingRequest, type BookingRequest } from "../../../lib/data/booking-requests"
 import type { ChatConversation, ChatMessage } from "../../../lib/data/messages"
 import { BookingDetails } from "../BookingList"
+import { adminBookingRequestPath } from "../routes"
 import { initialsFromName } from "../../../lib/utils/name"
 
 const dayFormatter = new Intl.DateTimeFormat("en-PH", {
@@ -131,11 +132,12 @@ export function MessagesWorkspace({
 
   async function openBooking() {
     if (!active?.bookingRequestId || bookingLoading) return
+    if (!isTeam) { window.location.assign(adminBookingRequestPath(active.bookingRequestId)); return }
     const request = ++bookingLoad.current
     setBookingLoading(true)
     setBookingError("")
     try {
-      const result = await (isTeam ? getMyBookingRequest(active.bookingRequestId) : getAdminBookingRequest(active.bookingRequestId))
+      const result = await getMyBookingRequest(active.bookingRequestId)
       if (request === bookingLoad.current) setBooking(result.bookingRequest)
     } catch (cause) {
       if (request === bookingLoad.current) setBookingError(cause instanceof Error ? cause.message : "Unable to load booking details.")
@@ -355,7 +357,7 @@ export function MessagesWorkspace({
           </form>
         )}
       </section>
-      {booking && <BookingDetails item={booking} readOnly={isTeam} customerCanEditTimes={isTeam} onClose={() => setBooking(null)} onSaved={setBooking} />}
+      {booking && isTeam && <BookingDetails item={booking} customerCanEditTimes onClose={() => setBooking(null)} onSaved={setBooking} />}
     </div>
   )
 }

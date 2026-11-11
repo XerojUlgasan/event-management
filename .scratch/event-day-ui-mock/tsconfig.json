@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "baseUrl": "../..",
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "react": ["apps/web/node_modules/@types/react"],
+      "react/*": ["apps/web/node_modules/@types/react/*"],
+      "react-dom/*": ["apps/web/node_modules/@types/react-dom/*"],
+      "@event-management/ui": ["packages/ui/src/index.ts"],
+      "@event-management/contracts/*": ["packages/contracts/src/*"]
+    }
+  },
+  "include": ["main.tsx", "env.d.ts"]
+}
