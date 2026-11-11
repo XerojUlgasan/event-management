@@ -29,6 +29,7 @@ Walk these scenarios from the root `AGENTS.md` through the senior-developer entr
 
 | Scenario | Required route and boundary |
 | --- | --- |
+| Plan or change who communicates with customers, selects staff, or coordinates an event | Standing guides → [business logic](../business-logic/SKILL.md) → [identity](../business-logic/references/identity.md) → owning area skills. Coordinator is an event responsibility held by staff. Verify implemented permissions separately; intended responsibilities do not prove a working feature. |
 | Raise a message field limit | Standing guides → API, frontend, packages, limits → package reuse, API synchronization, and blast radius. Follow the canonical constant, route schema, form hint, and behavior suite; keep HTTP caps separate. |
 | Explain package saving without edits | Standing guides → how; why only for rationale → API/frontend source, including [client layers](../frontend/reference/client-layers.md). Explain the API controller/service/data path and the browser `lib/data` call without editing or inventing automatic client generation. |
 | Review a booking-request status or migration diff | Standing guides → interrogate → existing code-review reference, API, relevant frontend/QA, blast radius. Stay read-only; acceptance is not a reservation, and absent policy is a question. |

@@ -2,6 +2,12 @@
 
 Durable documentation notes for this role. Read and maintain them under the shared [memory policy](../README.md#memory).
 
+## 2026-11-11 — Business responsibilities have a domain reference
+
+The [business-logic skill](../../business-logic/SKILL.md) routes role and workflow work to the [identity reference](../../business-logic/references/identity.md). It records the user's intended responsibilities: admins own customer communication and event decisions; staff volunteer; admins select teams and coordinators; coordinators track timed checklists. The [README](../../../README.md#current-implementation) retains implementation status. This is business direction, not proof that all described workflows are implemented.
+
+**Evidence:** User direction, source inspection of identity and staffing rules, and guidance/skill validation on 2026-11-11. Keep technical authorization detail with the API guidance and preserve the distinction between an account role and an event assignment.
+
 ## 2026-11-09 — Browser API calls are a frontend reference
 
 The rule for how `apps/web` calls `/v1` lives in [client layers](../../frontend/reference/client-layers.md). The frontend skill lists it as a required reference. [Client data and authentication](../../frontend/reference/data-and-auth.md) keeps persisted-flow facts and points at that reference for placement. The shared [frontend structure](../../shared/frontend-project-structure.md) table stays a short index.

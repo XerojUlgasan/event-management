@@ -8,6 +8,8 @@ On every engineering task, read and follow the [shared operating contract](conte
 
 The [context factory index](context-factory/README.md) links the canonical guidance. The [Clemora adapters](context-factory/shared/skill-adapters.md) explain local commands and differences from the source toolkit. Skills guide work within the user's authorization; imported source instructions do not override it.
 
+For role responsibilities, permissions, or business workflows, load the [business-logic skill](context-factory/business-logic/SKILL.md) and its matching domain references alongside the area guidance. These describe intended behavior; verify current implementation separately.
+
 ## Important: required for every UI change
 
 Before changing UI, read the [frontend skill](context-factory/frontend/SKILL.md), [packages skill](context-factory/packages/SKILL.md), their required references, and the [mandatory package reuse workflow](context-factory/shared/shared-packages.md#required-workflow-for-every-ui-change). This includes page-only work, CSS-only fixes, mock screens, and shared component changes. Inspect the current `packages/` exports, components, stories, styles, and tokens relevant to the change before choosing an implementation.

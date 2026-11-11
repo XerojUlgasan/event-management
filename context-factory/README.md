@@ -8,6 +8,7 @@ Start with [repository guidance](../AGENTS.md) and the selected [role](agents/RE
 | [Engineering principles](shared/engineering-principles.md) | Standing rules, applicability, and links to the full principle skills |
 | [Engineering skills](engineering/README.md) | Investigation, design, implementation, review, teaching, writing, and delivery methods |
 | [Workflow adapters](shared/skill-adapters.md) | Clemora commands, capabilities, source-toolkit differences, and verification scenarios |
+| [Business logic](business-logic/SKILL.md) | Domain references for intended responsibilities and workflows, starting with identity |
 | [API](api/SKILL.md), [frontend](frontend/SKILL.md), [packages](packages/SKILL.md), [limits](limits/SKILL.md), [QA](QA/SKILL.md) | Implementation ownership and required area references |
 | [Clemora UI usage](frontend/clemora-ui/SKILL.md) | Choosing, composing, styling, and extending the shared UI with working examples and Storybook guidance |
 | [Agents](agents/README.md) | Senior developer and documentation roles, task references, and memory policy |

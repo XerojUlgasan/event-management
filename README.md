@@ -6,17 +6,21 @@ This README owns product scope, current implementation status, and development s
 
 ## Product scope
 
-Scope recorded on 2026-11-03:
+Scope recorded on 2026-11-03, with identity responsibilities and booking-linked communication clarified on 2026-11-11:
 
 | Area | Intended behavior |
 | --- | --- |
 | Catalogs | Present packages, services, and venues with administrator-managed content. |
-| Inquiries and quotations | Let customers start from a package or describe requirements first. Staff collect missing details, prepare custom quotations, issue revisions, and retain quotation history. Changes affecting an agreed price or delivery require customer reapproval. |
-| Availability and booking | Let staff check availability, control confirmation, and record event changes. Define date holds, exclusive periods, setup/cleanup buffers, and cancellation rules; prevent conflicting confirmations, including simultaneous attempts. |
-| Event preparation and workforce | Maintain event details, staff profiles and availability, manager-assigned teams, schedules, tasks/checklists, progress, operational concerns, and notifications. |
-| Customer service | Use AI for factual answers from approved information, inquiry collection, and human handoff. Staff retain quotation and commitment decisions. |
+| Inquiries and quotations | Let customers start from a package or describe requirements first. Admins communicate with customers, collect missing details, discuss custom packages and added services or venues, prepare quotations, issue revisions, and retain quotation history. Changes affecting an agreed price or delivery require customer reapproval. |
+| Availability and booking | Admins review and accept event requests, manage scheduling, and record event changes. Define date holds, exclusive periods, setup/cleanup buffers, and cancellation rules; prevent conflicting confirmations, including simultaneous attempts. |
+| Event preparation and workforce | Staff view upcoming event days and volunteer when available; admins select teams and appoint a coordinator from the selected staff. Coordinators accept timed checklists and track completion; admins monitor progress. Maintain staff profiles, schedules, operational concerns, and notifications. |
+| Customer service | Use AI for factual answers from approved information, inquiry collection, and human handoff. Admins retain quotation and commitment decisions. |
 | Reports and past events | Report on actual business records and maintain a managed past-events showcase with publication permissions. |
-| Access and communication | Give customers access to their own inquiries and conversations, and staff access appropriate to their roles. |
+| Access and communication | Automatically create a conversation for each submitted booking request so the customer and admin can communicate and create booking-related transactions. Give customers access to their own inquiries and conversations, and staff access appropriate to their roles. |
+
+The [identity reference](context-factory/business-logic/references/identity.md) defines these intended role responsibilities. Admin means the System Administrator; coordinator is an event responsibility assigned to staff.
+
+The [messages reference](context-factory/business-logic/references/messages.md) describes intended booking-linked communication. Transaction types, steps, and approval rules remain to be defined within the scope boundaries below.
 
 A request does not reserve a date, establish a final price, or confirm a booking. Confirmation rules remain to be agreed and must not be inferred from payment.
 
@@ -33,7 +37,7 @@ Before implementing dependent work, confirm intake fields and real catalog conte
 | Website and catalogs | `/`, `/about`, `/packages`, `/services`, `/venues`, and their `/{slug}` pages are server-rendered HTML. Cards and View more are links. A catalog title is unique, and its slug is the public address. Book now sits under the package price and guest count and continues at `/login`. `/login` and `/app` stay client-rendered; catalog overlays remain inside `/app`. All three catalogs persist in PostgreSQL and support direct saves, canvas content, and archives. |
 | Identity | Local email/password and optional Firebase sign-in share database profiles, roles, and server-side sessions. Sign-in returns to a requested workspace path only when it is local and allowed for the signed-in role. |
 | Booking requests | Signed-in customers submit package inquiries for one or more requested dates. PostgreSQL stores ordered per-day date and time entries, package snapshots, request details, status history, and a linked conversation. Customers supply times after submission; for an accepted request, a System Administrator selects one response-deadline offset for the request and applies it to create operational days from every ready requested date and update current scheduled days. Signed-out drafts resume after sign-in for explicit review and submission. |
-| Messages | Customer-to-admin conversations persist in PostgreSQL, including request-linked conversations, unread counts, and read state. |
+| Messages | Customer-to-admin conversations persist in PostgreSQL, including request-linked conversations, unread counts, and read state. Transaction creation within conversations is not implemented. |
 | Directory and staff access | System Administrators have a read-only Staff & Customers directory. Staff Event days combines a monthly calendar, searchable table, response filters, and persisted availability controls. Assigned to me shows assignment cards with schedule, role/status, and a details drawer containing the confirmed team. System Administrators review request status and manage event-day staffing on `/app/bookings/{id}`, opened from Admin Bookings or a linked admin conversation. |
 | Remaining scope | Requirements-first inquiries, quotations, booking confirmation and date holds, workforce checklists/notifications, AI replies/handoff, reports, and the managed showcase are not implemented. Other business screens may contain demo or local data. |
 

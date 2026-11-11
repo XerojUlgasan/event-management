@@ -1,0 +1,4 @@
+interface:
+  display_name: "Clemora Business Logic"
+  short_description: "Route Clemora work to the relevant business domain"
+  default_prompt: "Use $business-logic to load the domain reference for this task and apply its intended responsibilities while checking current implementation separately."
