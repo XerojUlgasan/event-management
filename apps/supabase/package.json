@@ -2,7 +2,7 @@
   "name": "@event-management/supabase",
   "private": true,
   "scripts": {
-    "start": "supabase start",
+    "start": "supabase start --exclude postgrest,postgres-meta,imgproxy",
     "stop": "supabase stop",
     "status": "supabase status",
     "functions:serve": "supabase functions serve api --env-file .env.functions"
