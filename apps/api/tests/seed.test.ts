@@ -58,7 +58,7 @@ async function runSeed(target = database) {
   });
 }
 
-const tables = ["users", "packages", "catalog_pages", "catalog_sections", "catalog_widgets", "media_assets", "services", "venues", "booking_requests", "booking_request_status_history", "conversations", "messages"] as const;
+const tables = ["users", "sessions", "packages", "catalog_pages", "catalog_sections", "catalog_widgets", "media_assets", "services", "venues", "booking_requests", "booking_request_status_history", "conversations", "messages", "events_day", "event_staff_availability", "event_staffs"] as const;
 async function ids() {
   const snapshot: Record<string, string[]> = {};
   for (const table of tables) {
@@ -93,8 +93,72 @@ test("seed creates demo users, venues, and conversations while preserving unrela
     (SELECT count(*)::int FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN users u ON u.id = c.customer_id WHERE u.email LIKE 'demo.%@clemora.example.test') AS messages,
     (SELECT count(*)::int FROM packages WHERE published_at IS NOT NULL) AS package_published,
     (SELECT count(*)::int FROM venues WHERE name LIKE 'Demo %' AND archived_at IS NULL) AS venue_published`);
-  assert.deepEqual(coverage.rows[0], { requests: 0, conversations: 5, messages: 10, package_published: 3, venue_published: 3 });
-  const packageRows = await pool.query("SELECT id, name, max_guests, price, published_at IS NOT NULL AS published FROM packages ORDER BY name");
+  assert.deepEqual(coverage.rows[0], { requests: 0, conversations: 5, messages: 10, package_published: 103, venue_published: 3 });
+  const scenario = await pool.query(`SELECT
+    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test') AS users,
+    (SELECT count(DISTINCT password_hash)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test') AS password_hashes,
+    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test' AND role = 'admin' AND staff_role = 'System Administrator') AS admins,
+    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test' AND role = 'staff' AND staff_role IS NOT NULL) AS staff,
+    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test' AND role = 'customer' AND staff_role IS NULL) AS customers,
+    (SELECT count(*)::int FROM sessions s JOIN users u ON u.id = s.user_id WHERE u.email LIKE 'scenario.user%@clemora.example.test') AS sessions,
+    (SELECT count(*)::int FROM packages WHERE name LIKE 'Scenario Celebration %') AS packages,
+    (SELECT count(*)::int FROM venues WHERE name LIKE 'Scenario Venue %') AS venues,
+    (SELECT count(*)::int FROM services WHERE name LIKE 'Scenario Service %') AS services,
+    (SELECT count(*)::int FROM media_assets) AS media,
+    (SELECT count(*)::int FROM catalog_pages) AS pages,
+    (SELECT count(*)::int FROM catalog_sections) AS sections,
+    (SELECT count(*)::int FROM catalog_widgets) AS widgets,
+    (SELECT count(*)::int FROM booking_requests WHERE reference LIKE 'SCN-%') AS bookings,
+    (SELECT count(*)::int FROM booking_request_status_history h JOIN booking_requests b ON b.id = h.booking_request_id WHERE b.reference LIKE 'SCN-%') AS history,
+    (SELECT count(*)::int FROM conversations c JOIN booking_requests b ON b.id = c.booking_request_id WHERE b.reference LIKE 'SCN-%') AS booking_conversations,
+    (SELECT count(*)::int FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN booking_requests b ON b.id = c.booking_request_id WHERE b.reference LIKE 'SCN-%') AS booking_messages,
+    (SELECT count(*)::int FROM events_day d JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%') AS event_days,
+    (SELECT count(*)::int FROM event_staff_availability a JOIN events_day d ON d.id = a.event_day_id JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%') AS availability,
+    (SELECT count(*)::int FROM event_staffs s JOIN events_day d ON d.id = s.event_day_id JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%') AS assignments`);
+  assert.deepEqual(scenario.rows[0], {
+    users: 100, password_hashes: 1, admins: 4, staff: 24, customers: 72, sessions: 100,
+    packages: 100, venues: 100, services: 100, media: 103, pages: 103, sections: 103, widgets: 106,
+    bookings: 100, history: 100, booking_conversations: 100, booking_messages: 100,
+    event_days: 100, availability: 100, assignments: 100,
+  });
+  const violations = await pool.query(`SELECT
+    (SELECT count(*)::int FROM booking_requests b JOIN users u ON u.id = b.customer_id WHERE b.reference LIKE 'SCN-%' AND u.role <> 'customer') AS non_customer_bookings,
+    (SELECT count(*)::int FROM booking_requests WHERE reference LIKE 'SCN-%' AND out_of_range IS DISTINCT FROM (guest_count IS NOT NULL AND guest_count > package_max_guests)) AS range_mismatches,
+    (SELECT count(*)::int FROM events_day d JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%' AND b.status <> 'accepted') AS days_outside_accepted,
+    (SELECT count(*)::int FROM events_day d JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%' AND d.status = 'moved' AND NOT EXISTS (SELECT 1 FROM events_day r WHERE r.id = d.replacement_event_day_id AND r.booking_request_id = d.booking_request_id AND r.status = 'scheduled')) AS broken_moves,
+    (SELECT count(*)::int FROM event_staffs s JOIN events_day d ON d.id = s.event_day_id JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%' AND s.status = 'confirmed' AND (d.status <> 'scheduled' OR d.staffing_status <> 'closed' OR NOT EXISTS (SELECT 1 FROM event_staff_availability a WHERE a.event_day_id = s.event_day_id AND a.staff_id = s.staff_id AND a.response = 'available'))) AS invalid_assignments,
+    (SELECT count(*)::int FROM messages m JOIN users u ON u.id = m.sender_id JOIN conversations c ON c.id = m.conversation_id JOIN booking_requests b ON b.id = c.booking_request_id WHERE b.reference LIKE 'SCN-%' AND m.sender_role::text <> u.role) AS sender_mismatches,
+    (SELECT count(*)::int FROM services s WHERE s.name LIKE 'Scenario Service %' AND s.archived_at IS NULL AND NOT EXISTS (SELECT 1 FROM catalog_pages p JOIN catalog_sections cs ON cs.page_id = p.id JOIN catalog_widgets w ON w.section_id = cs.id WHERE p.service_id = s.id AND w.type = 'photo')) AS services_without_photos,
+    (SELECT count(*)::int FROM booking_requests b JOIN packages p ON p.id = b.package_id WHERE b.reference LIKE 'SCN-%' AND p.archived_at IS NOT NULL) AS archived_package_bookings`);
+  assert.deepEqual(violations.rows[0], {
+    non_customer_bookings: 0, range_mismatches: 0, days_outside_accepted: 0, broken_moves: 0,
+    invalid_assignments: 0, sender_mismatches: 0, services_without_photos: 0, archived_package_bookings: 0,
+  });
+  const bookingDates = await pool.query<{ min_day: string; max_day: string; outside: number }>(`SELECT min(day) AS min_day, max(day) AS max_day,
+    count(*) FILTER (WHERE day < '2026-10-01' OR day > '2026-11-30')::int AS outside
+    FROM (
+      SELECT preferred_date AS day FROM booking_requests WHERE reference LIKE 'SCN-%'
+      UNION ALL
+      SELECT to_char(d.day, 'YYYY-MM-DD') FROM events_day d JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%'
+      UNION ALL
+      SELECT value->>'date' FROM booking_requests b CROSS JOIN LATERAL jsonb_array_elements(b.requested_days) value WHERE b.reference LIKE 'SCN-%' AND b.requested_days IS NOT NULL
+    ) days`);
+  assert.deepEqual(bookingDates.rows[0], { min_day: "2026-10-01", max_day: "2026-11-30", outside: 0 });
+  const bookingStatuses = await pool.query("SELECT status, count(*)::int AS count FROM booking_requests WHERE reference LIKE 'SCN-%' GROUP BY status ORDER BY status");
+  assert.deepEqual(bookingStatuses.rows, [
+    { status: "accepted", count: 50 },
+    { status: "cancelled", count: 5 },
+    { status: "declined", count: 10 },
+    { status: "needs_details", count: 10 },
+    { status: "under_review", count: 25 },
+  ]);
+  const dayStatuses = await pool.query("SELECT d.status, count(*)::int AS count FROM events_day d JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%' GROUP BY d.status ORDER BY d.status");
+  assert.deepEqual(dayStatuses.rows, [
+    { status: "cancelled", count: 8 },
+    { status: "moved", count: 8 },
+    { status: "scheduled", count: 84 },
+  ]);
+  const packageRows = await pool.query("SELECT id, name, max_guests, price, published_at IS NOT NULL AS published FROM packages WHERE name IN ('The Grand Celebration', 'The Intimate Gathering', 'The Sweet Soirée') ORDER BY name");
   assert.deepEqual(packageRows.rows.map((row) => ({
     name: row.name,
     maxGuests: row.max_guests,
@@ -117,15 +181,17 @@ test("seed creates demo users, venues, and conversations while preserving unrela
     LEFT JOIN catalog_sections s ON s.page_id = cp.id
     LEFT JOIN catalog_widgets w ON w.section_id = s.id
     LEFT JOIN media_assets m ON m.id = w.media_id
+    WHERE p.name IN ('The Grand Celebration', 'The Intimate Gathering', 'The Sweet Soirée')
     GROUP BY p.id, p.name
     ORDER BY p.name`);
   assert.equal(packagePageContent.rowCount, 3);
   assert.ok(packagePageContent.rows.every((row) => row.sections > 0 && row.markdown_widgets > 0 && row.sample_photo_widgets > 0));
   const publicPackages = (await read("/packages")).packages;
-  assert.deepEqual(publicPackages.map((row: any) => row.name).sort(), [
-    "The Grand Celebration", "The Intimate Gathering", "The Sweet Soirée",
-  ]);
-  assert.ok(publicPackages.every((pkg: any) => {
+  const sampleNames = ["The Grand Celebration", "The Intimate Gathering", "The Sweet Soirée"];
+  const samplePackages = publicPackages.filter((row: any) => sampleNames.includes(row.name));
+  assert.deepEqual(samplePackages.map((row: any) => row.name).sort(), sampleNames);
+  assert.equal(publicPackages.filter((row: any) => String(row.name).startsWith("Scenario Celebration ")).length, 80);
+  assert.ok(samplePackages.every((pkg: any) => {
     const widgets = pkg.sections.flatMap((section: any) => section.widgets);
     return widgets.some((widget: any) => widget.type === "markdown") &&
       widgets.some((widget: any) => widget.type === "photo" && widget.media?.source === "sample");
@@ -135,20 +201,25 @@ test("seed creates demo users, venues, and conversations while preserving unrela
   const initialPublicVenues = (await read("/venues")).venues.filter((venue: any) => demoVenues.rows.some((row) => row.id === venue.id));
   assert.equal(initialPublicVenues.length, 3);
   assert.ok(initialPublicVenues.every((venue: any) => !("imageUrls" in venue) && !venue.description.includes("venue draft")));
-  assert.equal((await pool.query("SELECT count(*)::int AS count FROM services")).rows[0].count, 0);
+  assert.equal((await pool.query("SELECT count(*)::int AS count FROM services")).rows[0].count, 100);
   const conversation = await pool.query(`SELECT c.id, c.customer_id, count(m.id)::int AS message_count,
-    array_agg(u.role ORDER BY m.created_at) AS sender_roles
+    array_agg(u.role ORDER BY m.created_at) AS sender_roles,
+    array_agg(m.sender_role ORDER BY m.created_at) AS message_roles
     FROM conversations c JOIN users customer ON customer.id = c.customer_id
     JOIN messages m ON m.conversation_id = c.id JOIN users u ON u.id = m.sender_id
     WHERE customer.email = 'demo.camille@clemora.example.test' GROUP BY c.id`);
   assert.equal(conversation.rowCount, 1);
   assert.equal(conversation.rows[0].message_count, 2);
   assert.deepEqual(conversation.rows[0].sender_roles, ["customer", "admin"]);
+  assert.deepEqual(conversation.rows[0].message_roles, ["customer", "admin"]);
 
   await pool.query("UPDATE venues SET description = 'Edited description', updated_at = created_at + interval '5 seconds' WHERE id = $1", [demoVenues.rows[0].id]);
   await pool.query("UPDATE venues SET name = 'Edited demo venue', updated_at = created_at + interval '5 seconds' WHERE id = $1", [demoVenues.rows[1].id]);
   await pool.query("UPDATE venues SET archived_at = now() WHERE id = $1", [demoVenues.rows[2].id]);
   await pool.query("UPDATE packages SET price = price + 1 WHERE id = $1", [grandCelebration.id]);
+  const scenarioPackage = await pool.query("SELECT id FROM packages WHERE name = 'Scenario Celebration 002'");
+  assert.equal(scenarioPackage.rowCount, 1);
+  await pool.query("UPDATE packages SET price = 12345 WHERE id = $1", [scenarioPackage.rows[0].id]);
   const unrelated = await pool.query("INSERT INTO users (email, display_name, role, password_hash) VALUES ($1, $2, 'customer', 'unused') RETURNING id", ["unrelated-seed-test@example.test", "Unrelated person"]);
   const beforeRerun = await ids();
   await runSeed();
@@ -157,19 +228,25 @@ test("seed creates demo users, venues, and conversations while preserving unrela
   assert.equal((await pool.query("SELECT name FROM venues WHERE id = $1", [demoVenues.rows[1].id])).rows[0].name, "Edited demo venue");
   assert.ok((await pool.query("SELECT archived_at FROM venues WHERE id = $1", [demoVenues.rows[2].id])).rows[0].archived_at);
   assert.equal((await pool.query("SELECT price FROM packages WHERE id = $1", [grandCelebration.id])).rows[0].price, 185001);
+  assert.equal((await pool.query("SELECT price FROM packages WHERE id = $1", [scenarioPackage.rows[0].id])).rows[0].price, 12345);
   assert.equal((await pool.query("SELECT display_name FROM users WHERE id = $1", [unrelated.rows[0].id])).rows[0].display_name, "Unrelated person");
 
   const publicVenues = await read("/venues");
   assert.ok(publicVenues.venues.some((row: any) => row.id === demoVenues.rows[0].id && !("imageUrls" in row)));
   assert.ok(publicVenues.venues.some((row: any) => row.id === demoVenues.rows[1].id && row.name === "Edited demo venue"));
   assert.ok(!publicVenues.venues.some((row: any) => row.id === demoVenues.rows[2].id));
-  assert.equal((await read("/services")).services.length, 0);
+  const publicServices = await read("/services");
+  assert.equal(publicServices.services.length, 60);
+  assert.ok(publicServices.services.every((service: any) => service.hourlyRatePesos > 0 && typeof service.imageUrl === "string"));
   const customerCookie = await login("demo.camille@clemora.example.test");
   const adminCookie = await login("demo.admin@clemora.example.test");
   assert.equal((await read("/booking-requests/mine", customerCookie)).bookingRequests.length, 0);
   const customerThread = await read("/messages/conversation", customerCookie);
   assert.equal(customerThread.conversation.id, conversation.rows[0].id);
   assert.equal(customerThread.messages.length, 2);
-  assert.equal((await read("/admin/booking-requests", adminCookie)).bookingRequests.length, 0);
+  assert.equal((await read("/admin/booking-requests", adminCookie)).bookingRequests.length, 100);
+  const scenarioAdmin = await login("scenario.user001@clemora.example.test");
+  assert.equal((await read("/me", scenarioAdmin)).role, "admin");
+  assert.equal((await read("/me", scenarioAdmin)).staffRole, "System Administrator");
   assert.ok((await read("/admin/conversations", adminCookie)).conversations.some((row: any) => row.id === conversation.rows[0].id));
 });

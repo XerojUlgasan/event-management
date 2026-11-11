@@ -3,6 +3,8 @@ import "dotenv/config";
 import { sql } from "kysely";
 import { db } from "./client.js";
 import { hashPassword } from "../utils/password.js";
+import { LOCAL_PASSWORD } from "./seed/context.js";
+import { seedScenario } from "./seed/scenario/index.js";
 import { seedDemo } from "./seed-demo.js";
 import { seedSamplePackages } from "./seed-packages.js";
 
@@ -35,11 +37,12 @@ const venues = [
 
 
 try {
+  const passwordHash = await hashPassword(LOCAL_PASSWORD);
   const seeded = await db.transaction().execute(async (db) => {
     const rows = [];
     // Fixture addresses are insert-only: a pre-existing account is never claimed.
     for (const account of [...legacyAccounts, ...demoAccounts]) {
-      const row = await db.insertInto("users").values({ ...account, password_hash: await hashPassword("p@ssword01") })
+      const row = await db.insertInto("users").values({ ...account, password_hash: passwordHash })
         .onConflict((conflict) => conflict.expression(sql`lower(trim(email))`).doNothing())
         .returning(["id", "email", "role", "staff_role"]).executeTakeFirst();
       if (row) rows.push(row);
@@ -53,12 +56,14 @@ try {
         .returning("id").executeTakeFirst();
       if (inserted) venueCount++;
     }
-    const demo = await seedDemo(db);
-    return { accounts: rows, packageCount, venueCount, demo };
+    const demo = await seedDemo(db, passwordHash);
+    const scenario = await seedScenario(db, passwordHash);
+    return { accounts: rows, packageCount, venueCount, demo, scenario };
   });
   console.table(seeded.accounts.map(({ email, role, staff_role }) => ({ email, role, staff_role })));
   console.log(`Inserted ${seeded.accounts.length} local accounts, ${seeded.packageCount} sample canvas packages, and ${seeded.venueCount} venues.`);
   console.log("Inserted connected demo rows:", seeded.demo);
+  console.log("Inserted scenario rows:", seeded.scenario);
 } finally {
   await db.destroy();
 }

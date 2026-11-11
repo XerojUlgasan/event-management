@@ -1,48 +1,67 @@
+/* Workspace frame and navigation */
 .staff-workspace {
   min-height: 100vh;
   background: var(--canvas);
   color: var(--text-primary);
 }
+
+.staff-table th,
+.staff-response-feedback,
+.staff-availability small,
+.staff-muted,
+.staff-details dt,
+.staff-team span {
+  color: var(--text-secondary);
+}
+
 .staff-header {
   background: var(--surface-base);
   border-bottom: 1px solid var(--border-subtle);
 }
+
 .staff-header-inner,
 .staff-nav,
 .staff-main {
   width: min(1440px, calc(100% - 64px));
   margin-inline: auto;
 }
+
 .staff-header-inner {
-  min-height: 88px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
+  min-height: 88px;
 }
+
 .staff-identity {
   display: flex;
   align-items: center;
   gap: 12px;
   min-width: 0;
 }
+
 .staff-identity > div {
   display: grid;
   min-width: 0;
   font-size: 0.875rem;
 }
-.staff-identity strong,
-.staff-identity span {
+
+.staff-identity > div strong,
+.staff-identity > div span {
   overflow-wrap: anywhere;
 }
+
 .staff-identity > div span {
   color: var(--text-muted);
   font-size: 0.75rem;
 }
+
 .staff-nav {
   display: flex;
   gap: 32px;
 }
+
 .staff-nav a {
   padding: 14px 0;
   border-bottom: 3px solid var(--transparent);
@@ -50,36 +69,42 @@
   text-decoration: none;
   font-weight: 600;
 }
+
 .staff-nav a[aria-current="page"] {
-  border-color: var(--wine);
-  color: var(--wine);
+  border-color: var(--accent);
+  color: var(--accent);
 }
+
 .staff-nav a:focus-visible {
-  outline: 2px solid var(--wine);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
 .staff-main {
   padding-block: 36px 64px;
 }
+
 .staff-main .page-head {
   margin-bottom: 28px;
 }
+
+/* Event calendar, filters, and results */
 .staff-events-layout {
   display: grid;
   grid-template-columns: minmax(290px, 340px) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
-.staff-calendar > .ui-month-calendar {
-  width: 100%;
-}
+
 .staff-calendar > p {
   margin: 14px 0 0;
   font-size: 0.875rem;
 }
+
 .staff-results {
   min-width: 0;
 }
+
 .staff-tools {
   display: flex;
   align-items: end;
@@ -88,19 +113,22 @@
   flex-wrap: wrap;
   margin-bottom: 16px;
 }
+
 .staff-search {
   display: grid;
-  gap: 6px;
+  gap: var(--field-gap);
+  width: min(100%, 320px);
   font-size: 0.875rem;
   font-weight: 600;
-  width: min(100%, 320px);
 }
+
 .staff-table-wrap {
   overflow-x: auto;
-  background: var(--surface-base);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-base);
 }
+
 .staff-table {
   width: 100%;
   min-width: 780px;
@@ -109,156 +137,180 @@
   font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
 }
+
 .staff-table th {
   background: var(--surface-subtle);
-  color: var(--text-secondary);
   font-size: 0.75rem;
 }
+
 .staff-table th,
 .staff-table td {
   padding: 15px 14px;
   vertical-align: top;
   border-bottom: 1px solid var(--border-subtle);
 }
-.staff-table tr:last-child td {
+
+.staff-table tbody > tr:last-child > td {
   border-bottom: 0;
 }
+
 .staff-table td {
   line-height: 1.55;
 }
+
+/* Availability controls and inline feedback */
 .staff-response-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
+
 .staff-response-feedback {
   max-width: 28ch;
   margin: 8px 0 0;
-  color: var(--text-secondary);
   font-size: 0.8125rem;
   line-height: 1.5;
 }
+
 .staff-response-error {
   color: var(--status-danger-text);
 }
+
 .staff-availability small {
   display: block;
   max-width: 24ch;
-  margin-top: 8px;
-  color: var(--text-secondary);
+  margin-block-start: 8px;
   line-height: 1.4;
 }
-.staff-muted {
-  color: var(--text-secondary);
-}
+
+/* Assignment cards; Panel owns the surface and padding. */
 .staff-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: 16px;
 }
+
 .staff-assignment-card {
-  padding: 22px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
 }
+
 .staff-assignment-card p {
   margin: 0;
   line-height: 1.55;
 }
+
 .staff-assignment-card > button {
-  margin-top: auto;
+  margin-block-start: auto;
 }
+
 .staff-card-heading {
   display: flex;
-  width: 100%;
-  gap: 12px;
   justify-content: space-between;
   align-items: start;
+  gap: 12px;
+  width: 100%;
 }
+
 .staff-card-heading h2 {
-  font-size: 1.125rem;
   margin: 0;
   overflow-wrap: anywhere;
+  font-size: 1.125rem;
 }
+
+/* Page alerts and event details (also rendered in the shared Drawer). */
 .staff-message {
+  margin-block-end: 20px;
   padding: 12px 16px;
-  background: var(--status-success-surface);
-  border-radius: 8px;
-  margin-bottom: 20px;
+  border-radius: var(--radius-control);
 }
+
 .staff-error {
   background: var(--status-danger-surface);
   color: var(--status-danger-text);
 }
+
 .staff-details {
   display: grid;
   gap: 16px;
   margin-block: 24px;
 }
-.staff-details div {
+
+.staff-details > div {
   display: grid;
   gap: 4px;
 }
+
 .staff-details dt {
-  color: var(--text-secondary);
   font-size: 0.875rem;
 }
+
 .staff-details dd {
   margin: 0;
-  font-weight: 600;
   overflow-wrap: anywhere;
+  font-weight: 600;
 }
+
 .staff-team {
-  padding-left: 20px;
+  padding-inline-start: 20px;
   line-height: 1.8;
 }
-.staff-team span {
-  color: var(--text-secondary);
-}
+
 .staff-notice {
-  background: var(--status-warning-surface);
   padding: 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
+  background: var(--status-warning-surface);
 }
+
+/* Keep the table scrollable while the surrounding layout stacks. */
 @media (max-width: 850px) {
   .staff-events-layout {
     grid-template-columns: 1fr;
   }
+
   .staff-calendar {
     max-width: 460px;
   }
 }
+
 @media (max-width: 600px) {
   .staff-header-inner,
   .staff-nav,
   .staff-main {
     width: calc(100% - 32px);
   }
+
   .staff-header-inner {
-    min-height: 76px;
     gap: 12px;
+    min-height: 76px;
   }
+
   .staff-identity {
     gap: 8px;
   }
+
   .staff-identity > div {
     max-width: 130px;
   }
+
   .staff-identity .avatar {
     display: none;
   }
+
   .staff-nav {
     gap: 24px;
   }
+
   .staff-main {
-    padding-top: 24px;
+    padding-block-start: 24px;
   }
+
   .staff-main .page-head {
-    align-items: flex-start;
     gap: 16px;
   }
+
   .staff-tools {
     align-items: stretch;
   }

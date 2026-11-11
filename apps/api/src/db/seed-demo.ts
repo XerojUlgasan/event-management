@@ -2,7 +2,6 @@ import { catalogSlug } from "@event-management/contracts/catalog-slug";
 import { createHash } from "node:crypto";
 import type { Transaction } from "kysely";
 import type { DB } from "./types.js";
-import { hashPassword } from "../utils/password.js";
 
 type SeedDb = Transaction<DB>;
 
@@ -42,7 +41,7 @@ const venues = [
 ] as const;
 
 type UserKey = (typeof users)[number]["key"];
-export async function seedDemo(db: SeedDb) {
+export async function seedDemo(db: SeedDb, passwordHash: string) {
   const now = seedClock();
   const count = { users: 0, services: 0, packages: 0, venues: 0, assignments: 0, requests: 0, history: 0, conversations: 0, messages: 0 };
   const persistedUsers = new Map<UserKey, { id: string; role: string; staffRole: string | null; name: string }>();
@@ -50,7 +49,7 @@ export async function seedDemo(db: SeedDb) {
   for (const user of users) {
     const id = seedId(`user:${user.key}`);
     if (!(await db.selectFrom("users").select("id").where("id", "=", id).executeTakeFirst())) {
-      const inserted = await db.insertInto("users").values({ id, email: user.email, display_name: user.name, role: user.role, staff_role: user.staffRole, password_hash: await hashPassword("p@ssword01"), created_at: now, updated_at: now })
+      const inserted = await db.insertInto("users").values({ id, email: user.email, display_name: user.name, role: user.role, staff_role: user.staffRole, password_hash: passwordHash, created_at: now, updated_at: now })
         .onConflict((conflict) => conflict.doNothing()).returning("id").executeTakeFirst();
       if (inserted) count.users++;
     }
@@ -80,7 +79,7 @@ export async function seedDemo(db: SeedDb) {
     if (!conversation || conversation.customer_id !== customer.id) continue;
     const subject = { ana: "wedding", ben: "birthday", camille: "corporate", daniel: "wedding", ella: "birthday" }[user.key] ?? "private";
     for (const [index, sender, body] of [[0, customer, `Hello, I would like to ask about a ${subject} event.`], [1, admin, "Thanks for reaching out. Please share your preferred date and guest count."]] as const) {
-      const message = await db.insertInto("messages").values({ id: seedId(`message:${user.key}:${index}`), conversation_id: conversation.id, sender_id: sender.id, body, created_at: new Date(now.getTime() + index * 600000), read_at: index === 0 ? new Date(now.getTime() + 600000) : null })
+      const message = await db.insertInto("messages").values({ id: seedId(`message:${user.key}:${index}`), conversation_id: conversation.id, sender_id: sender.id, sender_role: index === 0 ? "customer" : "admin", body, created_at: new Date(now.getTime() + index * 600000), read_at: index === 0 ? new Date(now.getTime() + 600000) : null })
         .onConflict((conflict) => conflict.doNothing()).returning("id").executeTakeFirst();
       if (message) count.messages++;
     }

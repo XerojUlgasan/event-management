@@ -113,7 +113,7 @@ pnpm dev
 | `pnpm dev:prepare` | Prepare PostgreSQL and apply migrations |
 | `pnpm storybook` | Run only Storybook |
 | `pnpm db:up` / `pnpm db:down` | Start / stop PostgreSQL; stopping retains its volume |
-| `pnpm db:seed` | Insert local fixtures and sample catalog/conversation data |
+| `pnpm db:seed` | Insert local fixtures, sample catalog data, and the interconnected scenario |
 | `pnpm supabase:start` / `pnpm supabase:stop` | Start / stop the local Supabase stack in `apps/supabase` |
 | `pnpm supabase:status` | Show local Supabase URLs |
 | `pnpm agents:sync` | Sync additions across `.agents`, `.agent`, `.claude`, and `.cursor` |

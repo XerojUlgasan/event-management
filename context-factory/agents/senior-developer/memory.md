@@ -2,6 +2,14 @@
 
 Durable engineering notes for this role. Read and maintain them under the shared [memory policy](../README.md#memory).
 
+## 2026-11-11 — Seed scenario is insert-only and separate from required fixtures
+
+`pnpm db:seed` keeps the named local accounts, three canvas packages, archived venue samples, and `demo.*` conversations, then runs `apps/api/src/db/seed/scenario/`. That module adds 100 interconnected rows to every application table inside the same transaction. Scenario IDs come from `clemora-scenario-v1` keys. Reruns do not update existing rows. `SEED_RANDOM_SEED` only changes the status shuffle for rows that have not been inserted yet. [Database seed](../../../docs/SEED.md) owns the account bands, counts, and rerun rules.
+
+**Evidence:** `pnpm --filter @event-management/api exec tsx --test tests/seed.test.ts` passed on 2026-11-11 against a disposable migrated database. The test checked scenario counts, booking and event-day distributions, relationship invariants, public catalog reads, password login, and a second run that preserved edited prices and unrelated rows.
+
+**Why it matters:** Do not fold the named fixtures into the 100-row scenario. Confirmed staff assignments belong on accepted bookings whose event day is still scheduled and closed, with an available response. Video scenario rows store metadata only and do not upload bytes.
+
 ## 2026-11-09 — Web API calls go through lib/http and lib/data
 
 `apps/web` reaches `/v1` only through `src/lib/http.ts`. Domain endpoint functions live in `src/lib/data/`. `src/lib/services/` owns catalog upload-then-save, the signed-out booking draft, and message-thread merge. `src/lib/utils/` owns name and peso display helpers. There is no `lib/api.ts` barrel.
