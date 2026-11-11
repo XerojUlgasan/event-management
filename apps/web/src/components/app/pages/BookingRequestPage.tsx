@@ -184,6 +184,7 @@ export function BookingRequestPage({
   const [notice, setNotice] = useState("");
   const [pageTab, setPageTab] = useState("details");
   const detailsPanelId = "booking-request-details-panel";
+  const packagePanelId = "booking-request-package-panel";
   const quotationPanelId = "booking-request-quotation-panel";
   const generation = useRef(0);
 
@@ -294,6 +295,12 @@ export function BookingRequestPage({
                 label: "Details",
                 id: "booking-tab-details",
                 panelId: detailsPanelId,
+              },
+              {
+                value: "package",
+                label: "Package",
+                id: "booking-tab-package",
+                panelId: packagePanelId,
               },
               {
                 value: "quotation",
@@ -447,7 +454,6 @@ export function BookingRequestPage({
               </div>
             )}
           </section>
-          <BookingPackage id={item.id} admin editable={!["declined", "cancelled"].includes(item.status)} onChanged={() => setProposalRevision(value => value + 1)} />
           <div
             inert={savingStatus || refreshing || undefined}
             aria-busy={savingStatus || refreshing}
@@ -461,6 +467,23 @@ export function BookingRequestPage({
             />
           </div>
           </div>
+          )}
+          {pageTab === "package" && (
+            <div
+              id={packagePanelId}
+              role="tabpanel"
+              tabIndex={0}
+              aria-labelledby="booking-tab-package"
+            >
+              <BookingPackage
+                id={item.id}
+                admin
+                editable={
+                  !["declined", "cancelled"].includes(item.status)
+                }
+                onChanged={() => setProposalRevision((value) => value + 1)}
+              />
+            </div>
           )}
           {pageTab === "quotation" && (
             <div

@@ -229,10 +229,6 @@
   display: grid;
   gap: 0.75rem;
   margin-block: 1rem;
-  padding: 1rem;
-  border: 1px solid var(--line);
-  border-radius: 0.75rem;
-  background: var(--surface-base);
   min-width: 0;
 }
 .booking-current-package h3,

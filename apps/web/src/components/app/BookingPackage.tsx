@@ -1,6 +1,6 @@
 import "../../styles/booking-request.css";
 import { useEffect, useState } from "react";
-import { Button, Select } from "@event-management/ui";
+import { Button } from "@event-management/ui";
 import {
   getBookingPackage,
   getBookingPackageHistory,
@@ -8,13 +8,8 @@ import {
   type BookingPackageResult,
   type PackageHistoryEntry,
 } from "../../lib/data/booking-packages";
-import {
-  getAdminPackage,
-  getAdminPackages,
-  type AdminPackage,
-} from "../../lib/data/packages";
 import { getAdminServices, type AdminService } from "../../lib/data/services";
-import { PackageCanvas, PackagePreview } from "./PackagePreview";
+import { PackageCanvas } from "./PackagePreview";
 import { PackageEditor } from "./pages/PackageEditor";
 
 export function BookingPackage({
@@ -30,26 +25,22 @@ export function BookingPackage({
 }) {
   const [loaded, setLoaded] = useState<BookingPackageResult | null>(null);
   const [history, setHistory] = useState<PackageHistoryEntry[]>([]);
-  const [catalog, setCatalog] = useState<AdminPackage[]>([]);
   const [services, setServices] = useState<AdminService[]>([]);
-  const [base, setBase] = useState<AdminPackage | null>(null);
-  const [view, setView] = useState<"preview" | "edit" | null>(null);
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
   async function load() {
     setBusy(true);
     setError("");
     try {
-      const [result, packages, options, audit] = await Promise.all([
+      const [result, options, audit] = await Promise.all([
         getBookingPackage(id, admin),
-        admin ? getAdminPackages() : Promise.resolve(null),
         admin ? getAdminServices() : Promise.resolve(null),
         admin ? getBookingPackageHistory(id) : Promise.resolve(null),
       ]);
       setLoaded(result);
       setHistory(audit?.history ?? []);
-      setBase(result.package);
-      setCatalog(packages?.packages.filter((p) => !p.archivedAt) ?? []);
       setServices(options?.services ?? []);
     } catch (cause) {
       setError(
@@ -61,25 +52,13 @@ export function BookingPackage({
       setBusy(false);
     }
   }
+
   useEffect(() => {
     void load();
   }, [id, admin]);
-  async function chooseBase(value: string) {
-    setBusy(true);
-    setError("");
-    try {
-      setBase(await getAdminPackage(value));
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Unable to load package.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
+
   return (
-    <section aria-label="Current proposal" className="booking-current-package">
-      <h3>Current proposal</h3>
+    <section aria-label="Package" className="booking-current-package">
       {busy && <p role="status">Loading package…</p>}
       {error && (
         <p role="alert">
@@ -89,49 +68,19 @@ export function BookingPackage({
           </Button>
         </p>
       )}
-      {loaded && (
+      {loaded && !editing && (
         <>
-          <p>
-            <strong>{loaded.package.name}</strong> ·{" "}
-            {loaded.package.packageType === "custom"
-              ? "Private custom package"
-              : "Catalog package"}
-          </p>
-          <div className="booking-actions">
-            <Button
-              variant="secondary"
-              disabled={busy}
-              onClick={() => setView("preview")}
-            >
-              View proposal
-            </Button>
-            {admin && editable && loaded.package.packageType !== "custom" && (
-              <label>
-                Starting package{" "}
-                <Select
-                  value={base?.id ?? ""}
-                  disabled={busy}
-                  onChange={(e) => void chooseBase(e.target.value)}
-                >
-                  {catalog.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-            )}
-            {admin && editable && (
-              <Button disabled={busy || !base} onClick={() => setView("edit")}>
-                {loaded.package.packageType === "custom"
-                  ? "Edit custom package"
-                  : "Customize package"}
+          {admin && editable && (
+            <div className="booking-actions">
+              <Button disabled={busy} onClick={() => setEditing(true)}>
+                Edit package
               </Button>
-            )}
-          </div>
+            </div>
+          )}
+          <PackageCanvas item={loaded.package} hideServices />
         </>
       )}
-      {admin && history.length > 0 && (
+      {admin && history.length > 0 && !editing && (
         <details>
           <summary>Private package edit history</summary>
           {history.map((entry) => (
@@ -158,34 +107,27 @@ export function BookingPackage({
               <details>
                 <summary>Previous content</summary>
                 <p>{entry.before.description}</p>
-                <PackageCanvas item={entry.before} />
+                <PackageCanvas item={entry.before} hideServices />
               </details>
               <details>
                 <summary>Saved content</summary>
                 <p>{entry.after.description}</p>
-                <PackageCanvas item={entry.after} />
+                <PackageCanvas item={entry.after} hideServices />
               </details>
             </details>
           ))}
         </details>
       )}
-      {view === "preview" && loaded && (
-        <PackagePreview
-          item={loaded.package}
-          allowBooking={false}
-          onClose={() => setView(null)}
-        />
-      )}
-      {view === "edit" && loaded && base && (
+      {editing && loaded && (
         <PackageEditor
-          initial={base}
+          initial={loaded.package}
           serviceOptions={services}
           onClose={() => {
-            setView(null);
+            setEditing(false);
             void load();
           }}
           onSaved={() => {
-            setView(null);
+            setEditing(false);
             void load();
             onChanged?.();
           }}
@@ -195,9 +137,9 @@ export function BookingPackage({
               content,
               {
                 expectedBookingUpdatedAt: loaded.bookingUpdatedAt,
-                expectedUpdatedAt: base.updatedAt,
+                expectedUpdatedAt: loaded.package.updatedAt,
                 ...(loaded.package.packageType === "catalog"
-                  ? { sourcePackageId: base.id }
+                  ? { sourcePackageId: loaded.package.id }
                   : {}),
               },
               loaded.package.packageType === "custom",

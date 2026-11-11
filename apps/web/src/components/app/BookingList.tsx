@@ -722,6 +722,10 @@ export function BookingDetails({
   onClose: () => void;
   onSaved: (item: BookingRequest) => void;
 }) {
+  const [pageTab, setPageTab] = useState("details");
+  const detailsPanelId = "booking-details-details-panel";
+  const packagePanelId = "booking-details-package-panel";
+  const quotationPanelId = "booking-details-quotation-panel";
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
@@ -752,6 +756,41 @@ export function BookingDetails({
         </Button>
         <h2 id="booking-details-title">Booking request {item.reference}</h2>
         <BookingStatusBadge status={item.status} />
+        <Tabs
+          role="tablist"
+          variant="underline"
+          className="booking-request-tabs"
+          active={pageTab}
+          onChange={setPageTab}
+          aria-label="Booking sections"
+          items={[
+            {
+              value: "details",
+              label: "Details",
+              id: "booking-details-tab-details",
+              panelId: detailsPanelId,
+            },
+            {
+              value: "package",
+              label: "Package",
+              id: "booking-details-tab-package",
+              panelId: packagePanelId,
+            },
+            {
+              value: "quotation",
+              label: "Quotation",
+              id: "booking-details-tab-quotation",
+              panelId: quotationPanelId,
+            },
+          ]}
+        />
+        {pageTab === "details" && (
+        <div
+          id={detailsPanelId}
+          role="tabpanel"
+          tabIndex={0}
+          aria-labelledby="booking-details-tab-details"
+        >
         <div className="booking-details-grid">
           <section>
             <h3>Event details</h3>
@@ -817,8 +856,6 @@ export function BookingDetails({
           </section>
         </div>
         {item.requestedDays && <section><h3>Requested days</h3><p>Times use {item.timeZone}. Dates are not reserved.</p>{item.requestedDays.map(day => <RequestedDay key={day.date} item={item} day={day} editable={customerCanEditTimes && !["declined", "cancelled"].includes(item.status) && !day.eventDayId} onSaved={onSaved} />)}</section>}
-        <BookingPackage id={item.id} admin={false} />
-        <Quotations bookingId={item.id} admin={false} />
         <details className="booking-history">
           <summary>Status history</summary>
           <ul>
@@ -831,6 +868,28 @@ export function BookingDetails({
             ))}
           </ul>
         </details>
+        </div>
+        )}
+        {pageTab === "package" && (
+          <div
+            id={packagePanelId}
+            role="tabpanel"
+            tabIndex={0}
+            aria-labelledby="booking-details-tab-package"
+          >
+            <BookingPackage id={item.id} admin={false} />
+          </div>
+        )}
+        {pageTab === "quotation" && (
+          <div
+            id={quotationPanelId}
+            role="tabpanel"
+            tabIndex={0}
+            aria-labelledby="booking-details-tab-quotation"
+          >
+            <Quotations bookingId={item.id} admin={false} />
+          </div>
+        )}
 
       </div>
     </NativeDialog>,

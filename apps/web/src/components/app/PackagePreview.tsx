@@ -8,8 +8,45 @@ import { CatalogSections } from "./CatalogSections"
 import { BookingRequestDialog } from "./BookingRequest"
 
 export { priceLabel }
-export function PackageCanvas({ item }: { item: Omit<PackageContent, "services"> & { services: { serviceId: string; name?: string; role: "included" | "optional" }[] } }) {
-  return <main className="package-canvas-preview"><div className="canvas-intro"><span>THE CLEMORA COLLECTION</span><h1>{item.name || "Untitled package"}</h1><div><strong>{priceLabel(item.price)}</strong><strong>Up to {item.maxGuests} guests</strong></div></div>{item.services && item.services.length > 0 && <section><h2>Package services</h2><ul>{item.services.map(service => <li key={service.serviceId}>{service.name ?? "Service"} · {service.role === "included" ? "Included" : "Optional"}</li>)}</ul></section>}<CatalogSections sections={item.sections} /></main>
+export function PackageCanvas({
+  item,
+  hideServices = false,
+}: {
+  item: Omit<PackageContent, "services"> & {
+    services: {
+      serviceId: string;
+      name?: string;
+      role: "included" | "optional";
+    }[];
+  };
+  hideServices?: boolean;
+}) {
+  return (
+    <main className="package-canvas-preview">
+      <div className="canvas-intro">
+        <span>THE CLEMORA COLLECTION</span>
+        <h1>{item.name || "Untitled package"}</h1>
+        <div>
+          <strong>{priceLabel(item.price)}</strong>
+          <strong>Up to {item.maxGuests} guests</strong>
+        </div>
+      </div>
+      {!hideServices && item.services && item.services.length > 0 && (
+        <section>
+          <h2>Package services</h2>
+          <ul>
+            {item.services.map((service) => (
+              <li key={service.serviceId}>
+                {service.name ?? "Service"} ·{" "}
+                {service.role === "included" ? "Included" : "Optional"}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <CatalogSections sections={item.sections} />
+    </main>
+  );
 }
 export function PackagePreview({ item, loading = false, error = "", onClose, allowBooking = true }: { item: PublicPackage | null; loading?: boolean; error?: string; allowBooking?: boolean; onClose: () => void }) {
   const [booking, setBooking] = useState(false)
