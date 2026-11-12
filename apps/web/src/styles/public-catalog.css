@@ -57,6 +57,7 @@
   overflow-wrap: anywhere;
 }
 .catalog-card p {
+  flex-grow: 1;
   margin: 0 0 22px;
   color: var(--catalog-muted, var(--muted));
   font-size: 15px;
@@ -70,7 +71,6 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px 16px;
-  margin-top: auto;
   padding: 15px 0;
   border-top: 1px solid var(--catalog-line, var(--border-subtle));
   color: var(--catalog-ink, var(--ink));
@@ -97,6 +97,11 @@
 .catalog-view-more span {
   font-size: 18px;
   line-height: 1;
+}
+.catalog-card > a:focus-visible {
+  outline: 3px solid var(--catalog-accent, var(--wine));
+  outline-offset: -3px;
+  border-radius: 14px;
 }
 .catalog-card-action:focus-visible,
 .catalog-view-more:focus-visible,

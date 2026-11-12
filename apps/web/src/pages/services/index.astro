@@ -15,9 +15,13 @@ try {
 
 <PublicDocument title="Services | Clemora" description="Published event services from Clemora.">
   <section class="section">
-    <span class="eyebrow">Make it yours</span>
-    <h1 class="section-title small">All services</h1>
-    <p>Explore services for your gathering.</p>
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">Make it yours</span>
+        <h1 class="section-title small">All services</h1>
+      </div>
+      <p>Explore services for your gathering.</p>
+    </div>
     {unavailable && <p class="catalog-status" role="alert">The catalog is unavailable right now.</p>}
     {!unavailable && services.length === 0 && <p class="catalog-status">Our service catalog is being prepared. Please check back soon.</p>}
     {services.length > 0 && <ServiceCards items={services} />}

@@ -15,9 +15,13 @@ try {
 
 <PublicDocument title="Venues | Clemora" description="Published venues from Clemora.">
   <section class="section">
-    <span class="eyebrow">Find your setting</span>
-    <h1 class="section-title small">All venues</h1>
-    <p>Explore venues for your gathering. Availability is confirmed by our team when reviewing your request.</p>
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">Find your setting</span>
+        <h1 class="section-title small">All venues</h1>
+      </div>
+      <p>Explore venues for your gathering. Availability is confirmed by our team when reviewing your request.</p>
+    </div>
     {unavailable && <p class="catalog-status" role="alert">The catalog is unavailable right now.</p>}
     {!unavailable && venues.length === 0 && <p class="catalog-status">No venues are available yet.</p>}
     {venues.length > 0 && <VenueCards items={venues} />}

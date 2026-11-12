@@ -2,6 +2,14 @@
 
 Durable engineering notes for this role. Read and maintain them under the shared [memory policy](../README.md#memory).
 
+## 2026-11-12 — Public canvas views own their stylesheet import and widget wrapper
+
+Server-rendered public catalog detail pages reuse the admin canvas markup (`package-canvas-preview`, `canvas-*`), so they must import `apps/web/src/styles/package-editor.css` themselves; only admin editors imported it before, which left `/packages/{slug}`, `/services/{slug}`, and `/venues/{slug}` unstyled. Keep the matching widget wrapper contract: public widgets use the same `canvas-widget-content canvas-${type}` structure as `CatalogSections.tsx`, with `.canvas-public-markdown` owning public prose typography. Public list cards need `.catalog-card > a` as a flex column and `.catalog-card p { flex-grow: 1 }` so card bodies stretch and the meta/action rows align across a row even when a title wraps. Public detail canvases use `.public-detail` to cap the shared 1680px admin canvas at the list pages' 1220px container, and match the list gutters (30px desktop, 21px under 600px) so back links, headings, and cards share one left edge.
+
+**Evidence:** Chromium screenshots at desktop, tablet, and mobile for the three list pages, their detail pages, and `/about`; measured card meta/action rows aligned at the same y across each desktop row and detail content at x=140 (desktop) and x=21 (mobile), matching list pages. Canvas widgets with sections reported no horizontal or vertical overflow after the width cap. Production build served both `app.*.css` and `package-editor.*.css` on a detail route; card focus reported a `:focus-visible` wine outline. `pnpm check` and `pnpm --filter @event-management/web build` passed. `pnpm check:design` still fails on the two pre-existing findings in `PublicDocument.astro` and `admin-event-days.css`.
+
+**Why it matters:** A canvas component's stylesheet is not global by import order; new public previews of admin markup must import it. Do not duplicate those rules in page CSS, and scope public container overrides with `.public-detail` so the admin canvas keeps its wide editing surface.
+
 ## 2026-11-11 — Quotations retain financial history without package snapshots
 
 The user approved removing quotation `offered_package_updated_at` and `offered_package_terms`. The follow-up `20261111150000_simplify_quotation_offers` migration drops those columns and their shape constraint; it preserves financial values, package identity, revision/status history, audit events and message links. Quotation amounts remain saved per version. Package/event edits no longer automatically block sending or acceptance. Explicit revisions use the current proposal price and copy adjustments for review. The [quotation policy](../../business-logic/references/quotations.md) owns this simpler flow.

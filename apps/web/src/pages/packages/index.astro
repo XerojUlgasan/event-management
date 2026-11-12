@@ -15,9 +15,13 @@ try {
 
 <PublicDocument title="Packages | Clemora" description="Published event packages from Clemora.">
   <section class="section">
-    <span class="eyebrow">The Clemora collection</span>
-    <h1 class="section-title small">All packages</h1>
-    <p>Explore packages for your gathering.</p>
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">The Clemora collection</span>
+        <h1 class="section-title small">All packages</h1>
+      </div>
+      <p>Explore packages for your gathering.</p>
+    </div>
     {unavailable && <p class="catalog-status" role="alert">The catalog is unavailable right now.</p>}
     {!unavailable && packages.length === 0 && <p class="catalog-status">No packages are published yet.</p>}
     {packages.length > 0 && <PackageCards items={packages} />}

@@ -331,6 +331,15 @@
   margin: 0 auto;
   padding: 50px 30px 90px;
 }
+.package-canvas-preview.public-detail {
+  max-width: 1220px;
+}
+@media (max-width: 600px) {
+  .package-canvas-preview.public-detail {
+    padding-left: 21px;
+    padding-right: 21px;
+  }
+}
 .canvas-intro {
   text-align: center;
   margin-bottom: 40px;
@@ -340,7 +349,10 @@
   margin: 12px 0;
 }
 .canvas-intro p {
+  max-width: 72ch;
+  margin: 0 auto;
   color: var(--text-muted);
+  line-height: 1.65;
 }
 .canvas-intro > div {
   display: flex;
@@ -380,6 +392,31 @@
 .canvas-markdown .wmde-markdown {
   background: var(--transparent);
   color: var(--text-primary);
+}
+.canvas-public-markdown {
+  max-width: 72ch;
+}
+.canvas-public-markdown h2,
+.canvas-public-markdown h3 {
+  margin: 0 0 10px;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  line-height: 1.25;
+}
+.canvas-public-markdown h2 {
+  font-size: 26px;
+}
+.canvas-public-markdown h3 {
+  font-size: 20px;
+}
+.canvas-public-markdown p {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1.7;
+}
+.canvas-public-markdown > :last-child {
+  margin-bottom: 0;
 }
 .canvas-empty {
   height: 100%;
