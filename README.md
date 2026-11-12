@@ -139,7 +139,7 @@ pnpm dev
 
 ### Local Supabase
 
-`apps/supabase` is the local Supabase CLI project, pinned to CLI 3.0.0. `pnpm supabase:start` requires Docker and starts only Postgres 17, the Kong API gateway, Storage, and Edge Runtime. Postgres listens on `127.0.0.1:54322` and the API gateway on `54321`. Optional services are disabled in `apps/supabase/config.toml`; the package start script also excludes PostgREST, database metadata, and image proxy. Studio and local log analytics are disabled to reduce resource usage. Run `pnpm supabase:stop` followed by `pnpm supabase:start` to apply service changes to an existing stack. This stack can run beside `pnpm db:up`. Local Storage declares the private `event-management` bucket in `apps/supabase/config.toml`. Restart the stack after pulling that bucket so Storage creates it. New catalog objects use the key `catalog-media/<id>`; this change does not copy objects already stored elsewhere.
+`apps/supabase` is the local Supabase CLI project, pinned to CLI 3.0.0. `pnpm supabase:start` requires Docker and starts its own Postgres 17, Studio, and Storage. Postgres listens on `127.0.0.1:54322`, the API gateway on `54321`, and Studio on `54323`. This stack can run beside `pnpm db:up`. Local Storage declares the private `event-management` bucket in `apps/supabase/config.toml`. Restart the stack after pulling that bucket so Storage creates it. New catalog objects use the key `catalog-media/<id>`; this change does not copy objects already stored elsewhere.
 
 The Node API, Prisma, seeds, and integration tests still use Compose PostgreSQL from `apps/api/compose.yaml` on port 5432. Do not point that API's `DB_HOST` at the Supabase database until that cutover is explicit. Supabase Auth is not the application sign-in.
 
