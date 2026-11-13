@@ -23,6 +23,13 @@ export const newCatalogSection = (): CatalogSection => ({ id: uuid(), title: "",
 const newSection = newCatalogSection
 const widget = (type: CatalogWidget["type"], y: number): CatalogWidget => ({ id: uuid(), type, x: 0, y, w: 6, h: 5, markdown: type === "markdown" ? "## Your heading\n\nTell your story here." : "", media: null, alt: "", caption: "", autoplay: false })
 const message = (e: unknown) => e instanceof Error ? e.message : "Something went wrong."
+const HISTORY_LIMIT = 50
+const TEXT_BURST_MS = 700
+const isTextField = (target: EventTarget | null) => {
+  if (target instanceof HTMLTextAreaElement) return true
+  if (target instanceof HTMLInputElement) return !["checkbox", "radio", "file", "range", "color", "button", "submit", "reset"].includes(target.type)
+  return target instanceof HTMLElement && target.isContentEditable
+}
 function MediaWidget({ widget, onSelectFile }: { widget: CatalogWidget; onSelectFile: (file?: File) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
   return <div className="pe-media-preview">
@@ -44,7 +51,12 @@ export function CatalogEditor<T extends CanvasContent>({ initial, entity, onClos
   saveLabel?: string
 }) {
   const title = entity[0].toUpperCase() + entity.slice(1)
-  const [content, setContent] = useState<T>(() => structuredClone(initial))
+  const [content, setContentState] = useState<T>(() => structuredClone(initial))
+  const contentRef = useRef(content)
+  const historyRef = useRef<{ past: T[]; future: T[] }>({ past: [], future: [] })
+  const lastEdit = useRef<{ at: number; kind: "text" | "action" }>({ at: 0, kind: "action" })
+  const shortcuts = useRef({ undo: () => {}, redo: () => {}, busy: false })
+  const [canUndo, setCanUndo] = useState(false), [canRedo, setCanRedo] = useState(false)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [markdownPreview, setMarkdownPreview] = useState<Record<string, boolean>>({})
   const [targetSection, setTargetSection] = useState(0)
@@ -52,6 +64,63 @@ export function CatalogEditor<T extends CanvasContent>({ initial, entity, onClos
   const [files, setFiles] = useState<Record<string, File>>({})
   const [localUrls, setLocalUrls] = useState<Record<string, string>>({})
   const [mediaEditing, setMediaEditing] = useState<{ sectionId: string; widgetId: string } | null>(null)
+  // Content-only history. Publishing a snapshot is cheap because each change
+  // replaces the section or widget objects it touches and reuses the rest.
+  const applyContent = (next: T) => {
+    contentRef.current = next
+    setContentState(next)
+    setCanUndo(historyRef.current.past.length > 0)
+    setCanRedo(historyRef.current.future.length > 0)
+  }
+  const setContent = (update: T | ((current: T) => T)) => {
+    const previous = contentRef.current
+    const next = typeof update === "function" ? (update as (current: T) => T)(previous) : update
+    if (next === previous) return
+    const typing = isTextField(document.activeElement)
+    const now = Date.now()
+    // One burst of typing in a field becomes a single undo step.
+    if (!(typing && lastEdit.current.kind === "text" && now - lastEdit.current.at < TEXT_BURST_MS)) {
+      historyRef.current.past = [...historyRef.current.past, previous].slice(-HISTORY_LIMIT)
+      historyRef.current.future = []
+    }
+    lastEdit.current = { at: now, kind: typing ? "text" : "action" }
+    applyContent(next)
+  }
+  const undo = () => {
+    const past = historyRef.current.past
+    if (busy || !past.length) return
+    historyRef.current.past = past.slice(0, -1)
+    historyRef.current.future = [contentRef.current, ...historyRef.current.future].slice(0, HISTORY_LIMIT)
+    lastEdit.current = { at: 0, kind: "action" }
+    applyContent(past[past.length - 1])
+  }
+  const redo = () => {
+    const [next, ...future] = historyRef.current.future
+    if (busy || !next) return
+    historyRef.current.future = future
+    historyRef.current.past = [...historyRef.current.past, contentRef.current].slice(-HISTORY_LIMIT)
+    lastEdit.current = { at: 0, kind: "action" }
+    applyContent(next)
+  }
+  useEffect(() => { shortcuts.current = { undo, redo, busy } })
+  useEffect(() => {
+    const onShortcut = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.isComposing) return
+      const key = event.key.toLowerCase()
+      const undoStep = key === "z" && !event.shiftKey
+      const redoStep = key === "y" || (key === "z" && event.shiftKey)
+      if (!undoStep && !redoStep) return
+      const target = event.target instanceof HTMLElement ? event.target : null
+      // Text fields keep their native text undo; other dialogs keep their own shortcuts.
+      if (isTextField(target) || target?.closest("dialog") !== dialogRef.current) return
+      event.preventDefault()
+      if (shortcuts.current.busy) return
+      if (redoStep) shortcuts.current.redo()
+      else shortcuts.current.undo()
+    }
+    window.addEventListener("keydown", onShortcut)
+    return () => window.removeEventListener("keydown", onShortcut)
+  }, [])
   const displayContent = { ...content, sections: content.sections.map(s => ({ ...s, widgets: s.widgets.map(w => localUrls[w.id] && w.media ? { ...w, media: { ...w.media, url: localUrls[w.id] } } : w) })) }
   const editingMedia = mediaEditing && displayContent.sections.find(s => s.id === mediaEditing.sectionId)?.widgets.find(w => w.id === mediaEditing.widgetId)
   const pending = useRef<string[]>([]), objectUrls = useRef<string[]>([])
@@ -118,7 +187,7 @@ export function CatalogEditor<T extends CanvasContent>({ initial, entity, onClos
       pending.current = []; onSaved()
     } catch (e) { setError(message(e)) } finally { setBusy(false) }
   }
-  return createPortal(<NativeDialog ref={dialogRef} className="pe-overlay" aria-label={`${title} editor`} onCancel={event => { event.preventDefault(); if (settings) setSettings(false); else cancel() }}><fieldset disabled={busy} className="pe-editor-fields"><header className="pe-bar"><Button variant="plain" className="pe-back" onClick={cancel} aria-label={`Back to ${entity}s`}>←</Button><label className="pe-name"><small>{title.toUpperCase()} NAME</small><Input variant="plain" aria-label={`${title} name`} maxLength={nameMaxLength} value={content.name} placeholder={`Untitled ${entity}`} onChange={e => setContent({ ...content, name: e.target.value })} /></label><div className="pe-bar-actions"><Button variant="secondary" onClick={() => setSettings(!settings)} aria-expanded={settings}>⚙ &nbsp; {title} details</Button><Button variant="secondary" onClick={() => { setPreview(!preview); setSettings(false) }}>{preview ? "✎  Back to editor" : "◉  Preview"}</Button><Button variant="secondary" onClick={cancel} disabled={busy}>Cancel</Button><Button onClick={() => void save()} disabled={busy}>{busy ? "Saving…" : saveLabel}</Button></div></header>
+  return createPortal(<NativeDialog ref={dialogRef} className="pe-overlay" aria-label={`${title} editor`} onCancel={event => { event.preventDefault(); if (settings) setSettings(false); else cancel() }}><fieldset disabled={busy} className="pe-editor-fields"><header className="pe-bar"><Button variant="plain" className="pe-back" onClick={cancel} aria-label={`Back to ${entity}s`}>←</Button><label className="pe-name"><small>{title.toUpperCase()} NAME</small><Input variant="plain" aria-label={`${title} name`} maxLength={nameMaxLength} value={content.name} placeholder={`Untitled ${entity}`} onChange={e => setContent({ ...content, name: e.target.value })} /></label><div className="pe-bar-actions"><Button variant="secondary" size="icon" icon="undo" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!canUndo} onClick={undo} /><Button variant="secondary" size="icon" icon="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={!canRedo} onClick={redo} /><Button variant="secondary" onClick={() => setSettings(!settings)} aria-expanded={settings}>⚙ &nbsp; {title} details</Button><Button variant="secondary" onClick={() => { setPreview(!preview); setSettings(false) }}>{preview ? "✎  Back to editor" : "◉  Preview"}</Button><Button variant="secondary" onClick={cancel} disabled={busy}>Cancel</Button><Button onClick={() => void save()} disabled={busy}>{busy ? "Saving…" : saveLabel}</Button></div></header>
     {settings && <div className="pe-settings"><h2>{title} details</h2>{renderDetails(content, setContent)}<Button variant="secondary" onClick={() => setSettings(false)}>Done</Button></div>}
     {error && <p className="pe-error" role="alert">{error}</p>}
     {preview ? <div className="pe-preview-area"><div className="pe-preview-switch"><Button variant="secondary" aria-pressed={mode === "customer"} onClick={() => setMode("customer")}>Customer page</Button><Button variant="secondary" aria-pressed={mode === "card"} onClick={() => setMode("card")}>Admin card</Button></div><CanvasPreviewStage width={width}>{renderPreview(displayContent, mode)}</CanvasPreviewStage></div> : <div className="pe-workspace"><aside className="pe-sidebar"><small>BUILD YOUR PAGE</small><h2>Tell the story</h2><p>Arrange content to give clients a feel for this {entity}.</p><small>ADD A WIDGET</small>{content.sections.length > 1 && <label className="pe-target">Add to section<Select value={Math.min(targetSection, content.sections.length - 1)} onChange={e => setTargetSection(Number(e.target.value))}>{content.sections.map((s, i) => <option key={s.id} value={i}>{s.title || `Section ${i + 1}`}</option>)}</Select></label>}{(["photo", "markdown", "video"] as const).map(t => <Button variant="secondary" key={t} disabled={content.sections.reduce((n, s) => n + s.widgets.length, 0) >= MAX_CATALOG_WIDGETS} onClick={() => { const sid = content.sections[Math.min(targetSection, content.sections.length - 1)]?.id; if (sid) setSection(sid, s => ({ ...s, widgets: [...s.widgets, widget(t, Math.max(0, ...s.widgets.map(w => w.y + w.h)))] })) }}><b>{t === "photo" ? "▧" : t === "markdown" ? "T" : "▷"}</b><span><strong>{t === "markdown" ? "Markdown" : t[0].toUpperCase() + t.slice(1)}</strong><small>{t === "photo" ? "Set the scene" : t === "markdown" ? "Share the details" : "Bring it to life"}</small></span></Button>)}<p className="pe-tip"><strong>Make it yours.</strong><br />{width < 520 ? "Use the arrows to reorder. Open the editor on a wider screen to drag and resize widgets." : "Drag widgets by their header and resize from the corner grip. Widgets snap to the grid."}</p></aside><div className="pe-canvas-area" ref={gridContainer}><div className="pe-canvas-heading"><div><small>YOUR CANVAS</small><h2>{title} content</h2><p>Add, reorder, and resize your content.</p>{width < 520 && <p>Use the arrows to reorder. Drag and resize on a wider screen.</p>}</div><span>▦ &nbsp; 12-column layout · widgets snap to grid</span></div>
