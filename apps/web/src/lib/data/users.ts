@@ -9,5 +9,9 @@ export type AdminUser = {
   createdAt: string
 }
 
-export const getAdminUsers = () =>
-  request<{ staff: AdminUser[]; customers: AdminUser[] }>("/admin/users")
+export type DirectoryStats = { staffTotal: number; customerTotal: number; staffRoles: number; staffJoined: number; customerJoined: number }
+export const getAdminUsers = (group: "staff" | "customers", search: string, cursor?: string) => {
+  const query = new URLSearchParams({ group, search })
+  if (cursor) query.set("cursor", cursor)
+  return request<{ staff: AdminUser[]; customers: AdminUser[]; nextCursor: string | null; stats: DirectoryStats }>(`/admin/users?${query}`)
+}

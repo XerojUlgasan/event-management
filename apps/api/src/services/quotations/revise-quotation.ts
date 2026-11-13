@@ -3,7 +3,7 @@ import type { Kysely } from "kysely";
 import { itemSchema } from "../../controllers/quotations/schemas.js";
 import { createQuotationData } from "../../data/quotations/create-quotation.js";
 import { findQuoteData } from "../../data/quotations/find-quotation.js";
-import { listQuotesData } from "../../data/quotations/list-quotations.js";
+import { quotationWriteStateData } from "../../data/quotations/list-quotations.js";
 import { updateQuotationData } from "../../data/quotations/update-quotation.js";
 import type { DB } from "../../db/types.js";
 import {
@@ -36,8 +36,8 @@ export async function reviseQuotationService(
       !["draft", "sent", "accepted"].includes(row.status)
     )
       return failure("Only an active quotation can be revised", 409);
-    const rows = await listQuotesData(trx, booking.id);
-    if (rows.some((q) => q.status === "draft" && q.id !== id))
+    const rows = await quotationWriteStateData(trx, booking.id, id);
+    if (rows.has_other_draft)
       return failure("A quotation draft already exists", 409);
     const pkg = await proposalPackage(trx, booking);
     const base = basePrice(pkg.price);
@@ -56,7 +56,7 @@ export async function reviseQuotationService(
     });
     const draft = await createQuotationData(trx, {
       booking_request_id: booking.id,
-      version: (rows[0]?.version ?? 0) + 1,
+      version: rows.max_version + 1,
       currency: "PHP",
       base_amount_minor: base,
       total_amount_minor: total,

@@ -667,3 +667,54 @@ test("private package edits remain visible separately while quotations retain th
   assert.equal((await read(await call(`/quotations/${q.id}`, "GET", undefined, customerCookie), 200)).quotation.totalAmountMinor, 120000);
   assert.equal(edited.bookingRequest.packageId, b.packageId);
 });
+
+test("quotation and package histories paginate independently without losing current versions", async () => {
+  const b = await booking();
+  const current = await create(b);
+  await pool.query(`INSERT INTO quotations (booking_request_id,version,currency,base_amount_minor,total_amount_minor,items,status,created_by,sent_at,offered_package_id,adjustments_reviewed)
+    SELECT q.booking_request_id, n, q.currency, q.base_amount_minor, q.total_amount_minor, q.items,
+      CASE WHEN n = 2 THEN 'sent' ELSE 'superseded' END, q.created_by, now(), q.offered_package_id, true
+    FROM quotations q CROSS JOIN generate_series(2, 35) n WHERE q.id = $1`, [current.id]);
+  const base = `/admin/booking-requests/${b.id}/quotations?limit=10`;
+  const first = await read(await call(base), 200);
+  assert.equal(first.quotations.length, 10);
+  assert.equal(first.currentDraft.id, current.id);
+  assert.equal(first.currentOffer.version, 2);
+  assert.ok(first.nextCursor);
+  const second = await read(await call(`${base}&cursor=${encodeURIComponent(first.nextCursor)}`), 200);
+  assert.equal(second.quotations[0].version, 25);
+  assert.equal(second.currentDraft.id, current.id);
+  const removedId = first.quotations.at(-1).id;
+  await pool.query("DELETE FROM quotations WHERE id = $1", [removedId]);
+  const repeated = await read(await call(`${base}&cursor=${encodeURIComponent(first.nextCursor)}`), 200);
+  assert.deepEqual(repeated.quotations.map((q: any) => q.id), second.quotations.map((q: any) => q.id));
+  const exact = await read(await call(`/admin/booking-requests/${b.id}/quotations?quotationId=${current.id}`), 200);
+  assert.deepEqual(exact.quotations.map((q: any) => q.id), [current.id]);
+  const customer = await read(await call(`/booking-requests/${b.id}/quotations?limit=10`, "GET", undefined, customerCookie), 200);
+  assert.ok(customer.quotations.every((q: any) => q.status !== "draft"));
+  assert.equal(customer.currentDraft, null);
+  assert.equal(customer.currentOffer.version, 2);
+  await read(await call(`/booking-requests/${b.id}/quotations?cursor=${encodeURIComponent(first.nextCursor)}`, "GET", undefined, customerCookie), 400);
+  await read(await call(`/booking-requests/${b.id}/quotations`, "GET", undefined, otherCookie), 404);
+  const another = await booking();
+  await read(await call(`/admin/booking-requests/${another.id}/quotations?cursor=${encodeURIComponent(first.nextCursor)}`), 400);
+
+  const pkg = (await read(await call(`/admin/booking-requests/${b.id}/package`), 200)).package;
+  await pool.query(`INSERT INTO audit_events(action, entity_type, entity_id, metadata, created_at)
+    SELECT 'booking.custom_package_updated', 'booking_request', $1, $2::jsonb,
+      '2098-01-01T00:00:00.123000Z'::timestamptz + (n / 2) * interval '1 microsecond'
+    FROM generate_series(1, 34) n`, [b.id, JSON.stringify({ before: pkg, after: pkg })]);
+  const invalidPosition = Buffer.from(JSON.stringify({ version: 1, scope: JSON.stringify(["private-package-history", b.id]), position: { createdAt: "2026-99-99T00:00:00.000001Z", id: randomUUID() } })).toString("base64url");
+  await read(await call(`/admin/booking-requests/${b.id}/package-history?cursor=${invalidPosition}`), 400);
+  const historyBase = `/admin/booking-requests/${b.id}/package-history?limit=10`;
+  const historyFirst = await read(await call(historyBase), 200);
+  const historySecond = await read(await call(`${historyBase}&cursor=${encodeURIComponent(historyFirst.nextCursor)}`), 200);
+  assert.equal(historyFirst.history.length, 10);
+  assert.equal(historySecond.history.length, 10);
+  assert.equal(new Set([...historyFirst.history, ...historySecond.history].map((row: any) => row.id)).size, 20);
+  await pool.query("DELETE FROM audit_events WHERE id = $1", [historyFirst.history.at(-1).id]);
+  const afterDeletion = await read(await call(`${historyBase}&cursor=${encodeURIComponent(historyFirst.nextCursor)}`), 200);
+  assert.deepEqual(afterDeletion.history.map((row: any) => row.id), historySecond.history.map((row: any) => row.id));
+  await read(await call(`/admin/booking-requests/${another.id}/package-history?cursor=${encodeURIComponent(historyFirst.nextCursor)}`), 400);
+  await read(await call(historyBase, "GET", undefined, customerCookie), 403);
+});

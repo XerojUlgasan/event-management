@@ -66,12 +66,14 @@ export async function responses(
   db: Database,
   days: DayRow[],
   staffId?: string,
+  summaryOnly = false,
 ) {
   const { availability, assignments } = await listEventDayResponsesData(
     db,
     days.map((d) => d.id),
+    summaryOnly ? { staffId } : undefined,
   );
-  const staff = staffId ? [] : await listEligibleStaffData(db);
+  const staff = staffId || summaryOnly ? [] : await listEligibleStaffData(db);
   return days.map((day) => {
     const a = availability.filter((x) => x.event_day_id === day.id),
       s = assignments.filter((x) => x.event_day_id === day.id);

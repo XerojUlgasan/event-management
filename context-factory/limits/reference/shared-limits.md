@@ -4,6 +4,7 @@
 
 | Import path | Export | Current value and scope |
 | --- | --- | --- |
+| `@event-management/contracts/pagination` | `DEFAULT_PAGE_SIZE`, `MAX_PAGE_SIZE`, `MAX_CURSOR_LENGTH` | Collection endpoints default to 15 rows, accept at most 50 rows per page, and reject cursors longer than 2,048 characters. This is a shared pagination contract, not a domain field or request-body limit. |
 | `@event-management/contracts/limits/images` | `MAX_IMAGE_SIZE_BYTES` | 10 MiB (`10 * 1024 * 1024`) per uploaded catalog-canvas image. |
 | `@event-management/contracts/limits/videos` | `QUOTATION_JSON_BODY_LIMIT_BYTES` | 2 MiB | Admin quotation JSON, including full ordered item lists. |
 | `MAX_VIDEO_SIZE_BYTES` | 25 MiB (`25 * 1024 * 1024`) per uploaded catalog-canvas video. |

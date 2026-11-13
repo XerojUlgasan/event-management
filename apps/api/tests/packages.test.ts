@@ -134,7 +134,12 @@ after(async () => {
   await db?.destroy();
   await pool?.end();
   if (admin) {
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const active = await admin.query("SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1", [database]);
+      if (active.rows[0].count === 0) break;
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
     await admin.end();
   }
 });
@@ -296,12 +301,32 @@ test("catalog validates widget sources, bounds, counts and paginates direct pack
   await assert.rejects(pool.query("INSERT INTO media_assets(kind,source,url) VALUES('image','external','https://example.test/photo.jpg')"), /media_assets_source/);
   for(const geometry of [{x:11,w:2},{h:101},{w:0}]){const c=structuredClone(data);Object.assign(c.sections[0].widgets[0],geometry);await read(await call('/admin/packages','POST',c,adminCookie),400);}
   const c=structuredClone(data);c.sections[0].widgets.push({...c.sections[0].widgets[0]});await read(await call('/admin/packages','POST',c,adminCookie),400);
-  const countBefore=(await read(await call('/packages'),200)).packages.length;
+  const countBefore=(await read(await call('/packages?limit=50'),200)).packages.length;
   for(let i=0;i<17;i++)await read(await call('/admin/packages','POST',{...data,name:`Paged ${i}`},adminCookie),201);
-  const first=await read(await call('/packages?limit=15'),200);assert.equal(first.packages.length,15);assert.equal(first.nextOffset,15);
-  const second=await read(await call('/packages?limit=15&offset=15'),200);assert.equal(second.packages.length,countBefore+2);assert.equal(second.nextOffset,null);
+  const first=await read(await call('/packages?limit=15'),200);assert.equal(first.packages.length,15);assert.ok(first.nextCursor);
+  const second=await read(await call(`/packages?limit=15&cursor=${encodeURIComponent(first.nextCursor)}`),200);assert.equal(second.packages.length,countBefore+2);assert.equal(second.nextCursor,null);
   const ids=[...first.packages,...second.packages].map(p=>p.id);assert.equal(new Set(ids).size,ids.length);
-  await read(await call('/packages?limit=16'),400);
+  await read(await call('/packages?limit=51'),400);
+  await read(await call('/packages?cursor=invalid'),400);
+});
+
+test("service pages preserve microsecond boundaries and filter scope", async () => {
+  const created = [];
+  for (let i = 0; i < 3; i++) created.push(await createServiceWithPhoto({ name: `Cursor service ${i}`, description: "Pagination proof", hourlyRatePesos: 500 }));
+  for (let i = 0; i < created.length; i++) await pool.query("UPDATE services SET created_at = $1::timestamptz, published_at = $1::timestamptz WHERE id = $2", [`2026-01-01T00:00:00.00000${i + 1}Z`, created[i].id]);
+  const first = await read(await call("/admin/services?limit=1&archived=active&search=Cursor%20service", "GET", undefined, adminCookie), 200);
+  assert.equal(first.counts.filtered, 3); assert.ok(first.nextCursor);
+  const forged = JSON.parse(Buffer.from(first.nextCursor, "base64url").toString("utf8"));
+  forged.position.sort = "0000-01-01T00:00:00.000001Z";
+  const forgedCursor = Buffer.from(JSON.stringify(forged)).toString("base64url");
+  await read(await call(`/admin/services?limit=1&archived=active&search=Cursor%20service&cursor=${forgedCursor}`, "GET", undefined, adminCookie), 400);
+  await read(await call(`/admin/services/${first.services[0].id}`, "DELETE", undefined, adminCookie), 204);
+  const second = await read(await call(`/admin/services?limit=1&archived=active&search=Cursor%20service&cursor=${encodeURIComponent(first.nextCursor)}`, "GET", undefined, adminCookie), 200);
+  assert.equal(second.services.length, 1); assert.notEqual(second.services[0].id, first.services[0].id);
+  const third = await read(await call(`/admin/services?limit=1&archived=active&search=Cursor%20service&cursor=${encodeURIComponent(second.nextCursor)}`, "GET", undefined, adminCookie), 200);
+  assert.equal(third.services.length, 1); assert.notEqual(third.services[0].id, second.services[0].id); assert.equal(third.nextCursor, null);
+  await read(await call(`/admin/services?limit=1&archived=active&search=other&cursor=${encodeURIComponent(first.nextCursor)}`, "GET", undefined, adminCookie), 400);
+  for (const service of [second.services[0], third.services[0]]) await read(await call(`/admin/services/${service.id}`, "DELETE", undefined, adminCookie), 204);
 });
 
 async function uploadCanvas(bytes:Uint8Array,mime:string,cookie=adminCookie){const form=new FormData();form.set('file',new Blob([Buffer.from(bytes)],{type:mime}),'media');return app.request('/v1/admin/catalog-media',{method:'POST',headers:{Cookie:cookie},body:form});}

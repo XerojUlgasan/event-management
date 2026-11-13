@@ -6,6 +6,7 @@ import {
   MAX_QUOTATION_AMOUNT_MINOR,
 } from "@event-management/contracts/quotations";
 import type { Quotation, QuotationItem, QuotationStatus } from "@event-management/contracts/quotations";
+import { usePagination } from "../../lib/use-pagination";
 import { getAdminServices, type AdminService } from "../../lib/data/services";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -13,6 +14,7 @@ import {
   Button,
   FormField,
   Input,
+  Pagination,
   Select,
   Textarea,
   useNotifications,
@@ -282,6 +284,7 @@ function QuotationAdjustmentCard({
               }
             >
               <option value="">None</option>
+              {line.serviceId && !services.some(service => service.id === line.serviceId) && <option value={line.serviceId}>Selected service ({line.serviceId})</option>}
               {services.map((service) => (
                 <option key={service.id} value={service.id}>
                   {service.name}
@@ -327,57 +330,81 @@ export function Quotations({
   const generation = useRef(0);
   const [services, setServices] = useState<AdminService[]>([]);
   const [serviceError, setServiceError] = useState("");
-  async function loadServices() {
+  const [serviceCursor, setServiceCursor] = useState<string | null>(null);
+  const [serviceLoading, setServiceLoading] = useState(false);
+  async function loadServices(cursor?: string) {
     const current = generation.current;
+    setServiceLoading(true);
     try {
-      const result = await getAdminServices();
+      const result = await getAdminServices({ cursor });
       if (current !== generation.current) return;
-      setServices(result.services);
+      setServices(previous => cursor ? [...previous, ...result.services] : result.services);
+      setServiceCursor(result.nextCursor);
       setServiceError("");
     } catch (cause) {
       if (current !== generation.current) return;
       setServiceError(notifyError(cause, "Unable to load services."));
-    }
+    } finally { if (current === generation.current) setServiceLoading(false); }
   }
   const [rows, setRows] = useState<Quotation[]>([]),
     [draft, setDraft] = useState<Quotation | null>(null),
     [items, setItems] = useState<QuotationItem[]>([]);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const [loadedPageKey, setLoadedPageKey] = useState("");
+  const [loadedScope, setLoadedScope] = useState("");
   const [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [reason, setReason] = useState("");
   const [showRevision, setShowRevision] = useState(false);
+  const [offer, setOffer] = useState<Quotation | null>(null);
+  const [previousDraftVersion, setPreviousDraftVersion] = useState<number | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const identity = JSON.stringify([bookingId ?? null, admin, quotationId ?? null]);
+  const pagination = usePagination(identity);
+  const pageRequest = useRef(0);
+  const currentPageKey = JSON.stringify([bookingId ?? null, admin, quotationId ?? null, pagination.cursor ?? null]);
+  const pageKeyRef = useRef(currentPageKey);
+  pageKeyRef.current = currentPageKey;
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(
     null,
   );
 
-  async function load() {
+  async function load(cursor = pagination.cursor) {
     const currentGeneration = generation.current;
+    const sequence = ++pageRequest.current;
+    const key = JSON.stringify([bookingId ?? null, admin, quotationId ?? null, cursor ?? null]);
     setLoading(true);
     setError("");
     try {
-      const result =
-        quotationId && !admin
-          ? [(await getQuotation(quotationId)).quotation]
-          : bookingId
-            ? (await getQuotations(bookingId, admin)).quotations.filter(
-                (q) => !quotationId || q.id === quotationId,
-              )
-            : [];
-      if (currentGeneration !== generation.current) return;
-      setRows(result);
-      const current = result.find((q) => q.status === "draft") ?? null;
-      setDraft(current);
-      setItems(current?.items ?? []);
+      const result = quotationId && !admin
+        ? (() => getQuotation(quotationId).then(({ quotation }) => ({ quotations: [quotation], nextCursor: null, currentDraft: null, currentOffer: quotation.status === "sent" || quotation.status === "accepted" ? quotation : null, previousDraftVersion: null })))()
+        : bookingId
+          ? await getQuotations(bookingId, admin, { cursor, quotationId })
+          : { quotations: [], nextCursor: null, currentDraft: null, currentOffer: null, previousDraftVersion: null };
+      const resolved = await result;
+      if (currentGeneration !== generation.current || sequence !== pageRequest.current || pageKeyRef.current !== key) return;
+      setRows(resolved.quotations);
+      setLoadedPageKey(key);
+      setLoadedScope(identity);
+      setNextCursor(resolved.nextCursor);
+      setOffer(resolved.currentOffer);
+      setPreviousDraftVersion(resolved.previousDraftVersion);
+      if (draftRef.current?.id !== resolved.currentDraft?.id || draftRef.current?.updatedAt !== resolved.currentDraft?.updatedAt) setItems(resolved.currentDraft?.items ?? []);
+      setDraft(resolved.currentDraft);
     } catch (cause) {
-      if (currentGeneration !== generation.current) return;
+      if (currentGeneration !== generation.current || sequence !== pageRequest.current || pageKeyRef.current !== key) return;
       setError(notifyError(cause, "Unable to load quotations."));
     } finally {
-      if (currentGeneration === generation.current) setLoading(false);
+      if (currentGeneration === generation.current && sequence === pageRequest.current && pageKeyRef.current === key) setLoading(false);
     }
   }
   useEffect(() => {
     void load();
+    return () => { pageRequest.current++; };
+  }, [bookingId, admin, quotationId, pagination.cursor]);
+  useEffect(() => {
     if (admin) void loadServices();
     return () => { generation.current++; };
   }, [bookingId, admin, quotationId]);
@@ -388,7 +415,8 @@ export function Quotations({
     try {
       await fn();
       notify(successMessage);
-      await load();
+      if (pagination.page !== 1) pagination.reset();
+      else await load();
     } catch (cause) {
       setError(notifyError(cause, "Unable to update quotation."));
     } finally {
@@ -413,15 +441,8 @@ export function Quotations({
     () => [...rows].sort((a, b) => b.version - a.version),
     [rows],
   );
-  const currentOffer = sorted.find(
-    (q) => q.status === "sent" || q.status === "accepted",
-  );
-  const earlierVersions = sorted.filter((q) => q.status === "superseded");
-
-  const previousDraftVersion =
-    draft?.previousQuotationId != null
-      ? rows.find((q) => q.id === draft.previousQuotationId)?.version
-      : undefined;
+  const currentOffer = offer;
+  const earlierVersions = loadedPageKey === currentPageKey ? sorted.filter((q) => q.status === "superseded") : [];
 
   const adminEmpty =
     admin &&
@@ -431,6 +452,8 @@ export function Quotations({
     !error &&
     !draft &&
     rows.length === 0;
+
+  if (loadedScope !== identity) return <section className="quotation-builder" aria-label="Quotations">{error ? <p role="alert">{error} <Button variant="secondary" onClick={() => void load()}>Retry</Button></p> : <p role="status">Loading quotations…</p>}</section>;
 
   return (
     <section className="quotation-builder" aria-label="Quotations">
@@ -487,7 +510,7 @@ export function Quotations({
       {admin && draft && serviceError && (
         <p role="alert">
           {serviceError}{" "}
-          <Button variant="secondary" onClick={() => void loadServices()}>
+          <Button variant="secondary" onClick={() => void loadServices(services.length ? serviceCursor ?? undefined : undefined)}>
             Retry services
           </Button>
         </p>
@@ -524,6 +547,7 @@ export function Quotations({
             below is added to it or taken off it.
           </p>
 
+          {serviceCursor && <Button variant="secondary" disabled={serviceLoading} onClick={() => void loadServices(serviceCursor)}>Load more services</Button>}
           {items.map((line, index) => (
             <QuotationAdjustmentCard
               key={line.id}
@@ -717,7 +741,7 @@ export function Quotations({
         </div>
       )}
 
-      {earlierVersions.length > 0 && (
+      {(earlierVersions.length > 0 || pagination.page > 1 || !!nextCursor) && (
         <section className="quotation-history" aria-labelledby="quotation-history-title">
           <h2 id="quotation-history-title">Earlier versions</h2>
           {earlierVersions.map((quotation) => {
@@ -752,6 +776,7 @@ export function Quotations({
               </div>
             );
           })}
+          {!quotationId && <Pagination page={pagination.page} hasNextPage={!!nextCursor} onPrevious={pagination.previous} onNext={() => pagination.next(nextCursor)} pending={loading || busy || loadedPageKey !== currentPageKey} label="Quotation history" />}
         </section>
       )}
     </section>

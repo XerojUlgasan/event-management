@@ -6,6 +6,6 @@ export const quoteResult = {
   description: "Quotation",
 };
 export const listResult = {
-  content: json(z.object({ quotations: z.array(quotationSchema) })),
+  content: json(z.object({ quotations: z.array(quotationSchema), nextCursor: z.string().nullable(), currentDraft: quotationSchema.nullable(), currentOffer: quotationSchema.nullable(), previousDraftVersion: z.number().nullable() })),
   description: "Quotation history",
 };

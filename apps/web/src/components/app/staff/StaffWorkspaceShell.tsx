@@ -1,12 +1,14 @@
 import { EventChecklistWorkspace } from "../checklists/EventChecklistWorkspace";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Avatar,
   Badge,
   Brand,
   Button,
   Drawer,
+  DataTable,
   Input,
+  Pagination,
   MonthCalendar,
   PageHeader,
   Panel,
@@ -17,9 +19,12 @@ import {
 import {
   getStaffAssignments,
   getStaffEventDays,
+  getStaffEventCalendar,
+  getStaffEventDay,
   respondToEventDay,
   type EventDay,
 } from "../../../lib/data/event-days";
+import { usePagination } from "../../../lib/use-pagination";
 import { formatEventTime } from "../../../lib/utils/event-day-time";
 
 type Response = "available" | "unavailable";
@@ -273,82 +278,106 @@ export function StaffWorkspaceShell({
   const { notify, notifyError } = useNotifications();
   const assignments = path === "/app/assignments";
   const [days, setDays] = useState<EventDay[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadedKey, setLoadedKey] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [availabilityRequest, setAvailabilityRequest] =
-    useState<AvailabilityRequest | null>(null);
+  const [calendarError, setCalendarError] = useState("");
+  const [calendarCounts, setCalendarCounts] = useState<Record<string, number>>({});
+  const [calendarKey, setCalendarKey] = useState("");
+  const [availabilityRequest, setAvailabilityRequest] = useState<AvailabilityRequest | null>(null);
   const busy = availabilityRequest?.phase === "pending";
   const [now, setNow] = useState(Date.now());
   const [month, setMonth] = useState(currentMonth);
   const [selectedDate, setSelectedDate] = useState<string>();
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState<"all" | "open" | "responded">("all");
   const [detailId, setDetailId] = useState<string>();
-  const sequence = useRef(0);
-  const inFlight = useRef<number | null>(null);
+  const [detail, setDetail] = useState<EventDay | null>(null);
+  const [detailError, setDetailError] = useState("");
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [revision, setRevision] = useState(0);
   const busyRef = useRef(false);
-  const hasLoaded = useRef(false);
+  const mounted = useRef(true);
+  const listSequence = useRef(0);
+  const calendarSequence = useRef(0);
+  const detailSequence = useRef(0);
   const loadFailure = useRef("");
-  const load = useCallback(async () => {
-    if (inFlight.current || busyRef.current) return;
-    const request = ++sequence.current;
-    inFlight.current = request;
-    if (hasLoaded.current) setRefreshing(true);
-    else setLoading(true);
-    try {
-      const result = await (assignments
-        ? getStaffAssignments()
-        : getStaffEventDays());
-      if (request === sequence.current) {
+  const normalizedSearch = search.trim();
+  const effectiveFilter = assignments ? "all" : filter;
+  const scope = JSON.stringify([assignments, normalizedSearch, effectiveFilter, assignments ? null : selectedDate ?? null]);
+  const pagination = usePagination(scope);
+  const pageKey = JSON.stringify([scope, pagination.cursor ?? null]);
+  const currentCalendarKey = JSON.stringify([month, normalizedSearch, effectiveFilter]);
+  const refresh = useCallback(() => {
+    pagination.reset();
+    setRevision(value => value + 1);
+  }, [pagination.reset]);
+
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => {
+    const request = ++listSequence.current;
+    let active = true;
+    setLoading(true);
+    const load = async () => {
+      try {
+        const query = { cursor: pagination.cursor, search: normalizedSearch || undefined, filter: effectiveFilter, date: assignments ? undefined : selectedDate };
+        const result = await (assignments ? getStaffAssignments(query) : getStaffEventDays(query));
+        if (!active || request !== listSequence.current) return;
         setDays(result.eventDays);
+        setNextCursor(result.nextCursor);
+        setLoadedKey(pageKey);
         setError("");
         loadFailure.current = "";
-        setAvailabilityRequest(null);
-        hasLoaded.current = true;
-      }
-    } catch (cause) {
-      if (request === sequence.current) {
+      } catch (cause) {
+        if (!active || request !== listSequence.current) return;
         const message = errorMessage(cause, "Unable to load event days.");
         setError(message);
         if (loadFailure.current !== message) { loadFailure.current = message; notifyError(message); }
+      } finally {
+        if (active && request === listSequence.current) { setLoading(false); setRefreshing(false); }
       }
-    } finally {
-      if (inFlight.current === request) inFlight.current = null;
-      if (request === sequence.current) {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    }
-  }, [assignments, notifyError]);
-  const latestLoad = useRef(load);
-  latestLoad.current = load;
-  useEffect(() => {
-    hasLoaded.current = false;
-    setDays([]);
-    setError("");
-    setDetailId(undefined);
-    setSelectedDate(undefined);
-    setSearch("");
-    setFilter("all");
-    setMonth(currentMonth());
-    setAvailabilityRequest(null);
-    setLoading(true);
+    };
     void load();
-    const interval = window.setInterval(() => void load(), 60000);
-    const focus = () => {
-      if (document.visibilityState === "visible") void load();
-    };
-    window.addEventListener("focus", focus);
-    document.addEventListener("visibilitychange", focus);
-    return () => {
-      sequence.current++;
-      inFlight.current = null;
-      window.clearInterval(interval);
-      window.removeEventListener("focus", focus);
-      document.removeEventListener("visibilitychange", focus);
-    };
-  }, [load]);
+    return () => { active = false; listSequence.current++; };
+  }, [assignments, effectiveFilter, normalizedSearch, notifyError, pageKey, pagination.cursor, selectedDate, revision]);
+
+  useEffect(() => {
+    if (assignments) return;
+    const request = ++calendarSequence.current;
+    let active = true;
+    getStaffEventCalendar(month, { search: normalizedSearch || undefined, filter: effectiveFilter }).then(result => {
+      if (!active || request !== calendarSequence.current) return;
+      setCalendarCounts(Object.fromEntries(result.counts.map(item => [item.day, item.count])));
+      setCalendarKey(currentCalendarKey);
+      setCalendarError("");
+    }).catch(cause => {
+      if (active && request === calendarSequence.current) setCalendarError(errorMessage(cause, "Unable to load calendar counts."));
+    });
+    return () => { active = false; calendarSequence.current++; };
+  }, [assignments, currentCalendarKey, effectiveFilter, month, normalizedSearch, revision]);
+
+  useEffect(() => {
+    if (!detailId) { setDetail(null); setDetailError(""); return; }
+    const request = ++detailSequence.current;
+    let active = true;
+    setDetailLoading(true);
+    getStaffEventDay(detailId).then(result => {
+      if (active && request === detailSequence.current) { setDetail(result.eventDay); setDetailError(""); }
+    }).catch(cause => {
+      if (active && request === detailSequence.current) { setDetail(null); setDetailError(errorMessage(cause, "Unable to load event details.")); }
+    }).finally(() => { if (active && request === detailSequence.current) setDetailLoading(false); });
+    return () => { active = false; detailSequence.current++; };
+  }, [detailId, revision]);
+
+  useEffect(() => {
+    const update = () => { if (!busyRef.current && document.visibilityState === "visible") { setRefreshing(true); setRevision(value => value + 1); } };
+    const interval = window.setInterval(update, 60000);
+    window.addEventListener("focus", update);
+    document.addEventListener("visibilitychange", update);
+    return () => { window.clearInterval(interval); window.removeEventListener("focus", update); document.removeEventListener("visibilitychange", update); };
+  }, []);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
@@ -356,54 +385,28 @@ export function StaffWorkspaceShell({
   const respond = async (day: EventDay, response: Response) => {
     if (busyRef.current || !isOpen(day, Date.now())) return;
     busyRef.current = true;
+    listSequence.current++;
+    detailSequence.current++;
     setAvailabilityRequest({ dayId: day.id, response, phase: "pending" });
-    setError("");
-    // Invalidate any earlier refresh so it cannot overwrite the mutation result.
-    const request = ++sequence.current;
     try {
       const result = await respondToEventDay(day.id, response);
-      if (request !== sequence.current) return;
-      setDays((previous) =>
-        previous.map((item) => (item.id === day.id ? result.eventDay : item)),
-      );
+      if (!mounted.current) return;
+      setDays(previous => previous.map(item => item.id === day.id ? { ...item, ownAvailability: result.eventDay.ownAvailability, ownAssignment: result.eventDay.ownAssignment } : item));
+      setDetail(previous => previous?.id === day.id ? { ...previous, ownAvailability: result.eventDay.ownAvailability, ownAssignment: result.eventDay.ownAssignment } : previous);
       setAvailabilityRequest({ dayId: day.id, response, phase: "saved" });
       notify(`Availability saved: ${response}.`);
     } catch (cause) {
-      if (request !== sequence.current) return;
+      if (!mounted.current) return;
       const message = notifyError(cause instanceof TypeError ? "Unable to reach Clemora. Check your connection and try again." : cause, "Unable to save your response. Please try again.");
-      setAvailabilityRequest({
-        dayId: day.id,
-        response,
-        phase: "failed",
-        message,
-      });
+      setAvailabilityRequest({ dayId: day.id, response, phase: "failed", message });
     } finally {
       busyRef.current = false;
-      setLoading(false);
-      setRefreshing(false);
-      void latestLoad.current();
+      if (mounted.current) setRevision(value => value + 1);
     }
   };
-  const counts = useMemo(
-    () =>
-      days.reduce<Record<string, number>>((result, day) => {
-        result[day.day] = (result[day.day] ?? 0) + 1;
-        return result;
-      }, {}),
-    [days],
-  );
-  const visible = days.filter(
-    (day) =>
-      (!selectedDate || assignments || day.day === selectedDate) &&
-      day.eventType.toLowerCase().includes(search.trim().toLowerCase()) &&
-      (filter === "all" ||
-        (filter === "open" && isOpen(day, now)) ||
-        (filter === "responded" && day.ownAvailability)),
-  );
-  const detail = days.find((day) => day.id === detailId);
-  const openDetails = (id: string) => {
-    setDetailId(id);
-  };
+  const visible = loadedKey === pageKey ? days : [];
+  const counts = calendarKey === currentCalendarKey ? calendarCounts : {};
+  const openDetails = (id: string) => { setDetail(null); setDetailError(""); setDetailId(id); };
   const name = profile.displayName || profile.email;
   const initials = name
     .split(/\s+/)
@@ -452,8 +455,8 @@ export function StaffWorkspaceShell({
           actions={
             <Button
               variant="secondary"
-              onClick={() => void load()}
-              disabled={refreshing || !!busy}
+              onClick={refresh}
+              disabled={loading || refreshing || !!busy}
             >
               {refreshing ? "Refreshing…" : "Refresh"}
             </Button>
@@ -462,13 +465,13 @@ export function StaffWorkspaceShell({
         {error && (
           <div className="staff-message staff-error" role="alert">
             {error}{" "}
-            <Button variant="link" onClick={() => void load()}>
+            <Button variant="link" onClick={refresh}>
               Retry
             </Button>
           </div>
         )}
         {loading && <p role="status">Loading event days…</p>}
-        {!loading && (hasLoaded.current || !error) && (
+        {(loadedKey === pageKey || !error) && (
           <div
             className={
               assignments ? "staff-assignment-view" : "staff-events-layout"
@@ -489,6 +492,7 @@ export function StaffWorkspaceShell({
                     counts={counts}
                     countLabel="event day"
                   />
+                  {calendarError && <p role="alert">{calendarError} <Button variant="link" onClick={refresh}>Retry</Button></p>}
                   <p className="staff-muted">
                     Select a date to filter event days.
                   </p>
@@ -512,6 +516,7 @@ export function StaffWorkspaceShell({
                   Search event days
                   <Input
                     type="search"
+                    maxLength={200}
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Search by event name"
@@ -522,7 +527,7 @@ export function StaffWorkspaceShell({
                     aria-label="Filter event days"
                     variant="segmented"
                     active={filter}
-                    onChange={setFilter}
+                    onChange={(value) => setFilter(value as "all" | "open" | "responded")}
                     items={[
                       { value: "all", label: "All" },
                       { value: "open", label: "Open" },
@@ -531,17 +536,8 @@ export function StaffWorkspaceShell({
                   />
                 )}
               </div>
-              {!visible.length ? (
-                <Panel>
-                  <p>
-                    {days.length
-                      ? "No event days match these filters."
-                      : assignments
-                        ? "You have no assignments yet."
-                        : "No event days are available yet."}
-                  </p>
-                </Panel>
-              ) : assignments ? (
+              {assignments ? (
+                !visible.length ? <Panel><p>{loading ? "Loading assignments…" : "No assignments match these filters."}</p></Panel> : (
                 <div className="staff-card-grid">
                   {visible.map((day) => (
                     <Panel
@@ -583,93 +579,33 @@ export function StaffWorkspaceShell({
                     </Panel>
                   ))}
                 </div>
+                )
               ) : (
-                <div className="staff-table-wrap">
-                  <table className="staff-table">
-                    <thead>
-                      <tr>
-                        <th>Event</th>
-                        <th>Schedule</th>
-                        <th>Status</th>
-                        <th>My response</th>
-                        <th>Deadline</th>
-                        <th>Availability</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visible.map((day) => (
-                        <tr key={day.id}>
-                          <td>
-                            <strong>{day.eventType}</strong>
-                            <br />
-                            <span className="staff-muted">Request {day.bookingReference} · {day.packageName}</span>
-                            <br />
-                            <Button
-                              variant="link"
-                              onClick={() => openDetails(day.id)}
-                            >
-                              Show details
-                            </Button>
-                          </td>
-                          <td>
-                            <strong>{formatSchedule(day).eventDate}</strong>
-                            <br />
-                            {formatSchedule(day).start} –{" "}
-                            {formatSchedule(day).end}
-                            <br />
-                            <span className="staff-muted">{day.timezone}</span>
-                          </td>
-                          <td>
-                            <Badge>
-                              {day.status === "scheduled"
-                                ? day.staffingStatus === "open" &&
-                                  !isOpen(day, now)
-                                  ? "Closed"
-                                  : label(day.staffingStatus)
-                                : label(day.status)}
-                            </Badge>
-                          </td>
-                          <td>
-                            {day.ownAvailability
-                              ? label(day.ownAvailability)
-                              : "No response"}
-                          </td>
-                          <td>
-                            {day.availabilityDeadline
-                              ? formatEventTime(
-                                  day.availabilityDeadline,
-                                  day.timezone,
-                                )
-                              : "No deadline"}
-                          </td>
-                          <td>
-                            <Availability
-                              day={day}
-                              now={now}
-                              request={availabilityRequest}
-                              onRespond={respond}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable label="Event days" rows={visible} rowKey={day => day.id} minWidth={950} emptyMessage={loading ? "Loading event days…" : "No event days match these filters."} columns={[
+                  { key: "event", header: "Event", cell: day => <><strong>{day.eventType}</strong><br /><span className="staff-muted">Request {day.bookingReference} · {day.packageName}</span><br /><Button variant="link" onClick={() => openDetails(day.id)}>Show details</Button></> },
+                  { key: "schedule", header: "Schedule", cell: day => <><strong>{formatSchedule(day).eventDate}</strong><br />{formatSchedule(day).start} – {formatSchedule(day).end}<br /><span className="staff-muted">{day.timezone}</span></> },
+                  { key: "status", header: "Status", cell: day => <Badge>{day.status === "scheduled" ? day.staffingStatus === "open" && !isOpen(day, now) ? "Closed" : label(day.staffingStatus) : label(day.status)}</Badge> },
+                  { key: "response", header: "My response", cell: day => day.ownAvailability ? label(day.ownAvailability) : "No response" },
+                  { key: "deadline", header: "Deadline", cell: day => day.availabilityDeadline ? formatEventTime(day.availabilityDeadline, day.timezone) : "No deadline" },
+                  { key: "availability", header: "Availability", cell: day => <Availability day={day} now={now} request={availabilityRequest} onRespond={respond} /> },
+                ]} />
               )}
+              {pagination.page > 1 && !loading && !visible.length && <p>These results changed. <Button variant="link" onClick={refresh}>Refresh from the first page</Button></p>}
+              <Pagination page={pagination.page} hasNextPage={loadedKey === pageKey && !!nextCursor} pending={loading} disabled={!!busy} onPrevious={pagination.previous} onNext={() => pagination.next(nextCursor)} label={assignments ? "Assignment pages" : "Event day pages"} />
             </section>
           </div>
         )}
       </main>
-      {detail && (
+      {detailId && (detail && detail.id === detailId ? (
         <Details
           day={detail}
           onClose={() => setDetailId(undefined)}
           now={now}
           request={availabilityRequest}
           onRespond={respond}
-          error={error}
+          error={detailError}
         />
-      )}
+      ) : <Drawer title="Event details" onClose={() => setDetailId(undefined)}>{detailLoading ? <p role="status">Loading event details…</p> : <p role="alert">{detailError || "Event details unavailable."} <Button variant="link" onClick={() => setRevision(value => value + 1)}>Retry</Button></p>}</Drawer>)}
     </div>
   );
 }

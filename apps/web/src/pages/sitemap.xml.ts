@@ -1,10 +1,10 @@
 import type { APIRoute } from "astro"
-import { loadPackages, loadServices, loadVenues } from "../lib/server/catalog"
+import { loadAllCatalog, loadPackagesPage, loadServicesPage, loadVenuesPage } from "../lib/server/catalog"
 
 export const GET: APIRoute = async ({ url }) => {
   let paths = ["/", "/about", "/packages", "/services", "/venues"]
   try {
-    const [packages, services, venues] = await Promise.all([loadPackages(), loadServices(), loadVenues()])
+    const [packages, services, venues] = await Promise.all([loadAllCatalog(loadPackagesPage), loadAllCatalog(loadServicesPage), loadAllCatalog(loadVenuesPage)])
     paths = [
       ...paths,
       ...packages.map((item) => `/packages/${item.slug}`),

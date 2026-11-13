@@ -5,15 +5,13 @@ import type { DB } from "../../db/types.js";
 import type { VenueContent } from "../../controllers/venues/schemas.js";
 import { createVenueData } from "../../data/venues/create-venue.js";
 import { findVenueData, lockVenueData } from "../../data/venues/find-venue.js";
-import { listAdminVenuesData, listPublicVenuesData, findPublishedVenueData, findPublishedVenueBySlugData } from "../../data/venues/list-venues.js";
+import { findPublishedVenueData, findPublishedVenueBySlugData } from "../../data/venues/list-venues.js";
 import { updateVenueData } from "../../data/venues/update-venue.js";
 import { archiveVenueData } from "../../data/venues/archive-venue.js";
 import { deleteVenueData } from "../../data/venues/delete-venue.js";
 import { venueAdminDto, venuePublicDto } from "./venue-response.js";
 import { error, nextUpdate } from "./venue-rules.js";
 import { duplicateTitle, reserveCatalogTitle } from "../../utils/catalog-title.js";
-export async function listVenuesService(db: Kysely<DB>, limit?: number, offset = 0) { const rows = await listPublicVenuesData(db, limit === undefined ? undefined : limit + 1, offset); return { venues: await Promise.all((limit === undefined ? rows : rows.slice(0, limit)).map(v => venuePublicDto(db, v))), nextOffset: limit !== undefined && rows.length > limit ? offset + limit : null }; }
-export async function listAdminVenuesService(db: Kysely<DB>) { return { venues: await Promise.all((await listAdminVenuesData(db)).map(v => venueAdminDto(db, v))) }; }
 export async function getVenueService(db: Kysely<DB>, id: string) { const row = await findPublishedVenueData(db, id); return row ? venuePublicDto(db, row) : error("Venue not found", 404); }
 export async function getVenueBySlugService(db: Kysely<DB>, slug: string) { const row = await findPublishedVenueBySlugData(db, slug); return row ? venuePublicDto(db, row) : error("Venue not found", 404); }
 export async function getAdminVenueService(db: Kysely<DB>, id: string) { const row = await findVenueData(db, id); return row ? venueAdminDto(db, row) : error("Venue not found", 404); }

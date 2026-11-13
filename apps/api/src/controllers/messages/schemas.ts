@@ -49,10 +49,12 @@ export const conversationSchema = z.object({
 export const threadSchema = z.object({
   conversation: conversationSchema,
   messages: z.array(messageSchema),
+  nextCursor: z.string().nullable(),
 });
 
 export const conversationsSchema = z.object({
   conversations: z.array(conversationSchema),
+  nextCursor: z.string().nullable(),
 });
 
 export const adminConversationsPageSchema = conversationsSchema.extend({

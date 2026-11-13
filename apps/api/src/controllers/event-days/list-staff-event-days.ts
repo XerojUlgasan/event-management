@@ -1,23 +1,24 @@
 import { createRoute } from "@hono/zod-openapi";
-import * as service from "../../services/event-days/list-event-days.js";
+import { listStaffEventDaysPageService } from "../../services/event-days/list-staff-event-days-page.js";
 import type { AppRouteHandler } from "../../types/hono.js";
-import { listResponse, tags } from "./schemas.js";
+import { tags } from "./schemas.js";
+import { staffPageQuery, staffPageResponse } from "./page-schemas.js";
 export const listStaffEventDaysRoute = createRoute({
   method: "get",
   path: "/staff/event-days",
   tags,
-  responses: listResponse,
+  request: { query: staffPageQuery },
+  responses: staffPageResponse,
 });
 export const listStaffEventDaysRouteHandler: AppRouteHandler<
   typeof listStaffEventDaysRoute
 > = async (c) =>
   c.json(
-    {
-      eventDays: await service.listEventDaysService(
+    await listStaffEventDaysPageService(
         c.get("db"),
-        undefined,
         c.get("session").user.id,
+        false,
+        c.req.valid("query"),
       ),
-    },
     200,
   );

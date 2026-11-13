@@ -1,4 +1,6 @@
-import { Button, NativeDialog, useNotifications } from "@event-management/ui"
+import { DEFAULT_PAGE_SIZE } from "@event-management/contracts/pagination"
+import { usePagination } from "../lib/use-pagination"
+import { Button, Pagination, NativeDialog, useNotifications } from "@event-management/ui"
 import { useCallback, useEffect, useId, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { getPackage, getPackages, packageImageSrc, type PublicPackage } from "../lib/data/packages"
@@ -73,52 +75,44 @@ function CatalogPreview({ selected, venue, onClose, allowBooking }: { selected: 
 export function PublicCatalog({ kind, mode = "featured", allowBooking = true, onViewMore }: { kind: Kind; mode?: "featured" | "overview"; allowBooking?: boolean; onViewMore?: () => void }) {
   const { notifyError } = useNotifications()
   const [items, setItems] = useState<(PublicPackage | PublicService | Venue)[]>([])
-  const [nextOffset, setNextOffset] = useState<number | null>(null)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const pagination = usePagination(`${kind}:${mode}`)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [initialized, setInitialized] = useState(false)
   const [selected, setSelected] = useState<Preview>(null)
   const [parentService, setParentService] = useState<string | null>(null)
-  const sentinelRef = useRef<HTMLDivElement>(null)
   const busy = useRef(false)
   const generation = useRef(0)
-  const limit = mode === "featured" ? 3 : 15
+  const limit = mode === "featured" ? 3 : DEFAULT_PAGE_SIZE
 
-  const load = useCallback(async (offset: number, reset = false) => {
+  const load = useCallback(async (cursor: string | undefined) => {
     if (busy.current) return
     const current = generation.current
     busy.current = true
     setLoading(true); setError("")
     try {
       if (kind === "packages") {
-        const result = await getPackages({ limit, offset })
+        const result = await getPackages({ limit, cursor })
         if (current !== generation.current) return
-        setItems(previous => reset ? result.packages : [...previous, ...result.packages])
-        setNextOffset(result.nextOffset)
+        setItems(result.packages)
+        setNextCursor(result.nextCursor)
       } else if (kind === "venues") {
-        const result = await getVenues({ limit, offset })
+        const result = await getVenues({ limit, cursor })
         if (current !== generation.current) return
-        setItems(previous => reset ? result.venues : [...previous, ...result.venues])
-        setNextOffset(result.nextOffset)
+        setItems(result.venues)
+        setNextCursor(result.nextCursor)
       } else {
-        const result = await getServices({ limit, offset })
+        const result = await getServices({ limit, cursor })
         if (current !== generation.current) return
-        setItems(previous => reset ? result.services : [...previous, ...result.services])
-        setNextOffset(result.nextOffset)
+        setItems(result.services)
+        setNextCursor(result.nextCursor)
       }
     } catch (reason) { if (current === generation.current) setError(notifyError(reason, `Unable to load ${kind}.`)) }
     finally { if (current === generation.current) { busy.current = false; setLoading(false); setInitialized(true) } }
   }, [kind, limit, notifyError])
 
-  useEffect(() => { void load(0, true); return () => { generation.current++; busy.current = false } }, [load])
-  useEffect(() => {
-    if (mode !== "overview" || nextOffset === null || loading || error) return
-    const sentinel = sentinelRef.current
-    if (!sentinel) return
-    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) { observer.disconnect(); void load(nextOffset) } }, { rootMargin: "450px 0px" })
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [mode, nextOffset, loading, error, load])
+  useEffect(() => { void load(pagination.cursor); return () => { generation.current++; busy.current = false } }, [load, pagination.cursor])
 
   const showPackage = (id: string) => { if (selected?.kind === "services") setParentService(selected.id); setSelected({ kind: "packages", id }) }
   const closePreview = () => { if (selected?.kind === "packages" && parentService) { setSelected({ kind: "services", id: parentService }); setParentService(null) } else setSelected(null) }
@@ -127,9 +121,9 @@ export function PublicCatalog({ kind, mode = "featured", allowBooking = true, on
     {!initialized && <p className="catalog-status" role="status">Loading {kind}…</p>}
     {initialized && items.length === 0 && !error && <p className="catalog-status">{kind === "packages" ? "No packages are published yet." : kind === "venues" ? "No venues are available yet." : "Our service catalog is being prepared. Please check back soon."}</p>}
     {items.length > 0 && <div className="catalog-grid">{kind === "packages" ? (items as PublicPackage[]).map(item => <PackageCard key={item.id} item={item} onPreview={() => showPackage(item.id)} />) : kind === "venues" ? (items as Venue[]).map(item => <VenueCard key={item.id} item={item} onPreview={() => setSelected({ kind: "venues", id: item.id })} />) : (items as PublicService[]).map(item => <ServiceCard key={item.id} item={item} onPreview={() => setSelected({ kind: "services", id: item.id })} />)}</div>}
-    {error && <p className="catalog-status" role="alert">{error} <Button variant="secondary" type="button" onClick={() => void load(items.length ? nextOffset ?? items.length : 0, items.length === 0)}>Try again</Button></p>}
+    {error && <p className="catalog-status" role="alert">{error} <Button variant="secondary" type="button" onClick={() => void load(pagination.cursor)}>Try again</Button></p>}
     {mode === "featured" && onViewMore && <Button variant="secondary" type="button" className="catalog-view-more" onClick={onViewMore}>View more {kind}<span aria-hidden="true">↗</span></Button>}
-    {mode === "overview" && <div className="catalog-pagination"><div ref={sentinelRef} aria-hidden="true" />{loading && initialized && <p role="status">Loading more {kind}…</p>}{nextOffset !== null && !loading && !error && <Button variant="secondary" type="button" onClick={() => void load(nextOffset)}>Load more {kind}</Button>}{initialized && nextOffset === null && items.length > 0 && <p>All {items.length} {kind} shown</p>}</div>}
+    {mode === "overview" && initialized && <Pagination page={pagination.page} hasNextPage={nextCursor !== null} pending={loading} onPrevious={pagination.previous} onNext={() => pagination.next(nextCursor)} label="Catalog pages" />}
     <CatalogPreview allowBooking={allowBooking} selected={selected} venue={selected?.kind === "venues" ? (items as Venue[]).find(item => item.id === selected.id) : undefined} onClose={closePreview} />
   </>
 }

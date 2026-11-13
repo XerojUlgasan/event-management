@@ -1,3 +1,4 @@
+import { getMyStatusHistoryRoute, getMyStatusHistoryRouteHandler, getAdminStatusHistoryRoute, getAdminStatusHistoryRouteHandler } from "./get-status-history.js";
 import { saveRequestedDayTimesRoute, saveRequestedDayTimesRouteHandler } from "./save-requested-day-times.js";
 import quotationRoutes from "../quotations/index.js";
 import { getMyBookingPackageRoute, getMyBookingPackageRouteHandler, getAdminBookingPackageRoute, getAdminBookingPackageRouteHandler } from "./get-booking-package.js";
@@ -31,6 +32,8 @@ routes.openapi(cancelBookingRequestRoute,cancelBookingRequestRouteHandler);
 routes.openapi(listMyBookingRequestsRoute,listMyBookingRequestsRouteHandler);
 routes.openapi(listAdminBookingRequestsRoute,listAdminBookingRequestsRouteHandler);
 routes.openapi(getBookingCalendarRoute,getBookingCalendarRouteHandler);
+routes.openapi(getMyStatusHistoryRoute,getMyStatusHistoryRouteHandler);
+routes.openapi(getAdminStatusHistoryRoute,getAdminStatusHistoryRouteHandler);
 routes.openapi(getMyBookingRequestRoute,getMyBookingRequestRouteHandler);
 routes.openapi(getAdminBookingRequestRoute,getAdminBookingRequestRouteHandler);
 routes.openapi(updateBookingStatusRoute,updateBookingStatusRouteHandler);

@@ -5,7 +5,7 @@ import { bookingSchema, idParams } from "./schemas.js";
 import { errors, json } from "./http.js";
 
 const responses = {
-  200: { content: json(z.object({ bookingRequest: bookingSchema })), description: "Booking request with status history" },
+  200: { content: json(z.object({ bookingRequest: bookingSchema })), description: "Booking request" },
   400: errors[400], 401: errors[401], 403: errors[403], 404: errors[404],
 };
 export const getMyBookingRequestRoute = createRoute({

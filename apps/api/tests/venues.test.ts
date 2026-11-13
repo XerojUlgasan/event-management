@@ -85,9 +85,10 @@ test("venue catalog requires complete content and protects admin operations", as
     { ...content, imageUrls: Array(11).fill(photo("excess")) }, { ...content, imageUrls: [`/v1/venue-images/${randomUUID()}`] },
   ]) await read(await call("/admin/venues", "POST", invalid, adminCookie), 400);
   await read(await call("/venues/not-a-uuid"), 400);
-  await read(await call("/venues?limit=16"), 400);
-  await read(await call("/venues?offset=-1"), 400);
+  await read(await call("/venues?limit=51"), 400);
+  await read(await call("/venues?cursor=invalid"), 400);
   await read(await call("/admin/venues", "POST", content, adminCookie, "https://untrusted.example"), 403);
+  await read(await call(path, "DELETE", undefined, adminCookie), 204);
 });
 
 test("venues save directly, publish edits immediately and reject stale or archived writes", async () => {
@@ -122,11 +123,17 @@ test("venue canvas photos keep order and pagination is stable", async () => {
   const edited = await read(await call(`/admin/venues/${created.id}`, "PATCH", { ...content, expectedUpdatedAt: created.updatedAt }, adminCookie), 200);
   assert.deepEqual(edited.sections, detail.sections);
   for (let i = 0; i < 17; i++) await read(await call("/admin/venues", "POST", { ...content, name: `Pagination ${String(i).padStart(2, "0")}` }, adminCookie), 201);
-  const all = (await read(await call("/venues"), 200)).venues;
-  const page1 = await read(await call("/venues?limit=15&offset=0"), 200);
-  const page2 = await read(await call(`/venues?limit=15&offset=${page1.nextOffset}`), 200);
-  assert.equal(page1.venues.length, 15); assert.equal(page1.nextOffset, 15); assert.equal(page2.nextOffset, null);
+  const all = (await read(await call("/venues?limit=50"), 200)).venues;
+  const page1 = await read(await call("/venues?limit=15"), 200);
+  assert.equal(page1.venues.length, 15); assert.ok(page1.nextCursor);
+  const page2 = await read(await call(`/venues?limit=15&cursor=${encodeURIComponent(page1.nextCursor)}`), 200);
+  assert.equal(page2.nextCursor, null);
   assert.deepEqual([...page1.venues, ...page2.venues].map((v: any) => v.id), all.map((v: any) => v.id));
+  await read(await call(`/packages?cursor=${encodeURIComponent(page1.nextCursor)}`), 400);
+  const filtered = await read(await call("/admin/venues?limit=2&archived=active&search=Pagination", "GET", undefined, adminCookie), 200);
+  assert.equal(filtered.venues.length, 2); assert.equal(filtered.counts.filtered, 17);
+  await read(await call(`/admin/venues?archived=archived&search=Pagination&cursor=${encodeURIComponent(filtered.nextCursor)}`, "GET", undefined, adminCookie), 400);
+  await read(await call(`/admin/venues/${created.id}`, "DELETE", undefined, adminCookie), 204);
 });
 
 test("concurrent venue edits have one winner and obsolete routes are absent", async () => {

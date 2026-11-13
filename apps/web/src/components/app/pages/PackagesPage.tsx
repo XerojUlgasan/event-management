@@ -1,12 +1,13 @@
+import { usePagination } from "../../../lib/use-pagination";
 import {
   Button,
+  Pagination,
   PageHeader,
   SearchField,
   Tabs,
   useNotifications,
 } from "@event-management/ui";
 import { PackageCard, PackageEditor } from "./PackageEditor";
-import { getAdminServices } from "../../../lib/data/services";
 import { CatalogCardActions } from "./CatalogCard";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -22,38 +23,38 @@ export function PackagesPage() {
   const { notify, notifyError } = useNotifications();
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const [counts, setCounts] = useState({ active: 0, archived: 0, filtered: 0 });
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const requestId = useRef(0);
   const [rows, setRows] = useState<AdminPackage[]>([]),
-    [serviceOptions, setServiceOptions] = useState<import("../../../lib/data/services").AdminService[]>([]),
     [search, setSearch] = useState(""),
     [archived, setArchived] = useState(false),
     [editing, setEditing] = useState<AdminPackage | "new" | null>(null),
     [preview, setPreview] = useState<AdminPackage | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true);
+  const pagination = usePagination(`${archived}:${search}`);
   const load = useCallback(async () => {
+    const current = ++requestId.current;
     setLoading(true);
     setError("");
     try {
-      const [packages, services] = await Promise.all([getAdminPackages(), getAdminServices()]);
-      if (!mounted.current) return;
-      setRows(packages.packages); setServiceOptions(services.services);
+      const packages = await getAdminPackages({ cursor: pagination.cursor, search, archived: archived ? "archived" : "active" });
+      if (!mounted.current || current !== requestId.current) return;
+      setNextCursor(packages.nextCursor); setCounts(packages.counts);
+      setRows(packages.packages);
     } catch (e) {
-      if (!mounted.current) return;
+      if (!mounted.current || current !== requestId.current) return;
       setError(notifyError(e, "Something went wrong."));
     } finally {
-      if (mounted.current) setLoading(false);
+      if (mounted.current && current === requestId.current) setLoading(false);
     }
-  }, [notifyError]);
+  }, [notifyError, pagination.cursor, search, archived]);
   useEffect(() => {
     void load();
+    return () => { requestId.current++; };
   }, [load]);
-  const visible = rows.filter(
-    (p) =>
-      !!p.archivedAt === archived &&
-      `${p.name} ${p.description}`
-        .toLowerCase()
-        .includes(search.toLowerCase().trim()),
-  );
+  const visible = rows;
   const act = async (item: AdminPackage, action: "archive" | "delete") => {
     if (
       !window.confirm(
@@ -85,17 +86,19 @@ export function PackagesPage() {
         role="group"
         aria-label="Package catalog"
         active={archived ? "Archives" : "Packages"}
-        onChange={(value) => setArchived(value === "Archives")}
+        onChange={(value) => { setArchived(value === "Archives"); }}
         items={[
           {
             value: "Packages",
             label: "Packages",
-            count: rows.filter((row) => !row.archivedAt).length,
+            count: counts.active,
+
           },
           {
             value: "Archives",
             label: "Archives",
-            count: rows.filter((row) => row.archivedAt).length,
+            count: counts.archived,
+
           },
         ]}
       />
@@ -103,12 +106,12 @@ export function PackagesPage() {
         <SearchField
           type="search"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value.slice(0, 200)); }}
           placeholder="Search packages"
           ariaLabel="Search packages"
         />
         <span>
-          {visible.length} {visible.length === 1 ? "package" : "packages"}
+          {counts.filtered} {counts.filtered === 1 ? "package" : "packages"}
         </span>
       </div>
       {loading && <p role="status">Loading packages…</p>}
@@ -140,9 +143,9 @@ export function PackagesPage() {
         ))}
       </div>
       {!loading && !visible.length && <p>No packages found.</p>}
+      <Pagination page={pagination.page} hasNextPage={nextCursor !== null} pending={loading} onPrevious={pagination.previous} onNext={() => pagination.next(nextCursor)} label="Catalog pages" />
       {editing && (
         <PackageEditor
-          serviceOptions={serviceOptions}
           initial={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={() => {

@@ -310,3 +310,7 @@ textarea.ui-control { min-height: 85px; resize: vertical; }
 .ui-data-table tbody th:first-child { background: inherit; }
 .ui-data-table tbody tr:last-child > * { border-bottom: 0; }
 .ui-data-table-empty td { padding: 28px 12px; color: var(--text-muted); }
+
+.ui-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; padding-block: 16px; font-size: 13px; color: var(--text-muted); }
+.ui-pagination > span { min-width: 70px; text-align: center; }
+.ui-pagination > a { text-decoration: none; }

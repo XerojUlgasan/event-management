@@ -1,7 +1,7 @@
 import { navigateWorkspace } from "../../../lib/workspace-navigation"
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages"
 import { Fragment, useEffect, useRef, useState, type SubmitEvent } from "react"
-import { Avatar, Badge, Button, Dialog, Icon, Input, useNotifications } from "@event-management/ui"
+import { Avatar, Badge, Button, Dialog, Icon, Input, Pagination, useNotifications } from "@event-management/ui"
 
 import { getMyBookingRequest, type BookingRequest } from "../../../lib/data/booking-requests"
 import type { ChatConversation, ChatMessage } from "../../../lib/data/messages"
@@ -44,10 +44,8 @@ export function MessagesWorkspace({
   title,
   viewerRole,
   conversations,
-  hasMore = false,
-  loadingMore = false,
-  loadMoreError = "",
-  onLoadMore,
+  activeConversation,
+  listPage,
   activeId,
   onSelect,
   messages,
@@ -62,14 +60,16 @@ export function MessagesWorkspace({
   onNewChat,
   newChatBusy = false,
   readOnly = false,
+  hasOlder = false,
+  loadingOlder = false,
+  onLoadOlder,
+  historyNotice = "",
 }: {
   title: string
   viewerRole: "admin" | "customer"
   conversations: ChatConversation[]
-  hasMore?: boolean
-  loadingMore?: boolean
-  loadMoreError?: string
-  onLoadMore?: () => void
+  activeConversation?: ChatConversation | null
+  listPage?: { page: number; hasNextPage: boolean; pending: boolean; onPrevious: () => void; onNext: () => void; onRefresh: () => void }
   activeId: string | null
   onSelect: (id: string) => void
   messages: ChatMessage[]
@@ -84,6 +84,10 @@ export function MessagesWorkspace({
   onNewChat?: () => void
   newChatBusy?: boolean
   readOnly?: boolean
+  hasOlder?: boolean
+  loadingOlder?: boolean
+  onLoadOlder?: () => void
+  historyNotice?: string
 }) {
   const { notify, notifyError } = useNotifications()
   const [quotationId, setQuotationId] = useState<string | null>(null)
@@ -95,11 +99,9 @@ export function MessagesWorkspace({
   const [bookingError, setBookingError] = useState("")
   const bookingLoad = useRef(0)
   const thread = useRef<HTMLDivElement>(null)
-  const sidebar = useRef<HTMLElement>(null)
-  const listEnd = useRef<HTMLDivElement>(null)
-  const active = conversations.find((item) => item.id === activeId) ?? null
+  const active = conversations.find((item) => item.id === activeId) ?? activeConversation ?? null
   const isTeam = viewerRole === "customer"
-  const singleConversation = isTeam && conversations.length === 1
+  const singleConversation = isTeam && conversations.length === 1 && conversations[0]?.id === activeId && !listPage?.hasNextPage && (listPage?.page ?? 1) === 1
   const activeName = isTeam ? "Clemora team" : active?.customerName ?? "Messages"
   const activeDetail = isTeam
     ? active?.eventType || "Events and catering support"
@@ -120,22 +122,20 @@ export function MessagesWorkspace({
     return () => { bookingLoad.current++ }
   }, [activeId])
 
+  const olderScroll = useRef<{ height: number; top: number } | null>(null)
+  const previousFirst = useRef<string | undefined>(undefined)
+  const previousActive = useRef<string | null>(null)
   useEffect(() => {
     const element = thread.current
-    if (element) element.scrollTop = element.scrollHeight
+    if (previousActive.current !== activeId) olderScroll.current = null
+    const first = messages[0]?.id
+    if (element && olderScroll.current && first !== previousFirst.current) {
+      element.scrollTop = olderScroll.current.top + element.scrollHeight - olderScroll.current.height
+      olderScroll.current = null
+    } else if (element && (previousActive.current !== activeId || !previousFirst.current || previousFirst.current === first)) element.scrollTop = element.scrollHeight
+    previousFirst.current = first
+    previousActive.current = activeId
   }, [messages.length, activeId])
-
-  useEffect(() => {
-    if (!hasMore || loadingMore || loadMoreError || !onLoadMore || !listEnd.current || !sidebar.current || typeof IntersectionObserver === "undefined") return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) onLoadMore()
-      },
-      { root: sidebar.current, rootMargin: "0px 0px 150px 0px" },
-    )
-    observer.observe(listEnd.current)
-    return () => observer.disconnect()
-  }, [hasMore, loadingMore, loadMoreError, onLoadMore])
 
   async function openBooking() {
     if (!active?.bookingRequestId || bookingLoading) return
@@ -179,7 +179,7 @@ export function MessagesWorkspace({
     <div
       className={`customer-messages panel ${conversationOpen ? "conversation-open" : ""} ${singleConversation ? "single-conversation" : ""}`}
     >
-      <aside ref={sidebar}>
+      <aside>
         <div className="messages-sidebar-head">
           <h1>{title}</h1>
           {isTeam && onNewChat && (
@@ -230,16 +230,10 @@ export function MessagesWorkspace({
             )}
           </div>
         )}
-        {loadingMore && <p className="messages-list-status" role="status">Loading more conversations…</p>}
-        {loadMoreError && <p className="messages-list-status" role="alert">{loadMoreError}</p>}
-        {hasMore && onLoadMore && (
-          <div className="messages-list-footer">
-            <Button variant="plain" type="button" className="messages-load-more" onClick={onLoadMore} disabled={loadingMore}>
-              {loadingMore ? "Loading…" : "Load more conversations"}
-            </Button>
-          </div>
-        )}
-        {hasMore && <div ref={listEnd} aria-hidden="true" />}
+        {listPage && <div className="messages-list-footer">
+          <Pagination page={listPage.page} hasNextPage={listPage.hasNextPage} pending={listPage.pending} onPrevious={listPage.onPrevious} onNext={listPage.onNext} label="Conversation pages" />
+          {listPage.page > 1 && <><p>Conversation order can change as messages arrive.</p><Button variant="plain" type="button" onClick={listPage.onRefresh}>Refresh conversations</Button></>}
+        </div>}
       </aside>
 
       <section>
@@ -304,6 +298,8 @@ export function MessagesWorkspace({
               <p>{threadEmpty.body}</p>
             </div>
           )}
+          {historyNotice && <p role="status">{historyNotice}</p>}
+          {hasOlder && onLoadOlder && <Button variant="plain" type="button" onClick={() => { if (thread.current) olderScroll.current = { height: thread.current.scrollHeight, top: thread.current.scrollTop }; onLoadOlder() }} disabled={loadingOlder}>{loadingOlder ? "Loading…" : "Load older messages"}</Button>}
           {messages.map((message, index) => {
             const mine = message.senderRole === viewerRole
             const showDay = index === 0 || dayKey(message.createdAt) !== dayKey(messages[index - 1].createdAt)

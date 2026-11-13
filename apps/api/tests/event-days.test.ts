@@ -201,6 +201,21 @@ async function listBookingEventDays(bookingRequestId: string): Promise<JsonRecor
   ));
 }
 
+async function listStaffDays(cookie: string, path = "/staff/event-days"): Promise<JsonRecord[]> {
+  const result: JsonRecord[] = [];
+  let cursor: string | undefined;
+  do {
+    const body = asRecord(await read(await call(`${path}?${new URLSearchParams({ limit: "50", ...(cursor ? { cursor } : {}) })}`, "GET", undefined, cookie), 200), "page");
+    result.push(...eventDays(body));
+    cursor = typeof body.nextCursor === "string" ? body.nextCursor : undefined;
+  } while (cursor);
+  return result;
+}
+async function roster(id: string): Promise<JsonRecord[]> {
+  const body = asRecord(await read(await call(`/admin/event-days/${id}/staff?limit=50`, "GET", undefined, adminCookie), 200), "roster");
+  return arrayField(body, "staff").map(value => asRecord(value, "staff row"));
+}
+
 async function updateBookingStatus(bookingRequestId: string, status: "needs_details" | "cancelled" | "accepted", reason?: string): Promise<JsonRecord> {
   const body = await read(
     await call(`/admin/booking-requests/${bookingRequestId}/status`, "PATCH", { status, reason }, adminCookie),
@@ -338,7 +353,7 @@ test("permissions, accepted bookings, local event days, deadlines, and staff red
   assert.equal(draft.status, "scheduled");
   assert.equal(draft.staffingStatus, "draft");
   const draftId = dayId(draft);
-  const hiddenDrafts = eventDays(await read(await call("/staff/event-days", "GET", undefined, staffOneCookie), 200));
+  const hiddenDrafts = (await listStaffDays(staffOneCookie));
   assert.ok(!hiddenDrafts.some((day) => day.id === draftId));
 
   const opened = await createEventDay(acceptedBooking, schedule({
@@ -349,7 +364,7 @@ test("permissions, accepted bookings, local event days, deadlines, and staff red
     daysBefore: 2,
   }));
   const openedId = dayId(opened);
-  const staffOpenDays = eventDays(await read(await call("/staff/event-days", "GET", undefined, staffOneCookie), 200));
+  const staffOpenDays = (await listStaffDays(staffOneCookie));
   assert.ok(staffOpenDays.some((day) => day.id === openedId));
   const staffView = staffOpenDays.find((day) => day.id === openedId);
   assert.ok(staffView);
@@ -364,7 +379,7 @@ test("permissions, accepted bookings, local event days, deadlines, and staff red
 
   await pool?.query("UPDATE events_day SET availability_deadline = now() - interval '1 second' WHERE id = $1", [openedId]);
   await expectError(await call(`/staff/event-days/${openedId}/availability`, "PUT", { response: "available" }, staffOneCookie), 409);
-  const expired = eventDays(await read(await call("/staff/event-days", "GET", undefined, staffOneCookie), 200))
+  const expired = (await listStaffDays(staffOneCookie))
     .find((day) => day.id === openedId);
   assert.ok(expired);
   assert.equal(expired.staffingStatus, "closed");
@@ -378,7 +393,7 @@ test("availability is distinct and repeatable, and only available staff can be a
   const bookingRequestId = await createBooking();
   const day = await createEventDay(bookingRequestId);
   const id = dayId(day);
-  assert.ok(!eventDays(await read(await call("/staff/event-days", "GET", undefined, staffOneCookie), 200)).some((row) => row.id === id));
+  assert.ok(!(await listStaffDays(staffOneCookie)).some((row) => row.id === id));
   await expectError(await call(`/staff/event-days/${id}/availability`, "PUT", { response: "available" }, staffOneCookie), 409);
   await expectError(await call(`/admin/event-days/${id}/assignments/${staffOneId}`, "PUT", { role: "helper", status: "confirmed" }, adminCookie), 409);
 
@@ -393,15 +408,12 @@ test("availability is distinct and repeatable, and only available staff can be a
   const adminOpen = eventDays(await read(await call(`/admin/event-days?bookingRequestId=${bookingRequestId}`, "GET", undefined, adminCookie), 200))
     .find((row) => row.id === id);
   assert.ok(adminOpen);
-  const responses = arrayField(adminOpen, "availability").map((value) => asRecord(value, "availability response"));
-  assert.equal(responses.length, 2);
-  assert.equal(responses.find((entry) => entry.staffId === staffOneId)?.response, "available");
-  assert.equal(responses.find((entry) => entry.staffId === staffTwoId)?.response, "unavailable");
-  assert.equal(responses.some((entry) => entry.staffId === staffThreeId), false);
-  const eligible = arrayField(adminOpen, "eligibleStaff").map((value) => asRecord(value, "eligible staff"));
-  assert.ok(eligible.some((entry) => entry.id === staffOneId));
-  assert.ok(!eligible.some((entry) => entry.id === customerId));
-  assert.ok(!eligible.some((entry) => entry.id === adminId));
+  assert.deepEqual(adminOpen.availability, [], "schedule summaries do not embed the staff roster");
+  assert.deepEqual(adminOpen.eligibleStaff, []);
+  const availableStaff = await roster(id);
+  assert.deepEqual(availableStaff.map(entry => entry.staffId), [staffOneId]);
+  assert.equal(availableStaff[0]?.eligible, true);
+  assert.equal(availableStaff[0]?.assignment, null);
 
   await expectError(await call(`/admin/event-days/${id}/assignments/${staffOneId}`, "PUT", { role: "helper", status: "confirmed" }, adminCookie), 409);
   await setStaffing(id, "closed");
@@ -437,13 +449,13 @@ test("availability is distinct and repeatable, and only available staff can be a
   assert.equal(await rowCount("SELECT id FROM event_staffs WHERE event_day_id = $1 AND role = 'coordinator' AND status = 'confirmed'", [id]), 1);
   assert.equal(await rowCount("SELECT id FROM event_staffs WHERE event_day_id = $1 AND status = 'confirmed'", [id]), 2);
 
-  const staffAssignments = eventDays(await read(await call("/staff/assignments", "GET", undefined, staffOneCookie), 200));
+  const staffAssignments = (await listStaffDays(staffOneCookie, "/staff/assignments"));
   const ownDay = staffAssignments.find((row) => row.id === id);
   assert.ok(ownDay);
   assert.equal(ownDay.ownAssignment && asRecord(ownDay.ownAssignment, "own assignment").role, "coordinator");
   assert.deepEqual(ownDay.availability, []);
   assert.deepEqual(ownDay.eligibleStaff, []);
-  const secondStaffDay = eventDays(await read(await call("/staff/event-days", "GET", undefined, staffTwoCookie), 200))
+  const secondStaffDay = (await listStaffDays(staffTwoCookie))
     .find((row) => row.id === id);
   assert.ok(secondStaffDay);
   const visibleAssignments = arrayField(secondStaffDay, "assignments").map((value) => asRecord(value, "assignment"));
@@ -530,7 +542,7 @@ test("cancellation closes the day and retains responses while movement links one
   assert.equal(await rowCount("SELECT id FROM event_staff_availability WHERE event_day_id = $1", [cancellableId]), 1);
   assert.equal(await rowCount("SELECT id FROM event_staffs WHERE event_day_id = $1 AND status = 'confirmed'", [cancellableId]), 0);
   assert.equal(await rowCount("SELECT id FROM event_staffs WHERE event_day_id = $1 AND status = 'cancelled'", [cancellableId]), 1);
-  const cancelledStaffDay = eventDays(await read(await call("/staff/event-days", "GET", undefined, staffOneCookie), 200))
+  const cancelledStaffDay = (await listStaffDays(staffOneCookie))
     .find((row) => row.id === cancellableId);
   assert.ok(cancelledStaffDay);
   assert.equal(asRecord(cancelledStaffDay.ownAssignment, "own cancelled assignment").status, "cancelled");
@@ -571,9 +583,9 @@ test("cancellation closes the day and retains responses while movement links one
   assert.equal(originalAfterMove.status, "moved");
   assert.equal(originalAfterMove.staffingStatus, "closed");
   assert.equal(originalAfterMove.replacementEventDayId, replacementId);
-  assert.equal(arrayField(originalAfterMove, "availability").length, 1);
-  assert.equal(asRecord(arrayField(originalAfterMove, "assignments")[0], "cancelled assignment").status, "cancelled");
-  const movedStaffDay = eventDays(await read(await call("/staff/event-days", "GET", undefined, staffTwoCookie), 200))
+  assert.deepEqual(originalAfterMove.availability, []);
+  assert.equal(asRecord((await roster(originalId))[0]?.assignment, "cancelled assignment").status, "cancelled");
+  const movedStaffDay = (await listStaffDays(staffTwoCookie))
     .find((row) => row.id === originalId);
   assert.ok(movedStaffDay);
   assert.equal(movedStaffDay.status, "moved");
@@ -628,10 +640,11 @@ test("customer and admin booking cancellation end every scheduled day and releas
   const cancelledCustomerDayTwo = customerDays.find((day) => day.id === customerDayTwoId);
   assert.ok(cancelledCustomerDayOne);
   assert.ok(cancelledCustomerDayTwo);
-  assert.equal(arrayField(cancelledCustomerDayOne, "assignments").length, 1);
-  assert.equal(asRecord(arrayField(cancelledCustomerDayOne, "assignments")[0], "assignment").status, "cancelled");
-  assert.equal(arrayField(cancelledCustomerDayOne, "availability").length, 1);
-  assert.equal(arrayField(cancelledCustomerDayTwo, "availability").length, 1);
+  assert.deepEqual(cancelledCustomerDayOne.assignments, [], "schedule summaries omit the roster");
+  assert.equal(asRecord((await roster(dayId(cancelledCustomerDayOne)))[0]?.assignment, "assignment").status, "cancelled");
+  assert.equal((await roster(dayId(cancelledCustomerDayOne))).length, 1);
+  assert.equal((await roster(dayId(cancelledCustomerDayTwo))).length, 0, "unavailable responses remain outside the available roster");
+  assert.equal(await rowCount("SELECT id FROM event_staff_availability WHERE event_day_id=$1 AND response='unavailable'", [customerDayTwoId]), 1);
   assert.equal(await rowCount("SELECT id FROM events_day WHERE booking_request_id = $1 AND status = 'scheduled'", [customerBookingId]), 0);
   assert.equal(await rowCount("SELECT s.id FROM event_staffs s JOIN events_day d ON d.id = s.event_day_id WHERE d.booking_request_id = $1 AND s.status = 'confirmed'", [customerBookingId]), 0);
   assert.equal(await rowCount("SELECT a.id FROM event_staff_availability a JOIN events_day d ON d.id = a.event_day_id WHERE d.booking_request_id = $1", [customerBookingId]), 2);
@@ -688,10 +701,10 @@ test("customer and admin booking cancellation end every scheduled day and releas
   assert.equal(cancelledReplacement.staffingStatus, "closed");
   assert.equal(cancelledAdminDay.status, "cancelled");
   assert.ok(adminDays.every((day) => day.status !== "scheduled"));
-  assert.equal(arrayField(unchangedSource, "availability").length, 1);
-  assert.equal(asRecord(arrayField(unchangedSource, "assignments")[0], "moved assignment").status, "cancelled");
-  assert.equal(arrayField(cancelledReplacement, "availability").length, 1);
-  assert.equal(asRecord(arrayField(cancelledReplacement, "assignments")[0], "replacement assignment").status, "cancelled");
+  assert.equal((await roster(dayId(unchangedSource))).length, 1);
+  assert.equal(asRecord((await roster(dayId(unchangedSource)))[0]?.assignment, "moved assignment").status, "cancelled");
+  assert.equal((await roster(dayId(cancelledReplacement))).length, 1);
+  assert.equal(asRecord((await roster(dayId(cancelledReplacement)))[0]?.assignment, "replacement assignment").status, "cancelled");
   assert.equal(await rowCount("SELECT id FROM events_day WHERE booking_request_id = $1 AND status = 'scheduled'", [adminBookingId]), 0);
   assert.equal(await rowCount("SELECT s.id FROM event_staffs s JOIN events_day d ON d.id = s.event_day_id WHERE d.booking_request_id = $1 AND s.status = 'confirmed'", [adminBookingId]), 0);
   assert.equal(await rowCount("SELECT a.id FROM event_staff_availability a JOIN events_day d ON d.id = a.event_day_id WHERE d.booking_request_id = $1", [adminBookingId]), 3);
@@ -734,7 +747,7 @@ test("a needs-details booking allows staffing cleanup while rejecting new schedu
   assert.ok(cleanedDay);
   assert.equal(cleanedDay.status, "scheduled");
   assert.equal(cleanedDay.staffingStatus, "closed");
-  assert.equal(asRecord(arrayField(cleanedDay, "assignments")[0], "cleaned assignment").status, "cancelled");
+  assert.equal(asRecord((await roster(dayId(cleanedDay)))[0]?.assignment, "cleaned assignment").status, "cancelled");
 
   await expectError(await call(`/admin/event-days/${cancelDayId}/staffing`, "PATCH", { staffingStatus: "open", daysBefore: 2 }, adminCookie), 409);
   await expectError(await call(`/staff/event-days/${cancelDayId}/availability`, "PUT", { response: "available" }, staffOneCookie), 409);
@@ -1333,4 +1346,105 @@ test("checklist migration preserves populated bookings, days, assignments and re
     await baseline.query("INSERT INTO event_checklists(event_day_id,title,created_by,updated_by) VALUES($1,'Draft',$2,$2)", [day, actor]);
     await assert.rejects(baseline.query("INSERT INTO event_checklists(event_day_id,title,created_by,updated_by) VALUES($1,'Duplicate',$2,$2)", [day, actor]), /event_checklists_event_day_id_key/);
   } finally { await baseline.end(); await admin.query(`DROP DATABASE IF EXISTS "${migrationDatabase}"`); }
+});
+
+test("staffing lists bound every page, preserve microseconds and calendar counts, and authorize separate detail reads", async () => {
+  assert.ok(pool);
+  const bookingId = await createBooking();
+  await pool.query("UPDATE booking_requests SET event_type='Pagination staffing' WHERE id=$1", [bookingId]);
+  const inserted = await pool.query<{ id: string }>(`INSERT INTO events_day
+    (booking_request_id,day,starts_at,ends_at,staffing_status,availability_deadline)
+    SELECT $1,'2097-01-20','2097-01-20T02:00:00Z'::timestamptz + n * interval '1 microsecond',
+    '2097-01-20T03:00:00Z'::timestamptz + n * interval '1 microsecond','open','2097-01-18T15:59:59.999Z'
+    FROM generate_series(1,38) n RETURNING id`, [bookingId]);
+  const search = encodeURIComponent("Pagination staffing");
+  const first = asRecord(await read(await call(`/staff/event-days?search=${search}`, "GET", undefined, staffOneCookie), 200), "page");
+  assert.equal(eventDays(first).length, 15);
+  const cursor = stringField(first, "nextCursor");
+  const calendar = asRecord(await read(await call(`/staff/event-days/calendar?month=2097-01&search=${search}`, "GET", undefined, staffOneCookie), 200), "calendar");
+  assert.deepEqual(calendar.counts, [{ day: "2097-01-20", count: 38 }]);
+  await expectError(await call(`/staff/event-days?search=${search}&limit=51`, "GET", undefined, staffOneCookie), 400);
+  await expectError(await call(`/staff/event-days?cursor=${cursor}&search=another`, "GET", undefined, staffOneCookie), 400);
+  await expectError(await call(`/staff/event-days?cursor=${cursor}&search=${search}`, "GET", undefined, staffTwoCookie), 400);
+  const visited = eventDays(first).map(dayId);
+  let next: string | undefined = cursor;
+  while (next) {
+    const page = asRecord(await read(await call(`/staff/event-days?search=${search}&limit=7&cursor=${next}`, "GET", undefined, staffOneCookie), 200), "page");
+    const rows = eventDays(page);
+    assert.ok(rows.length <= 7);
+    visited.push(...rows.map(dayId));
+    next = typeof page.nextCursor === "string" ? page.nextCursor : undefined;
+  }
+  assert.equal(visited.length, 38);
+  assert.equal(new Set(visited).size, 38, "microsecond positions cannot duplicate or skip a row");
+  assert.deepEqual(new Set(visited), new Set(inserted.rows.map(row => row.id)));
+  const boundaryId = visited[14];
+  await pool.query("DELETE FROM events_day WHERE id=$1", [boundaryId]);
+  const afterDelete = eventDays(await read(await call(`/staff/event-days?search=${search}&cursor=${cursor}`, "GET", undefined, staffOneCookie), 200));
+  assert.equal(dayId(afterDelete[0]), visited[15], "cursor survives deletion of its boundary row");
+  const selectedId = visited[25];
+  await respond(selectedId, "available", staffOneCookie);
+  const responded = eventDays(await read(await call(`/staff/event-days?search=${search}&filter=responded`, "GET", undefined, staffOneCookie), 200));
+  assert.deepEqual(responded.map(dayId), [selectedId], "filter includes rows beyond the first unfiltered page");
+  await setStaffing(selectedId, "closed");
+  await assign(selectedId, staffOneId, "coordinator");
+  const assignments = eventDays(await read(await call(`/staff/assignments?search=${search}`, "GET", undefined, staffOneCookie), 200));
+  assert.deepEqual(assignments.map(dayId), [selectedId]);
+  const detail = eventDay(await read(await call(`/staff/event-days/${selectedId}`, "GET", undefined, staffOneCookie), 200));
+  assert.equal(asRecord(detail.ownAssignment, "assignment").role, "coordinator");
+  await expectError(await call(`/staff/event-days/${selectedId}`, "GET", undefined, staffTwoCookie), 404);
+  await expectError(await call(`/staff/event-days/${selectedId}`, "GET", undefined, customerCookie), 403);
+  await expectError(await call("/staff/event-days/calendar?month=2097-13", "GET", undefined, staffOneCookie), 400);
+  await expectError(await call("/staff/event-days/calendar?month=2097-01", "GET", undefined, customerCookie), 403);
+});
+
+test("admin roster pages preserve available-only rows and assignment actions beyond the first page", async () => {
+  assert.ok(pool);
+  const bookingId = await createBooking();
+  const day = await createEventDay(bookingId, schedule({ day: "2097-02-20", startsAt: "2097-02-20T10:00:00+08:00", endsAt: "2097-02-20T12:00:00+08:00", staffingStatus: "open", daysBefore: 2 }));
+  const id = dayId(day);
+  const people: { id: string; cookie: string }[] = [];
+  for (let index = 0; index < 36; index++) {
+    const person = await createUser("staff", `Roster ${String(index).padStart(2, "0")}`);
+    people.push(person);
+    await pool.query("INSERT INTO event_staff_availability(event_day_id,staff_id,response) VALUES($1,$2,'available')", [id, person.id]);
+  }
+  const nullName = await createUser("staff", "Temporary name");
+  await pool.query("UPDATE users SET display_name=NULL WHERE id=$1", [nullName.id]);
+  await pool.query("INSERT INTO event_staff_availability(event_day_id,staff_id,response) VALUES($1,$2,'available'),($1,$3,'unavailable')", [id, nullName.id, staffTwoId]);
+  await expectError(await call(`/admin/event-days/${id}/staff`, "GET", undefined, staffOneCookie), 403);
+  await expectError(await call(`/admin/event-days/${randomUUID()}/staff`, "GET", undefined, adminCookie), 404);
+  const first = asRecord(await read(await call(`/admin/event-days/${id}/staff`, "GET", undefined, adminCookie), 200), "roster");
+  assert.equal(arrayField(first, "staff").length, 15);
+  const cursor = stringField(first, "nextCursor");
+  const visited: string[] = [];
+  let next: string | undefined;
+  do {
+    const page = asRecord(await read(await call(`/admin/event-days/${id}/staff?${next ? `cursor=${next}` : ""}`, "GET", undefined, adminCookie), 200), "roster");
+    const staff = arrayField(page, "staff").map(value => asRecord(value, "staff row"));
+    visited.push(...staff.map(row => stringField(row, "staffId")));
+    next = typeof page.nextCursor === "string" ? page.nextCursor : undefined;
+  } while (next);
+  assert.equal(visited.length, 37);
+  assert.equal(new Set(visited).size, 37);
+  assert.ok(!visited.includes(staffTwoId), "unavailable responses remain omitted");
+  assert.ok(visited.includes(nullName.id), "nullable staff names have a stable fallback");
+  await expectError(await call(`/admin/event-days/${dayId(await createEventDay(await createBooking()))}/staff?cursor=${cursor}`, "GET", undefined, adminCookie), 400);
+  await setStaffing(id, "closed");
+  const beyondPageOne = people[23];
+  assert.ok(beyondPageOne);
+  await assign(id, beyondPageOne.id, "coordinator");
+  const allRows: JsonRecord[] = [];
+  next = undefined;
+  do {
+    const page = asRecord(await read(await call(`/admin/event-days/${id}/staff?${next ? `cursor=${next}` : ""}`, "GET", undefined, adminCookie), 200), "roster");
+    allRows.push(...arrayField(page, "staff").map(value => asRecord(value, "staff row")));
+    next = typeof page.nextCursor === "string" ? page.nextCursor : undefined;
+  } while (next);
+  assert.deepEqual(allRows.find(row => row.staffId === beyondPageOne.id)?.assignment, { role: "coordinator", status: "confirmed" });
+  await assign(id, beyondPageOne.id, "coordinator", "cancelled");
+  const summary = (await listBookingEventDays(bookingId))[0];
+  assert.deepEqual(summary.availability, []);
+  assert.deepEqual(summary.eligibleStaff, []);
+  assert.deepEqual(summary.assignments, [], "summary never reintroduces full assignment history");
 });

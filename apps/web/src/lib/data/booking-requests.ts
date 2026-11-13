@@ -49,24 +49,19 @@ export type BookingRequest = Omit<
   outOfRange: boolean;
   createdAt: string;
   updatedAt: string;
-  statusHistory: {
-    status: BookingStatus;
-    reason: string | null;
-    changedBy: string;
-    createdAt: string;
-  }[];
+
 };
 export type BookingRequestFilters = {
   status?: BookingStatus;
   preferredDate?: string;
   cursor?: string;
-  limit: number;
+  limit?: number;
 };
 
 export const createBookingRequest = (body: BookingRequestInput) =>
   request<{ bookingRequest: BookingRequest }>("/booking-requests", body);
-export const getMyBookingRequests = () =>
-  request<{ bookingRequests: BookingRequest[] }>("/booking-requests/mine");
+export const getMyBookingRequests = (cursor?: string) =>
+  request<{ bookingRequests: BookingRequest[]; nextCursor: string | null }>(`/booking-requests/mine${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);
 export const getMyBookingRequest = (id: string) =>
   request<{ bookingRequest: BookingRequest }>(
     `/booking-requests/${encodeURIComponent(id)}`,
@@ -75,10 +70,9 @@ export const getAdminBookingRequest = (id: string) =>
   request<{ bookingRequest: BookingRequest }>(
     `/admin/booking-requests/${encodeURIComponent(id)}`,
   );
-export const getAdminBookingRequests = () =>
-  request<{ bookingRequests: BookingRequest[] }>("/admin/booking-requests");
 export const getAdminBookingRequestsPage = (filters: BookingRequestFilters) => {
-  const query = new URLSearchParams({ limit: String(filters.limit) });
+  const query = new URLSearchParams();
+  if (filters.limit) query.set("limit", String(filters.limit));
   if (filters.status) query.set("status", filters.status);
   if (filters.preferredDate) query.set("preferredDate", filters.preferredDate);
   if (filters.cursor) query.set("cursor", filters.cursor);
@@ -118,3 +112,7 @@ export const cancelMyBookingRequest = (id: string, reason: string) =>
 
 export const updateRequestedDayTimes = (id: string, date: string, body: { startsAt: string; endsAt: string; expectedUpdatedAt: string }) =>
   request<{ bookingRequest: BookingRequest }>(`/booking-requests/${encodeURIComponent(id)}/requested-days/${encodeURIComponent(date)}/times`, body, undefined, "PATCH");
+
+export type BookingStatusHistoryEntry = { id: string; status: BookingStatus; reason: string | null; changedBy: string; createdAt: string };
+export const getBookingStatusHistory = (id: string, admin: boolean, cursor?: string) =>
+  request<{ history: BookingStatusHistoryEntry[]; nextCursor: string | null }>(`${admin ? "/admin" : ""}/booking-requests/${encodeURIComponent(id)}/status-history${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);

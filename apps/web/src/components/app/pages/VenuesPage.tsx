@@ -1,8 +1,9 @@
+import { usePagination } from "../../../lib/use-pagination";
 import { CatalogCard, CatalogCardActions } from "./CatalogCard"
 import type { ReactNode } from "react"
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Button, Dialog, FormField, Input, PageHeader, SearchField, Tabs, Textarea, useNotifications } from "@event-management/ui"
+import { Button, Pagination, Dialog, FormField, Input, PageHeader, SearchField, Tabs, Textarea, useNotifications } from "@event-management/ui"
 import { ApiError } from "../../../lib/http"
 import { catalogMediaSrc } from "../../../lib/data/catalog-media"
 import { archiveVenue, createVenue, deleteVenue, getAdminVenue, getAdminVenues, updateVenue, type AdminVenue, type VenueContent } from "../../../lib/data/venues"
@@ -24,6 +25,9 @@ export function VenuesPage() {
   const { notify, notifyError } = useNotifications()
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  const [counts, setCounts] = useState({ active: 0, archived: 0, filtered: 0 });
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const requestId = useRef(0);
   const [rows, setRows] = useState<AdminVenue[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -35,11 +39,13 @@ export function VenuesPage() {
   const savedDuringEditRef = useRef(false)
   const [preview, setPreview] = useState<AdminVenue | null>(null)
   const [confirm, setConfirm] = useState<{ item: AdminVenue; action: "archive" | "delete" } | null>(null)
+  const pagination = usePagination(`${tab}:${search}`);
   const load = useCallback(async () => {
+    const current = ++requestId.current;
     setLoading(true); setError("")
-    try { const result = await getAdminVenues(); if (mounted.current) setRows(result.venues) } catch (err) { if (mounted.current) setError(notifyError(err, "Something went wrong. Please try again.")) } finally { if (mounted.current) setLoading(false) }
-  }, [notifyError])
-  useEffect(() => { void load() }, [load])
+    try { const result = await getAdminVenues({ cursor: pagination.cursor, search, archived: tab === "Archives" ? "archived" : "active" }); if (mounted.current && current === requestId.current) { setRows(result.venues); setNextCursor(result.nextCursor); setCounts(result.counts) } } catch (err) { if (mounted.current && current === requestId.current) setError(notifyError(err, "Something went wrong. Please try again.")) } finally { if (mounted.current && current === requestId.current) setLoading(false) }
+  }, [notifyError, pagination.cursor, search, tab])
+  useEffect(() => { void load(); return () => { requestId.current++ } }, [load])
   const openEdit = async (id: string) => {
     setBusy(true); setError("")
     try { const item = await getAdminVenue(id); if (!mounted.current) return; savedDuringEditRef.current = false; savedRef.current = { id, updatedAt: item.updatedAt }; setEditing(content(item)) }
@@ -65,14 +71,11 @@ export function VenuesPage() {
       notify(`Venue ${confirm.action === "archive" ? "archived" : "deleted"}.`); setConfirm(null); await load()
     } catch (err) { setError(notifyError(err, "Something went wrong. Please try again.")); setConfirm(null) } finally { setBusy(false) }
   }
-  const visible = rows.filter(item => {
-    if (tab === "Archives" ? !item.archivedAt : !!item.archivedAt) return false
-    return `${item.name} ${item.location} ${item.description}`.toLowerCase().includes(search.toLowerCase().trim())
-  })
+  const visible = rows
   return <div className="pe-list">
     <PageHeader className="pe-list-head" title="Venues" description="Manage your venue catalog." actions={tab === "Venues" && <Button disabled={busy} onClick={() => { savedDuringEditRef.current = false; savedRef.current = { id: null, updatedAt: null }; setEditing(empty()) }}>+ Create venue</Button>} />
-    <Tabs className="pe-tabs" role="group" aria-label="Venue catalog" active={tab} onChange={setTab} items={[{ value: "Venues", label: "Venues", count: rows.filter(item => !item.archivedAt).length }, { value: "Archives", label: "Archives", count: rows.filter(item => item.archivedAt).length }]} />
-    <div className="pe-list-tools"><SearchField type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search venues" ariaLabel="Search venues" /><span>{visible.length} {visible.length === 1 ? "venue" : "venues"}</span></div>
+    <Tabs className="pe-tabs" role="group" aria-label="Venue catalog" active={tab} onChange={value => { setTab(value) }} items={[{ value: "Venues", label: "Venues", count: counts.active }, { value: "Archives", label: "Archives", count: counts.archived }]} />
+    <div className="pe-list-tools"><SearchField type="search" value={search} onChange={event => { setSearch(event.target.value.slice(0, 200)) }} placeholder="Search venues" ariaLabel="Search venues" /><span>{counts.filtered} {counts.filtered === 1 ? "venue" : "venues"}</span></div>
     {loading && <p role="status">Loading venues…</p>}{error && <p role="alert">{error} <Button variant="secondary" onClick={() => void load()}>Try again</Button></p>}
     {!loading && !error && visible.length === 0 && <p>{search.trim() ? "No venues found." : tab === "Archives" ? "No archived venues found." : "No venues yet. Create one to get started."}</p>}
     <div className="pe-cards">{visible.map(item => {
@@ -81,6 +84,7 @@ export function VenuesPage() {
         item.archivedAt ? { label: "Delete", onSelect: () => setConfirm({ item, action: "delete" }) } : { label: "Archive", onSelect: () => setConfirm({ item, action: "archive" }) },
       ]} />} />
     })}</div>
+    <Pagination page={pagination.page} hasNextPage={nextCursor !== null} pending={loading} onPrevious={pagination.previous} onNext={() => pagination.next(nextCursor)} label="Catalog pages" />
     {preview && <CatalogDetailPreview entity="venue" onClose={() => setPreview(null)}><VenueCanvas item={preview} /></CatalogDetailPreview>}
     {editing && <CatalogEditor initial={editing} entity="venue" nameMaxLength={200} onClose={() => { setEditing(null); if (savedDuringEditRef.current) void load() }} onSave={save} onSaved={() => { setEditing(null); void load() }} validate={form => {
       if (form.maxGuests != null && (!Number.isInteger(form.maxGuests) || form.maxGuests < 1 || form.maxGuests > 2147483647)) return "Maximum guests must be a positive whole number."

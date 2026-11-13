@@ -74,6 +74,22 @@ async function read(path: string, cookie?: string) {
   return response.json() as Promise<any>;
 }
 
+async function readAll(path: string, collection: string, cookie?: string) {
+  const rows: Record<string, unknown>[] = [];
+  let cursor: string | undefined;
+  do {
+    const query = new URLSearchParams({ limit: "50", ...(cursor ? { cursor } : {}) });
+    const page = await read(`${path}?${query}`, cookie);
+    assert.ok(Array.isArray(page[collection]));
+    for (const row of page[collection]) {
+      assert.ok(typeof row === "object" && row !== null && !Array.isArray(row));
+      rows.push(row);
+    }
+    cursor = typeof page.nextCursor === "string" ? page.nextCursor : undefined;
+  } while (cursor);
+  return rows;
+}
+
 async function login(email: string) {
   const response = await app.request("/v1/auth/login", {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -244,7 +260,7 @@ test("seed creates demo users, venues, and conversations while preserving unrela
     ORDER BY p.name`);
   assert.equal(packagePageContent.rowCount, 3);
   assert.ok(packagePageContent.rows.every((row) => row.sections > 0 && row.markdown_widgets > 0 && row.sample_photo_widgets > 0));
-  const publicPackages = (await read("/packages")).packages;
+  const publicPackages = (await readAll("/packages", "packages"));
   const sampleNames = ["The Grand Celebration", "The Intimate Gathering", "The Sweet Soirée"];
   const samplePackages = publicPackages.filter((row: any) => sampleNames.includes(row.name));
   assert.deepEqual(samplePackages.map((row: any) => row.name).sort(), sampleNames);
@@ -256,7 +272,7 @@ test("seed creates demo users, venues, and conversations while preserving unrela
   }));
   const demoVenues = await pool.query("SELECT id FROM venues WHERE name LIKE 'Demo %' ORDER BY name");
   assert.equal(demoVenues.rowCount, 3);
-  const initialPublicVenues = (await read("/venues")).venues.filter((venue: any) => demoVenues.rows.some((row) => row.id === venue.id));
+  const initialPublicVenues = (await readAll("/venues", "venues")).filter((venue: any) => demoVenues.rows.some((row) => row.id === venue.id));
   assert.equal(initialPublicVenues.length, 3);
   assert.ok(initialPublicVenues.every((venue: any) => !("imageUrls" in venue) && !venue.description.includes("venue draft")));
   assert.equal((await pool.query("SELECT count(*)::int AS count FROM services")).rows[0].count, 100);
@@ -315,11 +331,11 @@ test("seed creates demo users, venues, and conversations while preserving unrela
   assert.equal((await pool.query("SELECT price FROM packages WHERE id = $1", [scenarioPackage.rows[0].id])).rows[0].price, 12345);
   assert.equal((await pool.query("SELECT display_name FROM users WHERE id = $1", [unrelated.rows[0].id])).rows[0].display_name, "Unrelated person");
 
-  const publicVenues = await read("/venues");
+  const publicVenues = { venues: await readAll("/venues", "venues") };
   assert.ok(publicVenues.venues.some((row: any) => row.id === demoVenues.rows[0].id && !("imageUrls" in row)));
   assert.ok(publicVenues.venues.some((row: any) => row.id === demoVenues.rows[1].id && row.name === "Edited demo venue"));
   assert.ok(!publicVenues.venues.some((row: any) => row.id === demoVenues.rows[2].id));
-  const publicServices = await read("/services");
+  const publicServices = { services: await readAll("/services", "services") };
   assert.equal(publicServices.services.length, 60);
   assert.ok(publicServices.services.every((service: any) => service.hourlyRatePesos > 0 && typeof service.imageUrl === "string"));
   const customerCookie = await login("demo.camille@clemora.example.test");
@@ -328,11 +344,11 @@ test("seed creates demo users, venues, and conversations while preserving unrela
   const customerThread = await read("/messages/conversation", customerCookie);
   assert.equal(customerThread.conversation.id, conversation.rows[0].id);
   assert.equal(customerThread.messages.length, 2);
-  assert.equal((await read("/admin/booking-requests", adminCookie)).bookingRequests.length, 100);
+  assert.equal((await readAll("/admin/booking-requests", "bookingRequests", adminCookie)).length, 100);
   const scenarioAdmin = await login("scenario.user001@clemora.example.test");
   assert.equal((await read("/me", scenarioAdmin)).role, "admin");
   assert.equal((await read("/me", scenarioAdmin)).staffRole, "System Administrator");
-  assert.ok((await read("/admin/conversations", adminCookie)).conversations.some((row: any) => row.id === conversation.rows[0].id));
+  assert.ok((await readAll("/admin/conversations", "conversations", adminCookie)).some((row: any) => row.id === conversation.rows[0].id));
   const quotationCustomerCookie = await login(quotation.email);
   const adminQuotations = (await read(`/admin/booking-requests/${quotation.booking_request_id}/quotations`, scenarioAdmin)).quotations;
   const customerQuotations = (await read(`/booking-requests/${quotation.booking_request_id}/quotations`, quotationCustomerCookie)).quotations;

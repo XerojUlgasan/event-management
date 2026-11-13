@@ -1,24 +1,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
-import { json, errors, body, idParams } from "../packages/http.js";
-import { contentSchema, adminSchema, publicSchema } from "./schemas.js";
-import { listAdminServicesService } from "../../services/services/list-admin-services.js";
-export const listAdminServicesRoute = createRoute({
-  method: "get",
-  path: "/admin/services",
-  tags: ["Services"],
-  request: {},
-  responses: {
-    200: {
-      content: json(z.object({ services: z.array(adminSchema) })),
-      description: "Service catalog",
-    },
-    ...errors,
-  },
-});
-export const listAdminServicesRouteHandler: AppRouteHandler<
-  typeof listAdminServicesRoute
-> = async (c) => {
-  const value = await listAdminServicesService(c.get("db"));
-  return c.json({ services: value }, 200);
-};
+import { paginationQuerySchema } from "../../utils/pagination.js";
+import { adminSchema } from "./schemas.js";
+import { json, errors } from "../packages/http.js";
+import { listAdminServicesPageService } from "../../services/services/list-admin-services-page.js";
+
+export const listAdminServicesRoute = createRoute({ method: "get", path: "/admin/services", tags: ["Services"], request: { query: paginationQuerySchema.extend({ search: z.string().trim().max(200).optional(), archived: z.enum(["all", "active", "archived"]).default("all") }) }, responses: {
+  200: { content: json(z.object({ services: z.array(adminSchema), nextCursor: z.string().nullable(), counts: z.object({ active: z.number().int(), archived: z.number().int(), filtered: z.number().int() }) })), description: "Admin services" }, ...errors,
+} });
+export const listAdminServicesRouteHandler: AppRouteHandler<typeof listAdminServicesRoute> = async c => c.json(await listAdminServicesPageService(c.get("db"), c.req.valid("query")), 200);

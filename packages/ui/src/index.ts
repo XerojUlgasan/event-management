@@ -14,6 +14,8 @@ export { ActionLink } from "./atoms/ActionLink";
 export { SectionCounter } from "./atoms/SectionCounter";
 
 // Molecules
+export { Pagination } from "./molecules/Pagination";
+export type { PaginationProps } from "./molecules/Pagination";
 export { Brand } from "./molecules/Brand";
 export { StatCard } from "./molecules/StatCard";
 export { Panel } from "./molecules/Panel";

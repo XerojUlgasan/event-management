@@ -3,6 +3,9 @@ import { createEventChecklistRoute, createEventChecklistRouteHandler } from "../
 import { updateEventChecklistRoute, updateEventChecklistRouteHandler, updateEventChecklistStaffRoute } from "../event-checklists/update-event-checklist.js";
 import { sendEventChecklistRoute, sendEventChecklistRouteHandler } from "../event-checklists/send-event-checklist.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { getStaffEventCalendarRoute, getStaffEventCalendarRouteHandler } from "./get-staff-event-calendar.js";
+import { getStaffEventDayRoute, getStaffEventDayRouteHandler } from "./get-staff-event-day.js";
+import { listEventDayStaffRoute, listEventDayStaffRouteHandler } from "./list-event-day-staff.js";
 import { createMiddleware } from "hono/factory";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
@@ -67,9 +70,12 @@ routes.use("/staff/event-days", requireSession, staff);
 routes.use("/staff/event-days/*", requireSession, staff);
 routes.use("/staff/assignments", requireSession, staff);
 routes.openapi(listAdminEventDaysRoute, listAdminEventDaysRouteHandler);
+routes.openapi(listEventDayStaffRoute, listEventDayStaffRouteHandler);
 routes.openapi(createEventDayRoute, createEventDayRouteHandler);
 routes.openapi(applyResponseDeadlinesRoute, applyResponseDeadlinesRouteHandler);
 routes.openapi(listStaffEventDaysRoute, listStaffEventDaysRouteHandler);
+routes.openapi(getStaffEventCalendarRoute, getStaffEventCalendarRouteHandler);
+routes.openapi(getStaffEventDayRoute, getStaffEventDayRouteHandler);
 routes.openapi(listStaffAssignmentsRoute, listStaffAssignmentsRouteHandler);
 routes.openapi(
   respondEventDayAvailabilityRoute,

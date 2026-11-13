@@ -8,14 +8,9 @@ import {
   type ChatConversation,
   type ChatThread,
 } from "../../../lib/data/messages"
+import { usePagination } from "../../../lib/use-pagination"
 import { MessagesWorkspace } from "../messages/MessagesWorkspace"
-import { mergeThread } from "../../../lib/services/merge-thread"
-
-function mergeConversations(current: ChatConversation[], incoming: ChatConversation[], newestFirst: boolean) {
-  const incomingIds = new Set(incoming.map((conversation) => conversation.id))
-  const remaining = current.filter((conversation) => !incomingIds.has(conversation.id))
-  return newestFirst ? [...incoming, ...remaining] : [...remaining, ...incoming]
-}
+import { mergePolledThread, prependOlder } from "../../../lib/services/merge-thread"
 
 export function MessagesPage() {
   const { notifyError } = useNotifications()
@@ -23,85 +18,77 @@ export function MessagesPage() {
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const listFailure = useRef("")
   const threadFailure = useRef("")
+  const activeIdRef = useRef<string | null>(null)
+  const loadingThreadId = useRef<string | null>(null)
+  const localMessages = useRef(new Set<string>())
   const [conversations, setConversations] = useState<ChatConversation[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
+  activeIdRef.current = activeId
   const [thread, setThread] = useState<ChatThread | null>(null)
   const [loadingList, setLoadingList] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [loadingThread, setLoadingThread] = useState(false)
   const [listError, setListError] = useState("")
-  const [loadMoreError, setLoadMoreError] = useState("")
   const [threadError, setThreadError] = useState("")
   const [conversationOpen, setConversationOpen] = useState(false)
-  const listBusy = useRef(false)
-  const moreBusy = useRef(false)
-  const hasLoadedMore = useRef(false)
+  const pagination = usePagination("admin-conversations")
+  const [listRevision, setListRevision] = useState(0)
+  const listRequest = useRef(0)
+  const [historyNotice, setHistoryNotice] = useState("")
+  const [loadingOlder, setLoadingOlder] = useState(false)
 
   const loadList = useCallback(async () => {
-    if (listBusy.current || moreBusy.current) return
-    listBusy.current = true
+    const request = ++listRequest.current
     try {
-      const result = await getAdminConversations()
-      if (!mounted.current) return
-      setConversations((current) => mergeConversations(current, result.conversations, true))
-      if (!hasLoadedMore.current) setNextCursor(result.nextCursor)
+      const result = await getAdminConversations(pagination.cursor)
+      if (!mounted.current || request !== listRequest.current) return
+      setConversations(result.conversations)
+      setNextCursor(result.nextCursor)
       setListError("")
       listFailure.current = ""
     } catch (cause) {
-      if (!mounted.current) return
+      if (!mounted.current || request !== listRequest.current) return
       const message = notificationErrorMessage(cause, "Unable to load conversations.")
       setListError(message)
       if (listFailure.current !== message) { listFailure.current = message; notifyError(message) }
     } finally {
-      listBusy.current = false
-      if (mounted.current) setLoadingList(false)
+      if (mounted.current && request === listRequest.current) setLoadingList(false)
     }
-  }, [notifyError])
-
-  const loadMore = useCallback(async () => {
-    if (!nextCursor || moreBusy.current || listBusy.current) return
-    moreBusy.current = true
-    setLoadingMore(true)
-    setLoadMoreError("")
-    try {
-      const result = await getAdminConversations(nextCursor)
-      if (!mounted.current) return
-      setConversations((current) => mergeConversations(current, result.conversations, false))
-      setNextCursor(result.nextCursor)
-      hasLoadedMore.current = true
-    } catch (cause) {
-      if (!mounted.current) return
-      setLoadMoreError(notifyError(cause, "Unable to load more conversations."))
-    } finally {
-      moreBusy.current = false
-      if (mounted.current) setLoadingMore(false)
-    }
-  }, [nextCursor, notifyError])
+  }, [notifyError, pagination.cursor])
 
   useEffect(() => {
+    setLoadingList(true)
     void loadList()
-    const timer = window.setInterval(() => void loadList(), 5000)
-    return () => window.clearInterval(timer)
-  }, [loadList])
+    const timer = pagination.page === 1 ? window.setInterval(() => void loadList(), 5000) : undefined
+    return () => { listRequest.current++; if (timer) window.clearInterval(timer) }
+  }, [loadList, pagination.page, listRevision])
 
   const loadThread = useCallback(async (id: string) => {
+    if (loadingThreadId.current === id) return
+    loadingThreadId.current = id
     setLoadingThread(true)
     try {
       const result = await getAdminConversation(id)
-      if (!mounted.current) return
-      setThread((current) => mergeThread(current, result))
+      if (!mounted.current || activeIdRef.current !== id) return
+      const unacknowledged = new Set(localMessages.current)
+      result.messages.forEach(message => localMessages.current.delete(message.id))
+      setThread(current => {
+        const merged = mergePolledThread(current, result, unacknowledged)
+        if (merged.gap) setHistoryNotice("New messages arrived while you were away. Earlier history was reset; load older messages to see it.")
+        return merged.thread
+      })
       setConversations((current) => current.map((item) => item.id === id ? result.conversation : item))
       setThreadError("")
       threadFailure.current = ""
     } catch (cause) {
-      if (!mounted.current) return
+      if (!mounted.current || activeIdRef.current !== id) return
       const message = notificationErrorMessage(cause, "Unable to load this conversation.")
       setThreadError(message)
       const key = `${id}:${message}`
       if (threadFailure.current !== key) { threadFailure.current = key; notifyError(message) }
     } finally {
-      if (mounted.current) setLoadingThread(false)
+      if (loadingThreadId.current === id) loadingThreadId.current = null
+      if (mounted.current && activeIdRef.current === id) setLoadingThread(false)
     }
   }, [notifyError])
 
@@ -121,12 +108,26 @@ export function MessagesPage() {
     if (window.matchMedia("(min-width: 601px)").matches) setActiveId(conversations[0].id)
   }, [activeId, conversations])
 
+  const loadOlder = async () => {
+    if (!activeId || !thread?.nextCursor || loadingOlder) return
+    const id = activeId
+    setLoadingOlder(true)
+    try {
+      const older = await getAdminConversation(id, thread.nextCursor)
+      older.messages.forEach(message => localMessages.current.delete(message.id))
+      setThread(current => current?.conversation.id === id ? prependOlder(current, older) : current)
+    } catch (cause) { notifyError(cause, "Unable to load older messages.") }
+    finally { setLoadingOlder(false) }
+  }
+
   const send = async (body: string) => {
     if (!activeId) return
     const result = await sendAdminMessage(activeId, body)
+    localMessages.current.add(result.message.id)
     setThread((current) =>
       current && current.conversation.id === activeId
         ? {
+            ...current,
             conversation: {
               ...current.conversation,
               status: "active",
@@ -137,7 +138,7 @@ export function MessagesPage() {
           }
         : current,
     )
-    void loadList()
+    if (pagination.page === 1) void loadList()
   }
 
   return (
@@ -146,16 +147,19 @@ export function MessagesPage() {
         title="Messages"
         viewerRole="admin"
         conversations={conversations}
-        hasMore={!!nextCursor}
-        loadingMore={loadingMore}
-        loadMoreError={loadMoreError}
-        onLoadMore={() => void loadMore()}
+        activeConversation={thread?.conversation}
+        listPage={{ page: pagination.page, hasNextPage: !!nextCursor, pending: loadingList, onPrevious: () => { setLoadingList(true); pagination.previous() }, onNext: () => { setLoadingList(true); pagination.next(nextCursor) }, onRefresh: () => { setLoadingList(true); pagination.reset(); setListRevision(value => value + 1) } }}
         activeId={activeId}
         onSelect={(id) => {
+          setHistoryNotice("")
           setActiveId(id)
           setConversationOpen(true)
         }}
         messages={thread?.messages ?? []}
+        hasOlder={!!thread?.nextCursor}
+        loadingOlder={loadingOlder}
+        onLoadOlder={() => void loadOlder()}
+        historyNotice={historyNotice}
         loading={
           (loadingList && !conversations.length) ||
           loadingThread ||

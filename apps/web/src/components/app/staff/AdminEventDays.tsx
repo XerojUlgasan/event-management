@@ -3,7 +3,6 @@ import { useEffect, useRef, useState, type SubmitEvent } from "react";
 import {
   Badge,
   Button,
-  DataTable,
   Dialog,
   FormField,
   Input,
@@ -20,11 +19,11 @@ import {
   getAdminEventDays,
   moveEventDay,
   applyResponseDeadlines,
-  setAssignment,
   updateStaffing,
   type EventDay,
   type EventDaySchedule,
 } from "../../../lib/data/event-days";
+import { EventDayStaffTable } from "./EventDayStaffTable";
 import { formatEventTime, zonedInstant, localInput } from "../../../lib/utils/event-day-time";
 function asDays(value: string): ResponseDeadlineDays | null {
   return RESPONSE_DEADLINE_DAYS.find(days => String(days) === value) ?? null;
@@ -154,7 +153,6 @@ export function AdminEventDays({ booking, onBookingChanged, refreshKey = 0, onBu
   const [selected, setSelected] = useState("");
   const [moving, setMoving] = useState("");
   const [cancelDayId, setCancelDayId] = useState("");
-  const [roles, setRoles] = useState<Record<string, "coordinator" | "helper">>({});
   const [deadlines, setDeadlines] = useState<Record<string, ResponseDeadlineDays | null>>({});
   const [batchDays, setBatchDays] = useState<ResponseDeadlineDays | null>(null);
   const batchEdited = useRef(false);
@@ -250,9 +248,6 @@ export function AdminEventDays({ booking, onBookingChanged, refreshKey = 0, onBu
   const current = entries.find(entry => entry.key === selected) ?? entries.find(entry => entry.requested?.date === selectedRequestedDate && entry.day?.status === "scheduled") ?? entries.find(entry => entry.day?.status === "scheduled") ?? entries.find(entry => !entry.day) ?? entries[0];
   const day = current?.day;
   const requested = current?.requested;
-  const people = day?.availability
-    .filter(entry => entry.response === "available")
-    .map(entry => ({ id: entry.staffId, displayName: entry.staffName })) ?? [];
   if (!booking.requestedDays && !accepted && !loading && !error && !days.length) return null;
 
   return <section className="admin-event-days">
@@ -279,38 +274,7 @@ export function AdminEventDays({ booking, onBookingChanged, refreshKey = 0, onBu
       {day && accepted && moving === day.id && day.status === "scheduled" && <ScheduleForm key={day.id} booking={booking} initial={day} busy={locked} label="Create replacement day" onCancel={() => setMoving("")} submit={body => void run(() => moveEventDay(day.id, body))} />}
       {day && <section className="admin-event-staff"><div className="admin-event-staff-head"><div><h4>Staff responses and assignments</h4><p>{day.status !== "scheduled" ? "Previous responses and assignments are kept below." : day.staffingStatus === "open" ? "Staff can respond until the deadline. Close responses before confirming assignments." : day.staffingStatus === "draft" ? "Open responses to collect staff availability." : "Responses are closed. Confirm available staff as coordinator or helper."}</p></div>{accepted && day.status === "scheduled" && day.staffingStatus === "open" && <Button variant="secondary" disabled={locked} onClick={() => void run(() => updateStaffing(day.id, "closed"))}>Close responses</Button>}</div>
         {accepted && day.status === "scheduled" && day.staffingStatus !== "open" && <div className="admin-event-reopen"><DeadlineChoice label={day.staffingStatus === "draft" ? "Response deadline" : "Response deadline to reopen"} value={deadlines[day.id] ?? null} onChange={value => setDeadlines(previous => ({ ...previous, [day.id]: value }))} disabled={locked} /><Button variant="secondary" disabled={locked || !deadlines[day.id]} onClick={() => { const value = deadlines[day.id]; if (value) void run(() => updateStaffing(day.id, "open", value)); }}>Open responses</Button>{deadlines[day.id] && <span>Closes {deadlinePreview(day.day, deadlines[day.id], day.timezone)}</span>}</div>}
-        <DataTable
-          className="admin-event-staff-table"
-          label="Staff responses and assignments"
-          minWidth={850}
-          emptyMessage="No staff have responded as available yet."
-          rows={people.map(staff => {
-            const assignment = day.assignments.find(item => item.staffId === staff.id);
-            const key = `${day.id}:${staff.id}`;
-            return {
-              ...staff,
-              assignment,
-              key,
-              role: roles[key] ?? assignment?.role ?? "helper",
-              canAssign: accepted && day.status === "scheduled" && day.staffingStatus === "closed" && day.eligibleStaff.some(item => item.id === staff.id),
-            };
-          })}
-          rowKey={staff => staff.id}
-          columns={[
-            { key: "staff", header: "Staff member", cell: staff => staff.displayName },
-            { key: "response", header: "Response", cell: () => <Badge tone="success">Available</Badge> },
-            { key: "role", header: "Role", cell: staff => staff.canAssign ? (
-              <Select aria-label={`Role for ${staff.displayName}`} value={staff.role} disabled={locked} onChange={event => setRoles(previous => ({ ...previous, [staff.key]: event.target.value === "coordinator" ? "coordinator" : "helper" }))}>
-                <option value="helper">Helper</option><option value="coordinator">Coordinator</option>
-              </Select>
-            ) : staff.assignment?.role ?? "—" },
-            { key: "assignment", header: "Assignment", cell: staff => staff.assignment ? `${staff.assignment.status === "confirmed" ? "Confirmed" : "Cancelled"} ${staff.assignment.role}` : "Not assigned" },
-            { key: "actions", header: "Actions", cell: staff => <div className="admin-event-actions">
-              {staff.canAssign && <Button size="small" disabled={locked || (staff.assignment?.status === "confirmed" && staff.assignment.role === staff.role)} onClick={() => void run(() => setAssignment(day.id, staff.id, staff.role, "confirmed"))}>{staff.assignment?.status === "confirmed" ? staff.assignment.role === staff.role ? "Confirmed" : "Confirm role" : "Confirm"}</Button>}
-              {day.status === "scheduled" && staff.assignment?.status === "confirmed" && <Button size="small" variant="secondary" disabled={locked} onClick={() => void run(() => setAssignment(day.id, staff.id, staff.assignment?.role ?? staff.role, "cancelled"))}>Cancel assignment</Button>}
-            </div> },
-          ]}
-        />
+        <EventDayStaffTable key={day.id} day={day} accepted={accepted} locked={locked} refreshKey={`${revision}:${reload}:${refreshKey}`} run={run} />
       </section>}
     </Panel>}
     {cancelDayId && <Dialog title="Cancel event day?" intro="This closes responses and cancels assignments for this day." onClose={() => { if (!busy) setCancelDayId(""); }} actions={<><Button variant="secondary" disabled={busy} onClick={() => setCancelDayId("")}>Keep day</Button><Button variant="danger" disabled={locked} onClick={() => void run(() => cancelEventDay(cancelDayId))}>Cancel day</Button></>} />}

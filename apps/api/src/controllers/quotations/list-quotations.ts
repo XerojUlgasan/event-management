@@ -1,14 +1,16 @@
-import { createRoute } from "@hono/zod-openapi";
+import { createRoute, z } from "@hono/zod-openapi";
 import { listQuotationService } from "../../services/quotations/list-quotation.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { errors } from "../booking-requests/http.js";
+import { paginationQuerySchema } from "../../utils/pagination.js";
 import { listResult } from "./responses.js";
 import { idParams } from "./schemas.js";
+const querySchema = paginationQuerySchema.extend({ quotationId: z.string().uuid().optional() });
 export const listAdminQuotationsRoute = createRoute({
   method: "get",
   path: "/admin/booking-requests/{id}/quotations",
   tags: ["Quotations"],
-  request: { params: idParams },
+  request: { params: idParams, query: querySchema },
   responses: { 200: listResult, ...errors },
 });
 export const listAdminQuotationsRouteHandler: AppRouteHandler<
@@ -19,17 +21,18 @@ export const listAdminQuotationsRouteHandler: AppRouteHandler<
     c.req.valid("param").id,
     c.get("session").user.id,
     false,
+    c.req.valid("query"),
   );
   return "message" in r
     ? c.json({ error: r.message }, r.status)
-    : c.json({ quotations: r }, 200);
+    : c.json(r, 200);
 };
 
 export const listCustomerQuotationsRoute = createRoute({
   method: "get",
   path: "/booking-requests/{id}/quotations",
   tags: ["Quotations"],
-  request: { params: idParams },
+  request: { params: idParams, query: querySchema },
   responses: { 200: listResult, ...errors },
 });
 export const listCustomerQuotationsRouteHandler: AppRouteHandler<
@@ -40,8 +43,9 @@ export const listCustomerQuotationsRouteHandler: AppRouteHandler<
     c.req.valid("param").id,
     c.get("session").user.id,
     true,
+    c.req.valid("query"),
   );
   return "message" in r
     ? c.json({ error: r.message }, r.status)
-    : c.json({ quotations: r }, 200);
+    : c.json(r, 200);
 };

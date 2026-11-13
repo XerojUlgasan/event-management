@@ -1,10 +1,12 @@
+import { BookingStatusHistory } from "./BookingStatusHistory";
+import { usePagination } from "../../lib/use-pagination"
 import { navigateWorkspace } from "../../lib/workspace-navigation"
 import { BookingPackage } from "./BookingPackage";
 import { Quotations } from "./Quotations";
 import { ApiError } from "../../lib/http";
 import { getMyBookingRequest } from "../../lib/data/booking-requests";
 import { localInput, zonedInstant } from "../../lib/utils/event-day-time";
-import { FormField, Input, NativeDialog, Select, Textarea, useNotifications } from "@event-management/ui"
+import { FormField, Input, NativeDialog, Pagination, Select, Textarea, useNotifications } from "@event-management/ui"
 import { MAX_BOOKING_REASON_LENGTH } from "@event-management/contracts/limits/booking-requests";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -13,7 +15,6 @@ import { durationLabel } from "./BookingRequest";
 import {
   cancelMyBookingRequest,
   updateRequestedDayTimes,
-  getAdminBookingRequests,
   getAdminBookingRequestsPage,
   getBookingRequestCalendar,
   getMyBookingRequests,
@@ -64,22 +65,29 @@ function BookingCards({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
+  const pagination = usePagination("my-booking-requests");
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadedCursor, setLoadedCursor] = useState<string | null>(null);
+  const generation = useRef(0);
+  const currentCursor = useRef(pagination.cursor);
+  currentCursor.current = pagination.cursor;
   const load = useCallback(async () => {
+    const current = ++generation.current;
     setLoading(true);
     setError("");
     try {
-      const result = await (admin
-        ? getAdminBookingRequests()
-        : getMyBookingRequests());
-      if (!mounted.current) return;
+      const result = await getMyBookingRequests(pagination.cursor ?? undefined);
+      if (!mounted.current || generation.current !== current || currentCursor.current !== pagination.cursor) return;
       setItems(result.bookingRequests);
+      setNextCursor(result.nextCursor);
+      setLoadedCursor(pagination.cursor ?? "");
     } catch (cause) {
-      if (!mounted.current) return;
+      if (!mounted.current || generation.current !== current || currentCursor.current !== pagination.cursor) return;
       setError(notifyError(cause, "Unable to load requests."));
     } finally {
-      if (mounted.current) setLoading(false);
+      if (mounted.current && generation.current === current && currentCursor.current === pagination.cursor) setLoading(false);
     }
-  }, [admin, notifyError]);
+  }, [pagination.cursor, notifyError]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -138,7 +146,7 @@ function BookingCards({
         Preferred dates and final prices are subject to staff review. Accepted
         requests are being processed and are not confirmed bookings.
       </p>
-      {loading && <p role="status">Loading requests…</p>}
+      {(loading || loadedCursor !== (pagination.cursor ?? "")) && <p role="status">Loading requests…</p>}
       {error && (
         <p role="alert">
           {error}{" "}
@@ -147,7 +155,7 @@ function BookingCards({
           </Button>
         </p>
       )}
-      {!loading && !error && items.length === 0 && (
+      {!loading && loadedCursor === (pagination.cursor ?? "") && !error && items.length === 0 && (
         <Panel className="booking-empty">
           <span className="booking-empty-icon">
             <Icon name="calendar" />
@@ -163,7 +171,7 @@ function BookingCards({
           )}
         </Panel>
       )}
-      {items.map((item) => (
+      {!loading && loadedCursor === (pagination.cursor ?? "") && !error && items.map((item) => (
         <Panel as="article"
           className="customer-event-record booking-record"
           key={item.id}
@@ -229,20 +237,7 @@ function BookingCards({
                 : "The preferred date is not reserved."}
             </span>
           </div>
-          {item.statusHistory?.length > 0 && (
-            <details className="booking-history">
-              <summary>View status history</summary>
-              <ul>
-                {item.statusHistory.map((entry, index) => (
-                  <li key={index}>
-                    {labels[entry.status]} ·{" "}
-                    {new Date(entry.createdAt).toLocaleString()}
-                    {entry.reason ? ` — ${entry.reason}` : ""}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
+          <BookingStatusHistory id={item.id} admin={admin} revision={item.updatedAt} timeZone={item.timeZone} summary="View status history" />
           {admin &&
             !readOnly &&
             !["declined", "cancelled"].includes(item.status) && (
@@ -269,6 +264,7 @@ function BookingCards({
           )}
         </Panel>
       ))}
+      {!loading && loadedCursor === (pagination.cursor ?? "") && !error && <Pagination page={pagination.page} hasNextPage={!!nextCursor} onPrevious={pagination.previous} onNext={() => nextCursor && pagination.next(nextCursor)} />}
       {selected && <BookingDetails item={selected} customerCanEditTimes onClose={() => setSelected(null)} onSaved={updated => { setSelected(updated); setItems(rows => rows.map(row => row.id === updated.id ? updated : row)); }} />}
     </div>
   );
@@ -398,7 +394,7 @@ function CancelForm({
   );
 }
 
-const PAGE_SIZE = 50;
+
 const dateKey = (year: number, month: number, day: number) =>
   `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 const shortDate = (value: string) =>
@@ -416,78 +412,32 @@ function AdminBookingList() {
   const [day, setDay] = useState<string | undefined>();
   const [items, setItems] = useState<BookingRequest[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
-  const [pageCursor, setPageCursor] = useState<{
-    value: string;
-    scope: string;
-  } | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadedKey, setLoadedKey] = useState("");
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [calendarError, setCalendarError] = useState("");
   const [calendarLoading, setCalendarLoading] = useState(true);
   const [revision, setRevision] = useState(0);
-  const generation = useRef(0);
-  const moreBusy = useRef(false);
-  const sentinel = useRef<HTMLDivElement>(null);
   const statusFilter = status === "all" ? undefined : status;
-  const monthKey = dateKey(month.getFullYear(), month.getMonth(), 1).slice(
-    0,
-    7,
-  );
-  const queryScope = JSON.stringify([
-    statusFilter ?? null,
-    day ?? null,
-    revision,
-  ]);
-  const cursor = pageCursor?.scope === queryScope ? pageCursor.value : null;
-  const currentScope = useRef(queryScope);
-  currentScope.current = queryScope;
+  const monthKey = dateKey(month.getFullYear(), month.getMonth(), 1).slice(0, 7);
+  const scope = JSON.stringify([statusFilter ?? null, day ?? null]);
+  const pagination = usePagination(scope);
+  const requestKey = JSON.stringify([scope, pagination.cursor]);
+  const currentScope = useRef(requestKey);
+  currentScope.current = requestKey;
 
   useEffect(() => {
-    const current = ++generation.current;
-    moreBusy.current = false;
-    setLoadingMore(false);
+    let active = true;
     setLoading(true);
     setError("");
-    setPageCursor(null);
     setItems([]);
-    getAdminBookingRequestsPage({
-      status: statusFilter,
-      preferredDate: day,
-      limit: PAGE_SIZE,
-    })
-      .then((result) => {
-        if (
-          generation.current === current &&
-          currentScope.current === queryScope
-        ) {
-          setItems(result.bookingRequests);
-          setPageCursor(
-            result.nextCursor
-              ? { value: result.nextCursor, scope: queryScope }
-              : null,
-          );
-        }
-      })
-      .catch((cause) => {
-        if (
-          generation.current === current &&
-          currentScope.current === queryScope
-        ) {
-          setError(notifyError(cause, "Unable to load requests."));
-        }
-      })
-      .finally(() => {
-        if (
-          generation.current === current &&
-          currentScope.current === queryScope
-        )
-          setLoading(false);
-      });
-    return () => {
-      generation.current++;
-    };
-  }, [statusFilter, day, revision, queryScope, notifyError]);
+    getAdminBookingRequestsPage({ status: statusFilter, preferredDate: day, cursor: pagination.cursor ?? undefined })
+      .then(result => { if (active && currentScope.current === requestKey) { setItems(result.bookingRequests); setNextCursor(result.nextCursor); setLoadedKey(requestKey); } })
+      .catch(cause => { if (active && currentScope.current === requestKey) setError(notifyError(cause, "Unable to load requests.")); })
+      .finally(() => { if (active && currentScope.current === requestKey) setLoading(false); });
+    return () => { active = false; };
+  }, [statusFilter, day, requestKey, pagination.cursor, revision, notifyError]);
   useEffect(() => {
     let active = true;
     setCalendarError("");
@@ -515,67 +465,6 @@ function AdminBookingList() {
       active = false;
     };
   }, [monthKey, statusFilter, revision, notifyError]);
-  const loadMore = useCallback(async () => {
-    if (
-      !cursor ||
-      loading ||
-      moreBusy.current ||
-      currentScope.current !== queryScope
-    )
-      return;
-    const current = generation.current;
-    moreBusy.current = true;
-    setLoadingMore(true);
-    setError("");
-    try {
-      const result = await getAdminBookingRequestsPage({
-        status: statusFilter,
-        preferredDate: day,
-        limit: PAGE_SIZE,
-        cursor,
-      });
-      if (
-        generation.current === current &&
-        currentScope.current === queryScope
-      ) {
-        setItems((rows) => [...rows, ...result.bookingRequests]);
-        setPageCursor(
-          result.nextCursor
-            ? { value: result.nextCursor, scope: queryScope }
-            : null,
-        );
-      }
-    } catch (cause) {
-      if (generation.current === current && currentScope.current === queryScope) {
-        setError(notifyError(cause, "Unable to load more requests."));
-      }
-    } finally {
-      if (
-        generation.current === current &&
-        currentScope.current === queryScope
-      ) {
-        moreBusy.current = false;
-        setLoadingMore(false);
-      }
-    }
-  }, [cursor, day, loading, statusFilter, queryScope, notifyError]);
-  useEffect(() => {
-    if (
-      !sentinel.current ||
-      !cursor ||
-      error ||
-      typeof IntersectionObserver === "undefined"
-    )
-      return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) void loadMore();
-      },
-      { rootMargin: "150px" },
-    );
-    observer.observe(sentinel.current);
-    return () => observer.disconnect();
-  }, [cursor, error, loadMore]);
   return (
     <div className="booking-admin">
       <PageHeader
@@ -625,7 +514,7 @@ function AdminBookingList() {
             </Button>
           )}
         </div>
-        {loading ? (
+        {loading || loadedKey !== requestKey ? (
           <p role="status">Loading requests…</p>
         ) : !items.length && !error ? (
           <p>No requests match these filters.</p>
@@ -680,9 +569,7 @@ function AdminBookingList() {
             {error}{" "}
             <Button variant="secondary"
               type="button"
-              onClick={() =>
-                cursor ? void loadMore() : setRevision((value) => value + 1)
-              }
+              onClick={() => setRevision((value) => value + 1)}
             >
               Try again
             </Button>
@@ -692,18 +579,9 @@ function AdminBookingList() {
           <span>
             Showing {items.length} {items.length === 1 ? "request" : "requests"}
           </span>
-          {cursor && (
-            <Button variant="secondary"
-              type="button"
-              disabled={loadingMore}
-              onClick={() => void loadMore()}
-            >
-              {loadingMore ? "Loading…" : "Load more requests"}
-            </Button>
-          )}
+          <Pagination page={pagination.page} hasNextPage={loadedKey === requestKey && !!nextCursor} onPrevious={pagination.previous} onNext={() => nextCursor && pagination.next(nextCursor)} pending={loading || loadedKey !== requestKey} />
           <span>Preferred dates are not reserved.</span>
         </div>
-        <div ref={sentinel} aria-hidden="true" />
       </Panel>
 
     </div>
@@ -854,18 +732,7 @@ export function BookingDetails({
           </section>
         </div>
         {item.requestedDays && <section><h3>Requested days</h3><p>Times use {item.timeZone}. Dates are not reserved.</p>{item.requestedDays.map(day => <RequestedDay key={day.date} item={item} day={day} editable={customerCanEditTimes && !["declined", "cancelled"].includes(item.status) && !day.eventDayId} onSaved={onSaved} />)}</section>}
-        <details className="booking-history">
-          <summary>Status history</summary>
-          <ul>
-            {item.statusHistory.map((entry, index) => (
-              <li key={index}>
-                {labels[entry.status]} ·{" "}
-                {new Date(entry.createdAt).toLocaleString()}
-                {entry.reason ? ` — ${entry.reason}` : ""}
-              </li>
-            ))}
-          </ul>
-        </details>
+        <BookingStatusHistory id={item.id} admin={false} revision={item.updatedAt} timeZone={item.timeZone} />
         </div>
         )}
         {pageTab === "package" && (

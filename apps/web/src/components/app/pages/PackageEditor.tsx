@@ -1,4 +1,6 @@
-import { Button, Input, Select, Textarea } from "@event-management/ui";
+import { useEffect, useRef, useState } from "react";
+import { getAdminServices, type AdminService } from "../../../lib/data/services";
+import { Button, Input, Select, Textarea, useNotifications } from "@event-management/ui";
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 import {
   MAX_PACKAGE_SERVICES,
@@ -61,7 +63,6 @@ export function PackageEditor({
   onClose,
   onSaved,
   saveCustom,
-  serviceOptions = [],
 }: {
   initial: AdminPackage | null;
   onClose: () => void;
@@ -71,8 +72,24 @@ export function PackageEditor({
       services: { serviceId: string; role: "included" | "optional" }[];
     },
   ) => Promise<void>;
-  serviceOptions?: { id: string; name: string; archivedAt: string | null }[];
 }) {
+  const { notifyError } = useNotifications();
+  const [serviceOptions, setServiceOptions] = useState<AdminService[]>([]);
+  const [serviceCursor, setServiceCursor] = useState<string | null>(null);
+  const [serviceError, setServiceError] = useState("");
+  const [serviceLoading, setServiceLoading] = useState(false);
+  const alive = useRef(true);
+  async function loadServices(cursor?: string) {
+    setServiceLoading(true);
+    try {
+      const page = await getAdminServices({ cursor, archived: "active" });
+      if (!alive.current) return;
+      setServiceOptions(previous => cursor ? [...previous, ...page.services] : page.services);
+      setServiceCursor(page.nextCursor); setServiceError("");
+    } catch (cause) { if (alive.current) setServiceError(notifyError(cause, "Unable to load services.")); }
+    finally { if (alive.current) setServiceLoading(false); }
+  }
+  useEffect(() => { alive.current = true; void loadServices(); return () => { alive.current = false; }; }, []);
   type EditorContent = PackageContent & {
     services: { serviceId: string; role: "included" | "optional" }[];
   };
@@ -219,6 +236,8 @@ export function PackageEditor({
                   </option>
                 ))}
             </Select>
+            {serviceError && <p role="alert">{serviceError} <Button variant="secondary" onClick={() => void loadServices(serviceOptions.length ? serviceCursor ?? undefined : undefined)}>Retry</Button></p>}
+            {serviceCursor && !serviceError && <Button variant="secondary" disabled={serviceLoading} onClick={() => void loadServices(serviceCursor)}>Load more services</Button>}
           </fieldset>
           <label>
             Catalog description

@@ -18,12 +18,13 @@ import {
 
 import { photos } from "../data"
 import { BookingList } from "./BookingList"
-import { PackageCatalog } from "../PackageCatalog"
+import { PublicCatalog } from "../../PublicCatalog"
 import { BookingRequestDialog } from "../BookingRequest"
 import { initialsFromName } from "../../../lib/utils/name"
 import { SignInMethods } from "../SignInMethods"
+import { usePagination } from "../../../lib/use-pagination"
 import { MessagesWorkspace } from "../messages/MessagesWorkspace"
-import { mergeThread } from "../../../lib/services/merge-thread"
+import { mergePolledThread, prependOlder } from "../../../lib/services/merge-thread"
 import { readBookingDraft } from "../../../lib/services/booking-draft"
 import { getPackageBySlug, type PublicPackage } from "../../../lib/data/packages"
 import {
@@ -57,6 +58,7 @@ export function CustomerDashboard({
   const { notify, notifyError } = useNotifications()
   const mounted = useRef(true)
   const selection = useRef(0)
+  const localMessages = useRef(new Set<string>())
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; selection.current++ } }, [])
   useEffect(() => {
     try {
@@ -85,8 +87,17 @@ export function CustomerDashboard({
   const [bookingResume, setBookingResume] = useState(() => new URLSearchParams(search).get("booking") === "resume")
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesError, setMessagesError] = useState("")
+  const [threadError, setThreadError] = useState("")
   const lastMessageError = useRef("")
   const [newChatBusy, setNewChatBusy] = useState(false)
+  const [listCursor, setListCursor] = useState<string | null>(null)
+  const pagination = usePagination("customer-conversations")
+  const [listRevision, setListRevision] = useState(0)
+  const [threadRevision, setThreadRevision] = useState(0)
+  const handledReference = useRef<string | null>(null)
+  const listRequest = useRef(0)
+  const [historyNotice, setHistoryNotice] = useState("")
+  const [loadingOlder, setLoadingOlder] = useState(false)
   useEffect(() => {
     const params = new URLSearchParams(search)
     const slug = params.get("book")
@@ -100,24 +111,19 @@ export function CustomerDashboard({
     return () => { active = false }
   }, [search, notifyError])
 
-  const refreshMessages = useCallback(async (active: () => boolean) => {
+  const refreshMessages = useCallback(async (isActive: () => boolean) => {
+    const request = ++listRequest.current
+    const active = () => isActive() && request === listRequest.current
     try {
-      const { conversations } = await getMyConversations()
+      const page = await getMyConversations(pagination.cursor)
       if (!active()) return
-      setMessageConversations(conversations)
-      const targetId = pendingBookingReference
-        ? conversations.find((item) => item.bookingRequestReference === pendingBookingReference)?.id ?? null
-        : selectedConversationId && conversations.some((item) => item.id === selectedConversationId)
-        ? selectedConversationId
-        : conversations[0]?.id ?? null
+      setListCursor(page.nextCursor)
+      setMessageConversations(page.conversations)
+      const matching = pendingBookingReference && handledReference.current !== pendingBookingReference ? await getMyConversations(undefined, pendingBookingReference) : null
+      if (!active()) return
+      if (matching) handledReference.current = pendingBookingReference
+      const targetId = matching?.conversations[0]?.id ?? selectedConversationId ?? page.conversations[0]?.id ?? null
       setSelectedConversationId(targetId)
-      if (targetId) {
-        const thread = await getMyConversationById(targetId)
-        if (!active()) return
-        setMessageThread((current) => mergeThread(current, thread))
-      } else {
-        setMessageThread(null)
-      }
       setMessagesError("")
       lastMessageError.current = ""
     } catch (cause) {
@@ -129,32 +135,50 @@ export function CustomerDashboard({
     } finally {
       if (active()) setMessagesLoading(false)
     }
-  }, [pendingBookingReference, selectedConversationId, notifyError])
+  }, [pagination.cursor, pendingBookingReference, selectedConversationId, notifyError])
 
   useEffect(() => {
     if (tab !== "Messages") return
     let active = true
     setMessagesLoading(true)
     void refreshMessages(() => active)
-    const timer = window.setInterval(() => void refreshMessages(() => active), 5000)
+    const timer = pagination.page === 1 ? window.setInterval(() => void refreshMessages(() => active), 5000) : undefined
+    return () => { active = false; listRequest.current++; if (timer) window.clearInterval(timer) }
+  }, [tab, refreshMessages, pagination.page, listRevision])
+
+  useEffect(() => {
+    if (tab !== "Messages" || !selectedConversationId) return
+    let active = true
+    const id = selectedConversationId
+    const load = async () => {
+      try {
+        const thread = await getMyConversationById(id)
+        if (!active) return
+        const unacknowledged = new Set(localMessages.current)
+        thread.messages.forEach(message => localMessages.current.delete(message.id))
+        setMessageThread(current => {
+          const merged = mergePolledThread(current, thread, unacknowledged)
+          if (merged.gap) setHistoryNotice("New messages arrived while you were away. Earlier history was reset; load older messages to see it.")
+          return merged.thread
+        })
+        setThreadError("")
+      } catch (cause) { if (active) setThreadError(notificationErrorMessage(cause, "Unable to load this conversation.")) }
+    }
+    void load()
+    const timer = window.setInterval(() => void load(), 5000)
     return () => { active = false; window.clearInterval(timer) }
-  }, [tab, refreshMessages])
+  }, [tab, selectedConversationId, notifyError, threadRevision])
 
   const showSentInList = (conversation: ChatConversation, message: ChatMessage) => {
-    setMessageConversations((current) => {
-      const source = current.find((item) => item.id === conversation.id) ?? conversation
-      return [
-        { ...source, status: "active", lastMessage: message, updatedAt: message.createdAt },
-        ...current.filter((item) => item.id !== conversation.id),
-      ]
-    })
+    setMessageConversations(current => current.map(item => item.id === conversation.id ? { ...item, status: "active", lastMessage: message, updatedAt: message.createdAt } : item))
   }
 
-  const appendMessage = (message: ChatMessage) => {
+  const appendMessage = (message: ChatMessage, conversationId: string) => {
     setMessageThread((current) => {
-      if (!current) return current
+      if (!current || current.conversation.id !== conversationId) return current
       if (current.messages.some((item) => item.id === message.id)) return current
       return {
+        ...current,
         conversation: {
           ...current.conversation,
           lastMessage: message,
@@ -165,15 +189,30 @@ export function CustomerDashboard({
     })
   }
 
+  const loadOlder = async () => {
+    if (!messageThread?.nextCursor || loadingOlder) return
+    const id = messageThread.conversation.id
+    setLoadingOlder(true)
+    try {
+      const older = await getMyConversationById(id, messageThread.nextCursor)
+      older.messages.forEach(message => localMessages.current.delete(message.id))
+      setMessageThread(current => current?.conversation.id === id ? prependOlder(current, older) : current)
+    } catch (cause) { notifyError(cause, "Unable to load older messages.") }
+    finally { setLoadingOlder(false) }
+  }
+
   const sendMessage = async (body: string) => {
-    const previousStatus = messageThread?.conversation.status ?? "active"
-    const result = await sendMyMessage(body, messageThread?.conversation.id)
-    appendMessage(result.message)
-    if (messageThread) showSentInList(messageThread.conversation, result.message)
+    const conversation = messageThread?.conversation
+    if (!conversation) return
+    const previousStatus = conversation.status
+    const result = await sendMyMessage(body, conversation.id)
+    localMessages.current.add(result.message.id)
+    appendMessage(result.message, conversation.id)
+    showSentInList(conversation, result.message)
     // A new message reopens a closed general conversation.
     if (previousStatus === "closed") {
       setMessageThread((current) =>
-        current
+        current?.conversation.id === conversation.id
           ? {
               ...current,
               conversation: {
@@ -200,7 +239,8 @@ export function CustomerDashboard({
       const thread = await createMyConversation()
       setSelectedConversationId(thread.conversation.id)
       setMessageThread(thread)
-      setMessageConversations((current) => [thread.conversation, ...current])
+      pagination.reset()
+      setListRevision(value => value + 1)
       setConversationOpen(true)
       notify("New chat started.")
     } catch (cause) {
@@ -214,6 +254,7 @@ export function CustomerDashboard({
     const location = window.location.href
     const current = ++selection.current
     const active = () => mounted.current && selection.current === current && window.location.href === location
+    setHistoryNotice("")
     setSelectedConversationId(id)
     setConversationOpen(true)
     setMessagesLoading(true)
@@ -238,8 +279,10 @@ export function CustomerDashboard({
     try {
       const thread = messageThread ?? await getMyConversation()
       const result = await sendMyMessage(body, thread.conversation.id)
+      localMessages.current.add(result.message.id)
       setSelectedConversationId(thread.conversation.id)
       setMessageThread({
+        ...thread,
         conversation: { ...thread.conversation, status: "active", lastMessage: result.message, updatedAt: result.message.createdAt },
         messages: [...thread.messages, result.message],
       })
@@ -345,7 +388,7 @@ export function CustomerDashboard({
               description="Explore currently published packages."
 
             />
-            <PackageCatalog />
+            <PublicCatalog kind="packages" mode="overview" />
           </div>
         )}
 
@@ -372,13 +415,20 @@ export function CustomerDashboard({
               title="Messages"
               viewerRole="customer"
               conversations={messageConversations}
+              activeConversation={messageThread?.conversation}
               activeId={messageThread?.conversation.id ?? null}
               onSelect={(id) => void selectConversation(id)}
               messages={messageThread?.messages ?? []}
+              listPage={{ page: pagination.page, hasNextPage: !!listCursor, pending: messagesLoading, onPrevious: () => { setMessagesLoading(true); pagination.previous() }, onNext: () => { setMessagesLoading(true); pagination.next(listCursor) }, onRefresh: () => { setMessagesLoading(true); pagination.reset(); setListRevision(value => value + 1) } }}
+              hasOlder={!!messageThread?.nextCursor}
+              loadingOlder={loadingOlder}
+              onLoadOlder={() => void loadOlder()}
+              historyNotice={historyNotice}
               loading={messagesLoading}
-              error={messagesError}
+              error={messagesError || threadError}
               onRetry={() => {
                 setMessagesLoading(true)
+                setThreadRevision(value => value + 1)
                 const location = window.location.href
                 void refreshMessages(() => window.location.href === location)
               }}

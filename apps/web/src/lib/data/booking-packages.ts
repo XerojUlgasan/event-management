@@ -40,7 +40,7 @@ export type PackageHistoryEntry = {
   after: CatalogPackage;
   createdAt: string;
 };
-export const getBookingPackageHistory = (id: string) =>
-  request<{ history: PackageHistoryEntry[] }>(
-    `/admin/booking-requests/${encodeURIComponent(id)}/package-history`,
+export const getBookingPackageHistory = (id: string, cursor?: string) =>
+  request<{ history: PackageHistoryEntry[]; nextCursor: string | null }>(
+    `/admin/booking-requests/${encodeURIComponent(id)}/package-history${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
   );

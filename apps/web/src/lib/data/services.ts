@@ -1,6 +1,6 @@
 import type { CatalogSection } from "@event-management/contracts/catalog"
 import { request } from "../http"
-import { pageQuery } from "./page-query"
+import { pageQuery, type CatalogPageQuery } from "./page-query"
 
 export type ServiceContent = {
   name: string
@@ -19,9 +19,9 @@ export type PublicService = ServiceContent & {
 }
 export type AdminService = PublicService
 
-export const getAdminServices = () => request<{ services: AdminService[] }>("/admin/services")
-export const getServices = (page?: { limit: number; offset?: number }) =>
-  request<{ services: PublicService[]; nextOffset: number | null }>(`/services${pageQuery(page)}`)
+export const getAdminServices = (page?: CatalogPageQuery) => request<{ services: AdminService[]; nextCursor: string | null; counts: { active: number; archived: number; filtered: number } }>(`/admin/services${pageQuery(page)}`)
+export const getServices = (page?: CatalogPageQuery) =>
+  request<{ services: PublicService[]; nextCursor: string | null }>(`/services${pageQuery(page)}`)
 export const getService = (id: string) =>
   request<PublicService>(`/services/${encodeURIComponent(id)}`)
 export const getAdminService = (id: string) =>

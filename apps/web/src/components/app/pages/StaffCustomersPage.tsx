@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   Button,
   ActivityList,
@@ -7,12 +7,14 @@ import {
   Icon,
   PageHeader,
   Panel,
+  Pagination,
   SearchField,
   StatCard,
   Tabs,
   useNotifications,
 } from "@event-management/ui"
-import { getAdminUsers, type AdminUser } from "../../../lib/data/users"
+import { usePagination } from "../../../lib/use-pagination"
+import { getAdminUsers, type AdminUser, type DirectoryStats } from "../../../lib/data/users"
 
 type LoadState = "loading" | "ready" | "error"
 
@@ -31,6 +33,9 @@ export function StaffCustomersPage() {
   const [tab, setTab] = useState("Staff")
   const [loadState, setLoadState] = useState<LoadState>("loading")
   const [loadRevision, setLoadRevision] = useState(0)
+  const [stats, setStats] = useState<DirectoryStats>({ staffTotal: 0, customerTotal: 0, staffRoles: 0, staffJoined: 0, customerJoined: 0 })
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [loadedKey, setLoadedKey] = useState("")
   const [staff, setStaff] = useState<AdminUser[]>([])
   const [customers, setCustomers] = useState<AdminUser[]>([])
   const [staffQuery, setStaffQuery] = useState("")
@@ -38,46 +43,33 @@ export function StaffCustomersPage() {
   const [selectedStaff, setSelectedStaff] = useState<AdminUser | null>(null)
   const [selectedCustomer, setSelectedCustomer] = useState<AdminUser | null>(null)
 
+  const group = tab === "Staff" ? "staff" : "customers"
+  const search = group === "staff" ? staffQuery : customerQuery
+  const scope = JSON.stringify([group, search.trim().toLowerCase()])
+  const pagination = usePagination(scope)
+  const requestKey = JSON.stringify([scope, pagination.cursor])
+  const currentScope = useRef(requestKey)
+  currentScope.current = requestKey
   useEffect(() => {
     let active = true
     setLoadState("loading")
-    getAdminUsers()
-      .then(({ staff, customers }) => {
-        if (!active) return
+    getAdminUsers(group, search, pagination.cursor ?? undefined)
+      .then(({ staff, customers, stats, nextCursor }) => {
+        if (!active || currentScope.current !== requestKey) return
         setStaff(staff)
         setCustomers(customers)
+        setStats(stats)
+        setNextCursor(nextCursor)
+        setLoadedKey(requestKey)
         setLoadState("ready")
       })
-      .catch(() => { if (active) { setLoadState("error"); notifyError("Unable to load staff and customers.") } })
+      .catch(() => { if (active && currentScope.current === requestKey) { setLoadState("error"); notifyError("Unable to load staff and customers.") } })
     return () => { active = false }
-  }, [notifyError, loadRevision])
+  }, [group, search, requestKey, pagination.cursor, notifyError, loadRevision])
 
-  const filteredStaff = staff.filter((person) =>
-    `${person.displayName ?? ""} ${person.staffRole ?? ""} ${person.email}`
-      .toLowerCase()
-      .includes(staffQuery.trim().toLowerCase()),
-  )
-
-  const filteredCustomers = customers.filter((person) =>
-    `${person.displayName ?? ""} ${person.email}`
-      .toLowerCase()
-      .includes(customerQuery.trim().toLowerCase()),
-  )
-
-  if (loadState === "loading") {
-    return (
-      <div className="content-stack">
-        <PageHeader
-          title="Staff & Customers"
-          description="View staff roles and customer profiles in one place."
-        />
-        <div className="loading-state" aria-busy="true" aria-label="Loading users">
-          <Icon name="spinner" size={24} />
-          <span>Loading…</span>
-        </div>
-      </div>
-    )
-  }
+  const pageReady = loadState === "ready" && loadedKey === requestKey
+  const filteredStaff = staff
+  const filteredCustomers = customers
 
   if (loadState === "error") {
     return (
@@ -108,28 +100,23 @@ export function StaffCustomersPage() {
         active={tab}
         onChange={setTab}
         items={[
-          { value: "Staff", label: "Staff", count: staff.length },
-          { value: "Customers", label: "Customers", count: customers.length },
+          { value: "Staff", label: "Staff", count: stats.staffTotal },
+          { value: "Customers", label: "Customers", count: stats.customerTotal },
         ]}
       />
+      {!pageReady && <p role="status">Loading users…</p>}
       {tab === "Staff" ? (
         <>
           <div className="stats-grid three">
-            <StatCard label="Total staff" value={String(staff.length)} detail="In the directory" />
+            <StatCard label="Total staff" value={String(stats.staffTotal)} detail="In the directory" />
             <StatCard
               label="By role"
-              value={String(new Set(staff.map((p) => p.staffRole).filter(Boolean)).size)}
+              value={String(stats.staffRoles)}
               detail="Distinct job roles"
             />
             <StatCard
               label="Joined this month"
-              value={String(
-                staff.filter((p) => {
-                  const d = new Date(p.createdAt)
-                  const now = new Date()
-                  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
-                }).length,
-              )}
+              value={String(stats.staffJoined)}
               detail="New this month"
             />
           </div>
@@ -137,7 +124,7 @@ export function StaffCustomersPage() {
             <div className="table-tools">
               <SearchField
                 value={staffQuery}
-                onChange={(event) => setStaffQuery(event.target.value)}
+                onChange={(event) => setStaffQuery(event.target.value.slice(0, 200))}
                 placeholder="Search staff name, role, or email"
               />
             </div>
@@ -148,7 +135,7 @@ export function StaffCustomersPage() {
                 <span>Phone</span>
                 <span></span>
               </div>
-              {filteredStaff.map((person) => (
+              {(pageReady ? filteredStaff : []).map((person) => (
                 <Button variant="plain"
                   className="staff-admin-row"
                   key={person.id}
@@ -166,7 +153,7 @@ export function StaffCustomersPage() {
                   <Icon name="chevron" size={15} />
                 </Button>
               ))}
-              {filteredStaff.length === 0 && (
+              {pageReady && filteredStaff.length === 0 && (
                 <div className="empty-state">
                   <Icon name="search" size={28} />
                   <strong>No matching staff</strong>
@@ -174,21 +161,16 @@ export function StaffCustomersPage() {
                 </div>
               )}
             </div>
+            <Pagination page={pagination.page} hasNextPage={pageReady && !!nextCursor} onPrevious={pagination.previous} onNext={() => nextCursor && pagination.next(nextCursor)} pending={!pageReady} />
           </Panel>
         </>
       ) : (
         <>
           <div className="stats-grid three">
-            <StatCard label="Total customers" value={String(customers.length)} detail="In the directory" />
+            <StatCard label="Total customers" value={String(stats.customerTotal)} detail="In the directory" />
             <StatCard
               label="Joined this month"
-              value={String(
-                customers.filter((p) => {
-                  const d = new Date(p.createdAt)
-                  const now = new Date()
-                  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
-                }).length,
-              )}
+              value={String(stats.customerJoined)}
               detail="New this month"
             />
             <StatCard label="Active inquiries" value="—" detail="Coming soon" />
@@ -197,7 +179,7 @@ export function StaffCustomersPage() {
             <div className="table-tools">
               <SearchField
                 value={customerQuery}
-                onChange={(event) => setCustomerQuery(event.target.value)}
+                onChange={(event) => setCustomerQuery(event.target.value.slice(0, 200))}
                 placeholder="Search customer name or email"
               />
             </div>
@@ -207,7 +189,7 @@ export function StaffCustomersPage() {
                 <span>Email</span>
                 <span></span>
               </div>
-              {filteredCustomers.map((customer) => (
+              {(pageReady ? filteredCustomers : []).map((customer) => (
                 <Button variant="plain"
                   className="customer-admin-row"
                   key={customer.id}
@@ -224,7 +206,7 @@ export function StaffCustomersPage() {
                   <Icon name="chevron" size={15} />
                 </Button>
               ))}
-              {filteredCustomers.length === 0 && (
+              {pageReady && filteredCustomers.length === 0 && (
                 <div className="empty-state">
                   <Icon name="search" size={28} />
                   <strong>No matching customers</strong>
@@ -232,6 +214,7 @@ export function StaffCustomersPage() {
                 </div>
               )}
             </div>
+            <Pagination page={pagination.page} hasNextPage={pageReady && !!nextCursor} onPrevious={pagination.previous} onNext={() => nextCursor && pagination.next(nextCursor)} pending={!pageReady} />
           </Panel>
         </>
       )}

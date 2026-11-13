@@ -2,7 +2,7 @@ import type { Kysely } from "kysely";
 import { lockBookingRequestData } from "../../data/booking-requests/lock-booking-request.js";
 import { createQuotationData } from "../../data/quotations/create-quotation.js";
 import { findQuoteData } from "../../data/quotations/find-quotation.js";
-import { listQuotesData } from "../../data/quotations/list-quotations.js";
+import { quotationWriteStateData } from "../../data/quotations/list-quotations.js";
 import type { DB } from "../../db/types.js";
 import {
   audit,
@@ -29,12 +29,12 @@ export async function createQuotationService(
     const base = basePrice(pkg.price);
     if (base === null)
       return failure("Package price is outside the supported range", 400);
-    const existing = await listQuotesData(trx, booking.id);
-    if (existing.some((q) => ["draft", "sent", "accepted"].includes(q.status)))
+    const existing = await quotationWriteStateData(trx, booking.id);
+    if (existing.has_active)
       return failure("Revise the active quotation instead", 409);
     const row = await createQuotationData(trx, {
       booking_request_id: booking.id,
-      version: (existing[0]?.version ?? 0) + 1,
+      version: existing.max_version + 1,
       currency: "PHP",
       base_amount_minor: base,
       total_amount_minor: base,

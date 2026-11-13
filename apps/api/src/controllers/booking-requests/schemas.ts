@@ -54,7 +54,6 @@ export const bookingSchema = z.object({
   requestedDays: z.array(requestedDayResponseSchema).min(1).nullable(), durationMode: durationModeSchema.nullable(), requestedDayCount: z.number().int().positive().nullable(),
   contactName: z.string(), phoneNumber: z.string(), preferredVenueLocation: z.string().nullable(), specialRequests: z.string().nullable(),
   status: statusSchema, outOfRange: z.boolean(), createdAt: z.string(), updatedAt: z.string(),
-  statusHistory: z.array(z.object({ status: statusSchema, reason: z.string().nullable(), changedBy: z.string().uuid(), createdAt: z.string() })),
 });
 export type CreateInput = z.infer<typeof createSchema>;
 export type Status = z.infer<typeof statusSchema>;

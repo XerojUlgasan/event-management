@@ -4,7 +4,6 @@ import type { BookingEstimatedDuration } from "@event-management/contracts/limit
 import type { Status } from "../../controllers/booking-requests/schemas.js";
 import { requestedDaysSchema } from "../../controllers/booking-requests/schemas.js";
 import { listRequestedDaySchedulesData } from "../../data/booking-requests/list-requested-day-schedules.js";
-import { listStatusHistoryData } from "../../data/booking-requests/list-status-history.js";
 
 type Database = Kysely<DB> | Transaction<DB>;
 
@@ -12,10 +11,6 @@ export async function bookingRequestDtos(
   db: Database,
   rows: (Selectable<BookingRequests> & { revision: string })[],
 ) {
-  const history = await listStatusHistoryData(
-    db,
-    rows.map((r) => r.id),
-  );
   const schedules = new Map((await listRequestedDaySchedulesData(db, rows.map(r => r.id))).map(day => [day.id, day]));
   return rows.map((r) => {
     const days = r.requested_days === null ? null : requestedDaysSchema.parse(r.requested_days);
@@ -63,14 +58,7 @@ export async function bookingRequestDtos(
       outOfRange: r.out_of_range,
       createdAt: r.created_at.toISOString(),
       updatedAt: r.revision,
-      statusHistory: history
-        .filter((h) => h.booking_request_id === r.id)
-        .map((h) => ({
-          status: h.status as Status,
-          reason: h.reason,
-          changedBy: h.changed_by,
-          createdAt: h.created_at.toISOString(),
-        })),
+
     };
   });
 }

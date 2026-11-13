@@ -1,6 +1,6 @@
 import type { CatalogSection } from "@event-management/contracts/catalog"
 import { request } from "../http"
-import { pageQuery } from "./page-query"
+import { pageQuery, type CatalogPageQuery } from "./page-query"
 
 export type VenueContent = {
   name: string
@@ -19,9 +19,9 @@ export type Venue = VenueContent & {
 }
 export type AdminVenue = Venue
 
-export const getVenues = (page?: { limit: number; offset?: number }) =>
-  request<{ venues: Venue[]; nextOffset: number | null }>(`/venues${pageQuery(page)}`)
-export const getAdminVenues = () => request<{ venues: AdminVenue[] }>("/admin/venues")
+export const getVenues = (page?: CatalogPageQuery) =>
+  request<{ venues: Venue[]; nextCursor: string | null }>(`/venues${pageQuery(page)}`)
+export const getAdminVenues = (page?: CatalogPageQuery) => request<{ venues: AdminVenue[]; nextCursor: string | null; counts: { active: number; archived: number; filtered: number } }>(`/admin/venues${pageQuery(page)}`)
 export const getAdminVenue = (id: string) =>
   request<AdminVenue>(`/admin/venues/${encodeURIComponent(id)}`)
 export const createVenue = (content: VenueContent) =>

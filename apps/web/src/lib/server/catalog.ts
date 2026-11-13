@@ -17,19 +17,44 @@ async function serverGet<T>(path: string): Promise<T | null> {
   return response.json() as Promise<T>
 }
 
-export async function loadPackages(limit?: number) {
-  const page = await serverGet<{ packages: PublicPackage[] }>(`/packages${limit ? `?limit=${limit}` : ""}`)
-  return page?.packages ?? []
+type Page<T> = { items: T[]; nextCursor: string | null }
+async function loadPage<T>(kind: "packages" | "services" | "venues", limit?: number, cursor?: string): Promise<Page<T>> {
+  const params = new URLSearchParams()
+  if (limit !== undefined) params.set("limit", String(limit))
+  if (cursor) params.set("cursor", cursor)
+  const result = await serverGet<Record<string, T[]> & { nextCursor: string | null }>(`/${kind}?${params}`)
+  return { items: result?.[kind] ?? [], nextCursor: result?.nextCursor ?? null }
+}
+export const loadPackagesPage = (limit?: number, cursor?: string) => loadPage<PublicPackage>("packages", limit, cursor)
+export const loadServicesPage = (limit?: number, cursor?: string) => loadPage<PublicService>("services", limit, cursor)
+export const loadVenuesPage = (limit?: number, cursor?: string) => loadPage<Venue>("venues", limit, cursor)
+export const loadPackages = async (limit: number) => (await loadPackagesPage(limit)).items
+export const loadServices = async (limit: number) => (await loadServicesPage(limit)).items
+export const loadVenues = async (limit: number) => (await loadVenuesPage(limit)).items
+
+export async function loadAllCatalog<T>(load: (limit?: number, cursor?: string) => Promise<Page<T>>) {
+  const items: T[] = []
+  let cursor: string | undefined
+  do {
+    const page = await load(undefined, cursor)
+    items.push(...page.items)
+    cursor = page.nextCursor ?? undefined
+  } while (cursor)
+  return items
 }
 
-export async function loadServices(limit?: number) {
-  const page = await serverGet<{ services: PublicService[] }>(`/services${limit ? `?limit=${limit}` : ""}`)
-  return page?.services ?? []
-}
-
-export async function loadVenues(limit?: number) {
-  const page = await serverGet<{ venues: Venue[] }>(`/venues${limit ? `?limit=${limit}` : ""}`)
-  return page?.venues ?? []
+export function catalogPageLinks(url: URL, nextCursor: string | null) {
+  const cursor = url.searchParams.get("cursor") ?? undefined
+  const history = url.searchParams.getAll("previous")
+  const link = (current: string | undefined, previous: string[]) => {
+    const params = new URLSearchParams()
+    if (current) params.set("cursor", current)
+    for (const item of previous) params.append("previous", item)
+    const query = params.toString()
+    return `${url.pathname}${query ? `?${query}` : ""}`
+  }
+  return { previous: history.length ? link(history.at(-1) || undefined, history.slice(0, -1)) : null,
+    next: nextCursor ? link(nextCursor, [...history, cursor ?? ""]) : null }
 }
 
 export function loadPackage(slug: string) {

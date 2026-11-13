@@ -12,5 +12,6 @@ export async function listEventDaysService(
     db,
     await listEventDaysData(db, bookingId, staffId, assignmentsOnly),
     staffId,
+    true,
   );
 }

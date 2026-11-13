@@ -1,9 +1,11 @@
+import { usePagination } from "../../../lib/use-pagination";
 import { CatalogCard, CatalogCardActions } from "./CatalogCard";
 import type { ReactNode } from "react";
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Button,
+  Pagination,
   Dialog,
   FormField,
   Input,
@@ -79,6 +81,9 @@ export function ServicesPanel() {
   const { notify, notifyError } = useNotifications();
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const [counts, setCounts] = useState({ active: 0, archived: 0, filtered: 0 });
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const requestId = useRef(0);
   const [rows, setRows] = useState<AdminService[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -96,21 +101,24 @@ export function ServicesPanel() {
     item: AdminService;
     action: "archive" | "delete";
   } | null>(null);
+  const pagination = usePagination(`${tab}:${search}`);
   const load = useCallback(async () => {
+    const current = ++requestId.current;
     setLoading(true);
     setError("");
     try {
-      const result = await getAdminServices();
-      if (mounted.current) setRows(result.services);
+      const result = await getAdminServices({ cursor: pagination.cursor, search, archived: tab === "Archives" ? "archived" : "active" });
+      if (mounted.current && current === requestId.current) { setRows(result.services); setNextCursor(result.nextCursor); setCounts(result.counts); }
     } catch (err) {
-      if (!mounted.current) return;
+      if (!mounted.current || current !== requestId.current) return;
       setError(notifyError(err, "Something went wrong. Please try again."));
     } finally {
-      if (mounted.current) setLoading(false);
+      if (mounted.current && current === requestId.current) setLoading(false);
     }
-  }, [notifyError]);
+  }, [notifyError, pagination.cursor, search, tab]);
   useEffect(() => {
     void load();
+    return () => { requestId.current++; };
   }, [load]);
   const openEdit = async (id: string) => {
     setBusy(true);
@@ -160,12 +168,7 @@ export function ServicesPanel() {
       setBusy(false);
     }
   };
-  const visible = rows.filter((item) => {
-    if (tab === "Archives" ? !item.archivedAt : !!item.archivedAt) return false;
-    return `${item.name} ${item.description}`
-      .toLowerCase()
-      .includes(search.toLowerCase().trim());
-  });
+  const visible = rows;
   return (
     <div className="pe-list">
       <PageHeader
@@ -192,17 +195,19 @@ export function ServicesPanel() {
         role="group"
         aria-label="Service catalog"
         active={tab}
-        onChange={setTab}
+        onChange={(value) => { setTab(value); }}
         items={[
           {
             value: "Services",
             label: "Services",
-            count: rows.filter((item) => !item.archivedAt).length,
+            count: counts.active,
+
           },
           {
             value: "Archives",
             label: "Archives",
-            count: rows.filter((item) => item.archivedAt).length,
+            count: counts.archived,
+
           },
         ]}
       />
@@ -210,12 +215,12 @@ export function ServicesPanel() {
         <SearchField
           type="search"
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => { setSearch(event.target.value.slice(0, 200)); }}
           placeholder="Search services"
           ariaLabel="Search services"
         />
         <span>
-          {visible.length} {visible.length === 1 ? "service" : "services"}
+          {counts.filtered} {counts.filtered === 1 ? "service" : "services"}
         </span>
       </div>
       {loading && <p role="status">Loading services…</p>}
@@ -273,6 +278,7 @@ export function ServicesPanel() {
           );
         })}
       </div>
+      <Pagination page={pagination.page} hasNextPage={nextCursor !== null} pending={loading} onPrevious={pagination.previous} onNext={() => pagination.next(nextCursor)} label="Catalog pages" />
       {preview && (
         <CatalogDetailPreview entity="service" onClose={() => setPreview(null)}>
           <ServiceCanvas item={preview} />

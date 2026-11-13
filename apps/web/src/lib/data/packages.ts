@@ -1,19 +1,19 @@
 import type { CatalogPackage, PackageContent } from "@event-management/contracts/catalog"
 import { request } from "../http"
 import { catalogMediaSrc } from "./catalog-media"
-import { pageQuery } from "./page-query"
+import { pageQuery, type CatalogPageQuery } from "./page-query"
 
 export type { PackagePrice, PackageContent, CatalogMedia, CatalogWidget, CatalogSection } from "@event-management/contracts/catalog"
 export type PublicPackage = CatalogPackage
 export type AdminPackage = CatalogPackage
 
-export const getPackages = (page?: { limit: number; offset?: number }) =>
-  request<{ packages: PublicPackage[]; nextOffset: number | null }>(`/packages${pageQuery(page)}`)
+export const getPackages = (page?: CatalogPageQuery) =>
+  request<{ packages: PublicPackage[]; nextCursor: string | null }>(`/packages${pageQuery(page)}`)
 export const getPackage = (id: string) =>
   request<PublicPackage>(`/packages/${encodeURIComponent(id)}`)
 export const getPackageBySlug = (slug: string) =>
   request<PublicPackage>(`/packages/slug/${encodeURIComponent(slug)}`)
-export const getAdminPackages = () => request<{ packages: AdminPackage[] }>("/admin/packages")
+export const getAdminPackages = (page?: CatalogPageQuery) => request<{ packages: AdminPackage[]; nextCursor: string | null; counts: { active: number; archived: number; filtered: number } }>(`/admin/packages${pageQuery(page)}`)
 export const getAdminPackage = (id: string) =>
   request<AdminPackage>(`/admin/packages/${encodeURIComponent(id)}`)
 export const createPackage = (content: PackageContent) =>

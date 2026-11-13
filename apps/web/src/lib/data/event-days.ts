@@ -1,4 +1,5 @@
-import type { ResponseDeadlineDays } from "@event-management/contracts/event-days";
+import type { EventDayStaffRow, ResponseDeadlineDays } from "@event-management/contracts/event-days";
+import type { PaginationQuery, PageInfo } from "@event-management/contracts/pagination";
 import { request } from "../http";
 export type EventDay = {
   id: string;
@@ -58,14 +59,29 @@ export const createEventDay = (
   }>("/admin/event-days", { bookingRequestId, ...body });
 export const applyResponseDeadlines = (body: { bookingRequestId: string; daysBefore: ResponseDeadlineDays; expectedUpdatedAt: string }) =>
   request<{ eventDays: EventDay[] }>("/admin/event-days/apply-response-deadlines", body);
-export const getStaffEventDays = () =>
+export type StaffEventDayQuery = PaginationQuery & { search?: string; filter?: "all" | "open" | "responded"; date?: string };
+function queryString(query: StaffEventDayQuery = {}) {
+  const params = new URLSearchParams();
+  if (query.cursor) params.set("cursor", query.cursor);
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  if (query.search) params.set("search", query.search);
+  if (query.filter) params.set("filter", query.filter);
+  if (query.date) params.set("date", query.date);
+  return params.toString();
+}
+export const getEventDayStaff = (id: string, query: PaginationQuery = {}) =>
+  request<PageInfo & { staff: EventDayStaffRow[] }>(`/admin/event-days/${path(id)}/staff?${queryString(query)}`);
+export const getStaffEventCalendar = (month: string, query: Pick<StaffEventDayQuery, "search" | "filter"> = {}) =>
+  request<{ counts: { day: string; count: number }[] }>(`/staff/event-days/calendar?${queryString(query)}&month=${encodeURIComponent(month)}`);
+export const getStaffEventDay = (id: string) => request<{ eventDay: EventDay }>(`/staff/event-days/${path(id)}`);
+export const getStaffEventDays = (query: StaffEventDayQuery = {}) =>
   request<{
     eventDays: EventDay[];
-  }>("/staff/event-days");
-export const getStaffAssignments = () =>
+  } & PageInfo>(`/staff/event-days?${queryString(query)}`);
+export const getStaffAssignments = (query: StaffEventDayQuery = {}) =>
   request<{
     eventDays: EventDay[];
-  }>("/staff/assignments");
+  } & PageInfo>(`/staff/assignments?${queryString(query)}`);
 export const respondToEventDay = (
   id: string,
   response: "available" | "unavailable",

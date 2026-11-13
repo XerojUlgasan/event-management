@@ -1,6 +1,6 @@
 import "../../styles/booking-request.css";
 import { useEffect, useRef, useState } from "react";
-import { Button, useNotifications } from "@event-management/ui";
+import { Button, Pagination, useNotifications } from "@event-management/ui";
 import {
   getBookingPackage,
   getBookingPackageHistory,
@@ -8,7 +8,7 @@ import {
   type BookingPackageResult,
   type PackageHistoryEntry,
 } from "../../lib/data/booking-packages";
-import { getAdminServices, type AdminService } from "../../lib/data/services";
+import { usePagination } from "../../lib/use-pagination";
 import { PackageCanvas } from "./PackagePreview";
 import { PackageEditor } from "./pages/PackageEditor";
 
@@ -27,37 +27,48 @@ export function BookingPackage({
   const generation = useRef(0);
   const [loaded, setLoaded] = useState<BookingPackageResult | null>(null);
   const [history, setHistory] = useState<PackageHistoryEntry[]>([]);
-  const [services, setServices] = useState<AdminService[]>([]);
   const [editing, setEditing] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadedKey, setLoadedKey] = useState("");
+  const [loadedIdentity, setLoadedIdentity] = useState("");
+  const identity = JSON.stringify([id, admin]);
+  const pagination = usePagination(identity);
+  const key = JSON.stringify([id, admin, pagination.cursor ?? null]);
+  const keyRef = useRef(key);
+  keyRef.current = key;
+  const request = useRef(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function load() {
     const current = generation.current;
+    const sequence = ++request.current;
+    const requestKey = key;
     setBusy(true);
     setError("");
     try {
-      const [result, options, audit] = await Promise.all([
+      const [result, audit] = await Promise.all([
         getBookingPackage(id, admin),
-        admin ? getAdminServices() : Promise.resolve(null),
-        admin ? getBookingPackageHistory(id) : Promise.resolve(null),
+        admin ? getBookingPackageHistory(id, pagination.cursor) : Promise.resolve(null),
       ]);
-      if (current !== generation.current) return;
+      if (current !== generation.current || sequence !== request.current || keyRef.current !== requestKey) return;
       setLoaded(result);
       setHistory(audit?.history ?? []);
-      setServices(options?.services ?? []);
+      setNextCursor(audit?.nextCursor ?? null);
+      setLoadedKey(requestKey);
+      setLoadedIdentity(identity);
     } catch (cause) {
-      if (current !== generation.current) return;
+      if (current !== generation.current || sequence !== request.current || keyRef.current !== requestKey) return;
       setError(notifyError(cause, "Unable to load the proposed package."));
     } finally {
-      if (current === generation.current) setBusy(false);
+      if (current === generation.current && sequence === request.current && keyRef.current === requestKey) setBusy(false);
     }
   }
 
   useEffect(() => {
     void load();
     return () => { generation.current++; };
-  }, [id, admin]);
+  }, [id, admin, pagination.cursor]);
 
   return (
     <section aria-label="Package" className="booking-current-package">
@@ -70,7 +81,7 @@ export function BookingPackage({
           </Button>
         </p>
       )}
-      {loaded && !editing && (
+      {loadedIdentity === identity && loaded && !editing && (
         <>
           {admin && editable && (
             <div className="booking-actions">
@@ -82,7 +93,7 @@ export function BookingPackage({
           <PackageCanvas item={loaded.package} hideServices />
         </>
       )}
-      {admin && history.length > 0 && !editing && (
+      {admin && loadedKey === key && (history.length > 0 || pagination.page > 1 || !!nextCursor) && !editing && (
         <details>
           <summary>Private package edit history</summary>
           {history.map((entry) => (
@@ -118,19 +129,20 @@ export function BookingPackage({
               </details>
             </details>
           ))}
+          <Pagination page={pagination.page} hasNextPage={!!nextCursor} onPrevious={pagination.previous} onNext={() => pagination.next(nextCursor)} pending={busy} label="Package history" />
         </details>
       )}
-      {editing && loaded && (
+      {loadedIdentity === identity && editing && loaded && (
         <PackageEditor
           initial={loaded.package}
-          serviceOptions={services}
           onClose={() => {
             setEditing(false);
             void load();
           }}
           onSaved={() => {
             setEditing(false);
-            void load();
+            if (pagination.page === 1) void load();
+            else pagination.reset();
             onChanged?.();
           }}
           saveCustom={async (content) => {

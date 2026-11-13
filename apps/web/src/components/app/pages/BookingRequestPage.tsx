@@ -1,3 +1,4 @@
+import { BookingStatusHistory } from "../BookingStatusHistory";
 import {
   useCallback,
   useEffect,
@@ -437,20 +438,7 @@ export function BookingRequestPage({
               <p>
                 Dates are not reserved. Staffing does not confirm the booking.
               </p>
-              <details className="booking-request-history">
-                <summary>Status history</summary>
-                <ul>
-                  {item.statusHistory.map((entry, index) => (
-                    <li key={index}>
-                      <strong>{bookingStatusLabels[entry.status]}</strong>
-                      <span>
-                        {bookingDateTime(entry.createdAt, item.timeZone)}
-                        {entry.reason ? ` · ${entry.reason}` : ""}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
+              <BookingStatusHistory id={item.id} admin revision={item.updatedAt} timeZone={item.timeZone} className="booking-request-history" />
             </div>
             {editStatus && (
               <div

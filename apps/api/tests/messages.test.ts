@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { sql } from "kysely";
 import { hashSessionToken } from "../src/utils/session.js";
+import { encodePageCursor } from "../src/utils/pagination.js";
 
 const database = `em_messages_test_${randomUUID().replaceAll("-", "")}`;
 let app: typeof import("../src/app.js").app;
@@ -284,6 +285,10 @@ test("old booking conversations remain active and explicitly closed history stay
     }, chatCustomerCookie), 201)).bookingRequest;
     const linked = (await read(await call("/messages/conversations", "GET", undefined, chatCustomerCookie), 200)).conversations.find((item: any) => item.bookingRequestId === booking.id);
     assert.ok(linked);
+    const byReference = await read(await call(`/messages/conversations?reference=${encodeURIComponent(booking.reference)}`, "GET", undefined, chatCustomerCookie), 200);
+    assert.equal(byReference.conversations[0]?.id, linked.id);
+    const otherLookup = await read(await call(`/messages/conversations?reference=${encodeURIComponent(booking.reference)}`, "GET", undefined, otherCustomerCookie), 200);
+    assert.equal(otherLookup.conversations.length, 0);
     const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
     await db.updateTable("conversations").set({ created_at: old }).where("id", "=", linked.id).execute();
     if (pastEnd) {
@@ -375,4 +380,45 @@ test("deferred AI routes are absent and cannot create automated replies", async 
     assert.equal(spec.paths[`/v1${path.replace(customerThread.conversation.id, "{id}")}`], undefined);
   }
   assert.equal((await db.selectFrom("messages").select("id").where("sender_role", "not in", ["customer", "admin"]).execute()).length, 0);
+});
+
+test("customer conversation and thread pages are bounded, scoped, and keep precise boundaries", async () => {
+  const conversations = Array.from({ length: 7 }, () => randomUUID()).sort().reverse();
+  await db.insertInto("conversations").values(conversations.map(id => ({ id, customer_id: chatCustomerId, status: "active", updated_at: new Date("2091-01-01T00:00:00Z") }))).execute();
+  await sql`update conversations set updated_at = '2091-01-01T00:00:00.000002Z' where id = any(${conversations.slice(0, 3)}::uuid[])`.execute(db);
+  await sql`update conversations set updated_at = '2091-01-01T00:00:00.000001Z' where id = ${conversations[3]}::uuid`.execute(db);
+  const ids: string[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = await read(await call(`/messages/conversations?limit=3${cursor ? `&cursor=${cursor}` : ""}`, "GET", undefined, chatCustomerCookie), 200);
+    assert.ok(page.conversations.length <= 3);
+    ids.push(...page.conversations.map((item: any) => item.id));
+    cursor = page.nextCursor;
+  } while (cursor);
+  assert.deepEqual(ids.slice(0, 7), conversations);
+  assert.equal(new Set(ids).size, ids.length);
+  const firstPage = await read(await call("/messages/conversations?limit=3", "GET", undefined, chatCustomerCookie), 200);
+  await read(await call(`/messages/conversations?cursor=${firstPage.nextCursor}`, "GET", undefined, customerCookie), 400);
+  await read(await call("/messages/conversations?limit=51", "GET", undefined, chatCustomerCookie), 400);
+  const invalidDate = "0000-01-01T00:00:00.000000Z";
+  const forgedCustomer = encodePageCursor(`customer-conversations:${chatCustomerId}:`, { updatedAt: invalidDate, id: conversations[0] });
+  const forgedAdmin = encodePageCursor("admin-conversations", { updatedAt: invalidDate, id: conversations[0] });
+  await read(await call(`/messages/conversations?cursor=${forgedCustomer}`, "GET", undefined, chatCustomerCookie), 400);
+  await read(await call(`/admin/conversations?cursor=${forgedAdmin}`, "GET", undefined, adminCookie), 400);
+
+  const messageIds = Array.from({ length: 7 }, () => randomUUID()).sort().reverse();
+  await db.insertInto("messages").values(messageIds.map(id => ({ id, conversation_id: conversations[0], sender_id: chatCustomerId, sender_role: "customer", body: id, created_at: new Date("2091-02-01T00:00:00Z") }))).execute();
+  await sql`update messages set created_at = '2091-02-01T00:00:00.000002Z' where id = any(${messageIds.slice(0, 3)}::uuid[])`.execute(db);
+  await sql`update messages set created_at = '2091-02-01T00:00:00.000001Z' where id = ${messageIds[3]}::uuid`.execute(db);
+  const threadPath = `/messages/conversations/${conversations[0]}`;
+  const latest = await read(await call(`${threadPath}?limit=3`, "GET", undefined, chatCustomerCookie), 200);
+  assert.deepEqual(latest.messages.map((item: any) => item.id), messageIds.slice(0, 3).reverse());
+  const older = await read(await call(`${threadPath}?limit=3&cursor=${latest.nextCursor}`, "GET", undefined, chatCustomerCookie), 200);
+  const oldest = await read(await call(`${threadPath}?limit=3&cursor=${older.nextCursor}`, "GET", undefined, chatCustomerCookie), 200);
+  assert.deepEqual([...oldest.messages, ...older.messages, ...latest.messages].map((item: any) => item.id), [...messageIds].reverse());
+  const forgedThread = encodePageCursor(`thread:${conversations[0]}`, { createdAt: invalidDate, id: messageIds[0] });
+  await read(await call(`${threadPath}?cursor=${forgedThread}`, "GET", undefined, chatCustomerCookie), 400);
+  await read(await call(`/messages/conversations/${conversations[1]}?cursor=${latest.nextCursor}`, "GET", undefined, chatCustomerCookie), 400);
+  await read(await call(`${threadPath}?cursor=${latest.nextCursor}`, "GET", undefined, otherCustomerCookie), 404);
+  await db.deleteFrom("conversations").where("id", "in", conversations).execute();
 });

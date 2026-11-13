@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./pagination": "./src/pagination.ts",
     "./catalog": "./src/catalog.ts",
     "./catalog-slug": "./src/catalog-slug.ts",
     "./quotations": "./src/quotations.ts",
