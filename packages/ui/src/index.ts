@@ -33,6 +33,8 @@ export type { SiteLink } from "./molecules/SiteHeader";
 export { InclusionStrip } from "./molecules/InclusionStrip";
 
 // Organisms
+export { DataTable } from "./organisms/DataTable";
+export type { DataTableColumn, DataTableProps } from "./organisms/DataTable";
 export { PageHeader } from "./organisms/PageHeader";
 export { MonthCalendar } from "./organisms/MonthCalendar";
 export type { MonthCalendarProps } from "./organisms/MonthCalendar";
@@ -42,3 +44,4 @@ export { Drawer } from "./organisms/Drawer";
 
 // Templates
 export { WorkspaceLayout } from "./templates/WorkspaceLayout";
+export { DateSelect } from "./molecules/DateSelect";

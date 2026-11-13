@@ -8,3 +8,5 @@
 - `packages/contracts` exposes catalog types through `@event-management/contracts/catalog`, shared domain limits through explicit `@event-management/contracts/limits/*` subpath exports, and the shared event-day deadline choices/calculator through `@event-management/contracts/event-days`. Reuse those exports rather than duplicating shapes or values. These contracts are separate from UI components and theme tokens; see the [shared limits guidance](../../limits/SKILL.md).
 
 Quotation item/terms/response types and shared quotation limits are exported through `@event-management/contracts/quotations`. The API parses HTTP and persisted JSON; the browser imports these types without treating TypeScript assertions as validation.
+
+Checklist wire types, operation types and task/text limits are exported through `@event-management/contracts/event-checklists`. The reusable `DateSelect` is exported from `@event-management/ui`; it composes shared Button/Select controls as a five-row scrolling long-date dropdown, initially centered on its supplied date, with keyboard selection and focus restoration. Its stories cover interaction, preparation dates and disabled controls.

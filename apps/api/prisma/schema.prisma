@@ -23,6 +23,10 @@ model User {
   assignedEventStaff EventStaff[] @relation("EventStaffAssigner")
   quotations Quotation[]
   auditEvents AuditEvent[]
+  createdChecklists EventChecklist[] @relation("ChecklistCreator")
+  updatedChecklists EventChecklist[] @relation("ChecklistUpdater")
+  sentChecklists EventChecklist[] @relation("ChecklistSender")
+  coordinatorChecklists EventChecklist[] @relation("ChecklistCoordinator")
 
   @@map("users")
 }
@@ -316,6 +320,7 @@ model EventDay {
   replacedEventDays EventDay[] @relation("EventDayReplacement")
   availability EventStaffAvailability[]
   staff EventStaff[]
+  checklist EventChecklist?
 
   @@unique([id, bookingRequestId])
   @@index([bookingRequestId, day])
@@ -355,4 +360,30 @@ model EventStaff {
   @@index([staffId, status])
   @@index([assignedBy])
   @@map("event_staffs")
+}
+
+model EventChecklist {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventDayId String @unique @map("event_day_id") @db.Uuid
+  title String
+  coordinatorId String? @map("coordinator_id") @db.Uuid
+  sentBy String? @map("sent_by") @db.Uuid
+  sentAt DateTime? @map("sent_at") @db.Timestamptz(6)
+  content Json @default("{\"tasks\":[]}") @db.JsonB
+  revision Int @default(1)
+  createdBy String @map("created_by") @db.Uuid
+  updatedBy String @map("updated_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  eventDay EventDay @relation(fields: [eventDayId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  coordinator User? @relation("ChecklistCoordinator", fields: [coordinatorId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  sender User? @relation("ChecklistSender", fields: [sentBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  creator User @relation("ChecklistCreator", fields: [createdBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  updater User @relation("ChecklistUpdater", fields: [updatedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([coordinatorId, updatedAt(sort: Desc)])
+  @@index([createdBy])
+  @@index([updatedBy])
+  @@index([sentBy])
+  @@map("event_checklists")
 }

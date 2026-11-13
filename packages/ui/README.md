@@ -6,7 +6,7 @@ Shared React presentation components for Clemora. Import public components from 
 
 - `atoms/` — primitives including `Button`, `Input`, `Textarea`, `Select`, `Badge`, `Icon`, `GoogleMark`, `Avatar`, `ActionLink`, `SectionCounter`, and `Wordmark`.
 - `molecules/` — combinations including `Panel`, `StatCard`, `InputGroup`, `SearchField`, `Tabs`, `FormField`, `ActivityList`, `Toast`, `NotificationProvider`, `Brand`, `SiteHeader`, and `InclusionStrip`.
-- `organisms/` — larger reusable sections: `PageHeader`, `Dialog`, `NativeDialog`, and `Drawer`.
+- `organisms/` — larger reusable sections: `DataTable`, `PageHeader`, `Dialog`, `NativeDialog`, and `Drawer`.
 - `templates/` — structural page layouts: `WorkspaceLayout`.
 
 ## Usage and ownership
@@ -29,6 +29,8 @@ Mount `Dialog` and `Drawer` conditionally. Their native modal lifecycle handles 
 For fields with help or error feedback, `FormField` accepts `description`, `error`, and a render-function child that supplies the control's ID and accessibility attributes. Spread these props on the actual `Input`, `Select`, or `Textarea`; validation and state stay in the app. Existing node children retain their label-wrapper behavior. See the [Clemora UI skill](../../context-factory/frontend/clemora-ui/SKILL.md) for composition examples.
 
 ## Storybook
+
+`DataTable` takes typed `columns` (`key`, `header`, and `cell(row)`), `rows`, a stable `rowKey(row)`, and an accessible `label`. The first column supplies row headers and stays pinned during horizontal scrolling. The scroll region supports keyboard focus; `minWidth` defaults to 720px. Empty results keep the column headers and render `emptyMessage` inside the table. Callers own filtering, loading/error feedback, and cell actions. The booking staff table uses it for available responses. Its stories cover empty, populated, narrow, and long-name states.
 
 ```bash
 pnpm --filter @event-management/ui storybook

@@ -111,6 +111,21 @@ export interface Conversations {
   updated_at: Generated<Timestamp>;
 }
 
+export interface EventChecklists {
+  content: Generated<Json>;
+  coordinator_id: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  event_day_id: string;
+  id: Generated<string>;
+  revision: Generated<number>;
+  sent_at: Timestamp | null;
+  sent_by: string | null;
+  title: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+}
+
 export interface EventsDay {
   availability_deadline: Timestamp | null;
   booking_request_id: string;
@@ -275,6 +290,7 @@ export interface DB {
   catalog_sections: CatalogSections;
   catalog_widgets: CatalogWidgets;
   conversations: Conversations;
+  event_checklists: EventChecklists;
   event_staff_availability: EventStaffAvailability;
   event_staffs: EventStaffs;
   events_day: EventsDay;

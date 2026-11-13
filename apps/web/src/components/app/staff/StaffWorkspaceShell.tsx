@@ -1,3 +1,4 @@
+import { EventChecklistWorkspace } from "../checklists/EventChecklistWorkspace";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Avatar,
@@ -251,6 +252,7 @@ function Details({
         </p>
       )}
       <Availability day={day} now={now} request={request} onRespond={onRespond} />
+      {day.status === "scheduled" && day.ownAssignment?.role === "coordinator" && day.ownAssignment.status === "confirmed" && <EventChecklistWorkspace key={`${day.id}:${day.assignments.find(item => item.role === "coordinator" && item.status === "confirmed")?.assignedAt}`} day={day} />}
     </Drawer>
   );
 }
@@ -576,7 +578,7 @@ export function StaffWorkspaceShell({
                         variant="secondary"
                         onClick={() => openDetails(day.id)}
                       >
-                        Show details
+                        {day.status === "scheduled" && day.ownAssignment?.role === "coordinator" && day.ownAssignment.status === "confirmed" ? "Open checklist and details" : "Show details"}
                       </Button>
                     </Panel>
                   ))}

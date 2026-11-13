@@ -25,6 +25,7 @@ Domain modules under `apps/web/src/lib/data/` are the functions screens use for 
 | `booking-requests.ts` | Customer and admin booking-request reads, create, per-day time saves, cancel and status update, plus admin date counts and filtered pages |
 | `users.ts` | Admin user directory read |
 | `event-days.ts` | Admin event-day reads and team operations, request-level deadline application that creates requested-date days and updates current scheduled deadlines from one 1–4-day choice, legacy manual creation and move/reopen deadline choices, staff availability responses, and own assignments |
+| `event-checklists.ts` | Admin draft/read/edit/send and coordinator read/task operations, all with shared checklist contracts and revision guards |
 | `page-query.ts` | `limit` and `offset` query string used by public list functions. It performs no HTTP |
 
 Call shape on `request(path, body?, idToken?, method?)`:

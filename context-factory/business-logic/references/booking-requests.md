@@ -9,7 +9,7 @@ This reference describes intended business behavior. The [current implementation
 - **Customer:** Chooses a package, submits a booking request, explains their event needs, and supplies missing details. The customer follows their own request's status and communicates with the admin.
 - **Admin:** Reviews the needs with the customer, updates the request's status, arranges event days for accepted requests, and decides when to open each day for staff availability. The admin selects the team and its coordinator, assigns the coordinator a timed checklist, and monitors progress.
 - **Staff:** Review event days open for availability responses and mark themselves available for days they can work. The admin decides which volunteers join each day's team.
-- **Coordinator:** A selected staff member who coordinates the team, accepts the assigned checklist and timeframes, and records completed tasks for the admin to monitor.
+- **Coordinator:** A selected staff member who coordinates the team, receives immediate checklist access when the admin sends it, edits tasks and timeframes, and records progress for the admin to monitor.
 
 The [identity reference](identity.md) defines these responsibilities. Admin means the System Administrator; coordinator is an event responsibility, not a separate account role or general admin access. The [event days and staffing reference](event-days-and-staffing.md) covers daily schedules, response deadlines, team assignments, and schedule changes.
 
@@ -20,7 +20,7 @@ The [identity reference](identity.md) defines these responsibilities. Admin mean
 3. Once the request is accepted for processing, the admin arranges its event days and decides when each day is ready to open for staff availability responses. Acceptance alone does not create or open an event day.
 4. Staff mark themselves available for the open days they can work.
 5. The admin reviews availability, selects the staff included in each day's team, and appoints a coordinator from the selected staff.
-6. The admin hands the coordinator a checklist with timeframes. The coordinator tracks completion against the event timeline, and the admin monitors progress.
+6. The admin sends a private draft checklist to the day’s confirmed coordinator, granting immediate access without acceptance. The coordinator tracks completion against the event timeline, and the admin monitors progress.
 
 ## Rules and boundaries
 

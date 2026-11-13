@@ -2,14 +2,14 @@
 
 Event days and staffing cover the scheduled days of work for an accepted booking request, staff availability, and the admin's selection of each day's team. One request can have several event days, each with its own schedule, response deadline, and team.
 
-This reference follows the intended responsibilities in [identity and responsibilities](identity.md) and explains the current scheduling and staffing workflow. Current rules below describe today's behavior, not approval of unresolved business policies. The [current implementation](../../../README.md#current-implementation) records full implementation status; coordinator checklists and progress tracking remain planned.
+This reference follows the intended responsibilities in [identity and responsibilities](identity.md) and explains the current scheduling and staffing workflow. Current rules below describe today's behavior, not approval of unresolved business policies. The [current implementation](../../../README.md#current-implementation) records full implementation status; coordinator checklists and progress tracking are implemented through the API.
 
 ## People and responsibilities
 
 - **Customer:** Supplies requested dates and each day's start and end times, and discusses event arrangements with the admin.
 - **Admin:** Arranges event days, opens and closes availability responses, selects staff, appoints the coordinator, and manages schedule changes. The admin remains responsible for customer communication and monitoring event progress.
 - **Staff:** Review upcoming event days, respond available or unavailable, and work on the days for which the admin confirms their assignment.
-- **Coordinator:** A selected staff member responsible for coordinating the team. The intended handoff includes accepting a checklist and its timeframes, following the timeline, and recording completed tasks.
+- **Coordinator:** A selected staff member responsible for coordinating the team. The admin sends a timed checklist for immediate access. The coordinator edits tasks, follows the timeline, and records progress without an acceptance step.
 
 Admin means the System Administrator. Coordinator is an event responsibility, not a separate account role or general admin access.
 
@@ -22,7 +22,9 @@ The current scheduling and staffing workflow is:
 3. Staff review each day's schedule and respond before its deadline. Responding available volunteers for that day; it does not place the person on the team.
 4. After responses close, the admin selects available staff as helpers and appoints a coordinator from that day's selected staff. Confirmed assignments identify the team.
 
-The intended delivery handoff is a timed checklist from the admin to the coordinator. The coordinator tracks completion, and the admin monitors progress. This part remains planned.
+The admin creates one private checklist draft per event day, then sends it to that day's current confirmed coordinator. Sending grants access immediately; there is no acceptance control, endpoint, or state. The coordinator can edit titles, instructions, each task’s date/time, status and notes, reorder tasks, and add/delete tasks. Tasks are stored as an ordered JSONB array inside a content object, with stable server-generated IDs. Completion keeps server-owned `completedAt`; there is no task completion actor field. Blocked tasks require a concern note. The admin monitors the same document.
+
+Every save and send checks a revision to reject stale changes. Both reads and writes check the saved recipient and current confirmed assignment. Any coordinator assignment cancellation, demotion, replacement or renewal invalidates the handoff atomically and returns the saved tasks to an admin-only draft. Reassigning the same person does not restore old access; a fresh admin send is required. Cancelling/moving the day or cancelling its request also revokes access in the same transaction. Each task owns its schedule, which may precede/follow the event day; there are no task groups. Sending requires at least one task, while the coordinator may delete the last task afterward. This handoff creates in-app access, not email or push delivery. See [coordinator checklists](../../../README.md#coordinator-checklists) for the persisted boundary.
 
 ## Current rules and boundaries
 

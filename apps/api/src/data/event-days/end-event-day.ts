@@ -1,3 +1,4 @@
+import { invalidateEventChecklistData } from "../event-checklists/invalidate-event-checklist.js";
 import { sql } from "kysely";
 import type { Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
@@ -7,7 +8,9 @@ export async function endEventDayData(
   id: string,
   status: "cancelled" | "moved",
   replacementId: string | null,
+  actorId: string,
 ) {
+  await invalidateEventChecklistData(db, id, actorId);
   await sql`update event_staffs set status='cancelled',updated_at=now() where event_day_id=${id}::uuid and status='confirmed'`.execute(
     db,
   );

@@ -1,3 +1,4 @@
+import { invalidateEventChecklistData } from "../../data/event-checklists/invalidate-event-checklist.js";
 import type { Kysely } from "kysely";
 import { lockStaffData } from "../../data/event-days/lock-staff.js";
 import { listEventDayResponsesData } from "../../data/event-days/list-event-day-responses.js";
@@ -42,6 +43,10 @@ export async function assignmentEventDayService(
         return fail("A coordinator is already assigned", 409);
       if (await hasOverlappingAssignmentData(trx, day, staffId))
         return fail("Staff member has an overlapping assignment", 409);
+    }
+    if ((existing?.role === "coordinator" && existing.status === "confirmed") ||
+      (input.role === "coordinator" && input.status === "confirmed")) {
+      await invalidateEventChecklistData(trx, id, actorId);
     }
     await upsertEventDayAssignmentData(
       trx,

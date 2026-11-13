@@ -32,6 +32,7 @@ import {
 import { BookingPackage } from "../BookingPackage";
 import { Quotations } from "../Quotations";
 import { AdminEventDays } from "../staff/AdminEventDays";
+import { AdminBookingChecklists } from "../checklists/AdminBookingChecklists";
 
 function RequestStatusForm({
   item,
@@ -186,6 +187,7 @@ export function BookingRequestPage({
   const detailsPanelId = "booking-request-details-panel";
   const packagePanelId = "booking-request-package-panel";
   const quotationPanelId = "booking-request-quotation-panel";
+  const checklistPanelId = "booking-request-checklist-panel";
   const generation = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -303,18 +305,28 @@ export function BookingRequestPage({
                 label: "Details",
                 id: "booking-tab-details",
                 panelId: detailsPanelId,
+                disabled: (savingDay || savingStatus) && pageTab !== "details",
               },
               {
                 value: "package",
                 label: "Package",
                 id: "booking-tab-package",
                 panelId: packagePanelId,
+                disabled: (savingDay || savingStatus) && pageTab !== "package",
               },
               {
                 value: "quotation",
                 label: "Quotation",
                 id: "booking-tab-quotation",
                 panelId: quotationPanelId,
+                disabled: (savingDay || savingStatus) && pageTab !== "quotation",
+              },
+              {
+                value: "checklist",
+                label: "Checklist",
+                id: "booking-tab-checklist",
+                panelId: checklistPanelId,
+                disabled: (savingDay || savingStatus) && pageTab !== "checklist",
               },
             ]}
           />
@@ -491,6 +503,11 @@ export function BookingRequestPage({
                 }
                 onChanged={() => setProposalRevision((value) => value + 1)}
               />
+            </div>
+          )}
+          {pageTab === "checklist" && (
+            <div id={checklistPanelId} role="tabpanel" tabIndex={0} aria-labelledby="booking-tab-checklist" inert={savingStatus || refreshing || undefined} aria-busy={savingStatus || refreshing}>
+              <AdminBookingChecklists key={item.id} booking={item} refreshKey={refreshKey} onBusyChange={setSavingDay} />
             </div>
           )}
           {pageTab === "quotation" && (

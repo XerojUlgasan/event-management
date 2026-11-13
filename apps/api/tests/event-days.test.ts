@@ -283,7 +283,7 @@ after(async () => {
   await db?.destroy();
   await pool?.end();
   if (admin) {
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
     await admin.end();
   }
 });
@@ -1061,4 +1061,276 @@ test("an expired recomputation for an open day aborts pending creation and prese
   assert.deepEqual(await listBookingEventDays(id), before);
   assert.deepEqual((await getRequestedBooking(id)).requestedDays, booking.requestedDays);
   assert.equal((await getRequestedBooking(id)).updatedAt, booking.updatedAt);
+});
+
+// Checklist assertions use the public schema to check the complete wire document.
+async function checklist(response: Response, status = 200) {
+  const { dto } = await import("../src/controllers/event-checklists/schemas.js");
+  const body = asRecord(await read(response, status), "checklist response");
+  return dto.parse(body.checklist);
+}
+const checklistTask = (title = "Confirm venue access") => ({ title, instructions: "Review the setup plan", startsAt: "2099-05-19T16:00:00+08:00", endsAt: "2099-05-19T16:30:00+08:00", status: "pending", note: "" });
+async function checklistFixture(withCoordinator = true) {
+  const bookingId = await createBooking();
+  const day = await createEventDay(bookingId);
+  const id = dayId(day);
+  const coordinator = await createUser("staff", "Checklist Coordinator");
+  const helper = await createUser("staff", "Checklist Helper");
+  await setStaffing(id, "open", 2);
+  await respond(id, "available", coordinator.cookie);
+  await respond(id, "available", helper.cookie);
+  await setStaffing(id, "closed");
+  if (withCoordinator) await assign(id, coordinator.id, "coordinator");
+  await assign(id, helper.id, "helper");
+  const adminPath = `/admin/event-days/${id}/checklist`;
+  const staffPath = `/staff/event-days/${id}/checklist`;
+  let document = await checklist(await call(adminPath, "POST", { title: "Delivery checklist" }, adminCookie), 201);
+  document = await checklist(await call(adminPath, "PATCH", { expectedRevision: document.revision, operation: { kind: "add", task: checklistTask() } }, adminCookie));
+  return { id, bookingId, coordinator, helper, adminPath, staffPath, document };
+}
+
+test("checklist private draft, immediate send, every task detail, ordering, deletion and completion timestamps persist", async () => {
+  const f = await checklistFixture();
+  const patch = (revision: number, operation: unknown, cookie = f.coordinator.cookie) => call(f.staffPath, "PATCH", { expectedRevision: revision, operation }, cookie);
+  await expectError(await call(f.staffPath, "GET", undefined, f.coordinator.cookie), 404);
+  await expectError(await patch(f.document.revision, { kind: "delete", taskId: f.document.content.tasks[0]?.id }), 404);
+  await expectError(await call(f.adminPath, "POST", { title: "Duplicate" }, adminCookie), 409);
+  let doc = await checklist(await call(`${f.adminPath}/send`, "POST", { expectedRevision: f.document.revision }, adminCookie));
+  assert.equal(doc.coordinatorId, f.coordinator.id);
+  assert.equal(doc.sentBy, adminId);
+  assert.ok(doc.sentAt);
+  assert.equal(doc.revision, f.document.revision + 1);
+  assert.deepEqual(await checklist(await call(f.staffPath, "GET", undefined, f.coordinator.cookie)), doc);
+  const first = doc.content.tasks[0]; assert.ok(first);
+  const edited = { ...checklistTask("Room readiness"), instructions: "Coordinate all positions", startsAt: "2099-05-21T23:45:00+08:00", endsAt: "2099-05-22T01:15:00+08:00", status: "blocked", note: "Waiting for venue access" };
+  doc = await checklist(await patch(doc.revision, { kind: "update", taskId: first.id, task: edited }));
+  assert.deepEqual(doc.content.tasks[0], { ...edited, id: first.id, completedAt: null });
+  assert.equal(doc.updatedBy, f.coordinator.id);
+  doc = await checklist(await patch(doc.revision, { kind: "update", taskId: first.id, task: { ...edited, status: "completed" } }));
+  const completedAt = doc.content.tasks[0]?.completedAt; assert.ok(completedAt);
+  assert.ok(Math.abs(Date.parse(completedAt) - Date.now()) < 10000);
+  doc = await checklist(await patch(doc.revision, { kind: "update", taskId: first.id, task: { ...edited, status: "completed", note: "Now ready" } }));
+  assert.equal(doc.content.tasks[0]?.completedAt, completedAt, "unrelated edits retain completion time");
+  doc = await checklist(await patch(doc.revision, { kind: "add", task: checklistTask("Brief team") }));
+  const second = doc.content.tasks[1]; assert.ok(second);
+  doc = await checklist(await patch(doc.revision, { kind: "reorder", taskIds: [second.id, first.id] }));
+  assert.deepEqual(doc.content.tasks.map(task => task.id), [second.id, first.id]);
+  doc = await checklist(await patch(doc.revision, { kind: "update", taskId: first.id, task: checklistTask("Reopened") }));
+  assert.equal(doc.content.tasks[1]?.completedAt, null);
+  doc = await checklist(await patch(doc.revision, { kind: "delete", taskId: second.id }));
+  doc = await checklist(await patch(doc.revision, { kind: "delete", taskId: first.id }));
+  assert.deepEqual(doc.content.tasks, [], "coordinator may delete the final task");
+  assert.ok(doc.sentAt, "deleting all tasks does not invent a completion or delivery state");
+  assert.deepEqual(await checklist(await call(f.adminPath, "GET", undefined, adminCookie)), doc);
+  assert.ok(pool);
+  const persisted = await pool.query("SELECT content, revision, sent_at FROM event_checklists WHERE event_day_id=$1", [f.id]);
+  assert.deepEqual(persisted.rows[0]?.content, { tasks: [] });
+  assert.equal(persisted.rows[0]?.revision, doc.revision);
+});
+
+test("checklist routes enforce roles, recipient/current assignment, immutable metadata and no acceptance operation", async () => {
+  const f = await checklistFixture();
+  for (const [cookie, status] of [[undefined, 401], [customerCookie, 403], [staffOneCookie, 403], [otherAdminCookie, 403]] as const) {
+    for (const [method, suffix, body] of [["GET", "", undefined], ["POST", "", { title: "Private" }], ["PATCH", "", { expectedRevision: 2, operation: { kind: "title", title: "Other" } }], ["POST", "/send", { expectedRevision: 2 }]] as const)
+      await expectError(await call(f.adminPath + suffix, method, body, cookie), status);
+  }
+  await expectError(await call(f.staffPath, "GET"), 401);
+  await expectError(await call(f.staffPath, "GET", undefined, customerCookie), 403);
+  const sent = await checklist(await call(`${f.adminPath}/send`, "POST", { expectedRevision: f.document.revision }, adminCookie));
+  for (const cookie of [f.helper.cookie, staffOneCookie]) {
+    await expectError(await call(f.staffPath, "GET", undefined, cookie), 404);
+    await expectError(await call(f.staffPath, "PATCH", { expectedRevision: sent.revision, operation: { kind: "add", task: checklistTask() } }, cookie), 404);
+  }
+  await expectError(await call(f.staffPath, "PATCH", { expectedRevision: sent.revision, operation: { kind: "title", title: "Renamed" } }, f.coordinator.cookie), 403);
+  await expectError(await call(f.adminPath, "PATCH", { expectedRevision: sent.revision, coordinatorId: f.helper.id, operation: { kind: "title", title: "Renamed" } }, adminCookie), 400);
+  const task = checklistTask();
+  for (const extra of [{ id: randomUUID() }, { completedAt: new Date().toISOString() }, { completedBy: f.coordinator.id }])
+    await expectError(await call(f.staffPath, "PATCH", { expectedRevision: sent.revision, operation: { kind: "add", task: { ...task, ...extra } } }, f.coordinator.cookie), 400);
+  assert.equal((await call(`${f.staffPath}/accept`, "POST", {}, f.coordinator.cookie)).status, 404);
+  assert.equal((await call(`${f.adminPath}/accept`, "POST", {}, adminCookie)).status, 404);
+  assert.deepEqual(await checklist(await call(f.adminPath, "GET", undefined, adminCookie)), sent);
+});
+
+test("checklist stale and simultaneous saves/sends cannot overwrite newer work", async () => {
+  const f = await checklistFixture();
+  const save = (name: string) => call(f.adminPath, "PATCH", { expectedRevision: f.document.revision, operation: { kind: "title", title: name } }, adminCookie);
+  const results = await Promise.all([save("First save"), save("Second save")]);
+  assert.deepEqual(results.map(response => response.status).sort(), [200, 409]);
+  await expectError(await call(`${f.adminPath}/send`, "POST", { expectedRevision: f.document.revision }, adminCookie), 409);
+  const latest = await checklist(await call(f.adminPath, "GET", undefined, adminCookie));
+  const sends = await Promise.all([1, 2].map(() => call(`${f.adminPath}/send`, "POST", { expectedRevision: latest.revision }, adminCookie)));
+  assert.deepEqual(sends.map(response => response.status).sort(), [200, 409]);
+  const current = await checklist(await call(f.staffPath, "GET", undefined, f.coordinator.cookie));
+  const task = current.content.tasks[0]; assert.ok(task);
+  const changes = await Promise.all([
+    call(f.adminPath, "PATCH", { expectedRevision: current.revision, operation: { kind: "delete", taskId: task.id } }, adminCookie),
+    call(f.staffPath, "PATCH", { expectedRevision: current.revision, operation: { kind: "update", taskId: task.id, task: checklistTask("Coordinator changed it") } }, f.coordinator.cookie),
+  ]);
+  assert.deepEqual(changes.map(response => response.status).sort(), [200, 409]);
+});
+
+test("checklist validates full JSONB documents, field limits, offsets, blocked notes, reorder IDs and task count", async () => {
+  const f = await checklistFixture();
+  const patch = (operation: unknown) => call(f.adminPath, "PATCH", { expectedRevision: f.document.revision, operation }, adminCookie);
+  for (const invalid of [
+    { title: " " }, { title: "x".repeat(201) }, { title: "Bad\u0000text" }, { instructions: "\ud800" }, { startsAt: "0000-05-19T16:00:00+08:00" }, { instructions: "x".repeat(4001) }, { note: "x".repeat(4001) },
+    { startsAt: "2099-05-19T16:00:00" }, { startsAt: "2099-02-30T16:00:00+08:00" },
+    { endsAt: "2099-05-19T15:00:00+08:00" }, { status: "done" }, { status: "blocked", note: " " },
+  ]) await expectError(await patch({ kind: "add", task: { ...checklistTask(), ...invalid } }), 400);
+  const task = f.document.content.tasks[0]; assert.ok(task);
+  for (const taskIds of [[], [randomUUID()], [task.id, task.id]]) await expectError(await patch({ kind: "reorder", taskIds }), 400);
+  await expectError(await patch({ kind: "delete", taskId: randomUUID() }), 404);
+  await expectError(await call(f.adminPath, "PATCH", { operation: { kind: "title", title: "No revision" } }, adminCookie), 400);
+  assert.ok(pool);
+  const stored = f.document.content.tasks[0]; assert.ok(stored);
+  for (const invalid of [{}, { tasks: null }, { tasks: [{ ...stored, id: "bad" }] }, { tasks: [stored, stored] },
+    { tasks: [{ ...stored, completedBy: adminId }] }, { tasks: [{ ...stored, status: "completed" }] },
+    { tasks: [{ ...stored, endsAt: "2099-05-19T15:00:00+08:00" }] }, { tasks: [{ ...stored, startsAt: "invalid" }] },
+    { tasks: [{ ...stored, startsAt: "2099-02-30T16:00:00+08:00" }] }])
+    await assert.rejects(pool.query("UPDATE event_checklists SET content=$2::jsonb WHERE event_day_id=$1", [f.id, JSON.stringify(invalid)]), /event_checklists_content_check/);
+  const hundred = Array.from({ length: 100 }, () => ({ ...stored, id: randomUUID() }));
+  await pool.query("UPDATE event_checklists SET content=$2::jsonb WHERE event_day_id=$1", [f.id, JSON.stringify({ tasks: hundred })]);
+  await expectError(await patch({ kind: "add", task: checklistTask() }), 400);
+  await assert.rejects(pool.query("UPDATE event_checklists SET content=$2::jsonb WHERE event_day_id=$1", [f.id, JSON.stringify({ tasks: [...hundred, { ...stored, id: randomUUID() }] })]), /event_checklists_content_check/);
+});
+
+test("sending needs nonempty tasks and the confirmed coordinator; Unicode text fits the operation body cap", async () => {
+  const f = await checklistFixture(false);
+  await expectError(await call(`${f.adminPath}/send`, "POST", { expectedRevision: f.document.revision }, adminCookie), 409);
+  await assign(f.id, f.coordinator.id, "coordinator");
+  let doc = await checklist(await call(f.adminPath, "PATCH", { expectedRevision: f.document.revision, operation: { kind: "add", task: { ...checklistTask("Unicode task"), instructions: "文".repeat(4000), note: "文".repeat(4000) } } }, adminCookie));
+  for (const task of doc.content.tasks) doc = await checklist(await call(f.adminPath, "PATCH", { expectedRevision: doc.revision, operation: { kind: "delete", taskId: task.id } }, adminCookie));
+  await expectError(await call(`${f.adminPath}/send`, "POST", { expectedRevision: doc.revision }, adminCookie), 409);
+});
+
+test("renewal, demotion, cancellation and replacement invalidate the handoff, including the same assignment row/person", async () => {
+  const f = await checklistFixture();
+  let doc = f.document;
+  const send = async () => { doc = await checklist(await call(`${f.adminPath}/send`, "POST", { expectedRevision: doc.revision }, adminCookie)); };
+  const assertRevoked = async (oldRevision: number) => {
+    await expectError(await call(f.staffPath, "GET", undefined, f.coordinator.cookie), 404);
+    await expectError(await call(f.staffPath, "PATCH", { expectedRevision: oldRevision, operation: { kind: "add", task: checklistTask() } }, f.coordinator.cookie), 404);
+    doc = await checklist(await call(f.adminPath, "GET", undefined, adminCookie));
+    assert.equal(doc.sentAt, null); assert.equal(doc.coordinatorId, null); assert.equal(doc.sentBy, null);
+    assert.equal(doc.revision, oldRevision + 1); assert.equal(doc.updatedBy, adminId);
+    assert.deepEqual(doc.content, f.document.content);
+  };
+  await send(); let oldRevision = doc.revision;
+  // Even a same-role reconfirmation starts a new assignment period.
+  await assign(f.id, f.coordinator.id, "coordinator");
+  await assertRevoked(oldRevision);
+  await send(); oldRevision = doc.revision;
+  await assign(f.id, f.helper.id, "helper");
+  assert.equal((await checklist(await call(f.staffPath, "GET", undefined, f.coordinator.cookie))).revision, oldRevision, "helper-only updates preserve the handoff");
+  await assign(f.id, f.coordinator.id, "helper");
+  await assertRevoked(oldRevision);
+  await assign(f.id, f.coordinator.id, "coordinator");
+  await expectError(await call(f.staffPath, "GET", undefined, f.coordinator.cookie), 404);
+  await send(); oldRevision = doc.revision;
+  await assign(f.id, f.coordinator.id, "coordinator", "cancelled");
+  await assertRevoked(oldRevision);
+  await assign(f.id, f.coordinator.id, "coordinator");
+  await expectError(await call(f.staffPath, "GET", undefined, f.coordinator.cookie), 404);
+  await send(); oldRevision = doc.revision;
+  await assign(f.id, f.coordinator.id, "coordinator", "cancelled");
+  await assign(f.id, f.helper.id, "coordinator");
+  await assertRevoked(oldRevision);
+  await send();
+  assert.equal(doc.coordinatorId, f.helper.id);
+  assert.deepEqual(await checklist(await call(f.staffPath, "GET", undefined, f.helper.cookie)), doc);
+});
+
+test("day cancellation, movement and parent cancellation clear delivery in the same transaction and preserve tasks", async () => {
+  for (const action of ["cancel", "move", "customer-cancel", "admin-cancel"] as const) {
+    const f = await checklistFixture();
+    const sent = await checklist(await call(`${f.adminPath}/send`, "POST", { expectedRevision: f.document.revision }, adminCookie));
+    if (action === "cancel") await read(await call(`/admin/event-days/${f.id}/cancel`, "POST", undefined, adminCookie), 200);
+    else if (action === "move") await read(await call(`/admin/event-days/${f.id}/move`, "POST", schedule({ day: "2099-05-22", startsAt: "2099-05-22T10:00:00+08:00", endsAt: "2099-05-22T12:00:00+08:00" }), adminCookie), 200);
+    else if (action === "customer-cancel") await read(await call(`/booking-requests/${f.bookingId}/cancel`, "PATCH", { reason: "Cancelled" }, customerCookie), 200);
+    else await updateBookingStatus(f.bookingId, "cancelled", "Cancelled");
+    const doc = await checklist(await call(f.adminPath, "GET", undefined, adminCookie));
+    assert.equal(doc.sentAt, null); assert.equal(doc.revision, sent.revision + 1); assert.deepEqual(doc.content, sent.content);
+    assert.equal(doc.updatedBy, action === "customer-cancel" ? customerId : adminId);
+    await expectError(await call(f.staffPath, "GET", undefined, f.coordinator.cookie), 404);
+    await expectError(await call(`${f.adminPath}/send`, "POST", { expectedRevision: doc.revision }, adminCookie), 409);
+  }
+});
+
+test("assignment failure rolls back checklist invalidation, and concurrent reassignment cannot leave an old grant", async () => {
+  const f = await checklistFixture();
+  const sent = await checklist(await call(`${f.adminPath}/send`, "POST", { expectedRevision: f.document.revision }, adminCookie));
+  assert.ok(pool);
+  await pool.query(`CREATE FUNCTION checklist_assignment_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.event_day_id = '${f.id}'::uuid THEN RAISE EXCEPTION 'Injected assignment failure'; END IF; RETURN NEW; END; $$; CREATE TRIGGER checklist_assignment_failure BEFORE UPDATE ON event_staffs FOR EACH ROW EXECUTE FUNCTION checklist_assignment_failure()`);
+  try {
+    const failed = await call(`/admin/event-days/${f.id}/assignments/${f.coordinator.id}`, "PUT", { role: "helper", status: "confirmed" }, adminCookie);
+    assert.equal(failed.status, 500); await failed.text();
+    assert.deepEqual(await checklist(await call(f.staffPath, "GET", undefined, f.coordinator.cookie)), sent);
+  } finally { await pool.query("DROP TRIGGER checklist_assignment_failure ON event_staffs; DROP FUNCTION checklist_assignment_failure()"); }
+  const [edit, reassigned] = await Promise.all([
+    call(f.staffPath, "PATCH", { expectedRevision: sent.revision, operation: { kind: "add", task: checklistTask("Racing edit") } }, f.coordinator.cookie),
+    call(`/admin/event-days/${f.id}/assignments/${f.coordinator.id}`, "PUT", { role: "coordinator", status: "confirmed" }, adminCookie),
+  ]);
+  assert.ok([200, 404].includes(edit.status)); await edit.text(); await read(reassigned, 200);
+  const draft = await checklist(await call(f.adminPath, "GET", undefined, adminCookie));
+  assert.equal(draft.sentAt, null);
+  await expectError(await call(f.staffPath, "GET", undefined, f.coordinator.cookie), 404);
+  await expectError(await call(`${f.adminPath}/send`, "POST", { expectedRevision: sent.revision }, adminCookie), 409);
+});
+
+test("checklist OpenAPI exposes only draft/read/edit/send and new table has RLS and restricted grants", async () => {
+  const spec = asRecord(await (await app.request("/openapi.json")).json(), "spec");
+  const paths = asRecord(spec.paths, "paths");
+  for (const [path, method] of [["/v1/admin/event-days/{id}/checklist", "get"], ["/v1/admin/event-days/{id}/checklist", "post"], ["/v1/admin/event-days/{id}/checklist", "patch"], ["/v1/admin/event-days/{id}/checklist/send", "post"], ["/v1/staff/event-days/{id}/checklist", "get"], ["/v1/staff/event-days/{id}/checklist", "patch"]])
+    assert.ok(method in asRecord(paths[path], path));
+  assert.ok(!Object.keys(paths).some(path => path.includes("checklist") && path.includes("accept")));
+  assert.ok(pool);
+  const rls = await pool.query("SELECT relrowsecurity FROM pg_class WHERE oid='event_checklists'::regclass");
+  assert.equal(rls.rows[0]?.relrowsecurity, true);
+  const grants = await pool.query("SELECT grantee, privilege_type FROM information_schema.table_privileges WHERE table_name='event_checklists' AND grantee IN ('PUBLIC','anon','authenticated')");
+  assert.equal(grants.rowCount, 0);
+});
+
+test("Edge route-family routing shares checklist authorization, operations and transport limits", async () => {
+  const f = await checklistFixture();
+  const { app: edge } = await import("../src/edge/server.js");
+  const request = (path: string, method: string, cookie?: string, body?: unknown) => edge.request(`/v1${path}`, { method,
+    headers: { ...(cookie ? { Cookie: cookie } : {}), ...(body ? { "Content-Type": "application/json" } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  await expectError(await request(f.staffPath, "GET", f.coordinator.cookie), 404);
+  await expectError(await request(f.adminPath, "GET", f.helper.cookie), 403);
+  const sent = await checklist(await request(`${f.adminPath}/send`, "POST", adminCookie, { expectedRevision: f.document.revision }));
+  assert.deepEqual(await checklist(await request(f.staffPath, "GET", f.coordinator.cookie)), sent);
+  const edited = await checklist(await request(f.staffPath, "PATCH", f.coordinator.cookie, { expectedRevision: sent.revision, operation: { kind: "add", task: { ...checklistTask(), instructions: "文".repeat(4000), note: "文".repeat(4000) } } }));
+  assert.equal(edited.content.tasks.length, 2);
+  const tooLarge = await request(f.staffPath, "PATCH", f.coordinator.cookie, { expectedRevision: edited.revision, operation: { kind: "add", task: { ...checklistTask(), instructions: "x".repeat(65536) } } });
+  assert.equal(tooLarge.status, 413); await tooLarge.text();
+  assert.equal((await request(`${f.staffPath}/accept`, "POST", f.coordinator.cookie, {})).status, 404);
+});
+
+test("checklist migration preserves populated bookings, days, assignments and responses", async () => {
+  assert.ok(admin);
+  const migrationDatabase = `em_checklist_migration_${randomUUID().replaceAll("-", "")}`;
+  await admin.query(`CREATE DATABASE "${migrationDatabase}"`);
+  const baseline = new Pool({ host: process.env.DB_HOST ?? "localhost", port: Number(process.env.DB_PORT ?? 5432), user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: migrationDatabase });
+  try {
+    const root = new URL("../prisma/migrations/", import.meta.url);
+    const migrations = (await readdir(root, { withFileTypes: true })).filter(entry => entry.isDirectory()).sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of migrations.filter(entry => entry.name < "20261113120000_event_checklists")) await baseline.query(await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"));
+    const actor = randomUUID(), staff = randomUUID(), customer = randomUUID(), packageId = randomUUID(), booking = randomUUID(), day = randomUUID();
+    await baseline.query("INSERT INTO users(id,email,role,staff_role,password_hash) VALUES ($1,'migration.admin@example.test','admin','System Administrator','unused'),($2,'migration.staff@example.test','staff',NULL,'unused'),($3,'migration.customer@example.test','customer',NULL,'unused')", [actor, staff, customer]);
+    await baseline.query("INSERT INTO packages(id,name,slug,price,max_guests) VALUES($1,'Migration package','migration-package',100000,100)", [packageId]);
+    await baseline.query("INSERT INTO booking_requests(id,reference,customer_id,package_id,package_name,package_price,package_max_guests,event_type,preferred_date,time_zone,contact_name,phone_number,status,out_of_range) VALUES($1,'CHECKLIST-MIGRATION',$2,$3,'Migration package',100000,100,'Wedding','2099-05-20','Asia/Manila','Customer','123','accepted',false)", [booking, customer, packageId]);
+    await baseline.query("INSERT INTO events_day(id,booking_request_id,day,starts_at,ends_at,staffing_status) VALUES($1,$2,'2099-05-20','2099-05-20T10:00:00+08:00','2099-05-20T12:00:00+08:00','closed')", [day, booking]);
+    await baseline.query("INSERT INTO event_staff_availability(event_day_id,staff_id,response) VALUES($1,$2,'available')", [day, staff]);
+    await baseline.query("INSERT INTO event_staffs(event_day_id,staff_id,role,assigned_by) VALUES($1,$2,'coordinator',$3)", [day, staff, actor]);
+    const tables = ["users", "packages", "booking_requests", "events_day", "event_staffs", "event_staff_availability"];
+    const snapshots: unknown[] = [];
+    for (const table of tables) snapshots.push((await baseline.query(`SELECT * FROM ${table} ORDER BY id`)).rows);
+    await baseline.query(await readFile(new URL("20261113120000_event_checklists/migration.sql", root), "utf8"));
+    for (const [index, table] of tables.entries()) assert.deepEqual((await baseline.query(`SELECT * FROM ${table} ORDER BY id`)).rows, snapshots[index], `${table} survives unchanged`);
+    assert.equal((await baseline.query("SELECT * FROM event_checklists")).rowCount, 0, "migration does not fabricate checklists");
+    await baseline.query("INSERT INTO event_checklists(event_day_id,title,created_by,updated_by) VALUES($1,'Draft',$2,$2)", [day, actor]);
+    await assert.rejects(baseline.query("INSERT INTO event_checklists(event_day_id,title,created_by,updated_by) VALUES($1,'Duplicate',$2,$2)", [day, actor]), /event_checklists_event_day_id_key/);
+  } finally { await baseline.end(); await admin.query(`DROP DATABASE IF EXISTS "${migrationDatabase}"`); }
 });

@@ -24,7 +24,7 @@ A staff member cannot mark themselves available again for an event day where the
 
 A coordinator is a staff member selected by the admin to coordinate a particular event's team. This is an event responsibility, not a separate account role or general admin access.
 
-The coordinator accepts the assigned checklist and its timeframes, follows the event timeline, and checks off completed tasks. The admin monitors those updates and the event's progress.
+The admin sends the checklist to the day’s confirmed coordinator, granting immediate access without acceptance. The coordinator can edit every task detail, reorder tasks, add/delete tasks, and record progress. The admin monitors the same checklist. A coordinator assignment change invalidates the handoff and requires a fresh admin send, including when the same person is reassigned.
 
 ## Customer
 
