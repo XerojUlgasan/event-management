@@ -2,6 +2,22 @@
 
 Durable engineering notes for this role. Read and maintain them under the shared [memory policy](../README.md#memory).
 
+## 2026-11-13 — Editor customer-page preview matches the edit canvas
+
+`CatalogEditor` renders its customer-page preview inside `.pe-preview-stage` at the measured edit-canvas width (`width - 2`). The scoped `package-editor.css` rules reuse the edit grid geometry: 12px container padding, 12px gaps, fixed 52px rows, and hidden overflow so widgets keep their authored boxes. The stacked variant uses the same measured-width check (`width < 520`) as the editor layout, not a viewport media query, because the sidebar changes width at 800px and makes the editor stack at different viewport widths. `CatalogSections` exposes each widget's authored height as `--catalog-widget-h` so stacked preview widgets match `h * 64px - 12px`. Public detail pages and the standalone full-screen preview keep their own widths; the admin card preview stays compact.
+
+**Evidence:** Chromium measurements at 1440, 1024, 801, 800, 750, 700, 694, 693, 660, 521, and 390px showed identical edit/preview widget boxes (for example 514x372 at 1440 and 340x372 at 390). Public `/packages/the-intimate-gathering` stayed at 1220px with 574x383 widgets, and the admin card preview stayed 390px. `pnpm --filter @event-management/web check` passed with 0 errors, `pnpm --filter @event-management/web build` passed, and `pnpm check:design` reported only the two pre-existing findings in `PublicDocument.astro` and `admin-event-days.css`.
+
+**Why it matters:** Keep the preview geometry tied to the measured canvas width. A viewport query will disagree with the editor around the 800px sidebar breakpoint, where the same viewport can render either the 12-column grid or the stacked layout.
+
+## 2026-11-13 — Widget resize grip must outrank react-grid-layout's hidden handle
+
+`isResizable` was already enabled on the editor grid, but `react-grid-layout/css/styles.css` sets `.react-grid-item > .react-resizable-handle { opacity: 0 }` until hover and draws a 20px SVG grip, so the canvases read as drag-only. `package-editor.css` now overrides at `.pe-grid .pe-widget .react-resizable-handle` specificity: 26px hit area, `opacity: 1` at rest, `background-image: none`, `cursor: nwse-resize`, and a token-colored two-line grip that turns `--accent-strong` on widget hover. Keep the handle above media (`z-index: 3`) and do not lower that specificity or the library rules win again.
+
+**Evidence:** Chromium showed `opacity: 0` and a 20x20 box before the override, then `opacity: 1` and 26x26 after. Corner drags resized photo (514x372 to 602x436) and Markdown widgets (372 to 500 high) with no page errors, and after resizing the Markdown widget the customer-page preview matched at 514x500. Keyboard Shift+Arrow resize still worked (514 to 426 wide). Widgets still stack with arrow reorder below the 520px measured width, where resizing stays disabled.
+
+**Why it matters:** A dependency stylesheet can hide an enabled interaction. Verify computed styles, not just props, and check the rendered affordance before assuming a feature is missing.
+
 ## 2026-11-12 — Public canvas views own their stylesheet import and widget wrapper
 
 Server-rendered public catalog detail pages reuse the admin canvas markup (`package-canvas-preview`, `canvas-*`), so they must import `apps/web/src/styles/package-editor.css` themselves; only admin editors imported it before, which left `/packages/{slug}`, `/services/{slug}`, and `/venues/{slug}` unstyled. Keep the matching widget wrapper contract: public widgets use the same `canvas-widget-content canvas-${type}` structure as `CatalogSections.tsx`, with `.canvas-public-markdown` owning public prose typography. Public list cards need `.catalog-card > a` as a flex column and `.catalog-card p { flex-grow: 1 }` so card bodies stretch and the meta/action rows align across a row even when a title wraps. Public detail canvases use `.public-detail` to cap the shared 1680px admin canvas at the list pages' 1220px container, and match the list gutters (30px desktop, 21px under 600px) so back links, headings, and cards share one left edge.
