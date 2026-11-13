@@ -1,7 +1,15 @@
 import MarkdownPreview from "@uiw/react-markdown-preview"
 import rehypeSanitize from "rehype-sanitize"
+import type { CSSProperties } from "react"
 import type { CatalogSection, CatalogWidget } from "@event-management/contracts/catalog"
 import { catalogMediaSrc } from "../../lib/data/catalog-media"
+
+type WidgetStyle = CSSProperties & { "--catalog-widget-h": number }
+const widgetStyle = (widget: CatalogWidget): WidgetStyle => ({
+  gridColumn: `${widget.x + 1} / span ${widget.w}`,
+  gridRow: `${widget.y + 1} / span ${widget.h}`,
+  "--catalog-widget-h": widget.h,
+})
 
 export function WidgetContent({ widget, editor = false }: { widget: CatalogWidget; editor?: boolean }) {
   const url = widget.media?.url ? catalogMediaSrc(widget.media.url) : ""
@@ -14,5 +22,5 @@ export function WidgetContent({ widget, editor = false }: { widget: CatalogWidge
   </div>
 }
 export function CatalogSections({ sections }: { sections: CatalogSection[] }) {
-  return <>{sections.map(section => <section className="canvas-section" key={section.id}>{section.title && <h2>{section.title}</h2>}<div className="canvas-public-grid">{[...section.widgets].sort((a, b) => a.y - b.y || a.x - b.x).map(widget => <div key={widget.id} className="canvas-public-widget" style={{ gridColumn: `${widget.x + 1} / span ${widget.w}`, gridRow: `${widget.y + 1} / span ${widget.h}` }}><WidgetContent widget={widget} /></div>)}</div></section>)}</>
+  return <>{sections.map(section => <section className="canvas-section" key={section.id}>{section.title && <h2>{section.title}</h2>}<div className="canvas-public-grid">{[...section.widgets].sort((a, b) => a.y - b.y || a.x - b.x).map(widget => <div key={widget.id} className="canvas-public-widget" style={widgetStyle(widget)}><WidgetContent widget={widget} /></div>)}</div></section>)}</>
 }

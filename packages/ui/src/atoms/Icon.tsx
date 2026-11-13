@@ -114,6 +114,18 @@ const iconPaths = {
       <circle cx="12" cy="13" r="4" />
     </>
   ),
+  undo: (
+    <>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
+    </>
+  ),
+  redo: (
+    <>
+      <path d="m15 14 5-5-5-5" />
+      <path d="M20 9H10a6 6 0 0 0 0 12h3" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof iconPaths;

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Icon, type IconName } from "@event-management/ui";
 
-const names = ["grid", "calendar", "users", "message", "box", "chart", "settings", "spinner", "search", "bell", "spark", "chevron", "check", "arrow", "clipboard", "alert", "card", "bank", "menu", "close", "more", "info", "help", "clock", "location", "camera"] satisfies IconName[];
+const names = ["grid", "calendar", "users", "message", "box", "chart", "settings", "spinner", "search", "bell", "spark", "chevron", "check", "arrow", "clipboard", "alert", "card", "bank", "menu", "close", "more", "info", "help", "clock", "location", "camera", "undo", "redo"] satisfies IconName[];
 
 const meta = {
   title: "Atoms/Icon",

@@ -6341,7 +6341,9 @@
   display: none;
 }
 .catalog-card > a {
-  display: block;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   color: inherit;
   text-decoration: none;
 }
@@ -6349,15 +6351,45 @@
   margin-top: 24px;
 }
 .section-back {
-  max-width: 1680px;
+  max-width: 1220px;
   margin: 24px auto 0;
   padding: 0 30px;
+}
+@media (max-width: 600px) {
+  .section-back {
+    padding: 0 21px;
+  }
+}
+.section-back a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--wine);
+  font-size: 14px;
+  font-weight: 600;
+}
+.section-back a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.section-back a:focus-visible {
+  outline: 3px solid var(--wine);
+  outline-offset: 2px;
 }
 .about-page {
   max-width: 760px;
 }
+.about-page .section-title {
+  margin: 0 0 18px;
+}
 .about-page p {
+  margin: 0 0 14px;
   color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1.75;
+}
+.about-page .button {
+  margin-top: 8px;
 }
 
 /* Event-day staffing composition */
