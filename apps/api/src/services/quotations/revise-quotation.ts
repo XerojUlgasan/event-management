@@ -23,20 +23,17 @@ export async function reviseQuotationService(
   actor: string,
   expected: string,
   reason: string,
-  customer: boolean,
 ) {
   return db.transaction().execute(async (trx) => {
     const found = await locked(trx, id);
-    if (!found || (customer && found.booking.customer_id !== actor))
+    if (!found)
       return failure("Quotation not found", 404);
     const { row, booking } = found;
     if (row.revision !== expected)
       return failure("Quotation changed. Refresh and try again", 409);
     if (
       closed(booking) ||
-      !(
-        customer ? ["sent", "accepted"] : ["draft", "sent", "accepted"]
-      ).includes(row.status)
+      !["draft", "sent", "accepted"].includes(row.status)
     )
       return failure("Only an active quotation can be revised", 409);
     const rows = await listQuotesData(trx, booking.id);
@@ -75,8 +72,6 @@ export async function reviseQuotationService(
       previousQuotationId: id,
       reason,
     });
-    return customer
-      ? { ok: true as const }
-      : dto((await findQuoteData(trx, draft.id))!);
+    return dto((await findQuoteData(trx, draft.id))!);
   });
 }

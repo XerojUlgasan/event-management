@@ -1,6 +1,5 @@
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
-import { expireConversationsData } from "../../data/messages/expire-conversations.js";
 import { listLastMessagesData } from "../../data/messages/list-last-messages.js";
 import { listConversationsData } from "../../data/messages/list-conversations.js";
 import { countUnreadMessagesData } from "../../data/messages/count-unread-messages.js";
@@ -26,7 +25,6 @@ export function decodeAdminConversationsCursor(cursor: string) {
 }
 
 export async function listAdminConversationsService(db: Kysely<DB>, cursor?: { updatedAt: string; id: string }) {
-  await expireConversationsData(db);
   const fetched = await listConversationsData(db, cursor);
   const rows = fetched.slice(0, 15);
   const ids = rows.map((row) => row.id);

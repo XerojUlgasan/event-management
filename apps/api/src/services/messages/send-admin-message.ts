@@ -1,7 +1,6 @@
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 import { createMessageData } from "../../data/messages/create-message.js";
-import { expireConversationsData } from "../../data/messages/expire-conversations.js";
 import { findConversationData } from "../../data/messages/find-conversation.js";
 
 import { messageDto, type MessageDto } from "./message-response.js";
@@ -17,7 +16,6 @@ export async function sendAdminMessageService(
   senderId: string,
   body: string,
 ): Promise<SendAdminMessageResult> {
-  await expireConversationsData(db);
   const conversation = await findConversationData(db, id);
   if (!conversation) return { kind: "not-found" };
   if (conversation.status === "closed") return { kind: "closed" };

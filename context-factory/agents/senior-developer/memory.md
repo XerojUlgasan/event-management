@@ -2,6 +2,14 @@
 
 Durable engineering notes for this role. Read and maintain them under the shared [memory policy](../README.md#memory).
 
+## 2026-11-13 — Booking conversations have no automatic expiry
+
+The [message policy](../../business-logic/references/messages.md) removes automatic conversation expiry. Message reads/sends, quotation delivery, and seed selection must not use age, inactivity, or parent event end times as a deadline. The API and browser contract no longer contain conversation `expiresAt`. Any future bookingless expiry policy is deferred; existing general routes have no timer either.
+
+**Evidence:** Messages 8/8, quotations 10/10, and seed 1/1 passed against disposable migrated databases. Workspace checks, web/API and Edge builds, guidance validation, and independent source review passed. These checks do not establish browser or hosted behavior.
+
+**Why it matters:** Existing closed booking threads remain closed. There is no stored closure reason that can safely distinguish timer closures from seeded or legacy closed states; removing the timer does not authorize reopening all of them.
+
 ## 2026-11-11 — Quotations retain financial history without package snapshots
 
 The user approved removing quotation `offered_package_updated_at` and `offered_package_terms`. The follow-up `20261111150000_simplify_quotation_offers` migration drops those columns and their shape constraint; it preserves financial values, package identity, revision/status history, audit events and message links. Quotation amounts remain saved per version. Package/event edits no longer automatically block sending or acceptance. Explicit revisions use the current proposal price and copy adjustments for review. The [quotation policy](../../business-logic/references/quotations.md) owns this simpler flow.

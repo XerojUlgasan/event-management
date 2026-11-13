@@ -1,7 +1,9 @@
 import { useState } from "react"
-import { Input, Avatar, Badge, Button, Icon, Panel } from "@event-management/ui"
+import { Input, Avatar, Badge, Button, Icon, Panel, useNotifications } from "@event-management/ui"
 
 export function OperationsPage() {
+  const { notify } = useNotifications()
+  const unavailable = () => notify("Demo only: this action is unavailable.", "info")
   const [checked, setChecked] = useState([true, true, false, false])
   return (
     <div className="content-stack">
@@ -17,8 +19,8 @@ export function OperationsPage() {
           <p>Tuesday, June 24 · Orchid Hall · 240 guests</p>
         </div>
         <div>
-          <Button variant="secondary">Generate report</Button>
-          <Button icon="alert">Report incident</Button>
+          <Button variant="secondary" onClick={unavailable}>Generate report</Button>
+          <Button icon="alert" onClick={unavailable}>Report incident</Button>
         </div>
       </div>
       <div className="ops-alert">
@@ -30,7 +32,7 @@ export function OperationsPage() {
             setup.
           </span>
         </div>
-        <Button variant="secondary" size="small">Review timeline</Button>
+        <Button variant="secondary" size="small" onClick={unavailable}>Review timeline</Button>
       </div>
       <div className="ops-layout">
         <div className="ops-main">
@@ -111,7 +113,7 @@ export function OperationsPage() {
           <Panel
             title="Priority tasks"
             description="Items due before team briefing"
-            action={<Button variant="link" size="small" >View all 24 tasks</Button>}
+            action={<Button variant="link" size="small" onClick={unavailable}>View all 24 tasks</Button>}
           >
             <div className="task-list">
               {[
@@ -124,11 +126,10 @@ export function OperationsPage() {
                   <Input variant="plain"
                     type="checkbox"
                     checked={checked[index]}
-                    onChange={() =>
-                      setChecked(
-                        checked.map((item, i) => (i === index ? !item : item)),
-                      )
-                    }
+                    onChange={() => {
+                      setChecked(checked.map((item, i) => (i === index ? !item : item)))
+                      notify("Demo only: task changes are not saved.", "info")
+                    }}
                   />
                   <span>
                     <strong>{task}</strong>
@@ -159,11 +160,11 @@ export function OperationsPage() {
                 <strong>Amina Santos</strong>
                 <small>Lead coordinator</small>
               </span>
-              <Button variant="secondary" size="icon" aria-label="More options"><Icon name="more" /></Button>
+              <Button variant="secondary" size="icon" aria-label="More options" onClick={unavailable}><Icon name="more" /></Button>
             </div>
             <div className="contact-row">
-              <Button variant="secondary" size="small">Message</Button>
-              <Button variant="secondary" size="small">Call</Button>
+              <Button variant="secondary" size="small" onClick={unavailable}>Message</Button>
+              <Button variant="secondary" size="small" onClick={unavailable}>Call</Button>
             </div>
           </Panel>
           <Panel
@@ -184,7 +185,7 @@ export function OperationsPage() {
                 <strong>4 / 5 ready</strong>
               </div>
             </div>
-            <Button variant="secondary" className="full-button">
+            <Button variant="secondary" className="full-button" onClick={unavailable}>
               View team assignments
             </Button>
           </Panel>
@@ -202,7 +203,7 @@ export function OperationsPage() {
                 <small>Reported 1:12 PM · Replacement dispatched</small>
               </span>
             </div>
-            <Button variant="link" size="small" >
+            <Button variant="link" size="small" onClick={unavailable}>
               Open incident record <Icon name="arrow" size={14} />
             </Button>
           </Panel>

@@ -10,11 +10,13 @@ import {
   type IconName,
   PageHeader,
   Panel,
+  useNotifications,
   SearchField,
   StatCard,
 } from "@event-management/ui"
 
 export function ReportsPage() {
+  const { notify } = useNotifications()
   const [period, setPeriod] = useState("Last 6 months")
   const [reportOpen, setReportOpen] = useState(false)
 
@@ -36,7 +38,7 @@ export function ReportsPage() {
       <div className="report-filter-note">
         <Icon name="calendar" />
         <span>Showing business activity from <strong>January 1–June 30, 2025</strong></span>
-        <Button variant="secondary" size="small">Compare period</Button>
+        <Button variant="secondary" size="small" onClick={() => notify("Demo only: period comparison is unavailable.", "info")}>Compare period</Button>
       </div>
 
       <div className="stats-grid">
@@ -88,7 +90,7 @@ export function ReportsPage() {
           className="performance-table-card"
           title="Event delivery performance"
           description="Based on recorded schedules, tasks, and incidents"
-          action={<Button variant="link" size="small" >View full report <Icon name="arrow" size={14} /></Button>}
+          action={<Button variant="link" size="small" onClick={() => notify("Demo only: the full report is unavailable.", "info")}>View full report <Icon name="arrow" size={14} /></Button>}
         >
           <div className="performance-table">
             <div className="performance-row header"><span>Metric</span><span>Current</span><span>Target</span><span>Trend</span></div>
@@ -150,7 +152,7 @@ export function ReportsPage() {
           actions={
             <>
               <Button variant="secondary" onClick={() => setReportOpen(false)}>Cancel</Button>
-              <Button icon="chart" onClick={() => setReportOpen(false)}>Generate report</Button>
+              <Button icon="chart" onClick={() => { setReportOpen(false); notify("Demo only: no report was generated.", "info") }}>Generate report</Button>
             </>
           }
         >

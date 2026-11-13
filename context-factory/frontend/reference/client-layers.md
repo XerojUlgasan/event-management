@@ -6,7 +6,7 @@ There is no `apps/web/src/controllers` folder and no `src/lib/api.ts` barrel. Do
 
 ## What talks to the API
 
-Private proposal reads/saves and audit history live in `lib/data/booking-packages.ts`; quotation draft/save/send/history/customer actions live in `lib/data/quotations.ts`. Reuse the shared quotation/catalog contracts. Message DTOs include a nullable quotation reference; render the exact referenced version through the authorized quotation endpoint rather than treating message text as an offer or resolving the latest version silently.
+Private proposal reads/saves and audit history live in `lib/data/booking-packages.ts`; quotation reads and admin draft/save/send/revision calls live in `lib/data/quotations.ts`. Customers discuss quotations through the existing message calls. Reuse the shared quotation/catalog contracts. Message DTOs include a nullable quotation reference; render the exact referenced version through the authorized quotation endpoint rather than treating message text as an offer or resolving the latest version silently.
 
 `request` in `apps/web/src/lib/http.ts` builds the URL from `PUBLIC_API_URL`, which already ends in `/v1`. Pass the path after that prefix, such as `/packages` or `/admin/packages`. The wrapper sends `credentials: "include"`. It sets `Content-Type: application/json` unless the body is `FormData`. It sends `Authorization: Bearer` only when the caller passes an identity token, which current auth exchanges do for Firebase. A failed response throws `ApiError`. A `204` response returns `undefined`. `request<T>` asserts the JSON type. It does not check that the server returned `T`. Compare a changed payload with the route schema, as [API synchronization](../../shared/api-type-sync.md) describes.
 
@@ -58,7 +58,7 @@ A service may import `lib/data`. A util does not import HTTP, storage, or React.
 1. Use the existing domain file when the route belongs to that API domain. Add `src/lib/data/<domain>.ts` when the domain is new. Name the file for the domain, in kebab-case when it has more than one word, as `booking-requests.ts` does.
 2. Export a camelCase function named for the operation, such as `getAdminPackages` or `updateBookingRequestStatus`.
 3. Call `request` with the path after `/v1`. Keep the function a direct call. Put upload-then-save, drafts, and response merging in `src/lib/services/`, in a file named for that sequence.
-4. Import the data function from the screen, or from the service when the screen should not sequence the calls. Catch `ApiError` in the screen that shows the message.
+4. Import the data function from the screen, or from the service when the screen should not sequence the calls. Catch `ApiError` in the screen that shows the message and call the shared `useNotifications().notifyError(cause, fallback)`. This formats and displays the failure and returns its message for optional inline error state. Keep useful inline validation or retry controls. Report success after the write resolves. Polling callers suppress identical failures until recovery; the HTTP wrapper does not emit notifications. `AuthProvider` owns authentication failure notices, so auth screens do not duplicate them.
 5. When the route shape changes, update the handwritten type and every caller in the same change. Do not treat `request<T>` as a generated client.
 
 Put a new pure helper in `src/lib/utils/` when more than one screen needs it or when it matches the money and name helpers. Leave a one-off JSX detail in the component.

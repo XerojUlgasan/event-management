@@ -1,5 +1,4 @@
 import type { ConversationWithCustomer, MessageWithSender } from "../../data/messages/types.js";
-import { conversationExpiresAt } from "../../utils/conversation-expiry.js";
 
 export type MessageDto = {
   id: string;
@@ -27,7 +26,6 @@ export type ConversationDto = {
   guestCount: number | null;
   status: "active" | "closed";
   closedAt: string | null;
-  expiresAt: string;
   lastMessage: MessageDto | null;
   unreadCount: number;
   updatedAt: string;
@@ -70,10 +68,6 @@ export function conversationDto(
     guestCount: row.guest_count,
     status: row.status as ConversationDto["status"],
     closedAt: row.closed_at ? new Date(row.closed_at).toISOString() : null,
-    expiresAt: conversationExpiresAt(
-      row.event_ends_at,
-      row.created_at,
-    ).toISOString(),
     lastMessage,
     unreadCount,
     updatedAt: row.updated_at.toISOString(),

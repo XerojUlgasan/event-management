@@ -1,9 +1,10 @@
+import { navigateWorkspace } from "../../lib/workspace-navigation"
 import { BookingPackage } from "./BookingPackage";
 import { Quotations } from "./Quotations";
 import { ApiError } from "../../lib/http";
 import { getMyBookingRequest } from "../../lib/data/booking-requests";
 import { localInput, zonedInstant } from "../../lib/utils/event-day-time";
-import { FormField, Input, NativeDialog, Select, Textarea } from "@event-management/ui"
+import { FormField, Input, NativeDialog, Select, Textarea, useNotifications } from "@event-management/ui"
 import { MAX_BOOKING_REASON_LENGTH } from "@event-management/contracts/limits/booking-requests";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -55,6 +56,9 @@ function BookingCards({
   onExplore?: () => void;
   onOpenChat?: (reference: string) => void;
 }) {
+  const { notify, notifyError } = useNotifications();
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [items, setItems] = useState<BookingRequest[]>([]);
   const [selected, setSelected] = useState<BookingRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,15 +71,15 @@ function BookingCards({
       const result = await (admin
         ? getAdminBookingRequests()
         : getMyBookingRequests());
+      if (!mounted.current) return;
       setItems(result.bookingRequests);
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Unable to load requests.",
-      );
+      if (!mounted.current) return;
+      setError(notifyError(cause, "Unable to load requests."));
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
-  }, [admin]);
+  }, [admin, notifyError]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -87,10 +91,9 @@ function BookingCards({
       setItems((rows) =>
         rows.map((row) => (row.id === id ? result.bookingRequest : row)),
       );
+      notify("Booking request cancelled.");
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Unable to cancel request.",
-      );
+      setError(notifyError(cause, "Unable to cancel request."));
     } finally {
       setBusy("");
     }
@@ -107,10 +110,9 @@ function BookingCards({
       setItems((rows) =>
         rows.map((row) => (row.id === id ? result.bookingRequest : row)),
       );
+      notify("Booking request status updated.");
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Unable to update request.",
-      );
+      setError(notifyError(cause, "Unable to update request."));
     } finally {
       setBusy("");
     }
@@ -405,6 +407,7 @@ const shortDate = (value: string) =>
   );
 
 function AdminBookingList() {
+  const { notifyError } = useNotifications();
   const [status, setStatus] = useState<BookingStatus | "all">("all");
   const [month, setMonth] = useState(() => {
     const now = new Date();
@@ -470,10 +473,9 @@ function AdminBookingList() {
         if (
           generation.current === current &&
           currentScope.current === queryScope
-        )
-          setError(
-            cause instanceof Error ? cause.message : "Unable to load requests.",
-          );
+        ) {
+          setError(notifyError(cause, "Unable to load requests."));
+        }
       })
       .finally(() => {
         if (
@@ -485,7 +487,7 @@ function AdminBookingList() {
     return () => {
       generation.current++;
     };
-  }, [statusFilter, day, revision, queryScope]);
+  }, [statusFilter, day, revision, queryScope, notifyError]);
   useEffect(() => {
     let active = true;
     setCalendarError("");
@@ -504,16 +506,15 @@ function AdminBookingList() {
           );
       })
       .catch((cause) => {
-        if (active)
-          setCalendarError(
-            cause instanceof Error ? cause.message : "Unable to load calendar.",
-          );
+        if (active) {
+          setCalendarError(notifyError(cause, "Unable to load calendar."));
+        }
       })
       .finally(() => { if (active) setCalendarLoading(false); });
     return () => {
       active = false;
     };
-  }, [monthKey, statusFilter, revision]);
+  }, [monthKey, statusFilter, revision, notifyError]);
   const loadMore = useCallback(async () => {
     if (
       !cursor ||
@@ -545,12 +546,9 @@ function AdminBookingList() {
         );
       }
     } catch (cause) {
-      if (generation.current === current && currentScope.current === queryScope)
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "Unable to load more requests.",
-        );
+      if (generation.current === current && currentScope.current === queryScope) {
+        setError(notifyError(cause, "Unable to load more requests."));
+      }
     } finally {
       if (
         generation.current === current &&
@@ -560,7 +558,7 @@ function AdminBookingList() {
         setLoadingMore(false);
       }
     }
-  }, [cursor, day, loading, statusFilter, queryScope]);
+  }, [cursor, day, loading, statusFilter, queryScope, notifyError]);
   useEffect(() => {
     if (
       !sentinel.current ||
@@ -646,14 +644,14 @@ function AdminBookingList() {
               </thead>
               <tbody>
                 {items.map((item) => (
-                  <tr key={item.id} onClick={() => window.location.assign(adminBookingRequestPath(item.id))}>
+                  <tr key={item.id} onClick={() => navigateWorkspace(adminBookingRequestPath(item.id))}>
                     <td>
                       <Button variant="secondary"
                         type="button"
                         className="booking-row-button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          window.location.assign(adminBookingRequestPath(item.id));
+                          navigateWorkspace(adminBookingRequestPath(item.id));
                         }}
                         aria-label={`View request ${item.reference}`}
                       >
@@ -898,6 +896,7 @@ export function BookingDetails({
 }
 
 function RequestedDay({ item, day, editable, onSaved }: { item: BookingRequest; day: NonNullable<BookingRequest["requestedDays"]>[number]; editable: boolean; onSaved: (item: BookingRequest) => void }) {
+  const { notify, notifyError } = useNotifications();
   const initialStart = localInput(day.startsAt, item.timeZone), initialEnd = localInput(day.endsAt, item.timeZone);
   const [start, setStart] = useState(initialStart.slice(11));
   const [end, setEnd] = useState(initialEnd.slice(11));
@@ -918,8 +917,8 @@ function RequestedDay({ item, day, editable, onSaved }: { item: BookingRequest; 
       const date = new Date(`${day.date}T00:00:00Z`); if (nextDay) date.setUTCDate(date.getUTCDate() + 1);
       const startsAt = zonedInstant(`${day.date}T${start}`, item.timeZone), endsAt = zonedInstant(`${date.toISOString().slice(0, 10)}T${end}`, item.timeZone);
       if (endsAt <= startsAt) throw new Error("End time must be after start time. Select next day for an overnight event.");
-      const result = await updateRequestedDayTimes(item.id, day.date, { startsAt, endsAt, expectedUpdatedAt: item.updatedAt }); dirty.current = false; onSaved(result.bookingRequest);
-    } catch (cause) { setStale(cause instanceof ApiError && cause.status === 409); setError(cause instanceof Error ? cause.message : "Unable to save times."); } finally { setBusy(false); }
+      const result = await updateRequestedDayTimes(item.id, day.date, { startsAt, endsAt, expectedUpdatedAt: item.updatedAt }); dirty.current = false; onSaved(result.bookingRequest); notify("Requested-day times saved.");
+    } catch (cause) { setStale(cause instanceof ApiError && cause.status === 409); setError(notifyError(cause, "Unable to save times.")); } finally { setBusy(false); }
   }
   return <Panel as="article" className="requested-day">
     <h4>{preferredDateLabel(day.date)}</h4>
@@ -934,7 +933,7 @@ function RequestedDay({ item, day, editable, onSaved }: { item: BookingRequest; 
         <label className="requested-day-next"><Input variant="plain" type="checkbox" checked={nextDay} onChange={e => { dirty.current = true; setNextDay(e.target.checked); }} /> <span>End on the next day</span></label>
         {error && <p role="alert">{error}</p>}
         <div className="requested-day-actions">
-          {stale && <Button type="button" variant="secondary" onClick={async () => { try { const result = await getMyBookingRequest(item.id); const refreshed = result.bookingRequest.requestedDays?.find(entry => entry.date === day.date); if (refreshed) resetTimes(refreshed); onSaved(result.bookingRequest); setStale(false); setError(""); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to refresh request."); } }}>Refresh saved times</Button>}
+          {stale && <Button type="button" variant="secondary" onClick={async () => { try { const result = await getMyBookingRequest(item.id); const refreshed = result.bookingRequest.requestedDays?.find(entry => entry.date === day.date); if (refreshed) resetTimes(refreshed); onSaved(result.bookingRequest); setStale(false); setError(""); notify("Saved times refreshed.", "info"); } catch (cause) { setError(notifyError(cause, "Unable to refresh request.")); } }}>Refresh saved times</Button>}
           <Button type="submit" disabled={stale}>{busy ? "Saving…" : "Save times"}</Button>
         </div>
       </fieldset>

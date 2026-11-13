@@ -9,7 +9,3 @@ export const listResult = {
   content: json(z.object({ quotations: z.array(quotationSchema) })),
   description: "Quotation history",
 };
-export const ackResult = {
-  content: json(z.object({ ok: z.literal(true) })),
-  description: "Revision requested",
-};

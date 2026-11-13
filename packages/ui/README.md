@@ -5,7 +5,7 @@ Shared React presentation components for Clemora. Import public components from 
 ## Layers
 
 - `atoms/` — primitives including `Button`, `Input`, `Textarea`, `Select`, `Badge`, `Icon`, `GoogleMark`, `Avatar`, `ActionLink`, `SectionCounter`, and `Wordmark`.
-- `molecules/` — combinations including `Panel`, `StatCard`, `InputGroup`, `SearchField`, `Tabs`, `FormField`, `ActivityList`, `Toast`, `Brand`, `SiteHeader`, and `InclusionStrip`.
+- `molecules/` — combinations including `Panel`, `StatCard`, `InputGroup`, `SearchField`, `Tabs`, `FormField`, `ActivityList`, `Toast`, `NotificationProvider`, `Brand`, `SiteHeader`, and `InclusionStrip`.
 - `organisms/` — larger reusable sections: `PageHeader`, `Dialog`, `NativeDialog`, and `Drawer`.
 - `templates/` — structural page layouts: `WorkspaceLayout`.
 
@@ -20,7 +20,7 @@ Use shared primitives for controls and presentation; application content, routin
 
 Shared component styles live in `src/styles.css`. Color choices and semantic surface, text, border, status, accent, and overlay tokens belong to `@event-management/theme`, including the existing Clemora and wine/cream tokens. App styles own page-specific layout.
 
-`Button.pending` disables the action, exposes `aria-busy`, and displays the spinner; callers supply pending text and state. `variant="danger"` styles destructive confirmations. `IconName`, `BadgeTone`, and `ToastTone` describe supported values. `Toast` defaults to success/status feedback; danger feedback uses an alert and matching icon/color. Callers own notification timers and cleanup.
+`Button.pending` disables the action, exposes `aria-busy`, and displays the spinner; callers supply pending text and state. `variant="danger"` styles destructive confirmations. `IconName`, `BadgeTone`, and `ToastTone` describe supported values. `Toast` defaults to success/status feedback; danger feedback uses an alert and matching icon/color. `Toast` also supports informational status feedback. For app notifications, mount `NotificationProvider` once and call `useNotifications().notify(message, tone)`; the default tone is `success`. Use `notifyError(cause, fallback)` for failures: it formats an unknown error, emits the danger notice, and returns the same message for optional contextual text, such as `setError(notifyError(cause, "Unable to save."))`. Polling can use `notificationErrorMessage` to compare errors before notifying. The provider stacks messages, suppresses identical visible messages, and owns timers and cleanup. Success/info notices dismiss after six seconds, with timing paused during hover or keyboard focus; danger notices stay until dismissed. The shared host follows the active native dialog so notices remain visible and dismissible in modal flows. Standalone `Toast` callers still own its lifetime. `placement="inline"` renders a persistent notice in document flow, including server-rendered catalog errors and their retry links.
 
 Mount `Dialog` and `Drawer` conditionally. Their native modal lifecycle handles background inertness and Escape requests; accepting `onClose` means unmounting the component. Ignoring a dismissal request keeps it open. Supply a title (`Drawer` requires one); an untitled `Dialog` needs `aria-label`. `Dialog.initialFocus` accepts a control ref for initial field focus. These wrappers restore focus to a connected opener. Specialized `NativeDialog` callers retain their own lifecycle.
 

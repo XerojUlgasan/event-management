@@ -38,13 +38,8 @@ export const reviseQuotation = (
   id: string,
   expectedUpdatedAt: string,
   reason: string,
-  admin: boolean,
 ) =>
-  request<{ quotation: Quotation } | { ok: true }>(
-    `${admin ? "/admin" : ""}${quote(id)}/revision`,
+  request<{ quotation: Quotation }>(
+    `/admin${quote(id)}/revision`,
     { expectedUpdatedAt, reason },
   );
-export const acceptQuotation = (id: string, expectedUpdatedAt: string) =>
-  request<{ quotation: Quotation }>(`${quote(id)}/accept`, {
-    expectedUpdatedAt,
-  });

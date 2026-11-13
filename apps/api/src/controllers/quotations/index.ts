@@ -3,10 +3,6 @@ import { createMiddleware } from "hono/factory";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import {
-  acceptQuotationRoute,
-  acceptQuotationRouteHandler,
-} from "./accept-quotation.js";
-import {
   createQuotationRoute,
   createQuotationRouteHandler,
 } from "./create-quotation.js";
@@ -23,8 +19,6 @@ import {
 import {
   reviseAdminQuotationRoute,
   reviseAdminQuotationRouteHandler,
-  reviseCustomerQuotationRoute,
-  reviseCustomerQuotationRouteHandler,
 } from "./revise-quotation.js";
 import {
   saveQuotationRoute,
@@ -68,10 +62,5 @@ routes.openapi(listCustomerQuotationsRoute, listCustomerQuotationsRouteHandler);
 routes.openapi(getQuotationRoute, getQuotationRouteHandler);
 routes.openapi(saveQuotationRoute, saveQuotationRouteHandler);
 routes.openapi(sendQuotationRoute, sendQuotationRouteHandler);
-routes.openapi(acceptQuotationRoute, acceptQuotationRouteHandler);
 routes.openapi(reviseAdminQuotationRoute, reviseAdminQuotationRouteHandler);
-routes.openapi(
-  reviseCustomerQuotationRoute,
-  reviseCustomerQuotationRouteHandler,
-);
 export default routes;

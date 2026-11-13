@@ -10,6 +10,7 @@ import {
   SearchField,
   StatCard,
   Tabs,
+  useNotifications,
 } from "@event-management/ui"
 import { getAdminUsers, type AdminUser } from "../../../lib/data/users"
 
@@ -26,8 +27,10 @@ function initials(name: string | null) {
 }
 
 export function StaffCustomersPage() {
+  const { notifyError } = useNotifications()
   const [tab, setTab] = useState("Staff")
   const [loadState, setLoadState] = useState<LoadState>("loading")
+  const [loadRevision, setLoadRevision] = useState(0)
   const [staff, setStaff] = useState<AdminUser[]>([])
   const [customers, setCustomers] = useState<AdminUser[]>([])
   const [staffQuery, setStaffQuery] = useState("")
@@ -36,15 +39,18 @@ export function StaffCustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<AdminUser | null>(null)
 
   useEffect(() => {
+    let active = true
     setLoadState("loading")
     getAdminUsers()
       .then(({ staff, customers }) => {
+        if (!active) return
         setStaff(staff)
         setCustomers(customers)
         setLoadState("ready")
       })
-      .catch(() => setLoadState("error"))
-  }, [])
+      .catch(() => { if (active) { setLoadState("error"); notifyError("Unable to load staff and customers.") } })
+    return () => { active = false }
+  }, [notifyError, loadRevision])
 
   const filteredStaff = staff.filter((person) =>
     `${person.displayName ?? ""} ${person.staffRole ?? ""} ${person.email}`
@@ -84,6 +90,7 @@ export function StaffCustomersPage() {
           <Icon name="alert" size={28} />
           <strong>Could not load users</strong>
           <span>Please check your connection and try again.</span>
+          <Button variant="secondary" onClick={() => { setLoadState("loading"); setLoadRevision(value => value + 1) }}>Try again</Button>
         </div>
       </div>
     )

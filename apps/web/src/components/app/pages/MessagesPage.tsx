@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+import { notificationErrorMessage, useNotifications } from "@event-management/ui"
 
 import {
   getAdminConversation,
@@ -17,6 +18,11 @@ function mergeConversations(current: ChatConversation[], incoming: ChatConversat
 }
 
 export function MessagesPage() {
+  const { notifyError } = useNotifications()
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  const listFailure = useRef("")
+  const threadFailure = useRef("")
   const [conversations, setConversations] = useState<ChatConversation[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -37,16 +43,21 @@ export function MessagesPage() {
     listBusy.current = true
     try {
       const result = await getAdminConversations()
+      if (!mounted.current) return
       setConversations((current) => mergeConversations(current, result.conversations, true))
       if (!hasLoadedMore.current) setNextCursor(result.nextCursor)
       setListError("")
+      listFailure.current = ""
     } catch (cause) {
-      setListError(cause instanceof Error ? cause.message : "Unable to load conversations.")
+      if (!mounted.current) return
+      const message = notificationErrorMessage(cause, "Unable to load conversations.")
+      setListError(message)
+      if (listFailure.current !== message) { listFailure.current = message; notifyError(message) }
     } finally {
       listBusy.current = false
-      setLoadingList(false)
+      if (mounted.current) setLoadingList(false)
     }
-  }, [])
+  }, [notifyError])
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || moreBusy.current || listBusy.current) return
@@ -55,16 +66,18 @@ export function MessagesPage() {
     setLoadMoreError("")
     try {
       const result = await getAdminConversations(nextCursor)
+      if (!mounted.current) return
       setConversations((current) => mergeConversations(current, result.conversations, false))
       setNextCursor(result.nextCursor)
       hasLoadedMore.current = true
     } catch (cause) {
-      setLoadMoreError(cause instanceof Error ? cause.message : "Unable to load more conversations.")
+      if (!mounted.current) return
+      setLoadMoreError(notifyError(cause, "Unable to load more conversations."))
     } finally {
       moreBusy.current = false
-      setLoadingMore(false)
+      if (mounted.current) setLoadingMore(false)
     }
-  }, [nextCursor])
+  }, [nextCursor, notifyError])
 
   useEffect(() => {
     void loadList()
@@ -76,15 +89,21 @@ export function MessagesPage() {
     setLoadingThread(true)
     try {
       const result = await getAdminConversation(id)
+      if (!mounted.current) return
       setThread((current) => mergeThread(current, result))
       setConversations((current) => current.map((item) => item.id === id ? result.conversation : item))
       setThreadError("")
+      threadFailure.current = ""
     } catch (cause) {
-      setThreadError(cause instanceof Error ? cause.message : "Unable to load this conversation.")
+      if (!mounted.current) return
+      const message = notificationErrorMessage(cause, "Unable to load this conversation.")
+      setThreadError(message)
+      const key = `${id}:${message}`
+      if (threadFailure.current !== key) { threadFailure.current = key; notifyError(message) }
     } finally {
-      setLoadingThread(false)
+      if (mounted.current) setLoadingThread(false)
     }
-  }, [])
+  }, [notifyError])
 
   useEffect(() => {
     if (!activeId) {

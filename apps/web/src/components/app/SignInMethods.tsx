@@ -1,4 +1,4 @@
-import { Input, Select } from "@event-management/ui"
+import { Input, Select, useNotifications } from "@event-management/ui"
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@event-management/contracts/limits/auth"
 import { useState } from "react";
 import type { SubmitEvent } from "react";
@@ -6,6 +6,7 @@ import { Button, FormField, Panel } from "@event-management/ui";
 import { firebaseConfigured, useAuth } from "../../lib/auth";
 
 export function SignInMethods() {
+  const { notify, notifyError } = useNotifications();
   const { profile, connectFirebase, createPassword, clearError } = useAuth();
   const [method, setMethod] = useState<"google" | "password">("google");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -14,17 +15,15 @@ export function SignInMethods() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
   const [formError, setFormError] = useState("");
   if (!profile) return null;
 
   const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     clearError();
-    setMessage("");
     setFormError("");
     if (!profile.hasPassword && newPassword !== confirmPassword) {
-      setFormError("Passwords do not match.");
+      setFormError(notifyError("Passwords do not match."));
       return;
     }
     setBusy(true);
@@ -36,7 +35,7 @@ export function SignInMethods() {
           firebaseEmail.trim(),
           firebasePassword,
         );
-        setMessage("Firebase connected. Both methods now open this account.");
+        notify("Firebase connected. Both methods now open this account.");
       } else {
         await createPassword(
           newPassword,
@@ -44,9 +43,7 @@ export function SignInMethods() {
           firebaseEmail.trim(),
           firebasePassword,
         );
-        setMessage(
-          "Password added. You can now sign in with your email and password.",
-        );
+        notify("Password added. You can now sign in with your email and password.");
       }
       setCurrentPassword("");
       setFirebasePassword("");
@@ -74,7 +71,6 @@ export function SignInMethods() {
           {profile.firebaseUid ? "Connected" : "Not connected"}
         </li>
       </ul>
-      {message && <p role="status">{message}</p>}
       {(!profile.hasPassword || !profile.firebaseUid) &&
         (firebaseConfigured ? (
           <form onSubmit={submit}>

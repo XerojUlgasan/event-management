@@ -14,7 +14,7 @@ Load the reference for the domain affected by the task before making business de
 | Booking requests | Customer package requests, admin review and status updates, accepted-request event days, opening staff availability, team selection, or the coordinator handoff | [Booking requests](references/booking-requests.md) |
 | Event days and staffing | Operational event-day schedules, response deadlines, staff availability, team and coordinator assignments, schedule conflicts, movement or cancellation, or the delivery handoff | [Event days and staffing](references/event-days-and-staffing.md) |
 | Messages | Automatic conversations after booking-request submission, customer/admin communication about a specific booking, or booking-related transactions within that conversation | [Messages](references/messages.md) |
-| Quotations | Private package proposals, quotation prices and adjustments, draft preparation, conversation delivery, customer acceptance, revisions, or quotation history | [Quotations](references/quotations.md) |
+| Quotations | Private package proposals, quotation prices and adjustments, draft preparation, conversation delivery, customer feedback through chat, admin revisions, or quotation history | [Quotations](references/quotations.md) |
 
 For work crossing domains, load each relevant reference. When a domain or decision is missing, state the gap and use the user's direction and [product scope](../../README.md#product-scope); ask about unresolved rules that affect permissions or commitments.
 

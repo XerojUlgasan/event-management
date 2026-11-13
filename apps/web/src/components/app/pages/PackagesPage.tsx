@@ -3,11 +3,12 @@ import {
   PageHeader,
   SearchField,
   Tabs,
+  useNotifications,
 } from "@event-management/ui";
 import { PackageCard, PackageEditor } from "./PackageEditor";
 import { getAdminServices } from "../../../lib/data/services";
 import { CatalogCardActions } from "./CatalogCard";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   archivePackage,
   deletePackage,
@@ -17,8 +18,10 @@ import {
 import { PackagePreview } from "../PackagePreview";
 import "../../../styles/package-editor.css";
 
-const message = (e: unknown) => e instanceof Error ? e.message : "Something went wrong.";
 export function PackagesPage() {
+  const { notify, notifyError } = useNotifications();
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [rows, setRows] = useState<AdminPackage[]>([]),
     [serviceOptions, setServiceOptions] = useState<import("../../../lib/data/services").AdminService[]>([]),
     [search, setSearch] = useState(""),
@@ -32,13 +35,15 @@ export function PackagesPage() {
     setError("");
     try {
       const [packages, services] = await Promise.all([getAdminPackages(), getAdminServices()]);
+      if (!mounted.current) return;
       setRows(packages.packages); setServiceOptions(services.services);
     } catch (e) {
-      setError(message(e));
+      if (!mounted.current) return;
+      setError(notifyError(e, "Something went wrong."));
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
-  }, []);
+  }, [notifyError]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -59,9 +64,10 @@ export function PackagesPage() {
     try {
       if (action === "archive") await archivePackage(item.id);
       else await deletePackage(item.id);
+      notify(`Package ${action === "archive" ? "archived" : "deleted"}.`);
       await load();
     } catch (e) {
-      setError(message(e));
+      setError(notifyError(e, "Something went wrong."));
     }
   };
   return (
@@ -106,7 +112,7 @@ export function PackagesPage() {
         </span>
       </div>
       {loading && <p role="status">Loading packages…</p>}
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert">{error} <Button variant="secondary" onClick={() => void load()}>Try again</Button></p>}
       <div className="pe-cards">
         {visible.map((item) => (
           <PackageCard

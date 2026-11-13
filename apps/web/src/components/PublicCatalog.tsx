@@ -1,4 +1,4 @@
-import { Button, NativeDialog } from "@event-management/ui"
+import { Button, NativeDialog, useNotifications } from "@event-management/ui"
 import { useCallback, useEffect, useId, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { getPackage, getPackages, packageImageSrc, type PublicPackage } from "../lib/data/packages"
@@ -40,18 +40,20 @@ function VenuePreview({ item, onClose }: { item: Venue; onClose: () => void }) {
 }
 
 function ServicePreview({ id, onClose }: { id: string; onClose: () => void }) {
+  const { notifyError } = useNotifications()
   const [service, setService] = useState<PublicService | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   useEffect(() => {
     let active = true
-    getService(id).then(detail => { if (active) setService(detail) }).catch(reason => { if (active) setError(reason instanceof Error ? reason.message : "Unable to load service.") }).finally(() => { if (active) setLoading(false) })
+    getService(id).then(detail => { if (active) setService(detail) }).catch(reason => { if (active) { setError(notifyError(reason, "Unable to load service.")) } }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [id])
+  }, [id, notifyError])
   return <CatalogDetailPreview entity="service" onClose={onClose}>{loading && <p className="package-preview-state" role="status">Loading service…</p>}{error && <p className="package-preview-state" role="alert">{error}</p>}{service && <ServiceCanvas item={service} />}</CatalogDetailPreview>
 }
 
 function CatalogPreview({ selected, venue, onClose, allowBooking }: { selected: Preview; venue: Venue | undefined; onClose: () => void; allowBooking: boolean }) {
+  const { notifyError } = useNotifications()
   const [packageDetail, setPackageDetail] = useState<PublicPackage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -59,9 +61,9 @@ function CatalogPreview({ selected, venue, onClose, allowBooking }: { selected: 
     if (selected?.kind !== "packages") return
     let active = true
     setPackageDetail(null); setLoading(true); setError("")
-    getPackage(selected.id).then(detail => { if (active) setPackageDetail(detail) }).catch(reason => { if (active) setError(reason instanceof Error ? reason.message : "Unable to load package.") }).finally(() => { if (active) setLoading(false) })
+    getPackage(selected.id).then(detail => { if (active) setPackageDetail(detail) }).catch(reason => { if (active) { setError(notifyError(reason, "Unable to load package.")) } }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [selected])
+  }, [selected, notifyError])
   if (selected?.kind === "venues" && venue) return <VenuePreview item={venue} onClose={onClose} />
   if (selected?.kind === "services") return <ServicePreview id={selected.id} onClose={onClose} />
   if (selected?.kind === "packages") return <PackagePreview allowBooking={allowBooking} item={packageDetail} loading={loading} error={error} onClose={onClose} />
@@ -69,6 +71,7 @@ function CatalogPreview({ selected, venue, onClose, allowBooking }: { selected: 
 }
 
 export function PublicCatalog({ kind, mode = "featured", allowBooking = true, onViewMore }: { kind: Kind; mode?: "featured" | "overview"; allowBooking?: boolean; onViewMore?: () => void }) {
+  const { notifyError } = useNotifications()
   const [items, setItems] = useState<(PublicPackage | PublicService | Venue)[]>([])
   const [nextOffset, setNextOffset] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
@@ -78,31 +81,36 @@ export function PublicCatalog({ kind, mode = "featured", allowBooking = true, on
   const [parentService, setParentService] = useState<string | null>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const busy = useRef(false)
+  const generation = useRef(0)
   const limit = mode === "featured" ? 3 : 15
 
   const load = useCallback(async (offset: number, reset = false) => {
     if (busy.current) return
+    const current = generation.current
     busy.current = true
     setLoading(true); setError("")
     try {
       if (kind === "packages") {
         const result = await getPackages({ limit, offset })
+        if (current !== generation.current) return
         setItems(previous => reset ? result.packages : [...previous, ...result.packages])
         setNextOffset(result.nextOffset)
       } else if (kind === "venues") {
         const result = await getVenues({ limit, offset })
+        if (current !== generation.current) return
         setItems(previous => reset ? result.venues : [...previous, ...result.venues])
         setNextOffset(result.nextOffset)
       } else {
         const result = await getServices({ limit, offset })
+        if (current !== generation.current) return
         setItems(previous => reset ? result.services : [...previous, ...result.services])
         setNextOffset(result.nextOffset)
       }
-    } catch (reason) { setError(reason instanceof Error ? reason.message : `Unable to load ${kind}.`) }
-    finally { busy.current = false; setLoading(false); setInitialized(true) }
-  }, [kind, limit])
+    } catch (reason) { if (current === generation.current) setError(notifyError(reason, `Unable to load ${kind}.`)) }
+    finally { if (current === generation.current) { busy.current = false; setLoading(false); setInitialized(true) } }
+  }, [kind, limit, notifyError])
 
-  useEffect(() => { void load(0, true) }, [load])
+  useEffect(() => { void load(0, true); return () => { generation.current++; busy.current = false } }, [load])
   useEffect(() => {
     if (mode !== "overview" || nextOffset === null || loading || error) return
     const sentinel = sentinelRef.current

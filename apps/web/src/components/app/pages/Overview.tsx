@@ -7,6 +7,7 @@ import {
   PageHeader,
   Panel,
   StatCard,
+  useNotifications,
 } from "@event-management/ui"
 
 import { bookings } from "../data"
@@ -19,6 +20,8 @@ export function Overview({
   firstName: string
   onNavigate: (key: NavKey) => void
 }) {
+  const { notify } = useNotifications()
+  const unavailable = () => notify("Demo only: this action is unavailable.", "info")
   return (
     <div className="content-stack">
       <PageHeader
@@ -123,7 +126,7 @@ export function Overview({
           action={<Badge tone="danger">3 urgent</Badge>}
         >
           <div className="attention-list">
-            <Button variant="plain">
+            <Button variant="plain" onClick={unavailable}>
               <span className="attention-icon danger">
                 <Icon name="alert" />
               </span>
@@ -133,7 +136,7 @@ export function Overview({
               </span>
               <Icon name="chevron" />
             </Button>
-            <Button variant="plain">
+            <Button variant="plain" onClick={unavailable}>
               <span className="attention-icon warning">
                 <Icon name="box" />
               </span>
@@ -143,7 +146,7 @@ export function Overview({
               </span>
               <Icon name="chevron" />
             </Button>
-            <Button variant="plain">
+            <Button variant="plain" onClick={unavailable}>
               <span className="attention-icon info">
                 <Icon name="clipboard" />
               </span>
@@ -207,7 +210,7 @@ export function Overview({
             Preferred date: August 10, 2025 · Harlow Residence
           </div>
           <div className="row-actions">
-            <Button variant="secondary">View customer</Button>
+            <Button variant="secondary" onClick={unavailable}>View customer</Button>
             <Button onClick={() => onNavigate("Bookings")}>Review booking</Button>
           </div>
         </Panel>

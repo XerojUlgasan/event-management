@@ -7,7 +7,7 @@ import {
 } from "@event-management/contracts/quotations";
 import type { Quotation, QuotationItem, QuotationStatus } from "@event-management/contracts/quotations";
 import { getAdminServices, type AdminService } from "../../lib/data/services";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Button,
@@ -15,9 +15,9 @@ import {
   Input,
   Select,
   Textarea,
+  useNotifications,
 } from "@event-management/ui";
 import {
-  acceptQuotation,
   createQuotation,
   getQuotation,
   getQuotations,
@@ -88,7 +88,7 @@ function readingIntro(quotation: Quotation) {
     return `Version ${quotation.version} was accepted on ${formatWhen(quotation.acceptedAt)}.`;
   }
   if (quotation.status === "sent" && quotation.sentAt) {
-    return `Version ${quotation.version} was sent on ${formatWhen(quotation.sentAt)}. The customer has not accepted it.`;
+    return `Version ${quotation.version} was sent on ${formatWhen(quotation.sentAt)}.`;
   }
   if (quotation.status === "superseded" && quotation.supersededAt) {
     return `Version ${quotation.version} was sent on ${quotation.sentAt ? formatWhen(quotation.sentAt) : "an earlier date"}. Replaced by a newer version.`;
@@ -145,7 +145,7 @@ function QuotationSummaryRead({ quotation }: { quotation: Quotation }) {
         ))}
       </div>
       <p className="quotation-fine">
-        Accepting this offer does not confirm the booking or reserve the date.
+        This offer does not confirm the booking or reserve the date.
       </p>
     </div>
   );
@@ -323,16 +323,20 @@ export function Quotations({
   admin: boolean;
   quotationId?: string;
 }) {
+  const { notify, notifyError } = useNotifications();
+  const generation = useRef(0);
   const [services, setServices] = useState<AdminService[]>([]);
   const [serviceError, setServiceError] = useState("");
   async function loadServices() {
+    const current = generation.current;
     try {
-      setServices((await getAdminServices()).services);
+      const result = await getAdminServices();
+      if (current !== generation.current) return;
+      setServices(result.services);
       setServiceError("");
     } catch (cause) {
-      setServiceError(
-        cause instanceof Error ? cause.message : "Unable to load services.",
-      );
+      if (current !== generation.current) return;
+      setServiceError(notifyError(cause, "Unable to load services."));
     }
   }
   const [rows, setRows] = useState<Quotation[]>([]),
@@ -348,6 +352,7 @@ export function Quotations({
   );
 
   async function load() {
+    const currentGeneration = generation.current;
     setLoading(true);
     setError("");
     try {
@@ -359,33 +364,33 @@ export function Quotations({
                 (q) => !quotationId || q.id === quotationId,
               )
             : [];
+      if (currentGeneration !== generation.current) return;
       setRows(result);
       const current = result.find((q) => q.status === "draft") ?? null;
       setDraft(current);
       setItems(current?.items ?? []);
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Unable to load quotations.",
-      );
+      if (currentGeneration !== generation.current) return;
+      setError(notifyError(cause, "Unable to load quotations."));
     } finally {
-      setLoading(false);
+      if (currentGeneration === generation.current) setLoading(false);
     }
   }
   useEffect(() => {
     void load();
     if (admin) void loadServices();
+    return () => { generation.current++; };
   }, [bookingId, admin, quotationId]);
 
-  async function action(fn: () => Promise<unknown>) {
+  async function action(successMessage: string, fn: () => Promise<unknown>) {
     setBusy(true);
     setError("");
     try {
       await fn();
+      notify(successMessage);
       await load();
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Unable to update quotation.",
-      );
+      setError(notifyError(cause, "Unable to update quotation."));
     } finally {
       setBusy(false);
     }
@@ -461,7 +466,7 @@ export function Quotations({
           <Button
             disabled={busy}
             onClick={() =>
-              void action(async () => {
+              void action("Quotation draft created.", async () => {
                 const booking = await getAdminBookingRequest(bookingId);
                 await createQuotation(
                   bookingId,
@@ -479,7 +484,7 @@ export function Quotations({
         <p className="quotation-lede">No quotations yet.</p>
       )}
 
-      {draft && serviceError && (
+      {admin && draft && serviceError && (
         <p role="alert">
           {serviceError}{" "}
           <Button variant="secondary" onClick={() => void loadServices()}>
@@ -488,7 +493,7 @@ export function Quotations({
         </p>
       )}
 
-      {draft && (
+      {admin && draft && (
         <fieldset className="quotation-stack" disabled={busy}>
           <div className="quotation-offer-head">
             <div>
@@ -562,8 +567,7 @@ export function Quotations({
           />
 
           <p className="quotation-fine">
-            Accepting this offer does not confirm the booking or reserve the
-            date.
+            This offer does not confirm the booking or reserve the date.
           </p>
 
           <div className="quotation-actions">
@@ -571,7 +575,7 @@ export function Quotations({
               variant="secondary"
               disabled={busy}
               onClick={() =>
-                void action(() =>
+                void action("Quotation adjustments saved.", () =>
                   saveQuotation(draft.id, draft.updatedAt, items),
                 )
               }
@@ -581,7 +585,7 @@ export function Quotations({
             <Button
               disabled={busy || editorTotal < 0}
               onClick={() =>
-                void action(async () => {
+                void action("Quotation saved and sent.", async () => {
                   const saved = await saveQuotation(
                     draft.id,
                     draft.updatedAt,
@@ -624,12 +628,11 @@ export function Quotations({
                   variant="secondary"
                   disabled={busy || !reason.trim()}
                   onClick={() =>
-                    void action(async () => {
+                    void action("Quotation revision started. Review and save the draft.", async () => {
                       await reviseQuotation(
                         draft.id,
                         draft.updatedAt,
                         reason.trim(),
-                        true,
                       );
                       setReason("");
                     })
@@ -646,42 +649,27 @@ export function Quotations({
       {!draft && currentOffer && (
         <div className="quotation-stack">
           <QuotationSummaryRead quotation={currentOffer} />
-          {currentOffer.status === "sent" && !admin && (
-            <div className="quotation-actions quotation-actions-start">
-              <Button
-                disabled={busy}
-                onClick={() =>
-                  void action(() =>
-                    acceptQuotation(currentOffer.id, currentOffer.updatedAt),
-                  )
-                }
-              >
-                Accept quotation
-              </Button>
-            </div>
-          )}
-          {(currentOffer.status === "sent" ||
-            currentOffer.status === "accepted") && (
+          {!admin && <p className="quotation-lede">Discuss this offer in Messages.</p>}
+          {admin && (
             <div className="quotation-revision">
               {!showRevision ? (
                 <div className="quotation-actions quotation-actions-start">
                   <Button
-                    variant={admin ? undefined : "secondary"}
-                    disabled={busy || (admin && !!draft)}
+                    disabled={busy}
                     onClick={() => setShowRevision(true)}
                   >
-                    {admin ? "Revise this offer" : "Request revision"}
+                    Revise this offer
                   </Button>
                 </div>
               ) : (
                 <>
                   <h3>
-                    {admin ? "Revise this offer" : "Request revision"}
+                    Revise this offer
                   </h3>
                   {currentOffer.status === "accepted" && (
                     <p className="quotation-lede">
                       Starting a revision immediately supersedes this accepted
-                      agreement. The customer must accept the new version.
+                      offer.
                     </p>
                   )}
                   <FormField label="Reason for the revision">
@@ -706,21 +694,20 @@ export function Quotations({
                       Cancel
                     </Button>
                     <Button
-                      disabled={busy || !reason.trim() || (admin && !!draft)}
+                      disabled={busy || !reason.trim()}
                       onClick={() =>
-                        void action(async () => {
+                        void action("Quotation revision started. Review and save the draft.", async () => {
                           await reviseQuotation(
                             currentOffer.id,
                             currentOffer.updatedAt,
                             reason.trim(),
-                            admin,
                           );
                           setReason("");
                           setShowRevision(false);
                         })
                       }
                     >
-                      {admin ? "Start revision" : "Request revision"}
+                      Start revision
                     </Button>
                   </div>
                 </>

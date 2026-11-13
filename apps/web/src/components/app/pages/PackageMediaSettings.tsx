@@ -1,4 +1,4 @@
-import { Button, Icon, Input, NativeDialog } from "@event-management/ui"
+import { Button, Icon, Input, NativeDialog, useNotifications } from "@event-management/ui"
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog"
@@ -16,6 +16,7 @@ export function PackageMediaSettings({ widget, fileName, onChange, onSelectFile,
   onClose: () => void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
+  const { notifyError } = useNotifications()
   const [error, setError] = useState("")
   const isPhoto = widget.type === "photo"
   const title = isPhoto ? "Photo settings" : "Video settings"
@@ -30,7 +31,7 @@ export function PackageMediaSettings({ widget, fileName, onChange, onSelectFile,
     <header><h2>{title}</h2><Button variant="plain" type="button" className="pe-media-close" aria-label={`Close ${title.toLowerCase()}`} onClick={onClose}><Icon name="close" size={20} strokeWidth="1.5" /></Button></header>
     <div className="pe-media-dialog-body">
       <div className="pe-media-settings-preview"><WidgetContent widget={widget} editor /></div>
-      <label>Upload {isPhoto ? "photo" : "video"}<Input variant="plain" type="file" accept={isPhoto ? "image/jpeg,image/png,image/webp" : "video/mp4,video/webm"} onChange={event => setError(onSelectFile(event.target.files?.[0]) || "")} /><small>{isPhoto ? "JPEG, PNG, or WebP" : "MP4 or WebM"} · Maximum {Math.floor((isPhoto ? MAX_IMAGE_SIZE_BYTES : MAX_VIDEO_SIZE_BYTES) / 1024 / 1024)} MiB{fileName && <span className="pe-media-filename">Selected: {fileName}</span>}</small></label>
+      <label>Upload {isPhoto ? "photo" : "video"}<Input variant="plain" type="file" accept={isPhoto ? "image/jpeg,image/png,image/webp" : "video/mp4,video/webm"} onChange={event => { const error = onSelectFile(event.target.files?.[0]); setError(error || ""); if (error) notifyError(error) }} /><small>{isPhoto ? "JPEG, PNG, or WebP" : "MP4 or WebM"} · Maximum {Math.floor((isPhoto ? MAX_IMAGE_SIZE_BYTES : MAX_VIDEO_SIZE_BYTES) / 1024 / 1024)} MiB{fileName && <span className="pe-media-filename">Selected: {fileName}</span>}</small></label>
       {error && <p className="pe-media-error" role="alert">{error}</p>}
       {isPhoto && <label>Image description<Input maxLength={MAX_CATALOG_TEXT_LENGTH} value={widget.alt} onChange={event => onChange({ alt: event.target.value })} /><small>Describe the image for people using screen readers.</small></label>}
       <label>Caption<Input maxLength={MAX_CATALOG_TEXT_LENGTH} value={widget.caption} onChange={event => onChange({ caption: event.target.value })} /></label>

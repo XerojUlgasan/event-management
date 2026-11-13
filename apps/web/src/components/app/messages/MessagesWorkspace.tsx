@@ -1,6 +1,7 @@
+import { navigateWorkspace } from "../../../lib/workspace-navigation"
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages"
 import { Fragment, useEffect, useRef, useState, type SubmitEvent } from "react"
-import { Avatar, Badge, Button, Dialog, Icon, Input } from "@event-management/ui"
+import { Avatar, Badge, Button, Dialog, Icon, Input, useNotifications } from "@event-management/ui"
 
 import { getMyBookingRequest, type BookingRequest } from "../../../lib/data/booking-requests"
 import type { ChatConversation, ChatMessage } from "../../../lib/data/messages"
@@ -84,6 +85,7 @@ export function MessagesWorkspace({
   newChatBusy?: boolean
   readOnly?: boolean
 }) {
+  const { notify, notifyError } = useNotifications()
   const [quotationId, setQuotationId] = useState<string | null>(null)
   const [draft, setDraft] = useState("")
   const [sending, setSending] = useState(false)
@@ -108,12 +110,14 @@ export function MessagesWorkspace({
 
   useEffect(() => {
     setDraft("")
+    setSending(false)
     setSendError("")
     setBooking(null)
     setQuotationId(null)
     setBookingError("")
     setBookingLoading(false)
     bookingLoad.current++
+    return () => { bookingLoad.current++ }
   }, [activeId])
 
   useEffect(() => {
@@ -135,7 +139,7 @@ export function MessagesWorkspace({
 
   async function openBooking() {
     if (!active?.bookingRequestId || bookingLoading) return
-    if (!isTeam) { window.location.assign(adminBookingRequestPath(active.bookingRequestId)); return }
+    if (!isTeam) { navigateWorkspace(adminBookingRequestPath(active.bookingRequestId)); return }
     const request = ++bookingLoad.current
     setBookingLoading(true)
     setBookingError("")
@@ -143,7 +147,9 @@ export function MessagesWorkspace({
       const result = await getMyBookingRequest(active.bookingRequestId)
       if (request === bookingLoad.current) setBooking(result.bookingRequest)
     } catch (cause) {
-      if (request === bookingLoad.current) setBookingError(cause instanceof Error ? cause.message : "Unable to load booking details.")
+      if (request === bookingLoad.current) {
+        setBookingError(notifyError(cause, "Unable to load booking details."));
+      }
     } finally {
       if (request === bookingLoad.current) setBookingLoading(false)
     }
@@ -153,15 +159,19 @@ export function MessagesWorkspace({
     event.preventDefault()
     const body = draft.trim()
     if (!body || sending || readOnly || !activeId) return
+    const request = bookingLoad.current
     setSending(true)
     setSendError("")
     try {
       await onSend(body)
+      if (request !== bookingLoad.current) return
       setDraft("")
+      notify("Message sent.")
     } catch (cause) {
-      setSendError(cause instanceof Error ? cause.message : "Unable to send your message. Please try again.")
+      if (request !== bookingLoad.current) return
+      setSendError(notifyError(cause, "Unable to send your message. Please try again."));
     } finally {
-      setSending(false)
+      if (request === bookingLoad.current) setSending(false)
     }
   }
 
@@ -331,7 +341,7 @@ export function MessagesWorkspace({
         )}
         {closedForCustomer && (
           <p className="messages-closed-note">
-            This conversation closed after inactivity. Send a message to reopen it; the
+            This conversation is closed. Send a message to reopen it; the
             history stays here.
           </p>
         )}

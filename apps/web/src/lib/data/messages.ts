@@ -28,7 +28,6 @@ export type ChatConversation = {
   guestCount: number | null
   status: ConversationStatus
   closedAt: string | null
-  expiresAt: string
   lastMessage: ChatMessage | null
   unreadCount: number
   updatedAt: string

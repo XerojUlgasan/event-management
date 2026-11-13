@@ -1,3 +1,4 @@
+import { navigateWorkspace } from "../../../lib/workspace-navigation"
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages"
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
@@ -11,8 +12,8 @@ import {
   Panel,
   Textarea,
   FormField,
-  Toast,
-  type ToastTone,
+  useNotifications,
+  notificationErrorMessage,
 } from "@event-management/ui"
 
 import { photos } from "../data"
@@ -53,8 +54,20 @@ export function CustomerDashboard({
   userEmail: string
   onSignOut: () => void
 }) {
+  const { notify, notifyError } = useNotifications()
+  const mounted = useRef(true)
+  const selection = useRef(0)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; selection.current++ } }, [])
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("clemora-message-sent") === "1") {
+        sessionStorage.removeItem("clemora-message-sent")
+        notify("Message sent.")
+      }
+    } catch { /* The saved message remains visible in the conversation. */ }
+  }, [notify])
   const tab = customerTab(path)
-  const go = (next: CustomerTab) => { window.location.assign(customerPaths[next]) }
+  const go = (next: CustomerTab) => { navigateWorkspace(customerPaths[next]) }
   const [messageOpen, setMessageOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement>(null)
@@ -72,40 +85,25 @@ export function CustomerDashboard({
   const [bookingResume, setBookingResume] = useState(() => new URLSearchParams(search).get("booking") === "resume")
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesError, setMessagesError] = useState("")
+  const lastMessageError = useRef("")
   const [newChatBusy, setNewChatBusy] = useState(false)
-  const [toast, setToast] = useState<{ message: string; tone: ToastTone } | null>(null)
-  const toastTimerRef = useRef<number | null>(null)
-  const mountedRef = useRef(true)
-
   useEffect(() => {
-    mountedRef.current = true
-    return () => {
-      mountedRef.current = false
-      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
-    }
-  }, [])
-
-  useEffect(() => {
-    const slug = new URLSearchParams(search).get("book")
+    const params = new URLSearchParams(search)
+    const slug = params.get("book")
+    const resume = params.get("booking") === "resume"
+    if (resume) { setBookingItem(readBookingDraft()?.item ?? null); setBookingResume(true); return }
+    setBookingItem(null)
+    setBookingResume(false)
     if (!slug) return
     let active = true
-    getPackageBySlug(slug).then(item => { if (active) { setBookingItem(item); setBookingResume(false) } }).catch(() => { if (active) setBookingItem(null) })
+    getPackageBySlug(slug).then(item => { if (active) { setBookingItem(item); setBookingResume(false) } }).catch(cause => { if (active) { setBookingItem(null); notifyError(cause, "Unable to open the selected package.") } })
     return () => { active = false }
-  }, [search])
+  }, [search, notifyError])
 
-  const notify = (message: string, tone: ToastTone = "success") => {
-    if (!mountedRef.current) return
-    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
-    setToast({ message, tone })
-    toastTimerRef.current = window.setTimeout(() => {
-      toastTimerRef.current = null
-      setToast(null)
-    }, 2600)
-  }
-
-  const refreshMessages = useCallback(async () => {
+  const refreshMessages = useCallback(async (active: () => boolean) => {
     try {
       const { conversations } = await getMyConversations()
+      if (!active()) return
       setMessageConversations(conversations)
       const targetId = pendingBookingReference
         ? conversations.find((item) => item.bookingRequestReference === pendingBookingReference)?.id ?? null
@@ -115,24 +113,31 @@ export function CustomerDashboard({
       setSelectedConversationId(targetId)
       if (targetId) {
         const thread = await getMyConversationById(targetId)
+        if (!active()) return
         setMessageThread((current) => mergeThread(current, thread))
       } else {
         setMessageThread(null)
       }
       setMessagesError("")
+      lastMessageError.current = ""
     } catch (cause) {
-      setMessagesError(cause instanceof Error ? cause.message : "Unable to load your messages.")
+      if (!active()) return
+      const message = notificationErrorMessage(cause, "Unable to load your messages.")
+      setMessagesError(message)
+      if (lastMessageError.current !== message) notifyError(message)
+      lastMessageError.current = message
     } finally {
-      setMessagesLoading(false)
+      if (active()) setMessagesLoading(false)
     }
-  }, [pendingBookingReference, selectedConversationId])
+  }, [pendingBookingReference, selectedConversationId, notifyError])
 
   useEffect(() => {
     if (tab !== "Messages") return
+    let active = true
     setMessagesLoading(true)
-    void refreshMessages()
-    const timer = window.setInterval(() => void refreshMessages(), 5000)
-    return () => window.clearInterval(timer)
+    void refreshMessages(() => active)
+    const timer = window.setInterval(() => void refreshMessages(() => active), 5000)
+    return () => { active = false; window.clearInterval(timer) }
   }, [tab, refreshMessages])
 
   const showSentInList = (conversation: ChatConversation, message: ChatMessage) => {
@@ -199,23 +204,29 @@ export function CustomerDashboard({
       setConversationOpen(true)
       notify("New chat started.")
     } catch (cause) {
-      notify(cause instanceof Error ? cause.message : "Unable to start a new chat.", "danger")
+      notifyError(cause, "Unable to start a new chat.")
     } finally {
       setNewChatBusy(false)
     }
   }
 
   const selectConversation = async (id: string) => {
+    const location = window.location.href
+    const current = ++selection.current
+    const active = () => mounted.current && selection.current === current && window.location.href === location
     setSelectedConversationId(id)
     setConversationOpen(true)
     setMessagesLoading(true)
     try {
-      setMessageThread(await getMyConversationById(id))
+      const thread = await getMyConversationById(id)
+      if (!active()) return
+      setMessageThread(thread)
       setMessagesError("")
     } catch (cause) {
-      setMessagesError(cause instanceof Error ? cause.message : "Unable to load this conversation.")
+      if (!active()) return
+      setMessagesError(notifyError(cause, "Unable to load this conversation."));
     } finally {
-      setMessagesLoading(false)
+      if (active()) setMessagesLoading(false)
     }
   }
 
@@ -236,10 +247,10 @@ export function CustomerDashboard({
       setMessageDraft("")
       setMessageOpen(false)
       setConversationOpen(true)
+      notify("Message sent.")
       go("Messages")
-      notify("Message sent. Our team is notified and will reply here.")
     } catch (cause) {
-      setDialogError(cause instanceof Error ? cause.message : "Unable to send your message.")
+      setDialogError(notifyError(cause, "Unable to send your message."));
     } finally {
       setDialogSending(false)
     }
@@ -325,7 +336,7 @@ export function CustomerDashboard({
             <section className="customer-grid"><Panel title="Your requests" description="See the latest status of your event requests."><p>Preferred dates and final prices are reviewed by our team.</p><Button variant="secondary" onClick={() => go("My events")}>View my events</Button></Panel><Panel className="customer-manager-card" title="Talk with our team" description="Have a question about your plans?"><p>Send us a message and we’ll continue the conversation in your workspace.</p><Button variant="secondary" className="full-button" onClick={() => setMessageOpen(true)}>Send a message</Button></Panel></section>
           </div>
         )}
-        {tab === "My events" && <div className="customer-content"><BookingList onExplore={() => go("Packages")} onOpenChat={(reference: string) => { window.location.assign(`/app/messages?request=${encodeURIComponent(reference)}`) }} /></div>}
+        {tab === "My events" && <div className="customer-content"><BookingList onExplore={() => go("Packages")} onOpenChat={(reference: string) => { navigateWorkspace(`/app/messages?request=${encodeURIComponent(reference)}`) }} /></div>}
 
         {tab === "Packages" && (
           <div className="customer-content">
@@ -368,7 +379,8 @@ export function CustomerDashboard({
               error={messagesError}
               onRetry={() => {
                 setMessagesLoading(true)
-                void refreshMessages()
+                const location = window.location.href
+                void refreshMessages(() => window.location.href === location)
               }}
               onSend={sendMessage}
               onBack={() => setConversationOpen(false)}
@@ -420,9 +432,14 @@ export function CustomerDashboard({
         </Dialog>
       )}
 
-      {bookingItem && <BookingRequestDialog item={bookingItem} resume={bookingResume} onClose={() => { setBookingItem(null); window.history.replaceState({}, "", path) }} />}
+      {bookingItem && <BookingRequestDialog item={bookingItem} resume={bookingResume} onClose={() => {
+        setBookingItem(null)
+        const url = new URL(window.location.href)
+        url.searchParams.delete("book")
+        url.searchParams.delete("booking")
+        navigateWorkspace(`${url.pathname}${url.search}${url.hash}`, true)
+      }} />}
 
-      {toast && <Toast tone={toast.tone}>{toast.message}</Toast>}
     </div>
   )
 }

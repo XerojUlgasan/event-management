@@ -10,6 +10,8 @@ import {
   PageHeader,
   Panel,
   Tabs,
+  useNotifications,
+  notificationErrorMessage,
 } from "@event-management/ui";
 import {
   getStaffAssignments,
@@ -32,9 +34,7 @@ const label = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 const errorMessage = (cause: unknown, fallback: string) =>
   cause instanceof TypeError
     ? "Unable to reach Clemora. Check your connection and try again."
-    : cause instanceof Error
-      ? cause.message
-      : fallback;
+    : notificationErrorMessage(cause, fallback);
 const isOpen = (day: EventDay, now: number) =>
   day.status === "scheduled" &&
   day.staffingStatus === "open" &&
@@ -268,6 +268,7 @@ export function StaffWorkspaceShell({
   path: string;
   onSignOut: () => void;
 }) {
+  const { notify, notifyError } = useNotifications();
   const assignments = path === "/app/assignments";
   const [days, setDays] = useState<EventDay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -283,13 +284,14 @@ export function StaffWorkspaceShell({
   const [filter, setFilter] = useState("all");
   const [detailId, setDetailId] = useState<string>();
   const sequence = useRef(0);
-  const inFlight = useRef(false);
+  const inFlight = useRef<number | null>(null);
   const busyRef = useRef(false);
   const hasLoaded = useRef(false);
+  const loadFailure = useRef("");
   const load = useCallback(async () => {
     if (inFlight.current || busyRef.current) return;
-    inFlight.current = true;
     const request = ++sequence.current;
+    inFlight.current = request;
     if (hasLoaded.current) setRefreshing(true);
     else setLoading(true);
     try {
@@ -299,21 +301,37 @@ export function StaffWorkspaceShell({
       if (request === sequence.current) {
         setDays(result.eventDays);
         setError("");
+        loadFailure.current = "";
         setAvailabilityRequest(null);
         hasLoaded.current = true;
       }
     } catch (cause) {
-      if (request === sequence.current)
-        setError(errorMessage(cause, "Unable to load event days."));
+      if (request === sequence.current) {
+        const message = errorMessage(cause, "Unable to load event days.");
+        setError(message);
+        if (loadFailure.current !== message) { loadFailure.current = message; notifyError(message); }
+      }
     } finally {
-      inFlight.current = false;
+      if (inFlight.current === request) inFlight.current = null;
       if (request === sequence.current) {
         setLoading(false);
         setRefreshing(false);
       }
     }
-  }, [assignments]);
+  }, [assignments, notifyError]);
+  const latestLoad = useRef(load);
+  latestLoad.current = load;
   useEffect(() => {
+    hasLoaded.current = false;
+    setDays([]);
+    setError("");
+    setDetailId(undefined);
+    setSelectedDate(undefined);
+    setSearch("");
+    setFilter("all");
+    setMonth(currentMonth());
+    setAvailabilityRequest(null);
+    setLoading(true);
     void load();
     const interval = window.setInterval(() => void load(), 60000);
     const focus = () => {
@@ -323,6 +341,7 @@ export function StaffWorkspaceShell({
     document.addEventListener("visibilitychange", focus);
     return () => {
       sequence.current++;
+      inFlight.current = null;
       window.clearInterval(interval);
       window.removeEventListener("focus", focus);
       document.removeEventListener("visibilitychange", focus);
@@ -338,27 +357,29 @@ export function StaffWorkspaceShell({
     setAvailabilityRequest({ dayId: day.id, response, phase: "pending" });
     setError("");
     // Invalidate any earlier refresh so it cannot overwrite the mutation result.
-    sequence.current++;
+    const request = ++sequence.current;
     try {
       const result = await respondToEventDay(day.id, response);
+      if (request !== sequence.current) return;
       setDays((previous) =>
         previous.map((item) => (item.id === day.id ? result.eventDay : item)),
       );
       setAvailabilityRequest({ dayId: day.id, response, phase: "saved" });
+      notify(`Availability saved: ${response}.`);
     } catch (cause) {
+      if (request !== sequence.current) return;
+      const message = notifyError(cause instanceof TypeError ? "Unable to reach Clemora. Check your connection and try again." : cause, "Unable to save your response. Please try again.");
       setAvailabilityRequest({
         dayId: day.id,
         response,
         phase: "failed",
-        message: errorMessage(
-          cause,
-          "Unable to save your response. Please try again.",
-        ),
+        message,
       });
     } finally {
       busyRef.current = false;
       setLoading(false);
       setRefreshing(false);
+      void latestLoad.current();
     }
   };
   const counts = useMemo(

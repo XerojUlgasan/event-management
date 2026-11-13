@@ -6,11 +6,14 @@ import {
   Panel,
   SearchField,
   StatCard,
+  useNotifications,
 } from "@event-management/ui"
 
 import type { NavKey } from "../types"
 
 export function GenericPage({ page }: { page: NavKey }) {
+  const { notify } = useNotifications()
+  const unavailable = () => notify("Demo only: this action is unavailable.", "info")
   const content: Record<string, {
     intro: string
     cards: [string, string, string][]
@@ -92,7 +95,7 @@ export function GenericPage({ page }: { page: NavKey }) {
         title={page}
         description={info.intro}
         actions={
-          <Button icon={page === "Reports" ? "chart" : "clipboard"}>
+          <Button icon={page === "Reports" ? "chart" : "clipboard"} onClick={unavailable}>
             {page === "Reports"
               ? "Export report"
               : `Add ${
@@ -128,7 +131,7 @@ export function GenericPage({ page }: { page: NavKey }) {
       >
         <div className="management-list">
           {adminRows.map((item, index) => (
-            <Button variant="plain" key={item}>
+            <Button variant="plain" key={item} onClick={unavailable}>
               <span className="management-icon">
                 <Icon
                   name={

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import {
   Input,
   Select,
@@ -14,7 +14,7 @@ import {
   SearchField,
   StatCard,
   Tabs,
-  Toast,
+  useNotifications,
 } from "@event-management/ui"
 
 export function InventoryPage() {
@@ -23,17 +23,8 @@ export function InventoryPage() {
   )
   const [selectedItem, setSelectedItem] = useState<string | null>(null)
   const [allocationOpen, setAllocationOpen] = useState(false)
-  const [toast, setToast] = useState("")
-  const toastTimerRef = useRef<number | null>(null)
-  const mountedRef = useRef(true)
-
-  useEffect(() => {
-    mountedRef.current = true
-    return () => {
-      mountedRef.current = false
-      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
-    }
-  }, [])
+  const { notify } = useNotifications()
+  const unavailable = () => notify("Demo only: this action is unavailable.", "info")
 
   const inventory = [
     {
@@ -98,16 +89,6 @@ export function InventoryPage() {
     },
   ]
 
-  const notify = (message: string) => {
-    if (!mountedRef.current) return
-    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
-    setToast(message)
-    toastTimerRef.current = window.setTimeout(() => {
-      toastTimerRef.current = null
-      setToast("")
-    }, 2400)
-  }
-
   return (
     <div className="content-stack inventory-page">
       <PageHeader
@@ -115,8 +96,8 @@ export function InventoryPage() {
         description="Track stock, equipment condition, event allocation, dispatch, and returns."
         actions={
           <div className="welcome-actions">
-            <Button variant="secondary">Import inventory</Button>
-            <Button icon="box">Add item</Button>
+            <Button variant="secondary" onClick={unavailable}>Import inventory</Button>
+            <Button icon="box" onClick={unavailable}>Add item</Button>
           </div>
         }
       />
@@ -187,7 +168,7 @@ export function InventoryPage() {
           </div>
           <div className="pagination">
             <span>Showing 6 of 1,284 inventory items</span>
-            <div><Button variant="plain">‹</Button><Button variant="plain" className="active">1</Button><Button variant="plain">2</Button><Button variant="plain">3</Button><Button variant="plain">›</Button></div>
+            <div><Button variant="plain" onClick={unavailable}>‹</Button><Button variant="plain" className="active" onClick={unavailable}>1</Button><Button variant="plain" onClick={unavailable}>2</Button><Button variant="plain" onClick={unavailable}>3</Button><Button variant="plain" onClick={unavailable}>›</Button></div>
           </div>
         </Panel>
       )}
@@ -206,7 +187,7 @@ export function InventoryPage() {
               ["Harlow Garden Birthday", "Jun 27 · Harlow Residence", "14 / 18 ready", "78%", "warning"],
               ["Arc & Co. Product Launch", "Jun 29 · Foundry Loft", "8 / 24 ready", "33%", "danger"],
             ].map((row) => (
-              <Button variant="plain" key={row[0]}>
+              <Button variant="plain" key={row[0]} onClick={unavailable}>
                 <span className="allocation-date"><Icon name="calendar" /></span>
                 <span><strong>{row[0]}</strong><small>{row[1]}</small></span>
                 <span className="allocation-progress">
@@ -225,7 +206,7 @@ export function InventoryPage() {
                 4 warming cabinets requested for Arc & Co. are already reserved
                 for Northstar Dinner.
               </p>
-              <Button variant="link" size="small" >Review alternatives <Icon name="arrow" size={14} /></Button>
+              <Button variant="link" size="small" onClick={unavailable}>Review alternatives <Icon name="arrow" size={14} /></Button>
             </Panel>
             <Panel
               title="High utilization"
@@ -287,7 +268,7 @@ export function InventoryPage() {
               <div className="dispatch-column" key={column.title}>
                 <div><strong>{column.title}</strong><span>{column.count}</span></div>
                 {column.items.map((item, index) => (
-                  <Button variant="plain" key={item[0]}>
+                  <Button variant="plain" key={item[0]} onClick={unavailable}>
                     <Badge tone={columnIndex === 2 && index === 1 ? "danger" : columnIndex === 3 ? "success" : "info"}>
                       {columnIndex === 0 ? "Packed" : columnIndex === 1 ? "In transit" : columnIndex === 2 ? "Return due" : "Checked"}
                     </Badge>
@@ -331,7 +312,7 @@ export function InventoryPage() {
               ]}
             />
             <div className="drawer-actions">
-              <Button variant="secondary">Adjust stock</Button>
+              <Button variant="secondary" onClick={unavailable}>Adjust stock</Button>
               <Button onClick={() => { setSelectedItem(null); setAllocationOpen(true) }}>Allocate item</Button>
             </div>
         </Drawer>
@@ -347,7 +328,7 @@ export function InventoryPage() {
           actions={
             <>
               <Button variant="secondary" onClick={() => setAllocationOpen(false)}>Cancel</Button>
-              <Button onClick={() => { setAllocationOpen(false); notify("24 items allocated to Northstar Annual Dinner") }}>Confirm allocation</Button>
+              <Button onClick={() => { setAllocationOpen(false); notify("Demo only: allocation was not saved.", "info") }}>Confirm allocation</Button>
             </>
           }
         >
@@ -364,7 +345,6 @@ export function InventoryPage() {
           </div>
         </Dialog>
       )}
-      {toast && <Toast>{toast}</Toast>}
     </div>
   )
 }

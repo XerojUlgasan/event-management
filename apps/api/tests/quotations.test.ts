@@ -163,7 +163,7 @@ async function create(b: any) {
   ).quotation;
 }
 
-test("empty quotation delivery, ownership, acceptance, revision and history", async () => {
+test("quotation delivery, ownership, removed customer actions and admin revision history", async () => {
   const b = await booking();
   let q = await create(b);
   assert.deepEqual(q.items, []);
@@ -186,6 +186,10 @@ test("empty quotation delivery, ownership, acceptance, revision and history", as
     (await call(`/quotations/${q.id}`, "GET", undefined, otherCookie)).status,
     404,
   );
+  assert.equal((await call(`/quotations/${q.id}`, "GET", undefined, customerCookie)).status, 404);
+  assert.equal((await call(`/admin/booking-requests/${b.id}/quotations`, "POST", { expectedUpdatedAt: b.updatedAt }, customerCookie)).status, 403);
+  assert.equal((await call(`/admin/quotations/${q.id}`, "PATCH", { expectedUpdatedAt: q.updatedAt, items: [] }, customerCookie)).status, 403);
+  assert.equal((await call(`/admin/quotations/${q.id}/send`, "POST", { expectedUpdatedAt: q.updatedAt }, customerCookie)).status, 403);
   const stale = q.updatedAt;
   q = (
     await read(
@@ -218,41 +222,22 @@ test("empty quotation delivery, ownership, acceptance, revision and history", as
     .where("quotation_id", "=", q.id)
     .execute();
   assert.equal(msg.length, 1);
-  assert.equal(
-    (
-      await call(
-        `/quotations/${q.id}/accept`,
-        "POST",
-        { expectedUpdatedAt: q.updatedAt },
-        otherCookie,
-      )
-    ).status,
-    404,
-  );
-  q = (
-    await read(
-      await call(
-        `/quotations/${q.id}/accept`,
-        "POST",
-        { expectedUpdatedAt: q.updatedAt },
-        customerCookie,
-      ),
-      200,
-    )
-  ).quotation;
-  assert.equal(q.status, "accepted");
-  assert.deepEqual(
-    await read(
-      await call(
-        `/quotations/${q.id}/revision`,
-        "POST",
-        { expectedUpdatedAt: q.updatedAt, reason: "Change terms" },
-        customerCookie,
-      ),
-      201,
-    ),
-    { ok: true },
-  );
+  assert.equal((await call(`/quotations/${q.id}`, "GET", undefined, customerCookie)).status, 200);
+  assert.equal((await call(`/quotations/${q.id}`, "GET", undefined, otherCookie)).status, 404);
+  const beforeQuotes = await db.selectFrom("quotations").selectAll().where("booking_request_id", "=", b.id).execute();
+  const beforeAudits = await db.selectFrom("audit_events").selectAll().where("entity_type", "=", "quotation").execute();
+  for (const action of ["accept", "revision"]) {
+    assert.equal((await call(`/quotations/${q.id}/${action}`, "POST", { expectedUpdatedAt: q.updatedAt, reason: "Change terms" }, customerCookie)).status, 404);
+  }
+  assert.equal((await call(`/admin/quotations/${q.id}/revision`, "POST", { expectedUpdatedAt: q.updatedAt, reason: "Change terms" }, customerCookie)).status, 403);
+  assert.deepEqual(await db.selectFrom("quotations").selectAll().where("booking_request_id", "=", b.id).execute(), beforeQuotes);
+  assert.deepEqual(await db.selectFrom("audit_events").selectAll().where("entity_type", "=", "quotation").execute(), beforeAudits);
+  const conversation = await db.selectFrom("conversations").select("id").where("booking_request_id", "=", b.id).executeTakeFirstOrThrow();
+  await read(await call("/messages/conversation/messages", "POST", { body: "Please change the offer.", conversationId: conversation.id }, customerCookie), 201);
+  await read(await call(`/admin/conversations/${conversation.id}/messages`, "POST", { body: "Let's discuss this offer." }), 201);
+  assert.deepEqual(await db.selectFrom("quotations").selectAll().where("booking_request_id", "=", b.id).execute(), beforeQuotes);
+  assert.deepEqual(await db.selectFrom("audit_events").selectAll().where("entity_type", "=", "quotation").execute(), beforeAudits);
+  await read(await call(`/admin/quotations/${q.id}/revision`, "POST", { expectedUpdatedAt: q.updatedAt, reason: "Change terms" }), 201);
   assert.equal(
     (
       await db
@@ -295,6 +280,29 @@ test("empty quotation delivery, ownership, acceptance, revision and history", as
     ).length,
     0,
   );
+});
+
+test("old active booking conversations receive exact quotation versions", async () => {
+  for (const pastEnd of [false, true]) {
+    const b = await booking();
+    const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    const conversation = await db.selectFrom("conversations").select("id").where("booking_request_id", "=", b.id).executeTakeFirstOrThrow();
+    await db.updateTable("conversations").set({ created_at: old }).where("id", "=", conversation.id).execute();
+    if (pastEnd) {
+      await db.updateTable("booking_requests").set({ starts_at: new Date(old.getTime() - 3600000), ends_at: old }).where("id", "=", b.id).execute();
+    }
+    let q = await create(b);
+    q = (await read(await call(`/admin/quotations/${q.id}`, "PATCH", { expectedUpdatedAt: q.updatedAt, items: [] }), 200)).quotation;
+    q = (await read(await call(`/admin/quotations/${q.id}/send`, "POST", { expectedUpdatedAt: q.updatedAt }), 200)).quotation;
+    assert.equal(q.status, "sent");
+    const messages = await db.selectFrom("messages").selectAll().where("quotation_id", "=", q.id).execute();
+    assert.equal(messages.length, 1);
+    assert.equal(messages[0].conversation_id, conversation.id);
+    assert.equal(messages[0].sender_role, "admin");
+    const audits = await db.selectFrom("audit_events").selectAll().where("entity_id", "=", q.id).where("action", "=", "quotation.sent").execute();
+    assert.equal(audits.length, 1);
+    assert.equal(audits[0].actor_id, messages[0].sender_id);
+  }
 });
 
 test("item validation, arithmetic, concurrent stale writes and closed delivery", async () => {
@@ -366,7 +374,7 @@ test("item validation, arithmetic, concurrent stale writes and closed delivery",
   );
 });
 
-test("requested-day changes preserve the sent price and allow acceptance", async () => {
+test("requested-day changes preserve the sent price", async () => {
   const b = await booking();
   let q = await create(b);
   q = (
@@ -391,17 +399,9 @@ test("requested-day changes preserve the sent price and allow acceptance", async
     })
     .where("id", "=", b.id)
     .execute();
-  assert.equal(
-    (
-      await call(
-        `/quotations/${q.id}/accept`,
-        "POST",
-        { expectedUpdatedAt: q.updatedAt },
-        customerCookie,
-      )
-    ).status,
-    200,
-  );
+  const current = (await read(await call(`/quotations/${q.id}`, "GET", undefined, customerCookie), 200)).quotation;
+  assert.equal(current.status, "sent");
+  assert.equal(current.totalAmountMinor, q.totalAmountMinor);
 });
 
 test("another System Administrator edits, sends and revises with audit", async () => {
@@ -603,7 +603,11 @@ test("package and service changes preserve quoted amounts; revisions use the cur
   await db.updateTable("packages").set({ name: "Changed proposal", price: 1500, updated_at: new Date() }).where("id", "=", pkg.id).execute();
   await db.updateTable("services").set({ description: "Changed coverage", archived_at: new Date(), updated_at: new Date() }).where("id", "=", service.id).execute();
   q = (await read(await call(`/admin/quotations/${q.id}/send`, "POST", { expectedUpdatedAt: q.updatedAt }), 200)).quotation;
-  q = (await read(await call(`/quotations/${q.id}/accept`, "POST", { expectedUpdatedAt: q.updatedAt }, customerCookie), 200)).quotation;
+  // Simulate a historical acceptance created before the customer endpoint was removed.
+  await db.updateTable("quotations").set({ status: "accepted", accepted_at: new Date() }).where("id", "=", q.id).execute();
+  q = (await read(await call(`/quotations/${q.id}`, "GET", undefined, customerCookie), 200)).quotation;
+  assert.equal(q.status, "accepted");
+  assert.ok(q.acceptedAt);
   assert.equal(q.baseAmountMinor, 100000);
   assert.equal(q.totalAmountMinor, 80000);
   assert.deepEqual(q.items, items);
@@ -626,10 +630,10 @@ test("package and service changes preserve quoted amounts; revisions use the cur
   assert.equal(history[1].totalAmountMinor, 80000);
   assert.deepEqual(history[1].items, items);
   const audit = await db.selectFrom("audit_events").select("action").where("entity_id", "=", q.id).execute();
-  assert(audit.some(row => row.action === "quotation.accepted"));
+  assert(audit.some(row => row.action === "quotation.sent"));
 });
 
-test("schedule and timezone changes do not block acceptance or alter saved amounts", async () => {
+test("schedule and timezone changes do not alter saved amounts", async () => {
   const b = await booking();
   await db.updateTable("booking_requests").set({ requested_days: null, status: "accepted" }).where("id", "=", b.id).execute();
   const day = await db.insertInto("events_day").values({ booking_request_id: b.id, day: "2099-01-01", starts_at: new Date("2099-01-01T01:00:00Z"), ends_at: new Date("2099-01-01T03:00:00Z") }).returning("id").executeTakeFirstOrThrow();
@@ -638,9 +642,9 @@ test("schedule and timezone changes do not block acceptance or alter saved amoun
   q = (await read(await call(`/admin/quotations/${q.id}/send`, "POST", { expectedUpdatedAt: q.updatedAt }), 200)).quotation;
   await db.updateTable("events_day").set({ status: "cancelled", staffing_status: "closed" }).where("id", "=", day.id).execute();
   await db.updateTable("booking_requests").set({ time_zone: "Asia/Tokyo" }).where("id", "=", b.id).execute();
-  const accepted = (await read(await call(`/quotations/${q.id}/accept`, "POST", { expectedUpdatedAt: q.updatedAt }, customerCookie), 200)).quotation;
-  assert.equal(accepted.status, "accepted");
-  assert.equal(accepted.totalAmountMinor, q.totalAmountMinor);
+  const current = (await read(await call(`/quotations/${q.id}`, "GET", undefined, customerCookie), 200)).quotation;
+  assert.equal(current.status, "sent");
+  assert.equal(current.totalAmountMinor, q.totalAmountMinor);
 });
 
 test("private package edits remain visible separately while quotations retain their own amounts", async () => {
@@ -660,7 +664,6 @@ test("private package edits remain visible separately while quotations retain th
   assert.equal(current.package.description, "Updated description");
   assert.equal(current.package.price.amountMinor, 180000);
   assert.equal(q.totalAmountMinor, 120000);
-  q = (await read(await call(`/quotations/${q.id}/accept`, "POST", { expectedUpdatedAt: q.updatedAt }, customerCookie), 200)).quotation;
-  assert.equal(q.totalAmountMinor, 120000);
+  assert.equal((await read(await call(`/quotations/${q.id}`, "GET", undefined, customerCookie), 200)).quotation.totalAmountMinor, 120000);
   assert.equal(edited.bookingRequest.packageId, b.packageId);
 });

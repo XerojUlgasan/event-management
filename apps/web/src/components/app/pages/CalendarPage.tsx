@@ -7,9 +7,12 @@ import {
   Icon,
   PageHeader,
   Panel,
+  useNotifications,
 } from "@event-management/ui"
 
 export function CalendarPage() {
+  const { notify } = useNotifications()
+  const unavailable = () => notify("Demo only: this action is unavailable.", "info")
   const [mode, setMode] = useState<"Month" | "Week" | "Day">("Month")
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null)
   const [conflictOpen, setConflictOpen] = useState(false)
@@ -81,8 +84,8 @@ export function CalendarPage() {
         description="Coordinate events, staff, transport, preparation, and equipment."
         actions={
           <div className="welcome-actions">
-            <Button variant="secondary">Check availability</Button>
-            <Button icon="calendar">Schedule event</Button>
+            <Button variant="secondary" onClick={unavailable}>Check availability</Button>
+            <Button icon="calendar" onClick={unavailable}>Schedule event</Button>
           </div>
         }
       />
@@ -109,10 +112,10 @@ export function CalendarPage() {
         <Panel className="calendar-panel">
           <div className="calendar-toolbar">
             <div className="month-selector">
-              <Button variant="secondary" size="small" aria-label="Previous month">‹</Button>
+              <Button variant="secondary" size="small" aria-label="Previous month" onClick={unavailable}>‹</Button>
               <strong>June 2025</strong>
-              <Button variant="secondary" size="small" aria-label="Next month">›</Button>
-              <Button variant="secondary" size="small" className="today-button">Today</Button>
+              <Button variant="secondary" size="small" aria-label="Next month" onClick={unavailable}>›</Button>
+              <Button variant="secondary" size="small" className="today-button" onClick={unavailable}>Today</Button>
             </div>
             <div className="calendar-modes">
               {(["Month", "Week", "Day"] as const).map((item) => (
@@ -266,7 +269,7 @@ export function CalendarPage() {
               <span>Transport <strong>80% reserved</strong></span>
               <span>Warming units <strong>100% reserved</strong></span>
             </div>
-            <Button variant="link" size="small" >
+            <Button variant="link" size="small" onClick={unavailable}>
               Review resource schedule <Icon name="arrow" size={14} />
             </Button>
           </Panel>
@@ -297,8 +300,8 @@ export function CalendarPage() {
               access, and guest arrival route with the venue coordinator.
             </div>
             <div className="drawer-actions">
-              <Button variant="secondary">Reschedule</Button>
-              <Button>Open related event</Button>
+              <Button variant="secondary" onClick={unavailable}>Reschedule</Button>
+              <Button onClick={unavailable}>Open related event</Button>
             </div>
         </Drawer>
       )}
@@ -315,7 +318,7 @@ export function CalendarPage() {
               <Button variant="secondary" onClick={() => setConflictOpen(false)}>
                 Decide later
               </Button>
-              <Button onClick={() => setConflictOpen(false)}>
+              <Button onClick={() => { setConflictOpen(false); notify("Demo only: reassignment is not available.", "info") }}>
                 Review reassignment
               </Button>
             </>

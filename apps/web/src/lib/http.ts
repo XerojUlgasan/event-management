@@ -1,4 +1,4 @@
-const configuredApiUrl = import.meta.env.PUBLIC_API_URL ?? "http://localhost:3000/v1";
+const configuredApiUrl = import.meta.env?.PUBLIC_API_URL ?? "http://localhost:3000/v1";
 
 export function apiBase() {
   const trimmed = configuredApiUrl.replace(/\/$/, "");
@@ -32,6 +32,11 @@ export async function request<T>(
     ...(body !== undefined ? { body: body instanceof FormData ? body : JSON.stringify(body) } : {}),
   });
   if (!response.ok) {
+    // A 401 on a data request may mean the cookie expired. Authentication
+    // endpoints also use 401 for bad credentials, so they are excluded.
+    if (response.status === 401 && !path.startsWith("/auth/") && path !== "/me" && typeof window !== "undefined") {
+      window.dispatchEvent(new Event("clemora:session-check"));
+    }
     const result = (await response.json().catch(() => ({}))) as {
       success?: boolean;
       error?: string | { issues?: { path?: (string | number)[]; message?: string }[] };

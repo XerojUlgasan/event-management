@@ -1,3 +1,4 @@
+import { navigateWorkspace } from "../../lib/workspace-navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Button,
@@ -90,7 +91,7 @@ export function AppShell({
 }) {
   const name = profile.displayName ?? profile.email
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const go = (key: NavKey) => { window.location.assign(adminPaths[key]) }
+  const go = (key: NavKey) => { navigateWorkspace(adminPaths[key]) }
 
   const body = useMemo(() => {
     if (active === "Overview")

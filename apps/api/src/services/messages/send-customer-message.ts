@@ -2,7 +2,6 @@ import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 import { createMessageData } from "../../data/messages/create-message.js";
 import { ensureConversationData } from "../../data/messages/ensure-conversation.js";
-import { expireConversationsData } from "../../data/messages/expire-conversations.js";
 import { updateConversationData } from "../../data/messages/update-conversation.js";
 import { findConversationData } from "../../data/messages/find-conversation.js";
 
@@ -14,7 +13,6 @@ export async function sendCustomerMessageService(
   body: string,
   conversationId?: string,
 ) {
-  await expireConversationsData(db);
   const conversation = conversationId
     ? await findConversationData(db, conversationId)
     : await ensureConversationData(db, customerId);
@@ -22,13 +20,12 @@ export async function sendCustomerMessageService(
     throw new Error("Conversation not found");
   }
 
-  // General conversations can reopen, but expired booking threads remain closed.
+  // General conversations can reopen, but closed booking threads remain closed.
   if (conversation.status === "closed") {
     if (conversation.booking_request_id) throw new Error("Conversation is closed");
     await updateConversationData(db, conversation.id, {
       status: "active",
       closed_at: null,
-      created_at: new Date(),
     });
   }
 

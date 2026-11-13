@@ -37,10 +37,9 @@ export async function sendQuotationService(
       booking.id,
       actor,
       id,
-      booking.ends_at,
     );
     if (!delivered)
-      return failure("Linked conversation is closed or expired", 409);
+      return failure("Linked conversation is closed", 409);
     const now = new Date();
     await supersedeActiveQuotationsData(trx, booking.id, now);
     await updateQuotationData(trx, id, { status: "sent", sent_at: now });

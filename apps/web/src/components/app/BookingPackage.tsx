@@ -1,6 +1,6 @@
 import "../../styles/booking-request.css";
-import { useEffect, useState } from "react";
-import { Button } from "@event-management/ui";
+import { useEffect, useRef, useState } from "react";
+import { Button, useNotifications } from "@event-management/ui";
 import {
   getBookingPackage,
   getBookingPackageHistory,
@@ -23,6 +23,8 @@ export function BookingPackage({
   editable?: boolean;
   onChanged?: () => void;
 }) {
+  const { notifyError } = useNotifications();
+  const generation = useRef(0);
   const [loaded, setLoaded] = useState<BookingPackageResult | null>(null);
   const [history, setHistory] = useState<PackageHistoryEntry[]>([]);
   const [services, setServices] = useState<AdminService[]>([]);
@@ -31,6 +33,7 @@ export function BookingPackage({
   const [error, setError] = useState("");
 
   async function load() {
+    const current = generation.current;
     setBusy(true);
     setError("");
     try {
@@ -39,22 +42,21 @@ export function BookingPackage({
         admin ? getAdminServices() : Promise.resolve(null),
         admin ? getBookingPackageHistory(id) : Promise.resolve(null),
       ]);
+      if (current !== generation.current) return;
       setLoaded(result);
       setHistory(audit?.history ?? []);
       setServices(options?.services ?? []);
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Unable to load the proposed package.",
-      );
+      if (current !== generation.current) return;
+      setError(notifyError(cause, "Unable to load the proposed package."));
     } finally {
-      setBusy(false);
+      if (current === generation.current) setBusy(false);
     }
   }
 
   useEffect(() => {
     void load();
+    return () => { generation.current++; };
   }, [id, admin]);
 
   return (

@@ -132,8 +132,8 @@ test("seed creates demo users, venues, and conversations while preserving unrela
     (SELECT count(*)::int FROM audit_events WHERE entity_type = 'quotation') AS audit_events
     FROM quotations q JOIN booking_requests b ON b.id = q.booking_request_id WHERE b.reference LIKE 'SCN-%'`);
   assert.deepEqual(quotationCoverage.rows[0], {
-    quotations: 100, bookings: 50, drafts: 17, sent: 17, accepted: 16, superseded: 50,
-    base_only: 26, delivered: 83, audit_events: 269,
+    quotations: 100, bookings: 50, drafts: 17, sent: 33, accepted: 0, superseded: 50,
+    base_only: 26, delivered: 83, audit_events: 253,
   });
   const quotationViolations = await pool.query(`SELECT q.id FROM quotations q
     JOIN booking_requests b ON b.id = q.booking_request_id
@@ -159,8 +159,7 @@ test("seed creates demo users, venues, and conversations while preserving unrela
         OR previous.superseded_at <> q.created_at OR previous.items <> q.items))
       OR (q.sent_at IS NOT NULL AND (m.id IS NULL OR c.booking_request_id <> b.id
         OR c.status <> 'active' OR m.sender_id <> q.created_by OR m.sender_role <> 'admin'
-        OR m.created_at <> q.sent_at OR q.sent_at < q.created_at
-        OR q.sent_at >= coalesce(b.ends_at, c.created_at) + interval '24 hours'))
+        OR m.created_at <> q.sent_at OR q.sent_at < q.created_at))
       OR (q.sent_at IS NULL AND m.id IS NOT NULL)
       OR NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.entity_id = q.id
         AND a.action = CASE WHEN q.version = 1 THEN 'quotation.created' ELSE 'quotation.revised' END
@@ -283,6 +282,19 @@ test("seed creates demo users, venues, and conversations while preserving unrela
   // Closing a parent after seeding must not replace its quotations with a different booking.
   await pool.query("UPDATE booking_requests SET status = 'cancelled' WHERE id = $1", [quotation.booking_request_id]);
   await pool.query("UPDATE conversations SET status = 'closed', closed_at = now() WHERE booking_request_id = $1", [quotation.booking_request_id]);
+  // A prior version of the application could accept a sent scenario quotation.
+  const historical = await pool.query(`SELECT q.id, q.booking_request_id, q.version, b.customer_id
+    FROM quotations q JOIN booking_requests b ON b.id = q.booking_request_id
+    WHERE b.reference LIKE 'SCN-%' AND q.status = 'sent' ORDER BY q.id LIMIT 1`);
+  assert.equal(historical.rowCount, 1);
+  const historicalQuote = historical.rows[0];
+  const acceptedAt = new Date("2026-10-31T00:00:05.000Z");
+  await pool.query("UPDATE quotations SET status = 'accepted', accepted_at = $1 WHERE id = $2", [acceptedAt, historicalQuote.id]);
+  const historicalAudit = await pool.query(`INSERT INTO audit_events
+    (actor_id, action, entity_type, entity_id, metadata, created_at)
+    VALUES ($1, 'quotation.accepted', 'quotation', $2, $3, $4) RETURNING *`,
+    [historicalQuote.customer_id, historicalQuote.id,
+      JSON.stringify({ bookingRequestId: historicalQuote.booking_request_id, version: historicalQuote.version }), acceptedAt]);
   const quotationsBeforeRerun = await pool.query("SELECT * FROM quotations ORDER BY id");
   const auditsBeforeRerun = await pool.query("SELECT * FROM audit_events ORDER BY id");
   const messagesBeforeRerun = await pool.query("SELECT * FROM messages WHERE quotation_id IS NOT NULL ORDER BY id");
@@ -292,6 +304,9 @@ test("seed creates demo users, venues, and conversations while preserving unrela
   assert.deepEqual(await ids(), beforeRerun);
   assert.deepEqual((await pool.query("SELECT * FROM quotations ORDER BY id")).rows, quotationsBeforeRerun.rows);
   assert.deepEqual((await pool.query("SELECT * FROM audit_events ORDER BY id")).rows, auditsBeforeRerun.rows);
+  const preservedAcceptance = await pool.query("SELECT status, accepted_at FROM quotations WHERE id = $1", [historicalQuote.id]);
+  assert.deepEqual(preservedAcceptance.rows[0], { status: "accepted", accepted_at: acceptedAt });
+  assert.deepEqual((await pool.query("SELECT * FROM audit_events WHERE id = $1", [historicalAudit.rows[0].id])).rows[0], historicalAudit.rows[0]);
   assert.deepEqual((await pool.query("SELECT * FROM messages WHERE quotation_id IS NOT NULL ORDER BY id")).rows, messagesBeforeRerun.rows);
   assert.equal((await pool.query("SELECT description FROM venues WHERE id = $1", [demoVenues.rows[0].id])).rows[0].description, "Edited description");
   assert.equal((await pool.query("SELECT name FROM venues WHERE id = $1", [demoVenues.rows[1].id])).rows[0].name, "Edited demo venue");

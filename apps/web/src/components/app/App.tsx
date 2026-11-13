@@ -1,7 +1,8 @@
-import { useEffect } from "react"
-import { Brand, Button } from "@event-management/ui"
+import { useEffect, useRef } from "react"
+import { Brand, Button, NotificationProvider } from "@event-management/ui"
 
 import { AuthProvider, useAuth } from "../../lib/auth"
+import { interceptWorkspaceLink, navigateWorkspace, useWorkspaceLocation } from "../../lib/workspace-navigation"
 import { AppShell } from "./AppShell"
 import { AuthPage } from "./AuthPage"
 import { CustomerDashboard } from "./customer/CustomerDashboard"
@@ -9,14 +10,39 @@ import { StaffWorkspaceShell } from "./staff/StaffWorkspaceShell"
 import { adminBookingRequestId, adminKey, allowedWorkspacePath, appHome, isStaffWorkspace, isSystemAdmin, normalizePath, workspaceReturnPath } from "./routes"
 
 export default function App({ initialPath, initialSearch }: { initialPath: string; initialSearch: string }) {
+  const location = useWorkspaceLocation(`${initialPath}${initialSearch}`)
+  const previousPath = useRef(location.path)
+  useEffect(() => {
+    document.addEventListener("click", interceptWorkspaceLink)
+    return () => document.removeEventListener("click", interceptWorkspaceLink)
+  }, [])
+  useEffect(() => {
+    if (previousPath.current === location.path) return
+    previousPath.current = location.path
+    if (location.hash) {
+      try { document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView() } catch { /* Invalid fragments retain their URL. */ }
+      return
+    }
+    window.scrollTo(0, 0)
+    const heading = document.querySelector<HTMLElement>("main h1, main [role='heading']") ?? document.querySelector<HTMLElement>("main")
+    if (heading) {
+      const previous = heading.getAttribute("tabindex")
+      heading.setAttribute("tabindex", "-1")
+      heading.focus({ preventScroll: true })
+      if (previous === null) heading.removeAttribute("tabindex")
+      else heading.setAttribute("tabindex", previous)
+    }
+  }, [location.path, location.hash])
   return (
-    <AuthProvider>
-      <Workspace path={normalizePath(initialPath)} search={initialSearch} />
-    </AuthProvider>
+    <NotificationProvider>
+      <AuthProvider>
+        <Workspace path={normalizePath(location.path)} search={location.search} hash={location.hash} />
+      </AuthProvider>
+    </NotificationProvider>
   )
 }
 
-function Workspace({ path, search }: { path: string; search: string }) {
+function Workspace({ path, search, hash }: { path: string; search: string; hash: string }) {
   const { status, profile, signOut } = useAuth()
   const mode = new URLSearchParams(search).get("mode") === "register" ? "register" : "signin"
 
@@ -35,8 +61,9 @@ function Workspace({ path, search }: { path: string; search: string }) {
       } else window.location.replace(workspaceReturnPath(profile, params.get("next")) ?? home)
       return
     }
-    if (path === "/app" || !allowedWorkspacePath(profile, path)) window.location.replace(home)
-  }, [status, profile, path, search])
+    if (path === "/app") navigateWorkspace(`${home}${search}${hash}`, true)
+    else if (!allowedWorkspacePath(profile, path)) navigateWorkspace(home, true)
+  }, [status, profile, path, search, hash])
 
   const handleSignOut = async () => {
     try {
@@ -58,7 +85,7 @@ function Workspace({ path, search }: { path: string; search: string }) {
 
   if (status !== "signed-in" || !profile) {
     if (path !== "/login") {
-      const next = `${path}${search}`
+      const next = `${path}${search}${hash}`
       window.location.replace(`/login?next=${encodeURIComponent(next)}`)
       return (
         <div className="auth-splash">
@@ -90,14 +117,15 @@ function Workspace({ path, search }: { path: string; search: string }) {
         </main>
       )
     }
-    return <StaffWorkspaceShell profile={profile} path={path} onSignOut={handleSignOut} />
+    return <StaffWorkspaceShell key={`${profile.id}:${profile.role}:${profile.staffRole}`} profile={profile} path={path} onSignOut={handleSignOut} />
   }
   if (isSystemAdmin(profile)) {
     const active = adminKey(path)
-    return active ? <AppShell profile={profile} active={active} bookingRequestId={adminBookingRequestId(path) ?? undefined} onSignOut={handleSignOut} /> : null
+    return active ? <AppShell key={`${profile.id}:${profile.role}:${profile.staffRole}`} profile={profile} active={active} bookingRequestId={adminBookingRequestId(path) ?? undefined} onSignOut={handleSignOut} /> : null
   }
   return (
     <CustomerDashboard
+      key={`${profile.id}:${profile.role}:${profile.staffRole}`}
       path={path}
       search={search}
       onPublic={() => { window.location.assign("/") }}

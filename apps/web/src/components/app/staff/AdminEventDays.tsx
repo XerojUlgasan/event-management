@@ -9,6 +9,8 @@ import {
   Panel,
   Tabs,
   Select,
+  useNotifications,
+  notificationErrorMessage,
 } from "@event-management/ui";
 import type { BookingRequest } from "../../../lib/data/booking-requests";
 import {
@@ -49,6 +51,7 @@ function ScheduleForm({
   busy: boolean;
   onCancel?: () => void;
 }) {
+  const { notifyError } = useNotifications();
   const zone = booking.timeZone;
   const [day, setDay] = useState(initial?.day ?? booking.preferredDate?.slice(0, 10) ?? "");
   const [start, setStart] = useState(
@@ -79,7 +82,7 @@ function ScheduleForm({
         ...(status === "open" && deadline ? { daysBefore: deadline } : {}),
       });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Check the schedule.");
+      setError(notifyError(cause, "Check the schedule."));
     }
   };
   return (
@@ -136,11 +139,13 @@ function dayState(entry: DayEntry) {
 }
 
 export function AdminEventDays({ booking, onBookingChanged, refreshKey = 0, onBusyChange }: { booking: BookingRequest; onBookingChanged: () => Promise<void>; refreshKey?: number; onBusyChange?: (busy: boolean) => void }) {
+  const { notify, notifyError } = useNotifications();
   const [days, setDays] = useState<EventDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const loadGeneration = useRef(0);
+  const loadFailure = useRef("");
   const [error, setError] = useState("");
   const [stale, setStale] = useState(false);
   const [loadedRevision, setLoadedRevision] = useState("");
@@ -163,17 +168,20 @@ export function AdminEventDays({ booking, onBookingChanged, refreshKey = 0, onBu
       .then(result => {
         if (!active || generation !== loadGeneration.current) return;
         setDays(result.eventDays);
+        loadFailure.current = "";
         setLoadedRevision(revision);
         setStale(false);
       })
       .catch(cause => {
         if (!active || generation !== loadGeneration.current) return;
         setStale(true);
-        setError(cause instanceof Error ? cause.message : "Unable to load event days.");
+        const message = notificationErrorMessage(cause, "Unable to load event days.");
+        setError(message);
+        if (loadFailure.current !== message) { loadFailure.current = message; notifyError(message); }
       })
       .finally(() => { if (active && generation === loadGeneration.current) setLoading(false); });
     return () => { active = false; };
-  }, [booking.id, revision, reload, refreshKey]);
+  }, [booking.id, revision, reload, refreshKey, notifyError]);
   useEffect(() => {
     onBusyChange?.(busy || loading);
     return () => onBusyChange?.(false);
@@ -201,15 +209,16 @@ export function AdminEventDays({ booking, onBookingChanged, refreshKey = 0, onBu
     setBusy(true);
     setStale(true);
     setError("");
+    let saved = false;
     try {
-      if (action) await action();
+      if (action) { await action(); saved = true; notify("Event day changes saved."); }
       await onBookingChanged();
       setMoving("");
       setCancelDayId("");
       setReload(value => value + 1);
     } catch (cause) {
       setCancelDayId("");
-      setError(cause instanceof Error ? cause.message : "Unable to update staffing.");
+      setError(notifyError(saved ? "Changes saved, but the request could not be refreshed. Please refresh and try again." : cause, "Unable to update staffing."));
     } finally {
       busyRef.current = false;
       setBusy(false);

@@ -11,6 +11,7 @@ import {
   SearchField,
   Tabs,
   Textarea,
+  useNotifications,
 } from "@event-management/ui";
 import { ApiError } from "../../../lib/http";
 import { catalogMediaSrc } from "../../../lib/data/catalog-media";
@@ -37,10 +38,6 @@ const empty = (): ServiceContent => ({
   hourlyRatePesos: null,
   sections: [{ id: crypto.randomUUID(), title: "", widgets: [] }],
 });
-const errorMessage = (error: unknown) =>
-  error instanceof Error
-    ? error.message
-    : "Something went wrong. Please try again.";
 const content = (version: AdminService): ServiceContent => ({
   name: version.name,
   description: version.description,
@@ -79,10 +76,12 @@ function ServiceCard({
 }
 
 export function ServicesPanel() {
+  const { notify, notifyError } = useNotifications();
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [rows, setRows] = useState<AdminService[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState("Services");
   const [search, setSearch] = useState("");
@@ -101,13 +100,15 @@ export function ServicesPanel() {
     setLoading(true);
     setError("");
     try {
-      setRows((await getAdminServices()).services);
+      const result = await getAdminServices();
+      if (mounted.current) setRows(result.services);
     } catch (err) {
-      setError(errorMessage(err));
+      if (!mounted.current) return;
+      setError(notifyError(err, "Something went wrong. Please try again."));
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
-  }, []);
+  }, [notifyError]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -116,13 +117,15 @@ export function ServicesPanel() {
     setError("");
     try {
       const item = await getAdminService(id);
+      if (!mounted.current) return;
       savedDuringEditRef.current = false;
       savedRef.current = { id, updatedAt: item.updatedAt };
       setEditing(content(item));
     } catch (err) {
-      setError(errorMessage(err));
+      if (!mounted.current) return;
+      setError(notifyError(err, "Something went wrong. Please try again."));
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
   const save = async (form: ServiceContent) => {
@@ -135,11 +138,9 @@ export function ServicesPanel() {
       savedRef.current = { id: result.id, updatedAt: result.updatedAt };
       savedDuringEditRef.current = true;
     } catch (err) {
-      throw new Error(
-        err instanceof ApiError && err.status === 409
-          ? `${errorMessage(err)} This service changed. Close and reopen it to load the latest details.`
-          : errorMessage(err),
-      );
+      if (err instanceof ApiError && err.status === 409)
+        throw new Error(`${err.message} This service changed. Close and reopen it to load the latest details.`);
+      throw err;
     }
   };
   const act = async () => {
@@ -149,13 +150,11 @@ export function ServicesPanel() {
     try {
       if (confirm.action === "archive") await archiveService(confirm.item.id);
       else await deleteService(confirm.item.id);
-      setNotice(
-        `Service ${confirm.action === "archive" ? "archived" : "deleted"}.`,
-      );
+      notify(`Service ${confirm.action === "archive" ? "archived" : "deleted"}.`);
       setConfirm(null);
       await load();
     } catch (err) {
-      setError(errorMessage(err));
+      setError(notifyError(err, "Something went wrong. Please try again."));
       setConfirm(null);
     } finally {
       setBusy(false);
@@ -228,7 +227,6 @@ export function ServicesPanel() {
           </Button>
         </p>
       )}
-      {notice && <p role="status">{notice}</p>}
       {!loading && !error && visible.length === 0 && (
         <p>
           {search.trim()
@@ -291,7 +289,6 @@ export function ServicesPanel() {
           onSave={save}
           onSaved={() => {
             setEditing(null);
-            setNotice("Service saved.");
             void load();
           }}
           validate={(form) => {

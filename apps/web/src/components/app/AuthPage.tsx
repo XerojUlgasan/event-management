@@ -1,13 +1,25 @@
-import { GoogleMark, InputGroup, Tabs } from "@event-management/ui"
-import { Input } from "@event-management/ui"
-import { MAX_DISPLAY_NAME_LENGTH, MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@event-management/contracts/limits/auth"
+import { GoogleMark, InputGroup, Tabs, useNotifications } from "@event-management/ui";
+import { Input } from "@event-management/ui";
+import {
+  MAX_DISPLAY_NAME_LENGTH,
+  MAX_EMAIL_LENGTH,
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+} from "@event-management/contracts/limits/auth";
 import { useState } from "react";
 import type { SubmitEvent } from "react";
 import { Brand, Button, FormField, Icon } from "@event-management/ui";
 
 import { firebaseConfigured, useAuth } from "../../lib/auth";
 
-export function AuthPage({ onBack, initialMode = "signin" }: { onBack: () => void; initialMode?: "signin" | "register" }) {
+export function AuthPage({
+  onBack,
+  initialMode = "signin",
+}: {
+  onBack: () => void;
+  initialMode?: "signin" | "register";
+}) {
+  const { notifyError } = useNotifications();
   const {
     signIn,
     signUp,
@@ -43,11 +55,11 @@ export function AuthPage({ onBack, initialMode = "signin" }: { onBack: () => voi
 
     if (mode === "register") {
       if (password.length < MIN_PASSWORD_LENGTH) {
-        setFormError(`Use a password with at least ${MIN_PASSWORD_LENGTH} characters.`);
+        setFormError(notifyError(`Use a password with at least ${MIN_PASSWORD_LENGTH} characters.`));
         return;
       }
       if (password !== confirmPassword) {
-        setFormError("Passwords do not match.");
+        setFormError(notifyError("Passwords do not match."));
         return;
       }
     }
@@ -114,8 +126,17 @@ export function AuthPage({ onBack, initialMode = "signin" }: { onBack: () => voi
             role="group"
             aria-label="Account access"
             active={mode}
-            items={[{ value: "signin", label: "Sign in", disabled: submitting }, { value: "register", label: "Create account", disabled: submitting }]}
-            onChange={value => { if (value === "signin" || value === "register") changeMode(value) }}
+            items={[
+              { value: "signin", label: "Sign in", disabled: submitting },
+              {
+                value: "register",
+                label: "Create account",
+                disabled: submitting,
+              },
+            ]}
+            onChange={(value) => {
+              if (value === "signin" || value === "register") changeMode(value);
+            }}
           />
           <span className="eyebrow">Clemora account</span>
           <div className="login-title">
@@ -132,7 +153,8 @@ export function AuthPage({ onBack, initialMode = "signin" }: { onBack: () => voi
               <FormField label="Full name">
                 <InputGroup>
                   <Icon name="users" size={16} />
-                  <Input variant="plain"
+                  <Input
+                    variant="plain"
                     autoComplete="name"
                     maxLength={MAX_DISPLAY_NAME_LENGTH}
                     value={name}
@@ -150,7 +172,8 @@ export function AuthPage({ onBack, initialMode = "signin" }: { onBack: () => voi
             <FormField label="Email address">
               <InputGroup>
                 <Icon name="users" size={16} />
-                <Input variant="plain"
+                <Input
+                  variant="plain"
                   type="email"
                   autoComplete="email"
                   maxLength={MAX_EMAIL_LENGTH}
@@ -168,7 +191,8 @@ export function AuthPage({ onBack, initialMode = "signin" }: { onBack: () => voi
             <FormField label="Password">
               <InputGroup>
                 <Icon name="settings" size={16} />
-                <Input variant="plain"
+                <Input
+                  variant="plain"
                   type={showPassword ? "text" : "password"}
                   autoComplete={
                     mode === "register" ? "new-password" : "current-password"
@@ -179,8 +203,14 @@ export function AuthPage({ onBack, initialMode = "signin" }: { onBack: () => voi
                     setFormError("");
                     clearError();
                   }}
-                  minLength={mode === "register" ? MIN_PASSWORD_LENGTH : undefined}
-                  maxLength={mode === "signin" && useFirebase ? 4096 : MAX_PASSWORD_LENGTH}
+                  minLength={
+                    mode === "register" ? MIN_PASSWORD_LENGTH : undefined
+                  }
+                  maxLength={
+                    mode === "signin" && useFirebase
+                      ? 4096
+                      : MAX_PASSWORD_LENGTH
+                  }
                   placeholder={
                     mode === "register"
                       ? `At least ${MIN_PASSWORD_LENGTH} characters`
@@ -188,7 +218,9 @@ export function AuthPage({ onBack, initialMode = "signin" }: { onBack: () => voi
                   }
                   required
                 />
-                <Button size="small" variant="light"
+                <Button
+                  size="small"
+                  variant="light"
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                 >
@@ -200,7 +232,8 @@ export function AuthPage({ onBack, initialMode = "signin" }: { onBack: () => voi
               <FormField label="Confirm password">
                 <InputGroup>
                   <Icon name="settings" size={16} />
-                  <Input variant="plain"
+                  <Input
+                    variant="plain"
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
                     maxLength={MAX_PASSWORD_LENGTH}
@@ -219,7 +252,8 @@ export function AuthPage({ onBack, initialMode = "signin" }: { onBack: () => voi
 
             {mode === "signin" && firebaseConfigured && (
               <label className="auth-existing-account">
-                <Input variant="plain"
+                <Input
+                  variant="plain"
                   type="checkbox"
                   checked={useFirebase}
                   disabled={submitting}
@@ -239,7 +273,8 @@ export function AuthPage({ onBack, initialMode = "signin" }: { onBack: () => voi
               </div>
             )}
 
-            <Button variant="primary"
+            <Button
+              variant="primary"
               type="submit"
               className="login-submit"
               disabled={submitting}
@@ -260,7 +295,8 @@ export function AuthPage({ onBack, initialMode = "signin" }: { onBack: () => voi
                 <span>or continue with</span>
               </div>
 
-              <Button variant="secondary"
+              <Button
+                variant="secondary"
                 type="button"
                 className="google-button"
                 onClick={continueWithGoogle}

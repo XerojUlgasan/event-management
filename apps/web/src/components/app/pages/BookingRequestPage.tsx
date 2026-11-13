@@ -13,6 +13,7 @@ import {
   Select,
   Tabs,
   Textarea,
+  useNotifications,
 } from "@event-management/ui";
 import { MAX_BOOKING_REASON_LENGTH } from "@event-management/contracts/limits/booking-requests";
 import {
@@ -43,6 +44,7 @@ function RequestStatusForm({
   onClose: () => void;
   onBusyChange: (busy: boolean) => void;
 }) {
+  const { notify, notifyError } = useNotifications();
   const [status, setStatus] = useState(item.status);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
@@ -73,14 +75,11 @@ function RequestStatusForm({
         status,
         reason.trim() || undefined,
       );
+      notify(`Request status updated to ${bookingStatusLabels[result.bookingRequest.status].toLowerCase()}.`);
       onSaved(result.bookingRequest);
     } catch (cause) {
       setStale(cause instanceof ApiError && cause.status === 409);
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Unable to update request status.",
-      );
+      setError(notifyError(cause, "Unable to update request status."));
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -172,6 +171,7 @@ export function BookingRequestPage({
 }: {
   bookingRequestId: string;
 }) {
+  const { notifyError } = useNotifications();
   const [item, setItem] = useState<BookingRequest | null>(null);
   const [refreshing, setRefreshing] = useState(true);
   const [error, setError] = useState("");
@@ -218,15 +218,23 @@ export function BookingRequestPage({
     }
   }, [bookingRequestId]);
 
+  const refreshWithNotice = (fallback: string) => {
+    const pending = refresh();
+    const current = generation.current;
+    void pending.catch(cause => { if (current === generation.current) notifyError(cause, fallback); });
+  };
+
   useEffect(() => {
     setItem(null);
     setNotice("");
     setPageTab("details");
-    void refresh().catch(() => {});
+    const pending = refresh();
+    const current = generation.current;
+    void pending.catch(cause => { if (current === generation.current) notifyError(cause, "Unable to load this booking request."); });
     return () => {
       generation.current++;
     };
-  }, [refresh]);
+  }, [refresh, notifyError]);
 
   return (
     <div className="booking-request-page">
@@ -240,7 +248,7 @@ export function BookingRequestPage({
           disabled={refreshing || savingStatus || savingDay}
           onClick={() => {
             setNotice("");
-            void refresh().catch(() => {});
+            refreshWithNotice("Unable to refresh this booking request.");
           }}
         >
           {refreshing && item ? "Refreshing…" : "Refresh request and days"}
@@ -262,7 +270,7 @@ export function BookingRequestPage({
           <Button
             variant="secondary"
             disabled={refreshing}
-            onClick={() => void refresh().catch(() => {})}
+            onClick={() => refreshWithNotice("Unable to refresh this booking request.")}
           >
             {refreshing ? "Refreshing…" : "Try again"}
           </Button>

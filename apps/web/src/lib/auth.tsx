@@ -1,4 +1,4 @@
-import { Button } from "@event-management/ui"
+import { Button, useNotifications } from "@event-management/ui"
 import {
   createContext,
   useCallback,
@@ -110,10 +110,26 @@ async function withFirebase<T>(
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { notify, notifyError } = useNotifications();
   const [status, setStatus] = useState<Status>("loading");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState("");
   const operation = useRef(0);
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  const probe = useRef<Promise<void> | null>(null);
+  const authBusy = useRef(false);
+  const probeFailure = useRef(false);
+
+  useEffect(() => {
+    try {
+      const notice = sessionStorage.getItem("clemora-auth-notice");
+      sessionStorage.removeItem("clemora-auth-notice");
+      if (notice === "signin") notify("Signed in successfully.");
+      if (notice === "register") notify("Account created. You are now signed in.");
+      if (notice === "signout") notify("Signed out successfully.");
+    } catch { /* Authentication still works when browser storage is unavailable. */ }
+  }, [notify]);
 
   useEffect(() => {
     const current = ++operation.current;
@@ -126,36 +142,86 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch((cause) => {
         if (!active || current !== operation.current) return;
-        if (!(cause instanceof ApiError && cause.status === 401))
-          setError(messageFor(cause));
+        if (!(cause instanceof ApiError && cause.status === 401)) {
+          setError(notifyError(messageFor(cause)));
+        }
         setStatus("signed-out");
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [notifyError]);
 
-  const run = useCallback(async (task: () => Promise<Profile | null>) => {
+  useEffect(() => {
+    let active = true;
+    const revalidate = () => {
+      if (statusRef.current !== "signed-in" || probe.current || authBusy.current) return;
+      const current = operation.current;
+      const pending = getMe().then(nextProfile => {
+        if (!active || current !== operation.current) return;
+        setProfile(nextProfile);
+        probeFailure.current = false;
+      }).catch(cause => {
+        if (!active || current !== operation.current) return;
+        if (cause instanceof ApiError && cause.status === 401) {
+          ++operation.current;
+          setProfile(null);
+          setStatus("signed-out");
+        } else if (!probeFailure.current) {
+          probeFailure.current = true;
+          notifyError(cause, "Unable to check your session. Please try again.");
+        }
+      }).finally(() => { if (probe.current === pending) probe.current = null; });
+      probe.current = pending;
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") revalidate(); };
+    window.addEventListener("clemora:session-check", revalidate);
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      active = false;
+      window.removeEventListener("clemora:session-check", revalidate);
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [notifyError]);
+
+  const run = useCallback(async (task: () => Promise<Profile | null>, notice?: "signin" | "register" | "signout") => {
     const current = ++operation.current;
+    authBusy.current = true;
+    probe.current = null;
     setError("");
+    let checkSession = false;
     try {
       const nextProfile = await task();
       if (current !== operation.current) return;
+      if (notice) {
+        try { sessionStorage.setItem("clemora-auth-notice", notice); }
+        catch { /* The destination page itself still confirms the new session. */ }
+      }
       setProfile(nextProfile);
       setStatus(nextProfile ? "signed-in" : "signed-out");
     } catch (cause) {
-      if (current === operation.current) setError(messageFor(cause));
+      if (current === operation.current) {
+        checkSession = cause instanceof ApiError && cause.status === 401 && statusRef.current === "signed-in";
+        setError(notifyError(messageFor(cause)));
+      }
       throw cause;
+    } finally {
+      if (current === operation.current) {
+        authBusy.current = false;
+        if (checkSession) window.dispatchEvent(new Event("clemora:session-check"));
+      }
     }
-  }, []);
+  }, [notifyError]);
 
   const signIn = (email: string, password: string) =>
-    run(() => login(email, password));
+    run(() => login(email, password), "signin");
   const signUp = (name: string, email: string, password: string) =>
-    run(() => register(name, email, password));
-  const signInWithGoogle = () => run(() => withFirebase("google", syncSession));
+    run(() => register(name, email, password), "register");
+  const signInWithGoogle = () => run(() => withFirebase("google", syncSession), "signin");
   const signInWithFirebase = (email: string, password: string) =>
-    run(() => withFirebase("password", syncSession, email, password));
+    run(() => withFirebase("password", syncSession, email, password), "signin");
   const connectFirebase: AuthContextValue["connectFirebase"] = (
     currentPassword,
     method,
@@ -188,7 +254,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     run(async () => {
       await endSession();
       return null;
-    });
+    }, "signout");
   const clearError = useCallback(() => setError(""), []);
 
   return (

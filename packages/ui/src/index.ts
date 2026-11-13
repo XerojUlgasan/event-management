@@ -27,6 +27,7 @@ export { ActivityList } from "./molecules/ActivityList";
 export type { ActivityItem } from "./molecules/ActivityList";
 export { Toast } from "./molecules/Toast";
 export type { ToastTone } from "./molecules/Toast";
+export { NotificationProvider, useNotifications, notificationErrorMessage } from "./molecules/NotificationProvider";
 export { SiteHeader } from "./molecules/SiteHeader";
 export type { SiteLink } from "./molecules/SiteHeader";
 export { InclusionStrip } from "./molecules/InclusionStrip";
