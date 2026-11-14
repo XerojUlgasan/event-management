@@ -5,10 +5,7 @@ import {
   ServiceCards,
 } from "../components/public/catalog/CatalogCards";
 import { ActionLink, Toast } from "@event-management/ui";
-import {
-  loadPackages,
-  loadServices,
-} from "../lib/server/catalog/load-catalog";
+import { loadPackages, loadServices } from "../lib/server/catalog/load-catalog";
 import type { PublicPackage } from "../lib/data/catalog/packages";
 import type { PublicService } from "../lib/data/catalog/services";
 
@@ -16,10 +13,7 @@ let packages: PublicPackage[] = [];
 let services: PublicService[] = [];
 let unavailable = false;
 try {
-  [packages, services] = await Promise.all([
-    loadPackages(3),
-    loadServices(3),
-  ]);
+  [packages, services] = await Promise.all([loadPackages(3), loadServices(3)]);
 } catch {
   unavailable = true;
 }
@@ -126,7 +120,7 @@ const description =
     <div class="intro-copy">
       <p>
         Styled by AMAC connects package discovery, booking requests, schedules,
-        team updates, and event progress in one simple experience.
+        planning updates, and event progress in one simple experience.
       </p>
       <ActionLink href="/about">How Styled by AMAC works</ActionLink>
     </div>

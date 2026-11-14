@@ -33,11 +33,7 @@ export const getCatalogMediaRouteHandler: AppRouteHandler<
     const token = getCookie(c, SESSION_COOKIE);
     if (token) {
       const resolved = await resolveSessionService(c.get("db"), token);
-      if (
-        resolved.kind === "ok" &&
-        resolved.session.user.role === "admin" &&
-        resolved.session.user.staff_role === "System Administrator"
-      ) {
+      if (resolved.kind === "ok" && resolved.session.user.role === "admin") {
         media = await findAdminCatalogMediaData(
           c.get("db"),
           id,

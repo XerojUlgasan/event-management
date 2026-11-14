@@ -147,8 +147,9 @@ export function PublicSite({
           </div>
           <div className="intro-copy">
             <p>
-              Styled by AMAC connects package discovery, booking requests, schedules,
-              team updates, and event progress in one simple experience.
+              Styled by AMAC connects package discovery, booking requests,
+              schedules, planning updates, and event progress in one simple
+              experience.
             </p>
             <ActionLink href="#packages">How Styled by AMAC works</ActionLink>
           </div>

@@ -1,6 +1,6 @@
 # Shared package ownership
 
-**Important: package reuse is required for every UI change.** Read the [frontend](../../frontend/SKILL.md) and [packages](../SKILL.md) skills and the required project structure and reuse references before editing. This applies to public, admin, staff, and customer UI, including page-only components, CSS-only fixes, mock screens, and shared package changes. Deciding that no package file needs an edit does not skip this workflow.
+**Important: package reuse is required for every UI change.** Read the [frontend](../../frontend/SKILL.md) and [packages](../SKILL.md) skills and the required project structure and reuse references before editing. This applies to public, admin, and customer UI, including page-only components, CSS-only fixes, mock screens, and shared package changes. Deciding that no package file needs an edit does not skip this workflow.
 
 ## Existing owners
 
@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | Reusable React presentation, component styles, and stories | [UI exports](../../../../packages/ui/src/index.ts), [package exports](../../../../packages/ui/package.json), [atomic layers](../../../../packages/ui/README.md), and the relevant component, story, and [styles](../../../../packages/ui/src/styles.css) | `@event-management/ui` and `@event-management/ui/styles.css` |
 | Shared design tokens | [Theme source](../../../../packages/theme/src/theme.css) and [package exports](../../../../packages/theme/package.json) | `@event-management/theme/theme.css` and its existing CSS variables or Tailwind tokens |
-| Shared catalog, filter and pagination types, domain limits, and event-day deadline policy | [Contract exports](../../../../packages/contracts/package.json) and the relevant source | `@event-management/contracts/catalog`, `@event-management/contracts/catalog-filters`, `@event-management/contracts/pagination`, the explicit `@event-management/contracts/limits/*` subpaths, and `@event-management/contracts/event-days` |
+| Shared catalog, filter and pagination types, and domain limits | [Contract exports](../../../../packages/contracts/package.json) and the relevant source | `@event-management/contracts/catalog`, `@event-management/contracts/catalog-filters`, `@event-management/contracts/pagination`, and the explicit `@event-management/contracts/limits/*` subpaths |
 
 The web app loads theme and UI styles through [app.css](../../../../apps/web/src/styles/app.css); Storybook loads them through its [preview CSS](../../../../packages/ui/.storybook/preview.css). Check those consumers before changing shared styles. API schemas enforce accepted domain values; browser hints consume the shared limits, while server HTTP body caps remain in the API. Load the [limits skill](../../contracts/SKILL.md) when changing a mirrored constraint or its consumers.
 
@@ -20,7 +20,7 @@ The web app loads theme and UI styles through [app.css](../../../../apps/web/src
 4. **Resolve mismatches explicitly.** If no shared export fits, state the concrete semantic or behavioral gap and why composition or a scoped extension is unsuitable before introducing an app-local alternative. Ordinary semantic HTML and page layout do not need a new library component. Existing duplicate markup or hard-coded shared styles are not a pattern to copy. Keep any correction within the requested UI flow rather than starting an unrelated migration.
 5. **Verify the owner and consumers.** Follow the [frontend checks](../../frontend/references/styling-and-verification.md) and, when UI or theme source changes, the [package checks](theme-and-verification.md). Inspect affected component states and consuming views, including relevant responsive and keyboard behavior. A shared change needs consumer evidence as well as Storybook coverage.
 
-For example, compose a staff page action from exported `Button` and `Icon`, with availability state and page spacing owned by `apps/web`. Copying `Button.tsx` into `staff/` or duplicating its base styles in `app.css` bypasses the shared owner. If a missing button capability is reusable, extend the package component and its stories instead.
+For example, compose an admin booking action from exported `Button` and `Icon`, with request state and page spacing owned by `apps/web`. Copying `Button.tsx` into a workspace or duplicating its base styles in `app.css` bypasses the shared owner. If a missing button capability is reusable, extend the package component and its stories instead.
 
 ## Completion audit
 

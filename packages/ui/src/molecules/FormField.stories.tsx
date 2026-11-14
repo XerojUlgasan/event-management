@@ -35,7 +35,7 @@ export const Text: Story = {
 
 export const HelpAndError: Story = {
   args: {
-    description: "Use the name staff should ask for.",
+    description: "Use the name the admin should use when contacting you.",
     error: "Enter a contact name.",
     children: (field) => <Input {...field} name="contactName" required />,
   },
@@ -52,9 +52,9 @@ export const LongFeedback: Story = {
   args: {
     label: "Special requests or services",
     description:
-      "Describe any services the team should discuss with you before preparing a quotation.",
+      "Describe any services the admin should discuss with you before preparing a quotation.",
     error:
-      "Please shorten this request and keep any additional details for your conversation with staff.",
+      "Please shorten this request and keep any additional details for your conversation with the admin.",
     children: (field) => <Textarea {...field} name="specialRequests" />,
   },
 };

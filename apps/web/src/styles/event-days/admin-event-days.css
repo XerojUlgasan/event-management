@@ -2,15 +2,13 @@
   margin-top: 28px;
 }
 .admin-event-section-head,
-.admin-event-staff-head,
 .admin-event-day-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
 }
-.admin-event-section-head h2,
-.admin-event-staff-head h4 {
+.admin-event-section-head h2 {
   margin: 0 0 6px;
 }
 .admin-event-section-head h2 {
@@ -18,42 +16,17 @@
   font-size: 22px;
   font-weight: 500;
 }
-.admin-event-staff-head h4 {
-  font-size: 16px;
-  font-weight: 600;
-}
-.admin-event-section-head p,
-.admin-event-staff-head p,
-.admin-event-deadline-row p {
+.admin-event-section-head p {
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.6;
   margin: 0;
 }
-.admin-event-deadline-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 18px 0;
-  border-bottom: 1px solid var(--line);
-}
-.admin-event-controls,
-.admin-event-reopen,
 .admin-event-actions {
   display: flex;
   align-items: flex-end;
   flex-wrap: wrap;
   gap: 10px;
-}
-.admin-event-controls {
-  flex: none;
-  flex-wrap: nowrap;
-}
-.admin-event-controls .ui-field,
-.admin-event-reopen .ui-field {
-  width: 225px;
-  font-size: 12px;
 }
 .admin-event-legacy {
   margin: 16px 0;
@@ -145,31 +118,6 @@
   font-size: 13px;
   line-height: 1.6;
 }
-.admin-event-staff {
-  margin-top: 23px;
-}
-.admin-event-staff-head > .button {
-  flex: none;
-}
-.admin-event-reopen {
-  margin: 18px 0;
-}
-.admin-event-reopen > span {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-.admin-event-staff-table {
-  margin-top: 18px;
-}
-.admin-event-staff-table .ui-control {
-  min-width: 116px;
-  padding: 7px 9px;
-  font-size: 12px;
-}
-.admin-event-staff-table .admin-event-actions {
-  align-items: flex-start;
-  flex-direction: column;
-}
 .admin-event-editor {
   padding: 20px 0 0;
   margin-top: 20px;
@@ -185,27 +133,12 @@
   gap: 14px;
   margin-bottom: 16px;
 }
-@media (max-width: 900px) {
-  .admin-event-deadline-row {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
 @media (max-width: 700px) {
   .admin-event-section-head,
-  .admin-event-staff-head,
   .admin-event-day-heading {
     align-items: flex-start;
     flex-direction: column;
     gap: 12px;
-  }
-  .admin-event-controls {
-    width: 100%;
-  }
-  .admin-event-controls .ui-field {
-    flex: 1;
-    width: auto;
-    min-width: 0;
   }
   .admin-event-selector {
     gap: 2px;
@@ -231,9 +164,6 @@
   }
   .admin-event-fields {
     grid-template-columns: 1fr;
-  }
-  .admin-event-reopen .ui-field {
-    width: 100%;
   }
 }
 

@@ -1,20 +1,8 @@
-import {
-  getEventChecklistRoute,
-  getEventChecklistRouteHandler,
-} from "../event-checklists/get-event-checklist.js";
-import {
-  createEventChecklistRoute,
-  createEventChecklistRouteHandler,
-} from "../event-checklists/create-event-checklist.js";
-import {
-  updateEventChecklistRoute,
-  updateEventChecklistRouteHandler,
-} from "../event-checklists/update-event-checklist.js";
-import {
-  sendEventChecklistRoute,
-  sendEventChecklistRouteHandler,
-} from "../event-checklists/send-event-checklist.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
+import {
+  scheduleRequestedDaysRoute,
+  scheduleRequestedDaysRouteHandler,
+} from "./schedule-requested-days.js";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import {
@@ -52,10 +40,7 @@ routes.use("/admin/event-days", requireSession, requireSystemAdmin);
 routes.use("/admin/event-days/*", requireSession, requireSystemAdmin);
 routes.openapi(listAdminEventDaysRoute, listAdminEventDaysRouteHandler);
 routes.openapi(createEventDayRoute, createEventDayRouteHandler);
+routes.openapi(scheduleRequestedDaysRoute, scheduleRequestedDaysRouteHandler);
 routes.openapi(cancelEventDayRoute, cancelEventDayRouteHandler);
 routes.openapi(moveEventDayRoute, moveEventDayRouteHandler);
-routes.openapi(getEventChecklistRoute, getEventChecklistRouteHandler);
-routes.openapi(createEventChecklistRoute, createEventChecklistRouteHandler);
-routes.openapi(updateEventChecklistRoute, updateEventChecklistRouteHandler);
-routes.openapi(sendEventChecklistRoute, sendEventChecklistRouteHandler);
 export default routes;

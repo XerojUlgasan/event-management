@@ -29,10 +29,9 @@ const domains = new Set([
   "booking-requests",
   "quotations",
   "messages",
-  "checklists",
   "event-days",
 ]);
-const roles = new Set(["admin", "customer", "staff"]);
+const roles = new Set(["admin", "customer"]);
 
 function report(path, message, line) {
   failures.push(`${relative(root, path)}${line ? `:${line}` : ""}: ${message}`);

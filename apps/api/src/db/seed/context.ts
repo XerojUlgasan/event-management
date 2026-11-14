@@ -96,9 +96,11 @@ export async function insertIfNew<T extends keyof DB>(
   return inserted !== undefined;
 }
 
-export function expectCount(label: string, count: number) {
-  if (count !== SCENARIO_COUNT)
-    throw new Error(
-      `${label} planned ${count} rows; expected ${SCENARIO_COUNT}`,
-    );
+export function expectCount(
+  label: string,
+  count: number,
+  expected = SCENARIO_COUNT,
+) {
+  if (count !== expected)
+    throw new Error(`${label} planned ${count} rows; expected ${expected}`);
 }

@@ -45,14 +45,13 @@ const row = await db
     email,
     display_name: user.displayName ?? fallbackName,
     role: "admin",
-    staff_role: "System Administrator",
   })
   .onConflict((conflict) =>
     conflict.column("firebase_uid").doUpdateSet({
       email,
       display_name: user.displayName ?? fallbackName,
       role: "admin",
-      staff_role: "System Administrator",
+
       updated_at: new Date(),
     }),
   )

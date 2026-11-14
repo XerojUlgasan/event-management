@@ -13,7 +13,7 @@ let db: typeof import("../src/db/client.js").db;
 let admin: Pool;
 let pool: Pool;
 let adminCookie: string;
-let undesignatedAdminCookie: string;
+let otherCustomerCookie: string;
 let customerCookie: string;
 let storageServer: Server;
 let failStorageDeletes = false;
@@ -111,7 +111,7 @@ before(async () => {
   process.env.DB_NAME = database;
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
-  async function session(role: string, staffRole: string | null = null) {
+  async function session(role: string) {
     const token = randomUUID();
     const user = await db
       .insertInto("users")
@@ -119,7 +119,6 @@ before(async () => {
         email: `${role}-${randomUUID()}@example.test`,
         password_hash: "unused",
         role,
-        staff_role: staffRole,
       })
       .returning("id")
       .executeTakeFirstOrThrow();
@@ -133,8 +132,8 @@ before(async () => {
       .execute();
     return `em_session=${token}`;
   }
-  adminCookie = await session("admin", "System Administrator");
-  undesignatedAdminCookie = await session("admin");
+  adminCookie = await session("admin");
+  otherCustomerCookie = await session("customer");
   customerCookie = await session("customer");
 });
 after(async () => {
@@ -269,7 +268,7 @@ test("services save directly, validate complete content, and enforce permissions
     hourlyRatePesos: 500,
   };
   await read(await call("/admin/services", "POST", content), 401);
-  for (const cookie of [customerCookie, undesignatedAdminCookie])
+  for (const cookie of [customerCookie, otherCustomerCookie])
     await read(await call("/admin/services", "POST", content, cookie), 403);
   for (const hourlyRatePesos of [null, 0, -1, 1.5, 2147483648])
     await read(
@@ -494,7 +493,7 @@ test("service canvas photos replace legacy image uploads and clean up removed me
 
 test("canvas saves publish atomically and protect concurrent edits", async () => {
   await read(await call("/admin/packages"), 401);
-  for (const cookie of [customerCookie, undesignatedAdminCookie])
+  for (const cookie of [customerCookie, otherCustomerCookie])
     await read(await call("/admin/packages", "POST", data, cookie), 403);
   for (const patch of [
     { name: "" },
@@ -1558,7 +1557,6 @@ test("admin archived media is private and unclaimed uploads cannot be taken by a
       email: `admin-${randomUUID()}@example.test`,
       password_hash: "unused",
       role: "admin",
-      staff_role: "System Administrator",
     })
     .returning("id")
     .executeTakeFirstOrThrow();

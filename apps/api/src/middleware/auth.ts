@@ -73,11 +73,10 @@ export const requireSession = createMiddleware<HonoEnv>(async (c, next) => {
   await next();
 });
 
-// A staff title grants booking visibility only. Administrative privileges require
-// the explicit System Administrator designation stored on the current user.
+// Administrative privileges come from the saved account role.
 export const requireSystemAdmin = createMiddleware<HonoEnv>(async (c, next) => {
   const user = c.get("session").user;
-  if (user.role !== "admin" || user.staff_role !== "System Administrator")
+  if (user.role !== "admin")
     return c.json({ error: "Admin access required" }, 403);
   await next();
 });

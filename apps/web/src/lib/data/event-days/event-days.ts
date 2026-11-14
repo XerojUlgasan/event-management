@@ -44,3 +44,15 @@ export const moveEventDay = (id: string, body: EventDaySchedule) =>
   request<{
     eventDay: EventDay;
   }>(`/admin/event-days/${path(id)}/move`, body);
+
+export const scheduleRequestedDays = (
+  bookingRequestId: string,
+  expectedUpdatedAt: string,
+) =>
+  request<{ eventDays: EventDay[] }>(
+    "/admin/event-days/schedule-requested-days",
+    {
+      bookingRequestId,
+      expectedUpdatedAt,
+    },
+  );

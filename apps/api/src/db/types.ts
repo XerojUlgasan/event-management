@@ -75,7 +75,6 @@ export interface CatalogPages {
   package_id: string | null;
   service_id: string | null;
   updated_at: Generated<Timestamp>;
-  venue_id: string | null;
 }
 
 export interface CatalogSections {
@@ -109,21 +108,6 @@ export interface Conversations {
   id: Generated<string>;
   status: Generated<string>;
   updated_at: Generated<Timestamp>;
-}
-
-export interface EventChecklists {
-  content: Generated<Json>;
-  coordinator_id: string | null;
-  created_at: Generated<Timestamp>;
-  created_by: string;
-  event_day_id: string;
-  id: Generated<string>;
-  revision: Generated<number>;
-  sent_at: Timestamp | null;
-  sent_by: string | null;
-  title: string;
-  updated_at: Generated<Timestamp>;
-  updated_by: string;
 }
 
 export interface EventsDay {
@@ -185,8 +169,6 @@ export interface PackageServices {
   sort_order: number;
 }
 
-
-
 export interface Quotations {
   accepted_at: Timestamp | null;
   adjustments_reviewed: Generated<boolean>;
@@ -236,7 +218,6 @@ export interface Users {
   id: Generated<string>;
   password_hash: string | null;
   role: Generated<string>;
-  staff_role: string | null;
   updated_at: Generated<Timestamp>;
 }
 
@@ -248,7 +229,6 @@ export interface DB {
   catalog_sections: CatalogSections;
   catalog_widgets: CatalogWidgets;
   conversations: Conversations;
-  event_checklists: EventChecklists;
   events_day: EventsDay;
   media_assets: MediaAssets;
   messages: Messages;

@@ -11,7 +11,7 @@ For contributor-guidance changes, walk each affected row from root AGENTS.md thr
 | Message field/file/collection limit | Contracts → shared limits + API type sync; API schema/body caps and relevant frontend hints. Follow authoritative constant and behavior checks; every UI edit still requires reuse. |
 | Booking status/schema/migration review | Review → API structure/database + matching booking rules + contract-change trace; QA for authorized isolated proof. Stay read-only; accepted inquiry is not reserved/confirmed. |
 | Narrow TypeScript bug | Owning area + Implement → TypeScript; Investigate for reproduction and root cause; TDD for explicit or practical regression proof. No unrelated framework work. |
-| Change staffing responsibility | Business → identity + staffing → affected API/frontend; inspect actual permissions separately. Coordinator is an event assignment held by staff. |
+| Change account responsibility or scheduling permissions | Business → identity + event days → affected API/frontend; inspect the enforced permissions separately. Only customers and designated System Administrators have account roles. |
 | Seed one table | QA → seed-one-table + canonical seed coverage; API database + affected business rules. Stable IDs, valid parents/state, insert-only rerun proof in disposable DB. |
 | Repository guide edit | Documentation → docs + technical writing → affected owners/incoming references. Run guidance checks; research/defense is not mandatory. |
 | Whole-paper polish or literature/defense | Documentation → recursive review, plus Research's relevant source/method/defense workflow. Check full scope, citations, evidence, prose, and final rendered artifact. |

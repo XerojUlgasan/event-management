@@ -3,11 +3,9 @@
 @import "@event-management/ui/styles.css";
 @import "./catalog/public-preview.css";
 @import "./catalog/public-catalog.css";
-@import "./workspaces/staff/staff-workspace.css";
 @import "./booking-requests/booking-request.css";
 @import "./booking-requests/customer-events.css";
 @import "./event-days/admin-event-days.css";
-@import "./checklists/event-checklists.css";
 @import "./public/site.css";
 
 html:has(.public-site) {
@@ -191,15 +189,6 @@ html:has(.public-site) {
   --service-ink: var(--ink);
   --service-muted: var(--muted);
   --service-heading-font: var(--font-serif);
-}
-.public-venues {
-  --catalog-line: var(--border-subtle);
-  --catalog-card: var(--surface-base);
-  --catalog-image: var(--accent-soft);
-  --catalog-accent: var(--wine);
-  --catalog-ink: var(--ink);
-  --catalog-muted: var(--muted);
-  --catalog-heading: var(--font-serif);
 }
 .packages {
   max-width: none;
@@ -1590,59 +1579,7 @@ html:has(.public-site) {
 .customer-admin-row.header > span:first-child {
   display: block;
 }
-.staff-admin-row {
-  width: 100%;
-  min-height: 62px;
-  padding: 9px 15px;
-  display: grid;
-  grid-template-columns: 1.3fr 0.8fr 1fr 0.55fr 15px;
-  align-items: center;
-  gap: 12px;
-  color: var(--ink);
-  text-align: left;
-  border: 0;
-  border-bottom: 1px solid var(--surface-raised);
-  background: var(--surface-base);
-  font-size: 9px;
-}
-.staff-admin-row:not(.header):hover {
-  background: var(--surface-subtle);
-}
-.staff-admin-row > span:first-child {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.staff-admin-row > span:first-child > span:not(.directory-avatar) {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.staff-admin-row strong {
-  font-size: 9px;
-}
-.staff-admin-row small {
-  overflow: hidden;
-  color: var(--muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 7px;
-}
-.staff-admin-row.header {
-  min-height: 35px;
-  color: var(--muted);
-  background: var(--surface-subtle);
-  font-size: 7px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-.staff-admin-row.header > span:first-child {
-  display: block;
-}
-.customer-admin-row:focus-visible,
-.staff-admin-row:focus-visible {
+.customer-admin-row:focus-visible {
   position: relative;
   outline: 2px solid var(--wine);
   outline-offset: -2px;
@@ -1739,48 +1676,6 @@ html:has(.public-site) {
   flex-direction: column;
   gap: 15px;
 }
-.progress-panel .panel-head > strong {
-  font-family: var(--font-serif);
-  font-size: 21px;
-}
-.progress-track {
-  height: 7px;
-  margin: 16px 0 13px;
-  overflow: hidden;
-  border-radius: 4px;
-  background: var(--surface-raised);
-}
-.progress-track span {
-  display: block;
-  width: 71%;
-  height: 100%;
-  background: var(--wine);
-}
-.phase-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-subtle);
-  font-size: 8px;
-}
-.phase-row > span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-.phase-row > span.complete {
-  color: var(--green);
-}
-.phase-row > span.active {
-  color: var(--wine);
-  font-weight: 700;
-}
-.phase-row > i {
-  height: 1px;
-  flex: 1;
-  background: var(--border-default);
-}
 .legend {
   display: flex;
   gap: 12px;
@@ -1857,35 +1752,6 @@ html:has(.public-site) {
   font-size: 9px;
 }
 .timeline-row small {
-  color: var(--muted);
-  font-size: 8px;
-}
-.task-list {
-  margin: 12px -19px -19px;
-}
-.task-row {
-  min-height: 55px;
-  padding: 10px 19px;
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  border-top: 1px solid var(--surface-raised);
-}
-.task-row input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--wine);
-}
-.task-row > span {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.task-row strong {
-  font-size: 9px;
-}
-.task-row small {
   color: var(--muted);
   font-size: 8px;
 }
@@ -5564,13 +5430,6 @@ html:has(.public-site) {
   .customer-admin-row > span:nth-child(4) {
     display: none;
   }
-  .staff-admin-row {
-    grid-template-columns: 1.4fr 0.8fr 15px;
-  }
-  .staff-admin-row > span:nth-child(3),
-  .staff-admin-row > span:nth-child(4) {
-    display: none;
-  }
 }
 
 /* Package draft editor */
@@ -5827,92 +5686,6 @@ html:has(.public-site) {
 }
 .service-assignment-preview p {
   margin: 4px 0;
-}
-
-/* Venues management */
-.venue-list {
-  display: grid;
-  gap: 1px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--line);
-  overflow: hidden;
-}
-.venue-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr 2fr auto;
-  gap: 16px;
-  align-items: start;
-  padding: 14px 18px;
-  background: var(--surface-base);
-}
-.venue-row-header {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  align-items: center;
-}
-.venue-row strong {
-  font-size: 14px;
-  font-weight: 700;
-}
-.venue-location {
-  color: var(--muted);
-  font-size: 13px;
-}
-.venue-description {
-  margin: 0;
-  color: var(--accent-violet-muted);
-  font-size: 12px;
-  line-height: 1.5;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.venue-actions {
-  display: flex;
-  gap: 8px;
-}
-.venue-actions .button {
-  min-height: 32px;
-  padding: 0 12px;
-  font-size: 11px;
-}
-.venue-empty {
-  padding: 40px 20px;
-  text-align: center;
-  color: var(--muted);
-}
-.venue-dialog {
-  width: min(600px, 100%);
-}
-@media (max-width: 768px) {
-  .venue-row {
-    grid-template-columns: 1fr;
-  }
-  .venue-row-header {
-    display: none;
-  }
-  .venue-actions {
-    margin-top: 8px;
-  }
-}
-
-.venue-photo-fallback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  min-height: 140px;
-  padding: 16px;
-  color: var(--text-secondary);
-  background: var(--surface-raised);
-  text-align: center;
 }
 
 /* Shared guest and customer conversation states */
@@ -6390,54 +6163,6 @@ html:has(.public-site) {
 }
 .about-page .button {
   margin-top: 8px;
-}
-
-/* Event-day staffing composition */
-.staffing-list {
-  display: grid;
-  gap: 1rem;
-  margin-top: 1rem;
-}
-.staffing-card {
-  padding: 1rem;
-}
-.staffing-card-heading,
-.staffing-person {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-.staffing-card-heading h2,
-.staffing-card-heading h4 {
-  margin: 0;
-}
-.staffing-person {
-  padding: 0.75rem 0;
-  border-top: 1px solid var(--color-line);
-}
-.staffing-person p {
-  margin: 0.25rem 0 0;
-}
-.staffing-actions {
-  display: flex;
-  align-items: end;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.75rem;
-}
-.staffing-admin {
-  margin: 1.5rem 0;
-}
-.staffing-form {
-  margin: 1rem 0;
-}
-.staffing-fields {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
 }
 
 /* Requested-day editor */

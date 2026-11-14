@@ -137,7 +137,11 @@ test("catalog cleanup retains records, guest limits, inquiry snapshots and canva
         return row;
       });
     }
-    for (const entry of entries.filter((e) => e.name >= migration))
+    for (const entry of entries.filter(
+      (e) =>
+        e.name >= migration &&
+        e.name <= "20261102191000_normalize_booking_history_index",
+    ))
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );

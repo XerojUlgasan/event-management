@@ -12,7 +12,6 @@ let db: typeof import("../src/db/client.js").db;
 let admin: Pool;
 let pool: Pool;
 let adminCookie: string;
-let staffCookie: string;
 let customerCookie: string;
 let otherCustomerCookie: string;
 let customerId: string;
@@ -233,6 +232,21 @@ before(async () => {
       );
     }
   }
+  const finalRoles = await pool.query(
+    "SELECT email, role FROM users WHERE email IN ('old-admin@example.test', 'old-staff@example.test') ORDER BY email",
+  );
+  assert.deepEqual(finalRoles.rows, [
+    { email: "old-admin@example.test", role: "admin" },
+    { email: "old-staff@example.test", role: "customer" },
+  ]);
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'staff_role'",
+      )
+    ).rowCount,
+    0,
+  );
   process.env.DB_NAME = database;
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
@@ -246,7 +260,6 @@ before(async () => {
         display_name: name,
         password_hash: "unused",
         role,
-        staff_role: role === "admin" ? "System Administrator" : null,
       })
       .returning("id")
       .executeTakeFirstOrThrow();
@@ -262,7 +275,6 @@ before(async () => {
   }
 
   ({ cookie: adminCookie } = await session("admin", "Admin Person"));
-  ({ cookie: staffCookie } = await session("staff", "Staff Person"));
   const customer = await session("customer", "Customer One");
   customerCookie = customer.cookie;
   customerId = customer.id;
@@ -406,32 +418,32 @@ test("requests enforce roles, published package availability, snapshots, ownersh
     amountMinor: 15_000_000,
   });
   assert.equal(withoutTimestamp.packageMaxGuests, 100);
-  const staffProfile = await read(
-    await call("/me", "GET", undefined, staffCookie),
+  const customerProfile = await read(
+    await call("/me", "GET", undefined, otherCustomerCookie),
     200,
   );
-  assert.equal(staffProfile.role, "staff");
+  assert.equal(customerProfile.role, "customer");
+  assert.equal("staffRole" in customerProfile, false);
   for (const path of [
     "/admin/users",
     "/admin/conversations",
     "/admin/packages",
     "/admin/services",
   ])
-    await read(await call(path, "GET", undefined, staffCookie), 403);
+    await read(await call(path, "GET", undefined, otherCustomerCookie), 403);
   for (const path of [
     "/admin/packages",
     "/admin/services",
     "/admin/conversations",
-    "/messages/conversation",
-    "/booking-requests",
   ])
-    await read(await call(path, "POST", {}, staffCookie), 403);
+    await read(await call(path, "POST", {}, otherCustomerCookie), 403);
   await read(
-    await call("/messages/conversation", "GET", undefined, staffCookie),
-    403,
-  );
-  await read(
-    await call(`/admin/packages/${pkg.id}`, "GET", undefined, staffCookie),
+    await call(
+      `/admin/packages/${pkg.id}`,
+      "GET",
+      undefined,
+      otherCustomerCookie,
+    ),
     403,
   );
   await read(
@@ -439,12 +451,18 @@ test("requests enforce roles, published package availability, snapshots, ownersh
       `/admin/services/${randomUUID()}`,
       "GET",
       undefined,
-      staffCookie,
+      otherCustomerCookie,
     ),
     403,
   );
-  await read(await call("/packages", "GET", undefined, staffCookie), 200);
-  await read(await call("/services", "GET", undefined, staffCookie), 200);
+  await read(
+    await call("/packages", "GET", undefined, otherCustomerCookie),
+    200,
+  );
+  await read(
+    await call("/services", "GET", undefined, otherCustomerCookie),
+    200,
+  );
   const created = (
     await read(
       await call("/booking-requests", "POST", input, customerCookie),
@@ -554,22 +572,29 @@ test("requests enforce roles, published package availability, snapshots, ownersh
     )
   ).bookingRequest;
   assert.deepEqual(detail, created);
-  for (const cookie of [adminCookie, staffCookie]) {
-    assert.deepEqual(
-      (
-        await read(
-          await call(
-            `/admin/booking-requests/${created.id}`,
-            "GET",
-            undefined,
-            cookie,
-          ),
-          200,
-        )
-      ).bookingRequest,
-      created,
-    );
-  }
+  assert.deepEqual(
+    (
+      await read(
+        await call(
+          `/admin/booking-requests/${created.id}`,
+          "GET",
+          undefined,
+          adminCookie,
+        ),
+        200,
+      )
+    ).bookingRequest,
+    created,
+  );
+  await read(
+    await call(
+      `/admin/booking-requests/${created.id}`,
+      "GET",
+      undefined,
+      otherCustomerCookie,
+    ),
+    403,
+  );
   await read(await call(`/booking-requests/${created.id}`, "GET"), 401);
   await read(
     await call(
@@ -689,20 +714,29 @@ test("requests enforce roles, published package availability, snapshots, ownersh
       )
     ).bookingRequests.some((request: any) => request.id === created.id),
   );
-  const staffRequests = (
+  const adminRequests = (
     await read(
-      await call("/admin/booking-requests", "GET", undefined, staffCookie),
+      await call("/admin/booking-requests", "GET", undefined, adminCookie),
       200,
     )
   ).bookingRequests;
-  assert.ok(staffRequests.some((row: any) => row.id === created.id));
-  assert.ok(!staffRequests.some((row: any) => row.reference === "LEGACY"));
+  assert.ok(adminRequests.some((row: any) => row.id === created.id));
+  assert.ok(!adminRequests.some((row: any) => row.reference === "LEGACY"));
+  await read(
+    await call(
+      "/admin/booking-requests",
+      "GET",
+      undefined,
+      otherCustomerCookie,
+    ),
+    403,
+  );
   await read(
     await call(
       `/admin/booking-requests/${created.id}/status`,
       "PATCH",
       { status: "accepted" },
-      staffCookie,
+      otherCustomerCookie,
     ),
     403,
   );
@@ -1072,7 +1106,7 @@ test("admin request filters, cursor pages and calendar counts use preferred date
       "/admin/booking-requests/calendar?month=2098-02&status=under_review",
       "GET",
       undefined,
-      staffCookie,
+      adminCookie,
     ),
     200,
   );
@@ -1288,7 +1322,6 @@ test("status history is bounded, ordered, scoped, and authorized", async () => {
   const path = `/booking-requests/${booking.id}/status-history`;
   await read(await call(path), 401);
   await read(await call(path, "GET", undefined, otherCustomerCookie), 404);
-  await read(await call(path, "GET", undefined, staffCookie), 403);
   await read(
     await call(
       `/admin/booking-requests/${booking.id}/status-history`,
@@ -1352,17 +1385,17 @@ test("status history is bounded, ordered, scoped, and authorized", async () => {
     ),
     expected,
   );
-  const staff = await read(
+  const adminHistory = await read(
     await call(
       `/admin/booking-requests/${booking.id}/status-history?limit=50`,
       "GET",
       undefined,
-      staffCookie,
+      adminCookie,
     ),
     200,
   );
   assert.deepEqual(
-    staff.history.map((item: { id: string }) => item.id),
+    adminHistory.history.map((item: { id: string }) => item.id),
     expected.slice(0, 50),
   );
   await read(
@@ -1544,8 +1577,7 @@ test("owner saves independent per-day times with exact revisions; roles, state a
   const path = timesPath(booking.id, "2099-12-05"),
     input = { ...sampleTimes, expectedUpdatedAt: booking.updatedAt };
   await read(await call(path, "PATCH", input), 401);
-  for (const cookie of [adminCookie, staffCookie])
-    await read(await call(path, "PATCH", input, cookie), 403);
+  await read(await call(path, "PATCH", input, adminCookie), 403);
   await read(await call(path, "PATCH", input, otherCustomerCookie), 404);
   for (const invalid of [
     { endsAt: undefined },
@@ -1814,16 +1846,19 @@ test("migration keeps legacy estimates, timestamps and related operational data 
   );
 });
 
-test("directory pages combine staff roles, search globally, and keep population statistics", async () => {
+test("customer directory searches and pages customers while keeping population statistics", async () => {
   const marker = `directory-${randomUUID()}`;
   const created = await pool.query(
-    `INSERT INTO users(email,display_name,role,staff_role,password_hash)
-    SELECT $1 || n || '@example.test', 'Directory ' || lpad(n::text, 3, '0'),
-      CASE WHEN n % 2 = 0 THEN 'admin' ELSE 'staff' END, 'Directory role', 'unused'
+    `INSERT INTO users(email,display_name,role,password_hash)
+    SELECT $1 || n || '@example.test', 'Directory ' || lpad(n::text, 3, '0'), 'customer', 'unused'
     FROM generate_series(1, 18) n RETURNING id`,
     [marker],
   );
-  const base = `/admin/users?group=staff&search=${marker}&limit=7`;
+  await pool.query(
+    "INSERT INTO users(email,display_name,role,password_hash) VALUES ($1, 'Directory admin', 'admin', 'unused')",
+    [`${marker}-admin@example.test`],
+  );
+  const base = `/admin/users?search=${marker}&limit=7`;
   const first = await read(
     await call(base, "GET", undefined, adminCookie),
     200,
@@ -1846,7 +1881,7 @@ test("directory pages combine staff roles, search globally, and keep population 
     ),
     200,
   );
-  const rows = [...first.staff, ...second.staff, ...third.staff];
+  const rows = [...first.customers, ...second.customers, ...third.customers];
   assert.equal(rows.length, 18);
   assert.equal(new Set(rows.map((row: any) => row.id)).size, 18);
   assert.deepEqual(
@@ -1854,15 +1889,19 @@ test("directory pages combine staff roles, search globally, and keep population 
     [...rows.map((row: any) => row.displayName)].sort(),
   );
   assert.ok(
-    rows.some((row: any) => row.role === "admin") &&
-      rows.some((row: any) => row.role === "staff"),
+    rows.every((row: any) => row.role === "customer" && !("staffRole" in row)),
   );
-  assert.ok(first.stats.staffTotal >= created.rows.length);
+  assert.equal("staff" in first, false);
+  assert.deepEqual(Object.keys(first.stats).sort(), [
+    "customerJoined",
+    "customerTotal",
+  ]);
+  assert.ok(first.stats.customerTotal >= created.rows.length);
   assert.deepEqual(first.stats, second.stats);
   assert.equal(third.nextCursor, null);
   await read(
     await call(
-      `/admin/users?group=customers&cursor=${encodeURIComponent(first.nextCursor)}`,
+      `/admin/users?search=other&cursor=${encodeURIComponent(first.nextCursor)}`,
       "GET",
       undefined,
       adminCookie,

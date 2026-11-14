@@ -77,23 +77,10 @@ const customer = createMiddleware<HonoEnv>(async (c, next) => {
     return c.json({ error: "Customer access required" }, 403);
   await next();
 });
-const bookingReader = createMiddleware<HonoEnv>(async (c, next) => {
-  if (!["admin", "staff"].includes(c.get("session").user.role))
-    return c.json({ error: "Staff access required" }, 403);
-  await next();
-});
 routes.use("/booking-requests", requireSession, customer);
 routes.use("/booking-requests/*", requireSession, customer);
-routes.use("/admin/booking-requests", requireSession, bookingReader);
-// Staff can read requests; only System Administrators can update them.
-routes.use(
-  "/admin/booking-requests/*",
-  requireSession,
-  createMiddleware<HonoEnv>(async (c, next) => {
-    if (c.req.method === "GET") return bookingReader(c, next);
-    return requireSystemAdmin(c, next);
-  }),
-);
+routes.use("/admin/booking-requests", requireSession, requireSystemAdmin);
+routes.use("/admin/booking-requests/*", requireSession, requireSystemAdmin);
 routes.openapi(saveRequestedDayTimesRoute, saveRequestedDayTimesRouteHandler);
 routes.openapi(createBookingRequestRoute, createBookingRequestRouteHandler);
 routes.openapi(cancelBookingRequestRoute, cancelBookingRequestRouteHandler);

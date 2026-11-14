@@ -57,12 +57,11 @@ export type ScenarioUser = {
   email: string;
   displayName: string;
   role: "admin" | "customer";
-  staffRole: string | null;
 };
 
-function roleFor(index: number): Pick<ScenarioUser, "role" | "staffRole"> {
-  if (index < 4) return { role: "admin", staffRole: "System Administrator" };
-  return { role: "customer", staffRole: null };
+function roleFor(index: number): Pick<ScenarioUser, "role"> {
+  if (index < 4) return { role: "admin" };
+  return { role: "customer" };
 }
 
 export function planScenarioUsers(): ScenarioUser[] {
@@ -77,7 +76,6 @@ export function planScenarioUsers(): ScenarioUser[] {
         email: `scenario.user${scenarioIndex(index)}@clemora.example.test`,
         displayName: `${given} ${family}`,
         role: role.role,
-        staffRole: role.staffRole,
       };
     },
   );
@@ -96,7 +94,7 @@ export async function seedScenarioUsers(
       email: user.email,
       display_name: user.displayName,
       role: user.role,
-      staff_role: user.staffRole,
+
       password_hash: input.passwordHash,
       created_at: input.now,
       updated_at: input.now,

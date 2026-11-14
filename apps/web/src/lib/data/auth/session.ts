@@ -6,8 +6,7 @@ export type Profile = {
   hasPassword: boolean;
   email: string;
   displayName: string | null;
-  role: "admin" | "staff" | "customer";
-  staffRole: string | null;
+  role: "admin" | "customer";
   createdAt: string;
   updatedAt: string;
 };

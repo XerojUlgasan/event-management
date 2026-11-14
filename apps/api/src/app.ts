@@ -4,7 +4,6 @@ import {
   MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
   QUOTATION_JSON_BODY_LIMIT_BYTES,
   bookingBodyLimit,
-  eventDayBodyLimit,
 } from "./constants/http.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
@@ -111,8 +110,9 @@ app.use(
   "/v1/admin/event-days",
   bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
 );
-app.use("/v1/admin/event-days/*", (c, next) =>
-  bodyLimit({ maxSize: eventDayBodyLimit(c.req.path) })(c, next),
+app.use(
+  "/v1/admin/event-days/*",
+  bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
 );
 app.route("/v1", eventDayRoutes);
 app.route("/v1", messageRoutes);

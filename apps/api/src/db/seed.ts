@@ -12,13 +12,11 @@ const legacyAccounts = [
     email: "admin1@gmail.com",
     display_name: "System Admin",
     role: "admin",
-    staff_role: "System Administrator",
   },
   ...Array.from({ length: 5 }, (_, i) => ({
     email: `user${i + 1}@gmail.com`,
     display_name: `User ${i + 1}`,
     role: "customer",
-    staff_role: null,
   })),
 ];
 const demoAccounts = [
@@ -26,7 +24,6 @@ const demoAccounts = [
     email: `customer${i + 1}@example.test`,
     display_name: `Demo Customer ${i + 1}`,
     role: "customer",
-    staff_role: null,
   })),
 ];
 
@@ -42,7 +39,7 @@ try {
         .onConflict((conflict) =>
           conflict.expression(sql`lower(trim(email))`).doNothing(),
         )
-        .returning(["id", "email", "role", "staff_role"])
+        .returning(["id", "email", "role"])
         .executeTakeFirst();
       if (row) rows.push(row);
     }
@@ -52,10 +49,9 @@ try {
     return { accounts: rows, packageCount, demo, scenario };
   });
   console.table(
-    seeded.accounts.map(({ email, role, staff_role }) => ({
+    seeded.accounts.map(({ email, role }) => ({
       email,
       role,
-      staff_role,
     })),
   );
   console.log(

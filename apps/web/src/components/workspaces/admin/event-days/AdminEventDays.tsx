@@ -16,6 +16,7 @@ import {
   createEventDay,
   getAdminEventDays,
   moveEventDay,
+  scheduleRequestedDays,
   type EventDay,
   type EventDaySchedule,
 } from "../../../../lib/data/event-days/event-days";
@@ -151,7 +152,7 @@ function scheduleLabel(start: string | null, end: string | null, zone: string) {
 function dayState(entry: DayEntry) {
   if (!entry.day)
     return entry.requested?.startsAt && entry.requested.endsAt
-      ? "Not opened"
+      ? "Ready to schedule"
       : "Waiting for times";
   if (entry.day.status !== "scheduled")
     return entry.day.status === "moved"
@@ -261,7 +262,7 @@ export function AdminEventDays({
           saved
             ? "Changes saved, but the request could not be refreshed. Please refresh and try again."
             : cause,
-          "Unable to update staffing.",
+          "Unable to update event days.",
         ),
       );
     } finally {
@@ -324,7 +325,7 @@ export function AdminEventDays({
         <div>
           <h2>Event days</h2>
           <p>
-            Select a day to manage its schedule and staff. All times use{" "}
+            Select a day to manage its schedule. All times use{" "}
             {booking.timeZone}.
           </p>
         </div>
@@ -337,11 +338,24 @@ export function AdminEventDays({
         </Button>
       )}
       {!accepted && (
-        <p>
-          Accept this request for processing before opening responses or
-          confirming staff.
-        </p>
+        <p>Accept this request before scheduling its event days.</p>
       )}
+      {accepted &&
+        booking.requestedDays?.some(
+          (item) => !item.eventDayId && item.startsAt && item.endsAt,
+        ) && (
+          <Button
+            disabled={locked}
+            pending={busy}
+            onClick={() =>
+              void run(() =>
+                scheduleRequestedDays(booking.id, booking.updatedAt),
+              )
+            }
+          >
+            Schedule ready requested days
+          </Button>
+        )}
       {accepted && !booking.requestedDays && (
         <details className="admin-event-legacy">
           <summary>Add an event day</summary>
@@ -395,11 +409,6 @@ export function AdminEventDays({
                       : dayState(current)
                     : "Not scheduled"}
                 </Badge>
-                {day?.status === "scheduled" && (
-                  <Badge tone="info">
-                    {dayState(current)}
-                  </Badge>
-                )}
               </div>
             </div>
             {day?.status === "scheduled" && (
@@ -456,7 +465,7 @@ export function AdminEventDays({
           </dl>
           {day?.status === "moved" && (
             <p className="admin-event-note">
-              This day was moved. Previous assignments were cancelled.{" "}
+              This day was moved.{" "}
               {day.replacementEventDayId && (
                 <Button
                   variant="link"
@@ -468,16 +477,13 @@ export function AdminEventDays({
             </p>
           )}
           {day?.status === "cancelled" && (
-            <p className="admin-event-note">
-              This event day is cancelled. Responses are closed and assignments
-              are cancelled.
-            </p>
+            <p className="admin-event-note">This event day is cancelled.</p>
           )}
           {!day && (
             <p className="admin-event-note">
               {requested?.startsAt && requested.endsAt
-                ? "The customer’s times are ready. Choose a response deadline and apply it to create this day and open responses."
-                : "Waiting for the customer to save start and end times. Apply deadlines again after their times are saved."}
+                ? "The customer’s times are ready to schedule."
+                : "Waiting for the customer to save start and end times."}
             </p>
           )}
           {day &&

@@ -10,10 +10,9 @@ import {
   workspaceReturnPath,
 } from "../../src/components/app/routes";
 
-const admin = { role: "admin", staffRole: "System Administrator" };
-const staff = { role: "staff", staffRole: "Coordinator" };
-const customer = { role: "customer", staffRole: null };
-const restrictedAdmin = { role: "admin", staffRole: "Coordinator" };
+const admin = { role: "admin" };
+const staff = { role: "staff" };
+const customer = { role: "customer" };
 const id = "01c8d471-f0c5-4b16-8594-3bb08e497761";
 const detail = `/app/bookings/${id}`;
 
@@ -41,11 +40,11 @@ test("admin booking links open the detail workspace with Bookings selected", () 
   assert.equal(allowedWorkspacePath(admin, detail), true);
 });
 
-test("customers and staff cannot enter an admin booking detail path", () => {
-  for (const profile of [customer, staff, restrictedAdmin])
+test("customers and removed staff roles cannot enter an admin booking detail path", () => {
+  for (const profile of [customer, staff])
     assert.equal(allowedWorkspacePath(profile, detail), false);
   assert.equal(allowedWorkspacePath(customer, "/app/events"), true);
-  assert.equal(allowedWorkspacePath(staff, "/app/assignments"), true);
+  assert.equal(allowedWorkspacePath(staff, "/app/assignments"), false);
   for (const path of [
     "/app/bookings//",
     `${detail}/staff`,
@@ -73,6 +72,5 @@ test("sign-in returns to local role-authorized booking links only", () => {
     assert.equal(workspaceReturnPath(admin, value), null);
   assert.equal(workspaceReturnPath(customer, detail), null);
   assert.equal(workspaceReturnPath(staff, detail), null);
-  assert.equal(workspaceReturnPath(restrictedAdmin, detail), null);
   assert.equal(workspaceReturnPath(customer, "/app/events"), "/app/events");
 });

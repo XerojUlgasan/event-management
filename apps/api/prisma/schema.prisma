@@ -9,7 +9,6 @@ model User {
   email        String    @unique
   displayName  String?   @map("display_name")
   role         String    @default("customer")
-  staffRole    String?   @map("staff_role")
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   bookingRequests BookingRequest[]
@@ -18,15 +17,8 @@ model User {
   conversations Conversation[] @relation("CustomerConversations")
   sentMessages Message[]     @relation("MessageSender")
   mediaAssets MediaAsset[]
-  eventAvailability EventStaffAvailability[]
-  eventAssignments EventStaff[] @relation("EventStaffMember")
-  assignedEventStaff EventStaff[] @relation("EventStaffAssigner")
   quotations Quotation[]
   auditEvents AuditEvent[]
-  createdChecklists EventChecklist[] @relation("ChecklistCreator")
-  updatedChecklists EventChecklist[] @relation("ChecklistUpdater")
-  sentChecklists EventChecklist[] @relation("ChecklistSender")
-  coordinatorChecklists EventChecklist[] @relation("ChecklistCoordinator")
 
   @@map("users")
 }
@@ -99,20 +91,6 @@ model Package {
   @@map("packages")
 }
 
-model Venue {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
-  name String
-  slug String @unique
-  location String
-  description String
-  maxGuests Int? @map("max_guests")
-  publishedAt DateTime @default(now()) @map("published_at") @db.Timestamptz(6)
-  page CatalogPage?
-  @@map("venues")
-}
 
 model Service {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -132,12 +110,10 @@ model Service {
 model CatalogPage {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   packageId String? @unique @map("package_id") @db.Uuid
-  venueId String? @unique @map("venue_id") @db.Uuid
   serviceId String? @unique @map("service_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   package Package? @relation(fields: [packageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  venue Venue? @relation(fields: [venueId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   service Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   sections CatalogSection[]
   @@map("catalog_pages")
@@ -302,7 +278,7 @@ model BookingRequestStatusHistory {
   @@map("booking_request_status_history")
 }
 
-// Status checks, RLS, and the confirmed-coordinator partial index live in SQL.
+// Status checks and RLS live in SQL.
 model EventDay {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   bookingRequestId String @map("booking_request_id") @db.Uuid
@@ -310,80 +286,15 @@ model EventDay {
   startsAt DateTime @map("starts_at") @db.Timestamptz(6)
   endsAt DateTime @map("ends_at") @db.Timestamptz(6)
   status String @default("scheduled")
-  staffingStatus String @default("draft") @map("staffing_status")
-  availabilityDeadline DateTime? @map("availability_deadline") @db.Timestamptz(6)
   replacementEventDayId String? @map("replacement_event_day_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   bookingRequest BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   replacementEventDay EventDay? @relation("EventDayReplacement", fields: [replacementEventDayId, bookingRequestId], references: [id, bookingRequestId], onDelete: Restrict, onUpdate: NoAction, map: "events_day_replacement_same_booking_fkey")
   replacedEventDays EventDay[] @relation("EventDayReplacement")
-  availability EventStaffAvailability[]
-  staff EventStaff[]
-  checklist EventChecklist?
 
   @@unique([id, bookingRequestId])
   @@index([bookingRequestId, day])
   @@index([replacementEventDayId, bookingRequestId])
   @@map("events_day")
-}
-
-model EventStaffAvailability {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  eventDayId String @map("event_day_id") @db.Uuid
-  staffId String @map("staff_id") @db.Uuid
-  response String
-  respondedAt DateTime @default(now()) @map("responded_at") @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-  eventDay EventDay @relation(fields: [eventDayId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  staff User @relation(fields: [staffId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-
-  @@unique([eventDayId, staffId])
-  @@index([staffId])
-  @@map("event_staff_availability")
-}
-
-model EventStaff {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  eventDayId String @map("event_day_id") @db.Uuid
-  staffId String @map("staff_id") @db.Uuid
-  role String
-  status String @default("confirmed")
-  assignedBy String @map("assigned_by") @db.Uuid
-  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-  eventDay EventDay @relation(fields: [eventDayId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  staff User @relation("EventStaffMember", fields: [staffId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  assigner User @relation("EventStaffAssigner", fields: [assignedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
-
-  @@unique([eventDayId, staffId])
-  @@index([staffId, status])
-  @@index([assignedBy])
-  @@map("event_staffs")
-}
-
-model EventChecklist {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  eventDayId String @unique @map("event_day_id") @db.Uuid
-  title String
-  coordinatorId String? @map("coordinator_id") @db.Uuid
-  sentBy String? @map("sent_by") @db.Uuid
-  sentAt DateTime? @map("sent_at") @db.Timestamptz(6)
-  content Json @default("{\"tasks\":[]}") @db.JsonB
-  revision Int @default(1)
-  createdBy String @map("created_by") @db.Uuid
-  updatedBy String @map("updated_by") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-  eventDay EventDay @relation(fields: [eventDayId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  coordinator User? @relation("ChecklistCoordinator", fields: [coordinatorId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  sender User? @relation("ChecklistSender", fields: [sentBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  creator User @relation("ChecklistCreator", fields: [createdBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  updater User @relation("ChecklistUpdater", fields: [updatedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
-
-  @@index([coordinatorId, updatedAt(sort: Desc)])
-  @@index([createdBy])
-  @@index([updatedBy])
-  @@index([sentBy])
-  @@map("event_checklists")
 }

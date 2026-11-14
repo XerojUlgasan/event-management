@@ -107,14 +107,6 @@ export function OverviewPage({
                     {booking.venue} · {booking.guests} guests
                   </span>
                 </div>
-                <div className="event-team">
-                  <Avatar size="sm" initials="AS" />
-                  <Avatar
-                    size="sm"
-                    className="second"
-                    initials={index === 0 ? "JB" : "MK"}
-                  />
-                </div>
                 <Badge tone={index === 1 ? "warning" : "success"}>
                   {booking.status}
                 </Badge>

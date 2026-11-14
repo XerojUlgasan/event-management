@@ -6,7 +6,7 @@ Use this when the task adds seeded rows for one database table. [Database seed](
 
 ## 1. Choose the layer
 
-Required fixtures are the named accounts, three canvas packages, archived sample venues, and `demo.*` conversations in `seed.ts`, `seed-packages.ts`, and `seed-demo.ts`. Add a row there when a current test or the [QA account table](accounts.md) depends on that exact email, name, or id.
+Required fixtures are the named accounts, three canvas packages, and `demo.*` conversations in `seed.ts`, `seed-packages.ts`, and `seed-demo.ts`. Add a row there when a current test or the [QA account table](accounts.md) depends on that exact email, name, or id.
 
 Everything else belongs in `apps/api/src/db/seed/scenario/`. `scenario/index.ts` is the orchestrator. Its current order is users, sessions, catalog, activity, operations, then quotations. `schema.prisma` can contain tables that this order does not seed yet, including `package_services`. Quotations and their delivery/audit records are seeded by `scenario/quotations.ts`. Read the orchestrator before assuming a table already has rows.
 
@@ -16,7 +16,7 @@ Done when you can name the file that will insert the table and the parent rows t
 
 Read the model in `apps/api/prisma/schema.prisma`, then the migrations that still apply to that table. Keep a constraint that a later migration did not drop. Prisma omits some checks and partial unique indexes, so the SQL is the insert rule.
 
-Also read the service that creates the same row. Copy its allowed status, role, and calculation. A row the database accepts can still be illegal for the API. Examples already used by the scenario: a booking customer is a customer; a booking package is published; `out_of_range` follows the guest count and package maximum; a confirmed event assignment is on a scheduled, closed day and has an `available` response; a message `sender_role` is `customer` or `admin` and matches that sender.
+Also read the service that creates the same row. Copy its allowed status, role, and calculation. A row the database accepts can still be illegal for the API. Examples already used by the scenario: a booking customer is a customer; a booking package is published; `out_of_range` follows the guest count and package maximum; a message `sender_role` is `customer` or `admin` and matches that sender.
 
 For `booking_requests` and `events_day`, keep every date inside the 30 days before and the 30 days after `seedClock()`, and make the set reach both edges.
 
@@ -30,7 +30,7 @@ Follow `scenario/users.ts`.
 2. Give each row `scenarioId("table:parent:index")`. The id stays stable across runs. Put a new key namespace in the string so it does not collide with an existing key.
 3. Insert with `insertIfNew`. It conflicts on `id` and leaves the stored row unchanged. Return the planned rows even when the insert inserted nothing, so the next module can reuse the ids.
 4. Pass `seedClock()` into new timestamps. Read `SEED_RANDOM_SEED` through `seedRandom` only to shuffle a fixed set of legal values. A new seed must not change the count.
-5. Reuse `LOCAL_PASSWORD` by accepting the hash `seed.ts` already computed. Reuse `catalogSlug`, `responseDeadlineForDay`, and `hashSessionToken` when the table uses those values.
+5. Reuse `LOCAL_PASSWORD` by accepting the hash `seed.ts` already computed. Reuse `catalogSlug` and `hashSessionToken` when the table uses those values.
 6. If the table's unique key is not `id`, make that natural key stable too. A new id with an existing `(package_id, service_id)` or `(booking_request_id, version)` fails the second run. `events_day.day` is a date: pass `sql\`${day}::date\`` in that insert. `insertIfNew` cannot express that cast.
 
 Wire the function into `seedScenario` after every parent it reads and before every child that needs its ids.

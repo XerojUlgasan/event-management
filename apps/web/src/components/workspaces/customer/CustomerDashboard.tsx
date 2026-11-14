@@ -531,8 +531,8 @@ export function CustomerDashboard({
                   Let’s bring your plans together
                 </h2>
                 <p>
-                  Browse packages, services, and venues, share your event
-                  details, and follow your request as our team reviews it.
+                  Browse packages and services, share your event details, and
+                  follow your request as our team reviews it.
                 </p>
                 <div className="customer-event-actions">
                   <Button onClick={() => go("Catalogs")}>

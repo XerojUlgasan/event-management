@@ -10,8 +10,7 @@ export const profileSchema = z.object({
   hasPassword: z.boolean(),
   email: z.string(),
   displayName: z.string().nullable(),
-  role: z.enum(["admin", "staff", "customer"]),
-  staffRole: z.string().nullable(),
+  role: z.enum(["admin", "customer"]),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -25,13 +24,7 @@ export function toProfile(row: Selectable<Users>): Profile {
     hasPassword: row.password_hash !== null,
     email: row.email,
     displayName: row.display_name,
-    role:
-      row.role === "admin"
-        ? "admin"
-        : row.role === "staff"
-          ? "staff"
-          : "customer",
-    staffRole: row.staff_role ?? null,
+    role: row.role === "admin" ? "admin" : "customer",
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };

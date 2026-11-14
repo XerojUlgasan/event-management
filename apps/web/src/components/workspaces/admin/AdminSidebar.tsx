@@ -21,7 +21,7 @@ export function AdminSidebar({
     Overview: "grid",
     Bookings: "clipboard",
     Messages: "message",
-    StaffCustomers: "users",
+    Customers: "users",
     Calendar: "calendar",
     Packages: "box",
     Services: "spark",
@@ -31,7 +31,7 @@ export function AdminSidebar({
     Administration: "settings",
   };
   const labelFor: Partial<Record<NavKey, string>> = {
-    StaffCustomers: "Staff & Customers",
+    Customers: "Customers",
   };
   return (
     <aside className={`sidebar ${collapsed ? "" : "sidebar-open"}`}>

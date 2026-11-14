@@ -28,7 +28,7 @@ export function CalendarPage() {
     { day: 2 },
     { day: 3, events: [["Tasting · Mendoza", "tasting"]] },
     { day: 4 },
-    { day: 5, events: [["Team training", "internal"]] },
+    { day: 5, events: [["Planning meeting", "internal"]] },
     { day: 6 },
     { day: 7, events: [["Bennett Anniversary", "confirmed"]] },
     { day: 8 },
@@ -82,7 +82,7 @@ export function CalendarPage() {
     <div className="content-stack calendar-page">
       <PageHeader
         title="Schedule"
-        description="Coordinate events, staff, transport, preparation, and equipment."
+        description="Review events and preparation on a shared schedule."
         actions={
           <div className="welcome-actions">
             <Button variant="secondary" onClick={unavailable}>
@@ -272,7 +272,7 @@ export function CalendarPage() {
                 <span className="agenda-time">9:00</span>
                 <span>
                   <strong>Kitchen briefing</strong>
-                  <small>Production kitchen · 8 staff</small>
+                  <small>Production kitchen</small>
                 </span>
                 <Badge tone="neutral">Internal</Badge>
               </Button>
@@ -298,26 +298,6 @@ export function CalendarPage() {
                 </span>
                 <Badge tone="success">Confirmed</Badge>
               </Button>
-            </div>
-          </Panel>
-          <Panel
-            className="availability-card"
-            title="Team availability"
-            action={<strong>86%</strong>}
-          >
-            <div className="availability-bar">
-              <span></span>
-            </div>
-            <div className="availability-lines">
-              <span>
-                <i className="available"></i>32 available
-              </span>
-              <span>
-                <i className="assigned"></i>11 assigned
-              </span>
-              <span>
-                <i className="away"></i>5 unavailable
-              </span>
             </div>
           </Panel>
           <Panel className="resource-calendar-card">
@@ -377,7 +357,7 @@ export function CalendarPage() {
           <div className="subheading">Preparation notes</div>
           <div className="schedule-note">
             Confirm loading entrance, service station placement, kitchen access,
-            and guest arrival route with the venue coordinator.
+            and guest arrival route with the venue contact.
           </div>
           <div className="drawer-actions">
             <Button variant="secondary" onClick={unavailable}>

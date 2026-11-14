@@ -677,7 +677,7 @@ test("db:seed inserts fixtures without changing existing accounts or sessions", 
   const collision = await db
     .insertInto("users")
     .values({
-      email: "staff1@example.test",
+      email: "customer10@example.test",
       display_name: "Existing account",
       role: "customer",
       password_hash: "existing-hash",

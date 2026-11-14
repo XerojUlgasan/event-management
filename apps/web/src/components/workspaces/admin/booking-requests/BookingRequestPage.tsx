@@ -33,7 +33,6 @@ import {
 import { BookingPackage } from "../../../booking-requests/BookingPackage";
 import { Quotations } from "../../../quotations/Quotations";
 import { AdminEventDays } from "../event-days/AdminEventDays";
-import { AdminBookingChecklists } from "../checklists/AdminBookingChecklists";
 
 function RequestStatusForm({
   item,
@@ -190,7 +189,6 @@ export function BookingRequestPage({
   const detailsPanelId = "booking-request-details-panel";
   const packagePanelId = "booking-request-package-panel";
   const quotationPanelId = "booking-request-quotation-panel";
-  const checklistPanelId = "booking-request-checklist-panel";
   const generation = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -332,14 +330,6 @@ export function BookingRequestPage({
                 disabled:
                   (savingDay || savingStatus) && pageTab !== "quotation",
               },
-              {
-                value: "checklist",
-                label: "Checklist",
-                id: "booking-tab-checklist",
-                panelId: checklistPanelId,
-                disabled:
-                  (savingDay || savingStatus) && pageTab !== "checklist",
-              },
             ]}
           />
           {pageTab === "details" && (
@@ -454,7 +444,7 @@ export function BookingRequestPage({
                 </div>
                 <div className="booking-request-overview-footer">
                   <p>
-                    Dates are not reserved. Staffing does not confirm the
+                    Dates are not reserved. Processing does not confirm the
                     booking.
                   </p>
                   <BookingStatusHistory
@@ -513,23 +503,6 @@ export function BookingRequestPage({
                 admin
                 editable={!["declined", "cancelled"].includes(item.status)}
                 onChanged={() => setProposalRevision((value) => value + 1)}
-              />
-            </div>
-          )}
-          {pageTab === "checklist" && (
-            <div
-              id={checklistPanelId}
-              role="tabpanel"
-              tabIndex={0}
-              aria-labelledby="booking-tab-checklist"
-              inert={savingStatus || refreshing || undefined}
-              aria-busy={savingStatus || refreshing}
-            >
-              <AdminBookingChecklists
-                key={item.id}
-                booking={item}
-                refreshKey={refreshKey}
-                onBusyChange={setSavingDay}
               />
             </div>
           )}

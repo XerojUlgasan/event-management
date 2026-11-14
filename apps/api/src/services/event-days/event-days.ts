@@ -1,7 +1,3 @@
-import {
-  responseDeadlineForDay,
-  type ResponseDeadlineDays,
-} from "@event-management/contracts/event-days";
 import type { Transaction } from "kysely";
 import type { DayRow } from "../../data/event-days/types.js";
 import type { Database } from "../../data/event-days/types.js";

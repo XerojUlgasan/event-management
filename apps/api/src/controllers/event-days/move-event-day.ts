@@ -20,7 +20,6 @@ export const moveEventDayRouteHandler: AppRouteHandler<
           c.get("db"),
           c.req.valid("param").id,
           c.req.valid("json"),
-          c.get("session").user.id,
         ),
       },
       200,

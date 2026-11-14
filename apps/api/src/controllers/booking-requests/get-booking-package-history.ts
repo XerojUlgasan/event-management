@@ -40,7 +40,7 @@ export const getAdminBookingPackageHistoryRouteHandler: AppRouteHandler<
   typeof getAdminBookingPackageHistoryRoute
 > = async (c) => {
   const user = c.get("session").user;
-  if (user.role !== "admin" || user.staff_role !== "System Administrator")
+  if (user.role !== "admin")
     return c.json({ error: "Booking request not found" }, 404);
   const history = await getBookingPackageHistoryService(
     c.get("db"),

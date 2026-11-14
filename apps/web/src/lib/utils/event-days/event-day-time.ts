@@ -1,11 +1,3 @@
-export function formatEventTime(value: string, timezone: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: timezone,
-  }).format(new Date(value));
-}
-
 // Interpret wall-clock values in the booking zone, never in the administrator's browser zone.
 export function zonedInstant(value: string, zone: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);

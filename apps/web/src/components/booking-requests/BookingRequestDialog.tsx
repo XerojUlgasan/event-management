@@ -323,8 +323,8 @@ export function BookingRequestDialog({
         {reference ? (
           <>
             <p>
-              Your request reference is <strong>{reference}</strong>. Staff will
-              review it.
+              Your request reference is <strong>{reference}</strong>. An
+              administrator will review it.
             </p>
             <Button variant="secondary" type="button" onClick={cancel}>
               Close
@@ -373,7 +373,7 @@ export function BookingRequestDialog({
               </div>
             </dl>
             <p>
-              Your preferred date is not reserved. Staff will review
+              Your preferred date is not reserved. An administrator will review
               availability and the final price.
             </p>
             {error && <p role="alert">{error}</p>}
@@ -645,7 +645,7 @@ export function BookingRequestDialog({
               {timeZone}.
             </p>
             <p>
-              Your preferred date is not reserved. Staff will review
+              Your preferred date is not reserved. An administrator will review
               availability and the final price.
             </p>
             {auth === "signed-out" && (

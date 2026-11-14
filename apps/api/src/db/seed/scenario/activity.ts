@@ -1,8 +1,4 @@
 import { BOOKING_ESTIMATED_DURATIONS } from "@event-management/contracts/limits/booking-requests";
-import {
-  RESPONSE_DEADLINE_DAYS,
-  responseDeadlineForDay,
-} from "@event-management/contracts/event-days";
 import type { SeedDb } from "../context.js";
 import {
   addUtcDays,
@@ -37,7 +33,7 @@ const STATUSES = [
 ] as const;
 type BookingStatus =
   "under_review" | "needs_details" | "accepted" | "declined" | "cancelled";
-type DayKind = "draft" | "open" | "closed" | "moved" | "cancelled";
+type DayKind = "scheduled" | "moved" | "cancelled";
 
 export type ScenarioEventDay = {
   id: string;
@@ -46,10 +42,7 @@ export type ScenarioEventDay = {
   startsAt: Date;
   endsAt: Date;
   status: "scheduled" | "cancelled" | "moved";
-  staffingStatus: "draft" | "open" | "closed";
-  availabilityDeadline: string | null;
   replacementEventDayId: string | null;
-  extraDraft: boolean;
 };
 
 export type ScenarioBooking = {
@@ -81,21 +74,18 @@ type PlannedActivity = {
   requestedDays: Map<string, string | null>;
 };
 
-function patternFor(
-  position: number,
-): Array<{ kind: DayKind; extraDraft: boolean }> {
+function patternFor(position: number): DayKind[] {
   const patterns: DayKind[][] = [
-    ["draft", "open"],
-    ["closed", "closed", "draft"],
-    ["moved", "closed"],
-    ["cancelled", "open", "closed"],
-    ["closed", "open"],
+    ["scheduled", "scheduled"],
+    ["scheduled", "scheduled", "scheduled"],
+    ["moved", "scheduled"],
+    ["cancelled", "scheduled", "scheduled"],
+    ["scheduled", "scheduled"],
   ];
   const pattern = patterns[position % 5];
   if (!pattern) throw new Error("Missing event-day pattern");
-  const days = pattern.map((kind) => ({ kind, extraDraft: false }));
-  if (position % 5 === 0 && position < 20)
-    days.push({ kind: "draft", extraDraft: true });
+  const days = [...pattern];
+  if (position % 5 === 0 && position < 20) days.push("scheduled");
   return days;
 }
 
@@ -113,26 +103,16 @@ function dayRecord(
   dayIndex: number,
   kind: DayKind,
   day: string,
-  extraDraft: boolean,
 ): ScenarioEventDay {
   const interval = manilaInterval(day);
-  const open = kind === "open";
-  const inactive = kind === "moved" || kind === "cancelled";
-  const daysBefore =
-    RESPONSE_DEADLINE_DAYS[dayIndex % RESPONSE_DEADLINE_DAYS.length] ?? 2;
   return {
     id: scenarioId(`event-day:${bookingIndex}:${dayIndex}`),
     bookingId,
     day: interval.day,
     startsAt: interval.startsAt,
     endsAt: interval.endsAt,
-    status: inactive ? kind : "scheduled",
-    staffingStatus: inactive ? "closed" : kind,
-    availabilityDeadline: open
-      ? responseDeadlineForDay(interval.day, daysBefore, "Asia/Manila")
-      : null,
+    status: kind,
     replacementEventDayId: null,
-    extraDraft,
   };
 }
 
@@ -179,23 +159,11 @@ export function planScenarioActivity(input: {
       specs.forEach((spec, dayIndex) => {
         const day = dates[dayIndex];
         if (!day) throw new Error("Scenario event day is missing a date");
-        eventDays.push(
-          dayRecord(
-            draft.id,
-            draft.index,
-            dayIndex,
-            spec.kind,
-            day,
-            spec.extraDraft,
-          ),
-        );
+        eventDays.push(dayRecord(draft.id, draft.index, dayIndex, spec, day));
       });
       const moved = eventDays.find((day) => day.status === "moved");
       if (moved) {
-        const replacement = eventDays.find(
-          (day) =>
-            day.status === "scheduled" && day.staffingStatus === "closed",
-        );
+        const replacement = eventDays.find((day) => day.status === "scheduled");
         if (!replacement || replacement.id === moved.id)
           throw new Error(
             `Moved day ${moved.id} needs a replacement on the same booking`,
@@ -286,7 +254,8 @@ export async function seedScenarioActivity(
   const admin = admins[0];
   if (!admin) throw new Error("Scenario activity requires an administrator");
   const packages = new Map(input.packages.map((pkg) => [pkg.id, pkg]));
-  const customers = new Map(input.users.map((user) => [user.id, user]));  let bookings = 0;
+  const customers = new Map(input.users.map((user) => [user.id, user]));
+  let bookings = 0;
   let history = 0;
   let conversations = 0;
   let messages = 0;
@@ -305,7 +274,8 @@ export async function seedScenarioActivity(
           ? pkg.maxGuests + 25
           : Math.max(1, pkg.maxGuests - 10);
     const legacy = booking.eventDays.length === 0 && index % 5 === 0;
-    const duration = legacy      ? (BOOKING_ESTIMATED_DURATIONS[
+    const duration = legacy
+      ? (BOOKING_ESTIMATED_DURATIONS[
           index % BOOKING_ESTIMATED_DURATIONS.length
         ] ?? "undecided")
       : "undecided";

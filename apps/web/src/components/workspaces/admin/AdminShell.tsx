@@ -23,7 +23,7 @@ import { OverviewPage } from "./overview/OverviewPage";
 import { PackagesPage } from "./catalog/PackagesPage";
 import { ServicesPage } from "./catalog/ServicesPage";
 import { ReportsPage } from "./reports/ReportsPage";
-import { StaffCustomersPage } from "./users/StaffCustomersPage";
+import { CustomersPage } from "./users/CustomersPage";
 import { AdminSidebar } from "./AdminSidebar";
 import { SignInMethods } from "../../auth/SignInMethods";
 import { adminPaths } from "../../app/routes";
@@ -130,7 +130,7 @@ export function AdminShell({
     if (active === "Bookings")
       return <BookingsPage bookingRequestId={bookingRequestId} />;
     if (active === "Messages") return <MessagesPage />;
-    if (active === "StaffCustomers") return <StaffCustomersPage />;
+    if (active === "Customers") return <CustomersPage />;
     if (active === "Calendar") return <CalendarPage />;
     if (active === "Packages") return <PackagesPage />;
     if (active === "Services") return <ServicesPage />;

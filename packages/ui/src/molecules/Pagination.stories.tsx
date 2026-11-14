@@ -9,7 +9,7 @@ const meta = {
     hasNextPage: true,
     onPrevious: () => {},
     onNext: () => {},
-    label: "Staff results pages",
+    label: "Customer results pages",
   },
 } satisfies Meta<typeof Pagination>;
 export default meta;
@@ -34,7 +34,7 @@ function InteractivePagination() {
   const [page, setPage] = useState(1);
   return (
     <div style={{ maxWidth: 300 }}>
-      <p>Staff results, page {page}.</p>
+      <p>Customer results, page {page}.</p>
       <Pagination
         page={page}
         hasNextPage={page < 3}

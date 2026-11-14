@@ -4,10 +4,10 @@ Load the reference for the domain affected by the task before making business de
 
 | Domain | Load when the task involves | Reference |
 | --- | --- | --- |
-| Identity | Customers, admins, staff, coordinators, account access, or responsibility for customer communication, scheduling, team selection, and event progress | [Identity and responsibilities](identity.md) |
-| Catalog | Package, service, or venue listings; customer browsing and package booking requests; requests for packages or venues; or admin preparation of custom packages | [Catalog](catalog.md) |
-| Booking requests | Customer package requests, admin review and status updates, accepted-request event days, opening staff availability, team selection, or the coordinator handoff | [Booking requests](booking-requests.md) |
-| Event days and staffing | Operational event-day schedules, response deadlines, staff availability, team and coordinator assignments, schedule conflicts, movement or cancellation, or the delivery handoff | [Event days and staffing](event-days-and-staffing.md) |
+| Identity | Customer and admin accounts, account access, customer communication, scheduling, and event progress | [Identity and responsibilities](identity.md) |
+| Catalog | Package and service listings, customer browsing and package booking requests, or admin preparation of custom packages | [Catalog](catalog.md) |
+| Booking requests | Customer package requests, admin review and status updates, requested event days and times, or admin event scheduling | [Booking requests](booking-requests.md) |
+| Event days | Operational event-day schedules, requested-day scheduling, movement, or cancellation | [Event days](event-days.md) |
 | Messages | Automatic conversations after booking-request submission, customer/admin communication about a specific booking, or booking-related transactions within that conversation | [Messages](messages.md) |
 | Quotations | Private package proposals, quotation prices and adjustments, draft preparation, conversation delivery, customer feedback through chat, admin revisions, or quotation history | [Quotations](quotations.md) |
 

@@ -119,13 +119,6 @@ const service = {
   hourlyRatePesos: 321,
   sections,
 };
-const venue = {
-  name: "Garden",
-  location: "City",
-  description: "Venue summary",
-  maxGuests: 234,
-  sections,
-};
 
 test("public package renders the canonical canvas with the booking action", () => {
   const action = createElement(
@@ -151,23 +144,18 @@ test("public package renders the canonical canvas with the booking action", () =
     assert.ok(actual.includes(value), value);
   assert.match(actual, /1,250/);
 });
-test("public service and venue render their canonical canvases and metadata", () => {
+test("public service renders its canonical canvas and metadata", () => {
   const serviceHtml = render(publicDetails.PublicServiceDetail, {
     item: service,
   });
-  const venueHtml = render(publicDetails.PublicVenueDetail, { item: venue });
   assert.equal(serviceHtml, render(canvas.ServiceCanvas, { item: service }));
-  assert.equal(venueHtml, render(canvas.VenueCanvas, { item: venue }));
   assert.match(serviceHtml, /321/);
   assert.match(serviceHtml, /<strong>summary<\/strong>/);
-  for (const value of ["Garden", "City", "Venue summary", "Up to 234 guests"])
-    assert.ok(venueHtml.includes(value), value);
 });
 test("SSR renders complete sanitized Markdown and media on every catalog", () => {
   for (const [component, item] of [
     [publicPackage.PublicPackageDetail, packageItem],
     [publicDetails.PublicServiceDetail, service],
-    [publicDetails.PublicVenueDetail, venue],
   ]) {
     const html = render(component, { item });
     for (const pattern of [
@@ -226,16 +214,11 @@ test("private package canvas retains description while hiding services and booki
   assert.match(html, /Up to 120 guests/);
 });
 
-test("legacy null service rate and venue capacity render safely", () => {
+test("legacy null service rate renders safely", () => {
   const serviceHtml = render(publicDetails.PublicServiceDetail, {
     item: { ...service, hourlyRatePesos: null },
   });
-  const venueHtml = render(publicDetails.PublicVenueDetail, {
-    item: { ...venue, maxGuests: null },
-  });
   assert.match(serviceHtml, /Rate not set/);
-  assert.match(venueHtml, /Venue summary/);
-  assert.doesNotMatch(venueHtml, /Up to .* guests/);
 });
 
 test("empty media has meaningful fallback and Markdown requests light mode", () => {

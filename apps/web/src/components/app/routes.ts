@@ -4,7 +4,7 @@ export const adminPaths: Record<NavKey, string> = {
   Overview: "/app/overview",
   Bookings: "/app/bookings",
   Messages: "/app/messages",
-  StaffCustomers: "/app/users",
+  Customers: "/app/users",
   Calendar: "/app/calendar",
   Packages: "/app/packages",
   Services: "/app/services",
@@ -50,24 +50,16 @@ export function customerTab(path: string): CustomerTab {
   return found?.[0] ?? "Home";
 }
 
-export function isSystemAdmin(profile: {
-  role: string;
-  staffRole: string | null;
-}) {
-  return (
-    profile.role === "admin" && profile.staffRole === "System Administrator"
-  );
+export function isSystemAdmin(profile: { role: string }) {
+  return profile.role === "admin";
 }
 
-export function appHome(profile: { role: string; staffRole: string | null }) {
+export function appHome(profile: { role: string }) {
   if (profile.role === "customer") return "/app/home";
   return "/app/overview";
 }
 
-export function allowedWorkspacePath(
-  profile: { role: string; staffRole: string | null },
-  path: string,
-) {
+export function allowedWorkspacePath(profile: { role: string }, path: string) {
   if (profile.role === "customer")
     return (
       path === "/app/packages" ||
@@ -78,7 +70,7 @@ export function allowedWorkspacePath(
 
 // Login return paths remain local and must belong to the signed-in role.
 export function workspaceReturnPath(
-  profile: { role: string; staffRole: string | null },
+  profile: { role: string },
   value: string | null,
 ) {
   if (!value?.startsWith("/app/") || value.includes("\\")) return null;

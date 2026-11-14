@@ -2,11 +2,10 @@ import { sql } from "kysely";
 import type { SeedDb } from "../context.js";
 import { expectCount } from "../context.js";
 import type { ScenarioBooking, ScenarioEventDay } from "./activity.js";
-import type { ScenarioUser } from "./users.js";
 
 export async function seedScenarioOperations(
   db: SeedDb,
-  input: { bookings: ScenarioBooking[]; users: ScenarioUser[]; now: Date },
+  input: { bookings: ScenarioBooking[]; now: Date },
 ) {
   const days = input.bookings.flatMap((booking) => booking.eventDays);
   expectCount("event days", days.length);

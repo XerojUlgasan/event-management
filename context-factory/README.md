@@ -17,7 +17,7 @@ Follow the standing rules in [AGENTS.md](../AGENTS.md). Select all rows that mat
 | Astro pages, React views, client requests/auth, app CSS | [Frontend](areas/frontend/SKILL.md) |
 | Any UI change; shared components, Storybook, tokens | [Packages](areas/packages/SKILL.md); UI changes also require [frontend](areas/frontend/SKILL.md) and [package reuse](areas/packages/references/reuse.md) |
 | Shared DTOs, field/file/collection limits, API body caps | [Contracts](areas/contracts/SKILL.md), [API/type sync](areas/contracts/references/api-type-sync.md), and [limits](areas/contracts/references/shared-limits.md) as applicable |
-| Responsibilities, permissions, catalog, inquiries, quotations, messages, staffing | [Business domain router](business/README.md), then its matching domain references |
+| Responsibilities, permissions, catalog, inquiries, quotations, messages, or event scheduling | [Business domain router](business/README.md), then its matching domain references |
 
 ## Choose the task
 

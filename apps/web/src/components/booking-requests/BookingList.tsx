@@ -199,8 +199,8 @@ function BookingCards({
       <p className="customer-events-notice">
         <Icon name="info" size={17} />
         <span>
-          These are booking requests. Dates and final prices need staff review;
-          acceptance is not a confirmed booking.
+          These are booking requests. Dates and final prices need administrator
+          review; acceptance is not a confirmed booking.
         </span>
       </p>
       {loading && (

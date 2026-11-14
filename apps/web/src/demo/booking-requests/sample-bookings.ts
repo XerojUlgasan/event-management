@@ -7,7 +7,6 @@ export const bookings = [
     venue: "The Glass Garden",
     guests: 180,
     status: "Confirmed",
-    coordinator: "Amina Santos",
   },
   {
     id: "CLM-2051",
@@ -17,7 +16,6 @@ export const bookings = [
     venue: "Orchid Hall",
     guests: 240,
     status: "In preparation",
-    coordinator: "Jon Bell",
   },
   {
     id: "CLM-2055",
@@ -27,7 +25,6 @@ export const bookings = [
     venue: "Harlow Residence",
     guests: 65,
     status: "Awaiting confirmation",
-    coordinator: "Amina Santos",
   },
   {
     id: "CLM-2058",
@@ -37,6 +34,5 @@ export const bookings = [
     venue: "Foundry Loft",
     guests: 120,
     status: "Under review",
-    coordinator: "Unassigned",
   },
 ];

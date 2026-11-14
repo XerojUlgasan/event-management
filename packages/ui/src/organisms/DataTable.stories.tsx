@@ -7,49 +7,61 @@ import {
   type DataTableColumn,
 } from "@event-management/ui";
 
-type StaffRow = {
+type RequestRow = {
   id: string;
-  name: string;
-  role: "coordinator" | "helper";
-  confirmed: boolean;
+  customerName: string;
+  eventType: "wedding" | "birthday";
+  status: "under_review" | "accepted";
 };
 
-const rows: StaffRow[] = [
-  { id: "miguel", name: "Miguel Flores", role: "coordinator", confirmed: true },
-  { id: "isabel", name: "Isabel Torres", role: "helper", confirmed: false },
-];
-const columns: DataTableColumn<StaffRow>[] = [
-  { key: "name", header: "Staff member", cell: (row) => row.name },
+const rows: RequestRow[] = [
   {
-    key: "response",
-    header: "Response",
-    cell: () => <Badge tone="success">Available</Badge>,
+    id: "request-142",
+    customerName: "Ana Santos",
+    eventType: "wedding",
+    status: "accepted",
   },
   {
-    key: "role",
-    header: "Role",
+    id: "request-143",
+    customerName: "Miguel Flores",
+    eventType: "birthday",
+    status: "under_review",
+  },
+];
+const columns: DataTableColumn<RequestRow>[] = [
+  {
+    key: "customer",
+    header: "Customer",
+    cell: (row) => row.customerName,
+  },
+  {
+    key: "status",
+    header: "Request status",
+    cell: (row) => (
+      <Badge tone={row.status === "accepted" ? "success" : "warning"}>
+        {row.status === "accepted" ? "Accepted" : "Under review"}
+      </Badge>
+    ),
+  },
+  {
+    key: "event-type",
+    header: "Event type",
     cell: (row) => (
       <Select
-        aria-label={`Role for ${row.name}`}
-        defaultValue={row.role}
-        disabled={row.confirmed}
+        aria-label={`Event type for ${row.customerName}`}
+        defaultValue={row.eventType}
       >
-        <option value="helper">Helper</option>
-        <option value="coordinator">Coordinator</option>
+        <option value="wedding">Wedding</option>
+        <option value="birthday">Birthday</option>
       </Select>
     ),
   },
   {
-    key: "assignment",
-    header: "Assignment",
-    cell: (row) => (row.confirmed ? `Confirmed ${row.role}` : "Not assigned"),
-  },
-  {
-    key: "actions",
-    header: "Actions",
+    key: "admin-action",
+    header: "Admin action",
     cell: () => (
       <Button size="small" disabled>
-        Example action
+        Review request
       </Button>
     ),
   },
@@ -57,16 +69,16 @@ const columns: DataTableColumn<StaffRow>[] = [
 
 const meta = {
   title: "Organisms/DataTable",
-  component: DataTable<StaffRow>,
+  component: DataTable<RequestRow>,
   args: {
-    label: "Available staff",
+    label: "Customer booking requests",
     columns,
     rows,
     rowKey: (row) => row.id,
-    emptyMessage: "No staff have responded as available yet.",
+    emptyMessage: "No booking requests are available for review.",
     minWidth: 850,
   },
-} satisfies Meta<typeof DataTable<StaffRow>>;
+} satisfies Meta<typeof DataTable<RequestRow>>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
@@ -84,12 +96,12 @@ export const LongNames: Story = {
     rows: [
       {
         ...rows[0],
-        name: "Maria Isabel Delos Santos Fernandez",
+        customerName: "Maria Isabel Delos Santos Fernandez",
         id: "long-name",
       },
       {
         ...rows[1],
-        name: "AlexandriaMontgomerySantosVillanueva",
+        customerName: "AlexandriaMontgomerySantosVillanueva",
         id: "unbroken-name",
       },
     ],

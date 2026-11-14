@@ -131,7 +131,6 @@ before(async () => {
         display_name: name,
         password_hash: "unused",
         role,
-        staff_role: role === "admin" ? "System Administrator" : null,
       })
       .returning("id")
       .executeTakeFirstOrThrow();
@@ -195,7 +194,7 @@ async function read(response: Response, status: number): Promise<any> {
   return response.status === 204 ? null : response.json();
 }
 
-test("customer and staff conversations enforce roles and validate messages", async () => {
+test("customer and admin conversations enforce roles and validate messages", async () => {
   await read(await call("/messages/conversation"), 401);
   await read(await call("/admin/conversations"), 401);
   await read(

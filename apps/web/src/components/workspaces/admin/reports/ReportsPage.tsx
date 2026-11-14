@@ -24,7 +24,7 @@ export function ReportsPage() {
     <div className="content-stack reports-page">
       <PageHeader
         title="Reports & performance"
-        description="Monitor booking health, event delivery, resources, feedback, and recorded team performance."
+        description="Monitor booking health, event delivery, resources and feedback."
         actions={
           <div className="welcome-actions">
             <Select
@@ -174,7 +174,7 @@ export function ReportsPage() {
         <Panel
           className="performance-table-card"
           title="Event delivery performance"
-          description="Based on recorded schedules, tasks, and incidents"
+          description="Based on recorded schedules and incidents"
           action={
             <Button
               variant="link"
@@ -202,15 +202,6 @@ export function ReportsPage() {
               <span>95.8%</span>
               <span>≥ 95%</span>
               <Badge tone="success">+2.1%</Badge>
-            </div>
-            <div className="performance-row">
-              <span>
-                <strong>Tasks completed by deadline</strong>
-                <small>2,184 of 2,296 recorded tasks</small>
-              </span>
-              <span>95.1%</span>
-              <span>≥ 93%</span>
-              <Badge tone="success">+1.4%</Badge>
             </div>
             <div className="performance-row">
               <span>
@@ -285,7 +276,7 @@ export function ReportsPage() {
               ],
               [
                 "Event completion report",
-                "Delivery timing, tasks, delays, and completion",
+                "Delivery timing, delays, and completion",
                 "clipboard",
                 "Updated today",
               ],
@@ -300,12 +291,6 @@ export function ReportsPage() {
                 "Allocation, availability, and equipment usage",
                 "box",
                 "Updated 2 hr ago",
-              ],
-              [
-                "Staff performance",
-                "Recorded assignments and task completion only",
-                "users",
-                "Updated yesterday",
               ],
               [
                 "Customer feedback",
@@ -365,7 +350,6 @@ export function ReportsPage() {
               "Event completion",
               "Resource utilization",
               "Customer feedback",
-              "Staff performance",
             ].map((item, index) => (
               <label key={item}>
                 <Input
@@ -375,11 +359,7 @@ export function ReportsPage() {
                 />
                 <span>
                   <strong>{item}</strong>
-                  <small>
-                    {index === 5
-                      ? "Uses recorded assignments and task completion data"
-                      : "Include current filtered period"}
-                  </small>
+                  <small>{"Include current filtered period"}</small>
                 </span>
               </label>
             ))}

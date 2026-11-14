@@ -3,6 +3,7 @@ import { seedClock, seedRandom } from "../context.js";
 import { planScenarioActivity, seedScenarioActivity } from "./activity.js";
 import { planScenarioCatalog, seedScenarioCatalog } from "./catalog.js";
 import { seedScenarioQuotations } from "./quotations.js";
+import { seedScenarioOperations } from "./operations.js";
 import { planScenarioSessions, seedScenarioSessions } from "./sessions.js";
 import { planScenarioUsers, seedScenarioUsers } from "./users.js";
 
@@ -35,6 +36,10 @@ export async function seedScenario(db: SeedDb, passwordHash: string) {
     packages: catalog.packages,
     now,
   });
+  const operations = await seedScenarioOperations(db, {
+    bookings: activity.bookings,
+    now,
+  });
   const quotations = await seedScenarioQuotations(db, {
     bookings: activity.bookings,
     users: persistedUsers.users,
@@ -45,6 +50,7 @@ export async function seedScenario(db: SeedDb, passwordHash: string) {
     sessions: sessions.inserted,
     ...catalog.inserted,
     ...activity.inserted,
+    ...operations.inserted,
     ...quotations.inserted,
   };
 }

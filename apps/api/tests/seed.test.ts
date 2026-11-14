@@ -57,6 +57,18 @@ after(async () => {
   await db?.destroy();
   await pool?.end();
   if (admin) {
+    // Pool shutdown can resolve before PostgreSQL has finished disconnecting.
+    // Wait for those connections to leave before forcibly dropping the test DB.
+    if (created) {
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const remaining = await admin.query(
+          "SELECT 1 FROM pg_stat_activity WHERE datname = $1",
+          [database],
+        );
+        if (remaining.rowCount === 0) break;
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+    }
     if (created) await admin.query(`DROP DATABASE "${database}" WITH (FORCE)`);
     await admin.end();
   }
@@ -166,15 +178,22 @@ test("seed creates demo users and conversations while preserving unrelated data 
   const scenario = await pool.query(`SELECT
     (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test') AS users,
     (SELECT count(DISTINCT password_hash)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test') AS password_hashes,
-    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test' AND role = 'admin' AND staff_role = 'System Administrator') AS admins,
-    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test' AND role = 'customer' AND staff_role IS NULL) AS customers,
+    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test' AND role = 'admin') AS admins,
+    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test' AND role = 'customer') AS customers,
     (SELECT count(*)::int FROM sessions s JOIN users u ON u.id = s.user_id WHERE u.email LIKE 'scenario.user%@clemora.example.test') AS sessions,
     (SELECT count(*)::int FROM packages WHERE name LIKE 'Scenario Celebration %') AS packages,
     (SELECT count(*)::int FROM services WHERE name LIKE 'Scenario Service %') AS services,
-    (SELECT count(*)::int FROM media_assets) AS media,
-    (SELECT count(*)::int FROM catalog_pages) AS pages,
-    (SELECT count(*)::int FROM catalog_sections) AS sections,
-    (SELECT count(*)::int FROM catalog_widgets) AS widgets,
+    (SELECT count(*)::int FROM media_assets m WHERE NOT EXISTS (
+      SELECT 1 FROM catalog_widgets w JOIN catalog_sections cs ON cs.id=w.section_id
+      JOIN catalog_pages cp ON cp.id=cs.page_id JOIN packages p ON p.id=cp.package_id
+      WHERE w.media_id=m.id AND p.name IN ('The Grand Celebration', 'The Intimate Gathering', 'The Sweet Soirée')
+    )) AS media,
+    (SELECT count(*)::int FROM catalog_pages cp LEFT JOIN packages p ON p.id=cp.package_id LEFT JOIN services s ON s.id=cp.service_id
+      WHERE p.name LIKE 'Scenario Celebration %' OR s.name LIKE 'Scenario Service %') AS pages,
+    (SELECT count(*)::int FROM catalog_sections cs JOIN catalog_pages cp ON cp.id=cs.page_id LEFT JOIN packages p ON p.id=cp.package_id LEFT JOIN services s ON s.id=cp.service_id
+      WHERE p.name LIKE 'Scenario Celebration %' OR s.name LIKE 'Scenario Service %') AS sections,
+    (SELECT count(*)::int FROM catalog_widgets w JOIN catalog_sections cs ON cs.id=w.section_id JOIN catalog_pages cp ON cp.id=cs.page_id LEFT JOIN packages p ON p.id=cp.package_id LEFT JOIN services s ON s.id=cp.service_id
+      WHERE p.name LIKE 'Scenario Celebration %' OR s.name LIKE 'Scenario Service %') AS widgets,
     (SELECT count(*)::int FROM booking_requests WHERE reference LIKE 'SCN-%') AS bookings,
     (SELECT count(*)::int FROM booking_request_status_history h JOIN booking_requests b ON b.id = h.booking_request_id WHERE b.reference LIKE 'SCN-%') AS history,
     (SELECT count(*)::int FROM conversations c JOIN booking_requests b ON b.id = c.booking_request_id WHERE b.reference LIKE 'SCN-%') AS booking_conversations,
@@ -227,7 +246,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
     LEFT JOIN messages m ON m.quotation_id = q.id
     LEFT JOIN conversations c ON c.id = m.conversation_id
     WHERE b.reference LIKE 'SCN-%' AND (
-      creator.role <> 'admin' OR creator.staff_role IS DISTINCT FROM 'System Administrator'
+      creator.role <> 'admin'
       OR b.status IN ('declined', 'cancelled') OR p.id IS NULL
       OR p.id <> b.package_id OR q.base_amount_minor <> p.price * 100 OR q.currency <> 'PHP'
       OR NOT clemora_quotation_items_valid(q.items)
@@ -573,10 +592,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
   );
   const scenarioAdmin = await login("scenario.user001@clemora.example.test");
   assert.equal((await read("/me", scenarioAdmin)).role, "admin");
-  assert.equal(
-    (await read("/me", scenarioAdmin)).staffRole,
-    "System Administrator",
-  );
+  assert.equal("staffRole" in (await read("/me", scenarioAdmin)), false);
   assert.ok(
     (await readAll("/admin/conversations", "conversations", adminCookie)).some(
       (row: any) => row.id === conversation.rows[0].id,

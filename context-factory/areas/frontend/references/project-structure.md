@@ -15,12 +15,11 @@ src/
     auth/                        sign-in composition
     booking-requests/            cross-workspace booking compositions
     catalog/                     catalog compositions shared by public and workspace
-    checklists/ messages/ quotations/
+    messages/ quotations/
     public/catalog/ public/site/ public-only composition
     workspaces/admin/            admin shell and sidebar
       booking-requests/ catalog/ event-days/ ... role-specific screens
-    workspaces/customer/          CustomerDashboard role entry
-    workspaces/staff/             staff shell
+    workspaces/customer/         CustomerDashboard role entry
   lib/
     auth/ http/ navigation/ pagination/  named infrastructure
     data/<domain>/               direct API calls and their data helpers
@@ -29,15 +28,15 @@ src/
     server/<domain>/             server-only loading and helpers
   demo/<domain>/                 explicit sample data
   styles/<domain>/               app-specific CSS
-  styles/workspaces/<role>/      role-specific CSS
+    styles/workspaces/<role>/      admin/customer-specific CSS
   styles/app.css                 deliberate root stylesheet entry point
 public/                          static assets
 tests/<domain>/                  tests grouped by affected behavior
 ```
 
-`components/workspaces/<role>/` owns each role's shell and navigation, with domain screens in named subfolders. The customer role entry `CustomerDashboard.tsx` is also permitted directly under its role. A component used across roles or by public and workspace views belongs in its domain folder, not a role folder. `components/public/` owns public-only compositions. `components/app/` is limited to the three entry and navigation files above. Keep public URLs in `pages/`; do not invent a parallel route framework or browser controllers. Sample photos and bookings belong under `demo/catalog/` and `demo/booking-requests/`; admin navigation belongs to the admin workspace, not demo data.
+`components/workspaces/<role>/` owns the admin or customer shell and navigation, with domain screens in named subfolders. The customer role entry `CustomerDashboard.tsx` is also permitted directly under its role. A component used across roles or by public and workspace views belongs in its domain folder, not a role folder. `components/public/` owns public-only compositions. `components/app/` is limited to the three entry and navigation files above. Keep public URLs in `pages/`; do not invent a parallel route framework or browser controllers. Sample photos and bookings belong under `demo/catalog/` and `demo/booking-requests/`; admin navigation belongs to the admin workspace, not demo data.
 
-`lib/data/catalog/{packages,services,venues,media,page-query}.ts` and `lib/data/booking-requests/{requests,packages}.ts` illustrate cohesive responsibility groups. Multiple related operations may share one file; split when responsibilities meaningfully differ, not one file per endpoint. The HTTP wrapper is `lib/http/request.ts`. The `auth`, `http`, `navigation`, and `pagination` infrastructure modules are explicit exceptions to domain grouping inside `lib`. `styles/app.css` is the stylesheet entry exception. Place new app styles under their domain and import them from the appropriate entry. Shared presentation belongs in `packages/ui`, shared tokens in `packages/theme`, and established shared contracts in `packages/contracts`; follow the [reuse workflow](../../packages/references/reuse.md#required-workflow-for-every-ui-change).
+`lib/data/catalog/{packages,services,media,page-query}.ts` and `lib/data/booking-requests/{requests,packages}.ts` illustrate cohesive responsibility groups. Multiple related operations may share one file; split when responsibilities meaningfully differ, not one file per endpoint. The HTTP wrapper is `lib/http/request.ts`. The `auth`, `http`, `navigation`, and `pagination` infrastructure modules are explicit exceptions to domain grouping inside `lib`. `styles/app.css` is the stylesheet entry exception. Place new app styles under their domain and import them from the appropriate entry. Shared presentation belongs in `packages/ui`, shared tokens in `packages/theme`, and established shared contracts in `packages/contracts`; follow the [reuse workflow](../../packages/references/reuse.md#required-workflow-for-every-ui-change).
 
 ## Names and dependencies
 

@@ -165,7 +165,7 @@ function Workspace({
     const active = adminKey(path);
     return active ? (
       <AdminShell
-        key={`${profile.id}:${profile.role}:${profile.staffRole}`}
+        key={`${profile.id}:${profile.role}`}
         profile={profile}
         active={active}
         bookingRequestId={adminBookingRequestId(path) ?? undefined}
@@ -175,7 +175,7 @@ function Workspace({
   }
   return (
     <CustomerDashboard
-      key={`${profile.id}:${profile.role}:${profile.staffRole}`}
+      key={`${profile.id}:${profile.role}`}
       path={path}
       search={search}
       onPublic={() => {

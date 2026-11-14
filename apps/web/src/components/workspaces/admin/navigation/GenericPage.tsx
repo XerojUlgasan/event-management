@@ -23,11 +23,10 @@ export function GenericPage({ page }: { page: NavKey }) {
     }
   > = {
     Calendar: {
-      intro:
-        "Coordinate events, staffing, transport, and resources across one shared schedule.",
+      intro: "Review events and preparation across one shared schedule.",
       cards: [
         ["This week", "12 events", "2 scheduling conflicts"],
-        ["Team coverage", "86%", "4 people unavailable"],
+        ["Upcoming", "4 events", "Scheduled this week"],
         ["Resources reserved", "74%", "8 items need review"],
       ],
     },
@@ -50,8 +49,7 @@ export function GenericPage({ page }: { page: NavKey }) {
       ],
     },
     Reports: {
-      intro:
-        "Understand bookings, event performance, resources, feedback, and team delivery.",
+      intro: "Understand bookings, event performance, resources, and feedback.",
       cards: [
         ["Event completion", "96%", "Last 90 days"],
         ["Avg. guest rating", "4.9", "From 68 reviews"],
@@ -73,7 +71,7 @@ export function GenericPage({ page }: { page: NavKey }) {
     page === "Administration"
       ? [
           "User & role management",
-          "Team resources",
+          "Resources",
           "Conversation monitoring",
           "Security & data access",
           "Audit logs",

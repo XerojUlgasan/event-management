@@ -19,7 +19,7 @@ export async function cancelBookingRequestService(
       return error("Booking request not found", 404);
     if (!["under_review", "needs_details", "accepted"].includes(row.status))
       return error("Invalid status transition", 409);
-    await cancelScheduledEventDaysService(trx, id, customerId);
+    await cancelScheduledEventDaysService(trx, id);
     const updated = await updateBookingStatusData(trx, id, "cancelled");
     await addStatusHistoryData(
       trx,

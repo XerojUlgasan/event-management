@@ -13,7 +13,6 @@ export async function moveEventDayService(
   db: Kysely<DB>,
   id: string,
   input: Schedule,
-  actorId: string,
 ) {
   return db.transaction().execute(async (trx) => {
     const day = await lockExisting(trx, id);
@@ -23,7 +22,7 @@ export async function moveEventDayService(
       day.booking_request_id,
       schedule,
     );
-    await endEventDayData(trx, id, "moved", replacement, actorId);
+    await endEventDayData(trx, id, "moved", replacement);
     await touchBookingRevisionData(trx, day.booking_request_id);
     return one(trx, replacement);
   });

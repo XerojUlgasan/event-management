@@ -52,7 +52,6 @@ before(async () => {
         display_name: role,
         password_hash: "unused",
         role,
-        staff_role: role === "admin" ? "System Administrator" : null,
       })
       .returning("id")
       .executeTakeFirstOrThrow();
@@ -565,7 +564,7 @@ test("requested-day changes preserve the sent price", async () => {
   assert.equal(current.totalAmountMinor, q.totalAmountMinor);
 });
 
-test("another System Administrator edits, sends and revises with audit", async () => {
+test("another admin edits, sends and revises with audit", async () => {
   const b = await booking();
   let q = await create(b);
   q = (

@@ -33,7 +33,6 @@ export async function seedScenarioQuotations(
       input.users.map((user) => user.id),
     )
     .where("role", "=", "admin")
-    .where("staff_role", "=", "System Administrator")
     .orderBy("id")
     .executeTakeFirst();
   if (!admin)

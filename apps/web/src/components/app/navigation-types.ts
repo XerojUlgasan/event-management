@@ -4,7 +4,7 @@ export type NavKey =
   | "Overview"
   | "Bookings"
   | "Messages"
-  | "StaffCustomers"
+  | "Customers"
   | "Calendar"
   | "Packages"
   | "Services"

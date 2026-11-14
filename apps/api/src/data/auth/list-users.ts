@@ -4,7 +4,6 @@ import type { DB } from "../../db/types.js";
 export function listUsersData(
   db: Kysely<DB>,
   input: {
-    group: "customers";
     search: string;
     position?: { name: string; id: string };
     limit: number;
@@ -12,7 +11,7 @@ export function listUsersData(
 ) {
   let query = db
     .selectFrom("users")
-    .select(["id", "display_name", "email", "role", "staff_role", "created_at"])
+    .select(["id", "display_name", "email", "role", "created_at"])
     .select(sql<string>`coalesce(display_name, '')`.as("cursor_name"))
     .where("role", "=", "customer");
   if (input.search)
@@ -34,14 +33,8 @@ export async function userDirectoryStats(db: Kysely<DB>) {
   const row = await db
     .selectFrom("users")
     .select([
-      sql<number>`count(*) filter (where role = 'admin')::int`.as(
-        "staff_total",
-      ),
       sql<number>`count(*) filter (where role = 'customer')::int`.as(
         "customer_total",
-      ),
-      sql<number>`count(*) filter (where role = 'admin' and date_trunc('month', created_at at time zone 'Asia/Manila') = date_trunc('month', now() at time zone 'Asia/Manila'))::int`.as(
-        "staff_joined",
       ),
       sql<number>`count(*) filter (where role = 'customer' and date_trunc('month', created_at at time zone 'Asia/Manila') = date_trunc('month', now() at time zone 'Asia/Manila'))::int`.as(
         "customer_joined",
@@ -49,10 +42,7 @@ export async function userDirectoryStats(db: Kysely<DB>) {
     ])
     .executeTakeFirstOrThrow();
   return {
-    staffTotal: row.staff_total,
     customerTotal: row.customer_total,
-    staffRoles: 0,
-    staffJoined: row.staff_joined,
     customerJoined: row.customer_joined,
   };
 }

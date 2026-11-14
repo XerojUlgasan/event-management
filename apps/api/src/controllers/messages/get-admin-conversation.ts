@@ -9,7 +9,7 @@ export const getAdminConversationRoute = createRoute({
   method: "get",
   path: "/admin/conversations/{id}",
   tags: ["Messages"],
-  summary: "Read a customer conversation as staff",
+  summary: "Read a customer conversation as an admin",
   request: { params: idParams, query: paginationQuerySchema },
   responses: {
     200: {

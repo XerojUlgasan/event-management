@@ -36,42 +36,36 @@ const users = [
     email: "demo.admin@clemora.example.test",
     name: "Mara Santos",
     role: "admin",
-    staffRole: "System Administrator",
   },
   {
     key: "ana",
     email: "demo.ana@clemora.example.test",
     name: "Ana Reyes",
     role: "customer",
-    staffRole: null,
   },
   {
     key: "ben",
     email: "demo.ben@clemora.example.test",
     name: "Ben Cruz",
     role: "customer",
-    staffRole: null,
   },
   {
     key: "camille",
     email: "demo.camille@clemora.example.test",
     name: "Camille Lim",
     role: "customer",
-    staffRole: null,
   },
   {
     key: "daniel",
     email: "demo.daniel@clemora.example.test",
     name: "Daniel Flores",
     role: "customer",
-    staffRole: null,
   },
   {
     key: "ella",
     email: "demo.ella@clemora.example.test",
     name: "Ella Navarro",
     role: "customer",
-    staffRole: null,
   },
 ] as const;
 
@@ -82,7 +76,6 @@ export async function seedDemo(db: SeedDb, passwordHash: string) {
     users: 0,
     services: 0,
     packages: 0,
-    assignments: 0,
     requests: 0,
     history: 0,
     conversations: 0,
@@ -90,7 +83,7 @@ export async function seedDemo(db: SeedDb, passwordHash: string) {
   };
   const persistedUsers = new Map<
     UserKey,
-    { id: string; role: string; staffRole: string | null; name: string }
+    { id: string; role: string; name: string }
   >();
 
   for (const user of users) {
@@ -109,7 +102,7 @@ export async function seedDemo(db: SeedDb, passwordHash: string) {
           email: user.email,
           display_name: user.name,
           role: user.role,
-          staff_role: user.staffRole,
+
           password_hash: passwordHash,
           created_at: now,
           updated_at: now,
@@ -121,14 +114,14 @@ export async function seedDemo(db: SeedDb, passwordHash: string) {
     }
     const row = await db
       .selectFrom("users")
-      .select(["id", "role", "staff_role", "display_name"])
+      .select(["id", "role", "display_name"])
       .where("id", "=", id)
       .executeTakeFirst();
     if (row)
       persistedUsers.set(user.key, {
         id: row.id,
         role: row.role,
-        staffRole: row.staff_role,
+
         name: row.display_name ?? user.name,
       });
   }
@@ -140,8 +133,7 @@ export async function seedDemo(db: SeedDb, passwordHash: string) {
       !customer ||
       customer.role !== "customer" ||
       !admin ||
-      admin.role !== "admin" ||
-      admin.staffRole !== "System Administrator"
+      admin.role !== "admin"
     )
       continue;
     const id = seedId(`conversation:${user.key}`);

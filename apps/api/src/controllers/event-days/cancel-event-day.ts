@@ -18,7 +18,6 @@ export const cancelEventDayRouteHandler: AppRouteHandler<
         eventDay: await service.cancelEventDayService(
           c.get("db"),
           c.req.valid("param").id,
-          c.get("session").user.id,
         ),
       },
       200,

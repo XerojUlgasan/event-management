@@ -20,8 +20,8 @@ const meta = {
             <strong>The Glass Garden</strong>
           </div>
           <div>
-            <span>Coordinator</span>
-            <strong>Amina Santos</strong>
+            <span>Customer contact</span>
+            <strong>Isabel Mendoza-Reyes</strong>
           </div>
         </div>
         <div className="drawer-actions">

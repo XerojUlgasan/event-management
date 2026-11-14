@@ -1,7 +1,4 @@
-import { useState } from "react";
 import {
-  Input,
-  Avatar,
   Badge,
   Button,
   Icon,
@@ -13,7 +10,6 @@ export function OperationsPage() {
   const { notify } = useNotifications();
   const unavailable = () =>
     notify("Demo only: this action is unavailable.", "info");
-  const [checked, setChecked] = useState([true, true, false, false]);
   return (
     <div className="content-stack">
       <div className="breadcrumb">
@@ -52,31 +48,6 @@ export function OperationsPage() {
       <div className="ops-layout">
         <div className="ops-main">
           <Panel
-            className="progress-panel"
-            title="Preparation progress"
-            description="17 of 24 tasks complete"
-            action={<strong>71%</strong>}
-          >
-            <div className="progress-track">
-              <span></span>
-            </div>
-            <div className="phase-row">
-              <span className="complete">
-                <Icon name="check" />
-                Planning
-              </span>
-              <i></i>
-              <span className="complete">
-                <Icon name="check" />
-                Procurement
-              </span>
-              <i></i>
-              <span className="active">Preparation</span>
-              <i></i>
-              <span>Event day</span>
-            </div>
-          </Panel>
-          <Panel
             title="Event timeline"
             description="Scheduled versus actual activity"
             action={
@@ -96,7 +67,7 @@ export function OperationsPage() {
                 ["12:30 PM", "Equipment dispatch", "12:42 PM", "12 min late"],
                 ["2:00 PM", "Venue access & unloading", "2:01 PM", "On time"],
                 ["2:30 PM", "Floral installation", "2:55 PM", "25 min late"],
-                ["3:30 PM", "Team briefing", "—", "Upcoming"],
+                ["3:30 PM", "Event briefing", "—", "Upcoming"],
               ].map((row, index) => (
                 <div
                   className={`timeline-row ${index === 3 ? "delayed" : ""}`}
@@ -125,104 +96,8 @@ export function OperationsPage() {
               ))}
             </div>
           </Panel>
-          <Panel
-            title="Priority tasks"
-            description="Items due before team briefing"
-            action={
-              <Button variant="link" size="small" onClick={unavailable}>
-                View all 24 tasks
-              </Button>
-            }
-          >
-            <div className="task-list">
-              {[
-                "Confirm table linen placement",
-                "Test AV and presentation microphones",
-                "Complete dietary meal labels",
-                "Brief service captains on table zones",
-              ].map((task, index) => (
-                <label className="task-row" key={task}>
-                  <Input
-                    variant="plain"
-                    type="checkbox"
-                    checked={checked[index]}
-                    onChange={() => {
-                      setChecked(
-                        checked.map((item, i) => (i === index ? !item : item)),
-                      );
-                      notify("Demo only: task changes are not saved.", "info");
-                    }}
-                  />
-                  <span>
-                    <strong>{task}</strong>
-                    <small>
-                      {index % 2
-                        ? "Assigned to Devon Price"
-                        : "Assigned to Venue team"}
-                    </small>
-                  </span>
-                  <Badge tone={index === 2 ? "danger" : "neutral"}>
-                    {index === 2
-                      ? "Overdue"
-                      : index < 2
-                        ? "Complete"
-                        : "3:15 PM"}
-                  </Badge>
-                </label>
-              ))}
-            </div>
-          </Panel>
         </div>
         <div className="ops-side">
-          <Panel>
-            <div className="panel-title">Event lead</div>
-            <div className="lead-person">
-              <Avatar size="lg" initials="AS" />
-              <span>
-                <strong>Amina Santos</strong>
-                <small>Lead coordinator</small>
-              </span>
-              <Button
-                variant="secondary"
-                size="icon"
-                aria-label="More options"
-                onClick={unavailable}
-              >
-                <Icon name="more" />
-              </Button>
-            </div>
-            <div className="contact-row">
-              <Button variant="secondary" size="small" onClick={unavailable}>
-                Message
-              </Button>
-              <Button variant="secondary" size="small" onClick={unavailable}>
-                Call
-              </Button>
-            </div>
-          </Panel>
-          <Panel title="Team readiness" action={<strong>18 / 20</strong>}>
-            <div className="readiness">
-              <div>
-                <span>Kitchen</span>
-                <strong>6 / 6 ready</strong>
-              </div>
-              <div>
-                <span>Service</span>
-                <strong>8 / 9 ready</strong>
-              </div>
-              <div>
-                <span>Logistics</span>
-                <strong>4 / 5 ready</strong>
-              </div>
-            </div>
-            <Button
-              variant="secondary"
-              className="full-button"
-              onClick={unavailable}
-            >
-              View team assignments
-            </Button>
-          </Panel>
           <Panel
             className="incident-card"
             title="Incidents"

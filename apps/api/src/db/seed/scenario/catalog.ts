@@ -100,7 +100,7 @@ export function planScenarioCatalog(): ScenarioCatalog & { pages: PagePlan[] } {
   ];
   expectCount("packages", packages.length);
   expectCount("services", services.length);
-  expectCount("catalog pages", pages.length);
+  expectCount("catalog pages", pages.length, 80);
   return { packages, services, pages };
 }
 
@@ -195,7 +195,7 @@ export async function seedScenarioCatalog(
     )
       media += 1;
   }
-  expectCount("media", attachedMedia.size + 20);
+  expectCount("media", attachedMedia.size + 20, 80);
 
   for (const page of input.catalog.pages) {
     const pageId = scenarioId(`page:${page.key}`);

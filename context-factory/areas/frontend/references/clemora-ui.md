@@ -22,7 +22,7 @@ Choose the local API rather than a similarly named upstream component:
 | Surface or workspace structure | `Panel`, `PageHeader`, and `WorkspaceLayout`; page navigation and content stay in the app. `PageHeader` supplies an `h1` by default, with `titleAs="h2"`/`"h3"` for nested sections. Pass heading content, not another heading element. |
 | Status and icons | `Badge.tone` uses exported `BadgeTone`; `Icon.name`, `Button.icon`, and `Toast.icon` use exported `IconName`. The spinner icon respects reduced motion. Icon-only buttons need an accessible name. |
 | Task date input without a calendar | `DateSelect` takes ISO `value` and `centerDate` date keys plus `onChange`; spread FormField props onto it. It opens a five-row scrolling list with long date labels, initially centered on `centerDate`. Arrow keys choose, Enter/Space commits, and Escape dismisses with focus restored. |
-| Monthly date counts and filtering | `MonthCalendar` receives `month` as `YYYY-MM`, optional date-keyed `counts`, `selectedDate`, and change callbacks. The app owns count aggregation, fetching, date toggling, selected-date reset, and domain labels. Staff use operational event-day dates; booking views use every requested date, with `preferred_date` fallback for legacy requests. It renders a date filter rather than an event scheduler. |
+| Monthly date counts and filtering | `MonthCalendar` receives `month` as `YYYY-MM`, optional date-keyed `counts`, `selectedDate`, and change callbacks. The app owns count aggregation, fetching, date toggling, selected-date reset, and domain labels. Admin booking views use requested dates and operational event-day dates, with `preferred_date` fallback for legacy requests. It renders a date filter rather than an event scheduler. |
 | Action and error feedback | Use `useNotifications().notify(message, tone)` under the app-root `NotificationProvider`; tones are `success` (default), `danger`, and `info`. The provider composes `Toast`, stacks/deduplicates visible messages, keeps errors until dismissed, and handles timers and native modal placement. Notify after successful writes. Use the shared `notifyError(cause, fallback)` for user-facing failures; it returns the formatted message so `setError(notifyError(cause, fallback))` can retain contextual text without repeating formatting. Preserve field errors and contextual retry controls. Suppress repeated polling failures until recovery or a different error. Demo controls explain that no operation was performed. Server-rendered public catalog failures use `Toast` with `placement="inline"` and a retry link, without client hydration. Loading and empty states remain contextual; the library does not export `Alert`, `Empty`, or `Skeleton`. |
 
 For example, let the app supply submission and validation feedback:
@@ -37,7 +37,7 @@ export function ContactForm({ onSubmit, nameError }: {
 }) {
   return (
     <form onSubmit={onSubmit}>
-      <FormField label="Contact name" description="Who should staff contact?" error={nameError}>
+      <FormField label="Contact name" description="Who should we contact?" error={nameError}>
         {(field) => <Input {...field} name="contactName" autoComplete="name" required />}
       </FormField>
       <Button type="submit">Review details</Button>

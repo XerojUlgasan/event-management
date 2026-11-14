@@ -11,11 +11,3 @@ export function bookingBodyLimit(path: string) {
 }
 
 export const MEDIA_UPLOAD_BODY_OVERHEAD_BYTES = 64 * 1024;
-
-// One checklist operation carries at most one task's two 4,000-character text fields.
-export const CHECKLIST_JSON_BODY_LIMIT_BYTES = 64 * 1024;
-export function eventDayBodyLimit(path: string) {
-  return /\/checklist(?:\/send)?$/.test(path)
-    ? CHECKLIST_JSON_BODY_LIMIT_BYTES
-    : SMALL_JSON_BODY_LIMIT_BYTES;
-}

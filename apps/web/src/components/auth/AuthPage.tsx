@@ -326,8 +326,8 @@ export function AuthPage({
           )}
 
           <p className="login-disclaimer">
-            Customer sign-up is open. Team accounts are created by an
-            administrator.
+            Customer sign-up is open. Administrator access is managed
+            separately.
           </p>
         </div>
       </main>
