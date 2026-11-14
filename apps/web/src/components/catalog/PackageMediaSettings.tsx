@@ -21,7 +21,7 @@ export function PackageMediaSettings({
   onClose,
   entity = "package",
 }: {
-  entity?: "package" | "service" | "venue";
+  entity?: "package" | "service";
   widget: CatalogWidget;
   fileName?: string;
   onChange: (patch: Partial<CatalogWidget>) => void;

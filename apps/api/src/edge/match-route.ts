@@ -6,7 +6,6 @@ export const routeFamilies = [
   },
   { id: "services", prefixes: ["/v1/admin/services", "/v1/services"] },
   { id: "packages", prefixes: ["/v1/admin/packages", "/v1/packages"] },
-  { id: "venues", prefixes: ["/v1/admin/venues", "/v1/venues"] },
   {
     id: "booking-requests",
     prefixes: [

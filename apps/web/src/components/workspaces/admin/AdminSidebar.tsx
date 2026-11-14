@@ -25,7 +25,6 @@ export function AdminSidebar({
     Calendar: "calendar",
     Packages: "box",
     Services: "spark",
-    Venues: "location",
     Inventory: "box",
     Operations: "clipboard",
     Reports: "chart",

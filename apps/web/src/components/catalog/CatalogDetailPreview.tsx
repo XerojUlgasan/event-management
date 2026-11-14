@@ -7,7 +7,7 @@ export function CatalogDetailPreview({
   children,
   onClose,
 }: {
-  entity: "service" | "venue";
+  entity: "service";
   children: ReactNode;
   onClose: () => void;
 }) {

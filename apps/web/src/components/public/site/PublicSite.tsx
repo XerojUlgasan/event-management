@@ -4,9 +4,9 @@ import { Badge, Brand, Button, Dialog, Icon } from "@event-management/ui";
 
 import { PackageCatalog } from "../../catalog/PackageCatalog";
 import { PublicServiceCatalog } from "../../catalog/PublicServiceCatalog";
-import { CatalogOverlay, PublicCatalog } from "../../catalog/PublicCatalog";
+import { CatalogOverlay } from "../../catalog/PublicCatalog";
 
-type CatalogKind = "services" | "packages" | "venues";
+type CatalogKind = "services" | "packages";
 
 export function PublicSite({
   onEnterCustomer,
@@ -26,7 +26,6 @@ export function PublicSite({
         <nav className={`public-nav ${mobileOpen ? "open" : ""}`}>
           <a href="#packages">Packages</a>
           <a href="#services">Services</a>
-          <a href="#venues">Venues</a>
           <a href="#about">About us</a>
         </nav>
         <div className="header-actions">
@@ -137,29 +136,6 @@ export function PublicSite({
           />
         </section>
 
-        <section
-          className="public-venues section"
-          id="venues"
-          aria-labelledby="venues-title"
-        >
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">Find your setting</span>
-              <h2 className="section-title small" id="venues-title">
-                Explore our venues
-              </h2>
-            </div>
-            <p>
-              Discover published venues and their details. Availability is
-              confirmed by our team when reviewing your request.
-            </p>
-          </div>
-          <PublicCatalog
-            kind="venues"
-            onViewMore={() => setCatalogOverlay("venues")}
-          />
-        </section>
-
         <section className="intro section" id="intro">
           <div>
             <span className="eyebrow">Your occasion, considered</span>
@@ -204,7 +180,6 @@ export function PublicSite({
         <div>
           <a href="#packages">Packages</a>
           <a href="#services">Services</a>
-          <a href="#venues">Venues</a>
           <a href="#about">Contact</a>
         </div>
         <span>© 2025 Styled by AMAC</span>

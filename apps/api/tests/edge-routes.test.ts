@@ -43,7 +43,6 @@ test("route families follow the longest owned prefix", () => {
   assert.equal(matchRouteFamily("/v1/admin/catalog-media"), "catalog-media");
   assert.equal(matchRouteFamily("/v1/catalog-media/asset"), "catalog-media");
   assert.equal(matchRouteFamily("/v1/services/svc"), "services");
-  assert.equal(matchRouteFamily("/v1/venues"), "venues");
 });
 
 test("private canvas payloads use the catalog cap in either runtime path format", () => {

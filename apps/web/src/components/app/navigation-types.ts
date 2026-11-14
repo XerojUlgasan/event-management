@@ -8,7 +8,6 @@ export type NavKey =
   | "Calendar"
   | "Packages"
   | "Services"
-  | "Venues"
   | "Inventory"
   | "Operations"
   | "Reports"

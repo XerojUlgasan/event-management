@@ -14,7 +14,7 @@ import {
   scenarioIndex,
   shuffle,
 } from "../context.js";
-import type { ScenarioPackage, ScenarioVenue } from "./catalog.js";
+import type { ScenarioPackage } from "./catalog.js";
 import type { ScenarioUser } from "./users.js";
 
 const EVENT_TYPES = [
@@ -139,7 +139,6 @@ function dayRecord(
 export function planScenarioActivity(input: {
   users: ScenarioUser[];
   packages: ScenarioPackage[];
-  venues: ScenarioVenue[];
   now: Date;
   random: () => number;
 }): PlannedActivity {
@@ -280,7 +279,6 @@ export async function seedScenarioActivity(
     plan: PlannedActivity;
     users: ScenarioUser[];
     packages: ScenarioPackage[];
-    venues: ScenarioVenue[];
     now: Date;
   },
 ) {
@@ -288,8 +286,7 @@ export async function seedScenarioActivity(
   const admin = admins[0];
   if (!admin) throw new Error("Scenario activity requires an administrator");
   const packages = new Map(input.packages.map((pkg) => [pkg.id, pkg]));
-  const customers = new Map(input.users.map((user) => [user.id, user]));
-  let bookings = 0;
+  const customers = new Map(input.users.map((user) => [user.id, user]));  let bookings = 0;
   let history = 0;
   let conversations = 0;
   let messages = 0;
@@ -308,14 +305,12 @@ export async function seedScenarioActivity(
           ? pkg.maxGuests + 25
           : Math.max(1, pkg.maxGuests - 10);
     const legacy = booking.eventDays.length === 0 && index % 5 === 0;
-    const duration = legacy
-      ? (BOOKING_ESTIMATED_DURATIONS[
+    const duration = legacy      ? (BOOKING_ESTIMATED_DURATIONS[
           index % BOOKING_ESTIMATED_DURATIONS.length
         ] ?? "undecided")
       : "undecided";
     const requested = input.plan.requestedDays.get(booking.id);
     const preferredDate = booking.preferredDate;
-    const venue = input.venues[index % input.venues.length];
     if (
       await insertIfNew(db, "booking_requests", {
         id: booking.id,
@@ -336,8 +331,7 @@ export async function seedScenarioActivity(
         guest_count: guestCount,
         contact_name: customer.displayName,
         phone_number: `0917${String(index).padStart(7, "0")}`,
-        preferred_venue_location:
-          index % 2 === 0 ? (venue?.location ?? null) : null,
+        preferred_venue_location: null,
         special_requests:
           index % 3 === 0
             ? null

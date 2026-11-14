@@ -15,16 +15,6 @@ const SAMPLE_PHOTOS = [
   "/images/dessert.jpg",
   "/images/hero.jpg",
 ] as const;
-const CITIES = [
-  "Quezon City",
-  "Makati",
-  "Taguig",
-  "Pasig",
-  "Cebu City",
-  "Davao City",
-  "Baguio",
-  "Iloilo City",
-] as const;
 
 export type ScenarioPackage = {
   id: string;
@@ -32,13 +22,6 @@ export type ScenarioPackage = {
   slug: string;
   price: number;
   maxGuests: number;
-  archived: boolean;
-};
-export type ScenarioVenue = {
-  id: string;
-  name: string;
-  location: string;
-  maxGuests: number | null;
   archived: boolean;
 };
 export type ScenarioService = {
@@ -49,14 +32,13 @@ export type ScenarioService = {
 };
 export type ScenarioCatalog = {
   packages: ScenarioPackage[];
-  venues: ScenarioVenue[];
   services: ScenarioService[];
 };
 
 type WidgetKind = "photo" | "markdown" | "video";
 type PagePlan = {
   key: string;
-  owner: { packageId?: string; venueId?: string; serviceId?: string };
+  owner: { packageId?: string; serviceId?: string };
   widget: WidgetKind;
   title: string;
   label: string;
@@ -87,20 +69,6 @@ export function planScenarioCatalog(): ScenarioCatalog & { pages: PagePlan[] } {
       };
     },
   );
-  const venues = Array.from(
-    { length: SCENARIO_COUNT },
-    (_, index): ScenarioVenue => {
-      const name = `Scenario Venue ${scenarioIndex(index)}`;
-      const legacy = index >= 90;
-      return {
-        id: scenarioId(`venue:${index}`),
-        name,
-        location: `${CITIES[index % CITIES.length] ?? "Quezon City"} sample ${scenarioIndex(index)}`,
-        maxGuests: legacy ? null : guestLimit(index),
-        archived: index >= 70,
-      };
-    },
-  );
   const services = Array.from(
     { length: SCENARIO_COUNT },
     (_, index): ScenarioService => ({
@@ -120,24 +88,6 @@ export function planScenarioCatalog(): ScenarioCatalog & { pages: PagePlan[] } {
         title: index % 3 === 0 ? "" : "Details",
         label: service.name,
       })),
-    ...venues
-      .filter((_, index) => index < 15)
-      .map((venue, index) => ({
-        key: `venue-photo:${index}`,
-        owner: { venueId: venue.id },
-        widget: "photo" as const,
-        title: "Space",
-        label: venue.name,
-      })),
-    ...venues
-      .filter((_, index) => index >= 70 && index < 75)
-      .map((venue, index) => ({
-        key: `venue-video:${index + 70}`,
-        owner: { venueId: venue.id },
-        widget: "video" as const,
-        title: "Walkthrough",
-        label: venue.name,
-      })),
     ...packages
       .filter((_, index) => index < 20)
       .map((pkg, index) => ({
@@ -149,10 +99,9 @@ export function planScenarioCatalog(): ScenarioCatalog & { pages: PagePlan[] } {
       })),
   ];
   expectCount("packages", packages.length);
-  expectCount("venues", venues.length);
   expectCount("services", services.length);
   expectCount("catalog pages", pages.length);
-  return { packages, venues, services, pages };
+  return { packages, services, pages };
 }
 
 export async function seedScenarioCatalog(
@@ -166,7 +115,6 @@ export async function seedScenarioCatalog(
   const admin = input.users.find((user) => user.role === "admin");
   if (!admin) throw new Error("Scenario catalog requires an administrator");
   let packages = 0;
-  let venues = 0;
   let services = 0;
   let media = 0;
   let pages = 0;
@@ -189,23 +137,6 @@ export async function seedScenarioCatalog(
       })
     )
       packages += 1;
-  }
-  for (const venue of input.catalog.venues) {
-    if (
-      await insertIfNew(db, "venues", {
-        id: venue.id,
-        name: venue.name,
-        slug: catalogSlug(venue.name),
-        location: venue.location,
-        description: `${venue.name} is a synthetic venue. Availability has not been checked.`,
-        max_guests: venue.maxGuests,
-        published_at: input.now,
-        archived_at: venue.archived ? input.now : null,
-        created_at: input.now,
-        updated_at: input.now,
-      })
-    )
-      venues += 1;
   }
   for (const service of input.catalog.services) {
     if (
@@ -275,7 +206,6 @@ export async function seedScenarioCatalog(
       await insertIfNew(db, "catalog_pages", {
         id: pageId,
         package_id: page.owner.packageId ?? null,
-        venue_id: page.owner.venueId ?? null,
         service_id: page.owner.serviceId ?? null,
         created_at: input.now,
         updated_at: input.now,
@@ -317,8 +247,7 @@ export async function seedScenarioCatalog(
 
   return {
     packages: input.catalog.packages,
-    venues: input.catalog.venues,
     services: input.catalog.services,
-    inserted: { packages, venues, services, media, pages, sections, widgets },
+    inserted: { packages, services, media, pages, sections, widgets },
   };
 }

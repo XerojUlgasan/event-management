@@ -29,13 +29,11 @@ export async function seedScenario(db: SeedDb, passwordHash: string) {
     plan: planScenarioActivity({
       users: persistedUsers.users,
       packages: catalog.packages,
-      venues: catalog.venues,
       now,
       random: seedRandom(),
     }),
     users: persistedUsers.users,
     packages: catalog.packages,
-    venues: catalog.venues,
     now,
   });
   const operations = await seedScenarioOperations(db, {

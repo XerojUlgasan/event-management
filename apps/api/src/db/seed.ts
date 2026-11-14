@@ -1,4 +1,3 @@
-import { catalogSlug } from "@event-management/contracts/catalog-slug";
 import "dotenv/config";
 import { sql } from "kysely";
 import { db } from "./client.js";
@@ -48,114 +47,6 @@ const demoAccounts = [
   })),
 ];
 
-const venues = [
-  {
-    id: "b1000000-0000-0000-0000-000000000001",
-    name: "Sample Garden 01",
-    location: "Demo location 01",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-  {
-    id: "b1000000-0000-0000-0000-000000000002",
-    name: "Sample Hall 02",
-    location: "Demo location 02",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-  {
-    id: "b1000000-0000-0000-0000-000000000003",
-    name: "Sample Pavilion 03",
-    location: "Demo location 03",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-  {
-    id: "b1000000-0000-0000-0000-000000000004",
-    name: "Sample Terrace 04",
-    location: "Demo location 04",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-  {
-    id: "b1000000-0000-0000-0000-000000000005",
-    name: "Sample Ballroom 05",
-    location: "Demo location 05",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-  {
-    id: "b1000000-0000-0000-0000-000000000006",
-    name: "Sample Courtyard 06",
-    location: "Demo location 06",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-  {
-    id: "b1000000-0000-0000-0000-000000000007",
-    name: "Sample Lounge 07",
-    location: "Demo location 07",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-  {
-    id: "b1000000-0000-0000-0000-000000000008",
-    name: "Sample Riverside 08",
-    location: "Demo location 08",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-  {
-    id: "b1000000-0000-0000-0000-000000000009",
-    name: "Sample Orchard 09",
-    location: "Demo location 09",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-  {
-    id: "b1000000-0000-0000-0000-000000000010",
-    name: "Sample Beach 10",
-    location: "Demo location 10",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-  {
-    id: "b1000000-0000-0000-0000-000000000011",
-    name: "Sample Convention Hall 11",
-    location: "Demo location 11",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-  {
-    id: "b1000000-0000-0000-0000-000000000012",
-    name: "Sample Studio 12",
-    location: "Demo location 12",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-  {
-    id: "b1000000-0000-0000-0000-000000000013",
-    name: "Sample Loft 13",
-    location: "Demo location 13",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-  {
-    id: "b1000000-0000-0000-0000-000000000014",
-    name: "Sample Grand Hall 14",
-    location: "Demo location 14",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-  {
-    id: "b1000000-0000-0000-0000-000000000015",
-    name: "Sample Hotel 15",
-    location: "Demo location 15",
-    description:
-      "Synthetic venue for demonstration only. Confirm venue details and availability separately.",
-  },
-];
-
 try {
   const passwordHash = await hashPassword(LOCAL_PASSWORD);
   const seeded = await db.transaction().execute(async (db) => {
@@ -173,24 +64,9 @@ try {
       if (row) rows.push(row);
     }
     const packageCount = await seedSamplePackages(db);
-    let venueCount = 0;
-    for (const venue of venues) {
-      const inserted = await db
-        .insertInto("venues")
-        .values({
-          ...venue,
-          slug: catalogSlug(venue.name),
-          max_guests: null,
-          archived_at: new Date(),
-        })
-        .onConflict((conflict) => conflict.column("id").doNothing())
-        .returning("id")
-        .executeTakeFirst();
-      if (inserted) venueCount++;
-    }
     const demo = await seedDemo(db, passwordHash);
     const scenario = await seedScenario(db, passwordHash);
-    return { accounts: rows, packageCount, venueCount, demo, scenario };
+    return { accounts: rows, packageCount, demo, scenario };
   });
   console.table(
     seeded.accounts.map(({ email, role, staff_role }) => ({
@@ -200,7 +76,7 @@ try {
     })),
   );
   console.log(
-    `Inserted ${seeded.accounts.length} local accounts, ${seeded.packageCount} sample canvas packages, and ${seeded.venueCount} venues.`,
+    `Inserted ${seeded.accounts.length} local accounts and ${seeded.packageCount} sample canvas packages.`,
   );
   console.log("Inserted connected demo rows:", seeded.demo);
   console.log("Inserted scenario rows:", seeded.scenario);

@@ -21,7 +21,7 @@ export function CatalogFiltersForm({
   const [maxPrice, setMaxPrice] = useState("");
   const [guests, setGuests] = useState("");
   const [error, setError] = useState("");
-  const hasPrice = kind !== "venues";
+  const hasPrice = true;
   const hasGuests = kind !== "services";
   const apply = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -136,9 +136,7 @@ export function CatalogFiltersForm({
       <p className="catalog-filter-hint">
         {kind === "packages"
           ? "Prices are package totals. Enter your guest count to see packages that can fit your event."
-          : kind === "services"
-            ? "Rates are per hour, not the total event price. Services without a listed rate are excluded when filtering by price."
-            : "Enter your guest count to see venues that can fit your event. Venues without a listed capacity are excluded when filtering."}
+          : "Rates are per hour, not the total event price. Services without a listed rate are excluded when filtering by price."}
       </p>
     </form>
   );

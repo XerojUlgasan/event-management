@@ -3,27 +3,22 @@ import PublicDocument from "../layouts/PublicDocument.astro";
 import {
   PackageCards,
   ServiceCards,
-  VenueCards,
 } from "../components/public/catalog/CatalogCards";
 import { ActionLink, Toast } from "@event-management/ui";
 import {
   loadPackages,
   loadServices,
-  loadVenues,
 } from "../lib/server/catalog/load-catalog";
 import type { PublicPackage } from "../lib/data/catalog/packages";
 import type { PublicService } from "../lib/data/catalog/services";
-import type { Venue } from "../lib/data/catalog/venues";
 
 let packages: PublicPackage[] = [];
 let services: PublicService[] = [];
-let venues: Venue[] = [];
 let unavailable = false;
 try {
-  [packages, services, venues] = await Promise.all([
+  [packages, services] = await Promise.all([
     loadPackages(3),
     loadServices(3),
-    loadVenues(3),
   ]);
 } catch {
   unavailable = true;
@@ -117,31 +112,6 @@ const description =
     {services.length > 0 && <ServiceCards items={services} />}
     <a class="button button-secondary catalog-view-more" href="/services">
       View more services <span aria-hidden="true">↗</span>
-    </a>
-  </section>
-
-  <section
-    class="public-venues section"
-    id="venues"
-    aria-labelledby="venues-title"
-  >
-    <div class="section-heading">
-      <div>
-        <h2 class="section-title small" id="venues-title">
-          Explore our venues
-        </h2>
-      </div>
-      <p>
-        Discover published venues and their details. Availability is confirmed
-        by our team when reviewing your request.
-      </p>
-    </div>
-    {!unavailable && venues.length === 0 && (
-      <p class="catalog-status">No venues are available yet.</p>
-    )}
-    {venues.length > 0 && <VenueCards items={venues} />}
-    <a class="button button-secondary catalog-view-more" href="/venues">
-      View more venues <span aria-hidden="true">↗</span>
     </a>
   </section>
 

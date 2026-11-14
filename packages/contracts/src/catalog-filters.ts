@@ -1,6 +1,6 @@
 import type { PaginationQuery } from "./pagination.js";
 
-export type CatalogKind = "packages" | "services" | "venues";
+export type CatalogKind = "packages" | "services";
 export type CatalogFilters = {
   minPricePesos?: number;
   maxPricePesos?: number;

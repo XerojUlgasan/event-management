@@ -21,7 +21,6 @@ import { MessagesPage } from "./messages/MessagesPage";
 import { OperationsPage } from "./operations/OperationsPage";
 import { OverviewPage } from "./overview/OverviewPage";
 import { PackagesPage } from "./catalog/PackagesPage";
-import { VenuesPage } from "./catalog/VenuesPage";
 import { ServicesPage } from "./catalog/ServicesPage";
 import { ReportsPage } from "./reports/ReportsPage";
 import { StaffCustomersPage } from "./users/StaffCustomersPage";
@@ -135,7 +134,6 @@ export function AdminShell({
     if (active === "Calendar") return <CalendarPage />;
     if (active === "Packages") return <PackagesPage />;
     if (active === "Services") return <ServicesPage />;
-    if (active === "Venues") return <VenuesPage />;
     if (active === "Inventory") return <InventoryPage />;
     if (active === "Operations") return <OperationsPage />;
     if (active === "Reports") return <ReportsPage />;
@@ -216,7 +214,6 @@ export function AdminShell({
       {active !== "Bookings" &&
         active !== "Packages" &&
         active !== "Services" &&
-        active !== "Venues" &&
         active !== "Administration" &&
         active !== "Messages" && (
           <p className="demo-note" role="note">

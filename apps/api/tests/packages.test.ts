@@ -1725,7 +1725,7 @@ test("canvas collection, Markdown and transport boundaries are enforced", async 
   );
 });
 
-test("service and venue canvases save rich content directly and enforce media ownership", async () => {
+test("service canvases save rich content directly and enforce media ownership", async () => {
   const image = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
   const mp4 = new Uint8Array([
     0, 0, 0, 20, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0, 105, 115,
@@ -1806,14 +1806,6 @@ test("service and venue canvases save rich content directly and enforce media ow
     "## Details\n\n**Custom content**",
   );
   assert.equal((await call(`/catalog-media/${photo.id}`)).status, 200);
-  const venue = {
-    name: "Canvas venue",
-    location: "City",
-    description: "Summary",
-    maxGuests: 100,
-    sections,
-  };
-  await read(await call("/admin/venues", "POST", venue, adminCookie), 400);
   const { sections: ignored, ...legacy } = service;
   const edited = await read(
     await call(
@@ -1871,71 +1863,6 @@ test("service and venue canvases save rich content directly and enforce media ow
       .rowCount,
     0,
   );
-  const venuePhoto = await read(await uploadCanvas(image, "image/png"), 201);
-  const venueVideo = await read(await uploadCanvas(mp4, "video/mp4"), 201);
-  const venueSections = structuredClone(sections);
-  venueSections[0].widgets[0].media = venuePhoto;
-  venueSections[0].widgets[1].media = venueVideo;
-  const savedVenue = await read(
-    await call(
-      "/admin/venues",
-      "POST",
-      { ...venue, sections: venueSections },
-      adminCookie,
-    ),
-    201,
-  );
-  const publicVenue = await read(await call(`/venues/${savedVenue.id}`), 200);
-  assert.deepEqual(
-    publicVenue.sections[0].widgets.map((w: any) => [w.x, w.y, w.w, w.h]),
-    [
-      [0, 0, 6, 6],
-      [6, 3, 5, 8],
-      [2, 12, 8, 4],
-    ],
-  );
-  assert.equal(publicVenue.sections[0].widgets[0].media.id, venuePhoto.id);
-  assert.equal(publicVenue.sections[0].widgets[1].autoplay, true);
-  assert.equal(
-    publicVenue.sections[0].widgets[2].markdown,
-    "## Details\n\n**Custom content**",
-  );
-  const { sections: ignoredVenueSections, ...legacyVenue } = venue;
-  const venueLegacyEdit = await read(
-    await call(
-      `/admin/venues/${savedVenue.id}`,
-      "PATCH",
-      { ...legacyVenue, expectedUpdatedAt: savedVenue.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  assert.equal(venueLegacyEdit.sections[0].widgets[1].media.id, venueVideo.id);
-  assert.deepEqual(
-    venueLegacyEdit.sections[0].widgets.map((w: any) => [w.x, w.y, w.w, w.h]),
-    [
-      [0, 0, 6, 6],
-      [6, 3, 5, 8],
-      [2, 12, 8, 4],
-    ],
-  );
-  const venueEdit = await read(
-    await call(
-      `/admin/venues/${savedVenue.id}`,
-      "PATCH",
-      { ...venue, sections: [], expectedUpdatedAt: venueLegacyEdit.updatedAt },
-      adminCookie,
-    ),
-    200,
-  );
-  assert.deepEqual(venueEdit.sections, []);
-  assert.equal((await call(`/catalog-media/${venuePhoto.id}`)).status, 404);
-  for (const media of [venuePhoto, venueVideo])
-    assert.equal(
-      (await pool.query("SELECT id FROM media_assets WHERE id=$1", [media.id]))
-        .rowCount,
-      0,
-    );
 });
 
 test("booking-owned packages retain the inquiry and isolate copied media", async () => {

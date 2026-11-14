@@ -36,6 +36,3 @@ export const serviceCatalogQuerySchema = paginationQuerySchema
   })
   .strict()
   .refine(priceRange, rangeMessage);
-export const venueCatalogQuerySchema = paginationQuerySchema
-  .extend({ guests })
-  .strict();

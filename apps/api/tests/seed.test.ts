@@ -88,7 +88,6 @@ const tables = [
   "catalog_widgets",
   "media_assets",
   "services",
-  "venues",
   "booking_requests",
   "booking_request_status_history",
   "conversations",
@@ -153,20 +152,18 @@ async function login(email: string) {
   return cookie;
 }
 
-test("seed creates demo users, venues, and conversations while preserving unrelated data on rerun", async () => {
+test("seed creates demo users and conversations while preserving unrelated data on rerun", async () => {
   await runSeed();
   const coverage = await pool.query(`SELECT
     (SELECT count(*)::int FROM booking_requests WHERE reference LIKE 'DEMO-%') AS requests,
     (SELECT count(*)::int FROM conversations c JOIN users u ON u.id = c.customer_id WHERE u.email LIKE 'demo.%@clemora.example.test') AS conversations,
     (SELECT count(*)::int FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN users u ON u.id = c.customer_id WHERE u.email LIKE 'demo.%@clemora.example.test') AS messages,
-    (SELECT count(*)::int FROM packages WHERE published_at IS NOT NULL) AS package_published,
-    (SELECT count(*)::int FROM venues WHERE name LIKE 'Demo %' AND archived_at IS NULL) AS venue_published`);
+    (SELECT count(*)::int FROM packages WHERE published_at IS NOT NULL) AS package_published`);
   assert.deepEqual(coverage.rows[0], {
     requests: 0,
     conversations: 5,
     messages: 10,
     package_published: 103,
-    venue_published: 3,
   });
   const scenario = await pool.query(`SELECT
     (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test') AS users,
@@ -176,7 +173,6 @@ test("seed creates demo users, venues, and conversations while preserving unrela
     (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test' AND role = 'customer' AND staff_role IS NULL) AS customers,
     (SELECT count(*)::int FROM sessions s JOIN users u ON u.id = s.user_id WHERE u.email LIKE 'scenario.user%@clemora.example.test') AS sessions,
     (SELECT count(*)::int FROM packages WHERE name LIKE 'Scenario Celebration %') AS packages,
-    (SELECT count(*)::int FROM venues WHERE name LIKE 'Scenario Venue %') AS venues,
     (SELECT count(*)::int FROM services WHERE name LIKE 'Scenario Service %') AS services,
     (SELECT count(*)::int FROM media_assets) AS media,
     (SELECT count(*)::int FROM catalog_pages) AS pages,
@@ -197,12 +193,11 @@ test("seed creates demo users, venues, and conversations while preserving unrela
     customers: 72,
     sessions: 100,
     packages: 100,
-    venues: 100,
     services: 100,
-    media: 103,
-    pages: 103,
-    sections: 103,
-    widgets: 106,
+    media: 80,
+    pages: 80,
+    sections: 80,
+    widgets: 80,
     bookings: 100,
     history: 100,
     booking_conversations: 100,
@@ -424,20 +419,6 @@ test("seed creates demo users, venues, and conversations while preserving unrela
       );
     }),
   );
-  const demoVenues = await pool.query(
-    "SELECT id FROM venues WHERE name LIKE 'Demo %' ORDER BY name",
-  );
-  assert.equal(demoVenues.rowCount, 3);
-  const initialPublicVenues = (await readAll("/venues", "venues")).filter(
-    (venue: any) => demoVenues.rows.some((row) => row.id === venue.id),
-  );
-  assert.equal(initialPublicVenues.length, 3);
-  assert.ok(
-    initialPublicVenues.every(
-      (venue: any) =>
-        !("imageUrls" in venue) && !venue.description.includes("venue draft"),
-    ),
-  );
   assert.equal(
     (await pool.query("SELECT count(*)::int AS count FROM services")).rows[0]
       .count,
@@ -455,17 +436,6 @@ test("seed creates demo users, venues, and conversations while preserving unrela
   assert.deepEqual(conversation.rows[0].sender_roles, ["customer", "admin"]);
   assert.deepEqual(conversation.rows[0].message_roles, ["customer", "admin"]);
 
-  await pool.query(
-    "UPDATE venues SET description = 'Edited description', updated_at = created_at + interval '5 seconds' WHERE id = $1",
-    [demoVenues.rows[0].id],
-  );
-  await pool.query(
-    "UPDATE venues SET name = 'Edited demo venue', updated_at = created_at + interval '5 seconds' WHERE id = $1",
-    [demoVenues.rows[1].id],
-  );
-  await pool.query("UPDATE venues SET archived_at = now() WHERE id = $1", [
-    demoVenues.rows[2].id,
-  ]);
   await pool.query("UPDATE packages SET price = price + 1 WHERE id = $1", [
     grandCelebration.id,
   ]);
@@ -565,29 +535,6 @@ test("seed creates demo users, venues, and conversations while preserving unrela
   );
   assert.equal(
     (
-      await pool.query("SELECT description FROM venues WHERE id = $1", [
-        demoVenues.rows[0].id,
-      ])
-    ).rows[0].description,
-    "Edited description",
-  );
-  assert.equal(
-    (
-      await pool.query("SELECT name FROM venues WHERE id = $1", [
-        demoVenues.rows[1].id,
-      ])
-    ).rows[0].name,
-    "Edited demo venue",
-  );
-  assert.ok(
-    (
-      await pool.query("SELECT archived_at FROM venues WHERE id = $1", [
-        demoVenues.rows[2].id,
-      ])
-    ).rows[0].archived_at,
-  );
-  assert.equal(
-    (
       await pool.query("SELECT price FROM packages WHERE id = $1", [
         grandCelebration.id,
       ])
@@ -611,21 +558,6 @@ test("seed creates demo users, venues, and conversations while preserving unrela
     "Unrelated person",
   );
 
-  const publicVenues = { venues: await readAll("/venues", "venues") };
-  assert.ok(
-    publicVenues.venues.some(
-      (row: any) => row.id === demoVenues.rows[0].id && !("imageUrls" in row),
-    ),
-  );
-  assert.ok(
-    publicVenues.venues.some(
-      (row: any) =>
-        row.id === demoVenues.rows[1].id && row.name === "Edited demo venue",
-    ),
-  );
-  assert.ok(
-    !publicVenues.venues.some((row: any) => row.id === demoVenues.rows[2].id),
-  );
   const publicServices = { services: await readAll("/services", "services") };
   assert.equal(publicServices.services.length, 60);
   assert.ok(

@@ -207,14 +207,7 @@ export interface PackageServices {
   sort_order: number;
 }
 
-export interface PackageVenues {
-  created_at: Generated<Timestamp>;
-  details: Generated<string>;
-  id: Generated<string>;
-  package_id: string;
-  sort_order: number;
-  venue_id: string;
-}
+
 
 export interface Quotations {
   accepted_at: Timestamp | null;
@@ -269,19 +262,6 @@ export interface Users {
   updated_at: Generated<Timestamp>;
 }
 
-export interface Venues {
-  archived_at: Timestamp | null;
-  created_at: Generated<Timestamp>;
-  description: string;
-  id: Generated<string>;
-  location: string;
-  max_guests: number | null;
-  name: string;
-  published_at: Generated<Timestamp>;
-  slug: string;
-  updated_at: Generated<Timestamp>;
-}
-
 export interface DB {
   audit_events: AuditEvents;
   booking_request_status_history: BookingRequestStatusHistory;
@@ -297,11 +277,9 @@ export interface DB {
   media_assets: MediaAssets;
   messages: Messages;
   package_services: PackageServices;
-  package_venues: PackageVenues;
   packages: Packages;
   quotations: Quotations;
   services: Services;
   sessions: Sessions;
   users: Users;
-  venues: Venues;
 }
