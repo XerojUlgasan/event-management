@@ -33,13 +33,3 @@ export const updateEventChecklistRouteHandler: AppRouteHandler<
     throw error;
   }
 };
-export const updateEventChecklistStaffRoute = createRoute({
-  method: "patch",
-  path: "/staff/event-days/{id}/checklist",
-  tags,
-  request: {
-    params,
-    body: body(z.strictObject({ expectedRevision: revision, operation })),
-  },
-  responses: response,
-});

@@ -19,7 +19,7 @@ const userSchema = z.object({
   id: z.string().uuid(),
   displayName: z.string().nullable(),
   email: z.string(),
-  role: z.enum(["admin", "staff", "customer"]),
+  role: z.enum(["admin", "customer"]),
   staffRole: z.string().nullable(),
   createdAt: z.string(),
 });
@@ -31,7 +31,7 @@ const statsSchema = z.object({
   customerJoined: z.number(),
 });
 const querySchema = paginationQuerySchema.extend({
-  group: z.enum(["staff", "customers"]).default("staff"),
+  group: z.enum(["customers"]).default("customers"),
   search: z.string().max(200).default(""),
 });
 const positionSchema = z.object({ name: z.string(), id: z.string().uuid() });
@@ -75,14 +75,14 @@ export const listAdminUsersRouteHandler: AppRouteHandler<
     id: row.id,
     displayName: row.display_name,
     email: row.email,
-    role: row.role as "admin" | "staff" | "customer",
+    role: row.role as "admin" | "customer",
     staffRole: row.staff_role ?? null,
     createdAt: new Date(row.created_at).toISOString(),
   }));
   return c.json(
     {
-      staff: group === "staff" ? users : [],
-      customers: group === "customers" ? users : [],
+      staff: [],
+      customers: users,
       nextCursor: page.nextCursor,
       stats,
     },

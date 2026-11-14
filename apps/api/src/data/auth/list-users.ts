@@ -4,7 +4,7 @@ import type { DB } from "../../db/types.js";
 export function listUsersData(
   db: Kysely<DB>,
   input: {
-    group: "staff" | "customers";
+    group: "customers";
     search: string;
     position?: { name: string; id: string };
     limit: number;
@@ -14,14 +14,10 @@ export function listUsersData(
     .selectFrom("users")
     .select(["id", "display_name", "email", "role", "staff_role", "created_at"])
     .select(sql<string>`coalesce(display_name, '')`.as("cursor_name"))
-    .where(
-      "role",
-      "in",
-      input.group === "staff" ? ["admin", "staff"] : ["customer"],
-    );
+    .where("role", "=", "customer");
   if (input.search)
     query = query.where(
-      sql<boolean>`strpos(lower(concat_ws(' ', display_name, ${input.group === "staff" ? sql`staff_role` : sql`NULL`}, email)), ${input.search}) > 0`,
+      sql<boolean>`strpos(lower(concat_ws(' ', display_name, email)), ${input.search}) > 0`,
     );
   if (input.position)
     query = query.where(
@@ -38,16 +34,13 @@ export async function userDirectoryStats(db: Kysely<DB>) {
   const row = await db
     .selectFrom("users")
     .select([
-      sql<number>`count(*) filter (where role in ('admin', 'staff'))::int`.as(
+      sql<number>`count(*) filter (where role = 'admin')::int`.as(
         "staff_total",
       ),
       sql<number>`count(*) filter (where role = 'customer')::int`.as(
         "customer_total",
       ),
-      sql<number>`count(distinct staff_role) filter (where role in ('admin', 'staff') and staff_role <> '')::int`.as(
-        "staff_roles",
-      ),
-      sql<number>`count(*) filter (where role in ('admin', 'staff') and date_trunc('month', created_at at time zone 'Asia/Manila') = date_trunc('month', now() at time zone 'Asia/Manila'))::int`.as(
+      sql<number>`count(*) filter (where role = 'admin' and date_trunc('month', created_at at time zone 'Asia/Manila') = date_trunc('month', now() at time zone 'Asia/Manila'))::int`.as(
         "staff_joined",
       ),
       sql<number>`count(*) filter (where role = 'customer' and date_trunc('month', created_at at time zone 'Asia/Manila') = date_trunc('month', now() at time zone 'Asia/Manila'))::int`.as(
@@ -58,7 +51,7 @@ export async function userDirectoryStats(db: Kysely<DB>) {
   return {
     staffTotal: row.staff_total,
     customerTotal: row.customer_total,
-    staffRoles: row.staff_roles,
+    staffRoles: 0,
     staffJoined: row.staff_joined,
     customerJoined: row.customer_joined,
   };

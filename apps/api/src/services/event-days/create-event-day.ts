@@ -16,10 +16,7 @@ export async function createEventDayService(
     if (booking.status !== "accepted")
       return fail("Booking request must be accepted", 409);
     if (booking.requested_days !== null)
-      return fail(
-        "Use a requested day's response deadline to open staffing",
-        409,
-      );
+      return fail("This booking uses requested days for scheduling", 409);
     const schedule = validateSchedule(input, booking.time_zone);
     await touchBookingRevisionData(trx, bookingId);
     return one(trx, await createEventDayData(trx, bookingId, schedule));

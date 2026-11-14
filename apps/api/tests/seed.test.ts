@@ -93,8 +93,6 @@ const tables = [
   "conversations",
   "messages",
   "events_day",
-  "event_staff_availability",
-  "event_staffs",
   "quotations",
   "audit_events",
 ] as const;
@@ -169,7 +167,6 @@ test("seed creates demo users and conversations while preserving unrelated data 
     (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test') AS users,
     (SELECT count(DISTINCT password_hash)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test') AS password_hashes,
     (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test' AND role = 'admin' AND staff_role = 'System Administrator') AS admins,
-    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test' AND role = 'staff' AND staff_role IS NOT NULL) AS staff,
     (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test' AND role = 'customer' AND staff_role IS NULL) AS customers,
     (SELECT count(*)::int FROM sessions s JOIN users u ON u.id = s.user_id WHERE u.email LIKE 'scenario.user%@clemora.example.test') AS sessions,
     (SELECT count(*)::int FROM packages WHERE name LIKE 'Scenario Celebration %') AS packages,
@@ -182,15 +179,12 @@ test("seed creates demo users and conversations while preserving unrelated data 
     (SELECT count(*)::int FROM booking_request_status_history h JOIN booking_requests b ON b.id = h.booking_request_id WHERE b.reference LIKE 'SCN-%') AS history,
     (SELECT count(*)::int FROM conversations c JOIN booking_requests b ON b.id = c.booking_request_id WHERE b.reference LIKE 'SCN-%') AS booking_conversations,
     (SELECT count(*)::int FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN booking_requests b ON b.id = c.booking_request_id WHERE b.reference LIKE 'SCN-%' AND m.quotation_id IS NULL) AS booking_messages,
-    (SELECT count(*)::int FROM events_day d JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%') AS event_days,
-    (SELECT count(*)::int FROM event_staff_availability a JOIN events_day d ON d.id = a.event_day_id JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%') AS availability,
-    (SELECT count(*)::int FROM event_staffs s JOIN events_day d ON d.id = s.event_day_id JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%') AS assignments`);
+    (SELECT count(*)::int FROM events_day d JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%') AS event_days`);
   assert.deepEqual(scenario.rows[0], {
     users: 100,
     password_hashes: 1,
     admins: 4,
-    staff: 24,
-    customers: 72,
+    customers: 96,
     sessions: 100,
     packages: 100,
     services: 100,
@@ -203,8 +197,6 @@ test("seed creates demo users and conversations while preserving unrelated data 
     booking_conversations: 100,
     booking_messages: 100,
     event_days: 100,
-    availability: 100,
-    assignments: 100,
   });
   const quotationCoverage = await pool.query(`SELECT
     count(*)::int AS quotations, count(DISTINCT q.booking_request_id)::int AS bookings,
@@ -281,7 +273,6 @@ test("seed creates demo users and conversations while preserving unrelated data 
     (SELECT count(*)::int FROM booking_requests WHERE reference LIKE 'SCN-%' AND out_of_range IS DISTINCT FROM (guest_count IS NOT NULL AND guest_count > package_max_guests)) AS range_mismatches,
     (SELECT count(*)::int FROM events_day d JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%' AND b.status <> 'accepted') AS days_outside_accepted,
     (SELECT count(*)::int FROM events_day d JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%' AND d.status = 'moved' AND NOT EXISTS (SELECT 1 FROM events_day r WHERE r.id = d.replacement_event_day_id AND r.booking_request_id = d.booking_request_id AND r.status = 'scheduled')) AS broken_moves,
-    (SELECT count(*)::int FROM event_staffs s JOIN events_day d ON d.id = s.event_day_id JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%' AND s.status = 'confirmed' AND (d.status <> 'scheduled' OR d.staffing_status <> 'closed' OR NOT EXISTS (SELECT 1 FROM event_staff_availability a WHERE a.event_day_id = s.event_day_id AND a.staff_id = s.staff_id AND a.response = 'available'))) AS invalid_assignments,
     (SELECT count(*)::int FROM messages m JOIN users u ON u.id = m.sender_id JOIN conversations c ON c.id = m.conversation_id JOIN booking_requests b ON b.id = c.booking_request_id WHERE b.reference LIKE 'SCN-%' AND m.sender_role::text <> u.role) AS sender_mismatches,
     (SELECT count(*)::int FROM services s WHERE s.name LIKE 'Scenario Service %' AND s.archived_at IS NULL AND NOT EXISTS (SELECT 1 FROM catalog_pages p JOIN catalog_sections cs ON cs.page_id = p.id JOIN catalog_widgets w ON w.section_id = cs.id WHERE p.service_id = s.id AND w.type = 'photo')) AS services_without_photos,
     (SELECT count(*)::int FROM booking_requests b JOIN packages p ON p.id = b.package_id WHERE b.reference LIKE 'SCN-%' AND p.archived_at IS NOT NULL) AS archived_package_bookings`);
@@ -290,7 +281,6 @@ test("seed creates demo users and conversations while preserving unrelated data 
     range_mismatches: 0,
     days_outside_accepted: 0,
     broken_moves: 0,
-    invalid_assignments: 0,
     sender_mismatches: 0,
     services_without_photos: 0,
     archived_package_bookings: 0,

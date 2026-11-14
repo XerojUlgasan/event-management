@@ -941,7 +941,7 @@ test("schedule and timezone changes do not alter saved amounts", async () => {
   ).quotation;
   await db
     .updateTable("events_day")
-    .set({ status: "cancelled", staffing_status: "closed" })
+    .set({ status: "cancelled" })
     .where("id", "=", day.id)
     .execute();
   await db

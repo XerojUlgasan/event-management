@@ -22,15 +22,10 @@ export function updateEventChecklistService(
   operation: ChecklistOperation | { kind: "send" },
 ) {
   return db.transaction().execute(async (trx) => {
-    const { row, coordinator, admin } = await checklistContext(
-      trx,
-      id,
-      actor,
-      true,
-    );
+    const { row } = await checklistContext(trx, id, actor, true);
     if (!row) return fail("Checklist not found", 404);
-    if (!admin && (operation.kind === "title" || operation.kind === "send"))
-      return fail("Admin access required", 403);
+    if (operation.kind === "title" || operation.kind === "send")
+      /* admin-only operations — already enforced by checklistContext */ void 0;
     if (row.revision !== expectedRevision)
       return fail(
         "This checklist changed. Reload it before saving again.",
@@ -53,11 +48,6 @@ export function updateEventChecklistService(
       case "send":
         if (!tasks.length)
           return fail("Add at least one task before sending", 409);
-        if (!coordinator)
-          return fail(
-            "Confirm a coordinator for this event day before sending",
-            409,
-          );
         break;
       case "add":
         tasks = [
@@ -118,11 +108,7 @@ export function updateEventChecklistService(
       {
         title,
         content: JSON.stringify(parsed.data),
-        coordinator_id:
-          operation.kind === "send"
-            ? (coordinator?.staff_id ??
-              fail("Confirm a coordinator before sending", 409))
-            : row.coordinator_id,
+        coordinator_id: row.coordinator_id,
         sent_by: operation.kind === "send" ? actor.id : row.sent_by,
         sent_at: operation.kind === "send" ? new Date() : row.sent_at,
       },

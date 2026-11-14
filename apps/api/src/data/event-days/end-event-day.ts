@@ -11,10 +11,7 @@ export async function endEventDayData(
   actorId: string,
 ) {
   await invalidateEventChecklistData(db, id, actorId);
-  await sql`update event_staffs set status='cancelled',updated_at=now() where event_day_id=${id}::uuid and status='confirmed'`.execute(
-    db,
-  );
-  await sql`update events_day set status=${status},staffing_status='closed',replacement_event_day_id=${replacementId}::uuid,updated_at=now() where id=${id}::uuid`.execute(
+  await sql`update events_day set status=${status},replacement_event_day_id=${replacementId}::uuid,updated_at=now() where id=${id}::uuid`.execute(
     db,
   );
 }

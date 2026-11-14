@@ -19,8 +19,6 @@ export const routeFamilies = [
     id: "event-days",
     prefixes: [
       "/v1/admin/event-days",
-      "/v1/staff/event-days",
-      "/v1/staff/assignments",
     ],
   },
   { id: "messages", prefixes: ["/v1/admin/conversations", "/v1/messages"] },

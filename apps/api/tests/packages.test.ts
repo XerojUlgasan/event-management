@@ -13,7 +13,6 @@ let db: typeof import("../src/db/client.js").db;
 let admin: Pool;
 let pool: Pool;
 let adminCookie: string;
-let staffCookie: string;
 let undesignatedAdminCookie: string;
 let customerCookie: string;
 let storageServer: Server;
@@ -136,7 +135,6 @@ before(async () => {
   }
   adminCookie = await session("admin", "System Administrator");
   undesignatedAdminCookie = await session("admin");
-  staffCookie = await session("staff", "Waiter");
   customerCookie = await session("customer");
 });
 after(async () => {
@@ -271,7 +269,7 @@ test("services save directly, validate complete content, and enforce permissions
     hourlyRatePesos: 500,
   };
   await read(await call("/admin/services", "POST", content), 401);
-  for (const cookie of [staffCookie, customerCookie, undesignatedAdminCookie])
+  for (const cookie of [customerCookie, undesignatedAdminCookie])
     await read(await call("/admin/services", "POST", content, cookie), 403);
   for (const hourlyRatePesos of [null, 0, -1, 1.5, 2147483648])
     await read(
@@ -496,7 +494,7 @@ test("service canvas photos replace legacy image uploads and clean up removed me
 
 test("canvas saves publish atomically and protect concurrent edits", async () => {
   await read(await call("/admin/packages"), 401);
-  for (const cookie of [customerCookie, staffCookie, undesignatedAdminCookie])
+  for (const cookie of [customerCookie, undesignatedAdminCookie])
     await read(await call("/admin/packages", "POST", data, cookie), 403);
   for (const patch of [
     { name: "" },
@@ -1928,15 +1926,6 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
     ),
     200,
   );
-  await read(
-    await call(
-      `/admin/booking-requests/${booking.id}/package`,
-      "GET",
-      undefined,
-      staffCookie,
-    ),
-    404,
-  );
   const save = {
     ...content,
     expectedUpdatedAt: before.package.updatedAt,
@@ -2076,15 +2065,6 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
   assert.equal(history.length, 2);
   assert.equal(history[0].before.name, original.name);
   assert.equal(history[0].after.name, "Changed");
-  await read(
-    await call(
-      `/admin/booking-requests/${booking.id}/package-history`,
-      "GET",
-      undefined,
-      staffCookie,
-    ),
-    404,
-  );
   assert.equal(
     (await read(await call(`/packages/${original.id}`), 200)).name,
     original.name,
@@ -2216,7 +2196,7 @@ test("quotations do not retain removed package media or grant historical media a
     ).rows[0].count,
     0,
   );
-  for (const cookie of [customerCookie, adminCookie, staffCookie])
+  for (const cookie of [customerCookie, adminCookie])
     assert.equal(
       (await app.request(media.url, { headers: { Cookie: cookie } })).status,
       404,

@@ -114,9 +114,6 @@ app.use(
 app.use("/v1/admin/event-days/*", (c, next) =>
   bodyLimit({ maxSize: eventDayBodyLimit(c.req.path) })(c, next),
 );
-app.use("/v1/staff/event-days/*", (c, next) =>
-  bodyLimit({ maxSize: eventDayBodyLimit(c.req.path) })(c, next),
-);
 app.route("/v1", eventDayRoutes);
 app.route("/v1", messageRoutes);
 app.route("/v1", authRoutes);

@@ -22,23 +22,6 @@ const legacyAccounts = [
   })),
 ];
 const demoAccounts = [
-  ...[
-    "Event Coordinator",
-    "Event Coordinator",
-    "Head Waiter",
-    "Waiter",
-    "Waiter",
-    "Waiter",
-    "Graphic Designer",
-    "Photographer",
-    "Host",
-    "Catering Supervisor",
-  ].map((staff_role, i) => ({
-    email: `staff${i + 1}@example.test`,
-    display_name: `Demo Staff ${i + 1}`,
-    role: "staff",
-    staff_role,
-  })),
   ...Array.from({ length: 10 }, (_, i) => ({
     email: `customer${i + 1}@example.test`,
     display_name: `Demo Customer ${i + 1}`,

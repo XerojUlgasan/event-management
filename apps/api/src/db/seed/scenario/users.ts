@@ -7,15 +7,6 @@ import {
   scenarioIndex,
 } from "../context.js";
 
-const STAFF_ROLES = [
-  "Event Coordinator",
-  "Head Waiter",
-  "Waiter",
-  "Graphic Designer",
-  "Photographer",
-  "Host",
-  "Catering Supervisor",
-] as const;
 const GIVEN_NAMES = [
   "Amina",
   "Paolo",
@@ -65,17 +56,12 @@ export type ScenarioUser = {
   id: string;
   email: string;
   displayName: string;
-  role: "admin" | "staff" | "customer";
+  role: "admin" | "customer";
   staffRole: string | null;
 };
 
 function roleFor(index: number): Pick<ScenarioUser, "role" | "staffRole"> {
   if (index < 4) return { role: "admin", staffRole: "System Administrator" };
-  if (index < 28)
-    return {
-      role: "staff",
-      staffRole: STAFF_ROLES[(index - 4) % STAFF_ROLES.length] ?? "Waiter",
-    };
   return { role: "customer", staffRole: null };
 }
 

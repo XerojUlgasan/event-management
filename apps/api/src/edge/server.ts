@@ -95,7 +95,7 @@ async function createFamilyApp(id: RouteFamilyId) {
   for (const limit of bodyLimits[id] ?? [])
     family.use(limit.path, bodyLimit({ maxSize: limit.maxSize }));
   if (id === "event-days") {
-    for (const path of ["/admin/event-days/*", "/staff/event-days/*"])
+    for (const path of ["/admin/event-days/*"])
       family.use(path, (c, next) =>
         bodyLimit({ maxSize: eventDayBodyLimit(c.req.path) })(c, next),
       );

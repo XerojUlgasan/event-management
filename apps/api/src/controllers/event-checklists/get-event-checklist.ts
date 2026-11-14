@@ -27,10 +27,3 @@ export const getEventChecklistRouteHandler: AppRouteHandler<
     throw error;
   }
 };
-export const getEventChecklistStaffRoute = createRoute({
-  method: "get",
-  path: "/staff/event-days/{id}/checklist",
-  tags,
-  request: { params },
-  responses: readResponse,
-});

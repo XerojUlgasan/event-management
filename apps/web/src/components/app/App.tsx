@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Brand, Button, NotificationProvider } from "@event-management/ui";
+import { Brand, NotificationProvider } from "@event-management/ui";
 
 import { AuthProvider, useAuth } from "../../lib/auth/AuthProvider";
 import {
@@ -10,13 +10,11 @@ import {
 import { AdminShell } from "../workspaces/admin/AdminShell";
 import { AuthPage } from "../auth/AuthPage";
 import { CustomerDashboard } from "../workspaces/customer/CustomerDashboard";
-import { StaffWorkspaceShell } from "../workspaces/staff/StaffWorkspaceShell";
 import {
   adminBookingRequestId,
   adminKey,
   allowedWorkspacePath,
   appHome,
-  isStaffWorkspace,
   isSystemAdmin,
   normalizePath,
   workspaceReturnPath,
@@ -163,29 +161,6 @@ function Workspace({
     );
   }
 
-  if (isStaffWorkspace(profile)) {
-    if (profile.role !== "staff") {
-      return (
-        <main className="auth-splash">
-          <Brand />
-          <h1>Staff access required</h1>
-          <p>
-            Ask a System Administrator to review your account role before using
-            event staffing.
-          </p>
-          <Button onClick={handleSignOut}>Sign out</Button>
-        </main>
-      );
-    }
-    return (
-      <StaffWorkspaceShell
-        key={`${profile.id}:${profile.role}:${profile.staffRole}`}
-        profile={profile}
-        path={path}
-        onSignOut={handleSignOut}
-      />
-    );
-  }
   if (isSystemAdmin(profile)) {
     const active = adminKey(path);
     return active ? (

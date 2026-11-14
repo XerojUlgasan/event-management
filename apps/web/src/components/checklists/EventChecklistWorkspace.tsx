@@ -158,10 +158,6 @@ export function EventChecklistWorkspace({
     setTitle(value);
   };
   const locked = busy || stale || !active || day.status !== "scheduled";
-  const coordinator = day.assignments.find(
-    (assignment) =>
-      assignment.role === "coordinator" && assignment.status === "confirmed",
-  );
   const tasks = checklist?.content.tasks ?? [];
   const done = tasks.filter((task) => task.status === "completed").length;
   const blocked = tasks.filter((task) => task.status === "blocked").length;
@@ -523,27 +519,19 @@ export function EventChecklistWorkspace({
               </Button>
               {admin && (
                 <Button
-                  disabled={
-                    locked || !!editing || !tasks.length || !coordinator
-                  }
+                  disabled={locked || !!editing || !tasks.length}
                   pending={busy}
                   onClick={() =>
                     void run(
                       () => sendEventChecklist(day.id, checklist.revision),
-                      "Checklist sent. The coordinator can edit it now.",
+                      "Checklist sent.",
                     ).catch(() => {})
                   }
                 >
-                  {checklist.sentAt ? "Send again" : "Send to coordinator"}
+                  {checklist.sentAt ? "Send again" : "Send checklist"}
                 </Button>
               )}
             </div>
-          )}
-          {admin && !coordinator && (
-            <p>
-              Confirm a coordinator in this day’s team before sending. Your
-              draft stays private.
-            </p>
           )}
         </>
       )}
