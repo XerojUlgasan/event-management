@@ -26,7 +26,7 @@ Mount `Dialog` and `Drawer` conditionally. Their native modal lifecycle handles 
 
 `Tabs` defaults to filter-group buttons. For a true tablist, each item requires `id` and `panelId`; render matching labelled tab panels and hide inactive content. `PageHeader` supplies an `h1`, or `h2`/`h3` through `titleAs`; pass content rather than a heading element. Shared component dimension tokens retain the current appearance while centralizing control, radius, and field spacing values.
 
-For fields with help or error feedback, `FormField` accepts `description`, `error`, and a render-function child that supplies the control's ID and accessibility attributes. Spread these props on the actual `Input`, `Select`, or `Textarea`; validation and state stay in the app. Existing node children retain their label-wrapper behavior. See the [Clemora UI skill](../../context-factory/frontend/clemora-ui/SKILL.md) for composition examples.
+For fields with help or error feedback, `FormField` accepts `description`, `error`, and a render-function child that supplies the control's ID and accessibility attributes. Spread these props on the actual `Input`, `Select`, or `Textarea`; validation and state stay in the app. Existing node children retain their label-wrapper behavior. See the [Clemora UI reference](../../context-factory/areas/frontend/references/clemora-ui.md) for composition examples.
 
 ## Storybook
 

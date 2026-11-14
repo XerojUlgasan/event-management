@@ -18,9 +18,9 @@ Scope recorded on 2026-11-03, with identity responsibilities and booking-linked 
 | Reports and past events         | Report on actual business records and maintain a managed past-events showcase with publication permissions.                                                                                                                                                                                                                                                       |
 | Access and communication        | Automatically create a conversation for each submitted booking request so the customer and admin can communicate and create booking-related transactions. Give customers access to their own inquiries and conversations, and staff access appropriate to their roles.                                                                                            |
 
-The [identity reference](context-factory/business-logic/references/identity.md) defines these intended role responsibilities. Admin means the System Administrator; coordinator is an event responsibility assigned to staff.
+The [identity reference](context-factory/business/identity.md) defines these intended role responsibilities. Admin means the System Administrator; coordinator is an event responsibility assigned to staff.
 
-The [messages reference](context-factory/business-logic/references/messages.md) describes intended booking-linked communication. Quotations are the implemented booking-related transaction; other transaction types remain undefined within the scope boundaries below.
+The [messages reference](context-factory/business/messages.md) describes intended booking-linked communication. Quotations are the implemented booking-related transaction; other transaction types remain undefined within the scope boundaries below.
 
 A request does not reserve a date, establish a final price, or confirm a booking. Confirmation rules remain to be agreed and must not be inferred from payment.
 
@@ -108,7 +108,7 @@ docs/                  Seed guide and interview summary
 transcriptions/        Individual and combined interview transcripts
 ```
 
-Astro runs as a Node server. Public pages under `apps/web/src/pages` are rendered on each request. `/login` and `/app/*` mount `components/app/App.tsx` with `client:only="react"`. The app keeps its React and authentication providers mounted while same-origin `/app` navigation updates the URL with the History API; public and login routes remain document navigations. `GET /me` chooses the admin, staff, or customer shell, and each role keeps only its own `/app` paths. Shared UI uses atomic layers and exports from `packages/ui/src/index.ts`. Theme tokens live in `packages/theme/src/theme.css`; app styles live in `apps/web/src/styles/`. Web files follow the [frontend structure contract](context-factory/shared/frontend-project-structure.md), organized by layer, domain, and responsibility.
+Astro runs as a Node server. Public pages under `apps/web/src/pages` are rendered on each request. `/login` and `/app/*` mount `components/app/App.tsx` with `client:only="react"`. The app keeps its React and authentication providers mounted while same-origin `/app` navigation updates the URL with the History API; public and login routes remain document navigations. `GET /me` chooses the admin, staff, or customer shell, and each role keeps only its own `/app` paths. Shared UI uses atomic layers and exports from `packages/ui/src/index.ts`. Theme tokens live in `packages/theme/src/theme.css`; app styles live in `apps/web/src/styles/`. Web files follow the [frontend structure contract](context-factory/areas/frontend/references/project-structure.md), organized by layer, domain, and responsibility.
 
 API routes are mounted under `/v1` in `apps/api/src/app.ts`. HTTP contracts and handlers belong in `controllers/<domain>/`, business operations in `services/<domain>/`, and Kysely queries in `data/<domain>/`. Shared helpers belong in `utils/`. The running API exposes its OpenAPI contract at `/openapi.json`.
 
@@ -123,7 +123,7 @@ pnpm dev
 
 `pnpm dev` starts the local Supabase stack, serves the edge function, and starts the website at <http://localhost:4321/>. `pnpm all` remains the Compose PostgreSQL path: it creates `apps/api/.env` from its example if missing, starts PostgreSQL and waits for its healthcheck, applies committed migrations, then starts the Node API and web servers. Local email/password sign-in works without Firebase configuration. Catalog uploads use the private Supabase Storage bucket `event-management`; object keys stay `catalog-media/<id>`. The edge runtime supplies its own Storage URL and service role. The Node API needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from the API example.
 
-**Existing databases:** review pending migrations and back up affected data before `pnpm all`, `pnpm dev:prepare`, or `pnpm db:deploy`; these commands apply migrations. See [migration impact](#migration-impact).
+**Existing databases:** review pending migrations and back up affected data before `pnpm all`, `pnpm dev:prepare`, or `pnpm db:deploy`; these commands apply migrations. See [migration impact](README.md#migration-impact).
 
 | Service                               | Local URL                                           |
 | ------------------------------------- | --------------------------------------------------- |
@@ -180,7 +180,7 @@ Account settings → Sign-in methods supports connecting Firebase to a local acc
 
 System Administrator access requires both database role `admin` and staff title `System Administrator`. This permits catalog administration, directory reads, admin messages, and request-status updates. Staff cannot perform these writes. Reload after changing database roles so the frontend refreshes its profile.
 
-Password attempts are limited in memory per account; multiple API processes require a shared limiter. Browser writes must pass the configured `WEB_ORIGIN` check. See the [authentication reference](context-factory/api/reference/auth-and-sessions.md) and running OpenAPI contract for route details.
+Password attempts are limited in memory per account; multiple API processes require a shared limiter. Browser writes must pass the configured `WEB_ORIGIN` check. See the [authentication reference](context-factory/areas/api/references/auth-and-sessions.md) and running OpenAPI contract for route details.
 
 ### Optional Firebase setup
 
@@ -205,7 +205,7 @@ Package prices are stored as whole pesos; the API uses `{ kind: "fixed", currenc
 
 The shared editor uses photo, Markdown, and video widgets on a 12-column canvas. The editor, customer preview, and public detail page use the full available width with the same widget dimensions at the same screen width. Photos and videos fit inside their widgets without cropping; rendered text outside a widget is clipped without internal scrollbars. Markdown editing opens in a separate dialog so the canvas shows the rendered result. Editor guides and numbered columns use the actual snap geometry; each section shows its automatically growing row count from the lowest widget edge. Saves retain widget positions and spans, including intentional gaps. A widget can span at most 100 rows; sections have no separate fixed row count. Editor previews, saved catalog overlays, booking package views, and server-rendered public details reuse the same app composition and shared canvas/widget renderer; embedded booking views adapt to their containing area. Media uploads go through `POST /v1/admin/catalog-media`, remain pending until a catalog save references them, and stream through `/v1/catalog-media/{id}`. JPEG/PNG/WebP images allow up to 10 MiB; MP4/WebM videos allow up to 25 MiB. Photo/video widgets accept uploads only, with built-in sample photos retained for seeded packages; external URLs and hosted-player embeds are rejected. Video autoplay is opt-in and uses muted inline playback on customer previews and public pages.
 
-Public media streaming requires a reference from a published, non-archived catalog record. System Administrators can preview pending uploads and saved private media under the API access rules. Owners can preview media currently referenced by their private package; private responses use no-store caching. Quotations do not retain historical media or grant media access. Removing uploaded media triggers cleanup only when no current widget references it; storage failures can leave unreferenced assets for retry. See [catalog media](context-factory/api/reference/external-image-urls.md) for storage, cleanup, and migration details, and [shared limits](context-factory/limits/SKILL.md) for validation ownership.
+Public media streaming requires a reference from a published, non-archived catalog record. System Administrators can preview pending uploads and saved private media under the API access rules. Owners can preview media currently referenced by their private package; private responses use no-store caching. Quotations do not retain historical media or grant media access. Removing uploaded media triggers cleanup only when no current widget references it; storage failures can leave unreferenced assets for retry. See [catalog media](context-factory/areas/api/references/external-image-urls.md) for storage, cleanup, and migration details, and [shared limits](context-factory/areas/contracts/SKILL.md) for validation ownership.
 
 ## Database workflow
 
@@ -239,7 +239,7 @@ Review all pending migrations before upgrading a populated database:
 - `20261109140000_enable_application_rls` preserves records and blocks direct table access for Supabase client roles. Apply it as the table owner and verify the API database role before deployment. `pnpm db:deploy` targets the database configured for the API; creating this migration does not apply it to the separate local Supabase stack.
 - `20261111120000_booking_requested_days` adds the nullable requested-date JSONB column and array constraint without fabricating missing dates or rewriting existing booking data.
 
-Back up affected records before deployment. Apply coordinated API/frontend contract changes with their migrations; do not edit applied migrations or reset a database to resolve drift. The [database guidance](context-factory/api/reference/database-and-migrations.md), [catalog media reference](context-factory/api/reference/external-image-urls.md), and [seed guide](docs/SEED.md) provide the related procedures.
+Back up affected records before deployment. Apply coordinated API/frontend contract changes with their migrations; do not edit applied migrations or reset a database to resolve drift. The [database guidance](context-factory/areas/api/references/database-and-migrations.md), [catalog media reference](context-factory/areas/api/references/external-image-urls.md), and [seed guide](docs/SEED.md) provide the related procedures.
 
 ## Source formatting
 
@@ -278,7 +278,9 @@ Run the checks matching the changed area:
 | `pnpm --filter @event-management/api test:proposal-migration` | Populated baseline preservation, ownership, JSONB arithmetic, message linkage and RLS/grants                                                                          |
 | `pnpm --filter @event-management/api test:messages`           | Conversation ownership, messages, read state, and no automatic expiry                                                                                                 |
 
-Integration suites create disposable local PostgreSQL databases and require permission to create them. Auth also requires the Firebase CLI on `PATH` and ports 9099, 4409, and 4509 free; it uses an emulator rather than production Firebase. Media tests use a local Storage API fake rather than production Supabase Storage. See [API verification](context-factory/api/reference/verification.md) and the [seed guide](docs/SEED.md) for additional focused suites.
+Integration suites create disposable local PostgreSQL databases and require permission to create them. Auth also requires the Firebase CLI on `PATH` and ports 9099, 4409, and 4509 free; it uses an emulator rather than production Firebase. Media tests use a local Storage API fake rather than production Supabase Storage. See [API verification](context-factory/areas/api/references/verification.md) and the [seed guide](docs/SEED.md) for additional focused suites.
+
+For contributor-guidance changes, run `pnpm check:guidance` and `pnpm test:guidance`, then walk the [routing scenarios](context-factory/routing-checks.md). These verify navigation, registration, and structural routing; they do not prove future agent compliance.
 
 A passing build does not establish browser, persistence, or production-provider behavior. Verify affected customer/staff flows, permissions, reloads, and failure paths at the appropriate boundaries.
 
@@ -287,4 +289,5 @@ A passing build does not establish browser, persistence, or production-provider 
 - [Database seed](docs/SEED.md): fixtures, sample records, rerun behavior, and verification.
 - [Prevail interview summary](docs/PREVAIL_INTERVIEW_SUMMARY.md): timestamped findings and separate later scope decisions.
 - [Full transcription](transcriptions/full-transcription.md), [Video 1](transcriptions/video-1.md), and [Video 2](transcriptions/video-2.md): preserved interview source text.
-- [Repository guidance](AGENTS.md), [context factory](context-factory/README.md), and [agent index](context-factory/agents/README.md): contributor ownership, engineering/shared skills, documentation workflows, and QA guidance.
+- [Repository guidance](AGENTS.md) and the [context factory task router](context-factory/README.md): contributor roles, implementation areas, business rules, workflows, and QA helpers.
+- [Run summaries](context-factory/runs/README.md) and [historical decisions/verification](context-factory/history/README.md): continuation pointers, rationale, and dated evidence.

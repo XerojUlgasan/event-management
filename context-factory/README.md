@@ -1,20 +1,43 @@
-# Clemora context factory
+# Find the right guidance
 
-Start with [repository guidance](../AGENTS.md) and the selected [role](agents/README.md). These files are the canonical project guidance; read them directly when a client does not discover skills automatically.
+Follow the standing rules in [AGENTS.md](../AGENTS.md). Select all rows that match the work; read only the references whose stated conditions apply. A link makes guidance discoverable, not automatically mandatory. Recheck selection when scope changes.
 
-| Guidance | Responsibility |
+## Choose the responsibility
+
+| Work | Role |
 | --- | --- |
-| [Shared operating contract](shared/agent-workflow.md) | Authority, task lifecycle, evidence, and handoff on every engineering task |
-| [Engineering principles](shared/engineering-principles.md) | Standing rules, applicability, and links to the full principle skills |
-| [Engineering skills](engineering/README.md) | Investigation, design, implementation, review, teaching, writing, and delivery methods |
-| [Workflow adapters](shared/skill-adapters.md) | Clemora commands, capabilities, source-toolkit differences, and verification scenarios |
-| [Business logic](business-logic/SKILL.md) | Domain references for intended responsibilities and workflows, starting with identity |
-| [API](api/SKILL.md), [frontend](frontend/SKILL.md), [packages](packages/SKILL.md), [limits](limits/SKILL.md), [QA](QA/SKILL.md), [seed one table](QA/seed-a-table/SKILL.md) | Implementation ownership, required area references, and the procedure for adding seeded rows |
-| [Clemora UI usage](frontend/clemora-ui/SKILL.md) | Choosing, composing, styling, and extending the shared UI with working examples and Storybook guidance |
-| [Agents](agents/README.md) | Senior developer and documentation roles, task references, and memory policy |
+| Engineering investigation, planning, implementation, review, tickets, or verification | [Senior developer](agents/senior-developer.md) |
+| Repository docs, manuscripts, research, prose, or defense preparation | [Documentation](agents/documentation.md) |
 
-The senior developer reads the operating contract, principle digest, and engineering index at the start of every task, then loads the full skills selected by their triggers. Shared conventions link to area owners rather than replacing them. The documentation agent owns document structure and evidence; technical writing complements that role.
+## Choose the affected area
 
-**Important: every UI change requires the [frontend](frontend/SKILL.md) and [packages](packages/SKILL.md) skills, their required references, and the [package reuse workflow](shared/shared-packages.md#required-workflow-for-every-ui-change).** Check the existing packages before editing, including for page-only, CSS-only, and mock UI work, and audit reuse before delivery.
+| Work | Required area |
+| --- | --- |
+| HTTP routes, auth/sessions, API services, SQL, schema, migrations | [API](areas/api/SKILL.md); authentication/permission work also reads [auth/sessions](areas/api/references/auth-and-sessions.md) |
+| Astro pages, React views, client requests/auth, app CSS | [Frontend](areas/frontend/SKILL.md) |
+| Any UI change; shared components, Storybook, tokens | [Packages](areas/packages/SKILL.md); UI changes also require [frontend](areas/frontend/SKILL.md) and [package reuse](areas/packages/references/reuse.md) |
+| Shared DTOs, field/file/collection limits, API body caps | [Contracts](areas/contracts/SKILL.md), [API/type sync](areas/contracts/references/api-type-sync.md), and [limits](areas/contracts/references/shared-limits.md) as applicable |
+| Responsibilities, permissions, catalog, inquiries, quotations, messages, staffing | [Business domain router](business/README.md), then its matching domain references |
 
-After changing guidance, run `pnpm check:guidance`. This checks navigation, skill metadata, and registration. It cannot prove that an agent followed instructions or that application behavior works; inspect technical claims against source and exercise the affected behavior separately.
+## Choose the task
+
+| Task | Workflow |
+| --- | --- |
+| Explore, explain, plan a design, debug before editing, recover context, review lessons, sharpen a prompt | [Investigate](workflows/investigate/SKILL.md) |
+| Implement, refactor, fix a bug, change contracts, use TDD | [Implement](workflows/implement/SKILL.md) |
+| Review a diff, branch, PR, or proposed design | [Review](workflows/review/SKILL.md) |
+| Test accounts, authenticate API checks, inspect SQL, seed one table, benchmark | [QA](workflows/qa/SKILL.md) |
+| Write/revise repository guidance or documents; polish a paper or produce a document artifact | [Documentation](workflows/documentation/SKILL.md) |
+| Capstone ideation/validation, literature, research methods, citations, defense preparation | [Research](workflows/research/SKILL.md) |
+| Write an implementation, bug, spike, or Epic ticket | [Tickets](workflows/tickets/SKILL.md) |
+| Prepare, split, stack, open, or land authorized PR work | [Pull requests](workflows/pull-requests/SKILL.md) |
+
+## Continue or retain evidence
+
+- [Runs](runs/README.md): newest relevant work summary, unfinished items, and next action. Read when continuing a topic; write a compact handoff for meaningful multi-session work.
+- [Decisions](history/decisions/README.md): lasting choices, authority, rationale, and consequences. Current rules remain with their area/domain owner.
+- [Verification](history/verification/README.md): dated checks, tested artifact/environment, outcomes, and proof limits.
+- [History index](history/README.md): locate earlier evidence and rationale.
+- [Attribution](history/attribution.md): imported toolkit provenance and license; maintenance reference only.
+
+For guidance changes, use the [routing scenarios](routing-checks.md). Executable helpers live in `tools/`; select them through their owning workflow. Historical records are evidence, never startup instructions or new authorization.

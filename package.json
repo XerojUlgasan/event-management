@@ -17,7 +17,7 @@
     "check": "pnpm check:web-structure && pnpm --filter @event-management/web check && pnpm --filter @event-management/api check && pnpm --filter @event-management/ui check",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check:guidance": "node context-factory/engineering/scripts/check-guidance.mjs",
+    "check:guidance": "node context-factory/tools/check-guidance.mjs",
     "check:design": "node scripts/check-design.mjs",
     "agents:sync": "node scripts/sync-agents.mjs",
     "db:up": "pnpm --filter @event-management/api db:up",
@@ -34,7 +34,8 @@
     "supabase:stop": "pnpm --filter @event-management/supabase stop",
     "supabase:status": "pnpm --filter @event-management/supabase status",
     "build:edge": "pnpm --filter @event-management/api build:edge",
-    "check:web-structure": "node scripts/check-web-structure.mjs"
+    "check:web-structure": "node scripts/check-web-structure.mjs",
+    "test:guidance": "node --test context-factory/tools/check-guidance.test.mjs"
   },
   "devDependencies": {
     "concurrently": "^10.0.6",

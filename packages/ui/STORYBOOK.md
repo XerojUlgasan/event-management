@@ -25,4 +25,4 @@ pnpm --filter @event-management/ui check
 pnpm build:storybook
 ```
 
-To inspect interactively when appropriate, run `pnpm storybook` after checking the environment. A successful static build shows that stories bundle; inspect rendered states, focus and keyboard behavior, and affected app views separately. For web changes also follow the [frontend verification guidance](../../context-factory/frontend/reference/styling-and-verification.md) and run `pnpm check:design`.
+To inspect interactively when appropriate, run `pnpm storybook` after checking the environment. A successful static build shows that stories bundle; inspect rendered states, focus and keyboard behavior, and affected app views separately. For web changes also follow the [frontend verification guidance](../../context-factory/areas/frontend/references/styling-and-verification.md) and run `pnpm check:design`.

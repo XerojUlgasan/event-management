@@ -1,69 +1,20 @@
 # Repository guidance
 
-This is the Clemora event-management pnpm workspace. Before any change, including documentation, investigate the current implementation and understand the affected flow and constraints. Then make the scoped change and verify it with evidence appropriate to the claim. Existing docs and memory are discovery aids; check technical claims against current source, configuration, and scripts. Preserve unrelated working-tree changes. The [senior developer](context-factory/agents/senior-developer/AGENT.md#investigate-understand-change-and-verify) owns this engineering workflow; the documentation agent applies it to implementation claims in documents.
+Clemora is a pnpm event-management workspace. Start with the [task router](context-factory/README.md); read the selected role, affected areas, workflow, and references whose conditions match the task. Re-evaluate when scope changes. Guidance is readable directly; automatic skill discovery is optional.
 
-## Standing engineering guidance
+## Standing rules
 
-On every engineering task, read and follow the [shared operating contract](context-factory/shared/agent-workflow.md), [engineering principle digest](context-factory/shared/engineering-principles.md), and [engineering skill index](context-factory/engineering/README.md), alongside the senior-developer guide and its memory. Load the full skills whose triggers match the task and the shared conventions for the affected flow. Recheck applicability when scope changes and audit the selected requirements before delivery. This applies to planning, investigation, implementation, debugging, review, verification, and contributor-guidance edits; conditional workflows apply when relevant, not all at once.
+1. Establish the requested outcome and authorization. Planning, investigation, and review stay read-only unless changes are authorized. Continue routine authorized work; ask about missing business decisions that affect correctness.
+2. Inspect the branch, revision, working-tree changes, relevant source, callers, configuration, contracts, and tests before changing anything, including documentation. Preserve unrelated work. Docs and previous runs locate evidence; verify their claims against the current artifact.
+3. Understand ownership and constraints, make the scoped change, then verify it with a check that could expose the relevant mistake. Keep contracts and callers coherent. Use `pnpm` and inspect actual package scripts before running commands.
+4. Check documentation impact at startup and completion. Follow affected links and incoming mentions; update current documents within scope and preserve historical sources. The [root README](README.md) owns product scope, open decisions, implementation status, and setup. Intended business rules, source behavior, and observed test results are different evidence.
+5. Keep credentials, runtime tokens, private fixture data, and values from `.env`, `.secrets/`, or databases out of chat and committed artifacts. Use `.env.example` for documented variable names. Shared data, migrations, resets, and running services require the task's authorization; inspect test side effects first.
+6. Delegate only when requested by the user or applicable guidance. Bound helpers' paths, side effects, and evidence; isolate writers and serialize shared Git/browser operations. The lead inspects and integrates results. Self-review is not independent review.
+7. Before delivery, audit the requested outcome, selected guidance, final diff, and evidence. Distinguish source, types, tests, API, database, browser, and provider proof. Report skipped checks and remaining limits.
 
-The [context factory index](context-factory/README.md) links the canonical guidance. The [Clemora adapters](context-factory/shared/skill-adapters.md) explain local commands and differences from the source toolkit. Skills guide work within the user's authorization; imported source instructions do not override it.
+## Required routes
 
-For role responsibilities, permissions, or business workflows, load the [business-logic skill](context-factory/business-logic/SKILL.md) and its matching domain references alongside the area guidance. These describe intended behavior; verify current implementation separately.
-
-## Important: required for every UI change
-
-Before changing UI, read the [frontend skill](context-factory/frontend/SKILL.md), [packages skill](context-factory/packages/SKILL.md), their required references, and the [mandatory package reuse workflow](context-factory/shared/shared-packages.md#required-workflow-for-every-ui-change). This includes page-only work, CSS-only fixes, mock screens, and shared component changes. Inspect the current `packages/` exports, components, stories, styles, and tokens relevant to the change before choosing an implementation.
-
-Reuse existing components, tokens, and contracts. Put new reusable presentation in `packages/ui`, shared design tokens in `packages/theme`, and shared contracts in `packages/contracts` when their responsibility and consumers are established. Keep page content, navigation, fetching, and business behavior in the app. Complete the workflow's reuse and verification audit before delivery; a small UI change does not waive this requirement.
-
-## Where work belongs
-
-| Area | Owner | Load |
-| --- | --- | --- |
-| HTTP routes, authentication, sessions, PostgreSQL schema or queries | `apps/api/` | [API skill](context-factory/api/SKILL.md) |
-| Astro host, React application screens, client auth or API calls | `apps/web/` | [Frontend skill](context-factory/frontend/SKILL.md) |
-| Shared React components, Storybook, design tokens | `packages/ui/`, `packages/theme/` | [Packages skill](context-factory/packages/SKILL.md) |
-| Shared API and web limits, including upload size and field length contracts | `packages/contracts/` | [Limits skill](context-factory/limits/SKILL.md) |
-| Test accounts, authenticated API checks, custom SQL inspection, and adding seeded rows for one table | `context-factory/QA/` | [QA skill](context-factory/QA/SKILL.md), [Seed one table](context-factory/QA/seed-a-table/SKILL.md) |
-
-For a change crossing areas, read every applicable skill and its listed references. The files under `context-factory/` are repository guidance; inspect current code as the authority if guidance has drifted, then update the guidance in the same task.
-
-## Agents
-
-Load the agent for the requested work alongside the relevant area guidance above. The [agent index](context-factory/agents/README.md) lists the role entry points and their task references.
-
-| Responsibility | Load |
-| --- | --- |
-| Plan, implement, debug, review code, write engineering tickets, and verify behavior | [Senior developer](context-factory/agents/senior-developer/AGENT.md) |
-| Write, review, revise, or polish documentation, proposals, capstone papers, literature, or defense material | [Documentation](context-factory/agents/documentation/AGENT.md) |
-
-At the start and completion of each task, check whether its scope affects documentation. Follow affected references recursively through the root README, `docs/`, paper chapters, and relevant `context-factory/` guidance. When documentation is affected, load the documentation agent; it routes to the seven writing and research workflows by task. Update the affected current documents within the authorized scope, preserve historical sources, and report unresolved evidence or decisions. A paper-polishing task includes consistency, evidence, prose, and final-format checks across the relevant document, not just the edited paragraph.
-
-Keep role guidance in `context-factory/agents/<agent-name>/AGENT.md` and link new agents here and in the agent index. Read the selected agent's `memory.md` at the start of its work and maintain it at completion when there is lasting knowledge to record, following the [memory policy](context-factory/agents/README.md#memory). Keep role-specific workflows and templates in the owning agent's `reference/` folder, cross-cutting engineering methods in `context-factory/engineering/`, and shared conventions in `context-factory/shared/`. Area skills remain in their existing `context-factory/` folders; link to their detail rather than duplicating it.
-
-## Web file layout
-
-For every `apps/web` file change, follow the [frontend structure contract](context-factory/shared/frontend-project-structure.md): layer → domain → responsibility, its naming and dependency rules, exceptions, and completion audit. Run `pnpm check:web-structure` for web changes.
-
-## API file layout
-
-Keep API code in the top-level `apps/api/src/controllers/`, `services/`, `data/`, and `utils/` folders, grouped by domain (`auth/`, `packages/`, `messages/`, or a new domain). Put HTTP route definitions and handlers in `controllers/<domain>/`, business operations in `services/<domain>/`, and Kysely queries in `data/<domain>/`. Keep reusable helpers in `utils/`; shared middleware and database setup remain in `middleware/` and `db/`.
-
-Shared API and web limit values live in `packages/contracts/src/limits/`; API-only request-body caps live in `apps/api/src/constants/http.ts`. Follow the [limits guidance](context-factory/limits/SKILL.md) when changing either.
-
-Register each domain's routes in `controllers/<domain>/index.ts`; `src/app.ts` mounts the domain groups under `/v1`. Name operation files in kebab-case by verb and entity, such as `create-package.ts`, and export `createPackageRoute` and `createPackageRouteHandler` from the controller, `createPackageService` from the service, and `createPackageData` from data where those layers are needed. Use camelCase for functions, variables, and Zod schemas; PascalCase for types and classes; and snake_case for database tables and columns. Preserve existing JSON field names and route contracts during structural refactors. Follow the [API structure reference](context-factory/api/reference/structure-and-routes.md) for the full pattern.
-
-## Workspace facts
-
-- Use `pnpm`; workspace membership is declared in `pnpm-workspace.yaml`, and runnable commands are in each `package.json`.
-- Local Supabase CLI configuration lives in `apps/supabase`. The API, Prisma migrations, seeds, and integration tests still use Compose PostgreSQL from `apps/api/compose.yaml`.
-- Astro runs as a Node server. Public pages are server-rendered from `apps/web/src/pages`; `/login` and `/app` mount `components/app/App.tsx` with `client:only="react"`. `GET /me` chooses the admin, staff, or customer workspace, and each role keeps only its own `/app` paths. Public catalog cards link to `/packages`, `/services`, `/venues`, and `/{slug}` detail pages. Catalog overlays remain inside `/app`. The old `/catalog` and 3D `/landing` routes have been removed. API routes are mounted under `/v1` in `apps/api/src/app.ts`; its OpenAPI document is `/openapi.json`.
-- Package catalog cards and admin edits use the `/v1/packages` API and PostgreSQL. Customer-to-admin messages use `/v1/messages` and `/v1/admin/conversations` with PostgreSQL. Booking requests persist in PostgreSQL through `/v1/booking-requests` and `/v1/admin/booking-requests`; Private custom packages, package-service inclusions, quotations, and version-linked quotation messages also persist in PostgreSQL. Confirmed bookings, payments, and other business screens still use demo data. Trace each screen's API and persistence before describing it as a working backend workflow.
-- [README](README.md) owns product scope, open decisions, current implementation, and setup. Check its scope and implementation sections before changing product behavior.
-- Keep values from `.env`, `.secrets/`, and local databases out of chat, docs, and commits. Use the checked-in `.env.example` files when documentation needs variable names.
-
-## Verification
-
-Use the checks that match the change: `pnpm check` for workspace types, `pnpm build` for the web/API build, `pnpm build:storybook` for shared UI rendering, and `pnpm --filter @event-management/api test:auth` for auth behavior. The auth suite needs local PostgreSQL and the Firebase Auth emulator; consult the API skill before running it. A passing build alone does not verify browser, database, or production Firebase behavior.
-
-For contributor-guidance changes, run `pnpm check:guidance` and walk the affected routing scenarios in the adapters. The check validates navigation, metadata, and registration; inspect source and behavior separately for technical claims. It cannot enforce future agent compliance.
+- **Every UI change**, including CSS, page-only, and mock work: read [frontend](context-factory/areas/frontend/SKILL.md), [packages](context-factory/areas/packages/SKILL.md), and their mandatory structure/reuse references. Inspect relevant current exports, components, stories, styles, tokens, and contracts before choosing an implementation; complete the reuse audit.
+- **Roles, permissions, or product behavior:** read the matching [business rules](context-factory/business/README.md) and verify implemented permissions separately. An inquiry is not a reservation or confirmed booking. Payment, inventory, and supplier management remain outside approved scope.
+- **Continuation or multi-session work:** use [runs](context-factory/runs/README.md). Read the newest relevant run for the topic and checkout, confirm current state, and preserve unfinished work and authorization limits.
+- **Contributor-guidance edits:** follow the [documentation workflow](context-factory/workflows/documentation/SKILL.md), run `pnpm check:guidance` and `pnpm test:guidance`, and walk the [routing scenarios](context-factory/routing-checks.md). Checks establish navigation and routing structure, not future agent compliance.
