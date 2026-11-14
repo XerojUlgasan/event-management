@@ -14,8 +14,8 @@ import {
   packageImageSrc,
   type AdminPackage,
 } from "../../../lib/data/packages";
-import { centavosToPesos, pesosToCentavos } from "../../../lib/utils/money";
-import { PackageCanvas, priceLabel } from "../PackagePreview";
+import { centavosToPesos, pesosToCentavos, priceLabel } from "../../../lib/utils/money";
+import { PackageCanvas } from "../../catalog/CatalogContent";
 import { photos } from "../data";
 import "../../../styles/package-editor.css";
 
@@ -73,7 +73,7 @@ export function PackageEditor({
     },
   ) => Promise<void>;
 }) {
-  const { notifyError } = useNotifications();
+  const { notify, notifyError } = useNotifications();
   const [serviceOptions, setServiceOptions] = useState<AdminService[]>([]);
   const [serviceCursor, setServiceCursor] = useState<string | null>(null);
   const [serviceError, setServiceError] = useState("");
@@ -287,6 +287,7 @@ export function PackageEditor({
       renderPreview={(content, mode) =>
         mode === "customer" ? (
           <PackageCanvas
+            bookingAction={<Button onClick={() => notify("Booking is available after saving and opening the package.", "info")}>Book now</Button>}
             item={{
               ...content,
               services: content.services.map((s) => ({

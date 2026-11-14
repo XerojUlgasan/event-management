@@ -14,6 +14,12 @@ export default defineConfig({
   integrations: [react()],
   vite: {
     plugins: [tailwindcss()],
+    // Bundle the Markdown renderer so its stylesheet is handled during SSR.
+    resolve: {
+      noExternal: ["@uiw/react-markdown-preview"],
+      // React's integration inlines Babel helpers by default; these are CJS.
+      external: ["@babel/runtime"],
+    },
     ...(apiProxyTarget
       ? {
           server: {

@@ -231,8 +231,8 @@
   margin-block: 1rem;
   min-width: 0;
 }
-.booking-current-package h3,
-.booking-current-package p {
+.booking-current-package > h3,
+.booking-current-package > p {
   margin: 0;
 }
 

@@ -9,7 +9,7 @@ import {
   type PackageHistoryEntry,
 } from "../../lib/data/booking-packages";
 import { usePagination } from "../../lib/use-pagination";
-import { PackageCanvas } from "./PackagePreview";
+import { PackageCanvas } from "../catalog/CatalogContent";
 import { PackageEditor } from "./pages/PackageEditor";
 
 export function BookingPackage({

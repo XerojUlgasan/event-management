@@ -16,6 +16,6 @@
 | Multi-step client sequences and pure helpers | `apps/web/src/lib/services/` and `apps/web/src/lib/utils/` |
 | Session state, optional Firebase client | `apps/web/src/lib/auth.tsx` and `firebase.ts` |
 | App styling and assets | `apps/web/src/styles/` and `apps/web/public/` |
-| Reusable presentation and tokens | `packages/ui/` and `packages/theme/` |
+| Reusable presentation, including catalog canvas and widget rendering, and tokens | `packages/ui/` and `packages/theme/` |
 
 Follow nearby patterns, [client layers](../frontend/reference/client-layers.md), and [pages and structure](../frontend/reference/pages-and-structure.md). Do not add `apps/web` controllers or a parallel `src/routes` or feature-folder framework to mirror the source toolkit. Public catalogs are server-rendered pages at `/packages`, `/services`, `/venues`, and their slug detail routes. Workspace screens are real `/app` paths, limited by the signed-in role. Same-origin navigation within `/app` updates browser history without a document reload; login and public routes keep document navigation. Catalog overlays remain inside `/app`. [Client data and auth](../frontend/reference/data-and-auth.md) distinguishes persisted flows from demo data.

@@ -7,7 +7,8 @@ import { Button, Pagination, Dialog, FormField, Input, PageHeader, SearchField, 
 import { ApiError } from "../../../lib/http"
 import { catalogMediaSrc } from "../../../lib/data/catalog-media"
 import { archiveVenue, createVenue, deleteVenue, getAdminVenue, getAdminVenues, updateVenue, type AdminVenue, type VenueContent } from "../../../lib/data/venues"
-import { CatalogDetailPreview, VenueCanvas } from "../CatalogPreview"
+import { CatalogDetailPreview } from "../CatalogPreview"
+import { VenueCanvas } from "../../catalog/CatalogContent"
 import { CatalogEditor } from "./CatalogEditor"
 
 const empty = (): VenueContent => ({ name: "", location: "", description: "", maxGuests: null, sections: [{ id: crypto.randomUUID(), title: "", widgets: [] }] })

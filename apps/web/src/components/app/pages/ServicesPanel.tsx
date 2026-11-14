@@ -28,10 +28,10 @@ import {
   type ServiceContent,
 } from "../../../lib/data/services";
 import {
-  CatalogDetailPreview,
   ServiceCanvas,
   serviceRateLabel as rateLabel,
-} from "../CatalogPreview";
+} from "../../catalog/CatalogContent";
+import { CatalogDetailPreview } from "../CatalogPreview";
 import { CatalogEditor } from "./CatalogEditor";
 
 const empty = (): ServiceContent => ({

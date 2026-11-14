@@ -2,6 +2,14 @@
 
 Durable engineering notes for this role. Read and maintain them under the shared [memory policy](../README.md#memory).
 
+## 2026-11-14 — Catalog guides must match saved grid geometry
+
+The shared catalog renderer and editor consume `CATALOG_GRID` from `@event-management/ui`. Guides represent the actual 12 snap columns; section row counts derive from the lowest widget edge, including gaps, rather than a separate section setting. Narrow screens label the stacked view and saved coordinates separately. The [frontend verification reference](../../frontend/reference/styling-and-verification.md) owns geometry and rendering details; the [limits reference](../../limits/reference/shared-limits.md) owns widget bounds.
+
+**Evidence:** Local browser checks covered Packages, Services, and Venues, empty sections, keyboard movement, pointer drag/resize, live counts, undo, preview dimensions, and narrow-screen stacking. Package/service and venue API tests preserved coordinates and gaps in disposable databases. These checks do not establish hosted behavior.
+
+**Why it matters:** A decorative square background can misrepresent the saved grid. Change the shared metrics and inspect the rendered snap boundaries together; keep intentional gaps intact.
+
 ## 2026-11-13 — Booking conversations have no automatic expiry
 
 The [message policy](../../business-logic/references/messages.md) removes automatic conversation expiry. Message reads/sends, quotation delivery, and seed selection must not use age, inactivity, or parent event end times as a deadline. The API and browser contract no longer contain conversation `expiresAt`. Any future bookingless expiry policy is deferred; existing general routes have no timer either.

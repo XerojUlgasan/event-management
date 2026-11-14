@@ -5,7 +5,7 @@ import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/cata
 import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images"
 import { MAX_VIDEO_SIZE_BYTES } from "@event-management/contracts/limits/videos"
 import type { CatalogWidget } from "@event-management/contracts/catalog"
-import { WidgetContent } from "../CatalogSections"
+import { WidgetContent } from "../../catalog/CatalogContent"
 
 export function PackageMediaSettings({ widget, fileName, onChange, onSelectFile, onClose, entity = "package" }: {
   entity?: "package" | "service" | "venue"

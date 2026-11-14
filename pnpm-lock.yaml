@@ -136,6 +136,9 @@ importers:
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
+      vite:
+        specifier: 8.3.5
+        version: 8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
 
   packages/contracts: {}
 
@@ -143,9 +146,18 @@ importers:
 
   packages/ui:
     dependencies:
+      '@event-management/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@event-management/theme':
         specifier: workspace:*
         version: link:../theme
+      '@uiw/react-markdown-preview':
+        specifier: 5.2.1
+        version: 5.2.1(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(supports-color@10.2.2)
+      rehype-sanitize:
+        specifier: ^6.0.0
+        version: 6.0.0
     devDependencies:
       '@storybook/addon-docs':
         specifier: 10.6.3

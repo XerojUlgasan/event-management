@@ -244,13 +244,21 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
   await read(await call('/admin/packages'),401);
   for(const cookie of [customerCookie,staffCookie,undesignatedAdminCookie]) await read(await call('/admin/packages','POST',data,cookie),403);
   for(const patch of [{name:''},{price:null},{price:{...data.price,amountMinor:101}},{maxGuests:0},{eventTypes:['Birthday']},{guestMax:100}]) await read(await call('/admin/packages','POST',{...data,...patch},adminCookie),400);
-  const created=await read(await call('/admin/packages','POST',data,adminCookie),201);
+  const gridContent = structuredClone(data);
+  Object.assign(gridContent.sections[0].widgets[0], { x: 0, y: 2, w: 4, h: 8 });
+  Object.assign(gridContent.sections[0].widgets[1], { x: 7, y: 14, w: 5, h: 3 });
+  const expectedGeometry = [[0, 2, 4, 8], [7, 14, 5, 3]];
+  const geometry = (item: any) => item.sections[0].widgets.map(({ x, y, w, h }: any) => [x, y, w, h]);
+  const created=await read(await call('/admin/packages','POST',gridContent,adminCookie),201);
   assert.equal(created.name,data.name);assert.equal(created.description,data.description);assert.equal(created.imageUrl,'/images/wedding.jpg');
   for(const key of ['draft','published','versions','versionId','eventTypes','guestMax']) assert.equal(key in created,false);
   const detail=await read(await call(`/packages/${created.id}`),200);assert.equal(detail.sections[0].widgets.length,2);
-  const edits=await Promise.all(['First edit','Second edit'].map(name=>call(`/admin/packages/${created.id}`,'PATCH',{...data,name,expectedUpdatedAt:created.updatedAt},adminCookie)));
+  assert.deepEqual(geometry(detail), expectedGeometry);
+  const edits=await Promise.all(['First edit','Second edit'].map(name=>call(`/admin/packages/${created.id}`,'PATCH',{...gridContent,name,expectedUpdatedAt:created.updatedAt},adminCookie)));
   assert.deepEqual(edits.map(r=>r.status).sort(),[200,409]);
   const current=await read(await call(`/admin/packages/${created.id}`,'GET',undefined,adminCookie),200);
+  assert.deepEqual(geometry(current), expectedGeometry);
+  assert.deepEqual(geometry(await read(await call(`/packages/${created.id}`),200)), expectedGeometry);
   const before=(await pool.query('SELECT count(*) FROM catalog_sections WHERE page_id=(SELECT id FROM catalog_pages WHERE package_id=$1)',[created.id])).rows[0].count;
   const bad=structuredClone(data);bad.sections[0].widgets[0].media={kind:'image',source:'upload',id:randomUUID(),url:'/v1/catalog-media/missing'} as any;
   await read(await call(`/admin/packages/${created.id}`,'PATCH',{...bad,name:'Must roll back',expectedUpdatedAt:current.updatedAt},adminCookie),400);
@@ -299,7 +307,19 @@ test("catalog validates widget sources, bounds, counts and paginates direct pack
   const linkedPhoto=structuredClone(data);linkedPhoto.sections[0].widgets[0].media={kind:'image',source:'external',url:'https://example.test/photo.jpg'};
   await read(await call('/admin/packages','POST',linkedPhoto,adminCookie),400);
   await assert.rejects(pool.query("INSERT INTO media_assets(kind,source,url) VALUES('image','external','https://example.test/photo.jpg')"), /media_assets_source/);
-  for(const geometry of [{x:11,w:2},{h:101},{w:0}]){const c=structuredClone(data);Object.assign(c.sections[0].widgets[0],geometry);await read(await call('/admin/packages','POST',c,adminCookie),400);}
+  const { MAX_CATALOG_WIDGET_ROWS, MAX_CATALOG_WIDGET_Y } = await import('@event-management/contracts/limits/catalog');
+  assert.equal(MAX_CATALOG_WIDGET_ROWS, 100);
+  assert.equal(MAX_CATALOG_WIDGET_Y, 100000);
+  const maxGeometry = structuredClone(data);
+  maxGeometry.name = `Maximum grid ${randomUUID()}`;
+  Object.assign(maxGeometry.sections[0].widgets[0], { y: MAX_CATALOG_WIDGET_Y, h: MAX_CATALOG_WIDGET_ROWS });
+  const maxGeometrySaved = await read(await call('/admin/packages','POST',maxGeometry,adminCookie),201);
+  assert.deepEqual(
+    maxGeometrySaved.sections[0].widgets.map((widget: any) => [widget.y, widget.h]),
+    [[MAX_CATALOG_WIDGET_Y, MAX_CATALOG_WIDGET_ROWS], [0, 6]],
+  );
+  await read(await call(`/admin/packages/${maxGeometrySaved.id}`, 'DELETE', undefined, adminCookie), 204);
+  for(const invalidGeometry of [{x:11,w:2},{h:MAX_CATALOG_WIDGET_ROWS + 1},{y:MAX_CATALOG_WIDGET_Y + 1},{w:0}]){const c=structuredClone(data);Object.assign(c.sections[0].widgets[0],invalidGeometry);await read(await call('/admin/packages','POST',c,adminCookie),400);}
   const c=structuredClone(data);c.sections[0].widgets.push({...c.sections[0].widgets[0]});await read(await call('/admin/packages','POST',c,adminCookie),400);
   const countBefore=(await read(await call('/packages?limit=50'),200)).packages.length;
   for(let i=0;i<17;i++)await read(await call('/admin/packages','POST',{...data,name:`Paged ${i}`},adminCookie),201);
@@ -505,6 +525,7 @@ test("service and venue canvases save rich content directly and enforce media ow
   const { sections: ignored, ...legacy } = service;
   const edited = await read(await call(`/admin/services/${created.id}`, "PATCH", { ...legacy, name: "Changed", expectedUpdatedAt: created.updatedAt }, adminCookie), 200);
   assert.equal(edited.sections[0].widgets[0].media.id, photo.id);
+  assert.deepEqual(edited.sections[0].widgets.map((w: any) => [w.x, w.y, w.w, w.h]), [[0,0,6,6],[6,3,5,8],[2,12,8,4]]);
   assert.equal((await read(await call(`/services/${created.id}`), 200)).name, "Changed");
   await read(await call(`/admin/services/${created.id}/archive`, "POST", undefined, adminCookie), 200);
   assert.equal((await call(`/catalog-media/${photo.id}`)).status, 404);
@@ -519,12 +540,14 @@ test("service and venue canvases save rich content directly and enforce media ow
   venueSections[0].widgets[1].media = venueVideo;
   const savedVenue = await read(await call("/admin/venues", "POST", { ...venue, sections: venueSections }, adminCookie), 201);
   const publicVenue = await read(await call(`/venues/${savedVenue.id}`), 200);
+  assert.deepEqual(publicVenue.sections[0].widgets.map((w: any) => [w.x, w.y, w.w, w.h]), [[0,0,6,6],[6,3,5,8],[2,12,8,4]]);
   assert.equal(publicVenue.sections[0].widgets[0].media.id, venuePhoto.id);
   assert.equal(publicVenue.sections[0].widgets[1].autoplay, true);
   assert.equal(publicVenue.sections[0].widgets[2].markdown, "## Details\n\n**Custom content**");
   const { sections: ignoredVenueSections, ...legacyVenue } = venue;
   const venueLegacyEdit = await read(await call(`/admin/venues/${savedVenue.id}`, "PATCH", { ...legacyVenue, expectedUpdatedAt: savedVenue.updatedAt }, adminCookie), 200);
   assert.equal(venueLegacyEdit.sections[0].widgets[1].media.id, venueVideo.id);
+  assert.deepEqual(venueLegacyEdit.sections[0].widgets.map((w: any) => [w.x, w.y, w.w, w.h]), [[0,0,6,6],[6,3,5,8],[2,12,8,4]]);
   const venueEdit = await read(await call(`/admin/venues/${savedVenue.id}`, "PATCH", { ...venue, sections: [], expectedUpdatedAt: venueLegacyEdit.updatedAt }, adminCookie), 200);
   assert.deepEqual(venueEdit.sections, []);
   assert.equal((await call(`/catalog-media/${venuePhoto.id}`)).status, 404);

@@ -95,6 +95,7 @@
   min-height: 0;
   flex: 1;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   overscroll-behavior: contain;
 }
 .package-preview-state {

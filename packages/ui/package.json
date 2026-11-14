@@ -11,7 +11,10 @@
     "react-dom": "^19.3.1"
   },
   "dependencies": {
-    "@event-management/theme": "workspace:*"
+    "@event-management/theme": "workspace:*",
+    "@event-management/contracts": "workspace:*",
+    "@uiw/react-markdown-preview": "5.2.1",
+    "rehype-sanitize": "^6.0.0"
   },
   "scripts": {
     "check": "tsc --noEmit",

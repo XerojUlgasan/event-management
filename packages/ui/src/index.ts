@@ -35,6 +35,7 @@ export type { SiteLink } from "./molecules/SiteHeader";
 export { InclusionStrip } from "./molecules/InclusionStrip";
 
 // Organisms
+export { CatalogCanvas, CatalogSections, CatalogWidgetContent, CatalogMarkdown, CatalogGridGuides, CatalogGridRuler, CATALOG_GRID, catalogGridStyle } from "./organisms/CatalogCanvas";
 export { DataTable } from "./organisms/DataTable";
 export type { DataTableColumn, DataTableProps } from "./organisms/DataTable";
 export { PageHeader } from "./organisms/PageHeader";

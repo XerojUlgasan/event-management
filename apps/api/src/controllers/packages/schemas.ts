@@ -6,7 +6,7 @@ import {
   MAX_PACKAGE_SERVICES,
   MAX_WIDGET_MARKDOWN_LENGTH,
 } from "@event-management/contracts/catalog";
-import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
+import { MAX_CATALOG_TEXT_LENGTH, MAX_CATALOG_WIDGET_ROWS, MAX_CATALOG_WIDGET_Y } from "@event-management/contracts/limits/catalog";
 
 const text = z.string().trim().max(MAX_CATALOG_TEXT_LENGTH);
 const sampleImages = new Set([
@@ -59,9 +59,9 @@ export const widgetSchema = z
       .int()
       .min(0)
       .max(CATALOG_COLUMNS - 1),
-    y: z.number().int().min(0).max(100000),
+    y: z.number().int().min(0).max(MAX_CATALOG_WIDGET_Y),
     w: z.number().int().min(1).max(CATALOG_COLUMNS),
-    h: z.number().int().min(1).max(100),
+    h: z.number().int().min(1).max(MAX_CATALOG_WIDGET_ROWS),
     markdown: z.string().max(MAX_WIDGET_MARKDOWN_LENGTH),
     media: mediaSchema.nullable(),
     alt: text,

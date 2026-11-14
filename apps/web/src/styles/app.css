@@ -8,6 +8,10 @@
 @import "./admin-event-days.css";
 @import "./event-checklists.css";
 
+html:has(.public-site) {
+  scrollbar-gutter: stable;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -6347,9 +6351,6 @@
   flex-direction: column;
   color: inherit;
   text-decoration: none;
-}
-.canvas-intro > a.canvas-book {
-  margin-top: 24px;
 }
 .section-back {
   max-width: 1220px;

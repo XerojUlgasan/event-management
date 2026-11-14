@@ -115,13 +115,15 @@ test("venues save directly, publish edits immediately and reject stale or archiv
 
 test("venue canvas photos keep order and pagination is stable", async () => {
   const sections = [{ id: randomUUID(), title: "Gallery", widgets: ["/images/wedding.jpg", "/images/dinner.jpg"].map((url, i) => ({
-    id: randomUUID(), type: "photo", x: i * 6, y: 0, w: 6, h: 6, markdown: "", media: { kind: "image", source: "sample", url }, alt: "Venue photo", caption: "",
+    id: randomUUID(), type: "photo", x: i === 0 ? 0 : 7, y: i === 0 ? 0 : 13, w: i === 0 ? 4 : 5, h: i === 0 ? 6 : 7, markdown: "", media: { kind: "image", source: "sample", url }, alt: "Venue photo", caption: "",
   })) }];
   const created = await read(await call("/admin/venues", "POST", { ...content, sections }, adminCookie), 201);
   const detail = await read(await call(`/venues/${created.id}`), 200);
   assert.deepEqual(detail.sections[0].widgets.map((w: any) => w.media.url), ["/images/wedding.jpg", "/images/dinner.jpg"]);
+  assert.deepEqual(detail.sections[0].widgets.map((w: any) => [w.x, w.y, w.w, w.h]), [[0,0,4,6],[7,13,5,7]]);
   const edited = await read(await call(`/admin/venues/${created.id}`, "PATCH", { ...content, expectedUpdatedAt: created.updatedAt }, adminCookie), 200);
   assert.deepEqual(edited.sections, detail.sections);
+  assert.deepEqual(edited.sections[0].widgets.map((w: any) => [w.x, w.y, w.w, w.h]), [[0,0,4,6],[7,13,5,7]]);
   for (let i = 0; i < 17; i++) await read(await call("/admin/venues", "POST", { ...content, name: `Pagination ${String(i).padStart(2, "0")}` }, adminCookie), 201);
   const all = (await read(await call("/venues?limit=50"), 200)).venues;
   const page1 = await read(await call("/venues?limit=15"), 200);
