@@ -17,6 +17,7 @@ export { SectionCounter } from "./atoms/SectionCounter";
 export { Pagination } from "./molecules/Pagination";
 export type { PaginationProps } from "./molecules/Pagination";
 export { Brand } from "./molecules/Brand";
+export { BRAND_LOGO_URL } from "./assets/brand";
 export { StatCard } from "./molecules/StatCard";
 export { Panel } from "./molecules/Panel";
 export { SearchField } from "./molecules/SearchField";

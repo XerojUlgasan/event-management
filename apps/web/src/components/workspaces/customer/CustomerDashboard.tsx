@@ -516,7 +516,7 @@ export function CustomerDashboard({
           <div className="customer-content">
             <section className="customer-welcome">
               <div>
-                <span className="eyebrow">Your Clemora workspace</span>
+                <span className="eyebrow">Your Styled by AMAC workspace</span>
                 <h1 className="page-title">Welcome back, {userName}</h1>
                 <p>Plan an event and keep in touch with our team.</p>
               </div>
@@ -664,7 +664,7 @@ export function CustomerDashboard({
               newChatBusy={newChatBusy}
               listEmpty={{
                 title: "No conversation yet",
-                body: "Start a conversation with the Clemora team.",
+                body: "Start a conversation with the Styled by AMAC team.",
               }}
               threadEmpty={{
                 title: "Say hello",
@@ -680,7 +680,7 @@ export function CustomerDashboard({
           onClose={() => setMessageOpen(false)}
           initialFocus={messageInputRef}
           className="compact-modal"
-          eyebrow="Message the Clemora team"
+          eyebrow="Message the Styled by AMAC team"
           title="How can we help?"
           intro="Send a message about your event, quotation, or booking. Our team will reply in Messages."
           actions={

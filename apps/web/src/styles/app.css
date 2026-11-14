@@ -8,6 +8,7 @@
 @import "./booking-requests/customer-events.css";
 @import "./event-days/admin-event-days.css";
 @import "./checklists/event-checklists.css";
+@import "./public/site.css";
 
 html:has(.public-site) {
   scrollbar-gutter: stable;
@@ -19,12 +20,13 @@ html:has(.public-site) {
   }
   html {
     scroll-behavior: smooth;
+    scrollbar-color: var(--brand-taupe) var(--canvas);
   }
   body {
     margin: 0;
     color: var(--ink);
     font-family: var(--font-sans);
-    background: var(--surface-base);
+    background: var(--canvas);
     -webkit-font-smoothing: antialiased;
   }
   button,
@@ -880,8 +882,9 @@ html:has(.public-site) {
   padding: 23px 16px 16px;
   display: flex;
   flex-direction: column;
-  color: color-mix(in srgb, var(--surface-base) 76%, var(--transparent));
-  background: var(--accent-deep);
+  color: var(--text-secondary);
+  background: var(--brand-paper);
+  border-right: 1px solid var(--line);
 }
 .sidebar-top {
   height: 42px;
@@ -890,23 +893,19 @@ html:has(.public-site) {
   align-items: center;
 }
 .sidebar .brand {
-  font-size: 23px;
-}
-.sidebar .brand-mark {
-  width: 32px;
-  height: 32px;
-  font-size: 19px;
+  --brand-width: 168px;
+  flex-shrink: 0;
 }
 .sidebar-close {
   display: none;
   margin-left: auto;
-  color: var(--surface-base);
+  color: var(--text-primary);
   border: 0;
   background: none;
 }
 .workspace-label {
   margin: 31px 12px 10px;
-  color: color-mix(in srgb, var(--surface-base) 38%, var(--transparent));
+  color: var(--text-muted);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.13em;
@@ -933,12 +932,12 @@ html:has(.public-site) {
   font-weight: 500;
 }
 .side-nav button:hover {
-  background: color-mix(in srgb, var(--surface-base) 7%, var(--transparent));
-  color: var(--surface-base);
+  background: var(--surface-raised);
+  color: var(--text-primary);
 }
 .side-nav button.active {
-  color: var(--accent-deep);
-  background: var(--cream);
+  color: var(--text-primary);
+  background: var(--accent-soft);
   font-weight: 700;
 }
 .side-nav button b {
@@ -955,8 +954,7 @@ html:has(.public-site) {
 .sidebar-user {
   margin-top: auto;
   padding: 14px 7px 0;
-  border-top: 1px solid
-    color-mix(in srgb, var(--surface-base) 12%, var(--transparent));
+  border-top: 1px solid var(--line);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -976,7 +974,7 @@ html:has(.public-site) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: color-mix(in srgb, var(--surface-base) 97%, var(--transparent));
+  background: var(--brand-paper);
   border-bottom: 1px solid var(--line);
 }
 .app-header-actions {
@@ -1055,16 +1053,16 @@ html:has(.public-site) {
 .account-menu-sidebar .account-menu-trigger {
   width: 100%;
   justify-content: flex-start;
-  color: var(--surface-base);
+  color: var(--text-primary);
   font-size: 12px;
   font-weight: 600;
 }
-.account-menu-sidebar .account-menu-trigger > span {
-  color: var(--surface-base);
+.account-menu-sidebar .account-menu-trigger > span:not(.avatar) {
+  color: var(--text-primary);
 }
 .account-menu-sidebar .account-menu-trigger:hover,
 .account-menu-sidebar .account-menu-trigger[aria-expanded="true"] {
-  background: color-mix(in srgb, var(--surface-base) 12%, var(--transparent));
+  background: var(--surface-raised);
 }
 .account-menu-sidebar .account-menu {
   top: auto;
@@ -3668,7 +3666,7 @@ html:has(.public-site) {
   align-items: center;
   gap: 40px;
   border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--surface-base) 97%, var(--transparent));
+  background: var(--brand-paper);
 }
 .customer-brand-button {
   border: 0;
@@ -3676,11 +3674,7 @@ html:has(.public-site) {
   background: none;
 }
 .customer-brand-button .brand {
-  font-size: 22px;
-}
-.customer-brand-button .brand-mark {
-  width: 32px;
-  height: 32px;
+  --brand-width: 180px;
 }
 .customer-nav {
   align-self: stretch;
@@ -5293,8 +5287,8 @@ html:has(.public-site) {
     padding: 9px 14px 0;
     gap: 8px;
   }
-  .customer-brand-button .brand > span:last-child {
-    display: none;
+  .customer-brand-button .brand {
+    --brand-width: 148px;
   }
   .customer-profile {
     display: flex;

@@ -77,7 +77,7 @@ export function PackagePreview({
           >
             ×
           </Button>
-          <span className="package-preview-brand">Clemora</span>
+          <span className="package-preview-brand">Styled by AMAC</span>
           <span className="package-preview-divider" />
           <span className="package-preview-label" id={titleId}>
             Package preview

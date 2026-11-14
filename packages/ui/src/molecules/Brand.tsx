@@ -1,8 +1,15 @@
+import { BRAND_LOGO_URL } from "../assets/brand";
+
 export function Brand({ light = false }: { light?: boolean }) {
   return (
-    <div className={`brand ${light ? "brand-light" : ""}`}>
-      <span className="brand-mark">C</span>
-      <span>Clemora</span>
-    </div>
+    <span className={`brand ${light ? "brand-light" : ""}`}>
+      <img
+        className="brand-logo"
+        src={BRAND_LOGO_URL}
+        alt="Styled by AMAC"
+        width={1023}
+        height={1022}
+      />
+    </span>
   );
 }

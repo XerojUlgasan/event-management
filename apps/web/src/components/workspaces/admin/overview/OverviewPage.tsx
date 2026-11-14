@@ -29,7 +29,7 @@ export function OverviewPage({
         className="welcome-row"
         eyebrow="Monday, June 16"
         title={`Good morning, ${firstName}`}
-        description="Here’s what’s happening across Clemora this week."
+        description="Here’s what’s happening across Styled by AMAC this week."
         actions={
           <div className="welcome-actions">
             <Button

@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-14T05:58:58Z",
+  "title": "Design System: Styled by AMAC",
+  "extensions": {
+    "colorMeta": {
+      "charcoal": {
+        "role": "primary",
+        "displayName": "Charcoal"
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper"
+      },
+      "taupe": {
+        "role": "tertiary",
+        "displayName": "Decorative Taupe"
+      },
+      "taupe-text": {
+        "role": "secondary",
+        "displayName": "Readable Taupe"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "White Surface"
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Soft Border"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Editorial Display",
+        "purpose": "Public hero and section headlines."
+      },
+      "body": {
+        "displayName": "Operational Sans",
+        "purpose": "Body copy, navigation, forms, and workspace tasks."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Public image captions and compact authentication notes."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Login field labels and account helper text."
+      },
+      "control": {
+        "displayName": "Control",
+        "purpose": "Public navigation, links, and shared actions."
+      },
+      "support": {
+        "displayName": "Support",
+        "purpose": "Login introduction and visual-panel supporting copy."
+      },
+      "heroSupport": {
+        "displayName": "Hero Support",
+        "purpose": "Responsive supporting copy beside the public hero headline."
+      },
+      "aboutBody": {
+        "displayName": "About Body",
+        "purpose": "Longer public about-page copy."
+      },
+      "tabletDisplay": {
+        "displayName": "Tablet Display",
+        "purpose": "Responsive public hero heading at widths up to 820px."
+      },
+      "mobileDisplay": {
+        "displayName": "Mobile Display",
+        "purpose": "Responsive public hero heading at widths up to 600px."
+      },
+      "mobileSection": {
+        "displayName": "Mobile Section",
+        "purpose": "Public section headings at widths up to 600px."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shared-subtle",
+        "value": "0 8px 28px color-mix(in srgb, #272624 10%, transparent)",
+        "purpose": "Existing shared theme elevation for surfaces that need hierarchy."
+      }
+    ],
+    "motion": [
+      {
+        "name": "public-image-hover",
+        "value": "transform 250ms ease-out",
+        "purpose": "Restrained image zoom on public catalog hover."
+      },
+      {
+        "name": "shared-control-transition",
+        "value": "0.2s ease",
+        "purpose": "Existing shared button state transition."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "public-navigation-collapse",
+        "value": "1100px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Charcoal action button for the primary task on a screen.",
+      "html": "<button class=\"ds-button-primary\">Continue</button>",
+      "css": ".ds-button-primary { min-height: 43px; padding: 0 18px; border: 1px solid transparent; border-radius: 9px; color: #ffffff; background: #3a3937; font: 600 14px 'DM Sans', sans-serif; transition: 0.2s ease; } .ds-button-primary:hover { background: #272624; transform: translateY(-1px); } .ds-button-primary:focus-visible { outline: 2px solid #71645a; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Shared field for readable form entry and keyboard focus.",
+      "html": "<label class=\"ds-field\">Email<input class=\"ds-input\" type=\"email\" placeholder=\"name@example.com\"></label>",
+      "css": ".ds-field { display: grid; gap: 6px; color: #3a3937; font: 400 14px 'DM Sans', sans-serif; } .ds-input { min-height: 43px; padding: 11px 12px; border: 1px solid #d7d1cd; border-radius: 8px; color: #3a3937; background: #ffffff; font: inherit; } .ds-input:focus-visible { outline: 2px solid #3a3937; outline-offset: 1px; }"
+    },
+    {
+      "name": "Public Navigation Link",
+      "kind": "nav",
+      "description": "Quiet public-site link with a clear hover and focus state.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#packages\">Packages</a><a href=\"#services\">Services</a></nav>",
+      "css": ".ds-nav { display: flex; gap: 24px; color: #3a3937; font: 500 14px 'DM Sans', sans-serif; } .ds-nav a:hover { text-decoration: underline; text-underline-offset: 6px; } .ds-nav a:focus-visible { outline: 2px solid #71645a; outline-offset: 5px; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "description": "Compact status label that keeps operational meaning distinct.",
+      "html": "<span class=\"ds-badge ds-badge-success\">Available</span>",
+      "css": ".ds-badge { display: inline-flex; padding: 5px 9px; border-radius: 999px; font: 700 11px 'DM Sans', sans-serif; } .ds-badge-success { color: #26735b; background: #e7f3ed; }"
+    },
+    {
+      "name": "Public Catalog Row",
+      "kind": "card",
+      "description": "Open public catalog card treatment in the responsive three/two/one column grid.",
+      "html": "<article class=\"ds-catalog-row\"><h3>Package name</h3><p>Explore the details</p></article>",
+      "css": ".ds-catalog-row { padding: 24px 0; border: 0; border-bottom: 1px solid #d7d1cd; border-radius: 0; color: #3a3937; background: transparent; font-family: 'DM Sans', sans-serif; } .ds-catalog-row h3 { margin: 0; font: 600 24px 'Playfair Display', serif; } .ds-catalog-row p { color: #514d49; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "A calm, editorial welcome",
+    "overview": "The approved identity uses the actual supplied AMAC logo with a charcoal, off-white, and taupe palette. Public pages use spacious serif-led composition and a open catalog card presentation in a responsive three/two/one column grid. The same brand theme carries through login and administrator, customer, and staff workspaces, where information density follows the task. Shared controls and theme values are owned by packages/ui and packages/theme; app-specific public composition lives in apps/web/src/styles/public/site.css.",
+    "keyCharacteristics": [
+      "Quiet, spacious public presentation with serif display headings.",
+      "Sans-serif text and controls for reading and operational tasks.",
+      "Charcoal, paper, and taupe identity with distinct readable taupe text.",
+      "Operational status colors and information density remain clear in workspaces."
+    ],
+    "rules": [
+      {
+        "name": "The Readable Taupe Rule",
+        "body": "Use the darker readable taupe for text and focus indicators; reserve the lighter taupe for decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The Status Clarity Rule",
+        "body": "Keep success, warning, danger, and information colors distinct in operational workflows.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "Use the shared theme tokens and UI components for new branded surfaces.",
+      "Preserve the operational status palette and clarity of dense workspace tasks."
+    ],
+    "donts": [
+      "Do not redraw, recolor, or distort the supplied logo.",
+      "Do not apply public-page density to information-heavy workspace workflows.",
+      "Do not treat visual choices as changes to product policy or scope."
+    ]
+  }
+}

@@ -39,7 +39,7 @@ type AvailabilityRequest = {
 const label = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 const errorMessage = (cause: unknown, fallback: string) =>
   cause instanceof TypeError
-    ? "Unable to reach Clemora. Check your connection and try again."
+    ? "Unable to reach Styled by AMAC. Check your connection and try again."
     : notificationErrorMessage(cause, fallback);
 const isOpen = (day: EventDay, now: number) =>
   day.status === "scheduled" &&
@@ -526,7 +526,7 @@ export function StaffWorkspaceShell({
       if (!mounted.current) return;
       const message = notifyError(
         cause instanceof TypeError
-          ? "Unable to reach Clemora. Check your connection and try again."
+          ? "Unable to reach Styled by AMAC. Check your connection and try again."
           : cause,
         "Unable to save your response. Please try again.",
       );

@@ -424,7 +424,7 @@ export function CalendarPage() {
             <span>overlaps</span>
             <div>
               <Badge tone="warning">Private tasting</Badge>
-              <strong>Clemora Studio</strong>
+              <strong>Styled by AMAC</strong>
               <span>1:30–3:30 PM · Tasting lead</span>
               <small>Current end time leaves no travel buffer</small>
             </div>

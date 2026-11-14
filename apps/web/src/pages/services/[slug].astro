@@ -14,7 +14,9 @@ try {
   unavailable = true;
 }
 if (!unavailable && !item) Astro.response.status = 404;
-const title = item ? `${item.name} | Clemora` : "Service not found | Clemora";
+const title = item
+  ? `${item.name} | Styled by AMAC`
+  : "Service not found | Styled by AMAC";
 const description = item?.description || "This service is not available.";
 ---
 

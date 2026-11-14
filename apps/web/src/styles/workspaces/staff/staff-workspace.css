@@ -15,7 +15,7 @@
 }
 
 .staff-header {
-  background: var(--surface-base);
+  background: var(--brand-paper);
   border-bottom: 1px solid var(--border-subtle);
 }
 

@@ -129,6 +129,15 @@ export function AuthPage({
 
       <main className="login-main">
         <div className="login-form-wrap">
+          <div className="login-form-brand">
+            <Button
+              variant="plain"
+              onClick={onBack}
+              aria-label="Styled by AMAC home"
+            >
+              <Brand />
+            </Button>
+          </div>
           <Tabs
             className="auth-mode-tabs"
             variant="segmented"
@@ -147,10 +156,9 @@ export function AuthPage({
               if (value === "signin" || value === "register") changeMode(value);
             }}
           />
-          <span className="eyebrow">Clemora account</span>
-          <div className="login-title">
+          <h1 className="login-title">
             {mode === "register" ? "Create your account" : "Welcome back"}
-          </div>
+          </h1>
           <p className="login-intro">
             {mode === "register"
               ? "Create a customer account to request packages and track your events."

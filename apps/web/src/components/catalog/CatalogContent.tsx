@@ -63,7 +63,7 @@ export function PackageCanvas({
   return (
     <CatalogCanvas>
       <div className="catalog-detail-intro">
-        <span>THE CLEMORA COLLECTION</span>
+        <span>THE STYLED BY AMAC COLLECTION</span>
         <h1>{item.name || "Untitled package"}</h1>
         {item.description && <p>{item.description}</p>}
         <div className="catalog-detail-meta">

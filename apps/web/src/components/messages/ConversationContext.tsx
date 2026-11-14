@@ -231,7 +231,7 @@ export function ConversationContext({
             <p>
               {admin
                 ? "Send an offer from the booking's quotations when it is ready."
-                : "The Clemora team will share your offer in this conversation when it is ready."}
+                : "The Styled by AMAC team will share your offer in this conversation when it is ready."}
             </p>
           </div>
         ))}

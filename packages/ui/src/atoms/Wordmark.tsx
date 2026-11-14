@@ -1,7 +1,19 @@
+import { BRAND_LOGO_URL } from "../assets/brand";
+
 export function Wordmark({ href = "/" }: { href?: string }) {
   return (
-    <a className="cl-wordmark" href={href} aria-label="Clemora home">
-      Clemora
+    <a
+      className="brand cl-wordmark"
+      href={href}
+      aria-label="Styled by AMAC home"
+    >
+      <img
+        className="brand-logo"
+        src={BRAND_LOGO_URL}
+        alt="Styled by AMAC"
+        width={1023}
+        height={1022}
+      />
     </a>
   );
 }

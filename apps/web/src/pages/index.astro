@@ -5,7 +5,7 @@ import {
   ServiceCards,
   VenueCards,
 } from "../components/public/catalog/CatalogCards";
-import { ActionLink, Badge, Toast } from "@event-management/ui";
+import { ActionLink, Toast } from "@event-management/ui";
 import {
   loadPackages,
   loadServices,
@@ -29,56 +29,48 @@ try {
   unavailable = true;
 }
 const description =
-  "Clemora connects event planning, customer bookings, and catering operations in one workspace.";
+  "Styled by AMAC connects event planning, customer bookings, and catering operations in one workspace.";
 ---
 
-<PublicDocument title="Clemora | Event management" description={description}>
-  <section class="hero">
-    <div
-      class="hero-image"
-      aria-label="Elegant outdoor catered dinner table"
-    ></div>
-    <div class="hero-overlay"></div>
-    <div class="hero-content">
-      <Badge tone="cream">Events, beautifully managed</Badge>
-      <div class="display-title">
-        Gather well.
+<PublicDocument
+  title="Styled by AMAC | Event management"
+  description={description}
+>
+  <section class="amac-hero" aria-labelledby="hero-title">
+    <div class="amac-hero-copy">
+      <h1 id="hero-title">
+        Creating the
         <br />
-        We’ll handle the rest.
-      </div>
+        best <em>day ever.</em>
+      </h1>
       <p>
         Plan celebrations, team gatherings, and milestone occasions with clear
         packages, shared updates, and seamless coordination.
       </p>
-      <div class="hero-actions">
-        <a class="button button-light" href="/about">
-          Explore planning <span aria-hidden="true">→</span>
+      <div class="amac-hero-actions">
+        <a class="button button-primary" href="/packages">
+          Explore packages <span aria-hidden="true">↗</span>
         </a>
-        <a class="button button-ghost" href="/packages">
-          Explore packages
+        <a class="amac-text-link" href="/about">
+          Meet Styled by AMAC
         </a>
       </div>
     </div>
-    <div class="hero-trust">
-      <div>
-        <strong>4.9</strong>
-        <span>average guest rating</span>
-      </div>
-      <div>
-        <strong>420+</strong>
-        <span>events served with care</span>
-      </div>
-      <div>
-        <strong>12 yrs</strong>
-        <span>of trusted experience</span>
-      </div>
-    </div>
+    <figure class="amac-hero-photo">
+      <img
+        src="/images/hero.jpg"
+        alt="An intimate event setting with softly lit dinner tables"
+        width="1200"
+        height="1500"
+        fetchpriority="high"
+      />
+      <figcaption>A setting for your next celebration.</figcaption>
+    </figure>
   </section>
 
   <section class="packages section" id="packages">
     <div class="section-heading">
       <div>
-        <span class="eyebrow">Curated experiences</span>
         <h2 class="section-title small">A thoughtful place to begin</h2>
       </div>
       <p>
@@ -108,7 +100,6 @@ const description =
   >
     <div class="section-heading">
       <div>
-        <span class="eyebrow">Make it yours</span>
         <h2 class="section-title small" id="services-title">
           Explore our services
         </h2>
@@ -136,7 +127,6 @@ const description =
   >
     <div class="section-heading">
       <div>
-        <span class="eyebrow">Find your setting</span>
         <h2 class="section-title small" id="venues-title">
           Explore our venues
         </h2>
@@ -157,26 +147,24 @@ const description =
 
   <section class="intro section" id="intro">
     <div>
-      <span class="eyebrow">Your occasion, considered</span>
-      <div class="section-title">
+      <h2 class="section-title">
         More than a checklist.
         <br />
         One place for every event detail.
-      </div>
+      </h2>
     </div>
     <div class="intro-copy">
       <p>
-        Clemora connects package discovery, booking requests, schedules, team
-        updates, and event progress in one simple experience.
+        Styled by AMAC connects package discovery, booking requests, schedules,
+        team updates, and event progress in one simple experience.
       </p>
-      <ActionLink href="/about">How Clemora works</ActionLink>
+      <ActionLink href="/about">How Styled by AMAC works</ActionLink>
     </div>
   </section>
 
   <section class="cta section">
     <div>
-      <span class="eyebrow light">Let’s create something memorable</span>
-      <div class="section-title">Your table is waiting.</div>
+      <h2 class="section-title">Your table is waiting.</h2>
     </div>
     <a class="button button-light" href="/about">
       Tell us about your event <span aria-hidden="true">→</span>

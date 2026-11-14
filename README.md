@@ -1,6 +1,8 @@
-# Clemora
+# Styled by AMAC
 
-Clemora is the event-management product for **Prevail Events Management**. This pnpm workspace contains an Astro/React frontend, Hono OpenAPI backend, and shared UI, theme, and contract packages. PostgreSQL stores application records; Prisma owns schema changes and migrations, and Kysely handles runtime SQL.
+**Styled by AMAC** is the website's visible brand, replacing the previous Clemora identity. The supplied AMAC logo guides its charcoal, off-white, and taupe theme across public pages, login, and workspaces. This pnpm event-management workspace contains an Astro/React frontend, Hono OpenAPI backend, and shared UI, theme, and contract packages. PostgreSQL stores application records; Prisma owns schema changes and migrations, and Kysely handles runtime SQL. Original client research for **Prevail Events Management** is preserved in the interview records; the visual rebrand does not change product scope or establish a legal ownership change.
+
+The original logo is owned by `packages/ui/src/assets/`; shared colors and typography remain in `packages/theme/src/theme.css`. Existing package names, API routes, and browser storage keys retain their technical identifiers.
 
 This README owns product scope, current implementation status, and development setup. The [interview summary](docs/PREVAIL_INTERVIEW_SUMMARY.md) records client evidence and distinguishes it from later scope decisions. The [seed guide](docs/SEED.md) covers development fixtures and repeat runs.
 

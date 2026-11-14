@@ -171,10 +171,10 @@ export function PublicSite({
           </div>
           <div className="intro-copy">
             <p>
-              Clemora connects package discovery, booking requests, schedules,
+              Styled by AMAC connects package discovery, booking requests, schedules,
               team updates, and event progress in one simple experience.
             </p>
-            <ActionLink href="#packages">How Clemora works</ActionLink>
+            <ActionLink href="#packages">How Styled by AMAC works</ActionLink>
           </div>
         </section>
 
@@ -207,7 +207,7 @@ export function PublicSite({
           <a href="#venues">Venues</a>
           <a href="#about">Contact</a>
         </div>
-        <span>© 2025 Clemora Catering</span>
+        <span>© 2025 Styled by AMAC</span>
       </footer>
 
       {quoteOpen && (

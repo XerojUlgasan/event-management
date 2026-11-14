@@ -1,30 +1,28 @@
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--wine);
-  font-family: var(--font-serif);
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: -0.4px;
+  position: relative;
+  display: inline-block;
+  width: var(--brand-width, 180px);
+  max-width: 100%;
+  aspect-ratio: 3.3 / 1;
+  overflow: hidden;
+  vertical-align: middle;
+  background: var(--brand-paper);
+}
+.brand-logo {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: auto;
+  max-width: none;
+  transform: translateY(-50%);
 }
 .brand-light {
-  color: var(--surface-base);
+  background: var(--brand-paper);
 }
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 35px;
-  height: 35px;
-  color: var(--surface-base);
-  background: var(--wine);
-  border-radius: 50% 50% 45% 45%;
-  font-size: 21px;
-  font-style: italic;
-}
-.brand-light .brand-mark {
-  color: var(--wine);
-  background: var(--cream);
+::selection {
+  color: var(--brand-paper);
+  background: var(--brand-charcoal);
 }
 .button {
   min-height: var(--control-height);
@@ -183,7 +181,6 @@ textarea.ui-control {
 .button-primary {
   color: var(--surface-base);
   background: var(--wine);
-  box-shadow: 0 5px 16px color-mix(in srgb, var(--wine) 15%, var(--transparent));
 }
 .button-primary:hover:not(:disabled) {
   background: var(--wine-dark);
@@ -305,14 +302,13 @@ textarea.ui-control {
   font-size: 10px;
 }
 
-/* Clemora's new public-facing primitives. The prototype styles above remain scoped
-   to their existing class names while its other screens await redesign. */
+/* Public primitives share the Styled by AMAC palette with workspace controls. */
 .cl-wordmark {
   color: var(--cl-ink);
   font-family: var(--cl-font);
   font-size: clamp(26px, 2vw, 34px);
   font-weight: 500;
-  letter-spacing: -0.065em;
+  letter-spacing: -0.03em;
   line-height: 1;
   text-decoration: none;
 }
@@ -1163,7 +1159,8 @@ textarea.ui-control {
   background: var(--accent-border);
 }
 .ui-month-calendar-heat-3 {
-  background: var(--status-danger-border-strong);
+  color: var(--accent-deep);
+  background: var(--brand-taupe);
 }
 .ui-month-calendar-heat-4 {
   color: var(--surface-base);

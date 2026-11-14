@@ -150,7 +150,7 @@ export function MessagesWorkspace({
     conversations[0]?.id === activeId &&
     !conversationFeed?.hasMore;
   const activeName = isTeam
-    ? "Clemora team"
+    ? "Styled by AMAC team"
     : (active?.customerName ?? "Messages");
   const activeDetail = isTeam
     ? active?.eventType || "Events and catering support"
@@ -681,7 +681,7 @@ export function MessagesWorkspace({
         {!readOnly && !closedBookingForCustomer && (
           <form className="thread-input message-composer" onSubmit={submit}>
             <label htmlFor="conversation-message">
-              {isTeam ? "Message the Clemora team" : "Reply to customer"}
+              {isTeam ? "Message the Styled by AMAC team" : "Reply to customer"}
             </label>
             <Textarea
               variant="plain"

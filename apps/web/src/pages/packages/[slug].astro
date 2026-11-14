@@ -14,7 +14,9 @@ try {
   unavailable = true;
 }
 if (!unavailable && !item) Astro.response.status = 404;
-const title = item ? `${item.name} | Clemora` : "Package not found | Clemora";
+const title = item
+  ? `${item.name} | Styled by AMAC`
+  : "Package not found | Styled by AMAC";
 const description = item?.description || "This package is not available.";
 ---
 

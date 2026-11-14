@@ -187,7 +187,7 @@ function BookingCards({
     <div className="customer-events-page">
       <PageHeader
         title="My events"
-        description="Your plans, requested dates, and updates from the Clemora team."
+        description="Your plans, requested dates, and updates from the Styled by AMAC team."
         actions={
           onExplore ? (
             <Button icon="calendar" onClick={onExplore}>

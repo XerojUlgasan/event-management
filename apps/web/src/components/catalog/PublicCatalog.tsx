@@ -549,14 +549,14 @@ export function CatalogOverlay({
         >
           ×
         </Button>
-        <span className="package-preview-brand">Clemora</span>
+        <span className="package-preview-brand">Styled by AMAC</span>
         <span className="package-preview-divider" aria-hidden="true" />
         <span className="package-preview-label">The collection</span>
       </header>
       <div className="package-preview-scroll">
         <main className="catalog-overlay-main">
           <span className="package-preview-overline">
-            The Clemora collection
+            The Styled by AMAC collection
           </span>
           <h1 id={titleId}>All {kind}</h1>
           <p>Explore {kind} for your gathering.</p>

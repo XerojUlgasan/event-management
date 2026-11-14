@@ -309,7 +309,9 @@ export function BookingRequestDialog({
         >
           ×
         </Button>
-        <span className="booking-eyebrow">Clemora / Booking request</span>
+        <span className="booking-eyebrow">
+          Styled by AMAC / Booking request
+        </span>
         <h2 id={titleId}>
           {reference
             ? "Request submitted"

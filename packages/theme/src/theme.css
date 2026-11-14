@@ -1,42 +1,48 @@
 @theme {
-  --color-clemora-surface: #e9e7f0;
-  --color-clemora-ink: #111114;
-  --color-clemora-slate: #777b8b;
-  --color-clemora-coral: #c5543f;
-  --color-clemora-panel: #242329;
-  --color-clemora-line: #c8c7d2;
-  --font-clemora: "Inter", "Helvetica Neue", sans-serif;
+  /* Tailwind aliases for the same brand palette used by the CSS variables. */
+  --color-clemora-surface: #f4f4f4;
+  --color-clemora-ink: #3a3937;
+  --color-clemora-slate: #71645a;
+  --color-clemora-coral: #71645a;
+  --color-clemora-panel: #3a3937;
+  --color-clemora-line: #d7d1cd;
+  --font-clemora: "DM Sans", sans-serif;
 
-  /* The prototype retains these tokens until its other screens are redesigned. */
-  --color-wine: #790d16;
-  --color-wine-dark: #58070d;
-  --color-cream: #e5d3af;
-  --color-cream-soft: #f5eddf;
-  --color-ink: #211b1b;
-  --color-muted: #6f6868;
-  --color-line: #e9e4df;
-  --color-canvas: #f7f6f4;
+  --color-wine: #3a3937;
+  --color-wine-dark: #272624;
+  --color-cream: #d8d0ca;
+  --color-cream-soft: #efebe8;
+  --color-ink: #3a3937;
+  --color-muted: #71645a;
+  --color-line: #dedad7;
+  --color-canvas: #f4f4f4;
   --font-sans: "DM Sans", sans-serif;
   --font-serif: "Playfair Display", serif;
 }
 
 :root {
-  --cl-surface: #e9e7f0;
-  --cl-ink: #111114;
-  --cl-slate: #777b8b;
-  --cl-coral: #c5543f;
-  --cl-panel: #242329;
-  --cl-line: #c8c7d2;
-  --cl-font: "Inter", "Helvetica Neue", Arial, sans-serif;
+  --brand-charcoal: #3a3937;
+  --brand-paper: #f4f4f4;
+  --brand-taupe: #a89c95;
+  --brand-taupe-text: #71645a;
 
-  --wine: #790d16;
-  --wine-dark: #58070d;
-  --cream: #e5d3af;
-  --cream-soft: #f5eddf;
-  --ink: #211b1b;
-  --muted: #6f6868;
-  --line: #e9e4df;
-  --canvas: #f7f6f4;
+  /* Older token names remain available to every current consumer. */
+  --cl-surface: var(--brand-paper);
+  --cl-ink: var(--brand-charcoal);
+  --cl-slate: var(--brand-taupe-text);
+  --cl-coral: var(--brand-taupe-text);
+  --cl-panel: var(--brand-charcoal);
+  --cl-line: #d7d1cd;
+  --cl-font: "DM Sans", sans-serif;
+
+  --wine: var(--brand-charcoal);
+  --wine-dark: #272624;
+  --cream: #d8d0ca;
+  --cream-soft: #efebe8;
+  --ink: var(--brand-charcoal);
+  --muted: var(--brand-taupe-text);
+  --line: #dedad7;
+  --canvas: var(--brand-paper);
   --green: #26735b;
   --green-soft: #e7f3ed;
   --amber: #a46511;
@@ -51,27 +57,27 @@
   --google-yellow: #fbbc05;
   --google-green: #34a853;
   --surface-base: #ffffff;
-  --surface-subtle: #faf9f7;
-  --surface-muted: #f5f2ef;
-  --surface-raised: #f0edeb;
+  --surface-subtle: #faf9f8;
+  --surface-muted: #f1eeec;
+  --surface-raised: #e9e5e2;
   --surface-warm: var(--cream-soft);
-  --border-subtle: #e8dfda;
-  --border-default: #dcd6d2;
-  --border-strong: #b7afaa;
-  --border-emphasis: #aaa9a9;
-  --text-primary: #27231f;
-  --text-secondary: #514849;
-  --text-muted: #6f625d;
-  --text-subtle: #938b87;
-  --text-faint: #a89c95;
-  --accent-deep: #4f0910;
+  --border-subtle: #e5e0dc;
+  --border-default: #d7d1cd;
+  --border-strong: #aaa19b;
+  --border-emphasis: #948b85;
+  --text-primary: var(--brand-charcoal);
+  --text-secondary: #514d49;
+  --text-muted: var(--brand-taupe-text);
+  --text-subtle: #71645a;
+  --text-faint: var(--brand-taupe-text);
+  --accent-deep: #272624;
   --accent-dark: var(--wine-dark);
   --accent: var(--wine);
-  --accent-strong: #810b1a;
-  --accent-hover: #9e1320;
-  --accent-soft: #efe3db;
-  --accent-faint: #f7eef0;
-  --accent-border: #e8d0d3;
+  --accent-strong: var(--brand-charcoal);
+  --accent-hover: #5a524c;
+  --accent-soft: #e9e2dd;
+  --accent-faint: #f3f0ee;
+  --accent-border: #d8cec7;
   --status-danger-text: #9e3737;
   --status-danger-strong: #bd4646;
   --status-danger-dark: #882e2e;
@@ -94,19 +100,19 @@
   --status-info-text: var(--blue);
   --status-info-surface: var(--blue-soft);
   --status-info-border: #cbdde8;
-  --accent-violet-dark: #37354a;
-  --accent-violet-text: #645574;
-  --accent-violet-muted: #77717c;
-  --accent-violet-surface: #f0edf8;
-  --accent-violet-border: #ddd9e3;
+  --accent-violet-dark: #514d49;
+  --accent-violet-text: var(--brand-taupe-text);
+  --accent-violet-muted: var(--brand-taupe-text);
+  --accent-violet-surface: #f1eeec;
+  --accent-violet-border: #d8d2ce;
   --accent-coral: var(--cl-coral);
-  --accent-coral-dark: #a04030;
-  --accent-coral-surface: #fff0ec;
-  --accent-coral-border: #f0c4b0;
-  --overlay-ink: #211414;
-  --overlay-accent: #320a0e;
+  --accent-coral-dark: #514d49;
+  --accent-coral-surface: #f3f0ee;
+  --accent-coral-border: #d8cec7;
+  --overlay-ink: #272624;
+  --overlay-accent: #272624;
   --overlay-black: #000000;
-  --shadow: 0 16px 50px
+  --shadow: 0 8px 28px
     color-mix(in srgb, var(--overlay-ink) 10%, var(--transparent));
 
   /* Shared component dimensions preserve the current workspace baseline. */

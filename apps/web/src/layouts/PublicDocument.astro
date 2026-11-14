@@ -23,10 +23,9 @@ const { title, description } = Astro.props;
   <body>
     <div class="public-site">
       <header class="public-header">
-        <a href="/" aria-label="Clemora home">
+        <a href="/" aria-label="Styled by AMAC home">
           <Brand />
         </a>
-        <input id="public-menu" class="public-menu-toggle" type="checkbox" />
         <nav class="public-nav" aria-label="Primary">
           <a href="/packages">Packages</a>
           <a href="/services">Services</a>
@@ -40,18 +39,17 @@ const { title, description } = Astro.props;
           <a class="button button-primary" href="/login?mode=register">
             Get started
           </a>
-          <label
-            class="icon-button mobile-menu"
-            for="public-menu"
-            aria-label="Open navigation"
-          >
-            <span class="menu-open">
+          <details class="public-mobile-nav">
+            <summary aria-label="Open navigation">
               <Icon name="menu" />
-            </span>
-            <span class="menu-close">
-              <Icon name="close" />
-            </span>
-          </label>
+            </summary>
+            <nav aria-label="Mobile navigation">
+              <a href="/packages">Packages</a>
+              <a href="/services">Services</a>
+              <a href="/venues">Venues</a>
+              <a href="/about">About us</a>
+            </nav>
+          </details>
         </div>
       </header>
       <main>
@@ -69,7 +67,7 @@ const { title, description } = Astro.props;
           <a href="/venues">Venues</a>
           <a href="/about">About us</a>
         </div>
-        <span>© 2025 Clemora Catering</span>
+        <span>© {new Date().getFullYear()} Styled by AMAC</span>
       </footer>
     </div>
   </body>
