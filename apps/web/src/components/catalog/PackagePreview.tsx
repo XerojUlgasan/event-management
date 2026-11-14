@@ -1,4 +1,9 @@
-import { Button, NativeDialog, useNotifications } from "@event-management/ui";
+import {
+  Badge,
+  Button,
+  NativeDialog,
+  useNotifications,
+} from "@event-management/ui";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { PublicPackage } from "../../lib/data/catalog/packages";
@@ -11,11 +16,17 @@ export function PackagePreview({
   error = "",
   onClose,
   allowBooking = true,
+  showBookingAction = true,
+  hideServices = false,
+  onRetry,
 }: {
   item: PublicPackage | null;
   loading?: boolean;
   error?: string;
   allowBooking?: boolean;
+  showBookingAction?: boolean;
+  hideServices?: boolean;
+  onRetry?: () => void;
   onClose: () => void;
 }) {
   const { notify } = useNotifications();
@@ -71,14 +82,31 @@ export function PackagePreview({
           <span className="package-preview-label" id={titleId}>
             Package preview
           </span>
+          {item?.packageType === "custom" && (
+            <Badge tone="cream">Custom package</Badge>
+          )}
         </header>
         <div className="package-preview-scroll">
           {loading && <p role="status">Loading package…</p>}
-          {error && <p role="alert">{error}</p>}
+          {error && (
+            <div className="package-preview-state" role="alert">
+              <p>{error}</p>
+              {onRetry && (
+                <Button variant="secondary" onClick={onRetry}>
+                  Try again
+                </Button>
+              )}
+            </div>
+          )}
           {item && (
             <PackageCanvas
               item={item}
-              bookingAction={<Button onClick={book}>Book now</Button>}
+              hideServices={hideServices}
+              bookingAction={
+                showBookingAction ? (
+                  <Button onClick={book}>Book now</Button>
+                ) : undefined
+              }
             />
           )}
         </div>

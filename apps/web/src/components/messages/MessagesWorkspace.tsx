@@ -1,28 +1,33 @@
-import { navigateWorkspace } from "../../lib/navigation/workspace-navigation";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
-import { Fragment, useEffect, useRef, useState, type SubmitEvent } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type SubmitEvent,
+} from "react";
 import {
   Avatar,
   Badge,
   Button,
   Dialog,
   Icon,
-  Input,
-  Pagination,
+  Textarea,
   useNotifications,
 } from "@event-management/ui";
 
-import {
-  getMyBookingRequest,
-  type BookingRequest,
-} from "../../lib/data/booking-requests/requests";
 import type {
   ChatConversation,
   ChatMessage,
 } from "../../lib/data/messages/conversations";
 import { Quotations } from "../quotations/Quotations";
-import { BookingDetails } from "../booking-requests/BookingList";
-import { adminBookingRequestPath } from "../app/routes";
+import {
+  ConversationContext,
+  type ConversationContextView,
+} from "./ConversationContext";
+import "../../styles/messages/messages.css";
 import { initialsFromName } from "../../lib/utils/formatting/name";
 
 const dayFormatter = new Intl.DateTimeFormat("en-PH", {
@@ -60,7 +65,7 @@ export function MessagesWorkspace({
   viewerRole,
   conversations,
   activeConversation,
-  listPage,
+  conversationFeed,
   activeId,
   onSelect,
   messages,
@@ -75,8 +80,10 @@ export function MessagesWorkspace({
   onNewChat,
   newChatBusy = false,
   readOnly = false,
+  sendDisabled = false,
   hasOlder = false,
   loadingOlder = false,
+  olderError = "",
   onLoadOlder,
   historyNotice = "",
 }: {
@@ -84,13 +91,11 @@ export function MessagesWorkspace({
   viewerRole: "admin" | "customer";
   conversations: ChatConversation[];
   activeConversation?: ChatConversation | null;
-  listPage?: {
-    page: number;
-    hasNextPage: boolean;
+  conversationFeed?: {
+    hasMore: boolean;
     pending: boolean;
-    onPrevious: () => void;
-    onNext: () => void;
-    onRefresh: () => void;
+    error: string;
+    onLoadMore: () => void;
   };
   activeId: string | null;
   onSelect: (id: string) => void;
@@ -106,21 +111,34 @@ export function MessagesWorkspace({
   onNewChat?: () => void;
   newChatBusy?: boolean;
   readOnly?: boolean;
+  sendDisabled?: boolean;
   hasOlder?: boolean;
   loadingOlder?: boolean;
+  olderError?: string;
   onLoadOlder?: () => void;
   historyNotice?: string;
 }) {
   const { notify, notifyError } = useNotifications();
   const [quotationId, setQuotationId] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const draft = activeId ? (drafts[activeId] ?? "") : "";
+  const setDraft = (value: string) => {
+    if (activeId) setDrafts((previous) => ({ ...previous, [activeId]: value }));
+  };
+  const [pendingSends, setPendingSends] = useState<Record<string, boolean>>({});
+  const sending = !!activeId && !!pendingSends[activeId];
+  const pendingSendIds = useRef(new Set<string>());
   const [sendError, setSendError] = useState("");
-  const [booking, setBooking] = useState<BookingRequest | null>(null);
-  const [bookingLoading, setBookingLoading] = useState(false);
-  const [bookingError, setBookingError] = useState("");
-  const bookingLoad = useRef(0);
+  const [context, setContext] = useState<{
+    conversationId: string;
+    view: ConversationContextView;
+  } | null>(null);
+  const generation = useRef(0);
   const thread = useRef<HTMLDivElement>(null);
+  const inbox = useRef<HTMLElement>(null);
+  const inboxBoundary = useRef<HTMLDivElement>(null);
+  const historyBoundary = useRef<HTMLDivElement>(null);
+  const nearBottom = useRef(true);
   const active =
     conversations.find((item) => item.id === activeId) ??
     activeConversation ??
@@ -130,8 +148,7 @@ export function MessagesWorkspace({
     isTeam &&
     conversations.length === 1 &&
     conversations[0]?.id === activeId &&
-    !listPage?.hasNextPage &&
-    (listPage?.page ?? 1) === 1;
+    !conversationFeed?.hasMore;
   const activeName = isTeam
     ? "Clemora team"
     : (active?.customerName ?? "Messages");
@@ -147,91 +164,176 @@ export function MessagesWorkspace({
     isTeam && active?.status === "closed" && !active.bookingRequestId;
 
   useEffect(() => {
-    setDraft("");
-    setSending(false);
     setSendError("");
-    setBooking(null);
+    setContext(null);
     setQuotationId(null);
-    setBookingError("");
-    setBookingLoading(false);
-    bookingLoad.current++;
+    generation.current++;
     return () => {
-      bookingLoad.current++;
+      generation.current++;
     };
   }, [activeId]);
 
-  const olderScroll = useRef<{ height: number; top: number } | null>(null);
+  const olderScroll = useRef<{
+    id?: string;
+    offset: number;
+    height: number;
+    top: number;
+  } | null>(null);
   const previousFirst = useRef<string | undefined>(undefined);
   const previousActive = useRef<string | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = thread.current;
-    if (previousActive.current !== activeId) olderScroll.current = null;
+    const changedConversation = previousActive.current !== activeId;
+    if (changedConversation) olderScroll.current = null;
     const first = messages[0]?.id;
     if (element && olderScroll.current && first !== previousFirst.current) {
-      element.scrollTop =
-        olderScroll.current.top +
-        element.scrollHeight -
-        olderScroll.current.height;
+      const anchor = olderScroll.current;
+      const row = [
+        ...element.querySelectorAll<HTMLElement>("[data-message-id]"),
+      ].find((item) => item.dataset.messageId === anchor.id);
+      element.scrollTop = row
+        ? element.scrollTop +
+          row.getBoundingClientRect().top -
+          element.getBoundingClientRect().top -
+          anchor.offset
+        : anchor.top + element.scrollHeight - anchor.height;
       olderScroll.current = null;
     } else if (
       element &&
-      (previousActive.current !== activeId ||
+      (changedConversation ||
         !previousFirst.current ||
-        previousFirst.current === first)
-    )
+        nearBottom.current ||
+        first !== previousFirst.current)
+    ) {
       element.scrollTop = element.scrollHeight;
+    }
+    if (element)
+      nearBottom.current =
+        element.scrollHeight - element.scrollTop - element.clientHeight < 80;
     previousFirst.current = first;
     previousActive.current = activeId;
-  }, [messages.length, activeId]);
+  }, [messages, activeId]);
 
-  async function openBooking() {
-    if (!active?.bookingRequestId || bookingLoading) return;
-    if (!isTeam) {
-      navigateWorkspace(adminBookingRequestPath(active.bookingRequestId));
+  useEffect(() => {
+    if (!loadingOlder) olderScroll.current = null;
+  }, [loadingOlder]);
+
+  const requestOlder = useCallback(() => {
+    if (!onLoadOlder || loadingOlder || !hasOlder) return;
+    const element = thread.current;
+    if (element) {
+      const top = element.getBoundingClientRect().top;
+      const row = [
+        ...element.querySelectorAll<HTMLElement>("[data-message-id]"),
+      ].find((item) => item.getBoundingClientRect().bottom > top);
+      olderScroll.current = {
+        id: row?.dataset.messageId,
+        offset: row ? row.getBoundingClientRect().top - top : 0,
+        height: element.scrollHeight,
+        top: element.scrollTop,
+      };
+    }
+    onLoadOlder();
+  }, [onLoadOlder, loadingOlder, hasOlder]);
+
+  useEffect(() => {
+    const root = inbox.current;
+    const boundary = inboxBoundary.current;
+    if (
+      !root ||
+      !boundary ||
+      !conversationFeed?.hasMore ||
+      conversationFeed.pending ||
+      conversationFeed.error ||
+      loading
+    )
       return;
-    }
-    const request = ++bookingLoad.current;
-    setBookingLoading(true);
-    setBookingError("");
-    try {
-      const result = await getMyBookingRequest(active.bookingRequestId);
-      if (request === bookingLoad.current) setBooking(result.bookingRequest);
-    } catch (cause) {
-      if (request === bookingLoad.current) {
-        setBookingError(notifyError(cause, "Unable to load booking details."));
-      }
-    } finally {
-      if (request === bookingLoad.current) setBookingLoading(false);
-    }
-  }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && root.clientHeight > 0)
+          conversationFeed.onLoadMore();
+      },
+      { root, rootMargin: "120px 0px" },
+    );
+    observer.observe(boundary);
+    return () => observer.disconnect();
+  }, [conversationFeed, loading, conversationOpen]);
+
+  useEffect(() => {
+    const root = thread.current;
+    const boundary = historyBoundary.current;
+    if (
+      !root ||
+      !boundary ||
+      !hasOlder ||
+      loadingOlder ||
+      olderError ||
+      loading ||
+      !messages.length
+    )
+      return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && root.clientHeight > 0) requestOlder();
+      },
+      { root, rootMargin: "120px 0px" },
+    );
+    observer.observe(boundary);
+    return () => observer.disconnect();
+  }, [
+    requestOlder,
+    hasOlder,
+    loadingOlder,
+    olderError,
+    loading,
+    messages.length,
+    activeId,
+    conversationOpen,
+  ]);
 
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const body = draft.trim();
-    if (!body || sending || readOnly || !activeId) return;
-    const request = bookingLoad.current;
-    setSending(true);
+    if (
+      !body ||
+      sending ||
+      readOnly ||
+      sendDisabled ||
+      !activeId ||
+      pendingSendIds.current.has(activeId)
+    )
+      return;
+    const request = generation.current;
+    const conversationId = activeId;
+    const sentDraft = draft;
+    pendingSendIds.current.add(conversationId);
+    setPendingSends((previous) => ({ ...previous, [conversationId]: true }));
     setSendError("");
     try {
       await onSend(body);
-      if (request !== bookingLoad.current) return;
-      setDraft("");
+      setDrafts((previous) =>
+        previous[conversationId] === sentDraft
+          ? { ...previous, [conversationId]: "" }
+          : previous,
+      );
+      if (request !== generation.current) return;
       notify("Message sent.");
     } catch (cause) {
-      if (request !== bookingLoad.current) return;
+      if (request !== generation.current) return;
       setSendError(
         notifyError(cause, "Unable to send your message. Please try again."),
       );
     } finally {
-      if (request === bookingLoad.current) setSending(false);
+      pendingSendIds.current.delete(conversationId);
+      setPendingSends((previous) => ({ ...previous, [conversationId]: false }));
     }
   }
 
   return (
     <div
-      className={`customer-messages panel ${conversationOpen ? "conversation-open" : ""} ${singleConversation ? "single-conversation" : ""}`}
+      className={`customer-messages messages-workspace panel ${conversationOpen ? "conversation-open" : ""} ${singleConversation ? "single-conversation" : ""}`}
     >
-      <aside>
+      <aside ref={inbox} tabIndex={0} aria-label="Conversations">
         <div className="messages-sidebar-head">
           <h1>{title}</h1>
           {isTeam && onNewChat && (
@@ -247,7 +349,9 @@ export function MessagesWorkspace({
           )}
         </div>
         {conversations.map((conversation) => {
-          const name = isTeam ? "Clemora team" : conversation.customerName;
+          const name = isTeam
+            ? conversation.eventType || "General questions"
+            : conversation.customerName;
           const conversationAvatar = isTeam
             ? "C"
             : initialsFromName(conversation.customerName);
@@ -266,12 +370,23 @@ export function MessagesWorkspace({
               />
               <span>
                 <strong>{name}</strong>
-                {conversation.eventType && (
+                {!isTeam && conversation.eventType && (
                   <em className="conversation-booking">
                     {conversation.eventType}
                   </em>
                 )}
+                {conversation.bookingRequestReference && (
+                  <small className="conversation-reference">
+                    {conversation.bookingRequestReference}
+                    {conversation.eventStartsAt
+                      ? ` · ${dayFormatter.format(new Date(conversation.eventStartsAt))}`
+                      : ""}
+                  </small>
+                )}
                 <small>{preview(conversation)}</small>
+                {drafts[conversation.id] && (
+                  <small className="conversation-draft">Draft</small>
+                )}
               </span>
               <span className="conversation-badges">
                 <time
@@ -316,27 +431,29 @@ export function MessagesWorkspace({
             )}
           </div>
         )}
-        {listPage && (
-          <div className="messages-list-footer">
-            <Pagination
-              page={listPage.page}
-              hasNextPage={listPage.hasNextPage}
-              pending={listPage.pending}
-              onPrevious={listPage.onPrevious}
-              onNext={listPage.onNext}
-              label="Conversation pages"
-            />
-            {listPage.page > 1 && (
-              <>
-                <p>Conversation order can change as messages arrive.</p>
+        {conversationFeed && (
+          <div className="messages-list-footer" ref={inboxBoundary}>
+            {conversationFeed.error ? (
+              <div role="alert">
+                <p>{conversationFeed.error}</p>
                 <Button
-                  variant="plain"
-                  type="button"
-                  onClick={listPage.onRefresh}
+                  variant="secondary"
+                  size="small"
+                  onClick={conversationFeed.onLoadMore}
                 >
-                  Refresh conversations
+                  Try again
                 </Button>
-              </>
+              </div>
+            ) : (
+              <p role="status">
+                {conversationFeed.pending || (loading && !conversations.length)
+                  ? "Loading conversations…"
+                  : conversationFeed.hasMore
+                    ? "Scroll for more conversations"
+                    : conversations.length
+                      ? "All conversations loaded"
+                      : ""}
+              </p>
             )}
           </div>
         )}
@@ -366,37 +483,52 @@ export function MessagesWorkspace({
             </span>
             <small>{activeDetail}</small>
           </div>
-          {active && (
-            <div className="message-head-actions">
-              {active.bookingRequestId && (
+          {active?.bookingRequestId && (
+            <div
+              className="message-head-actions"
+              aria-label="Conversation information"
+            >
+              {(
+                [
+                  ["details", "info", "Details"],
+                  ["package", "box", "Current package"],
+                  ["quotation", "clipboard", "Quotation"],
+                ] as const
+              ).map(([view, icon, label]) => (
                 <Button
-                  variant="plain"
-                  type="button"
-                  className="message-info"
-                  aria-label="View booking request details"
-                  title="View booking request details"
-                  onClick={() => void openBooking()}
-                  disabled={bookingLoading}
+                  variant="secondary"
+                  key={view}
+                  icon={icon}
+                  aria-label={
+                    view === "details"
+                      ? "View event details"
+                      : view === "package"
+                        ? "View current package"
+                        : "View latest sent quotation"
+                  }
+                  onClick={() =>
+                    setContext({ conversationId: active.id, view })
+                  }
                 >
-                  <Icon name="info" size={19} />
+                  {label}
                 </Button>
-              )}
+              ))}
             </div>
           )}
         </div>
-
-        {bookingError && (
-          <div className="messages-error" role="alert">
-            <span>{bookingError}</span>
-            <Button
-              variant="plain"
-              type="button"
-              onClick={() => void openBooking()}
-            >
-              Try again
-            </Button>
+        {active?.bookingRequestId && (
+          <div className="message-event-context">
+            <Icon name="calendar" size={16} />
+            <strong>{active.eventType || "Event inquiry"}</strong>
+            <span>{active.bookingRequestReference}</span>
+            {active.eventStartsAt && (
+              <span>
+                Requested {dayFormatter.format(new Date(active.eventStartsAt))}
+              </span>
+            )}
           </div>
         )}
+
         {error && (
           <div className="messages-error" role="alert">
             <span>{error}</span>
@@ -408,7 +540,22 @@ export function MessagesWorkspace({
           </div>
         )}
 
-        <div className="message-thread" ref={thread} aria-live="polite">
+        <div
+          className="message-thread"
+          ref={thread}
+          tabIndex={0}
+          aria-label="Message history"
+          aria-live="polite"
+          onScroll={() => {
+            const element = thread.current;
+            if (element)
+              nearBottom.current =
+                element.scrollHeight -
+                  element.scrollTop -
+                  element.clientHeight <
+                80;
+          }}
+        >
           {loading && messages.length === 0 && (
             <p className="messages-empty">Loading messages…</p>
           )}
@@ -436,21 +583,29 @@ export function MessagesWorkspace({
           )}
           {historyNotice && <p role="status">{historyNotice}</p>}
           {hasOlder && onLoadOlder && (
-            <Button
-              variant="plain"
-              type="button"
-              onClick={() => {
-                if (thread.current)
-                  olderScroll.current = {
-                    height: thread.current.scrollHeight,
-                    top: thread.current.scrollTop,
-                  };
-                onLoadOlder();
-              }}
-              disabled={loadingOlder}
-            >
-              {loadingOlder ? "Loading…" : "Load older messages"}
-            </Button>
+            <div className="messages-history-boundary" ref={historyBoundary}>
+              {olderError ? (
+                <div role="alert">
+                  <p>{olderError}</p>
+                  <Button
+                    variant="secondary"
+                    size="small"
+                    onClick={requestOlder}
+                  >
+                    Try again
+                  </Button>
+                </div>
+              ) : (
+                <p role="status">
+                  {loadingOlder
+                    ? "Loading earlier messages…"
+                    : "Scroll up for earlier messages"}
+                </p>
+              )}
+            </div>
+          )}
+          {!hasOlder && messages.length > 0 && (
+            <p className="messages-history-start">Beginning of conversation</p>
           )}
           {messages.map((message, index) => {
             const mine = message.senderRole === viewerRole;
@@ -465,15 +620,29 @@ export function MessagesWorkspace({
                     {dayLabel(message.createdAt)}
                   </span>
                 )}
-                <div className={`message ${mine ? "customer-message" : "bot"}`}>
-                  {message.body}
-                  {message.quotationId && (
-                    <Button
-                      variant="secondary"
-                      onClick={() => setQuotationId(message.quotationId)}
-                    >
-                      View quotation
-                    </Button>
+                <div
+                  className={`message ${mine ? "customer-message" : "bot"}`}
+                  data-message-id={message.id}
+                >
+                  {message.quotationId ? (
+                    <div className="message-quotation">
+                      <span className="message-quotation-icon">
+                        <Icon name="clipboard" size={22} />
+                      </span>
+                      <div>
+                        <strong>Quotation</strong>
+                        <p>{message.body}</p>
+                        <Button
+                          variant="secondary"
+                          onClick={() => setQuotationId(message.quotationId)}
+                        >
+                          View quotation
+                          <Icon name="arrow" size={16} />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    message.body
                   )}
                   <small className="message-meta">
                     {!mine && `${message.senderName} · `}
@@ -510,9 +679,14 @@ export function MessagesWorkspace({
         )}
 
         {!readOnly && !closedBookingForCustomer && (
-          <form className="thread-input input-group" onSubmit={submit}>
-            <Input
+          <form className="thread-input message-composer" onSubmit={submit}>
+            <label htmlFor="conversation-message">
+              {isTeam ? "Message the Clemora team" : "Reply to customer"}
+            </label>
+            <Textarea
               variant="plain"
+              rows={2}
+              id="conversation-message"
               aria-label="Write a message"
               placeholder={
                 closedForCustomer
@@ -520,17 +694,30 @@ export function MessagesWorkspace({
                   : "Write a message…"
               }
               value={draft}
-              disabled={!activeId || sending}
+              disabled={!activeId || sending || sendDisabled}
               maxLength={MAX_MESSAGE_BODY_LENGTH}
               onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  (event.ctrlKey || event.metaKey) &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
             />
-            <Button
-              type="submit"
-              icon="arrow"
-              disabled={!draft.trim() || !activeId || sending}
-            >
-              {sending ? "Sending" : "Send"}
-            </Button>
+            <div className="message-composer-actions">
+              <small>Ctrl/⌘ + Enter to send</small>
+              <Button
+                type="submit"
+                icon="arrow"
+                disabled={!draft.trim() || !activeId || sending || sendDisabled}
+              >
+                {sending ? "Sending…" : "Send message"}
+              </Button>
+            </div>
           </form>
         )}
       </section>
@@ -544,12 +731,13 @@ export function MessagesWorkspace({
           />
         </Dialog>
       )}
-      {booking && isTeam && (
-        <BookingDetails
-          item={booking}
-          customerCanEditTimes
-          onClose={() => setBooking(null)}
-          onSaved={setBooking}
+      {context?.conversationId === activeId && active?.bookingRequestId && (
+        <ConversationContext
+          key={`${active.id}:${context.view}`}
+          bookingId={active.bookingRequestId}
+          admin={!isTeam}
+          view={context.view}
+          onClose={() => setContext(null)}
         />
       )}
     </div>

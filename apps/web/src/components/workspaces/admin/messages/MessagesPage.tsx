@@ -8,10 +8,9 @@ import {
   getAdminConversation,
   getAdminConversations,
   sendAdminMessage,
-  type ChatConversation,
   type ChatThread,
 } from "../../../../lib/data/messages/conversations";
-import { usePagination } from "../../../../lib/pagination/use-pagination";
+import { useConversationList } from "../../../../lib/services/messages/use-conversation-list";
 import { MessagesWorkspace } from "../../../messages/MessagesWorkspace";
 import {
   mergePolledThread,
@@ -27,65 +26,23 @@ export function MessagesPage() {
       mounted.current = false;
     };
   }, []);
-  const listFailure = useRef("");
   const threadFailure = useRef("");
   const activeIdRef = useRef<string | null>(null);
   const loadingThreadId = useRef<string | null>(null);
   const localMessages = useRef(new Set<string>());
-  const [conversations, setConversations] = useState<ChatConversation[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const inbox = useConversationList(getAdminConversations);
+  const { conversations, setConversations } = inbox;
   const [activeId, setActiveId] = useState<string | null>(null);
   activeIdRef.current = activeId;
   const [thread, setThread] = useState<ChatThread | null>(null);
-  const [loadingList, setLoadingList] = useState(true);
   const [loadingThread, setLoadingThread] = useState(false);
-  const [listError, setListError] = useState("");
   const [threadError, setThreadError] = useState("");
   const [conversationOpen, setConversationOpen] = useState(false);
-  const pagination = usePagination("admin-conversations");
-  const [listRevision, setListRevision] = useState(0);
-  const listRequest = useRef(0);
   const [historyNotice, setHistoryNotice] = useState("");
   const [loadingOlder, setLoadingOlder] = useState(false);
-
-  const loadList = useCallback(async () => {
-    const request = ++listRequest.current;
-    try {
-      const result = await getAdminConversations(pagination.cursor);
-      if (!mounted.current || request !== listRequest.current) return;
-      setConversations(result.conversations);
-      setNextCursor(result.nextCursor);
-      setListError("");
-      listFailure.current = "";
-    } catch (cause) {
-      if (!mounted.current || request !== listRequest.current) return;
-      const message = notificationErrorMessage(
-        cause,
-        "Unable to load conversations.",
-      );
-      setListError(message);
-      if (listFailure.current !== message) {
-        listFailure.current = message;
-        notifyError(message);
-      }
-    } finally {
-      if (mounted.current && request === listRequest.current)
-        setLoadingList(false);
-    }
-  }, [notifyError, pagination.cursor]);
-
-  useEffect(() => {
-    setLoadingList(true);
-    void loadList();
-    const timer =
-      pagination.page === 1
-        ? window.setInterval(() => void loadList(), 5000)
-        : undefined;
-    return () => {
-      listRequest.current++;
-      if (timer) window.clearInterval(timer);
-    };
-  }, [loadList, pagination.page, listRevision]);
+  const [olderError, setOlderError] = useState("");
+  const olderRequest = useRef(0);
+  const olderPending = useRef(false);
 
   const loadThread = useCallback(
     async (id: string) => {
@@ -103,7 +60,7 @@ export function MessagesPage() {
           const merged = mergePolledThread(current, result, unacknowledged);
           if (merged.gap)
             setHistoryNotice(
-              "New messages arrived while you were away. Earlier history was reset; load older messages to see it.",
+              "New messages arrived while you were away. Earlier history was reset; scroll up to see it.",
             );
           return merged.thread;
         });
@@ -130,10 +87,14 @@ export function MessagesPage() {
           setLoadingThread(false);
       }
     },
-    [notifyError],
+    [notifyError, setConversations],
   );
 
   useEffect(() => {
+    olderRequest.current++;
+    olderPending.current = false;
+    setLoadingOlder(false);
+    setOlderError("");
     if (!activeId) {
       setThread(null);
       return;
@@ -143,33 +104,52 @@ export function MessagesPage() {
     );
     void loadThread(activeId);
     const timer = window.setInterval(() => void loadThread(activeId), 5000);
-    return () => window.clearInterval(timer);
+    return () => {
+      olderRequest.current++;
+      window.clearInterval(timer);
+    };
   }, [activeId, loadThread]);
 
   useEffect(() => {
     if (activeId || conversations.length === 0) return;
-    if (window.matchMedia("(min-width: 601px)").matches)
+    if (window.matchMedia("(min-width: 761px)").matches)
       setActiveId(conversations[0].id);
   }, [activeId, conversations]);
 
   const loadOlder = async () => {
-    if (!activeId || !thread?.nextCursor || loadingOlder) return;
+    if (!activeId || !thread?.nextCursor || olderPending.current) return;
     const id = activeId;
+    const cursor = thread.nextCursor;
+    const request = ++olderRequest.current;
+    olderPending.current = true;
     setLoadingOlder(true);
+    setOlderError("");
     try {
-      const older = await getAdminConversation(id, thread.nextCursor);
+      const older = await getAdminConversation(id, cursor);
+      if (
+        !mounted.current ||
+        request !== olderRequest.current ||
+        activeIdRef.current !== id
+      )
+        return;
+      if (older.nextCursor === cursor)
+        throw new Error("Unable to load older messages. Please try again.");
       older.messages.forEach((message) =>
         localMessages.current.delete(message.id),
       );
       setThread((current) =>
-        current?.conversation.id === id
+        current?.conversation.id === id && current.nextCursor === cursor
           ? prependOlder(current, older)
           : current,
       );
     } catch (cause) {
-      notifyError(cause, "Unable to load older messages.");
+      if (mounted.current && request === olderRequest.current)
+        setOlderError(notifyError(cause, "Unable to load older messages."));
     } finally {
-      setLoadingOlder(false);
+      if (mounted.current && request === olderRequest.current) {
+        olderPending.current = false;
+        setLoadingOlder(false);
+      }
     }
   };
 
@@ -191,7 +171,7 @@ export function MessagesPage() {
           }
         : current,
     );
-    if (pagination.page === 1) void loadList();
+    void inbox.refresh();
   };
 
   return (
@@ -201,23 +181,11 @@ export function MessagesPage() {
         viewerRole="admin"
         conversations={conversations}
         activeConversation={thread?.conversation}
-        listPage={{
-          page: pagination.page,
-          hasNextPage: !!nextCursor,
-          pending: loadingList,
-          onPrevious: () => {
-            setLoadingList(true);
-            pagination.previous();
-          },
-          onNext: () => {
-            setLoadingList(true);
-            pagination.next(nextCursor);
-          },
-          onRefresh: () => {
-            setLoadingList(true);
-            pagination.reset();
-            setListRevision((value) => value + 1);
-          },
+        conversationFeed={{
+          hasMore: !!inbox.nextCursor,
+          pending: inbox.loadingMore,
+          error: inbox.moreError,
+          onLoadMore: () => void inbox.loadMore(),
         }}
         activeId={activeId}
         onSelect={(id) => {
@@ -228,22 +196,20 @@ export function MessagesPage() {
         messages={thread?.messages ?? []}
         hasOlder={!!thread?.nextCursor}
         loadingOlder={loadingOlder}
+        olderError={olderError}
         onLoadOlder={() => void loadOlder()}
         historyNotice={historyNotice}
         loading={
-          (loadingList && !conversations.length) ||
+          (inbox.loading && !conversations.length) ||
           loadingThread ||
           (!!activeId && thread?.conversation.id !== activeId)
         }
-        error={listError || threadError}
+        error={inbox.error || threadError}
         onRetry={() => {
-          if (activeId) {
-            void loadThread(activeId);
-          } else {
-            setLoadingList(true);
-            void loadList();
-          }
+          void inbox.refresh();
+          if (activeId) void loadThread(activeId);
         }}
+        sendDisabled={thread?.conversation.id !== activeId || !!threadError}
         onSend={send}
         onBack={() => {
           setConversationOpen(false);

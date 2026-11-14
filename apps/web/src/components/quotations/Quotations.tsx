@@ -105,7 +105,7 @@ function readingIntro(quotation: Quotation) {
   return `Version ${quotation.version}.`;
 }
 
-function QuotationSummaryRead({ quotation }: { quotation: Quotation }) {
+export function QuotationSummaryRead({ quotation }: { quotation: Quotation }) {
   return (
     <div className="quotation-offer">
       <div className="quotation-offer-hero">

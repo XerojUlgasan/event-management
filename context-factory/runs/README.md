@@ -14,6 +14,8 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Messages infinite scroll](2026-11-14_12-56-00_messages-infinite-scroll.md) | Customer/admin Messages / main | complete | Review or commit together with the preceding Messages context controls when requested |
+| [Messages context controls](2026-11-14_12-42-00_messages-context-controls.md) | Customer/admin Messages / main | complete | Review or commit the scoped uncommitted changes when requested |
 | [Customer events timeline](2026-11-14_11-50-00_customer-events-timeline.md) | Customer My events / main | complete | Review or commit the scoped uncommitted changes when requested |
 | [Catalog filter disclosure](2026-11-14_11-33-00_catalog-filter-disclosure.md) | Customer catalog refinement / main | complete | Review or commit together with the preceding catalog changes when requested |
 | [Customer catalog browsing](2026-11-14_11-29-00_customer-catalog-browsing.md) | Customer catalogs / main | complete | Review or commit the scoped uncommitted changes when requested |

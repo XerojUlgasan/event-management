@@ -1,6 +1,6 @@
 import { navigateWorkspace } from "../../../lib/navigation/workspace-navigation";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Avatar,
   Brand,
@@ -22,7 +22,7 @@ import { CustomerCatalogPage } from "./catalog/CustomerCatalogPage";
 import { BookingRequestDialog } from "../../booking-requests/BookingRequestDialog";
 import { initialsFromName } from "../../../lib/utils/formatting/name";
 import { SignInMethods } from "../../auth/SignInMethods";
-import { usePagination } from "../../../lib/pagination/use-pagination";
+import { useConversationList } from "../../../lib/services/messages/use-conversation-list";
 import { MessagesWorkspace } from "../../messages/MessagesWorkspace";
 import {
   mergePolledThread,
@@ -63,13 +63,11 @@ export function CustomerDashboard({
 }) {
   const { notify, notifyError } = useNotifications();
   const mounted = useRef(true);
-  const selection = useRef(0);
   const localMessages = useRef(new Set<string>());
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
-      selection.current++;
     };
   }, []);
   useEffect(() => {
@@ -96,9 +94,13 @@ export function CustomerDashboard({
   const [dialogSending, setDialogSending] = useState(false);
   const [dialogError, setDialogError] = useState("");
   const [messageThread, setMessageThread] = useState<ChatThread | null>(null);
-  const [messageConversations, setMessageConversations] = useState<
-    ChatConversation[]
-  >([]);
+  const inbox = useConversationList(getMyConversations, tab === "Messages");
+  const {
+    conversations: messageConversations,
+    setConversations: setMessageConversations,
+    loading: messagesLoading,
+    error: messagesError,
+  } = inbox;
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | null
   >(null);
@@ -111,19 +113,18 @@ export function CustomerDashboard({
   const [bookingResume, setBookingResume] = useState(
     () => new URLSearchParams(search).get("booking") === "resume",
   );
-  const [messagesLoading, setMessagesLoading] = useState(false);
-  const [messagesError, setMessagesError] = useState("");
+  const [threadLoading, setThreadLoading] = useState(false);
   const [threadError, setThreadError] = useState("");
-  const lastMessageError = useRef("");
   const [newChatBusy, setNewChatBusy] = useState(false);
-  const [listCursor, setListCursor] = useState<string | null>(null);
-  const pagination = usePagination("customer-conversations");
-  const [listRevision, setListRevision] = useState(0);
   const [threadRevision, setThreadRevision] = useState(0);
   const handledReference = useRef<string | null>(null);
-  const listRequest = useRef(0);
+  const referenceSelection = useRef(0);
+  const [referenceAttempt, setReferenceAttempt] = useState(0);
   const [historyNotice, setHistoryNotice] = useState("");
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [olderError, setOlderError] = useState("");
+  const olderRequest = useRef(0);
+  const olderPending = useRef(false);
   useEffect(() => {
     const params = new URLSearchParams(search);
     const slug = params.get("book");
@@ -155,71 +156,63 @@ export function CustomerDashboard({
     };
   }, [search, notifyError]);
 
-  const refreshMessages = useCallback(
-    async (isActive: () => boolean) => {
-      const request = ++listRequest.current;
-      const active = () => isActive() && request === listRequest.current;
-      try {
-        const page = await getMyConversations(pagination.cursor);
-        if (!active()) return;
-        setListCursor(page.nextCursor);
-        setMessageConversations(page.conversations);
-        const matching =
-          pendingBookingReference &&
-          handledReference.current !== pendingBookingReference
-            ? await getMyConversations(undefined, pendingBookingReference)
-            : null;
-        if (!active()) return;
-        if (matching) handledReference.current = pendingBookingReference;
-        const targetId =
-          matching?.conversations[0]?.id ??
-          selectedConversationId ??
-          page.conversations[0]?.id ??
-          null;
-        setSelectedConversationId(targetId);
-        setMessagesError("");
-        lastMessageError.current = "";
-      } catch (cause) {
-        if (!active()) return;
-        const message = notificationErrorMessage(
-          cause,
-          "Unable to load your messages.",
-        );
-        setMessagesError(message);
-        if (lastMessageError.current !== message) notifyError(message);
-        lastMessageError.current = message;
-      } finally {
-        if (active()) setMessagesLoading(false);
-      }
-    },
-    [
-      pagination.cursor,
-      pendingBookingReference,
-      selectedConversationId,
-      notifyError,
-    ],
-  );
-
   useEffect(() => {
     if (tab !== "Messages") return;
+    if (
+      pendingBookingReference &&
+      handledReference.current !== pendingBookingReference
+    )
+      return;
+    if (!selectedConversationId && messageConversations[0])
+      setSelectedConversationId(messageConversations[0].id);
+  }, [
+    tab,
+    pendingBookingReference,
+    selectedConversationId,
+    messageConversations,
+  ]);
+
+  useEffect(() => {
+    if (
+      tab !== "Messages" ||
+      !pendingBookingReference ||
+      handledReference.current === pendingBookingReference
+    )
+      return;
     let active = true;
-    setMessagesLoading(true);
-    void refreshMessages(() => active);
-    const timer =
-      pagination.page === 1
-        ? window.setInterval(() => void refreshMessages(() => active), 5000)
-        : undefined;
+    const selection = referenceSelection.current;
+    getMyConversations(undefined, pendingBookingReference)
+      .then((result) => {
+        if (!active || selection !== referenceSelection.current) return;
+        handledReference.current = pendingBookingReference;
+        setSelectedConversationId(
+          result.conversations[0]?.id ?? messageConversations[0]?.id ?? null,
+        );
+        if (result.conversations.length) setConversationOpen(true);
+      })
+      .catch((cause) => {
+        if (active && selection === referenceSelection.current)
+          setThreadError(
+            notifyError(cause, "Unable to find this booking conversation."),
+          );
+      });
     return () => {
       active = false;
-      listRequest.current++;
-      if (timer) window.clearInterval(timer);
     };
-  }, [tab, refreshMessages, pagination.page, listRevision]);
+  }, [tab, pendingBookingReference, notifyError, referenceAttempt]);
 
   useEffect(() => {
     if (tab !== "Messages" || !selectedConversationId) return;
     let active = true;
     const id = selectedConversationId;
+    olderRequest.current++;
+    olderPending.current = false;
+    setLoadingOlder(false);
+    setOlderError("");
+    setThreadLoading(true);
+    setMessageThread((current) =>
+      current?.conversation.id === id ? current : null,
+    );
     const load = async () => {
       try {
         const thread = await getMyConversationById(id);
@@ -232,11 +225,14 @@ export function CustomerDashboard({
           const merged = mergePolledThread(current, thread, unacknowledged);
           if (merged.gap)
             setHistoryNotice(
-              "New messages arrived while you were away. Earlier history was reset; load older messages to see it.",
+              "New messages arrived while you were away. Earlier history was reset; scroll up to see it.",
             );
           return merged.thread;
         });
         setThreadError("");
+        setMessageConversations((current) =>
+          current.map((item) => (item.id === id ? thread.conversation : item)),
+        );
       } catch (cause) {
         if (active)
           setThreadError(
@@ -245,15 +241,24 @@ export function CustomerDashboard({
               "Unable to load this conversation.",
             ),
           );
+      } finally {
+        if (active) setThreadLoading(false);
       }
     };
     void load();
     const timer = window.setInterval(() => void load(), 5000);
     return () => {
       active = false;
+      olderRequest.current++;
       window.clearInterval(timer);
     };
-  }, [tab, selectedConversationId, notifyError, threadRevision]);
+  }, [
+    tab,
+    selectedConversationId,
+    notifyError,
+    threadRevision,
+    setMessageConversations,
+  ]);
 
   const showSentInList = (
     conversation: ChatConversation,
@@ -292,29 +297,41 @@ export function CustomerDashboard({
   };
 
   const loadOlder = async () => {
-    if (!messageThread?.nextCursor || loadingOlder) return;
+    if (!messageThread?.nextCursor || olderPending.current) return;
     const id = messageThread.conversation.id;
+    const cursor = messageThread.nextCursor;
+    const request = ++olderRequest.current;
+    olderPending.current = true;
     setLoadingOlder(true);
+    setOlderError("");
     try {
-      const older = await getMyConversationById(id, messageThread.nextCursor);
+      const older = await getMyConversationById(id, cursor);
+      if (!mounted.current || request !== olderRequest.current) return;
+      if (older.nextCursor === cursor)
+        throw new Error("Unable to load older messages. Please try again.");
       older.messages.forEach((message) =>
         localMessages.current.delete(message.id),
       );
       setMessageThread((current) =>
-        current?.conversation.id === id
+        current?.conversation.id === id && current.nextCursor === cursor
           ? prependOlder(current, older)
           : current,
       );
     } catch (cause) {
-      notifyError(cause, "Unable to load older messages.");
+      if (mounted.current && request === olderRequest.current)
+        setOlderError(notifyError(cause, "Unable to load older messages."));
     } finally {
-      setLoadingOlder(false);
+      if (mounted.current && request === olderRequest.current) {
+        olderPending.current = false;
+        setLoadingOlder(false);
+      }
     }
   };
 
   const sendMessage = async (body: string) => {
     const conversation = messageThread?.conversation;
-    if (!conversation) return;
+    if (!conversation || conversation.id !== selectedConversationId)
+      throw new Error("Wait for this conversation to load before sending.");
     const previousStatus = conversation.status;
     const result = await sendMyMessage(body, conversation.id);
     localMessages.current.add(result.message.id);
@@ -345,13 +362,14 @@ export function CustomerDashboard({
 
   const startNewChat = async () => {
     if (newChatBusy) return;
+    referenceSelection.current++;
+    handledReference.current = pendingBookingReference;
     setNewChatBusy(true);
     try {
       const thread = await createMyConversation();
       setSelectedConversationId(thread.conversation.id);
       setMessageThread(thread);
-      pagination.reset();
-      setListRevision((value) => value + 1);
+      void inbox.refresh();
       setConversationOpen(true);
       notify("New chat started.");
     } catch (cause) {
@@ -361,28 +379,13 @@ export function CustomerDashboard({
     }
   };
 
-  const selectConversation = async (id: string) => {
-    const location = window.location.href;
-    const current = ++selection.current;
-    const active = () =>
-      mounted.current &&
-      selection.current === current &&
-      window.location.href === location;
+  const selectConversation = (id: string) => {
+    referenceSelection.current++;
+    handledReference.current = pendingBookingReference;
     setHistoryNotice("");
+    setThreadError("");
     setSelectedConversationId(id);
     setConversationOpen(true);
-    setMessagesLoading(true);
-    try {
-      const thread = await getMyConversationById(id);
-      if (!active()) return;
-      setMessageThread(thread);
-      setMessagesError("");
-    } catch (cause) {
-      if (!active()) return;
-      setMessagesError(notifyError(cause, "Unable to load this conversation."));
-    } finally {
-      if (active()) setMessagesLoading(false);
-    }
   };
 
   const sendFromDialog = async () => {
@@ -617,40 +620,43 @@ export function CustomerDashboard({
               title="Messages"
               viewerRole="customer"
               conversations={messageConversations}
-              activeConversation={messageThread?.conversation}
-              activeId={messageThread?.conversation.id ?? null}
+              activeConversation={
+                messageThread?.conversation.id === selectedConversationId
+                  ? messageThread.conversation
+                  : null
+              }
+              activeId={selectedConversationId}
               onSelect={(id) => void selectConversation(id)}
-              messages={messageThread?.messages ?? []}
-              listPage={{
-                page: pagination.page,
-                hasNextPage: !!listCursor,
-                pending: messagesLoading,
-                onPrevious: () => {
-                  setMessagesLoading(true);
-                  pagination.previous();
-                },
-                onNext: () => {
-                  setMessagesLoading(true);
-                  pagination.next(listCursor);
-                },
-                onRefresh: () => {
-                  setMessagesLoading(true);
-                  pagination.reset();
-                  setListRevision((value) => value + 1);
-                },
+              messages={
+                messageThread?.conversation.id === selectedConversationId
+                  ? messageThread.messages
+                  : []
+              }
+              conversationFeed={{
+                hasMore: !!inbox.nextCursor,
+                pending: inbox.loadingMore,
+                error: inbox.moreError,
+                onLoadMore: () => void inbox.loadMore(),
               }}
-              hasOlder={!!messageThread?.nextCursor}
+              hasOlder={
+                messageThread?.conversation.id === selectedConversationId &&
+                !!messageThread.nextCursor
+              }
               loadingOlder={loadingOlder}
+              olderError={olderError}
               onLoadOlder={() => void loadOlder()}
               historyNotice={historyNotice}
-              loading={messagesLoading}
+              loading={messagesLoading || threadLoading}
               error={messagesError || threadError}
               onRetry={() => {
-                setMessagesLoading(true);
                 setThreadRevision((value) => value + 1);
-                const location = window.location.href;
-                void refreshMessages(() => window.location.href === location);
+                setReferenceAttempt((value) => value + 1);
+                void inbox.refresh();
               }}
+              sendDisabled={
+                messageThread?.conversation.id !== selectedConversationId ||
+                !!threadError
+              }
               onSend={sendMessage}
               onBack={() => setConversationOpen(false)}
               conversationOpen={conversationOpen}
