@@ -127,35 +127,13 @@ export interface EventChecklists {
 }
 
 export interface EventsDay {
-  availability_deadline: Timestamp | null;
   booking_request_id: string;
   created_at: Generated<Timestamp>;
   day: Timestamp;
   ends_at: Timestamp;
   id: Generated<string>;
   replacement_event_day_id: string | null;
-  staffing_status: Generated<string>;
   starts_at: Timestamp;
-  status: Generated<string>;
-  updated_at: Generated<Timestamp>;
-}
-
-export interface EventStaffAvailability {
-  event_day_id: string;
-  id: Generated<string>;
-  responded_at: Generated<Timestamp>;
-  response: string;
-  staff_id: string;
-  updated_at: Generated<Timestamp>;
-}
-
-export interface EventStaffs {
-  assigned_at: Generated<Timestamp>;
-  assigned_by: string;
-  event_day_id: string;
-  id: Generated<string>;
-  role: string;
-  staff_id: string;
   status: Generated<string>;
   updated_at: Generated<Timestamp>;
 }
@@ -207,14 +185,7 @@ export interface PackageServices {
   sort_order: number;
 }
 
-export interface PackageVenues {
-  created_at: Generated<Timestamp>;
-  details: Generated<string>;
-  id: Generated<string>;
-  package_id: string;
-  sort_order: number;
-  venue_id: string;
-}
+
 
 export interface Quotations {
   accepted_at: Timestamp | null;
@@ -269,19 +240,6 @@ export interface Users {
   updated_at: Generated<Timestamp>;
 }
 
-export interface Venues {
-  archived_at: Timestamp | null;
-  created_at: Generated<Timestamp>;
-  description: string;
-  id: Generated<string>;
-  location: string;
-  max_guests: number | null;
-  name: string;
-  published_at: Generated<Timestamp>;
-  slug: string;
-  updated_at: Generated<Timestamp>;
-}
-
 export interface DB {
   audit_events: AuditEvents;
   booking_request_status_history: BookingRequestStatusHistory;
@@ -291,17 +249,13 @@ export interface DB {
   catalog_widgets: CatalogWidgets;
   conversations: Conversations;
   event_checklists: EventChecklists;
-  event_staff_availability: EventStaffAvailability;
-  event_staffs: EventStaffs;
   events_day: EventsDay;
   media_assets: MediaAssets;
   messages: Messages;
   package_services: PackageServices;
-  package_venues: PackageVenues;
   packages: Packages;
   quotations: Quotations;
   services: Services;
   sessions: Sessions;
   users: Users;
-  venues: Venues;
 }

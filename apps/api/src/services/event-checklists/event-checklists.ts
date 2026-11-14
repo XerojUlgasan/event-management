@@ -6,10 +6,7 @@ import { content } from "../../controllers/event-checklists/schemas.js";
 import { findEventDayBookingData } from "../../data/event-days/find-event-day-booking.js";
 import { lockBookingRequestData } from "../../data/event-days/lock-booking-request.js";
 import { lockEventDayData } from "../../data/event-days/lock-event-day.js";
-import {
-  getEventChecklistData,
-  getCoordinatorData,
-} from "../../data/event-checklists/get-event-checklist.js";
+import { getEventChecklistData } from "../../data/event-checklists/get-event-checklist.js";
 
 export type Actor = SessionContext["user"];
 export class ChecklistError extends Error {
@@ -48,28 +45,17 @@ export async function checklistContext(
   actor: Actor,
   writing: boolean,
 ) {
-  const admin = isAdmin(actor);
-  if (!admin && actor.role !== "staff") fail("Checklist access required", 403);
+  if (!isAdmin(actor)) fail("Checklist access required", 403);
   const ref = await findEventDayBookingData(trx, id);
   if (!ref) return fail("Event day not found", 404);
   await lockBookingRequestData(trx, ref.booking_request_id);
   const day = await lockEventDayData(trx, id);
   if (!day) return fail("Event day not found", 404);
-  const coordinator = await getCoordinatorData(trx, id);
   const row = await getEventChecklistData(trx, id);
-  if (
-    !admin &&
-    (day.status !== "scheduled" ||
-      day.booking_status !== "accepted" ||
-      !row?.sent_at ||
-      row.coordinator_id !== actor.id ||
-      coordinator?.staff_id !== actor.id)
-  )
-    return fail("Checklist not found or no longer shared with you", 404);
   if (
     writing &&
     (day.status !== "scheduled" || day.booking_status !== "accepted")
   )
     fail("Checklist changes require a scheduled day and accepted request", 409);
-  return { admin, row, coordinator };
+  return { admin: true, row };
 }

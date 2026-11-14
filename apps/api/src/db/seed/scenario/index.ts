@@ -2,7 +2,6 @@ import type { SeedDb } from "../context.js";
 import { seedClock, seedRandom } from "../context.js";
 import { planScenarioActivity, seedScenarioActivity } from "./activity.js";
 import { planScenarioCatalog, seedScenarioCatalog } from "./catalog.js";
-import { seedScenarioOperations } from "./operations.js";
 import { seedScenarioQuotations } from "./quotations.js";
 import { planScenarioSessions, seedScenarioSessions } from "./sessions.js";
 import { planScenarioUsers, seedScenarioUsers } from "./users.js";
@@ -29,18 +28,11 @@ export async function seedScenario(db: SeedDb, passwordHash: string) {
     plan: planScenarioActivity({
       users: persistedUsers.users,
       packages: catalog.packages,
-      venues: catalog.venues,
       now,
       random: seedRandom(),
     }),
     users: persistedUsers.users,
     packages: catalog.packages,
-    venues: catalog.venues,
-    now,
-  });
-  const operations = await seedScenarioOperations(db, {
-    bookings: activity.bookings,
-    users: persistedUsers.users,
     now,
   });
   const quotations = await seedScenarioQuotations(db, {
@@ -53,7 +45,6 @@ export async function seedScenario(db: SeedDb, passwordHash: string) {
     sessions: sessions.inserted,
     ...catalog.inserted,
     ...activity.inserted,
-    ...operations.inserted,
     ...quotations.inserted,
   };
 }

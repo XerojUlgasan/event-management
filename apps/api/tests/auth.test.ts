@@ -736,7 +736,6 @@ test("db:seed inserts fixtures without changing existing accounts or sessions", 
     "user3@gmail.com",
     "user4@gmail.com",
     "user5@gmail.com",
-    "staff2@example.test",
     "customer1@example.test",
   ]) {
     const response = await call("/auth/login", {
@@ -744,21 +743,8 @@ test("db:seed inserts fixtures without changing existing accounts or sessions", 
       password: "p@ssword01",
     });
     const profile = await profileOf(response);
-    assert.equal(
-      profile.role,
-      email.startsWith("staff") ? "staff" : "customer",
-    );
-    if (profile.role === "staff")
-      assert.equal(
-        (await profileOf(await call("/me", undefined, cookieOf(response))))
-          .staffRole,
-        "Event Coordinator",
-      );
+    assert.equal(profile.role, "customer");
   }
-  const staffLogin = await call("/auth/login", {
-    email: "staff2@example.test",
-    password: "p@ssword01",
-  });
   await runSeed();
   for (const original of [collision, plausible, existingAdmin])
     assert.deepEqual(
@@ -769,19 +755,5 @@ test("db:seed inserts fixtures without changing existing accounts or sessions", 
         .executeTakeFirstOrThrow(),
       original,
     );
-  assert.equal(
-    (await call("/me", undefined, cookieOf(staffLogin))).status,
-    200,
-  );
   assert.equal((await call("/me", undefined, unrelated.cookie)).status, 200);
-  assert.equal(
-    (
-      await db
-        .selectFrom("users")
-        .select("id")
-        .where("email", "=", "staff2@example.test")
-        .execute()
-    ).length,
-    1,
-  );
 });

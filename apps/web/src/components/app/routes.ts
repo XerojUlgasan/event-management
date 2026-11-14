@@ -8,7 +8,6 @@ export const adminPaths: Record<NavKey, string> = {
   Calendar: "/app/calendar",
   Packages: "/app/packages",
   Services: "/app/services",
-  Venues: "/app/venues",
   Inventory: "/app/inventory",
   Operations: "/app/operations",
   Reports: "/app/reports",
@@ -60,19 +59,8 @@ export function isSystemAdmin(profile: {
   );
 }
 
-export function isStaffWorkspace(profile: {
-  role: string;
-  staffRole: string | null;
-}) {
-  return (
-    profile.role === "staff" ||
-    (profile.role === "admin" && profile.staffRole !== "System Administrator")
-  );
-}
-
 export function appHome(profile: { role: string; staffRole: string | null }) {
   if (profile.role === "customer") return "/app/home";
-  if (isStaffWorkspace(profile)) return "/app/events";
   return "/app/overview";
 }
 
@@ -85,8 +73,6 @@ export function allowedWorkspacePath(
       path === "/app/packages" ||
       (Object.values(customerPaths) as string[]).includes(path)
     );
-  if (isStaffWorkspace(profile))
-    return path === "/app/events" || path === "/app/assignments";
   return isSystemAdmin(profile) && adminKey(path) !== null;
 }
 

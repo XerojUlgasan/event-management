@@ -24,11 +24,10 @@ import {
   getServices,
   type PublicService,
 } from "../../lib/data/catalog/services";
-import { getVenues, type Venue } from "../../lib/data/catalog/venues";
 import { PackagePreview } from "./PackagePreview";
 import { priceLabel } from "../../lib/utils/formatting/money";
 import { CatalogDetailPreview } from "./CatalogDetailPreview";
-import { ServiceCanvas, VenueCanvas } from "./CatalogContent";
+import { ServiceCanvas } from "./CatalogContent";
 import { photos } from "../../demo/catalog/photos";
 import { CatalogFiltersForm } from "./CatalogFiltersForm";
 
@@ -114,59 +113,6 @@ function ServiceCard({
   );
 }
 
-function VenueCard({
-  item,
-  onPreview,
-}: {
-  item: Venue;
-  onPreview: () => void;
-}) {
-  const photo = item.sections
-    .flatMap((section) => section.widgets)
-    .find((widget) => widget.type === "photo" && widget.media)?.media?.url;
-  return (
-    <article className="catalog-card">
-      <div className="catalog-card-image">
-        {photo ? (
-          <img src={packageImageSrc(photo)} alt="" loading="lazy" />
-        ) : (
-          <span className="venue-photo-fallback">
-            No venue photos available
-          </span>
-        )}
-      </div>
-      <div className="catalog-card-body">
-        <span className="catalog-card-kicker">{item.location}</span>
-        <h3>{item.name}</h3>
-        <p>{item.description}</p>
-        <div className="catalog-card-meta">
-          <span>
-            {item.maxGuests === null
-              ? "Ask us about capacity"
-              : `Up to ${item.maxGuests} guests`}
-          </span>
-        </div>
-        <Button
-          variant="secondary"
-          type="button"
-          className="catalog-card-action"
-          onClick={onPreview}
-        >
-          View venue <span aria-hidden="true">↗</span>
-        </Button>
-      </div>
-    </article>
-  );
-}
-
-function VenuePreview({ item, onClose }: { item: Venue; onClose: () => void }) {
-  return (
-    <CatalogDetailPreview entity="venue" onClose={onClose}>
-      <VenueCanvas item={item} />
-    </CatalogDetailPreview>
-  );
-}
-
 function ServicePreview({ id, onClose }: { id: string; onClose: () => void }) {
   const { notifyError } = useNotifications();
   const [service, setService] = useState<PublicService | null>(null);
@@ -209,12 +155,10 @@ function ServicePreview({ id, onClose }: { id: string; onClose: () => void }) {
 
 function CatalogPreview({
   selected,
-  venue,
   onClose,
   allowBooking,
 }: {
   selected: Preview;
-  venue: Venue | undefined;
   onClose: () => void;
   allowBooking: boolean;
 }) {
@@ -246,8 +190,6 @@ function CatalogPreview({
       active = false;
     };
   }, [selected, notifyError]);
-  if (selected?.kind === "venues" && venue)
-    return <VenuePreview item={venue} onClose={onClose} />;
   if (selected?.kind === "services")
     return <ServicePreview id={selected.id} onClose={onClose} />;
   if (selected?.kind === "packages")
@@ -281,7 +223,7 @@ export function PublicCatalog({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersId = useId();
   const topRef = useRef<HTMLDivElement>(null);
-  const [items, setItems] = useState<(PublicPackage | PublicService | Venue)[]>(
+  const [items, setItems] = useState<(PublicPackage | PublicService)[]>(
     [],
   );
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -310,11 +252,6 @@ export function PublicCatalog({
           const result = await getPackages({ limit, cursor, ...filters });
           if (current !== generation.current) return;
           setItems(result.packages);
-          setNextCursor(result.nextCursor);
-        } else if (kind === "venues") {
-          const result = await getVenues({ limit, cursor, ...filters });
-          if (current !== generation.current) return;
-          setItems(result.venues);
           setNextCursor(result.nextCursor);
         } else {
           const result = await getServices({ limit, cursor, ...filters });
@@ -413,9 +350,7 @@ export function PublicCatalog({
             ? `No ${kind} match your filters. Adjust your filters or use Clear to see all ${kind}.`
             : kind === "packages"
               ? "No packages are published yet."
-              : kind === "venues"
-                ? "No venues are available yet."
-                : "Our service catalog is being prepared. Please check back soon."}
+              : "Our service catalog is being prepared. Please check back soon."}
         </p>
       )}
       {items.length > 0 && (
@@ -428,25 +363,15 @@ export function PublicCatalog({
                   onPreview={() => showPackage(item.id)}
                 />
               ))
-            : kind === "venues"
-              ? (items as Venue[]).map((item) => (
-                  <VenueCard
-                    key={item.id}
-                    item={item}
-                    onPreview={() =>
-                      setSelected({ kind: "venues", id: item.id })
-                    }
-                  />
-                ))
-              : (items as PublicService[]).map((item) => (
-                  <ServiceCard
-                    key={item.id}
-                    item={item}
-                    onPreview={() =>
-                      setSelected({ kind: "services", id: item.id })
-                    }
-                  />
-                ))}
+            : (items as PublicService[]).map((item) => (
+                <ServiceCard
+                  key={item.id}
+                  item={item}
+                  onPreview={() =>
+                    setSelected({ kind: "services", id: item.id })
+                  }
+                />
+              ))}
         </div>
       )}
       {error && (
@@ -491,11 +416,6 @@ export function PublicCatalog({
       <CatalogPreview
         allowBooking={allowBooking}
         selected={selected}
-        venue={
-          selected?.kind === "venues"
-            ? (items as Venue[]).find((item) => item.id === selected.id)
-            : undefined
-        }
         onClose={closePreview}
       />
     </div>

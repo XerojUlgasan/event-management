@@ -203,7 +203,7 @@ export function CatalogEditor<T extends CanvasContent>({
   nameMaxLength = MAX_CATALOG_TEXT_LENGTH,
 }: {
   initial: T;
-  entity: "package" | "service" | "venue";
+  entity: "package" | "service";
   onClose: () => void;
   onSaved: () => void;
   onSave: (content: T) => Promise<void>;

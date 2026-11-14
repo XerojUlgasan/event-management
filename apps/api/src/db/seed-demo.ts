@@ -1,4 +1,3 @@
-import { catalogSlug } from "@event-management/contracts/catalog-slug";
 import { createHash } from "node:crypto";
 import type { Transaction } from "kysely";
 import type { DB } from "./types.js";
@@ -76,33 +75,6 @@ const users = [
   },
 ] as const;
 
-const venues = [
-  {
-    key: "garden",
-    name: "Demo Garden Pavilion",
-    location: "Quezon City, Metro Manila",
-    description:
-      "Sample open-air venue draft with covered dining space. Availability has not been checked.",
-    maxGuests: 100,
-  },
-  {
-    key: "hall",
-    name: "Demo City Function Hall",
-    location: "Makati, Metro Manila",
-    description:
-      "Sample indoor venue draft for celebrations and company events. Availability has not been checked.",
-    maxGuests: 100,
-  },
-  {
-    key: "terrace",
-    name: "Demo Rooftop Terrace",
-    location: "Taguig, Metro Manila",
-    description:
-      "Sample terrace venue draft for an evening event. Availability has not been checked.",
-    maxGuests: 80,
-  },
-] as const;
-
 type UserKey = (typeof users)[number]["key"];
 export async function seedDemo(db: SeedDb, passwordHash: string) {
   const now = seedClock();
@@ -110,7 +82,6 @@ export async function seedDemo(db: SeedDb, passwordHash: string) {
     users: 0,
     services: 0,
     packages: 0,
-    venues: 0,
     assignments: 0,
     requests: 0,
     history: 0,
@@ -160,26 +131,6 @@ export async function seedDemo(db: SeedDb, passwordHash: string) {
         staffRole: row.staff_role,
         name: row.display_name ?? user.name,
       });
-  }
-
-  for (const venue of venues) {
-    const inserted = await db
-      .insertInto("venues")
-      .values({
-        id: seedId(`venue:${venue.key}`),
-        name: venue.name,
-        slug: catalogSlug(venue.name),
-        location: venue.location,
-        description: venue.description.replace("venue draft", "venue"),
-        max_guests: venue.maxGuests,
-        created_at: now,
-        updated_at: now,
-        published_at: now,
-      })
-      .onConflict((conflict) => conflict.column("id").doNothing())
-      .returning("id")
-      .executeTakeFirst();
-    if (inserted) count.venues++;
   }
 
   for (const user of users.filter((item) => item.role === "customer")) {

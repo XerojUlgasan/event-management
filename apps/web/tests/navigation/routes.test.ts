@@ -23,8 +23,8 @@ test("customers browse catalogs while old package links and admin routes remain 
     assert.equal(customerTab(path), "Catalogs");
     assert.equal(allowedWorkspacePath(customer, path), true);
     assert.equal(
-      workspaceReturnPath(customer, `${path}?catalog=venues`),
-      `${path}?catalog=venues`,
+      workspaceReturnPath(customer, `${path}?catalog=services`),
+      `${path}?catalog=services`,
     );
   }
   assert.equal(adminKey("/app/packages"), "Packages");

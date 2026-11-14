@@ -52,12 +52,3 @@ export function responseDeadlineForDay(
   // If a timezone repeats the final clock time, the later occurrence ends that date.
   return new Date(Math.max(...candidates)).toISOString();
 }
-export type EventDayStaffRow = {
-  staffId: string;
-  staffName: string;
-  eligible: boolean;
-  assignment: {
-    role: "coordinator" | "helper";
-    status: "confirmed" | "cancelled";
-  } | null;
-};

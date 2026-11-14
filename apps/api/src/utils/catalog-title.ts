@@ -2,7 +2,7 @@ import { catalogSlug } from "@event-management/contracts/catalog-slug";
 import { sql, type Kysely, type SqlBool, type Transaction } from "kysely";
 import type { DB } from "../db/types.js";
 
-type CatalogTable = "packages" | "services" | "venues";
+type CatalogTable = "packages" | "services";
 type Database = Kysely<DB> | Transaction<DB>;
 
 export async function reserveCatalogTitle(

@@ -25,11 +25,7 @@ function dayStatus(day: EventDay) {
       : day.status === "cancelled"
         ? "Cancelled"
         : day.status;
-  return day.staffingStatus === "open"
-    ? "Responses open"
-    : day.staffingStatus === "closed"
-      ? "Responses closed"
-      : "Staffing draft";
+  return "Scheduled";
 }
 
 export function AdminBookingChecklists({
@@ -92,9 +88,6 @@ export function AdminBookingChecklists({
   }, [loading, editing, onBusyChange]);
 
   const day = days.find((item) => item.id === selected);
-  const coordinator = day?.assignments.find(
-    (item) => item.role === "coordinator" && item.status === "confirmed",
-  );
   const multipleYears =
     new Set(days.map((item) => item.day.slice(0, 4))).size > 1;
   return (
@@ -147,10 +140,6 @@ export function AdminBookingChecklists({
                   {formatEventTime(day.endsAt, day.timezone)}
                 </dd>
               </div>
-              <div>
-                <dt>Coordinator</dt>
-                <dd>{coordinator?.staffName ?? "Not confirmed"}</dd>
-              </div>
             </dl>
             {booking.status !== "accepted" && (
               <p className="admin-event-note">
@@ -164,7 +153,7 @@ export function AdminBookingChecklists({
               </p>
             )}
             <EventChecklistWorkspace
-              key={`${day.id}:${day.status}:${coordinator?.assignedAt ?? "unassigned"}`}
+              key={`${day.id}:${day.status}`}
               day={day}
               admin
               active={booking.status === "accepted"}

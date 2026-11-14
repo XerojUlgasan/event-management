@@ -33,7 +33,6 @@ test("catalog history scopes separate categories and applied filters", () => {
     scope,
     catalogFilterScope("packages", { guests: 101, minPricePesos: 0 }),
   );
-  assert.notEqual(scope, catalogFilterScope("venues", { guests: 100 }));
   assert.notEqual(
     catalogFilterScope("services", { minPricePesos: 0 }),
     catalogFilterScope("services", {}),

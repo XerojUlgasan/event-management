@@ -71,7 +71,6 @@ test("package reset removes booking chats before detaching requests and preserve
       [linked, general, user],
     );
     await pool.query("INSERT INTO services DEFAULT VALUES");
-    await pool.query("INSERT INTO venues DEFAULT VALUES");
     await pool.query(
       await readFile(
         new URL("20261102130000_package_canvas/migration.sql", root),
@@ -97,7 +96,7 @@ test("package reset removes booking chats before detaching requests and preserve
       (await pool.query("SELECT id FROM conversations")).rows.map((r) => r.id),
       [general],
     );
-    for (const table of ["users", "services", "venues"])
+    for (const table of ["users", "services"])
       assert.equal(
         Number(
           (await pool.query(`SELECT count(*) FROM ${table}`)).rows[0].count,

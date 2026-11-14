@@ -1,11 +1,5 @@
 import type { Kysely, Selectable, Transaction } from "kysely";
-import type {
-  BookingRequests,
-  DB,
-  EventsDay,
-  EventStaffAvailability,
-  EventStaffs,
-} from "../../db/types.js";
+import type { BookingRequests, DB, EventsDay } from "../../db/types.js";
 
 export type Database = Kysely<DB> | Transaction<DB>;
 export type DayRow = Pick<
@@ -15,8 +9,6 @@ export type DayRow = Pick<
   | "starts_at"
   | "ends_at"
   | "status"
-  | "staffing_status"
-  | "availability_deadline"
   | "replacement_event_day_id"
 > &
   Pick<Selectable<BookingRequests>, "event_type" | "time_zone"> & {
@@ -25,11 +17,3 @@ export type DayRow = Pick<
     day: string;
     booking_status: string;
   };
-export type AvailabilityRow = Pick<
-  Selectable<EventStaffAvailability>,
-  "event_day_id" | "staff_id" | "response" | "responded_at"
-> & { staff_name: string };
-export type AssignmentRow = Pick<
-  Selectable<EventStaffs>,
-  "event_day_id" | "staff_id" | "role" | "status" | "assigned_at"
-> & { staff_name: string };

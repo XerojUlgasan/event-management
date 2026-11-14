@@ -16,7 +16,6 @@ import authRoutes from "./controllers/auth/index.js";
 import messageRoutes from "./controllers/messages/index.js";
 import serviceRoutes from "./controllers/services/index.js";
 import packageRoutes from "./controllers/packages/index.js";
-import venueRoutes from "./controllers/venues/index.js";
 import healthRoutes from "./controllers/health/index.js";
 import userRoutes from "./controllers/users/index.js";
 import catalogMediaRoutes from "./controllers/catalog-media/index.js";
@@ -70,15 +69,6 @@ app.use(
   "/v1/admin/packages",
   bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }),
 );
-app.use(
-  "/v1/admin/venues",
-  bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }),
-);
-app.use(
-  "/v1/admin/venues/*",
-  bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }),
-);
-
 app.route("/v1", healthRoutes);
 app.use(
   "/v1/admin/catalog-media",
@@ -97,7 +87,6 @@ app.use(
 );
 app.route("/v1", serviceRoutes);
 app.route("/v1", packageRoutes);
-app.route("/v1", venueRoutes);
 app.use(
   "/v1/booking-requests",
   bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
@@ -123,9 +112,6 @@ app.use(
   bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
 );
 app.use("/v1/admin/event-days/*", (c, next) =>
-  bodyLimit({ maxSize: eventDayBodyLimit(c.req.path) })(c, next),
-);
-app.use("/v1/staff/event-days/*", (c, next) =>
   bodyLimit({ maxSize: eventDayBodyLimit(c.req.path) })(c, next),
 );
 app.route("/v1", eventDayRoutes);

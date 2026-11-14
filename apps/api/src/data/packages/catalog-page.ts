@@ -5,13 +5,9 @@ import type { DB } from "../../db/types.js";
 export type Database = Kysely<DB> | Transaction<DB>;
 export class InvalidPackageMedia extends Error {}
 
-type PageOwner = { kind: "package" | "service" | "venue"; id: string };
+type PageOwner = { kind: "package" | "service"; id: string };
 const ownerColumn = (owner: PageOwner) =>
-  owner.kind === "package"
-    ? "package_id"
-    : owner.kind === "service"
-      ? "service_id"
-      : "venue_id";
+  owner.kind === "package" ? "package_id" : "service_id";
 export async function readCatalogSectionsData(db: Database, owner: PageOwner) {
   const page = await db
     .selectFrom("catalog_pages")
@@ -85,11 +81,7 @@ export async function listCatalogMediaIdsData(db: Database, owner: PageOwner) {
     .innerJoin("catalog_pages as p", "p.id", "s.page_id")
     .select("w.media_id")
     .where(
-      owner.kind === "package"
-        ? "p.package_id"
-        : owner.kind === "service"
-          ? "p.service_id"
-          : "p.venue_id",
+      owner.kind === "package" ? "p.package_id" : "p.service_id",
       "=",
       owner.id,
     )
@@ -120,9 +112,7 @@ export async function replaceCatalogSectionsData(
       .values({
         ...(owner.kind === "package"
           ? { package_id: owner.id }
-          : owner.kind === "service"
-            ? { service_id: owner.id }
-            : { venue_id: owner.id }),
+          : { service_id: owner.id }),
         created_at: now,
         updated_at: now,
       })
@@ -153,7 +143,7 @@ export async function replaceCatalogSectionsData(
       .selectFrom("catalog_widgets as w")
       .innerJoin("catalog_sections as s", "s.id", "w.section_id")
       .innerJoin("catalog_pages as p", "p.id", "s.page_id")
-      .select(["s.page_id", "p.package_id", "p.service_id", "p.venue_id"])
+      .select(["s.page_id", "p.package_id", "p.service_id"])
       .where("w.media_id", "=", id)
       .execute();
     if (!references.length && media.created_by !== actorId)
@@ -164,9 +154,7 @@ export async function replaceCatalogSectionsData(
       references.some((reference) =>
         owner.kind === "package"
           ? reference.package_id !== owner.id
-          : owner.kind === "service"
-            ? reference.service_id !== owner.id
-            : reference.venue_id !== owner.id,
+          : reference.service_id !== owner.id,
       )
     )
       throw new InvalidPackageMedia(

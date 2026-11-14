@@ -1,8 +1,3 @@
-import {
-  RESPONSE_DEADLINE_DAYS,
-  responseDeadlineForDay,
-  type ResponseDeadlineDays,
-} from "@event-management/contracts/event-days";
 import { useEffect, useRef, useState, type SubmitEvent } from "react";
 import {
   Badge,
@@ -12,7 +7,6 @@ import {
   Input,
   Panel,
   Tabs,
-  Select,
   useNotifications,
   notificationErrorMessage,
 } from "@event-management/ui";
@@ -22,64 +16,13 @@ import {
   createEventDay,
   getAdminEventDays,
   moveEventDay,
-  applyResponseDeadlines,
-  updateStaffing,
   type EventDay,
   type EventDaySchedule,
 } from "../../../../lib/data/event-days/event-days";
-import { EventDayStaffTable } from "./EventDayStaffTable";
 import {
-  formatEventTime,
   zonedInstant,
   localInput,
 } from "../../../../lib/utils/event-days/event-day-time";
-function asDays(value: string): ResponseDeadlineDays | null {
-  return RESPONSE_DEADLINE_DAYS.find((days) => String(days) === value) ?? null;
-}
-function DeadlineChoice({
-  value,
-  onChange,
-  label = "Response deadline",
-  disabled = false,
-}: {
-  value: ResponseDeadlineDays | null;
-  onChange: (value: ResponseDeadlineDays | null) => void;
-  label?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <FormField label={label}>
-      {(props) => (
-        <Select
-          {...props}
-          value={value ?? ""}
-          disabled={disabled}
-          onChange={(event) => onChange(asDays(event.target.value))}
-        >
-          <option value="">Select days before event</option>
-          {RESPONSE_DEADLINE_DAYS.map((days) => (
-            <option key={days} value={days}>
-              {days} {days === 1 ? "day" : "days"} before
-            </option>
-          ))}
-        </Select>
-      )}
-    </FormField>
-  );
-}
-function deadlinePreview(
-  day: string,
-  daysBefore: ResponseDeadlineDays | null,
-  zone: string,
-) {
-  if (!daysBefore || !day) return "";
-  try {
-    const instant = responseDeadlineForDay(day, daysBefore, zone);
-    return `${formatEventTime(instant, zone)} (${zone})${Date.parse(instant) <= Date.now() ? " · Passed" : ""}`;
-  } catch {
-    return "Unable to calculate deadline for this date.";
-  }
-}
 function ScheduleForm({
   booking,
   initial,
@@ -106,28 +49,18 @@ function ScheduleForm({
   const [end, setEnd] = useState(
     localInput(initial?.endsAt ?? booking.endsAt, zone),
   );
-  const [deadline, setDeadline] = useState<ResponseDeadlineDays | null>(null);
-  const [status, setStatus] = useState<"draft" | "open">("draft");
   const [error, setError] = useState("");
   const onSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     try {
-      if (status === "open" && !deadline)
-        throw new Error("Set a response deadline when opening staffing.");
       if (!day || start.slice(0, 10) !== day)
         throw new Error("The start date must match the event day.");
       const startsAt = zonedInstant(start, zone),
         endsAt = zonedInstant(end, zone);
       if (endsAt <= startsAt)
         throw new Error("End time must be after start time.");
-      submit({
-        day,
-        startsAt,
-        endsAt,
-        staffingStatus: status,
-        ...(status === "open" && deadline ? { daysBefore: deadline } : {}),
-      });
+      submit({ day, startsAt, endsAt });
     } catch (cause) {
       setError(notifyError(cause, "Check the schedule."));
     }
@@ -169,26 +102,6 @@ function ScheduleForm({
             />
           )}
         </FormField>
-        <FormField label="Staffing">
-          {(props) => (
-            <Select
-              {...props}
-              value={status}
-              onChange={(e) =>
-                setStatus(e.target.value === "open" ? "open" : "draft")
-              }
-            >
-              <option value="draft">Draft</option>
-              <option value="open">Open for responses</option>
-            </Select>
-          )}
-        </FormField>
-        {status === "open" && (
-          <DeadlineChoice value={deadline} onChange={setDeadline} />
-        )}
-        {status === "open" && deadline && (
-          <p>Deadline: {deadlinePreview(day, deadline, zone)}</p>
-        )}
       </div>
       {error && <p role="alert">{error}</p>}
       <div className="admin-event-actions">
@@ -246,11 +159,7 @@ function dayState(entry: DayEntry) {
       : entry.day.status === "cancelled"
         ? "Cancelled"
         : entry.day.status;
-  return entry.day.staffingStatus === "open"
-    ? "Responses open"
-    : entry.day.staffingStatus === "closed"
-      ? "Responses closed"
-      : "Staffing draft";
+  return "Scheduled";
 }
 
 export function AdminEventDays({
@@ -278,11 +187,6 @@ export function AdminEventDays({
   const [selected, setSelected] = useState("");
   const [moving, setMoving] = useState("");
   const [cancelDayId, setCancelDayId] = useState("");
-  const [deadlines, setDeadlines] = useState<
-    Record<string, ResponseDeadlineDays | null>
-  >({});
-  const [batchDays, setBatchDays] = useState<ResponseDeadlineDays | null>(null);
-  const batchEdited = useRef(false);
   const revision = `${booking.id}:${booking.status}:${booking.updatedAt}`;
 
   useEffect(() => {
@@ -323,32 +227,9 @@ export function AdminEventDays({
     return () => onBusyChange?.(false);
   }, [busy, loading, onBusyChange]);
   useEffect(() => {
-    batchEdited.current = false;
     setSelected("");
     setMoving("");
   }, [booking.id]);
-  useEffect(() => {
-    if (batchEdited.current || loading || loadedRevision !== revision) return;
-    const active = days.filter(
-      (day) => day.status === "scheduled" && day.availabilityDeadline,
-    );
-    const matching = RESPONSE_DEADLINE_DAYS.filter(
-      (choice) =>
-        active.length > 0 &&
-        active.every((day) => {
-          try {
-            return (
-              Date.parse(
-                responseDeadlineForDay(day.day, choice, day.timezone),
-              ) === Date.parse(day.availabilityDeadline ?? "")
-            );
-          } catch {
-            return false;
-          }
-        }),
-    );
-    setBatchDays(matching.length === 1 ? (matching[0] ?? null) : null);
-  }, [days, loading, loadedRevision, revision]);
 
   const run = async (action?: () => Promise<unknown>) => {
     if (
@@ -455,43 +336,6 @@ export function AdminEventDays({
           Refresh request and days
         </Button>
       )}
-      {(booking.requestedDays ||
-        days.some((item) => item.status === "scheduled")) && (
-        <div className="admin-event-deadline-row">
-          <div className="admin-event-controls">
-            <DeadlineChoice
-              value={batchDays}
-              onChange={(value) => {
-                batchEdited.current = true;
-                setBatchDays(value);
-              }}
-              disabled={locked}
-            />
-            <Button
-              variant="secondary"
-              disabled={!accepted || !batchDays || locked}
-              onClick={() => {
-                if (batchDays)
-                  void run(() =>
-                    applyResponseDeadlines({
-                      bookingRequestId: booking.id,
-                      daysBefore: batchDays,
-                      expectedUpdatedAt: booking.updatedAt,
-                    }),
-                  );
-              }}
-            >
-              Apply deadlines
-            </Button>
-          </div>
-          <p>
-            Responses close at the end of each calculated date in{" "}
-            {booking.timeZone}. Closed windows stay closed.
-            {booking.requestedDays &&
-              " Apply again after missing times are saved."}
-          </p>
-        </div>
-      )}
       {!accepted && (
         <p>
           Accept this request for processing before opening responses or
@@ -552,9 +396,7 @@ export function AdminEventDays({
                     : "Not scheduled"}
                 </Badge>
                 {day?.status === "scheduled" && (
-                  <Badge
-                    tone={day.staffingStatus === "open" ? "success" : "neutral"}
-                  >
+                  <Badge tone="info">
                     {dayState(current)}
                   </Badge>
                 )}
@@ -611,24 +453,6 @@ export function AdminEventDays({
                   : "Not created"}
               </dd>
             </div>
-            <div>
-              <dt>Response deadline</dt>
-              <dd>
-                {day?.availabilityDeadline
-                  ? formatEventTime(day.availabilityDeadline, day.timezone)
-                  : "Not set"}
-                {batchDays && (!day || day.status === "scheduled") && (
-                  <small>
-                    Calculated:{" "}
-                    {deadlinePreview(
-                      current.date,
-                      batchDays,
-                      day?.timezone ?? booking.timeZone,
-                    )}
-                  </small>
-                )}
-              </dd>
-            </div>
           </dl>
           {day?.status === "moved" && (
             <p className="admin-event-note">
@@ -670,93 +494,12 @@ export function AdminEventDays({
                 submit={(body) => void run(() => moveEventDay(day.id, body))}
               />
             )}
-          {day && (
-            <section className="admin-event-staff">
-              <div className="admin-event-staff-head">
-                <div>
-                  <h4>Staff responses and assignments</h4>
-                  <p>
-                    {day.status !== "scheduled"
-                      ? "Previous responses and assignments are kept below."
-                      : day.staffingStatus === "open"
-                        ? "Staff can respond until the deadline. Close responses before confirming assignments."
-                        : day.staffingStatus === "draft"
-                          ? "Open responses to collect staff availability."
-                          : "Responses are closed. Confirm available staff as coordinator or helper."}
-                  </p>
-                </div>
-                {accepted &&
-                  day.status === "scheduled" &&
-                  day.staffingStatus === "open" && (
-                    <Button
-                      variant="secondary"
-                      disabled={locked}
-                      onClick={() =>
-                        void run(() => updateStaffing(day.id, "closed"))
-                      }
-                    >
-                      Close responses
-                    </Button>
-                  )}
-              </div>
-              {accepted &&
-                day.status === "scheduled" &&
-                day.staffingStatus !== "open" && (
-                  <div className="admin-event-reopen">
-                    <DeadlineChoice
-                      label={
-                        day.staffingStatus === "draft"
-                          ? "Response deadline"
-                          : "Response deadline to reopen"
-                      }
-                      value={deadlines[day.id] ?? null}
-                      onChange={(value) =>
-                        setDeadlines((previous) => ({
-                          ...previous,
-                          [day.id]: value,
-                        }))
-                      }
-                      disabled={locked}
-                    />
-                    <Button
-                      variant="secondary"
-                      disabled={locked || !deadlines[day.id]}
-                      onClick={() => {
-                        const value = deadlines[day.id];
-                        if (value)
-                          void run(() => updateStaffing(day.id, "open", value));
-                      }}
-                    >
-                      Open responses
-                    </Button>
-                    {deadlines[day.id] && (
-                      <span>
-                        Closes{" "}
-                        {deadlinePreview(
-                          day.day,
-                          deadlines[day.id],
-                          day.timezone,
-                        )}
-                      </span>
-                    )}
-                  </div>
-                )}
-              <EventDayStaffTable
-                key={day.id}
-                day={day}
-                accepted={accepted}
-                locked={locked}
-                refreshKey={`${revision}:${reload}:${refreshKey}`}
-                run={run}
-              />
-            </section>
-          )}
         </Panel>
       )}
       {cancelDayId && (
         <Dialog
           title="Cancel event day?"
-          intro="This closes responses and cancels assignments for this day."
+          intro="This marks the event day as cancelled."
           onClose={() => {
             if (!busy) setCancelDayId("");
           }}

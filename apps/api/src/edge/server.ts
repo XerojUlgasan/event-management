@@ -27,7 +27,6 @@ const loaders = {
   "catalog-media": () => import("../controllers/catalog-media/index.js"),
   services: () => import("../controllers/services/index.js"),
   packages: () => import("../controllers/packages/index.js"),
-  venues: () => import("../controllers/venues/index.js"),
   "booking-requests": () => import("../controllers/booking-requests/index.js"),
   "event-days": () => import("../controllers/event-days/index.js"),
   messages: () => import("../controllers/messages/index.js"),
@@ -52,10 +51,6 @@ const bodyLimits: Partial<
   packages: [
     { path: "/admin/packages", maxSize: CATALOG_JSON_BODY_LIMIT_BYTES },
     { path: "/admin/packages/*", maxSize: CATALOG_JSON_BODY_LIMIT_BYTES },
-  ],
-  venues: [
-    { path: "/admin/venues", maxSize: CATALOG_JSON_BODY_LIMIT_BYTES },
-    { path: "/admin/venues/*", maxSize: CATALOG_JSON_BODY_LIMIT_BYTES },
   ],
   services: [
     { path: "/admin/services", maxSize: CATALOG_JSON_BODY_LIMIT_BYTES },
@@ -100,7 +95,7 @@ async function createFamilyApp(id: RouteFamilyId) {
   for (const limit of bodyLimits[id] ?? [])
     family.use(limit.path, bodyLimit({ maxSize: limit.maxSize }));
   if (id === "event-days") {
-    for (const path of ["/admin/event-days/*", "/staff/event-days/*"])
+    for (const path of ["/admin/event-days/*"])
       family.use(path, (c, next) =>
         bodyLimit({ maxSize: eventDayBodyLimit(c.req.path) })(c, next),
       );

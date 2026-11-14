@@ -1,6 +1,5 @@
 import type { PublicPackage } from "../../data/catalog/packages";
 import type { PublicService } from "../../data/catalog/services";
-import type { Venue } from "../../data/catalog/venues";
 
 function serverApiBase() {
   const proxy = process.env.API_PROXY_TARGET?.replace(/\/$/, "");
@@ -20,7 +19,7 @@ async function serverGet<T>(path: string): Promise<T | null> {
 
 type Page<T> = { items: T[]; nextCursor: string | null };
 async function loadPage<T>(
-  kind: "packages" | "services" | "venues",
+  kind: "packages" | "services",
   limit?: number,
   cursor?: string,
 ): Promise<Page<T>> {
@@ -39,14 +38,10 @@ export const loadPackagesPage = (limit?: number, cursor?: string) =>
   loadPage<PublicPackage>("packages", limit, cursor);
 export const loadServicesPage = (limit?: number, cursor?: string) =>
   loadPage<PublicService>("services", limit, cursor);
-export const loadVenuesPage = (limit?: number, cursor?: string) =>
-  loadPage<Venue>("venues", limit, cursor);
 export const loadPackages = async (limit: number) =>
   (await loadPackagesPage(limit)).items;
 export const loadServices = async (limit: number) =>
   (await loadServicesPage(limit)).items;
-export const loadVenues = async (limit: number) =>
-  (await loadVenuesPage(limit)).items;
 
 export async function loadAllCatalog<T>(
   load: (limit?: number, cursor?: string) => Promise<Page<T>>,
@@ -85,8 +80,4 @@ export function loadPackage(slug: string) {
 
 export function loadService(slug: string) {
   return serverGet<PublicService>(`/services/slug/${encodeURIComponent(slug)}`);
-}
-
-export function loadVenue(slug: string) {
-  return serverGet<Venue>(`/venues/slug/${encodeURIComponent(slug)}`);
 }

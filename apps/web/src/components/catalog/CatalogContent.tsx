@@ -12,7 +12,6 @@ import type {
 } from "@event-management/contracts/catalog";
 import type { ReactNode } from "react";
 import type { ServiceContent } from "../../lib/data/catalog/services";
-import type { VenueContent } from "../../lib/data/catalog/venues";
 import { catalogMediaSrc } from "../../lib/data/catalog/media";
 import { priceLabel } from "../../lib/utils/formatting/money";
 import "../../styles/catalog/catalog-content.css";
@@ -108,24 +107,6 @@ export function ServiceCanvas({ item }: { item: ServiceContent }) {
         <div className="catalog-detail-meta">
           <strong>{serviceRateLabel(item.hourlyRatePesos)}</strong>
         </div>
-      </div>
-      <CatalogSections sections={resolveSections(item.sections)} />
-    </CatalogCanvas>
-  );
-}
-
-export function VenueCanvas({ item }: { item: VenueContent }) {
-  return (
-    <CatalogCanvas>
-      <div className="catalog-detail-intro">
-        <h1>{item.name || "Untitled venue"}</h1>
-        <p>{item.location}</p>
-        <p>{item.description}</p>
-        {item.maxGuests != null && (
-          <div className="catalog-detail-meta">
-            <strong>Up to {item.maxGuests} guests</strong>
-          </div>
-        )}
       </div>
       <CatalogSections sections={resolveSections(item.sections)} />
     </CatalogCanvas>

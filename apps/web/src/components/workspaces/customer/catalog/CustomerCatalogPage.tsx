@@ -9,11 +9,10 @@ export function CustomerCatalogPage({ search }: { search: string }) {
   const id = useId();
   const value = new URLSearchParams(search).get("catalog");
   const kind: CatalogKind =
-    value === "services" || value === "venues" ? value : "packages";
+    value === "services" ? value : "packages";
   const items = [
     { value: "packages", label: "Packages" },
     { value: "services", label: "Services" },
-    { value: "venues", label: "Venues" },
   ].map((item) => ({
     ...item,
     id: `${id}-${item.value}-tab`,
@@ -23,7 +22,7 @@ export function CustomerCatalogPage({ search }: { search: string }) {
     <div className="customer-content customer-catalog">
       <PageHeader
         title="Catalogs"
-        description="Find a package, explore services, or discover a venue for your event."
+        description="Find a package or explore services for your event."
       />
       <Tabs
         role="tablist"
