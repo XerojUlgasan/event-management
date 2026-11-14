@@ -1,4 +1,3 @@
-
 export const SMALL_JSON_BODY_LIMIT_BYTES = 16 * 1024;
 export const CATALOG_JSON_BODY_LIMIT_BYTES = 3 * 1024 * 1024;
 
@@ -6,7 +5,8 @@ export const CATALOG_JSON_BODY_LIMIT_BYTES = 3 * 1024 * 1024;
 export const QUOTATION_JSON_BODY_LIMIT_BYTES = 2 * 1024 * 1024;
 
 export function bookingBodyLimit(path: string) {
-  if (/^\/(?:v1\/)?admin\/booking-requests\/[^/]+\/custom-package$/.test(path)) return CATALOG_JSON_BODY_LIMIT_BYTES;
+  if (/^\/(?:v1\/)?admin\/booking-requests\/[^/]+\/custom-package$/.test(path))
+    return CATALOG_JSON_BODY_LIMIT_BYTES;
   return SMALL_JSON_BODY_LIMIT_BYTES;
 }
 
@@ -15,5 +15,7 @@ export const MEDIA_UPLOAD_BODY_OVERHEAD_BYTES = 64 * 1024;
 // One checklist operation carries at most one task's two 4,000-character text fields.
 export const CHECKLIST_JSON_BODY_LIMIT_BYTES = 64 * 1024;
 export function eventDayBodyLimit(path: string) {
-  return /\/checklist(?:\/send)?$/.test(path) ? CHECKLIST_JSON_BODY_LIMIT_BYTES : SMALL_JSON_BODY_LIMIT_BYTES;
+  return /\/checklist(?:\/send)?$/.test(path)
+    ? CHECKLIST_JSON_BODY_LIMIT_BYTES
+    : SMALL_JSON_BODY_LIMIT_BYTES;
 }

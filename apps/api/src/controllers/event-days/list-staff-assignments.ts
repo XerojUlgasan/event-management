@@ -15,10 +15,10 @@ export const listStaffAssignmentsRouteHandler: AppRouteHandler<
 > = async (c) =>
   c.json(
     await listStaffEventDaysPageService(
-        c.get("db"),
-        c.get("session").user.id,
-        true,
-        c.req.valid("query"),
-      ),
+      c.get("db"),
+      c.get("session").user.id,
+      true,
+      c.req.valid("query"),
+    ),
     200,
   );

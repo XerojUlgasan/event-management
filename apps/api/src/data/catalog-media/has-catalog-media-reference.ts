@@ -8,5 +8,7 @@ export const hasCatalogMediaReferenceData = (db: Database, id: string) =>
     .selectFrom("media_assets as m")
     .select("m.id")
     .where("m.id", "=", id)
-    .where(sql<boolean>`EXISTS (SELECT 1 FROM catalog_widgets w WHERE w.media_id=m.id)`)
+    .where(
+      sql<boolean>`EXISTS (SELECT 1 FROM catalog_widgets w WHERE w.media_id=m.id)`,
+    )
     .executeTakeFirst();

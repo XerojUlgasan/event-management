@@ -8,17 +8,19 @@ export function StatCard({
   detail,
   tone = "",
 }: {
-  label: string
-  value: string
-  change?: string
-  detail: string
-  tone?: string
+  label: string;
+  value: string;
+  change?: string;
+  detail: string;
+  tone?: string;
 }) {
   return (
     <div className={`stat-card ${tone}`}>
       <div className="stat-label">
         {label}
-        <Button variant="plain" aria-label={`More about ${label}`}>•••</Button>
+        <Button variant="plain" aria-label={`More about ${label}`}>
+          •••
+        </Button>
       </div>
       <div className="stat-value">{value}</div>
       <div className="stat-detail">
@@ -26,5 +28,5 @@ export function StatCard({
         <span>{detail}</span>
       </div>
     </div>
-  )
+  );
 }

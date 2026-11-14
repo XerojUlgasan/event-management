@@ -2,16 +2,41 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import { listVenuesRoute, listVenuesRouteHandler } from "./list-venues.js";
-import { getVenueBySlugRoute, getVenueBySlugRouteHandler } from "./get-venue-by-slug.js";
+import {
+  getVenueBySlugRoute,
+  getVenueBySlugRouteHandler,
+} from "./get-venue-by-slug.js";
 import { getVenueRoute, getVenueRouteHandler } from "./get-venue.js";
-import { listAdminVenuesRoute, listAdminVenuesRouteHandler } from "./list-admin-venues.js";
-import { getAdminVenueRoute, getAdminVenueRouteHandler } from "./get-admin-venue.js";
+import {
+  listAdminVenuesRoute,
+  listAdminVenuesRouteHandler,
+} from "./list-admin-venues.js";
+import {
+  getAdminVenueRoute,
+  getAdminVenueRouteHandler,
+} from "./get-admin-venue.js";
 import { createVenueRoute, createVenueRouteHandler } from "./create-venue.js";
 import { updateVenueRoute, updateVenueRouteHandler } from "./update-venue.js";
-import { archiveVenueRoute, archiveVenueRouteHandler } from "./archive-venue.js";
+import {
+  archiveVenueRoute,
+  archiveVenueRouteHandler,
+} from "./archive-venue.js";
 import { deleteVenueRoute, deleteVenueRouteHandler } from "./delete-venue.js";
-const routes = new OpenAPIHono<HonoEnv>({defaultHook: (result,c) => {if(!result.success) return c.json({error:result.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; ")},400);}});
-for (const path of ["/admin/venues", "/admin/venues/*"]) routes.use(path, requireSession, requireSystemAdmin);
+const routes = new OpenAPIHono<HonoEnv>({
+  defaultHook: (result, c) => {
+    if (!result.success)
+      return c.json(
+        {
+          error: result.error.issues
+            .map((i) => `${i.path.join(".")}: ${i.message}`)
+            .join("; "),
+        },
+        400,
+      );
+  },
+});
+for (const path of ["/admin/venues", "/admin/venues/*"])
+  routes.use(path, requireSession, requireSystemAdmin);
 routes.openapi(listVenuesRoute, listVenuesRouteHandler);
 routes.openapi(getVenueBySlugRoute, getVenueBySlugRouteHandler);
 routes.openapi(getVenueRoute, getVenueRouteHandler);

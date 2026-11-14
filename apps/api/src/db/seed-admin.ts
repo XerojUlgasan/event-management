@@ -6,7 +6,9 @@ const email = process.argv[2] ?? process.env.ADMIN_EMAIL;
 
 if (!email) {
   console.error("Usage: pnpm db:seed-admin <email>");
-  console.error("Set ADMIN_PASSWORD too when the Firebase user does not exist yet.");
+  console.error(
+    "Set ADMIN_PASSWORD too when the Firebase user does not exist yet.",
+  );
   process.exit(1);
 }
 

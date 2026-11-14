@@ -7,13 +7,16 @@ import { deadlineForDay, fail, lockExisting, one } from "./event-days.js";
 export async function staffingEventDayService(
   db: Kysely<DB>,
   id: string,
-  input: { staffingStatus: "open"; daysBefore: ResponseDeadlineDays } | { staffingStatus: "closed" },
+  input:
+    | { staffingStatus: "open"; daysBefore: ResponseDeadlineDays }
+    | { staffingStatus: "closed" },
 ) {
   return db.transaction().execute(async (trx) => {
     const day = await lockExisting(trx, id);
-    const deadline = input.staffingStatus === "open"
-      ? deadlineForDay(day.day, input.daysBefore, day.time_zone)
-      : day.availability_deadline?.toISOString() ?? null;
+    const deadline =
+      input.staffingStatus === "open"
+        ? deadlineForDay(day.day, input.daysBefore, day.time_zone)
+        : (day.availability_deadline?.toISOString() ?? null);
     if (
       input.staffingStatus === "open" &&
       (!deadline || new Date(deadline) <= new Date())

@@ -1,4 +1,11 @@
-import { SMALL_JSON_BODY_LIMIT_BYTES, CATALOG_JSON_BODY_LIMIT_BYTES, MEDIA_UPLOAD_BODY_OVERHEAD_BYTES, QUOTATION_JSON_BODY_LIMIT_BYTES, bookingBodyLimit, eventDayBodyLimit } from "./constants/http.js";
+import {
+  SMALL_JSON_BODY_LIMIT_BYTES,
+  CATALOG_JSON_BODY_LIMIT_BYTES,
+  MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
+  QUOTATION_JSON_BODY_LIMIT_BYTES,
+  bookingBodyLimit,
+  eventDayBodyLimit,
+} from "./constants/http.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
@@ -36,7 +43,11 @@ app.use(
 
 app.use("/v1/*", async (c, next) => {
   const origin = c.req.header("origin");
-  if (["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method) && origin && !allowedOrigins.includes(origin)) {
+  if (
+    ["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method) &&
+    origin &&
+    !allowedOrigins.includes(origin)
+  ) {
     return c.json({ error: "Origin is not allowed" }, 403);
   }
   c.header("Cache-Control", "no-store");
@@ -46,30 +57,77 @@ app.use("/v1/*", async (c, next) => {
 
 app.use("/v1/auth/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/messages/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/admin/conversations/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.use(
+  "/v1/admin/conversations/*",
+  bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
+);
 
-app.use("/v1/admin/packages/*", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/admin/packages", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/admin/venues", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/admin/venues/*", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
+app.use(
+  "/v1/admin/packages/*",
+  bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }),
+);
+app.use(
+  "/v1/admin/packages",
+  bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }),
+);
+app.use(
+  "/v1/admin/venues",
+  bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }),
+);
+app.use(
+  "/v1/admin/venues/*",
+  bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }),
+);
 
 app.route("/v1", healthRoutes);
-app.use("/v1/admin/catalog-media", bodyLimit({ maxSize: MAX_VIDEO_SIZE_BYTES + MEDIA_UPLOAD_BODY_OVERHEAD_BYTES }));
+app.use(
+  "/v1/admin/catalog-media",
+  bodyLimit({
+    maxSize: MAX_VIDEO_SIZE_BYTES + MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
+  }),
+);
 app.route("/v1", catalogMediaRoutes);
-app.use("/v1/admin/services", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/admin/services/*", bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }));
+app.use(
+  "/v1/admin/services",
+  bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }),
+);
+app.use(
+  "/v1/admin/services/*",
+  bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }),
+);
 app.route("/v1", serviceRoutes);
 app.route("/v1", packageRoutes);
 app.route("/v1", venueRoutes);
-app.use("/v1/booking-requests", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/booking-requests/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/admin/booking-requests/*", (c, next) => bodyLimit({ maxSize: bookingBodyLimit(c.req.path) })(c, next));
-app.use("/v1/admin/quotations/*", bodyLimit({ maxSize: QUOTATION_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/quotations/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.use(
+  "/v1/booking-requests",
+  bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
+);
+app.use(
+  "/v1/booking-requests/*",
+  bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
+);
+app.use("/v1/admin/booking-requests/*", (c, next) =>
+  bodyLimit({ maxSize: bookingBodyLimit(c.req.path) })(c, next),
+);
+app.use(
+  "/v1/admin/quotations/*",
+  bodyLimit({ maxSize: QUOTATION_JSON_BODY_LIMIT_BYTES }),
+);
+app.use(
+  "/v1/quotations/*",
+  bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
+);
 app.route("/v1", bookingRequestRoutes);
-app.use("/v1/admin/event-days", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/admin/event-days/*", (c, next) => bodyLimit({ maxSize: eventDayBodyLimit(c.req.path) })(c, next));
-app.use("/v1/staff/event-days/*", (c, next) => bodyLimit({ maxSize: eventDayBodyLimit(c.req.path) })(c, next));
+app.use(
+  "/v1/admin/event-days",
+  bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
+);
+app.use("/v1/admin/event-days/*", (c, next) =>
+  bodyLimit({ maxSize: eventDayBodyLimit(c.req.path) })(c, next),
+);
+app.use("/v1/staff/event-days/*", (c, next) =>
+  bodyLimit({ maxSize: eventDayBodyLimit(c.req.path) })(c, next),
+);
 app.route("/v1", eventDayRoutes);
 app.route("/v1", messageRoutes);
 app.route("/v1", authRoutes);

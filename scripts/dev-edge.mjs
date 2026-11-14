@@ -10,17 +10,23 @@ let child;
 let stopping = false;
 
 function serve() {
-  child = spawn("pnpm", ["--filter", "@event-management/supabase", "functions:serve"], {
-    stdio: "inherit",
-    shell: isWindows,
-  });
+  child = spawn(
+    "pnpm",
+    ["--filter", "@event-management/supabase", "functions:serve"],
+    {
+      stdio: "inherit",
+      shell: isWindows,
+    },
+  );
   child.on("exit", (code, signal) => {
     child = undefined;
     if (stopping) {
       process.exit(0);
     }
     const status = signal ? `signal ${signal}` : `exit ${code ?? 0}`;
-    console.error(`\n[dev] Edge function server stopped (${status}). Starting it again in 2 seconds.`);
+    console.error(
+      `\n[dev] Edge function server stopped (${status}). Starting it again in 2 seconds.`,
+    );
     setTimeout(serve, 2000);
   });
 }

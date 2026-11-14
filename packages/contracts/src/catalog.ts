@@ -24,11 +24,26 @@ export type CatalogWidget = {
   caption: string;
   autoplay: boolean;
 };
-export type CatalogSection = { id: string; title: string; widgets: CatalogWidget[] };
-export type PackagePrice = { kind: "fixed"; currency: "PHP"; amountMinor: number };
+export type CatalogSection = {
+  id: string;
+  title: string;
+  widgets: CatalogWidget[];
+};
+export type PackagePrice = {
+  kind: "fixed";
+  currency: "PHP";
+  amountMinor: number;
+};
 export type PackageServiceRole = "included" | "optional";
-export type PackageServiceInput = { serviceId: string; role: PackageServiceRole };
-export type PackageService = PackageServiceInput & { name: string; sortOrder: number; archivedAt: string | null };
+export type PackageServiceInput = {
+  serviceId: string;
+  role: PackageServiceRole;
+};
+export type PackageService = PackageServiceInput & {
+  name: string;
+  sortOrder: number;
+  archivedAt: string | null;
+};
 export type PackageContent = {
   name: string;
   description: string;

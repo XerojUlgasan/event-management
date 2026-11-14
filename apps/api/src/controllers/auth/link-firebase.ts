@@ -53,7 +53,12 @@ export const linkFirebaseRoute = createRoute({
 export const linkFirebaseRouteHandler: AppRouteHandler<
   typeof linkFirebaseRoute
 > = async (c) => {
-  const result = await linkFirebaseService(c.get("db"), c.get("session"), c.get("firebase"), c.req.valid("json").currentPassword);
+  const result = await linkFirebaseService(
+    c.get("db"),
+    c.get("session"),
+    c.get("firebase"),
+    c.req.valid("json").currentPassword,
+  );
   if (result.kind === "rate-limited")
     return c.json(
       { error: "Too many attempts. Try again in 15 minutes." },

@@ -22,5 +22,8 @@ export async function resolveSessionService(db: Kysely<DB>, token: string) {
     await deleteSessionByIdData(db, session.id);
     return { kind: "user-not-found" as const };
   }
-  return { kind: "ok" as const, session: { sessionId: session.id, expiresAt: session.expires_at, user } };
+  return {
+    kind: "ok" as const,
+    session: { sessionId: session.id, expiresAt: session.expires_at, user },
+  };
 }

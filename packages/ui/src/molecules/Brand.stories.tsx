@@ -13,5 +13,11 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 export const Light: Story = {
   args: { light: true },
-  decorators: [(Story) => <div style={{ padding: 24, background: "var(--wine)", borderRadius: 12 }}><Story /></div>],
+  decorators: [
+    (Story) => (
+      <div style={{ padding: 24, background: "var(--wine)", borderRadius: 12 }}>
+        <Story />
+      </div>
+    ),
+  ],
 };

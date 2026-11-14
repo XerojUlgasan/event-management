@@ -75,7 +75,10 @@ export async function validatePackageServicesData(
         !previouslyAssigned.has(service.serviceId),
     )
   )
-    return { message: "Archived services cannot be added to a package", status: 400 };
+    return {
+      message: "Archived services cannot be added to a package",
+      status: 400,
+    };
 
   return null;
 }

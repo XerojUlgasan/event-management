@@ -12,11 +12,23 @@ export const getAdminConversationRoute = createRoute({
   summary: "Read a customer conversation as staff",
   request: { params: idParams, query: paginationQuerySchema },
   responses: {
-    200: { content: json(threadSchema), description: "Conversation and messages" },
+    200: {
+      content: json(threadSchema),
+      description: "Conversation and messages",
+    },
     ...errors,
   },
 });
-export const getAdminConversationRouteHandler: AppRouteHandler<typeof getAdminConversationRoute> = async (c) => {
-  const result = await getAdminConversationService(c.get("db"), c.req.valid("param").id, c.req.valid("query").limit, c.req.valid("query").cursor);
-  return result ? c.json(result, 200) : c.json({ error: "Conversation not found" }, 404);
+export const getAdminConversationRouteHandler: AppRouteHandler<
+  typeof getAdminConversationRoute
+> = async (c) => {
+  const result = await getAdminConversationService(
+    c.get("db"),
+    c.req.valid("param").id,
+    c.req.valid("query").limit,
+    c.req.valid("query").cursor,
+  );
+  return result
+    ? c.json(result, 200)
+    : c.json({ error: "Conversation not found" }, 404);
 };

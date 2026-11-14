@@ -13,11 +13,24 @@ export const getCustomerConversationRoute = createRoute({
   request: { query: paginationQuerySchema },
   responses: {
     400: errors[400],
-    200: { content: json(threadSchema), description: "Conversation and messages" },
+    200: {
+      content: json(threadSchema),
+      description: "Conversation and messages",
+    },
     401: errors[401],
     403: errors[403],
   },
 });
-export const getCustomerConversationRouteHandler: AppRouteHandler<typeof getCustomerConversationRoute> = async (c) => {
-  return c.json(await getCustomerConversationService(c.get("db"), c.get("session").user.id, c.req.valid("query").limit, c.req.valid("query").cursor), 200);
+export const getCustomerConversationRouteHandler: AppRouteHandler<
+  typeof getCustomerConversationRoute
+> = async (c) => {
+  return c.json(
+    await getCustomerConversationService(
+      c.get("db"),
+      c.get("session").user.id,
+      c.req.valid("query").limit,
+      c.req.valid("query").cursor,
+    ),
+    200,
+  );
 };

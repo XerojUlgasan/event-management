@@ -19,6 +19,12 @@ export async function sendAdminMessageService(
   const conversation = await findConversationData(db, id);
   if (!conversation) return { kind: "not-found" };
   if (conversation.status === "closed") return { kind: "closed" };
-  const message = await createMessageData(db, conversation, senderId, "admin", body);
+  const message = await createMessageData(
+    db,
+    conversation,
+    senderId,
+    "admin",
+    body,
+  );
   return { kind: "ok", message: messageDto(message) };
 }

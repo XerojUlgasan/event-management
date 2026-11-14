@@ -9,5 +9,6 @@ export async function cancelScheduledEventDaysService(
   actorId: string,
 ) {
   const days = await lockScheduledEventDaysData(trx, bookingId);
-  for (const day of days) await endEventDayData(trx, day.id, "cancelled", null, actorId);
+  for (const day of days)
+    await endEventDayData(trx, day.id, "cancelled", null, actorId);
 }

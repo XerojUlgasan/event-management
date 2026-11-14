@@ -4,7 +4,14 @@ import { findConversationData } from "../../data/messages/find-conversation.js";
 
 import { getConversationThreadService } from "./get-conversation-thread.js";
 
-export async function getAdminConversationService(db: Kysely<DB>, id: string, limit?: number, cursor?: string) {
+export async function getAdminConversationService(
+  db: Kysely<DB>,
+  id: string,
+  limit?: number,
+  cursor?: string,
+) {
   const conversation = await findConversationData(db, id);
-  return conversation ? getConversationThreadService(db, conversation, "admin", limit, cursor) : null;
+  return conversation
+    ? getConversationThreadService(db, conversation, "admin", limit, cursor)
+    : null;
 }

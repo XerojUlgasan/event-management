@@ -14,7 +14,9 @@
     "storybook": "pnpm --filter @event-management/ui storybook",
     "build:storybook": "pnpm --filter @event-management/ui build:storybook",
     "build": "pnpm --filter @event-management/web build && pnpm --filter @event-management/api build",
-    "check": "pnpm --filter @event-management/web check && pnpm --filter @event-management/api check && pnpm --filter @event-management/ui check",
+    "check": "pnpm check:web-structure && pnpm --filter @event-management/web check && pnpm --filter @event-management/api check && pnpm --filter @event-management/ui check",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "check:guidance": "node context-factory/engineering/scripts/check-guidance.mjs",
     "check:design": "node scripts/check-design.mjs",
     "agents:sync": "node scripts/sync-agents.mjs",
@@ -31,10 +33,13 @@
     "supabase:start": "pnpm --filter @event-management/supabase start",
     "supabase:stop": "pnpm --filter @event-management/supabase stop",
     "supabase:status": "pnpm --filter @event-management/supabase status",
-    "build:edge": "pnpm --filter @event-management/api build:edge"
+    "build:edge": "pnpm --filter @event-management/api build:edge",
+    "check:web-structure": "node scripts/check-web-structure.mjs"
   },
   "devDependencies": {
     "concurrently": "^10.0.6",
-    "cross-env": "^10.1.0"
+    "cross-env": "^10.1.0",
+    "prettier": "3.10.1",
+    "prettier-plugin-astro": "1.1.2"
   }
 }

@@ -4,7 +4,10 @@ import type { MessageWithSender } from "./types.js";
 
 type Database = Kysely<DB>;
 
-export async function listLastMessagesData(db: Database, conversationIds: string[]) {
+export async function listLastMessagesData(
+  db: Database,
+  conversationIds: string[],
+) {
   if (!conversationIds.length) return new Map<string, MessageWithSender>();
   const rows = await db
     .selectFrom("messages as m")

@@ -22,7 +22,8 @@ export async function sendCustomerMessageService(
 
   // General conversations can reopen, but closed booking threads remain closed.
   if (conversation.status === "closed") {
-    if (conversation.booking_request_id) throw new Error("Conversation is closed");
+    if (conversation.booking_request_id)
+      throw new Error("Conversation is closed");
     await updateConversationData(db, conversation.id, {
       status: "active",
       closed_at: null,

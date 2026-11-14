@@ -15,4 +15,4 @@ For a narrow question, investigate and explain directly. For a broad subsystem, 
 
 Present what the feature is, its key concepts, the actual flow, the few files that matter, and relevant pitfalls. Use source links and a small diagram only when useful. Keep source interpretation distinct from observed runtime evidence. Use [why](../why/SKILL.md) for motivation/history and [teach](../teach/SKILL.md) when the user wants a guided explanation.
 
-A Clemora package save, for example, runs from React through `lib/data/packages.ts` and `lib/http.ts` to a route schema/handler, transaction-owning service, focused Kysely data function, and mapped response. Confirm the touched implementation instead of assuming every operation needs every layer.
+A Clemora package save, for example, runs from React through `lib/data/catalog/packages.ts` and `lib/http/request.ts` to a route schema/handler, transaction-owning service, focused Kysely data function, and mapped response. Confirm the touched implementation instead of assuming every operation needs every layer.

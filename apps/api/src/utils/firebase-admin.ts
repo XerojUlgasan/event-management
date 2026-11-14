@@ -1,7 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { applicationDefault, cert, getApps, initializeApp } from "firebase-admin/app";
+import {
+  applicationDefault,
+  cert,
+  getApps,
+  initializeApp,
+} from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
 const apiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -18,7 +23,10 @@ type ServiceAccount = {
 async function initialize() {
   const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n").trim();
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(
+    /\\n/g,
+    "\n",
+  ).trim();
 
   if (process.env.FIREBASE_AUTH_EMULATOR_HOST && projectId) {
     initializeApp({ projectId });

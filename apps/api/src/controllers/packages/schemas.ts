@@ -6,7 +6,11 @@ import {
   MAX_PACKAGE_SERVICES,
   MAX_WIDGET_MARKDOWN_LENGTH,
 } from "@event-management/contracts/catalog";
-import { MAX_CATALOG_TEXT_LENGTH, MAX_CATALOG_WIDGET_ROWS, MAX_CATALOG_WIDGET_Y } from "@event-management/contracts/limits/catalog";
+import {
+  MAX_CATALOG_TEXT_LENGTH,
+  MAX_CATALOG_WIDGET_ROWS,
+  MAX_CATALOG_WIDGET_Y,
+} from "@event-management/contracts/limits/catalog";
 
 const text = z.string().trim().max(MAX_CATALOG_TEXT_LENGTH);
 const sampleImages = new Set([
@@ -105,23 +109,58 @@ export const sectionSchema = z
     widgets: z.array(widgetSchema).max(MAX_CATALOG_WIDGETS),
   })
   .strict();
-export const sectionsSchema = z.array(sectionSchema).max(MAX_CATALOG_SECTIONS).superRefine((sections, ctx) => {
-  const sectionIds = sections.map(section => section.id);
-  const widgetIds = sections.flatMap(section => section.widgets.map(widget => widget.id));
-  if (new Set(sectionIds).size !== sectionIds.length || new Set(widgetIds).size !== widgetIds.length)
-    ctx.addIssue({ code: "custom", message: "Section and widget IDs must be unique" });
-  if (widgetIds.length > MAX_CATALOG_WIDGETS)
-    ctx.addIssue({ code: "custom", message: `Use at most ${MAX_CATALOG_WIDGETS} widgets` });
-});
-export const packageServicesSchema = z.array(z.object({ serviceId: z.string().uuid(), role: z.enum(["included", "optional"]) }).strict()).max(MAX_PACKAGE_SERVICES).superRefine((services, ctx) => {
-  if (new Set(services.map(service => service.serviceId)).size !== services.length) ctx.addIssue({ code: "custom", message: "Each service can only be added once" });
-});
-export const contentSchema = z.object({
-  name: text.min(1), description: text.optional(),
-  maxGuests: z.number().int().positive().max(2147483647), price: packagePriceSchema,
-  sections: sectionsSchema,
-  services: packageServicesSchema.default([]),
-}).strict();
+export const sectionsSchema = z
+  .array(sectionSchema)
+  .max(MAX_CATALOG_SECTIONS)
+  .superRefine((sections, ctx) => {
+    const sectionIds = sections.map((section) => section.id);
+    const widgetIds = sections.flatMap((section) =>
+      section.widgets.map((widget) => widget.id),
+    );
+    if (
+      new Set(sectionIds).size !== sectionIds.length ||
+      new Set(widgetIds).size !== widgetIds.length
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Section and widget IDs must be unique",
+      });
+    if (widgetIds.length > MAX_CATALOG_WIDGETS)
+      ctx.addIssue({
+        code: "custom",
+        message: `Use at most ${MAX_CATALOG_WIDGETS} widgets`,
+      });
+  });
+export const packageServicesSchema = z
+  .array(
+    z
+      .object({
+        serviceId: z.string().uuid(),
+        role: z.enum(["included", "optional"]),
+      })
+      .strict(),
+  )
+  .max(MAX_PACKAGE_SERVICES)
+  .superRefine((services, ctx) => {
+    if (
+      new Set(services.map((service) => service.serviceId)).size !==
+      services.length
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Each service can only be added once",
+      });
+  });
+export const contentSchema = z
+  .object({
+    name: text.min(1),
+    description: text.optional(),
+    maxGuests: z.number().int().positive().max(2147483647),
+    price: packagePriceSchema,
+    sections: sectionsSchema,
+    services: packageServicesSchema.default([]),
+  })
+  .strict();
 export type Content = z.infer<typeof contentSchema>;
 // Response schemas include the stored description and derived cover image.
 export const publicSchema = z.object({
@@ -139,7 +178,15 @@ export const publicSchema = z.object({
   publishedAt: z.string().nullable(),
   packageType: z.enum(["catalog", "custom"]),
   customForBookingRequestId: z.string().uuid().nullable(),
-  services: z.array(z.object({ serviceId: z.string().uuid(), name: z.string(), role: z.enum(["included", "optional"]), sortOrder: z.number(), archivedAt: z.string().nullable() })),
+  services: z.array(
+    z.object({
+      serviceId: z.string().uuid(),
+      name: z.string(),
+      role: z.enum(["included", "optional"]),
+      sortOrder: z.number(),
+      archivedAt: z.string().nullable(),
+    }),
+  ),
 });
 export const adminSchema = publicSchema;
 export const errorSchema = z.object({ error: z.string() });

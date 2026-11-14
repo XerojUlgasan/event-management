@@ -6,15 +6,18 @@ import { hashPassword, verifyPassword } from "../src/utils/password.js";
 const legacyHashes = [
   {
     password: "legacy-password",
-    encoded: "$argon2id$v=19$m=19456,t=2,p=1$dGVzdC1zYWx0LTE2Ynl0ZXM$M9ndicefOdcqlQ/tE6sBJdyfrVZkMTb9hJdqBmCguoY",
+    encoded:
+      "$argon2id$v=19$m=19456,t=2,p=1$dGVzdC1zYWx0LTE2Ynl0ZXM$M9ndicefOdcqlQ/tE6sBJdyfrVZkMTb9hJdqBmCguoY",
   },
   {
     password: "pássword-🔐",
-    encoded: "$argon2id$v=19$m=19456,t=2,p=1$dGVzdC1zYWx0LTE2Ynl0ZXM$OYzjPtWuQ0o7BCByB3MYj51BPDpGx/C4RzWk1rJYz2M",
+    encoded:
+      "$argon2id$v=19$m=19456,t=2,p=1$dGVzdC1zYWx0LTE2Ynl0ZXM$OYzjPtWuQ0o7BCByB3MYj51BPDpGx/C4RzWk1rJYz2M",
   },
   {
     password: "legacy-alternate",
-    encoded: "$argon2id$v=19$m=4096,t=3,p=2$dGVzdC1zYWx0LTE2Ynl0ZXM$MrILSNsKxXay1MjolMhOyrjeVrAgnHqpDz/R5eHOB5SUsOClOBegk/omfzB6vnZu",
+    encoded:
+      "$argon2id$v=19$m=4096,t=3,p=2$dGVzdC1zYWx0LTE2Ynl0ZXM$MrILSNsKxXay1MjolMhOyrjeVrAgnHqpDz/R5eHOB5SUsOClOBegk/omfzB6vnZu",
   },
 ];
 

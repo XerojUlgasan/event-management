@@ -12,7 +12,10 @@ export async function ensureConversationData(db: Database, customerId: string) {
     .limit(1)
     .executeTakeFirst();
   if (existing) return existing;
-  await db.insertInto("conversations").values({ customer_id: customerId }).execute();
+  await db
+    .insertInto("conversations")
+    .values({ customer_id: customerId })
+    .execute();
   return selectConversationColumnsData(db)
     .where("c.customer_id", "=", customerId)
     .orderBy("c.created_at", "desc")

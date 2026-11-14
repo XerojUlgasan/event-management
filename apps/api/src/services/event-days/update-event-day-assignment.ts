@@ -44,8 +44,10 @@ export async function assignmentEventDayService(
       if (await hasOverlappingAssignmentData(trx, day, staffId))
         return fail("Staff member has an overlapping assignment", 409);
     }
-    if ((existing?.role === "coordinator" && existing.status === "confirmed") ||
-      (input.role === "coordinator" && input.status === "confirmed")) {
+    if (
+      (existing?.role === "coordinator" && existing.status === "confirmed") ||
+      (input.role === "coordinator" && input.status === "confirmed")
+    ) {
       await invalidateEventChecklistData(trx, id, actorId);
     }
     await upsertEventDayAssignmentData(

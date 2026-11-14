@@ -7,8 +7,16 @@ export type PageInfo = { nextCursor: string | null };
 export type Page<T> = PageInfo & { items: T[] };
 
 /** Pass SQL rows fetched with limit + 1, before expensive response enrichment. */
-export function createPage<T>(rows: readonly T[], limit: number, cursorFor: (row: T) => string): Page<T> {
+export function createPage<T>(
+  rows: readonly T[],
+  limit: number,
+  cursorFor: (row: T) => string,
+): Page<T> {
   const items = rows.slice(0, limit);
   const last = items.at(-1);
-  return { items, nextCursor: rows.length > limit && last !== undefined ? cursorFor(last) : null };
+  return {
+    items,
+    nextCursor:
+      rows.length > limit && last !== undefined ? cursorFor(last) : null,
+  };
 }

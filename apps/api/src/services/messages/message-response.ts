@@ -1,4 +1,7 @@
-import type { ConversationWithCustomer, MessageWithSender } from "../../data/messages/types.js";
+import type {
+  ConversationWithCustomer,
+  MessageWithSender,
+} from "../../data/messages/types.js";
 
 export type MessageDto = {
   id: string;
@@ -64,7 +67,9 @@ export function conversationDto(
     eventStartsAt: row.event_starts_at
       ? new Date(row.event_starts_at).toISOString()
       : null,
-    eventEndsAt: row.event_ends_at ? new Date(row.event_ends_at).toISOString() : null,
+    eventEndsAt: row.event_ends_at
+      ? new Date(row.event_ends_at).toISOString()
+      : null,
     guestCount: row.guest_count,
     status: row.status as ConversationDto["status"],
     closedAt: row.closed_at ? new Date(row.closed_at).toISOString() : null,

@@ -1,6 +1,15 @@
 import type { ComponentPropsWithoutRef } from "react";
 
-export type BadgeTone = "neutral" | "cream" | "light" | "gold" | "success" | "warning" | "danger" | "info" | "accent";
+export type BadgeTone =
+  | "neutral"
+  | "cream"
+  | "light"
+  | "gold"
+  | "success"
+  | "warning"
+  | "danger"
+  | "info"
+  | "accent";
 
 export function Badge({
   children,
@@ -9,9 +18,15 @@ export function Badge({
   variant = "pill",
   ...props
 }: {
-  tone?: BadgeTone
-  variant?: "pill" | "counter"
+  tone?: BadgeTone;
+  variant?: "pill" | "counter";
 } & ComponentPropsWithoutRef<"span">) {
-  return <span {...props} className={`badge badge-${tone}${variant === "counter" ? " badge-counter" : ""}${className ? ` ${className}` : ""}`}>{children}</span>
+  return (
+    <span
+      {...props}
+      className={`badge badge-${tone}${variant === "counter" ? " badge-counter" : ""}${className ? ` ${className}` : ""}`}
+    >
+      {children}
+    </span>
+  );
 }
-

@@ -41,6 +41,10 @@ At the start and completion of each task, check whether its scope affects docume
 
 Keep role guidance in `context-factory/agents/<agent-name>/AGENT.md` and link new agents here and in the agent index. Read the selected agent's `memory.md` at the start of its work and maintain it at completion when there is lasting knowledge to record, following the [memory policy](context-factory/agents/README.md#memory). Keep role-specific workflows and templates in the owning agent's `reference/` folder, cross-cutting engineering methods in `context-factory/engineering/`, and shared conventions in `context-factory/shared/`. Area skills remain in their existing `context-factory/` folders; link to their detail rather than duplicating it.
 
+## Web file layout
+
+For every `apps/web` file change, follow the [frontend structure contract](context-factory/shared/frontend-project-structure.md): layer → domain → responsibility, its naming and dependency rules, exceptions, and completion audit. Run `pnpm check:web-structure` for web changes.
+
 ## API file layout
 
 Keep API code in the top-level `apps/api/src/controllers/`, `services/`, `data/`, and `utils/` folders, grouped by domain (`auth/`, `packages/`, `messages/`, or a new domain). Put HTTP route definitions and handlers in `controllers/<domain>/`, business operations in `services/<domain>/`, and Kysely queries in `data/<domain>/`. Keep reusable helpers in `utils/`; shared middleware and database setup remain in `middleware/` and `db/`.

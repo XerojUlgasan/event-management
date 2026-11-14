@@ -1,8 +1,17 @@
-import { MAX_EMAIL_LENGTH, MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH } from "@event-management/contracts/limits/auth";
+import {
+  MAX_EMAIL_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  MAX_PASSWORD_LENGTH,
+} from "@event-management/contracts/limits/auth";
 import { z } from "@hono/zod-openapi";
 import { errorSchema } from "./profile.js";
 
-export const emailSchema = z.string().trim().toLowerCase().email().max(MAX_EMAIL_LENGTH);
+export const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email()
+  .max(MAX_EMAIL_LENGTH);
 export const newPasswordSchema = z
   .string()
   .min(MIN_PASSWORD_LENGTH, "Use a password with at least 8 characters.")
@@ -29,4 +38,3 @@ export const errors = {
     description: "Too many attempts",
   },
 };
-

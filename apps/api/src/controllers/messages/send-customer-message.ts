@@ -19,7 +19,9 @@ export const sendCustomerMessageRoute = createRoute({
     409: errors[409],
   },
 });
-export const sendCustomerMessageRouteHandler: AppRouteHandler<typeof sendCustomerMessageRoute> = async (c) => {
+export const sendCustomerMessageRouteHandler: AppRouteHandler<
+  typeof sendCustomerMessageRoute
+> = async (c) => {
   const input = c.req.valid("json");
   try {
     const message = await sendCustomerMessageService(

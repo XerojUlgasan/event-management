@@ -1,31 +1,57 @@
 ---
-import { Pagination, Toast } from "@event-management/ui"
-import PublicDocument from "../../layouts/PublicDocument.astro"
-import { ServiceCards } from "../../components/public/CatalogCards"
-import { catalogPageLinks, loadServicesPage } from "../../lib/server/catalog"
-import type { PublicService } from "../../lib/data/services"
+import { Pagination, Toast } from "@event-management/ui";
+import PublicDocument from "../../layouts/PublicDocument.astro";
+import { ServiceCards } from "../../components/public/catalog/CatalogCards";
+import {
+  catalogPageLinks,
+  loadServicesPage,
+} from "../../lib/server/catalog/load-catalog";
+import type { PublicService } from "../../lib/data/catalog/services";
 
-let services: PublicService[] = []
-let unavailable = false
-let nextCursor: string | null = null
+let services: PublicService[] = [];
+let unavailable = false;
+let nextCursor: string | null = null;
 try {
-  const page = await loadServicesPage(undefined, Astro.url.searchParams.get("cursor") ?? undefined)
-  services = page.items
-  nextCursor = page.nextCursor
+  const page = await loadServicesPage(
+    undefined,
+    Astro.url.searchParams.get("cursor") ?? undefined,
+  );
+  services = page.items;
+  nextCursor = page.nextCursor;
 } catch {
-  unavailable = true
+  unavailable = true;
 }
-const links = catalogPageLinks(Astro.url, nextCursor)
+const links = catalogPageLinks(Astro.url, nextCursor);
 ---
 
-<PublicDocument title="Services | Clemora" description="Published event services from Clemora.">
+<PublicDocument
+  title="Services | Clemora"
+  description="Published event services from Clemora."
+>
   <section class="section">
     <span class="eyebrow">Make it yours</span>
     <h1 class="section-title small">All services</h1>
     <p>Explore services for your gathering.</p>
-    {unavailable && <Toast tone="danger" placement="inline"><span>The catalog is unavailable right now.</span><a href={Astro.url.pathname}>Try again</a></Toast>}
-    {!unavailable && services.length === 0 && <p class="catalog-status">Our service catalog is being prepared. Please check back soon.</p>}
+    {unavailable && (
+      <Toast tone="danger" placement="inline">
+        <span>The catalog is unavailable right now.</span>
+        <a href={Astro.url.pathname}>Try again</a>
+      </Toast>
+    )}
+    {!unavailable && services.length === 0 && (
+      <p class="catalog-status">
+        Our service catalog is being prepared. Please check back soon.
+      </p>
+    )}
     {services.length > 0 && <ServiceCards items={services} />}
-    {!unavailable && <Pagination page={Astro.url.searchParams.getAll("previous").length + 1} hasNextPage={!!links.next} previousHref={links.previous ?? undefined} nextHref={links.next ?? undefined} label="Catalog pages" />}
+    {!unavailable && (
+      <Pagination
+        page={Astro.url.searchParams.getAll("previous").length + 1}
+        hasNextPage={!!links.next}
+        previousHref={links.previous ?? undefined}
+        nextHref={links.next ?? undefined}
+        label="Catalog pages"
+      />
+    )}
   </section>
 </PublicDocument>

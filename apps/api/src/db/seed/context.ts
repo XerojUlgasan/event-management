@@ -8,7 +8,10 @@ export type SeedDb = Transaction<DB>;
 
 /** Stable UUID for a seed key. Existing rows are never updated. */
 export function scenarioId(key: string) {
-  const bytes = createHash("sha256").update(`clemora-scenario-v1:${key}`).digest().subarray(0, 16);
+  const bytes = createHash("sha256")
+    .update(`clemora-scenario-v1:${key}`)
+    .digest()
+    .subarray(0, 16);
   bytes[6] = (bytes[6] & 0x0f) | 0x50;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = bytes.toString("hex");
@@ -23,17 +26,23 @@ export function seedClock() {
   const value = process.env.SEED_CLOCK;
   if (!value) return new Date();
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) {
-    throw new Error("SEED_CLOCK must be an ISO UTC timestamp, for example 2026-10-31T00:00:00Z");
+    throw new Error(
+      "SEED_CLOCK must be an ISO UTC timestamp, for example 2026-10-31T00:00:00Z",
+    );
   }
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) throw new Error("SEED_CLOCK is not a valid date");
+  if (Number.isNaN(date.getTime()))
+    throw new Error("SEED_CLOCK is not a valid date");
   return date;
 }
 
 /** Deterministic unit interval. SEED_RANDOM_SEED changes the shuffle only. */
-export function seedRandom(seedText = process.env.SEED_RANDOM_SEED ?? "clemora-scenario-v1") {
+export function seedRandom(
+  seedText = process.env.SEED_RANDOM_SEED ?? "clemora-scenario-v1",
+) {
   let hash = 2166136261;
-  for (let i = 0; i < seedText.length; i += 1) hash = Math.imul(hash ^ seedText.charCodeAt(i), 16777619);
+  for (let i = 0; i < seedText.length; i += 1)
+    hash = Math.imul(hash ^ seedText.charCodeAt(i), 16777619);
   let state = hash >>> 0;
   return () => {
     state = (state + 0x6d2b79f5) >>> 0;
@@ -50,7 +59,8 @@ export function shuffle<T>(items: readonly T[], random: () => number) {
     const j = Math.floor(random() * (i + 1));
     const current = copy[i];
     const swap = copy[j];
-    if (current === undefined || swap === undefined) throw new Error("Shuffle index was empty");
+    if (current === undefined || swap === undefined)
+      throw new Error("Shuffle index was empty");
     copy[i] = swap;
     copy[j] = current;
   }
@@ -87,5 +97,8 @@ export async function insertIfNew<T extends keyof DB>(
 }
 
 export function expectCount(label: string, count: number) {
-  if (count !== SCENARIO_COUNT) throw new Error(`${label} planned ${count} rows; expected ${SCENARIO_COUNT}`);
+  if (count !== SCENARIO_COUNT)
+    throw new Error(
+      `${label} planned ${count} rows; expected ${SCENARIO_COUNT}`,
+    );
 }

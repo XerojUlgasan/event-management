@@ -1,13 +1,13 @@
 ---
-import "../styles/app.css"
-import { Brand, Icon } from "@event-management/ui"
+import "../styles/app.css";
+import { Brand, Icon } from "@event-management/ui";
 
 interface Props {
-  title: string
-  description: string
+  title: string;
+  description: string;
 }
 
-const { title, description } = Astro.props
+const { title, description } = Astro.props;
 ---
 
 <!doctype html>
@@ -23,7 +23,9 @@ const { title, description } = Astro.props
   <body>
     <div class="public-site">
       <header class="public-header">
-        <a href="/" aria-label="Clemora home"><Brand /></a>
+        <a href="/" aria-label="Clemora home">
+          <Brand />
+        </a>
         <input id="public-menu" class="public-menu-toggle" type="checkbox" />
         <nav class="public-nav" aria-label="Primary">
           <a href="/packages">Packages</a>
@@ -32,11 +34,23 @@ const { title, description } = Astro.props
           <a href="/about">About us</a>
         </nav>
         <div class="header-actions">
-          <a class="button button-link" href="/login">Sign in</a>
-          <a class="button button-primary" href="/login?mode=register">Get started</a>
-          <label class="icon-button mobile-menu" for="public-menu" aria-label="Open navigation">
-            <span class="menu-open"><Icon name="menu" /></span>
-            <span class="menu-close"><Icon name="close" /></span>
+          <a class="button button-link" href="/login">
+            Sign in
+          </a>
+          <a class="button button-primary" href="/login?mode=register">
+            Get started
+          </a>
+          <label
+            class="icon-button mobile-menu"
+            for="public-menu"
+            aria-label="Open navigation"
+          >
+            <span class="menu-open">
+              <Icon name="menu" />
+            </span>
+            <span class="menu-close">
+              <Icon name="close" />
+            </span>
           </label>
         </div>
       </header>
@@ -45,7 +59,10 @@ const { title, description } = Astro.props
       </main>
       <footer class="public-footer">
         <Brand light />
-        <p>Thoughtful event planning and calm coordination, from first idea to final update.</p>
+        <p>
+          Thoughtful event planning and calm coordination, from first idea to
+          final update.
+        </p>
         <div>
           <a href="/packages">Packages</a>
           <a href="/services">Services</a>

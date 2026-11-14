@@ -1,6 +1,6 @@
 # API and type synchronization
 
-Clemora has no generated browser API client or `gen:data` command. The HTTP wrapper lives in [apps/web/src/lib/http.ts](../../apps/web/src/lib/http.ts). Endpoint calls and several handwritten DTOs live under `apps/web/src/lib/data/`. [Client layers](../frontend/reference/client-layers.md) is the placement rule for those calls. Reusable catalog and pagination types and shared limits live in [packages/contracts](../../packages/contracts/package.json). OpenAPI route schemas and handlers in `apps/api/src/controllers/` own the HTTP contract.
+Clemora has no generated browser API client or `gen:data` command. The HTTP wrapper lives in [apps/web/src/lib/http/request.ts](../../apps/web/src/lib/http/request.ts). Endpoint calls and several handwritten DTOs live under `apps/web/src/lib/data/`. [Client layers](../frontend/reference/client-layers.md) is the placement rule for those calls. Reusable catalog and pagination types and shared limits live in [packages/contracts](../../packages/contracts/package.json). OpenAPI route schemas and handlers in `apps/api/src/controllers/` own the HTTP contract.
 
 When a route, payload, status, nullability, pagination field, or shared limit changes:
 
@@ -10,6 +10,6 @@ When a route, payload, status, nullability, pagination field, or shared limit ch
 4. Compare the actual response and affected OpenAPI operation with the browser expectation, including error and permission paths. A handwritten `request<T>` generic does not validate JSON or prove the server returned `T`.
 5. Run the closest API behavior suite and `pnpm check`. Exercise the affected browser journey when the result is user-visible. State any unavailable runtime evidence.
 
-`@event-management/contracts/pagination` owns the shared `PaginationQuery`, `PageInfo`, `Page<T>`, and page-size constants. The API applies those limits and returns each operation's named result array with `nextCursor`; preserve that array key and cursor pairing in the handwritten browser DTO. Route-specific SQL owns ordering, filter scope, and cursor position. See [API pagination](../api/reference/structure-and-routes.md#pagination) for the keyset rules.
+`@event-management/contracts/pagination` owns the shared `PaginationQuery`, `PageInfo`, `Page<T>`, and page-size constants. The API applies those limits and returns each operation's named result array with `nextCursor`; preserve that array key and cursor pairing in the handwritten browser DTO. Route-specific SQL owns ordering, filter scope, and cursor position. Inspect the relevant API route and data query for its keyset rules.
 
 During read-only review, inspect schemas, response construction, DTOs, callers, and available live contracts without generating into tracked paths or applying migrations. Shared catalog types already have an owner; other browser DTOs still need explicit comparison. Do not describe the current setup as automatic end-to-end type generation.

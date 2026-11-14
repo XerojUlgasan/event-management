@@ -29,13 +29,26 @@ export { ActivityList } from "./molecules/ActivityList";
 export type { ActivityItem } from "./molecules/ActivityList";
 export { Toast } from "./molecules/Toast";
 export type { ToastTone } from "./molecules/Toast";
-export { NotificationProvider, useNotifications, notificationErrorMessage } from "./molecules/NotificationProvider";
+export {
+  NotificationProvider,
+  useNotifications,
+  notificationErrorMessage,
+} from "./molecules/NotificationProvider";
 export { SiteHeader } from "./molecules/SiteHeader";
 export type { SiteLink } from "./molecules/SiteHeader";
 export { InclusionStrip } from "./molecules/InclusionStrip";
 
 // Organisms
-export { CatalogCanvas, CatalogSections, CatalogWidgetContent, CatalogMarkdown, CatalogGridGuides, CatalogGridRuler, CATALOG_GRID, catalogGridStyle } from "./organisms/CatalogCanvas";
+export {
+  CatalogCanvas,
+  CatalogSections,
+  CatalogWidgetContent,
+  CatalogMarkdown,
+  CatalogGridGuides,
+  CatalogGridRuler,
+  CATALOG_GRID,
+  catalogGridStyle,
+} from "./organisms/CatalogCanvas";
 export { DataTable } from "./organisms/DataTable";
 export type { DataTableColumn, DataTableProps } from "./organisms/DataTable";
 export { PageHeader } from "./organisms/PageHeader";

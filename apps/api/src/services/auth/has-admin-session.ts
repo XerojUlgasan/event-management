@@ -8,6 +8,12 @@ import { findAdminSessionByTokenHashData } from "../../data/auth/find-admin-sess
 
 type AuthContext = Context<HonoEnv>;
 
-export async function hasAdminSessionService(db: Kysely<DB>, token: string | undefined) {
-  return !!(token && await findAdminSessionByTokenHashData(db, hashSessionToken(token)));
+export async function hasAdminSessionService(
+  db: Kysely<DB>,
+  token: string | undefined,
+) {
+  return !!(
+    token &&
+    (await findAdminSessionByTokenHashData(db, hashSessionToken(token)))
+  );
 }

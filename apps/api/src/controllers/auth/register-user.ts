@@ -34,11 +34,16 @@ export const registerUserRoute = createRoute({
   },
 });
 
-export const registerUserRouteHandler: AppRouteHandler<typeof registerUserRoute> = async (
-  c,
-) => {
+export const registerUserRouteHandler: AppRouteHandler<
+  typeof registerUserRoute
+> = async (c) => {
   const { email, password, displayName } = c.req.valid("json");
-  const result = await registerUserService(c.get("db"), email, password, displayName);
+  const result = await registerUserService(
+    c.get("db"),
+    email,
+    password,
+    displayName,
+  );
   if (result.kind === "rate-limited")
     return c.json(
       { error: "Too many attempts. Try again in 15 minutes." },

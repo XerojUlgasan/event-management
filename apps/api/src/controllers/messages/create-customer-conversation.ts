@@ -16,5 +16,13 @@ export const createCustomerConversationRoute = createRoute({
   },
 });
 
-export const createCustomerConversationRouteHandler: AppRouteHandler<typeof createCustomerConversationRoute> = async (c) =>
-  c.json(await createCustomerConversationService(c.get("db"), c.get("session").user.id), 201);
+export const createCustomerConversationRouteHandler: AppRouteHandler<
+  typeof createCustomerConversationRoute
+> = async (c) =>
+  c.json(
+    await createCustomerConversationService(
+      c.get("db"),
+      c.get("session").user.id,
+    ),
+    201,
+  );

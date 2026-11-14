@@ -15,7 +15,14 @@ export const getPublicServiceBySlugRoute = createRoute({
   },
 });
 
-export const getPublicServiceBySlugRouteHandler: AppRouteHandler<typeof getPublicServiceBySlugRoute> = async (c) => {
-  const value = await getPublicServiceBySlugService(c.get("db"), c.req.valid("param").slug);
-  return value ? c.json(value, 200) : c.json({ error: "Service not found" }, 404);
+export const getPublicServiceBySlugRouteHandler: AppRouteHandler<
+  typeof getPublicServiceBySlugRoute
+> = async (c) => {
+  const value = await getPublicServiceBySlugService(
+    c.get("db"),
+    c.req.valid("param").slug,
+  );
+  return value
+    ? c.json(value, 200)
+    : c.json({ error: "Service not found" }, 404);
 };

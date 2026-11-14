@@ -1,31 +1,55 @@
 ---
-import { Pagination, Toast } from "@event-management/ui"
-import PublicDocument from "../../layouts/PublicDocument.astro"
-import { PackageCards } from "../../components/public/CatalogCards"
-import { catalogPageLinks, loadPackagesPage } from "../../lib/server/catalog"
-import type { PublicPackage } from "../../lib/data/packages"
+import { Pagination, Toast } from "@event-management/ui";
+import PublicDocument from "../../layouts/PublicDocument.astro";
+import { PackageCards } from "../../components/public/catalog/CatalogCards";
+import {
+  catalogPageLinks,
+  loadPackagesPage,
+} from "../../lib/server/catalog/load-catalog";
+import type { PublicPackage } from "../../lib/data/catalog/packages";
 
-let packages: PublicPackage[] = []
-let unavailable = false
-let nextCursor: string | null = null
+let packages: PublicPackage[] = [];
+let unavailable = false;
+let nextCursor: string | null = null;
 try {
-  const page = await loadPackagesPage(undefined, Astro.url.searchParams.get("cursor") ?? undefined)
-  packages = page.items
-  nextCursor = page.nextCursor
+  const page = await loadPackagesPage(
+    undefined,
+    Astro.url.searchParams.get("cursor") ?? undefined,
+  );
+  packages = page.items;
+  nextCursor = page.nextCursor;
 } catch {
-  unavailable = true
+  unavailable = true;
 }
-const links = catalogPageLinks(Astro.url, nextCursor)
+const links = catalogPageLinks(Astro.url, nextCursor);
 ---
 
-<PublicDocument title="Packages | Clemora" description="Published event packages from Clemora.">
+<PublicDocument
+  title="Packages | Clemora"
+  description="Published event packages from Clemora."
+>
   <section class="section">
     <span class="eyebrow">The Clemora collection</span>
     <h1 class="section-title small">All packages</h1>
     <p>Explore packages for your gathering.</p>
-    {unavailable && <Toast tone="danger" placement="inline"><span>The catalog is unavailable right now.</span><a href={Astro.url.pathname}>Try again</a></Toast>}
-    {!unavailable && packages.length === 0 && <p class="catalog-status">No packages are published yet.</p>}
+    {unavailable && (
+      <Toast tone="danger" placement="inline">
+        <span>The catalog is unavailable right now.</span>
+        <a href={Astro.url.pathname}>Try again</a>
+      </Toast>
+    )}
+    {!unavailable && packages.length === 0 && (
+      <p class="catalog-status">No packages are published yet.</p>
+    )}
     {packages.length > 0 && <PackageCards items={packages} />}
-    {!unavailable && <Pagination page={Astro.url.searchParams.getAll("previous").length + 1} hasNextPage={!!links.next} previousHref={links.previous ?? undefined} nextHref={links.next ?? undefined} label="Catalog pages" />}
+    {!unavailable && (
+      <Pagination
+        page={Astro.url.searchParams.getAll("previous").length + 1}
+        hasNextPage={!!links.next}
+        previousHref={links.previous ?? undefined}
+        nextHref={links.next ?? undefined}
+        label="Catalog pages"
+      />
+    )}
   </section>
 </PublicDocument>

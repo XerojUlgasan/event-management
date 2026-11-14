@@ -44,8 +44,15 @@ export const getCatalogMediaRouteHandler: AppRouteHandler<
           resolved.session.user.id,
         );
         adminView = !!media;
-      } else if (resolved.kind === "ok" && resolved.session.user.role === "customer") {
-        media = await findCustomerCatalogMediaData(c.get("db"), id, resolved.session.user.id);
+      } else if (
+        resolved.kind === "ok" &&
+        resolved.session.user.role === "customer"
+      ) {
+        media = await findCustomerCatalogMediaData(
+          c.get("db"),
+          id,
+          resolved.session.user.id,
+        );
         adminView = !!media;
       }
     }

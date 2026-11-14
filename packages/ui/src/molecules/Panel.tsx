@@ -27,12 +27,19 @@ export function Panel({
     action !== undefined;
 
   return (
-    <Component {...props} className={`panel${className ? ` ${className}` : ""}`}>
+    <Component
+      {...props}
+      className={`panel${className ? ` ${className}` : ""}`}
+    >
       {hasHeader && (
-        <div className={`panel-head${headClassName ? ` ${headClassName}` : ""}`}>
+        <div
+          className={`panel-head${headClassName ? ` ${headClassName}` : ""}`}
+        >
           {header ?? (
             <div>
-              {title !== undefined && <div className="panel-title">{title}</div>}
+              {title !== undefined && (
+                <div className="panel-title">{title}</div>
+              )}
               {description !== undefined && <p>{description}</p>}
             </div>
           )}

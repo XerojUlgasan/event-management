@@ -16,7 +16,12 @@ export const syncFirebaseProfileRoute = createRoute({
       content: {
         "application/json": {
           schema: z.object({
-            displayName: z.string().trim().min(1).max(MAX_DISPLAY_NAME_LENGTH).optional(),
+            displayName: z
+              .string()
+              .trim()
+              .min(1)
+              .max(MAX_DISPLAY_NAME_LENGTH)
+              .optional(),
           }),
         },
       },
@@ -50,7 +55,11 @@ export const syncFirebaseProfileRoute = createRoute({
 export const syncFirebaseProfileRouteHandler: AppRouteHandler<
   typeof syncFirebaseProfileRoute
 > = async (c) => {
-  const result = await syncFirebaseProfileService(c.get("db"), c.get("firebase"), c.req.valid("json").displayName);
+  const result = await syncFirebaseProfileService(
+    c.get("db"),
+    c.get("firebase"),
+    c.req.valid("json").displayName,
+  );
   if (result.kind === "missing-email") {
     return c.json(
       { error: "The signed-in account does not have an email address" },

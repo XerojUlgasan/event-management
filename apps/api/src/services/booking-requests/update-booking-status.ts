@@ -24,7 +24,8 @@ export async function updateBookingStatusService(
       status === "under_review"
     )
       return error("Invalid status transition", 409);
-    if (status === "cancelled") await cancelScheduledEventDaysService(trx, id, actorId);
+    if (status === "cancelled")
+      await cancelScheduledEventDaysService(trx, id, actorId);
     const updated = await updateBookingStatusData(trx, id, status);
     await addStatusHistoryData(trx, id, status, actorId, reason || null);
     return (await bookingRequestDtos(trx, [updated]))[0]!;

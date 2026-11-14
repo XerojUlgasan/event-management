@@ -27,7 +27,8 @@ export default defineConfig({
               "/v1": {
                 target: apiProxyTarget,
                 changeOrigin: true,
-                rewrite: (path) => path.replace(/^\/v1(?=\/|\?|$)/, "/functions/v1/api/v1"),
+                rewrite: (path) =>
+                  path.replace(/^\/v1(?=\/|\?|$)/, "/functions/v1/api/v1"),
               },
             },
           },

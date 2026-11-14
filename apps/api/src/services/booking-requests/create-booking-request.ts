@@ -20,9 +20,11 @@ export async function createBookingRequestService(
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-  if (input.requestedDays.some(day => day.date < today))
+  if (input.requestedDays.some((day) => day.date < today))
     return error("Choose today or a future date", 400);
-  const requestedDays = input.requestedDays.map(({ date }) => ({ date, startsAt: null, endsAt: null })).sort((a, b) => a.date.localeCompare(b.date));
+  const requestedDays = input.requestedDays
+    .map(({ date }) => ({ date, startsAt: null, endsAt: null }))
+    .sort((a, b) => a.date.localeCompare(b.date));
   return db.transaction().execute(async (trx) => {
     const pkg = await findAvailablePackageData(trx, input.packageId);
     if (!pkg)

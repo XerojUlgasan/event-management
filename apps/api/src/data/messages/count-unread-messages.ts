@@ -3,7 +3,11 @@ import type { DB } from "../../db/types.js";
 
 type Database = Kysely<DB>;
 
-export async function countUnreadMessagesData(db: Database, conversationIds: string[], viewer: "admin" | "customer") {
+export async function countUnreadMessagesData(
+  db: Database,
+  conversationIds: string[],
+  viewer: "admin" | "customer",
+) {
   if (!conversationIds.length) return new Map<string, number>();
   const rows = await db
     .selectFrom("messages as m")

@@ -1,6 +1,6 @@
 ---
-import "../styles/app.css"
-import App from "../components/app/App.tsx"
+import "../styles/app.css";
+import App from "../components/app/App.tsx";
 ---
 
 <!doctype html>
@@ -13,6 +13,10 @@ import App from "../components/app/App.tsx"
     <title>Clemora</title>
   </head>
   <body>
-    <App client:only="react" initialPath={Astro.url.pathname} initialSearch={Astro.url.search} />
+    <App
+      client:only="react"
+      initialPath={Astro.url.pathname}
+      initialSearch={Astro.url.search}
+    />
   </body>
 </html>

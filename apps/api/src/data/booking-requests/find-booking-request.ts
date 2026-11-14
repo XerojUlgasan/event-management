@@ -10,7 +10,8 @@ export const findBookingRequestData = (
 ) => {
   let query = db
     .selectFrom("booking_requests")
-    .selectAll().select(bookingRevision.as("revision"))
+    .selectAll()
+    .select(bookingRevision.as("revision"))
     .where("id", "=", id);
   if (customerId) query = query.where("customer_id", "=", customerId);
   return query.executeTakeFirst();

@@ -19,10 +19,12 @@ export function Drawer({
 }) {
   const titleId = useId();
   return (
-    <ModalSurface className="drawer-backdrop" onClose={onClose} aria-labelledby={titleId}>
-      <div
-        className={`detail-drawer${className ? ` ${className}` : ""}`}
-      >
+    <ModalSurface
+      className="drawer-backdrop"
+      onClose={onClose}
+      aria-labelledby={titleId}
+    >
+      <div className={`detail-drawer${className ? ` ${className}` : ""}`}>
         <Button
           variant="plain"
           type="button"
@@ -33,7 +35,9 @@ export function Drawer({
           <Icon name="close" />
         </Button>
         {status}
-        <h2 className="drawer-title" id={titleId}>{title}</h2>
+        <h2 className="drawer-title" id={titleId}>
+          {title}
+        </h2>
         {children}
       </div>
     </ModalSurface>

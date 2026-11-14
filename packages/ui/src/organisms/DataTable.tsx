@@ -35,17 +35,29 @@ export function DataTable<Row>({
       <table className="ui-data-table" aria-label={label} style={{ minWidth }}>
         <thead>
           <tr>
-            {columns.map(column => <th key={column.key} scope="col">{column.header}</th>)}
+            {columns.map((column) => (
+              <th key={column.key} scope="col">
+                {column.header}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
-          {rows.length ? rows.map(row => (
-            <tr key={rowKey(row)}>
-              {columns.map((column, index) => index === 0
-                ? <th key={column.key} scope="row">{column.cell(row)}</th>
-                : <td key={column.key}>{column.cell(row)}</td>)}
-            </tr>
-          )) : (
+          {rows.length ? (
+            rows.map((row) => (
+              <tr key={rowKey(row)}>
+                {columns.map((column, index) =>
+                  index === 0 ? (
+                    <th key={column.key} scope="row">
+                      {column.cell(row)}
+                    </th>
+                  ) : (
+                    <td key={column.key}>{column.cell(row)}</td>
+                  ),
+                )}
+              </tr>
+            ))
+          ) : (
             <tr className="ui-data-table-empty">
               <td colSpan={columns.length}>{emptyMessage}</td>
             </tr>

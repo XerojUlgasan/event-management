@@ -3,11 +3,20 @@ import type { HonoEnv } from "../../types/hono.js";
 import { requireFirebaseAuth, requireSession } from "../../middleware/auth.js";
 import { getMeRoute, getMeRouteHandler } from "./get-me.js";
 import { logoutUserRoute, logoutUserRouteHandler } from "./logout-user.js";
-import { syncFirebaseProfileRoute, syncFirebaseProfileRouteHandler } from "./sync-firebase-profile.js";
-import { registerUserRoute, registerUserRouteHandler } from "./register-user.js";
+import {
+  syncFirebaseProfileRoute,
+  syncFirebaseProfileRouteHandler,
+} from "./sync-firebase-profile.js";
+import {
+  registerUserRoute,
+  registerUserRouteHandler,
+} from "./register-user.js";
 import { loginUserRoute, loginUserRouteHandler } from "./login-user.js";
 import { addPasswordRoute, addPasswordRouteHandler } from "./add-password.js";
-import { linkFirebaseRoute, linkFirebaseRouteHandler } from "./link-firebase.js";
+import {
+  linkFirebaseRoute,
+  linkFirebaseRouteHandler,
+} from "./link-firebase.js";
 
 const authRoutes = new OpenAPIHono<HonoEnv>();
 authRoutes.use("/auth/sync", requireFirebaseAuth);

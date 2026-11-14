@@ -1,0 +1,32 @@
+# Dependencies and generated output.
+**/node_modules/
+**/.astro/
+**/dist/
+**/storybook-static/
+**/coverage/
+**/_generated/
+**/generated/
+**/*.generated.*
+apps/api/src/db/types.ts
+pnpm-lock.yaml
+skills-lock.json
+
+# Local data, assets, migrations, and imported agent tooling.
+**/.env*
+**/.secrets/
+**/.impeccable/
+.scratch/
+.agents/
+.agent/
+.claude/
+.cursor/
+apps/web/public/
+apps/api/prisma/
+sketches/
+
+# Keep historical documents and contributor guidance out of source-format sweeps.
+context-factory/
+docs/
+transcriptions/
+**/*.md
+!/README.md

@@ -9,8 +9,15 @@ import { findCustomPackageData } from "../../data/booking-requests/find-custom-p
 import { findAnyPackageData } from "../../data/booking-requests/find-any-package.js";
 import { lockAnyPackageData } from "../../data/booking-requests/lock-any-package.js";
 import { createCustomPackageData } from "../../data/booking-requests/create-custom-package.js";
-import { InvalidPackageMedia, listPackageMediaIdsData, replacePackageSectionsData } from "../../data/packages/catalog-page.js";
-import { validatePackageServicesData, replacePackageServicesData } from "../../data/packages/package-services.js";
+import {
+  InvalidPackageMedia,
+  listPackageMediaIdsData,
+  replacePackageSectionsData,
+} from "../../data/packages/catalog-page.js";
+import {
+  validatePackageServicesData,
+  replacePackageServicesData,
+} from "../../data/packages/package-services.js";
 import { findCatalogMediaData } from "../../data/catalog-media/find-catalog-media.js";
 import { createCatalogMediaData } from "../../data/catalog-media/create-catalog-media.js";
 import { createAuditEventData } from "../../data/audit/create-audit-event.js";
@@ -19,78 +26,222 @@ import { packageDto } from "../packages/package-response.js";
 import { nextUpdate } from "../packages/package-rules.js";
 import { bookingRequestDtos } from "./booking-request-response.js";
 import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
-import { getCatalogMedia, putCatalogMedia } from "../../utils/catalog-media-storage.js";
+import {
+  getCatalogMedia,
+  putCatalogMedia,
+} from "../../utils/catalog-media-storage.js";
 
-const error = (message: string, status: 400 | 404 | 409 | 502) => ({ message, status });
-export type CustomPackageInput = Content & { expectedBookingUpdatedAt: string; expectedUpdatedAt: string; sourcePackageId?: string };
-async function stageSourceMedia(db: Kysely<DB>, sourceId: string, content: Content, actorId: string, stagedIds: string[]) {
+const error = (message: string, status: 400 | 404 | 409 | 502) => ({
+  message,
+  status,
+});
+export type CustomPackageInput = Content & {
+  expectedBookingUpdatedAt: string;
+  expectedUpdatedAt: string;
+  sourcePackageId?: string;
+};
+async function stageSourceMedia(
+  db: Kysely<DB>,
+  sourceId: string,
+  content: Content,
+  actorId: string,
+  stagedIds: string[],
+) {
   const sourceIds = await listPackageMediaIdsData(db, sourceId);
-  const requestedIds = [...new Set(content.sections.flatMap(section => section.widgets.flatMap(widget => widget.media?.source === "upload" && widget.media.id ? [widget.media.id] : [])))].filter(id => sourceIds.includes(id));
+  const requestedIds = [
+    ...new Set(
+      content.sections.flatMap((section) =>
+        section.widgets.flatMap((widget) =>
+          widget.media?.source === "upload" && widget.media.id
+            ? [widget.media.id]
+            : [],
+        ),
+      ),
+    ),
+  ].filter((id) => sourceIds.includes(id));
   const replacements = new Map<string, string>();
   for (const sourceMediaId of requestedIds) {
     const source = await findCatalogMediaData(db, sourceMediaId);
-    if (!source?.storage_key || !source.mime_type || source.source !== "upload") throw new InvalidPackageMedia("Source media is unavailable. Refresh and try again");
-    const id = randomUUID(), key = `catalog-media/${id}`;
-    await createCatalogMediaData(db, { id, kind: source.kind, source: "upload", storage_key: key, mime_type: source.mime_type, byte_size: source.byte_size, created_by: actorId });
+    if (!source?.storage_key || !source.mime_type || source.source !== "upload")
+      throw new InvalidPackageMedia(
+        "Source media is unavailable. Refresh and try again",
+      );
+    const id = randomUUID(),
+      key = `catalog-media/${id}`;
+    await createCatalogMediaData(db, {
+      id,
+      kind: source.kind,
+      source: "upload",
+      storage_key: key,
+      mime_type: source.mime_type,
+      byte_size: source.byte_size,
+      created_by: actorId,
+    });
     stagedIds.push(id);
     const stream = await getCatalogMedia(source.storage_key);
-    await putCatalogMedia(key, new Uint8Array(await new Response(stream).arrayBuffer()), source.mime_type);
+    await putCatalogMedia(
+      key,
+      new Uint8Array(await new Response(stream).arrayBuffer()),
+      source.mime_type,
+    );
     replacements.set(sourceMediaId, id);
   }
-  return { ...content, sections: content.sections.map(section => ({ ...section, widgets: section.widgets.map(widget => {
-    const media = widget.media;
-    const id = media?.id && replacements.get(media.id);
-    return media && id ? { ...widget, media: { ...media, id, url: `/v1/catalog-media/${id}` } } : widget;
-  }) })) };
+  return {
+    ...content,
+    sections: content.sections.map((section) => ({
+      ...section,
+      widgets: section.widgets.map((widget) => {
+        const media = widget.media;
+        const id = media?.id && replacements.get(media.id);
+        return media && id
+          ? {
+              ...widget,
+              media: { ...media, id, url: `/v1/catalog-media/${id}` },
+            }
+          : widget;
+      }),
+    })),
+  };
 }
-export async function saveCustomPackageService(db: Kysely<DB>, id: string, actorId: string, input: CustomPackageInput, create: boolean) {
+export async function saveCustomPackageService(
+  db: Kysely<DB>,
+  id: string,
+  actorId: string,
+  input: CustomPackageInput,
+  create: boolean,
+) {
   const stagedIds: string[] = [];
   let previousMediaIds: string[] = [];
   try {
     const booking = await findBookingRequestData(db, id);
     if (!booking) return error("Booking request not found", 404);
     const custom = await findCustomPackageData(db, id);
-    const sourceId = create ? (input.sourcePackageId ?? booking.package_id) : custom?.id;
-    const source = sourceId ? await findAnyPackageData(db, sourceId) : undefined;
+    const sourceId = create
+      ? (input.sourcePackageId ?? booking.package_id)
+      : custom?.id;
+    const source = sourceId
+      ? await findAnyPackageData(db, sourceId)
+      : undefined;
     if (!source) return error("Package not found", 404);
-    if (["declined", "cancelled"].includes(booking.status)) return error("Closed booking requests cannot be customized", 409);
-    if (booking.revision !== input.expectedBookingUpdatedAt || source.updated_at.toISOString() !== input.expectedUpdatedAt) return error("Booking or package changed. Refresh and try again", 409);
-    if ((create && (custom || source.package_type !== "catalog")) || (!create && (!custom || source.id !== custom.id))) return error("Custom package state changed. Refresh and try again", 409);
-    if (source.archived_at) return error("Archived packages cannot be customized", 409);
+    if (["declined", "cancelled"].includes(booking.status))
+      return error("Closed booking requests cannot be customized", 409);
+    if (
+      booking.revision !== input.expectedBookingUpdatedAt ||
+      source.updated_at.toISOString() !== input.expectedUpdatedAt
+    )
+      return error("Booking or package changed. Refresh and try again", 409);
+    if (
+      (create && (custom || source.package_type !== "catalog")) ||
+      (!create && (!custom || source.id !== custom.id))
+    )
+      return error("Custom package state changed. Refresh and try again", 409);
+    if (source.archived_at)
+      return error("Archived packages cannot be customized", 409);
     let content: Content = input;
     if (create) {
-      try { content = await stageSourceMedia(db, source.id, input, actorId, stagedIds); }
-      catch (cause) { if (cause instanceof InvalidPackageMedia) throw cause; await cleanupCatalogMediaService(db, stagedIds); return error("Could not copy package media. Try again", 502); }
+      try {
+        content = await stageSourceMedia(
+          db,
+          source.id,
+          input,
+          actorId,
+          stagedIds,
+        );
+      } catch (cause) {
+        if (cause instanceof InvalidPackageMedia) throw cause;
+        await cleanupCatalogMediaService(db, stagedIds);
+        return error("Could not copy package media. Try again", 502);
+      }
     }
-    const outcome = await db.transaction().execute(async trx => {
+    const outcome = await db.transaction().execute(async (trx) => {
       const currentBooking = await lockBookingRequestData(trx, id);
       if (!currentBooking) return error("Booking request not found", 404);
       const current = await lockAnyPackageData(trx, source.id);
       const currentCustom = await findCustomPackageData(trx, id);
-      if (!current || currentBooking.revision !== input.expectedBookingUpdatedAt || current.updated_at.toISOString() !== input.expectedUpdatedAt) return error("Booking or package changed. Refresh and try again", 409);
-      if (["declined", "cancelled"].includes(currentBooking.status)) return error("Closed booking requests cannot be customized", 409);
-      if (current.archived_at || (create ? current.package_type !== "catalog" || !!currentCustom : currentCustom?.id !== current.id)) return error("Custom package state changed. Refresh and try again", 409);
-      const invalid = await validatePackageServicesData(trx, current.id, content.services);
+      if (
+        !current ||
+        currentBooking.revision !== input.expectedBookingUpdatedAt ||
+        current.updated_at.toISOString() !== input.expectedUpdatedAt
+      )
+        return error("Booking or package changed. Refresh and try again", 409);
+      if (["declined", "cancelled"].includes(currentBooking.status))
+        return error("Closed booking requests cannot be customized", 409);
+      if (
+        current.archived_at ||
+        (create
+          ? current.package_type !== "catalog" || !!currentCustom
+          : currentCustom?.id !== current.id)
+      )
+        return error(
+          "Custom package state changed. Refresh and try again",
+          409,
+        );
+      const invalid = await validatePackageServicesData(
+        trx,
+        current.id,
+        content.services,
+      );
       if (invalid) return invalid;
-      const before = await packageDto(trx, current, { includeArchivedServices: true });
+      const before = await packageDto(trx, current, {
+        includeArchivedServices: true,
+      });
       const now = nextUpdate(current.updated_at);
-      const saved = create ? await createCustomPackageData(trx, id, content, now, `private:${randomUUID()}`) : await updatePackageData(trx, current.id, content, current.slug, now);
-      previousMediaIds = await replacePackageSectionsData(trx, saved.id, content, actorId, now);
+      const saved = create
+        ? await createCustomPackageData(
+            trx,
+            id,
+            content,
+            now,
+            `private:${randomUUID()}`,
+          )
+        : await updatePackageData(trx, current.id, content, current.slug, now);
+      previousMediaIds = await replacePackageSectionsData(
+        trx,
+        saved.id,
+        content,
+        actorId,
+        now,
+      );
       await replacePackageServicesData(trx, saved.id, content.services);
       await touchBookingRevisionData(trx, id);
       const updatedBooking = await findBookingRequestData(trx, id);
-      if (!updatedBooking) throw new Error("Saved booking request is unavailable");
-      const pkg = await packageDto(trx, saved, { includeArchivedServices: true });
-      await createAuditEventData(trx, { actor_id: actorId, action: create ? "booking.custom_package_created" : "booking.custom_package_updated", entity_type: "booking_request", entity_id: id, metadata: JSON.stringify({ previousPackageId: current.id, packageId: saved.id, before, after: pkg }) });
+      if (!updatedBooking)
+        throw new Error("Saved booking request is unavailable");
+      const pkg = await packageDto(trx, saved, {
+        includeArchivedServices: true,
+      });
+      await createAuditEventData(trx, {
+        actor_id: actorId,
+        action: create
+          ? "booking.custom_package_created"
+          : "booking.custom_package_updated",
+        entity_type: "booking_request",
+        entity_id: id,
+        metadata: JSON.stringify({
+          previousPackageId: current.id,
+          packageId: saved.id,
+          before,
+          after: pkg,
+        }),
+      });
       const [bookingRequest] = await bookingRequestDtos(trx, [updatedBooking]);
       return { package: pkg, bookingRequest };
     });
-    await cleanupCatalogMediaService(db, "status" in outcome ? stagedIds : previousMediaIds);
+    await cleanupCatalogMediaService(
+      db,
+      "status" in outcome ? stagedIds : previousMediaIds,
+    );
     return outcome;
   } catch (cause) {
     await cleanupCatalogMediaService(db, stagedIds);
     if (cause instanceof InvalidPackageMedia) return error(cause.message, 400);
-    if (typeof cause === "object" && cause !== null && "code" in cause && cause.code === "23505") return error("Custom package already exists. Refresh and try again", 409);
+    if (
+      typeof cause === "object" &&
+      cause !== null &&
+      "code" in cause &&
+      cause.code === "23505"
+    )
+      return error("Custom package already exists. Refresh and try again", 409);
     throw cause;
   }
 }

@@ -11,7 +11,11 @@ import {
   eventDayBodyLimit,
 } from "../constants/http.js";
 import type { HonoEnv } from "../types/hono.js";
-import { matchRouteFamily, routeFamilies, type RouteFamilyId } from "./match-route.js";
+import {
+  matchRouteFamily,
+  routeFamilies,
+  type RouteFamilyId,
+} from "./match-route.js";
 
 const allowedOrigins = (process.env.WEB_ORIGIN ?? "http://localhost:4321")
   .split(",")
@@ -29,9 +33,14 @@ const loaders = {
   messages: () => import("../controllers/messages/index.js"),
   auth: () => import("../controllers/auth/index.js"),
   users: () => import("../controllers/users/index.js"),
-} satisfies Record<RouteFamilyId, () => Promise<{ default: OpenAPIHono<HonoEnv> }>>;
+} satisfies Record<
+  RouteFamilyId,
+  () => Promise<{ default: OpenAPIHono<HonoEnv> }>
+>;
 
-const bodyLimits: Partial<Record<RouteFamilyId, ReadonlyArray<{ path: string; maxSize: number }>>> = {
+const bodyLimits: Partial<
+  Record<RouteFamilyId, ReadonlyArray<{ path: string; maxSize: number }>>
+> = {
   "event-days": [
     { path: "/admin/event-days", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
   ],
@@ -52,7 +61,12 @@ const bodyLimits: Partial<Record<RouteFamilyId, ReadonlyArray<{ path: string; ma
     { path: "/admin/services", maxSize: CATALOG_JSON_BODY_LIMIT_BYTES },
     { path: "/admin/services/*", maxSize: CATALOG_JSON_BODY_LIMIT_BYTES },
   ],
-  "catalog-media": [{ path: "/admin/catalog-media", maxSize: MAX_VIDEO_SIZE_BYTES + MEDIA_UPLOAD_BODY_OVERHEAD_BYTES }],
+  "catalog-media": [
+    {
+      path: "/admin/catalog-media",
+      maxSize: MAX_VIDEO_SIZE_BYTES + MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
+    },
+  ],
   "booking-requests": [
     { path: "/booking-requests", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
     { path: "/booking-requests/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
@@ -73,18 +87,28 @@ function remember<T>(load: () => Promise<T>, drop: () => void) {
 }
 
 async function createFamilyApp(id: RouteFamilyId) {
-  const [{ default: routes }, { db }] = await Promise.all([loaders[id](), import("../db/client.js")]);
+  const [{ default: routes }, { db }] = await Promise.all([
+    loaders[id](),
+    import("../db/client.js"),
+  ]);
   const family = new OpenAPIHono<HonoEnv>();
   family.use("*", async (c, next) => {
     c.header("Cache-Control", "no-store");
     c.set("db", db);
     await next();
   });
-  for (const limit of bodyLimits[id] ?? []) family.use(limit.path, bodyLimit({ maxSize: limit.maxSize }));
+  for (const limit of bodyLimits[id] ?? [])
+    family.use(limit.path, bodyLimit({ maxSize: limit.maxSize }));
   if (id === "event-days") {
-    for (const path of ["/admin/event-days/*", "/staff/event-days/*"]) family.use(path, (c, next) => bodyLimit({ maxSize: eventDayBodyLimit(c.req.path) })(c, next));
+    for (const path of ["/admin/event-days/*", "/staff/event-days/*"])
+      family.use(path, (c, next) =>
+        bodyLimit({ maxSize: eventDayBodyLimit(c.req.path) })(c, next),
+      );
   }
-  if (id === "booking-requests") family.use("/admin/booking-requests/*", (c, next) => bodyLimit({ maxSize: bookingBodyLimit(c.req.path) })(c, next));
+  if (id === "booking-requests")
+    family.use("/admin/booking-requests/*", (c, next) =>
+      bodyLimit({ maxSize: bookingBodyLimit(c.req.path) })(c, next),
+    );
   family.route("/", routes);
   return family;
 }
@@ -102,20 +126,23 @@ function loadFamily(id: RouteFamilyId) {
 
 function loadDocumentation() {
   if (documentationApp) return documentationApp;
-  documentationApp = remember(async () => {
-    const docs = new OpenAPIHono<HonoEnv>();
-    for (const family of routeFamilies) {
-      const { default: routes } = await loaders[family.id]();
-      docs.route("/v1", routes);
-    }
-    docs.doc("/openapi.json", {
-      openapi: "3.0.0",
-      info: { title: "Event Management API", version: "0.1.0" },
-    });
-    return docs;
-  }, () => {
-    documentationApp = undefined;
-  });
+  documentationApp = remember(
+    async () => {
+      const docs = new OpenAPIHono<HonoEnv>();
+      for (const family of routeFamilies) {
+        const { default: routes } = await loaders[family.id]();
+        docs.route("/v1", routes);
+      }
+      docs.doc("/openapi.json", {
+        openapi: "3.0.0",
+        info: { title: "Event Management API", version: "0.1.0" },
+      });
+      return docs;
+    },
+    () => {
+      documentationApp = undefined;
+    },
+  );
   return documentationApp;
 }
 
@@ -130,7 +157,8 @@ export const app = new OpenAPIHono<HonoEnv>();
 app.use(
   "*",
   cors({
-    origin: (origin) => (origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0]),
+    origin: (origin) =>
+      origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
     credentials: true,
     allowHeaders: ["Authorization", "Content-Type"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -139,13 +167,19 @@ app.use(
 
 app.use("/v1/*", async (c, next) => {
   const origin = c.req.header("origin");
-  if (["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method) && origin && !allowedOrigins.includes(origin)) {
+  if (
+    ["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method) &&
+    origin &&
+    !allowedOrigins.includes(origin)
+  ) {
     return c.json({ error: "Origin is not allowed" }, 403);
   }
   await next();
 });
 
-app.all("/openapi.json", (c) => loadDocumentation().then((docs) => docs.fetch(c.req.raw)));
+app.all("/openapi.json", (c) =>
+  loadDocumentation().then((docs) => docs.fetch(c.req.raw)),
+);
 
 app.all("/v1/*", async (c) => {
   const family = matchRouteFamily(c.req.path);

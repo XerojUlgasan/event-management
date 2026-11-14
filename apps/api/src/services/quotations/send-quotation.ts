@@ -6,13 +6,7 @@ import {
   updateQuotationData,
 } from "../../data/quotations/update-quotation.js";
 import type { DB } from "../../db/types.js";
-import {
-  audit,
-  closed,
-  dto,
-  failure,
-  locked,
-} from "./quotation-context.js";
+import { audit, closed, dto, failure, locked } from "./quotation-context.js";
 
 export async function sendQuotationService(
   db: Kysely<DB>,
@@ -38,8 +32,7 @@ export async function sendQuotationService(
       actor,
       id,
     );
-    if (!delivered)
-      return failure("Linked conversation is closed", 409);
+    if (!delivered) return failure("Linked conversation is closed", 409);
     const now = new Date();
     await supersedeActiveQuotationsData(trx, booking.id, now);
     await updateQuotationData(trx, id, { status: "sent", sent_at: now });

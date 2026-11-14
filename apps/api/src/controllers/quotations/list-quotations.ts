@@ -5,7 +5,9 @@ import { errors } from "../booking-requests/http.js";
 import { paginationQuerySchema } from "../../utils/pagination.js";
 import { listResult } from "./responses.js";
 import { idParams } from "./schemas.js";
-const querySchema = paginationQuerySchema.extend({ quotationId: z.string().uuid().optional() });
+const querySchema = paginationQuerySchema.extend({
+  quotationId: z.string().uuid().optional(),
+});
 export const listAdminQuotationsRoute = createRoute({
   method: "get",
   path: "/admin/booking-requests/{id}/quotations",

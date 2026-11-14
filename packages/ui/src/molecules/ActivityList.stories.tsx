@@ -7,7 +7,10 @@ const meta = {
   component: ActivityList,
   args: {
     items: [
-      { title: "Booking status updated", detail: "Mendoza–Reyes Wedding · 12 min ago" },
+      {
+        title: "Booking status updated",
+        detail: "Mendoza–Reyes Wedding · 12 min ago",
+      },
       { title: "Quotation approved", detail: "Q-2048 · June 8, 2025" },
       { title: "Message received", detail: "Conversation with Amina Santos" },
     ],

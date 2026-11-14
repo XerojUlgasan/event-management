@@ -8,15 +8,15 @@ This README owns product scope, current implementation status, and development s
 
 Scope recorded on 2026-11-03, with identity responsibilities and booking-linked communication clarified on 2026-11-11:
 
-| Area | Intended behavior |
-| --- | --- |
-| Catalogs | Present packages, services, and venues with administrator-managed content. |
-| Inquiries and quotations | Let customers start from a package or describe requirements first. Admins communicate with customers, collect missing details, discuss custom packages and added services or venues, prepare quotations, issue revisions, and retain quotation history. Customers discuss offers and request changes through chat; admins handle quotation changes. |
-| Availability and booking | Admins review and accept event requests, manage scheduling, and record event changes. Define date holds, exclusive periods, setup/cleanup buffers, and cancellation rules; prevent conflicting confirmations, including simultaneous attempts. |
+| Area                            | Intended behavior                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Catalogs                        | Present packages, services, and venues with administrator-managed content.                                                                                                                                                                                                                                                                                        |
+| Inquiries and quotations        | Let customers start from a package or describe requirements first. Admins communicate with customers, collect missing details, discuss custom packages and added services or venues, prepare quotations, issue revisions, and retain quotation history. Customers discuss offers and request changes through chat; admins handle quotation changes.               |
+| Availability and booking        | Admins review and accept event requests, manage scheduling, and record event changes. Define date holds, exclusive periods, setup/cleanup buffers, and cancellation rules; prevent conflicting confirmations, including simultaneous attempts.                                                                                                                    |
 | Event preparation and workforce | Staff view upcoming event days and volunteer when available; admins select teams and appoint a coordinator from the selected staff. Admins send private timed checklists to the confirmed coordinator, who can edit tasks immediately and track completion; admins monitor progress. Maintain staff profiles, schedules, operational concerns, and notifications. |
-| Customer service | Use AI for factual answers from approved information, inquiry collection, and human handoff. Admins retain quotation and commitment decisions. |
-| Reports and past events | Report on actual business records and maintain a managed past-events showcase with publication permissions. |
-| Access and communication | Automatically create a conversation for each submitted booking request so the customer and admin can communicate and create booking-related transactions. Give customers access to their own inquiries and conversations, and staff access appropriate to their roles. |
+| Customer service                | Use AI for factual answers from approved information, inquiry collection, and human handoff. Admins retain quotation and commitment decisions.                                                                                                                                                                                                                    |
+| Reports and past events         | Report on actual business records and maintain a managed past-events showcase with publication permissions.                                                                                                                                                                                                                                                       |
+| Access and communication        | Automatically create a conversation for each submitted booking request so the customer and admin can communicate and create booking-related transactions. Give customers access to their own inquiries and conversations, and staff access appropriate to their roles.                                                                                            |
 
 The [identity reference](context-factory/business-logic/references/identity.md) defines these intended role responsibilities. Admin means the System Administrator; coordinator is an event responsibility assigned to staff.
 
@@ -32,17 +32,17 @@ Before implementing dependent work, confirm intake fields and real catalog conte
 
 ## Current implementation
 
-| Area | Implemented boundary |
-| --- | --- |
-| Website and catalogs | `/`, `/about`, `/packages`, `/services`, `/venues`, and their `/{slug}` pages are server-rendered HTML. Cards and View more are links. A catalog title is unique, and its slug is the public address. Book now sits under the package price and guest count and continues at `/login`. `/login` remains a client-rendered document route; same-origin `/app` navigation updates the URL and React workspace through browser history without reloading the document. Public and login destinations still use document navigation; catalog overlays remain inside `/app`. All three catalogs persist in PostgreSQL and support direct saves, canvas content, and archives. |
-| Identity | Local email/password and optional Firebase sign-in share database profiles, roles, and server-side sessions. Sign-in returns to a requested workspace path only when it is local and allowed for the signed-in role. The mounted workspace rechecks the session when the page becomes visible and after an eligible data request returns 401; an expired session returns to login with the current workspace path preserved. |
-| Booking requests | Signed-in customers submit package inquiries for one or more requested dates. PostgreSQL stores ordered per-day date and time entries, package snapshots, request details, status history, and a linked conversation. Customers supply times after submission; for an accepted request, a System Administrator selects one response-deadline offset for the request and applies it to create operational days from every ready requested date and update current scheduled days. Signed-out drafts resume after sign-in for explicit review and submission. |
-| Messages | Customer-to-admin conversations persist in PostgreSQL, including request-linked conversations, unread counts, and read state. Sent quotations appear as exact-version messages; other booking-related transaction types are not implemented. |
-| Directory and staff access | System Administrators have a read-only Staff & Customers directory. Staff Event days combines a monthly calendar, searchable table, response filters, and persisted availability controls. Assigned to me shows assignment cards with schedule, role/status, and a details drawer containing the confirmed team. System Administrators review request status and manage event-day staffing on `/app/bookings/{id}`, opened from Admin Bookings or a linked admin conversation. |
-| Event-day checklists | One PostgreSQL checklist per event day, with ordered JSONB tasks. Administrators create private drafts and send them to the confirmed coordinator for immediate task editing. Admins monitor the same saved document. Assignment changes revoke the handoff until a fresh send. |
-| Quotations | System Administrators prepare booking-owned private packages and versioned PHP quotations. Customers view saved prices, itemized adjustments, and sent history from booking details or the linked conversation, and respond through chat. Only System Administrators create, revise, save, or send quotations. |
-| UI feedback | Authentication and workspace actions use shared success, error, and information toasts, including native dialogs. Errors remain until dismissed; brief notices time out. Public catalog failures use persistent inline error notices with retry links; inline validation and retry controls remain available. Demo actions identify when no operation was performed. These notices do not add staff delivery notifications or external messages. |
-| Remaining scope | Requirements-first inquiries, booking confirmation and date holds, external workforce notifications, AI replies/handoff, reports, and the managed showcase are not implemented. Other business screens may contain demo or local data. |
+| Area                       | Implemented boundary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Website and catalogs       | `/`, `/about`, `/packages`, `/services`, `/venues`, and their `/{slug}` pages are server-rendered HTML. Cards and View more are links. A catalog title is unique, and its slug is the public address. Book now sits under the package price and guest count and continues at `/login`. `/login` remains a client-rendered document route; same-origin `/app` navigation updates the URL and React workspace through browser history without reloading the document. Public and login destinations still use document navigation; catalog overlays remain inside `/app`. All three catalogs persist in PostgreSQL and support direct saves, canvas content, and archives. |
+| Identity                   | Local email/password and optional Firebase sign-in share database profiles, roles, and server-side sessions. Sign-in returns to a requested workspace path only when it is local and allowed for the signed-in role. The mounted workspace rechecks the session when the page becomes visible and after an eligible data request returns 401; an expired session returns to login with the current workspace path preserved.                                                                                                                                                                                                                                             |
+| Booking requests           | Signed-in customers submit package inquiries for one or more requested dates. PostgreSQL stores ordered per-day date and time entries, package snapshots, request details, status history, and a linked conversation. Customers supply times after submission; for an accepted request, a System Administrator selects one response-deadline offset for the request and applies it to create operational days from every ready requested date and update current scheduled days. Signed-out drafts resume after sign-in for explicit review and submission.                                                                                                              |
+| Messages                   | Customer-to-admin conversations persist in PostgreSQL, including request-linked conversations, unread counts, and read state. Sent quotations appear as exact-version messages; other booking-related transaction types are not implemented.                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Directory and staff access | System Administrators have a read-only Staff & Customers directory. Staff Event days combines a monthly calendar, searchable table, response filters, and persisted availability controls. Assigned to me shows assignment cards with schedule, role/status, and a details drawer containing the confirmed team. System Administrators review request status and manage event-day staffing on `/app/bookings/{id}`, opened from Admin Bookings or a linked admin conversation.                                                                                                                                                                                           |
+| Event-day checklists       | One PostgreSQL checklist per event day, with ordered JSONB tasks. Administrators create private drafts and send them to the confirmed coordinator for immediate task editing. Admins monitor the same saved document. Assignment changes revoke the handoff until a fresh send.                                                                                                                                                                                                                                                                                                                                                                                          |
+| Quotations                 | System Administrators prepare booking-owned private packages and versioned PHP quotations. Customers view saved prices, itemized adjustments, and sent history from booking details or the linked conversation, and respond through chat. Only System Administrators create, revise, save, or send quotations.                                                                                                                                                                                                                                                                                                                                                           |
+| UI feedback                | Authentication and workspace actions use shared success, error, and information toasts, including native dialogs. Errors remain until dismissed; brief notices time out. Public catalog failures use persistent inline error notices with retry links; inline validation and retry controls remain available. Demo actions identify when no operation was performed. These notices do not add staff delivery notifications or external messages.                                                                                                                                                                                                                         |
+| Remaining scope            | Requirements-first inquiries, booking confirmation and date holds, external workforce notifications, AI replies/handoff, reports, and the managed showcase are not implemented. Other business screens may contain demo or local data.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ### Booking requests and messages
 
@@ -108,7 +108,7 @@ docs/                  Seed guide and interview summary
 transcriptions/        Individual and combined interview transcripts
 ```
 
-Astro runs as a Node server. Public pages under `apps/web/src/pages` are rendered on each request. `/login` and `/app/*` mount `components/app/App.tsx` with `client:only="react"`. The app keeps its React and authentication providers mounted while same-origin `/app` navigation updates the URL with the History API; public and login routes remain document navigations. `GET /me` chooses the admin, staff, or customer shell, and each role keeps only its own `/app` paths. Shared UI uses atomic layers and exports from `packages/ui/src/index.ts`. Theme tokens live in `packages/theme/src/theme.css`; app styles live in `apps/web/src/styles/`.
+Astro runs as a Node server. Public pages under `apps/web/src/pages` are rendered on each request. `/login` and `/app/*` mount `components/app/App.tsx` with `client:only="react"`. The app keeps its React and authentication providers mounted while same-origin `/app` navigation updates the URL with the History API; public and login routes remain document navigations. `GET /me` chooses the admin, staff, or customer shell, and each role keeps only its own `/app` paths. Shared UI uses atomic layers and exports from `packages/ui/src/index.ts`. Theme tokens live in `packages/theme/src/theme.css`; app styles live in `apps/web/src/styles/`. Web files follow the [frontend structure contract](context-factory/shared/frontend-project-structure.md), organized by layer, domain, and responsibility.
 
 API routes are mounted under `/v1` in `apps/api/src/app.ts`. HTTP contracts and handlers belong in `controllers/<domain>/`, business operations in `services/<domain>/`, and Kysely queries in `data/<domain>/`. Shared helpers belong in `utils/`. The running API exposes its OpenAPI contract at `/openapi.json`.
 
@@ -125,27 +125,27 @@ pnpm dev
 
 **Existing databases:** review pending migrations and back up affected data before `pnpm all`, `pnpm dev:prepare`, or `pnpm db:deploy`; these commands apply migrations. See [migration impact](#migration-impact).
 
-| Service | Local URL |
-| --- | --- |
-| Website and workspaces | <http://localhost:4321/> |
+| Service                               | Local URL                                           |
+| ------------------------------------- | --------------------------------------------------- |
+| Website and workspaces                | <http://localhost:4321/>                            |
 | Edge function health, from `pnpm dev` | <http://127.0.0.1:54321/functions/v1/api/v1/health> |
-| Node API health, from `pnpm all` | <http://localhost:3000/v1/health> |
-| Node OpenAPI, from `pnpm all` | <http://localhost:3000/openapi.json> |
-| Storybook, when started | <http://localhost:6006/> |
+| Node API health, from `pnpm all`      | <http://localhost:3000/v1/health>                   |
+| Node OpenAPI, from `pnpm all`         | <http://localhost:3000/openapi.json>                |
+| Storybook, when started               | <http://localhost:6006/>                            |
 
-| Command | Purpose |
-| --- | --- |
-| `pnpm dev` | Start the local Supabase stack, serve the edge function, and run the website |
-| `pnpm all` | Start Compose PostgreSQL, apply migrations, and run the Node API and web |
-| `pnpm all:storybook` | Start the Compose stack, Node API, web, and Storybook |
-| `pnpm all:web` | Run only the frontend |
-| `pnpm dev:prepare` | Prepare PostgreSQL and apply migrations |
-| `pnpm storybook` | Run only Storybook |
-| `pnpm db:up` / `pnpm db:down` | Start / stop PostgreSQL; stopping retains its volume |
-| `pnpm db:seed` | Insert local fixtures, sample catalog data, and the interconnected scenario |
-| `pnpm supabase:start` / `pnpm supabase:stop` | Start / stop the local Supabase stack in `apps/supabase` |
-| `pnpm supabase:status` | Show local Supabase URLs |
-| `pnpm agents:sync` | Sync additions across `.agents`, `.agent`, `.claude`, and `.cursor` |
+| Command                                      | Purpose                                                                      |
+| -------------------------------------------- | ---------------------------------------------------------------------------- |
+| `pnpm dev`                                   | Start the local Supabase stack, serve the edge function, and run the website |
+| `pnpm all`                                   | Start Compose PostgreSQL, apply migrations, and run the Node API and web     |
+| `pnpm all:storybook`                         | Start the Compose stack, Node API, web, and Storybook                        |
+| `pnpm all:web`                               | Run only the frontend                                                        |
+| `pnpm dev:prepare`                           | Prepare PostgreSQL and apply migrations                                      |
+| `pnpm storybook`                             | Run only Storybook                                                           |
+| `pnpm db:up` / `pnpm db:down`                | Start / stop PostgreSQL; stopping retains its volume                         |
+| `pnpm db:seed`                               | Insert local fixtures, sample catalog data, and the interconnected scenario  |
+| `pnpm supabase:start` / `pnpm supabase:stop` | Start / stop the local Supabase stack in `apps/supabase`                     |
+| `pnpm supabase:status`                       | Show local Supabase URLs                                                     |
+| `pnpm agents:sync`                           | Sync additions across `.agents`, `.agent`, `.claude`, and `.cursor`          |
 
 `pnpm agents:sync` runs once and copies missing entries from any of the four folders into the others, including hidden files, subfolders, and symbolic links. It creates missing folders and preserves existing files. Conflicting contents or entry types at the same relative path are reported and skipped, including descendants of conflicting paths; the command exits with status 1 after syncing unambiguous additions. It does not propagate edits or deletions: a file removed from one folder is restored from another on the next run. Rerun it after adding files to any folder.
 
@@ -195,11 +195,11 @@ The API verifies Firebase ID tokens, including revocation/disabled-user checks, 
 
 Catalog packages, services, and venues are flat records, each with one canvas page. A System Administrator catalog save publishes a complete record immediately. Packages can include ordered service links marked included or optional; these links do not calculate price or establish availability. Venues remain independent. Booking-owned custom packages are private and have a separate edit/audit flow. Updates require `expectedUpdatedAt`; stale or archived edits return `409`. Archive hides a record from public selection. A package referenced by a booking request cannot be deleted.
 
-| Catalog | Required save data |
-| --- | --- |
+| Catalog | Required save data                                                                                                                |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | Package | Name, positive `maxGuests`, fixed total PHP price, and canvas sections; the catalog description is separate from Markdown widgets |
-| Service | Name, description, positive whole-peso `hourlyRatePesos`, and a canvas photo |
-| Venue | Name, location, description, and positive `maxGuests`; canvas photos are optional |
+| Service | Name, description, positive whole-peso `hourlyRatePesos`, and a canvas photo                                                      |
+| Venue   | Name, location, description, and positive `maxGuests`; canvas photos are optional                                                 |
 
 Package prices are stored as whole pesos; the API uses `{ kind: "fixed", currency: "PHP", amountMinor }` in centavos divisible by 100. Booking snapshots use `packageName`, `packagePrice`, and `packageMaxGuests`. Migrated service rates and venue guest limits may be null on reads; saves enforce complete current input. Omitted service/venue canvas sections preserve saved content.
 
@@ -241,26 +241,42 @@ Review all pending migrations before upgrading a populated database:
 
 Back up affected records before deployment. Apply coordinated API/frontend contract changes with their migrations; do not edit applied migrations or reset a database to resolve drift. The [database guidance](context-factory/api/reference/database-and-migrations.md), [catalog media reference](context-factory/api/reference/external-image-urls.md), and [seed guide](docs/SEED.md) provide the related procedures.
 
+## Source formatting
+
+Run `pnpm format` to format source and configuration files across the workspace,
+or `pnpm format:check` to check them without writing changes. The root Prettier
+configuration covers JavaScript, TypeScript, React JSX/TSX, CSS, JSON, and YAML;
+`prettier-plugin-astro` adds Astro files. It uses two-space indentation and an
+80-character wrapping target.
+
+In VS Code or Cursor, install the recommended Prettier extension to use the
+checked-in format-on-save settings. The Astro extension is also recommended.
+Generated files, lockfiles, migrations, assets, local data, imported agent tooling,
+and historical documentation are excluded through `.prettierignore`. The root
+README remains included so these instructions can be checked with the source.
+
 ## Verification
 
 Run the checks matching the changed area:
 
-| Command | Checks |
-| --- | --- |
-| `pnpm check` | Workspace types |
-| `pnpm check:design` | Web controls use shared UI exports; authored web/UI colors use theme tokens. Source checks do not establish visual or behavioral correctness. |
-| `pnpm build` | Web production bundle and API types |
-| `pnpm build:storybook` | Shared UI rendering build |
-| `pnpm db:validate` | Prisma schema |
-| `pnpm check:guidance` | Context-factory links, anchors, skill metadata, registration, and reachability; does not verify agent compliance or application behavior |
-| `pnpm --filter @event-management/api test:auth` | Authentication and sessions with PostgreSQL and Firebase Auth emulator |
-| `pnpm --filter @event-management/api test:packages` | Package/service catalog and shared canvas behavior |
-| `pnpm --filter @event-management/api test:venues` | Venue catalog behavior |
-| `pnpm --filter @event-management/api test:booking-requests` | Inquiry creation and legacy preservation; requested-date validation, per-day time saves, stale writes, calendar counts, status filters, and duplicate-free pagination |
-| `pnpm --filter @event-management/api test:event-days` | Day staffing, availability, assignments, deadlines, permissions, overlap protection, requested-day scheduling links, and movement/cancellation |
-| `pnpm --filter @event-management/api test:quotations` | Quotation lifecycle, JSONB amounts, permissions, stale writes and atomic conversation delivery |
-| `pnpm --filter @event-management/api test:proposal-migration` | Populated baseline preservation, ownership, JSONB arithmetic, message linkage and RLS/grants |
-| `pnpm --filter @event-management/api test:messages` | Conversation ownership, messages, read state, and no automatic expiry |
+| Command                                                       | Checks                                                                                                                                                                |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm check`                                                  | Workspace types                                                                                                                                                       |
+| `pnpm format:check`                                           | Source formatting without changing files                                                                                                                              |
+| `pnpm check:design`                                           | Web controls use shared UI exports; authored web/UI colors use theme tokens. Source checks do not establish visual or behavioral correctness.                         |
+| `pnpm build`                                                  | Web production bundle and API types                                                                                                                                   |
+| `pnpm build:storybook`                                        | Shared UI rendering build                                                                                                                                             |
+| `pnpm db:validate`                                            | Prisma schema                                                                                                                                                         |
+| `pnpm check:web-structure`                                    | Web placement, naming, and runtime import rules; does not establish domain semantics or browser behavior                                                              |
+| `pnpm check:guidance`                                         | Context-factory links, anchors, skill metadata, registration, and reachability; does not verify agent compliance or application behavior                              |
+| `pnpm --filter @event-management/api test:auth`               | Authentication and sessions with PostgreSQL and Firebase Auth emulator                                                                                                |
+| `pnpm --filter @event-management/api test:packages`           | Package/service catalog and shared canvas behavior                                                                                                                    |
+| `pnpm --filter @event-management/api test:venues`             | Venue catalog behavior                                                                                                                                                |
+| `pnpm --filter @event-management/api test:booking-requests`   | Inquiry creation and legacy preservation; requested-date validation, per-day time saves, stale writes, calendar counts, status filters, and duplicate-free pagination |
+| `pnpm --filter @event-management/api test:event-days`         | Day staffing, availability, assignments, deadlines, permissions, overlap protection, requested-day scheduling links, and movement/cancellation                        |
+| `pnpm --filter @event-management/api test:quotations`         | Quotation lifecycle, JSONB amounts, permissions, stale writes and atomic conversation delivery                                                                        |
+| `pnpm --filter @event-management/api test:proposal-migration` | Populated baseline preservation, ownership, JSONB arithmetic, message linkage and RLS/grants                                                                          |
+| `pnpm --filter @event-management/api test:messages`           | Conversation ownership, messages, read state, and no automatic expiry                                                                                                 |
 
 Integration suites create disposable local PostgreSQL databases and require permission to create them. Auth also requires the Firebase CLI on `PATH` and ports 9099, 4409, and 4509 free; it uses an emulator rather than production Firebase. Media tests use a local Storage API fake rather than production Supabase Storage. See [API verification](context-factory/api/reference/verification.md) and the [seed guide](docs/SEED.md) for additional focused suites.
 

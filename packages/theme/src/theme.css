@@ -106,7 +106,8 @@
   --overlay-ink: #211414;
   --overlay-accent: #320a0e;
   --overlay-black: #000000;
-  --shadow: 0 16px 50px color-mix(in srgb, var(--overlay-ink) 10%, var(--transparent));
+  --shadow: 0 16px 50px
+    color-mix(in srgb, var(--overlay-ink) 10%, var(--transparent));
 
   /* Shared component dimensions preserve the current workspace baseline. */
   --radius-control: 8px;
@@ -122,4 +123,3 @@
   --font-size-control-small: 12px;
   --field-gap: 6px;
 }
-

@@ -9,8 +9,18 @@ import { createLocalUserData } from "../../data/auth/create-local-user.js";
 
 type AuthContext = Context<HonoEnv>;
 
-export async function registerUserService(db: Kysely<DB>, email: string, password: string, displayName: string) {
+export async function registerUserService(
+  db: Kysely<DB>,
+  email: string,
+  password: string,
+  displayName: string,
+) {
   if (!allowAuthAttempt(email)) return { kind: "rate-limited" as const };
-  const row = await createLocalUserData(db, email, displayName, await hashPassword(password));
+  const row = await createLocalUserData(
+    db,
+    email,
+    displayName,
+    await hashPassword(password),
+  );
   return row ? { kind: "ok" as const, row } : { kind: "conflict" as const };
 }

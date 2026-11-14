@@ -58,7 +58,17 @@ if (docker.status !== 0) {
 console.log("[setup] Starting PostgreSQL (docker compose)…");
 run(
   "docker",
-  ["compose", "--env-file", "apps/api/.env", "-f", "apps/api/compose.yaml", "up", "-d", "--wait", "db"],
+  [
+    "compose",
+    "--env-file",
+    "apps/api/.env",
+    "-f",
+    "apps/api/compose.yaml",
+    "up",
+    "-d",
+    "--wait",
+    "db",
+  ],
   "Docker Compose",
 );
 

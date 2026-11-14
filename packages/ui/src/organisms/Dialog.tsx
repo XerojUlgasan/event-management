@@ -28,13 +28,15 @@ export function Dialog({
   const titleId = useId();
   const introId = useId();
   return (
-    <ModalSurface className="modal-backdrop" onClose={onClose} initialFocus={initialFocus}
+    <ModalSurface
+      className="modal-backdrop"
+      onClose={onClose}
+      initialFocus={initialFocus}
       aria-label={ariaLabel}
       aria-labelledby={title != null ? titleId : undefined}
-      aria-describedby={intro != null ? introId : undefined}>
-      <div
-        className={`modal${className ? ` ${className}` : ""}`}
-      >
+      aria-describedby={intro != null ? introId : undefined}
+    >
+      <div className={`modal${className ? ` ${className}` : ""}`}>
         <Button
           variant="plain"
           type="button"
@@ -45,8 +47,16 @@ export function Dialog({
           <Icon name="close" />
         </Button>
         {eyebrow !== undefined && <span className="eyebrow">{eyebrow}</span>}
-        {title != null && <h2 id={titleId} className="modal-title">{title}</h2>}
-        {intro != null && <p id={introId} className="modal-intro">{intro}</p>}
+        {title != null && (
+          <h2 id={titleId} className="modal-title">
+            {title}
+          </h2>
+        )}
+        {intro != null && (
+          <p id={introId} className="modal-intro">
+            {intro}
+          </p>
+        )}
         {children}
         {actions !== undefined && <div className="form-actions">{actions}</div>}
       </div>

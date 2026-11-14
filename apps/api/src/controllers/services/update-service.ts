@@ -9,9 +9,7 @@ export const updateServiceRoute = createRoute({
   tags: ["Services"],
   request: {
     params: idParams,
-    body: body(
-      serviceEditSchema,
-    ),
+    body: body(serviceEditSchema),
   },
   responses: {
     200: { content: json(adminSchema), description: "Service catalog" },

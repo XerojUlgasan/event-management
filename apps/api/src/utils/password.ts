@@ -21,7 +21,10 @@ export async function verifyPassword(
   password: string,
 ) {
   const encoded = passwordHash ?? (await dummyHash);
-  const parameters = /^\$argon2id\$v=19\$m=(\d+),t=(\d+),p=(\d+)\$([A-Za-z0-9+/]+)\$([A-Za-z0-9+/]+)$/.exec(encoded);
+  const parameters =
+    /^\$argon2id\$v=19\$m=(\d+),t=(\d+),p=(\d+)\$([A-Za-z0-9+/]+)\$([A-Za-z0-9+/]+)$/.exec(
+      encoded,
+    );
   if (!parameters) throw new Error("Invalid Argon2id password hash");
   const [, memorySize, iterations, parallelism, salt, digest] = parameters;
   const expected = Buffer.from(digest, "base64");

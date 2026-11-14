@@ -6,7 +6,12 @@ export type Database = Kysely<DB> | Transaction<DB>;
 export class InvalidPackageMedia extends Error {}
 
 type PageOwner = { kind: "package" | "service" | "venue"; id: string };
-const ownerColumn = (owner: PageOwner) => owner.kind === "package" ? "package_id" : owner.kind === "service" ? "service_id" : "venue_id";
+const ownerColumn = (owner: PageOwner) =>
+  owner.kind === "package"
+    ? "package_id"
+    : owner.kind === "service"
+      ? "service_id"
+      : "venue_id";
 export async function readCatalogSectionsData(db: Database, owner: PageOwner) {
   const page = await db
     .selectFrom("catalog_pages")
@@ -71,21 +76,31 @@ export async function readCatalogSectionsData(db: Database, owner: PageOwner) {
       })),
   }));
 }
-export const readPackageSectionsData = (db: Database, packageId: string) => readCatalogSectionsData(db, { kind: "package", id: packageId });
+export const readPackageSectionsData = (db: Database, packageId: string) =>
+  readCatalogSectionsData(db, { kind: "package", id: packageId });
 export async function listCatalogMediaIdsData(db: Database, owner: PageOwner) {
   const rows = await db
     .selectFrom("catalog_widgets as w")
     .innerJoin("catalog_sections as s", "s.id", "w.section_id")
     .innerJoin("catalog_pages as p", "p.id", "s.page_id")
     .select("w.media_id")
-    .where(owner.kind === "package" ? "p.package_id" : owner.kind === "service" ? "p.service_id" : "p.venue_id", "=", owner.id)
+    .where(
+      owner.kind === "package"
+        ? "p.package_id"
+        : owner.kind === "service"
+          ? "p.service_id"
+          : "p.venue_id",
+      "=",
+      owner.id,
+    )
     .where("w.media_id", "is not", null)
     .execute();
   return [
     ...new Set(rows.flatMap((row) => (row.media_id ? [row.media_id] : []))),
   ];
 }
-export const listPackageMediaIdsData = (db: Database, packageId: string) => listCatalogMediaIdsData(db, { kind: "package", id: packageId });
+export const listPackageMediaIdsData = (db: Database, packageId: string) =>
+  listCatalogMediaIdsData(db, { kind: "package", id: packageId });
 export async function replaceCatalogSectionsData(
   db: Transaction<DB>,
   owner: PageOwner,
@@ -102,7 +117,15 @@ export async function replaceCatalogSectionsData(
   if (!page)
     page = await db
       .insertInto("catalog_pages")
-      .values({ ...(owner.kind === "package" ? { package_id: owner.id } : owner.kind === "service" ? { service_id: owner.id } : { venue_id: owner.id }), created_at: now, updated_at: now })
+      .values({
+        ...(owner.kind === "package"
+          ? { package_id: owner.id }
+          : owner.kind === "service"
+            ? { service_id: owner.id }
+            : { venue_id: owner.id }),
+        created_at: now,
+        updated_at: now,
+      })
       .returning("id")
       .executeTakeFirstOrThrow();
   // Lock all referenced uploads in stable order before checking ownership or replacing references.
@@ -137,7 +160,15 @@ export async function replaceCatalogSectionsData(
       throw new InvalidPackageMedia(
         "Uploaded media belongs to another administrator",
       );
-    if (references.some((reference) => owner.kind === "package" ? reference.package_id !== owner.id : owner.kind === "service" ? reference.service_id !== owner.id : reference.venue_id !== owner.id))
+    if (
+      references.some((reference) =>
+        owner.kind === "package"
+          ? reference.package_id !== owner.id
+          : owner.kind === "service"
+            ? reference.service_id !== owner.id
+            : reference.venue_id !== owner.id,
+      )
+    )
       throw new InvalidPackageMedia(
         "Uploaded media already belongs to another catalog page",
       );
@@ -212,4 +243,17 @@ export async function replaceCatalogSectionsData(
   return previousMediaIds;
 }
 
-export const replacePackageSectionsData = (db: Transaction<DB>, packageId: string, content: Content, actorId: string, now: Date) => replaceCatalogSectionsData(db, { kind: "package", id: packageId }, content, actorId, now);
+export const replacePackageSectionsData = (
+  db: Transaction<DB>,
+  packageId: string,
+  content: Content,
+  actorId: string,
+  now: Date,
+) =>
+  replaceCatalogSectionsData(
+    db,
+    { kind: "package", id: packageId },
+    content,
+    actorId,
+    now,
+  );

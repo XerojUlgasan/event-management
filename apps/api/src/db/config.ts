@@ -14,5 +14,4 @@ const database = encodeURIComponent(required("DB_NAME"));
 const user = encodeURIComponent(required("DB_USER"));
 const password = encodeURIComponent(required("DB_PASSWORD"));
 
-export const databaseUrl =
-  `postgresql://${user}:${password}@${host}:${port}/${database}?schema=public`;
+export const databaseUrl = `postgresql://${user}:${password}@${host}:${port}/${database}?schema=public`;

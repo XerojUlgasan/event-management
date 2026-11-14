@@ -2,7 +2,13 @@ import { createRoute, z } from "@hono/zod-openapi";
 import * as service from "../../services/event-days/update-event-day-staffing.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { body } from "../booking-requests/http.js";
-import { daysBefore, errorResponse, params, response, tags } from "./schemas.js";
+import {
+  daysBefore,
+  errorResponse,
+  params,
+  response,
+  tags,
+} from "./schemas.js";
 export const updateEventDayStaffingRoute = createRoute({
   method: "patch",
   path: "/admin/event-days/{id}/staffing",

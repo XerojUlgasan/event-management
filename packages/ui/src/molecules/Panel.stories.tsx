@@ -16,7 +16,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
-export const SemanticSection: Story = { args: { as: "section", "aria-label": "Assignments" } };
+export const SemanticSection: Story = {
+  args: { as: "section", "aria-label": "Assignments" },
+};
 export const WithAction: Story = {
   args: { action: <Button variant="secondary">View all</Button> },
 };

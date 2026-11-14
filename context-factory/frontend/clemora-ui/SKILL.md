@@ -51,7 +51,7 @@ export function ContactForm({ onSubmit, nameError }: {
 }
 ```
 
-The render function supplies the control ID, label association, invalid state, and description/error IDs. Spread them on the actual control, including inside an `InputGroup`; compose any additional `aria-describedby` IDs with the supplied value. Keep validation, touched state, pending state, and persistence in the app. See the [booking-request caller](../../../apps/web/src/components/app/BookingRequest.tsx) and [field stories](../../../packages/ui/src/molecules/FormField.stories.tsx).
+The render function supplies the control ID, label association, invalid state, and description/error IDs. Spread them on the actual control, including inside an `InputGroup`; compose any additional `aria-describedby` IDs with the supplied value. Keep validation, touched state, pending state, and persistence in the app. See the [booking-request caller](../../../apps/web/src/components/booking-requests/BookingRequestDialog.tsx) and [field stories](../../../packages/ui/src/molecules/FormField.stories.tsx).
 
 ## Ownership and styling
 

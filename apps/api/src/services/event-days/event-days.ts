@@ -1,4 +1,7 @@
-import { responseDeadlineForDay, type ResponseDeadlineDays } from "@event-management/contracts/event-days";
+import {
+  responseDeadlineForDay,
+  type ResponseDeadlineDays,
+} from "@event-management/contracts/event-days";
 import type { Transaction } from "kysely";
 import type { DayRow } from "../../data/event-days/types.js";
 import type { Database } from "../../data/event-days/types.js";
@@ -28,9 +31,19 @@ export class EventDayError extends Error {
 export const fail = (message: string, status: 400 | 404 | 409): never => {
   throw new EventDayError(message, status);
 };
-export function deadlineForDay(day: string, daysBefore: ResponseDeadlineDays, timeZone: string) {
-  try { return responseDeadlineForDay(day, daysBefore, timeZone); }
-  catch (error) { return fail(error instanceof Error ? error.message : "Invalid response deadline", 400); }
+export function deadlineForDay(
+  day: string,
+  daysBefore: ResponseDeadlineDays,
+  timeZone: string,
+) {
+  try {
+    return responseDeadlineForDay(day, daysBefore, timeZone);
+  } catch (error) {
+    return fail(
+      error instanceof Error ? error.message : "Invalid response deadline",
+      400,
+    );
+  }
 }
 export function validateSchedule(input: Schedule, timeZone: string) {
   const start = new Date(input.startsAt),
@@ -45,7 +58,9 @@ export function validateSchedule(input: Schedule, timeZone: string) {
   if (`${part("year")}-${part("month")}-${part("day")}` !== input.day)
     fail("Day must match the start date in the booking time zone", 400);
   if (end <= start) fail("End must be after start", 400);
-  const availabilityDeadline = input.daysBefore ? deadlineForDay(input.day, input.daysBefore, timeZone) : null;
+  const availabilityDeadline = input.daysBefore
+    ? deadlineForDay(input.day, input.daysBefore, timeZone)
+    : null;
   if (
     input.staffingStatus === "open" &&
     (!availabilityDeadline || new Date(availabilityDeadline) <= new Date())

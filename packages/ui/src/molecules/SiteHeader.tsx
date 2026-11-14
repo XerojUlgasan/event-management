@@ -8,14 +8,21 @@ export function SiteHeader({ links }: { links: SiteLink[] }) {
       <Wordmark />
       <nav className="cl-site-header__nav" aria-label="Main navigation">
         {links.map((link) => (
-          <a key={link.href} href={link.href}>{link.label}</a>
+          <a key={link.href} href={link.href}>
+            {link.label}
+          </a>
         ))}
       </nav>
       <details className="cl-site-header__mobile">
-        <summary aria-label="Open navigation"><span></span><span></span></summary>
+        <summary aria-label="Open navigation">
+          <span></span>
+          <span></span>
+        </summary>
         <nav aria-label="Mobile navigation">
           {links.map((link) => (
-            <a key={link.href} href={link.href}>{link.label}</a>
+            <a key={link.href} href={link.href}>
+              {link.label}
+            </a>
           ))}
         </nav>
       </details>

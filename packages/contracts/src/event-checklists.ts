@@ -10,7 +10,10 @@ export type ChecklistTaskInput = {
   status: "pending" | "blocked" | "completed";
   note: string;
 };
-export type ChecklistTask = ChecklistTaskInput & { id: string; completedAt: string | null };
+export type ChecklistTask = ChecklistTaskInput & {
+  id: string;
+  completedAt: string | null;
+};
 export type ChecklistOperation =
   | { kind: "title"; title: string }
   | { kind: "add"; task: ChecklistTaskInput }

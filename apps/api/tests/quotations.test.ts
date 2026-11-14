@@ -186,10 +186,44 @@ test("quotation delivery, ownership, removed customer actions and admin revision
     (await call(`/quotations/${q.id}`, "GET", undefined, otherCookie)).status,
     404,
   );
-  assert.equal((await call(`/quotations/${q.id}`, "GET", undefined, customerCookie)).status, 404);
-  assert.equal((await call(`/admin/booking-requests/${b.id}/quotations`, "POST", { expectedUpdatedAt: b.updatedAt }, customerCookie)).status, 403);
-  assert.equal((await call(`/admin/quotations/${q.id}`, "PATCH", { expectedUpdatedAt: q.updatedAt, items: [] }, customerCookie)).status, 403);
-  assert.equal((await call(`/admin/quotations/${q.id}/send`, "POST", { expectedUpdatedAt: q.updatedAt }, customerCookie)).status, 403);
+  assert.equal(
+    (await call(`/quotations/${q.id}`, "GET", undefined, customerCookie))
+      .status,
+    404,
+  );
+  assert.equal(
+    (
+      await call(
+        `/admin/booking-requests/${b.id}/quotations`,
+        "POST",
+        { expectedUpdatedAt: b.updatedAt },
+        customerCookie,
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await call(
+        `/admin/quotations/${q.id}`,
+        "PATCH",
+        { expectedUpdatedAt: q.updatedAt, items: [] },
+        customerCookie,
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await call(
+        `/admin/quotations/${q.id}/send`,
+        "POST",
+        { expectedUpdatedAt: q.updatedAt },
+        customerCookie,
+      )
+    ).status,
+    403,
+  );
   const stale = q.updatedAt;
   q = (
     await read(
@@ -222,22 +256,108 @@ test("quotation delivery, ownership, removed customer actions and admin revision
     .where("quotation_id", "=", q.id)
     .execute();
   assert.equal(msg.length, 1);
-  assert.equal((await call(`/quotations/${q.id}`, "GET", undefined, customerCookie)).status, 200);
-  assert.equal((await call(`/quotations/${q.id}`, "GET", undefined, otherCookie)).status, 404);
-  const beforeQuotes = await db.selectFrom("quotations").selectAll().where("booking_request_id", "=", b.id).execute();
-  const beforeAudits = await db.selectFrom("audit_events").selectAll().where("entity_type", "=", "quotation").execute();
+  assert.equal(
+    (await call(`/quotations/${q.id}`, "GET", undefined, customerCookie))
+      .status,
+    200,
+  );
+  assert.equal(
+    (await call(`/quotations/${q.id}`, "GET", undefined, otherCookie)).status,
+    404,
+  );
+  const beforeQuotes = await db
+    .selectFrom("quotations")
+    .selectAll()
+    .where("booking_request_id", "=", b.id)
+    .execute();
+  const beforeAudits = await db
+    .selectFrom("audit_events")
+    .selectAll()
+    .where("entity_type", "=", "quotation")
+    .execute();
   for (const action of ["accept", "revision"]) {
-    assert.equal((await call(`/quotations/${q.id}/${action}`, "POST", { expectedUpdatedAt: q.updatedAt, reason: "Change terms" }, customerCookie)).status, 404);
+    assert.equal(
+      (
+        await call(
+          `/quotations/${q.id}/${action}`,
+          "POST",
+          { expectedUpdatedAt: q.updatedAt, reason: "Change terms" },
+          customerCookie,
+        )
+      ).status,
+      404,
+    );
   }
-  assert.equal((await call(`/admin/quotations/${q.id}/revision`, "POST", { expectedUpdatedAt: q.updatedAt, reason: "Change terms" }, customerCookie)).status, 403);
-  assert.deepEqual(await db.selectFrom("quotations").selectAll().where("booking_request_id", "=", b.id).execute(), beforeQuotes);
-  assert.deepEqual(await db.selectFrom("audit_events").selectAll().where("entity_type", "=", "quotation").execute(), beforeAudits);
-  const conversation = await db.selectFrom("conversations").select("id").where("booking_request_id", "=", b.id).executeTakeFirstOrThrow();
-  await read(await call("/messages/conversation/messages", "POST", { body: "Please change the offer.", conversationId: conversation.id }, customerCookie), 201);
-  await read(await call(`/admin/conversations/${conversation.id}/messages`, "POST", { body: "Let's discuss this offer." }), 201);
-  assert.deepEqual(await db.selectFrom("quotations").selectAll().where("booking_request_id", "=", b.id).execute(), beforeQuotes);
-  assert.deepEqual(await db.selectFrom("audit_events").selectAll().where("entity_type", "=", "quotation").execute(), beforeAudits);
-  await read(await call(`/admin/quotations/${q.id}/revision`, "POST", { expectedUpdatedAt: q.updatedAt, reason: "Change terms" }), 201);
+  assert.equal(
+    (
+      await call(
+        `/admin/quotations/${q.id}/revision`,
+        "POST",
+        { expectedUpdatedAt: q.updatedAt, reason: "Change terms" },
+        customerCookie,
+      )
+    ).status,
+    403,
+  );
+  assert.deepEqual(
+    await db
+      .selectFrom("quotations")
+      .selectAll()
+      .where("booking_request_id", "=", b.id)
+      .execute(),
+    beforeQuotes,
+  );
+  assert.deepEqual(
+    await db
+      .selectFrom("audit_events")
+      .selectAll()
+      .where("entity_type", "=", "quotation")
+      .execute(),
+    beforeAudits,
+  );
+  const conversation = await db
+    .selectFrom("conversations")
+    .select("id")
+    .where("booking_request_id", "=", b.id)
+    .executeTakeFirstOrThrow();
+  await read(
+    await call(
+      "/messages/conversation/messages",
+      "POST",
+      { body: "Please change the offer.", conversationId: conversation.id },
+      customerCookie,
+    ),
+    201,
+  );
+  await read(
+    await call(`/admin/conversations/${conversation.id}/messages`, "POST", {
+      body: "Let's discuss this offer.",
+    }),
+    201,
+  );
+  assert.deepEqual(
+    await db
+      .selectFrom("quotations")
+      .selectAll()
+      .where("booking_request_id", "=", b.id)
+      .execute(),
+    beforeQuotes,
+  );
+  assert.deepEqual(
+    await db
+      .selectFrom("audit_events")
+      .selectAll()
+      .where("entity_type", "=", "quotation")
+      .execute(),
+    beforeAudits,
+  );
+  await read(
+    await call(`/admin/quotations/${q.id}/revision`, "POST", {
+      expectedUpdatedAt: q.updatedAt,
+      reason: "Change terms",
+    }),
+    201,
+  );
   assert.equal(
     (
       await db
@@ -286,20 +406,56 @@ test("old active booking conversations receive exact quotation versions", async 
   for (const pastEnd of [false, true]) {
     const b = await booking();
     const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
-    const conversation = await db.selectFrom("conversations").select("id").where("booking_request_id", "=", b.id).executeTakeFirstOrThrow();
-    await db.updateTable("conversations").set({ created_at: old }).where("id", "=", conversation.id).execute();
+    const conversation = await db
+      .selectFrom("conversations")
+      .select("id")
+      .where("booking_request_id", "=", b.id)
+      .executeTakeFirstOrThrow();
+    await db
+      .updateTable("conversations")
+      .set({ created_at: old })
+      .where("id", "=", conversation.id)
+      .execute();
     if (pastEnd) {
-      await db.updateTable("booking_requests").set({ starts_at: new Date(old.getTime() - 3600000), ends_at: old }).where("id", "=", b.id).execute();
+      await db
+        .updateTable("booking_requests")
+        .set({ starts_at: new Date(old.getTime() - 3600000), ends_at: old })
+        .where("id", "=", b.id)
+        .execute();
     }
     let q = await create(b);
-    q = (await read(await call(`/admin/quotations/${q.id}`, "PATCH", { expectedUpdatedAt: q.updatedAt, items: [] }), 200)).quotation;
-    q = (await read(await call(`/admin/quotations/${q.id}/send`, "POST", { expectedUpdatedAt: q.updatedAt }), 200)).quotation;
+    q = (
+      await read(
+        await call(`/admin/quotations/${q.id}`, "PATCH", {
+          expectedUpdatedAt: q.updatedAt,
+          items: [],
+        }),
+        200,
+      )
+    ).quotation;
+    q = (
+      await read(
+        await call(`/admin/quotations/${q.id}/send`, "POST", {
+          expectedUpdatedAt: q.updatedAt,
+        }),
+        200,
+      )
+    ).quotation;
     assert.equal(q.status, "sent");
-    const messages = await db.selectFrom("messages").selectAll().where("quotation_id", "=", q.id).execute();
+    const messages = await db
+      .selectFrom("messages")
+      .selectAll()
+      .where("quotation_id", "=", q.id)
+      .execute();
     assert.equal(messages.length, 1);
     assert.equal(messages[0].conversation_id, conversation.id);
     assert.equal(messages[0].sender_role, "admin");
-    const audits = await db.selectFrom("audit_events").selectAll().where("entity_id", "=", q.id).where("action", "=", "quotation.sent").execute();
+    const audits = await db
+      .selectFrom("audit_events")
+      .selectAll()
+      .where("entity_id", "=", q.id)
+      .where("action", "=", "quotation.sent")
+      .execute();
     assert.equal(audits.length, 1);
     assert.equal(audits[0].actor_id, messages[0].sender_id);
   }
@@ -399,7 +555,12 @@ test("requested-day changes preserve the sent price", async () => {
     })
     .where("id", "=", b.id)
     .execute();
-  const current = (await read(await call(`/quotations/${q.id}`, "GET", undefined, customerCookie), 200)).quotation;
+  const current = (
+    await read(
+      await call(`/quotations/${q.id}`, "GET", undefined, customerCookie),
+      200,
+    )
+  ).quotation;
   assert.equal(current.status, "sent");
   assert.equal(current.totalAmountMinor, q.totalAmountMinor);
 });
@@ -589,132 +750,420 @@ test("message failure rolls back send status, message and audit", async () => {
 });
 
 test("package and service changes preserve quoted amounts; revisions use the current price", async () => {
-  const pkg = await db.insertInto("packages").values({
-    name: "Financial history", slug: `financial-${randomUUID()}`, price: 1000, max_guests: 100,
-  }).returning("id").executeTakeFirstOrThrow();
-  const service = await db.insertInto("services").values({
-    name: "Original service", slug: `financial-service-${randomUUID()}`, description: "Original coverage",
-  }).returning("id").executeTakeFirstOrThrow();
-  await db.insertInto("package_services").values({ package_id: pkg.id, service_id: service.id, role: "included", sort_order: 0 }).execute();
+  const pkg = await db
+    .insertInto("packages")
+    .values({
+      name: "Financial history",
+      slug: `financial-${randomUUID()}`,
+      price: 1000,
+      max_guests: 100,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const service = await db
+    .insertInto("services")
+    .values({
+      name: "Original service",
+      slug: `financial-service-${randomUUID()}`,
+      description: "Original coverage",
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  await db
+    .insertInto("package_services")
+    .values({
+      package_id: pkg.id,
+      service_id: service.id,
+      role: "included",
+      sort_order: 0,
+    })
+    .execute();
   const b = await booking(pkg.id);
   let q = await create(b);
-  const items = [{ id: randomUUID(), direction: "deduct", kind: "deduction", description: "Agreed discount", amountMinor: 20000, serviceId: null }];
-  q = (await read(await call(`/admin/quotations/${q.id}`, "PATCH", { expectedUpdatedAt: q.updatedAt, items }), 200)).quotation;
-  await db.updateTable("packages").set({ name: "Changed proposal", price: 1500, updated_at: new Date() }).where("id", "=", pkg.id).execute();
-  await db.updateTable("services").set({ description: "Changed coverage", archived_at: new Date(), updated_at: new Date() }).where("id", "=", service.id).execute();
-  q = (await read(await call(`/admin/quotations/${q.id}/send`, "POST", { expectedUpdatedAt: q.updatedAt }), 200)).quotation;
+  const items = [
+    {
+      id: randomUUID(),
+      direction: "deduct",
+      kind: "deduction",
+      description: "Agreed discount",
+      amountMinor: 20000,
+      serviceId: null,
+    },
+  ];
+  q = (
+    await read(
+      await call(`/admin/quotations/${q.id}`, "PATCH", {
+        expectedUpdatedAt: q.updatedAt,
+        items,
+      }),
+      200,
+    )
+  ).quotation;
+  await db
+    .updateTable("packages")
+    .set({ name: "Changed proposal", price: 1500, updated_at: new Date() })
+    .where("id", "=", pkg.id)
+    .execute();
+  await db
+    .updateTable("services")
+    .set({
+      description: "Changed coverage",
+      archived_at: new Date(),
+      updated_at: new Date(),
+    })
+    .where("id", "=", service.id)
+    .execute();
+  q = (
+    await read(
+      await call(`/admin/quotations/${q.id}/send`, "POST", {
+        expectedUpdatedAt: q.updatedAt,
+      }),
+      200,
+    )
+  ).quotation;
   // Simulate a historical acceptance created before the customer endpoint was removed.
-  await db.updateTable("quotations").set({ status: "accepted", accepted_at: new Date() }).where("id", "=", q.id).execute();
-  q = (await read(await call(`/quotations/${q.id}`, "GET", undefined, customerCookie), 200)).quotation;
+  await db
+    .updateTable("quotations")
+    .set({ status: "accepted", accepted_at: new Date() })
+    .where("id", "=", q.id)
+    .execute();
+  q = (
+    await read(
+      await call(`/quotations/${q.id}`, "GET", undefined, customerCookie),
+      200,
+    )
+  ).quotation;
   assert.equal(q.status, "accepted");
   assert.ok(q.acceptedAt);
   assert.equal(q.baseAmountMinor, 100000);
   assert.equal(q.totalAmountMinor, 80000);
   assert.deepEqual(q.items, items);
   assert.equal(q.offeredPackageId, pkg.id);
-  for (const field of ["offeredPackageUpdatedAt", "offeredPackageTerms", "basisCurrent"]) assert.equal(field in q, false);
+  for (const field of [
+    "offeredPackageUpdatedAt",
+    "offeredPackageTerms",
+    "basisCurrent",
+  ])
+    assert.equal(field in q, false);
 
-  let revised = (await read(await call(`/admin/quotations/${q.id}/revision`, "POST", { expectedUpdatedAt: q.updatedAt, reason: "Offer the updated package price" }), 201)).quotation;
+  let revised = (
+    await read(
+      await call(`/admin/quotations/${q.id}/revision`, "POST", {
+        expectedUpdatedAt: q.updatedAt,
+        reason: "Offer the updated package price",
+      }),
+      201,
+    )
+  ).quotation;
   assert.equal(revised.baseAmountMinor, 150000);
   assert.equal(revised.totalAmountMinor, 130000);
   assert.deepEqual(revised.items, items);
   assert.equal(revised.adjustmentsReviewed, false);
-  assert.equal((await call(`/admin/quotations/${revised.id}/send`, "POST", { expectedUpdatedAt: revised.updatedAt })).status, 409);
-  revised = (await read(await call(`/admin/quotations/${revised.id}`, "PATCH", { expectedUpdatedAt: revised.updatedAt, items }), 200)).quotation;
-  await read(await call(`/admin/quotations/${revised.id}/send`, "POST", { expectedUpdatedAt: revised.updatedAt }), 200);
-  const history = (await read(await call(`/booking-requests/${b.id}/quotations`, "GET", undefined, customerCookie), 200)).quotations;
+  assert.equal(
+    (
+      await call(`/admin/quotations/${revised.id}/send`, "POST", {
+        expectedUpdatedAt: revised.updatedAt,
+      })
+    ).status,
+    409,
+  );
+  revised = (
+    await read(
+      await call(`/admin/quotations/${revised.id}`, "PATCH", {
+        expectedUpdatedAt: revised.updatedAt,
+        items,
+      }),
+      200,
+    )
+  ).quotation;
+  await read(
+    await call(`/admin/quotations/${revised.id}/send`, "POST", {
+      expectedUpdatedAt: revised.updatedAt,
+    }),
+    200,
+  );
+  const history = (
+    await read(
+      await call(
+        `/booking-requests/${b.id}/quotations`,
+        "GET",
+        undefined,
+        customerCookie,
+      ),
+      200,
+    )
+  ).quotations;
   assert.equal(history[0].status, "sent");
   assert.equal(history[1].status, "superseded");
   assert.ok(history[1].supersededAt);
   assert.equal(history[1].baseAmountMinor, 100000);
   assert.equal(history[1].totalAmountMinor, 80000);
   assert.deepEqual(history[1].items, items);
-  const audit = await db.selectFrom("audit_events").select("action").where("entity_id", "=", q.id).execute();
-  assert(audit.some(row => row.action === "quotation.sent"));
+  const audit = await db
+    .selectFrom("audit_events")
+    .select("action")
+    .where("entity_id", "=", q.id)
+    .execute();
+  assert(audit.some((row) => row.action === "quotation.sent"));
 });
 
 test("schedule and timezone changes do not alter saved amounts", async () => {
   const b = await booking();
-  await db.updateTable("booking_requests").set({ requested_days: null, status: "accepted" }).where("id", "=", b.id).execute();
-  const day = await db.insertInto("events_day").values({ booking_request_id: b.id, day: "2099-01-01", starts_at: new Date("2099-01-01T01:00:00Z"), ends_at: new Date("2099-01-01T03:00:00Z") }).returning("id").executeTakeFirstOrThrow();
-  const latest = (await read(await call(`/booking-requests/${b.id}`, "GET", undefined, customerCookie), 200)).bookingRequest;
+  await db
+    .updateTable("booking_requests")
+    .set({ requested_days: null, status: "accepted" })
+    .where("id", "=", b.id)
+    .execute();
+  const day = await db
+    .insertInto("events_day")
+    .values({
+      booking_request_id: b.id,
+      day: "2099-01-01",
+      starts_at: new Date("2099-01-01T01:00:00Z"),
+      ends_at: new Date("2099-01-01T03:00:00Z"),
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const latest = (
+    await read(
+      await call(`/booking-requests/${b.id}`, "GET", undefined, customerCookie),
+      200,
+    )
+  ).bookingRequest;
   let q = await create(latest);
-  q = (await read(await call(`/admin/quotations/${q.id}/send`, "POST", { expectedUpdatedAt: q.updatedAt }), 200)).quotation;
-  await db.updateTable("events_day").set({ status: "cancelled", staffing_status: "closed" }).where("id", "=", day.id).execute();
-  await db.updateTable("booking_requests").set({ time_zone: "Asia/Tokyo" }).where("id", "=", b.id).execute();
-  const current = (await read(await call(`/quotations/${q.id}`, "GET", undefined, customerCookie), 200)).quotation;
+  q = (
+    await read(
+      await call(`/admin/quotations/${q.id}/send`, "POST", {
+        expectedUpdatedAt: q.updatedAt,
+      }),
+      200,
+    )
+  ).quotation;
+  await db
+    .updateTable("events_day")
+    .set({ status: "cancelled", staffing_status: "closed" })
+    .where("id", "=", day.id)
+    .execute();
+  await db
+    .updateTable("booking_requests")
+    .set({ time_zone: "Asia/Tokyo" })
+    .where("id", "=", b.id)
+    .execute();
+  const current = (
+    await read(
+      await call(`/quotations/${q.id}`, "GET", undefined, customerCookie),
+      200,
+    )
+  ).quotation;
   assert.equal(current.status, "sent");
   assert.equal(current.totalAmountMinor, q.totalAmountMinor);
 });
 
 test("private package edits remain visible separately while quotations retain their own amounts", async () => {
   const b = await booking();
-  const before = await read(await call(`/admin/booking-requests/${b.id}/package`), 200);
-  const content = { name: "Private proposal", description: "Current description", maxGuests: 100, price: { kind: "fixed", currency: "PHP", amountMinor: 120000 }, services: [], sections: [] };
-  const custom = await read(await call(`/admin/booking-requests/${b.id}/custom-package`, "POST", {
-    ...content, expectedUpdatedAt: before.package.updatedAt, expectedBookingUpdatedAt: before.bookingUpdatedAt,
-  }), 200);
+  const before = await read(
+    await call(`/admin/booking-requests/${b.id}/package`),
+    200,
+  );
+  const content = {
+    name: "Private proposal",
+    description: "Current description",
+    maxGuests: 100,
+    price: { kind: "fixed", currency: "PHP", amountMinor: 120000 },
+    services: [],
+    sections: [],
+  };
+  const custom = await read(
+    await call(`/admin/booking-requests/${b.id}/custom-package`, "POST", {
+      ...content,
+      expectedUpdatedAt: before.package.updatedAt,
+      expectedBookingUpdatedAt: before.bookingUpdatedAt,
+    }),
+    200,
+  );
   let q = await create(custom.bookingRequest);
   assert.equal(q.offeredPackageId, custom.package.id);
-  const edited = await read(await call(`/admin/booking-requests/${b.id}/custom-package`, "PATCH", {
-    ...content, description: "Updated description", price: { kind: "fixed", currency: "PHP", amountMinor: 180000 }, expectedUpdatedAt: custom.package.updatedAt, expectedBookingUpdatedAt: custom.bookingRequest.updatedAt,
-  }), 200);
-  q = (await read(await call(`/admin/quotations/${q.id}/send`, "POST", { expectedUpdatedAt: q.updatedAt }), 200)).quotation;
-  const current = await read(await call(`/booking-requests/${b.id}/package`, "GET", undefined, customerCookie), 200);
+  const edited = await read(
+    await call(`/admin/booking-requests/${b.id}/custom-package`, "PATCH", {
+      ...content,
+      description: "Updated description",
+      price: { kind: "fixed", currency: "PHP", amountMinor: 180000 },
+      expectedUpdatedAt: custom.package.updatedAt,
+      expectedBookingUpdatedAt: custom.bookingRequest.updatedAt,
+    }),
+    200,
+  );
+  q = (
+    await read(
+      await call(`/admin/quotations/${q.id}/send`, "POST", {
+        expectedUpdatedAt: q.updatedAt,
+      }),
+      200,
+    )
+  ).quotation;
+  const current = await read(
+    await call(
+      `/booking-requests/${b.id}/package`,
+      "GET",
+      undefined,
+      customerCookie,
+    ),
+    200,
+  );
   assert.equal(current.package.description, "Updated description");
   assert.equal(current.package.price.amountMinor, 180000);
   assert.equal(q.totalAmountMinor, 120000);
-  assert.equal((await read(await call(`/quotations/${q.id}`, "GET", undefined, customerCookie), 200)).quotation.totalAmountMinor, 120000);
+  assert.equal(
+    (
+      await read(
+        await call(`/quotations/${q.id}`, "GET", undefined, customerCookie),
+        200,
+      )
+    ).quotation.totalAmountMinor,
+    120000,
+  );
   assert.equal(edited.bookingRequest.packageId, b.packageId);
 });
 
 test("quotation and package histories paginate independently without losing current versions", async () => {
   const b = await booking();
   const current = await create(b);
-  await pool.query(`INSERT INTO quotations (booking_request_id,version,currency,base_amount_minor,total_amount_minor,items,status,created_by,sent_at,offered_package_id,adjustments_reviewed)
+  await pool.query(
+    `INSERT INTO quotations (booking_request_id,version,currency,base_amount_minor,total_amount_minor,items,status,created_by,sent_at,offered_package_id,adjustments_reviewed)
     SELECT q.booking_request_id, n, q.currency, q.base_amount_minor, q.total_amount_minor, q.items,
       CASE WHEN n = 2 THEN 'sent' ELSE 'superseded' END, q.created_by, now(), q.offered_package_id, true
-    FROM quotations q CROSS JOIN generate_series(2, 35) n WHERE q.id = $1`, [current.id]);
+    FROM quotations q CROSS JOIN generate_series(2, 35) n WHERE q.id = $1`,
+    [current.id],
+  );
   const base = `/admin/booking-requests/${b.id}/quotations?limit=10`;
   const first = await read(await call(base), 200);
   assert.equal(first.quotations.length, 10);
   assert.equal(first.currentDraft.id, current.id);
   assert.equal(first.currentOffer.version, 2);
   assert.ok(first.nextCursor);
-  const second = await read(await call(`${base}&cursor=${encodeURIComponent(first.nextCursor)}`), 200);
+  const second = await read(
+    await call(`${base}&cursor=${encodeURIComponent(first.nextCursor)}`),
+    200,
+  );
   assert.equal(second.quotations[0].version, 25);
   assert.equal(second.currentDraft.id, current.id);
   const removedId = first.quotations.at(-1).id;
   await pool.query("DELETE FROM quotations WHERE id = $1", [removedId]);
-  const repeated = await read(await call(`${base}&cursor=${encodeURIComponent(first.nextCursor)}`), 200);
-  assert.deepEqual(repeated.quotations.map((q: any) => q.id), second.quotations.map((q: any) => q.id));
-  const exact = await read(await call(`/admin/booking-requests/${b.id}/quotations?quotationId=${current.id}`), 200);
-  assert.deepEqual(exact.quotations.map((q: any) => q.id), [current.id]);
-  const customer = await read(await call(`/booking-requests/${b.id}/quotations?limit=10`, "GET", undefined, customerCookie), 200);
+  const repeated = await read(
+    await call(`${base}&cursor=${encodeURIComponent(first.nextCursor)}`),
+    200,
+  );
+  assert.deepEqual(
+    repeated.quotations.map((q: any) => q.id),
+    second.quotations.map((q: any) => q.id),
+  );
+  const exact = await read(
+    await call(
+      `/admin/booking-requests/${b.id}/quotations?quotationId=${current.id}`,
+    ),
+    200,
+  );
+  assert.deepEqual(
+    exact.quotations.map((q: any) => q.id),
+    [current.id],
+  );
+  const customer = await read(
+    await call(
+      `/booking-requests/${b.id}/quotations?limit=10`,
+      "GET",
+      undefined,
+      customerCookie,
+    ),
+    200,
+  );
   assert.ok(customer.quotations.every((q: any) => q.status !== "draft"));
   assert.equal(customer.currentDraft, null);
   assert.equal(customer.currentOffer.version, 2);
-  await read(await call(`/booking-requests/${b.id}/quotations?cursor=${encodeURIComponent(first.nextCursor)}`, "GET", undefined, customerCookie), 400);
-  await read(await call(`/booking-requests/${b.id}/quotations`, "GET", undefined, otherCookie), 404);
+  await read(
+    await call(
+      `/booking-requests/${b.id}/quotations?cursor=${encodeURIComponent(first.nextCursor)}`,
+      "GET",
+      undefined,
+      customerCookie,
+    ),
+    400,
+  );
+  await read(
+    await call(
+      `/booking-requests/${b.id}/quotations`,
+      "GET",
+      undefined,
+      otherCookie,
+    ),
+    404,
+  );
   const another = await booking();
-  await read(await call(`/admin/booking-requests/${another.id}/quotations?cursor=${encodeURIComponent(first.nextCursor)}`), 400);
+  await read(
+    await call(
+      `/admin/booking-requests/${another.id}/quotations?cursor=${encodeURIComponent(first.nextCursor)}`,
+    ),
+    400,
+  );
 
-  const pkg = (await read(await call(`/admin/booking-requests/${b.id}/package`), 200)).package;
-  await pool.query(`INSERT INTO audit_events(action, entity_type, entity_id, metadata, created_at)
+  const pkg = (
+    await read(await call(`/admin/booking-requests/${b.id}/package`), 200)
+  ).package;
+  await pool.query(
+    `INSERT INTO audit_events(action, entity_type, entity_id, metadata, created_at)
     SELECT 'booking.custom_package_updated', 'booking_request', $1, $2::jsonb,
       '2098-01-01T00:00:00.123000Z'::timestamptz + (n / 2) * interval '1 microsecond'
-    FROM generate_series(1, 34) n`, [b.id, JSON.stringify({ before: pkg, after: pkg })]);
-  const invalidPosition = Buffer.from(JSON.stringify({ version: 1, scope: JSON.stringify(["private-package-history", b.id]), position: { createdAt: "2026-99-99T00:00:00.000001Z", id: randomUUID() } })).toString("base64url");
-  await read(await call(`/admin/booking-requests/${b.id}/package-history?cursor=${invalidPosition}`), 400);
+    FROM generate_series(1, 34) n`,
+    [b.id, JSON.stringify({ before: pkg, after: pkg })],
+  );
+  const invalidPosition = Buffer.from(
+    JSON.stringify({
+      version: 1,
+      scope: JSON.stringify(["private-package-history", b.id]),
+      position: { createdAt: "2026-99-99T00:00:00.000001Z", id: randomUUID() },
+    }),
+  ).toString("base64url");
+  await read(
+    await call(
+      `/admin/booking-requests/${b.id}/package-history?cursor=${invalidPosition}`,
+    ),
+    400,
+  );
   const historyBase = `/admin/booking-requests/${b.id}/package-history?limit=10`;
   const historyFirst = await read(await call(historyBase), 200);
-  const historySecond = await read(await call(`${historyBase}&cursor=${encodeURIComponent(historyFirst.nextCursor)}`), 200);
+  const historySecond = await read(
+    await call(
+      `${historyBase}&cursor=${encodeURIComponent(historyFirst.nextCursor)}`,
+    ),
+    200,
+  );
   assert.equal(historyFirst.history.length, 10);
   assert.equal(historySecond.history.length, 10);
-  assert.equal(new Set([...historyFirst.history, ...historySecond.history].map((row: any) => row.id)).size, 20);
-  await pool.query("DELETE FROM audit_events WHERE id = $1", [historyFirst.history.at(-1).id]);
-  const afterDeletion = await read(await call(`${historyBase}&cursor=${encodeURIComponent(historyFirst.nextCursor)}`), 200);
-  assert.deepEqual(afterDeletion.history.map((row: any) => row.id), historySecond.history.map((row: any) => row.id));
-  await read(await call(`/admin/booking-requests/${another.id}/package-history?cursor=${encodeURIComponent(historyFirst.nextCursor)}`), 400);
+  assert.equal(
+    new Set(
+      [...historyFirst.history, ...historySecond.history].map(
+        (row: any) => row.id,
+      ),
+    ).size,
+    20,
+  );
+  await pool.query("DELETE FROM audit_events WHERE id = $1", [
+    historyFirst.history.at(-1).id,
+  ]);
+  const afterDeletion = await read(
+    await call(
+      `${historyBase}&cursor=${encodeURIComponent(historyFirst.nextCursor)}`,
+    ),
+    200,
+  );
+  assert.deepEqual(
+    afterDeletion.history.map((row: any) => row.id),
+    historySecond.history.map((row: any) => row.id),
+  );
+  await read(
+    await call(
+      `/admin/booking-requests/${another.id}/package-history?cursor=${encodeURIComponent(historyFirst.nextCursor)}`,
+    ),
+    400,
+  );
   await read(await call(historyBase, "GET", undefined, customerCookie), 403);
 });

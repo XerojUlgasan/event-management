@@ -1,7 +1,15 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { copyFile, lstat, mkdir, readFile, readdir, readlink, symlink } from "node:fs/promises";
+import {
+  copyFile,
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  readlink,
+  symlink,
+} from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,7 +28,9 @@ async function inspect(folder, relativePath = "") {
   }
 
   if (!relativePath && !stats.isDirectory()) {
-    throw new Error(`${folder} must be a directory, not a file or symbolic link.`);
+    throw new Error(
+      `${folder} must be a directory, not a file or symbolic link.`,
+    );
   }
 
   let entry;
@@ -30,7 +40,9 @@ async function inspect(folder, relativePath = "") {
     const target = await readlink(path);
     entry = { type: "symlink", target, signature: `symlink:${target}` };
   } else if (stats.isFile()) {
-    const hash = createHash("sha256").update(await readFile(path)).digest("hex");
+    const hash = createHash("sha256")
+      .update(await readFile(path))
+      .digest("hex");
     entry = { type: "file", signature: `file:${hash}` };
   } else {
     throw new Error(`Unsupported entry: ${join(folder, relativePath)}`);
@@ -51,24 +63,35 @@ async function inspect(folder, relativePath = "") {
 // Inventory every folder before copying so conflicts have no preferred source.
 for (const folder of folders) await inspect(folder);
 
-const conflicts = [...entries].filter(([, copies]) =>
-  new Set([...copies.values()].map(entry => entry.signature)).size > 1
-).map(([path]) => path);
+const conflicts = [...entries]
+  .filter(
+    ([, copies]) =>
+      new Set([...copies.values()].map((entry) => entry.signature)).size > 1,
+  )
+  .map(([path]) => path);
 
 for (const path of conflicts) {
-  console.error(`Conflict: ${path} differs in ${[...entries.get(path).keys()].join(", ")}; left unchanged.`);
+  console.error(
+    `Conflict: ${path} differs in ${[...entries.get(path).keys()].join(", ")}; left unchanged.`,
+  );
 }
 
-for (const folder of folders) await mkdir(join(root, folder), { recursive: true });
+for (const folder of folders)
+  await mkdir(join(root, folder), { recursive: true });
 
 let copied = 0;
 // Parents precede children, including when a path originated in a later folder.
-const ordered = [...entries].sort(([a], [b]) =>
-  a.split(sep).length - b.split(sep).length || a.localeCompare(b)
+const ordered = [...entries].sort(
+  ([a], [b]) => a.split(sep).length - b.split(sep).length || a.localeCompare(b),
 );
 for (const [path, copies] of ordered) {
   // A file/directory conflict also blocks copying anything below that path.
-  if (conflicts.some(conflict => path === conflict || path.startsWith(`${conflict}${sep}`))) continue;
+  if (
+    conflicts.some(
+      (conflict) => path === conflict || path.startsWith(`${conflict}${sep}`),
+    )
+  )
+    continue;
 
   const [sourceFolder, entry] = copies.entries().next().value;
   for (const folder of folders) {
@@ -80,11 +103,17 @@ for (const [path, copies] of ordered) {
       await symlink(entry.target, destination);
     } else {
       // Refuse to overwrite a file even if it appeared after the inventory.
-      await copyFile(join(root, sourceFolder, path), destination, constants.COPYFILE_EXCL);
+      await copyFile(
+        join(root, sourceFolder, path),
+        destination,
+        constants.COPYFILE_EXCL,
+      );
     }
     copied++;
   }
 }
 
-console.log(`Agent sync: added ${copied} entries; ${conflicts.length} conflicts.`);
+console.log(
+  `Agent sync: added ${copied} entries; ${conflicts.length} conflicts.`,
+);
 if (conflicts.length) process.exitCode = 1;

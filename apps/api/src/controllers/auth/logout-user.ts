@@ -14,7 +14,9 @@ export const logoutUserRoute = createRoute({
   },
 });
 
-export const logoutUserRouteHandler: AppRouteHandler<typeof logoutUserRoute> = async (c) => {
+export const logoutUserRouteHandler: AppRouteHandler<
+  typeof logoutUserRoute
+> = async (c) => {
   await logoutUserService(c);
 
   return c.body(null, 204);

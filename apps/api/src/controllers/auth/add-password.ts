@@ -38,7 +38,12 @@ export const addPasswordRouteHandler: AppRouteHandler<
   typeof addPasswordRoute
 > = async (c) => {
   const firebase = c.get("firebase");
-  const result = await addPasswordService(c.get("db"), c.get("session"), firebase, c.req.valid("json").password);
+  const result = await addPasswordService(
+    c.get("db"),
+    c.get("session"),
+    firebase,
+    c.req.valid("json").password,
+  );
   if (result.kind === "rate-limited")
     return c.json(
       { error: "Too many attempts. Try again in 15 minutes." },

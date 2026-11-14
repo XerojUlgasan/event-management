@@ -19,6 +19,8 @@ export const getMeRoute = createRoute({
   },
 });
 
-export const getMeRouteHandler: AppRouteHandler<typeof getMeRoute> = async (c) => {
+export const getMeRouteHandler: AppRouteHandler<typeof getMeRoute> = async (
+  c,
+) => {
   return c.json(toProfile(c.get("session").user), 200);
 };

@@ -5,7 +5,38 @@ import { adminSchema } from "./schemas.js";
 import { json, errors } from "../packages/http.js";
 import { listAdminServicesPageService } from "../../services/services/list-admin-services-page.js";
 
-export const listAdminServicesRoute = createRoute({ method: "get", path: "/admin/services", tags: ["Services"], request: { query: paginationQuerySchema.extend({ search: z.string().trim().max(200).optional(), archived: z.enum(["all", "active", "archived"]).default("all") }) }, responses: {
-  200: { content: json(z.object({ services: z.array(adminSchema), nextCursor: z.string().nullable(), counts: z.object({ active: z.number().int(), archived: z.number().int(), filtered: z.number().int() }) })), description: "Admin services" }, ...errors,
-} });
-export const listAdminServicesRouteHandler: AppRouteHandler<typeof listAdminServicesRoute> = async c => c.json(await listAdminServicesPageService(c.get("db"), c.req.valid("query")), 200);
+export const listAdminServicesRoute = createRoute({
+  method: "get",
+  path: "/admin/services",
+  tags: ["Services"],
+  request: {
+    query: paginationQuerySchema.extend({
+      search: z.string().trim().max(200).optional(),
+      archived: z.enum(["all", "active", "archived"]).default("all"),
+    }),
+  },
+  responses: {
+    200: {
+      content: json(
+        z.object({
+          services: z.array(adminSchema),
+          nextCursor: z.string().nullable(),
+          counts: z.object({
+            active: z.number().int(),
+            archived: z.number().int(),
+            filtered: z.number().int(),
+          }),
+        }),
+      ),
+      description: "Admin services",
+    },
+    ...errors,
+  },
+});
+export const listAdminServicesRouteHandler: AppRouteHandler<
+  typeof listAdminServicesRoute
+> = async (c) =>
+  c.json(
+    await listAdminServicesPageService(c.get("db"), c.req.valid("query")),
+    200,
+  );

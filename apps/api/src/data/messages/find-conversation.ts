@@ -6,5 +6,7 @@ import { selectConversationColumnsData } from "./select-conversation-columns.js"
 type Database = Kysely<DB>;
 
 export async function findConversationData(db: Database, id: string) {
-  return selectConversationColumnsData(db).where("c.id", "=", id).executeTakeFirst();
+  return selectConversationColumnsData(db)
+    .where("c.id", "=", id)
+    .executeTakeFirst();
 }

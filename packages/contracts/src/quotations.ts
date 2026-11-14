@@ -1,9 +1,6 @@
 export type QuotationDirection = "add" | "deduct";
 export type QuotationKind =
-  | "addition"
-  | "deduction"
-  | "substitution"
-  | "adjustment";
+  "addition" | "deduction" | "substitution" | "adjustment";
 export type QuotationStatus = "draft" | "sent" | "accepted" | "superseded";
 export type QuotationItem = {
   id: string;

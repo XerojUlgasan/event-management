@@ -1,7 +1,11 @@
 import { sql } from "kysely";
 import type { Database, AvailabilityRow, AssignmentRow } from "./types.js";
 
-export async function listEventDayResponsesData(db: Database, ids: string[], summary?: { staffId?: string }) {
+export async function listEventDayResponsesData(
+  db: Database,
+  ids: string[],
+  summary?: { staffId?: string },
+) {
   if (!ids.length)
     return {
       availability: [] as AvailabilityRow[],

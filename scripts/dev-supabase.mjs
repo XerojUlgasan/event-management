@@ -44,7 +44,9 @@ if (!existsSync(envFile)) {
       "",
     ].join("\n"),
   );
-  console.log("[dev] Created apps/supabase/.env.functions for the local Supabase database.");
+  console.log(
+    "[dev] Created apps/supabase/.env.functions for the local Supabase database.",
+  );
 }
 
 console.log("[dev] Starting the local Supabase stack…");

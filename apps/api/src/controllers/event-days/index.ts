@@ -1,11 +1,34 @@
-import { getEventChecklistRoute, getEventChecklistRouteHandler, getEventChecklistStaffRoute } from "../event-checklists/get-event-checklist.js";
-import { createEventChecklistRoute, createEventChecklistRouteHandler } from "../event-checklists/create-event-checklist.js";
-import { updateEventChecklistRoute, updateEventChecklistRouteHandler, updateEventChecklistStaffRoute } from "../event-checklists/update-event-checklist.js";
-import { sendEventChecklistRoute, sendEventChecklistRouteHandler } from "../event-checklists/send-event-checklist.js";
+import {
+  getEventChecklistRoute,
+  getEventChecklistRouteHandler,
+  getEventChecklistStaffRoute,
+} from "../event-checklists/get-event-checklist.js";
+import {
+  createEventChecklistRoute,
+  createEventChecklistRouteHandler,
+} from "../event-checklists/create-event-checklist.js";
+import {
+  updateEventChecklistRoute,
+  updateEventChecklistRouteHandler,
+  updateEventChecklistStaffRoute,
+} from "../event-checklists/update-event-checklist.js";
+import {
+  sendEventChecklistRoute,
+  sendEventChecklistRouteHandler,
+} from "../event-checklists/send-event-checklist.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { getStaffEventCalendarRoute, getStaffEventCalendarRouteHandler } from "./get-staff-event-calendar.js";
-import { getStaffEventDayRoute, getStaffEventDayRouteHandler } from "./get-staff-event-day.js";
-import { listEventDayStaffRoute, listEventDayStaffRouteHandler } from "./list-event-day-staff.js";
+import {
+  getStaffEventCalendarRoute,
+  getStaffEventCalendarRouteHandler,
+} from "./get-staff-event-calendar.js";
+import {
+  getStaffEventDayRoute,
+  getStaffEventDayRouteHandler,
+} from "./get-staff-event-day.js";
+import {
+  listEventDayStaffRoute,
+  listEventDayStaffRouteHandler,
+} from "./list-event-day-staff.js";
 import { createMiddleware } from "hono/factory";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
@@ -17,7 +40,10 @@ import {
   createEventDayRoute,
   createEventDayRouteHandler,
 } from "./create-event-day.js";
-import { applyResponseDeadlinesRoute, applyResponseDeadlinesRouteHandler } from "./apply-response-deadlines.js";
+import {
+  applyResponseDeadlinesRoute,
+  applyResponseDeadlinesRouteHandler,
+} from "./apply-response-deadlines.js";
 import {
   listAdminEventDaysRoute,
   listAdminEventDaysRouteHandler,
@@ -92,6 +118,9 @@ routes.openapi(getEventChecklistRoute, getEventChecklistRouteHandler);
 routes.openapi(getEventChecklistStaffRoute, getEventChecklistRouteHandler);
 routes.openapi(createEventChecklistRoute, createEventChecklistRouteHandler);
 routes.openapi(updateEventChecklistRoute, updateEventChecklistRouteHandler);
-routes.openapi(updateEventChecklistStaffRoute, updateEventChecklistRouteHandler);
+routes.openapi(
+  updateEventChecklistStaffRoute,
+  updateEventChecklistRouteHandler,
+);
 routes.openapi(sendEventChecklistRoute, sendEventChecklistRouteHandler);
 export default routes;

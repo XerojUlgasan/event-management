@@ -15,7 +15,9 @@ export const sendAdminMessageRoute = createRoute({
     ...errors,
   },
 });
-export const sendAdminMessageRouteHandler: AppRouteHandler<typeof sendAdminMessageRoute> = async (c) => {
+export const sendAdminMessageRouteHandler: AppRouteHandler<
+  typeof sendAdminMessageRoute
+> = async (c) => {
   const result = await sendAdminMessageService(
     c.get("db"),
     c.req.valid("param").id,

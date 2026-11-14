@@ -3,7 +3,10 @@ import type { DB } from "../../db/types.js";
 
 import { selectConversationColumnsData } from "./select-conversation-columns.js";
 
-export async function createConversationData(db: Kysely<DB>, customerId: string) {
+export async function createConversationData(
+  db: Kysely<DB>,
+  customerId: string,
+) {
   const row = await db
     .insertInto("conversations")
     .values({ customer_id: customerId })

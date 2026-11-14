@@ -25,7 +25,9 @@ export const loginUserRoute = createRoute({
   },
 });
 
-export const loginUserRouteHandler: AppRouteHandler<typeof loginUserRoute> = async (c) => {
+export const loginUserRouteHandler: AppRouteHandler<
+  typeof loginUserRoute
+> = async (c) => {
   const { email, password } = c.req.valid("json");
   const result = await loginUserService(c.get("db"), email, password);
   if (result.kind === "rate-limited")

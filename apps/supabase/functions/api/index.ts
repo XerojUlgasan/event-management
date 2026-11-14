@@ -4,7 +4,9 @@ const functionPrefixes = ["/functions/v1/api", "/api"];
 
 function withApiPath(request: Request) {
   const url = new URL(request.url);
-  const prefix = functionPrefixes.find((item) => url.pathname === item || url.pathname.startsWith(`${item}/`));
+  const prefix = functionPrefixes.find(
+    (item) => url.pathname === item || url.pathname.startsWith(`${item}/`),
+  );
   if (!prefix) return request;
   url.pathname = url.pathname.slice(prefix.length) || "/";
   return new Request(url, request);

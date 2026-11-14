@@ -11,9 +11,19 @@ export async function bookingRequestDtos(
   db: Database,
   rows: (Selectable<BookingRequests> & { revision: string })[],
 ) {
-  const schedules = new Map((await listRequestedDaySchedulesData(db, rows.map(r => r.id))).map(day => [day.id, day]));
+  const schedules = new Map(
+    (
+      await listRequestedDaySchedulesData(
+        db,
+        rows.map((r) => r.id),
+      )
+    ).map((day) => [day.id, day]),
+  );
   return rows.map((r) => {
-    const days = r.requested_days === null ? null : requestedDaysSchema.parse(r.requested_days);
+    const days =
+      r.requested_days === null
+        ? null
+        : requestedDaysSchema.parse(r.requested_days);
     return {
       id: r.id,
       reference: r.reference,
@@ -28,21 +38,44 @@ export async function bookingRequestDtos(
       packageName: r.package_name,
       eventType: r.event_type,
       preferredDate: r.preferred_date,
-      requestedDays: days?.map(day => {
-        let schedule = day.eventDayId ? schedules.get(day.eventDayId) : undefined;
-        const visited = new Set<string>();
-        while (schedule?.replacement_event_day_id && !visited.has(schedule.id)) {
-          visited.add(schedule.id);
-          const replacement = schedules.get(schedule.replacement_event_day_id);
-          if (!replacement || replacement.booking_request_id !== r.id) break;
-          schedule = replacement;
-        }
-        return { ...day, operationalSchedule: schedule && schedule.booking_request_id === r.id ? {
-          id: schedule.id, day: schedule.day, startsAt: schedule.starts_at.toISOString(),
-          endsAt: schedule.ends_at.toISOString(), timeZone: r.time_zone, status: schedule.status,
-        } : null };
-      }) ?? null,
-      durationMode: days === null ? null : days.length === 1 ? "one_day" as const : "multi_day" as const,
+      requestedDays:
+        days?.map((day) => {
+          let schedule = day.eventDayId
+            ? schedules.get(day.eventDayId)
+            : undefined;
+          const visited = new Set<string>();
+          while (
+            schedule?.replacement_event_day_id &&
+            !visited.has(schedule.id)
+          ) {
+            visited.add(schedule.id);
+            const replacement = schedules.get(
+              schedule.replacement_event_day_id,
+            );
+            if (!replacement || replacement.booking_request_id !== r.id) break;
+            schedule = replacement;
+          }
+          return {
+            ...day,
+            operationalSchedule:
+              schedule && schedule.booking_request_id === r.id
+                ? {
+                    id: schedule.id,
+                    day: schedule.day,
+                    startsAt: schedule.starts_at.toISOString(),
+                    endsAt: schedule.ends_at.toISOString(),
+                    timeZone: r.time_zone,
+                    status: schedule.status,
+                  }
+                : null,
+          };
+        }) ?? null,
+      durationMode:
+        days === null
+          ? null
+          : days.length === 1
+            ? ("one_day" as const)
+            : ("multi_day" as const),
       requestedDayCount: days?.length ?? null,
       estimatedDuration: r.estimated_duration as BookingEstimatedDuration,
       estimatedDurationDays: r.estimated_duration_days,
@@ -58,7 +91,6 @@ export async function bookingRequestDtos(
       outOfRange: r.out_of_range,
       createdAt: r.created_at.toISOString(),
       updatedAt: r.revision,
-
     };
   });
 }

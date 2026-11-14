@@ -9,5 +9,6 @@ export const createBookingRequestData = (
   db
     .insertInto("booking_requests")
     .values(values)
-    .returningAll().returning(bookingRevision.as("revision"))
+    .returningAll()
+    .returning(bookingRevision.as("revision"))
     .executeTakeFirstOrThrow();

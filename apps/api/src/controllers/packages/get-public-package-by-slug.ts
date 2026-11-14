@@ -15,7 +15,12 @@ export const getPublicPackageBySlugRoute = createRoute({
   },
 });
 
-export const getPublicPackageBySlugRouteHandler: AppRouteHandler<typeof getPublicPackageBySlugRoute> = async (c) => {
-  const row = await getPublicPackageBySlugService(c.get("db"), c.req.valid("param").slug);
+export const getPublicPackageBySlugRouteHandler: AppRouteHandler<
+  typeof getPublicPackageBySlugRoute
+> = async (c) => {
+  const row = await getPublicPackageBySlugService(
+    c.get("db"),
+    c.req.valid("param").slug,
+  );
   return row ? c.json(row, 200) : c.json({ error: "Package not found" }, 404);
 };

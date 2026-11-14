@@ -4,4 +4,16 @@ import type { DB } from "../../db/types.js";
 import { lockServiceData } from "../../data/services/lock-service.js";
 import { error, nextUpdate } from "../packages/package-rules.js";
 import { serviceAdminDto } from "./service-response.js";
-export async function archiveServiceService(db: Kysely<DB>, id: string) { return db.transaction().execute(async trx => { const s = await lockServiceData(trx, id); if (!s) return error("Service not found", 404); const updated = await archiveServiceData(trx, id, s.archived_at ?? new Date(), nextUpdate(s.updated_at)); return serviceAdminDto(trx, updated); }); }
+export async function archiveServiceService(db: Kysely<DB>, id: string) {
+  return db.transaction().execute(async (trx) => {
+    const s = await lockServiceData(trx, id);
+    if (!s) return error("Service not found", 404);
+    const updated = await archiveServiceData(
+      trx,
+      id,
+      s.archived_at ?? new Date(),
+      nextUpdate(s.updated_at),
+    );
+    return serviceAdminDto(trx, updated);
+  });
+}

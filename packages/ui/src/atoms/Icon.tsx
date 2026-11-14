@@ -93,9 +93,25 @@ const iconPaths = {
   ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   close: <path d="m6 6 12 12M18 6 6 18" />,
-  more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
-  info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></>,
-  help: <><circle cx="12" cy="12" r="9" /><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 4M12 16h.01" /></>,
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1" />
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="19" cy="12" r="1" />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 8h.01" />
+    </>
+  ),
+  help: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 4M12 16h.01" />
+    </>
+  ),
   clock: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -130,7 +146,12 @@ const iconPaths = {
 
 export type IconName = keyof typeof iconPaths;
 
-export function Icon({ name, size = 18, className = "", ...props }: { name: IconName; size?: number } & SVGProps<SVGSVGElement>) {
+export function Icon({
+  name,
+  size = 18,
+  className = "",
+  ...props
+}: { name: IconName; size?: number } & SVGProps<SVGSVGElement>) {
   return (
     <svg
       width={size}
@@ -143,10 +164,13 @@ export function Icon({ name, size = 18, className = "", ...props }: { name: Icon
       strokeLinejoin="round"
       aria-hidden="true"
       {...props}
-      className={[name === "spinner" && "ui-spinner", className].filter(Boolean).join(" ") || undefined}
+      className={
+        [name === "spinner" && "ui-spinner", className]
+          .filter(Boolean)
+          .join(" ") || undefined
+      }
     >
       {iconPaths[name]}
     </svg>
-  )
+  );
 }
-

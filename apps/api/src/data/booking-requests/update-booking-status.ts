@@ -11,5 +11,6 @@ export const updateBookingStatusData = (
     .updateTable("booking_requests")
     .set({ status, updated_at: nextBookingRevision })
     .where("id", "=", id)
-    .returningAll().returning(bookingRevision.as("revision"))
+    .returningAll()
+    .returning(bookingRevision.as("revision"))
     .executeTakeFirstOrThrow();

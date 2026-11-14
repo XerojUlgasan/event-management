@@ -2,6 +2,14 @@
 
 Durable engineering notes for this role. Read and maintain them under the shared [memory policy](../README.md#memory).
 
+## 2026-11-14 — Web placement and structure guard
+
+The [frontend structure contract](../../shared/frontend-project-structure.md) owns the layer → domain → responsibility rules, component-group exceptions, and the `pnpm check:web-structure` audit. Register a new shared component domain in the checker and guide together.
+
+**Evidence:** Approved web structure and the checker at `scripts/check-web-structure.mjs`. The check covers configured static placement and import boundaries, not semantic ownership or runtime behavior. Verify the current source and rerun the check before claiming a later migration passes.
+
+**Why it matters:** Use the canonical contract for future placement decisions instead of reviving the former `components/app` feature dump.
+
 ## 2026-11-14 — Catalog guides must match saved grid geometry
 
 The shared catalog renderer and editor consume `CATALOG_GRID` from `@event-management/ui`. Guides represent the actual 12 snap columns; section row counts derive from the lowest widget edge, including gaps, rather than a separate section setting. Narrow screens label the stacked view and saved coordinates separately. The [frontend verification reference](../../frontend/reference/styling-and-verification.md) owns geometry and rendering details; the [limits reference](../../limits/reference/shared-limits.md) owns widget bounds.

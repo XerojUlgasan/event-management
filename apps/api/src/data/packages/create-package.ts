@@ -4,7 +4,9 @@ import type { Content } from "../../controllers/packages/schemas.js";
 export const packageColumns = (content: Content, slug: string) => ({
   name: content.name.trim(),
   slug,
-  ...(content.description !== undefined ? { description: content.description } : {}),
+  ...(content.description !== undefined
+    ? { description: content.description }
+    : {}),
   max_guests: content.maxGuests,
   price: content.price.amountMinor / 100,
 });

@@ -6,16 +6,29 @@ import { createEventChecklistService } from "../../services/event-checklists/cre
 import { ChecklistError } from "../../services/event-checklists/event-checklists.js";
 
 export const createEventChecklistRoute = createRoute({
-  method: "post", path: "/admin/event-days/{id}/checklist", tags,
+  method: "post",
+  path: "/admin/event-days/{id}/checklist",
+  tags,
   request: { params, body: body(z.strictObject({ title })) },
-  responses: { ...errors, 201: { ...response[200], description: "Private draft created" } },
+  responses: {
+    ...errors,
+    201: { ...response[200], description: "Private draft created" },
+  },
 });
-export const createEventChecklistRouteHandler: AppRouteHandler<typeof createEventChecklistRoute> = async c => {
+export const createEventChecklistRouteHandler: AppRouteHandler<
+  typeof createEventChecklistRoute
+> = async (c) => {
   try {
-    const checklist = await createEventChecklistService(c.get("db"), c.req.valid("param").id, c.get("session").user, c.req.valid("json").title);
+    const checklist = await createEventChecklistService(
+      c.get("db"),
+      c.req.valid("param").id,
+      c.get("session").user,
+      c.req.valid("json").title,
+    );
     return c.json({ checklist }, 201);
   } catch (error) {
-    if (error instanceof ChecklistError) return c.json({ error: error.message }, error.status);
+    if (error instanceof ChecklistError)
+      return c.json({ error: error.message }, error.status);
     throw error;
   }
 };

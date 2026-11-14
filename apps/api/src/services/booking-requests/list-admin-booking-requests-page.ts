@@ -7,13 +7,42 @@ import { listAdminBookingRequestsPageData } from "../../data/booking-requests/li
 import { encodePageCursor, parsePageCursor } from "../../utils/pagination.js";
 import { bookingRequestDtos } from "./booking-request-response.js";
 
-const positionSchema = z.object({ createdAt: z.iso.datetime().refine(value => !value.startsWith("0000-") && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}Z$/.test(value)), id: z.string().uuid() });
-export async function listAdminBookingRequestsPageService(db: Kysely<DB>, input: {
-  status?: Status; preferredDate?: string; customerId?: string; cursor?: string; limit: number;
-}) {
-  const scope = JSON.stringify(["booking-requests", input.customerId ?? null, input.status ?? null, input.preferredDate ?? null]);
+const positionSchema = z.object({
+  createdAt: z.iso
+    .datetime()
+    .refine(
+      (value) =>
+        !value.startsWith("0000-") &&
+        /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}Z$/.test(value),
+    ),
+  id: z.string().uuid(),
+});
+export async function listAdminBookingRequestsPageService(
+  db: Kysely<DB>,
+  input: {
+    status?: Status;
+    preferredDate?: string;
+    customerId?: string;
+    cursor?: string;
+    limit: number;
+  },
+) {
+  const scope = JSON.stringify([
+    "booking-requests",
+    input.customerId ?? null,
+    input.status ?? null,
+    input.preferredDate ?? null,
+  ]);
   const position = parsePageCursor(input.cursor, positionSchema, scope);
-  const rows = await listAdminBookingRequestsPageData(db, { ...input, position });
-  const page = createPage(rows, input.limit, row => encodePageCursor(scope, { createdAt: row.cursor_created_at, id: row.id }));
-  return { bookingRequests: await bookingRequestDtos(db, page.items), nextCursor: page.nextCursor };
+  const rows = await listAdminBookingRequestsPageData(db, {
+    ...input,
+    position,
+  });
+  const page = createPage(rows, input.limit, (row) =>
+    encodePageCursor(scope, { createdAt: row.cursor_created_at, id: row.id }),
+  );
+  return {
+    bookingRequests: await bookingRequestDtos(db, page.items),
+    nextCursor: page.nextCursor,
+  };
 }

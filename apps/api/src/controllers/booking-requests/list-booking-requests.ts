@@ -4,9 +4,58 @@ import { listAdminBookingRequestsPageService } from "../../services/booking-requ
 import { paginationQuerySchema } from "../../utils/pagination.js";
 import { bookingSchema, statusSchema } from "./schemas.js";
 import { errors, json } from "./http.js";
-const responses = {200:{content:json(z.object({bookingRequests:z.array(bookingSchema),nextCursor:z.string().nullable()})),description:"Booking requests"},400:errors[400],401:errors[401],403:errors[403]};
-export const listMyBookingRequestsRoute = createRoute({method:"get",path:"/booking-requests/mine",tags:["Booking requests"],request:{query:paginationQuerySchema},responses});
-export const listMyBookingRequestsRouteHandler: AppRouteHandler<typeof listMyBookingRequestsRoute> = async c => c.json(await listAdminBookingRequestsPageService(c.get("db"), {...c.req.valid("query"),customerId:c.get("session").user.id}),200);
-const querySchema = paginationQuerySchema.extend({ status: statusSchema.optional(), preferredDate: z.iso.date().refine(value => !value.startsWith("0000-"), "Invalid date").optional() });
-export const listAdminBookingRequestsRoute = createRoute({method:"get",path:"/admin/booking-requests",tags:["Booking requests"],request:{query:querySchema},responses});
-export const listAdminBookingRequestsRouteHandler: AppRouteHandler<typeof listAdminBookingRequestsRoute> = async c => c.json(await listAdminBookingRequestsPageService(c.get("db"), c.req.valid("query")),200);
+const responses = {
+  200: {
+    content: json(
+      z.object({
+        bookingRequests: z.array(bookingSchema),
+        nextCursor: z.string().nullable(),
+      }),
+    ),
+    description: "Booking requests",
+  },
+  400: errors[400],
+  401: errors[401],
+  403: errors[403],
+};
+export const listMyBookingRequestsRoute = createRoute({
+  method: "get",
+  path: "/booking-requests/mine",
+  tags: ["Booking requests"],
+  request: { query: paginationQuerySchema },
+  responses,
+});
+export const listMyBookingRequestsRouteHandler: AppRouteHandler<
+  typeof listMyBookingRequestsRoute
+> = async (c) =>
+  c.json(
+    await listAdminBookingRequestsPageService(c.get("db"), {
+      ...c.req.valid("query"),
+      customerId: c.get("session").user.id,
+    }),
+    200,
+  );
+const querySchema = paginationQuerySchema.extend({
+  status: statusSchema.optional(),
+  preferredDate: z.iso
+    .date()
+    .refine((value) => !value.startsWith("0000-"), "Invalid date")
+    .optional(),
+});
+export const listAdminBookingRequestsRoute = createRoute({
+  method: "get",
+  path: "/admin/booking-requests",
+  tags: ["Booking requests"],
+  request: { query: querySchema },
+  responses,
+});
+export const listAdminBookingRequestsRouteHandler: AppRouteHandler<
+  typeof listAdminBookingRequestsRoute
+> = async (c) =>
+  c.json(
+    await listAdminBookingRequestsPageService(
+      c.get("db"),
+      c.req.valid("query"),
+    ),
+    200,
+  );

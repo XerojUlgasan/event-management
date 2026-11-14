@@ -1,5 +1,11 @@
 import type { SeedDb } from "../context.js";
-import { expectCount, insertIfNew, SCENARIO_COUNT, scenarioId, scenarioIndex } from "../context.js";
+import {
+  expectCount,
+  insertIfNew,
+  SCENARIO_COUNT,
+  scenarioId,
+  scenarioIndex,
+} from "../context.js";
 
 const STAFF_ROLES = [
   "Event Coordinator",
@@ -10,8 +16,50 @@ const STAFF_ROLES = [
   "Host",
   "Catering Supervisor",
 ] as const;
-const GIVEN_NAMES = ["Amina", "Paolo", "Rafael", "Sofia", "Miguel", "Isabel", "Andres", "Camila", "Luis", "Elena", "Marco", "Diana", "Carlo", "Bea", "Nico", "Lara", "Hugo", "Pia", "Enzo", "Rosa"];
-const FAMILY_NAMES = ["Santos", "Reyes", "Cruz", "Garcia", "Flores", "Torres", "Ramos", "Navarro", "Castillo", "Morales", "Gutierrez", "Aguilar", "Domingo", "Villanueva", "Castro", "Fernandez", "Mendoza", "Silva", "Ortega", "Del Rosario"];
+const GIVEN_NAMES = [
+  "Amina",
+  "Paolo",
+  "Rafael",
+  "Sofia",
+  "Miguel",
+  "Isabel",
+  "Andres",
+  "Camila",
+  "Luis",
+  "Elena",
+  "Marco",
+  "Diana",
+  "Carlo",
+  "Bea",
+  "Nico",
+  "Lara",
+  "Hugo",
+  "Pia",
+  "Enzo",
+  "Rosa",
+];
+const FAMILY_NAMES = [
+  "Santos",
+  "Reyes",
+  "Cruz",
+  "Garcia",
+  "Flores",
+  "Torres",
+  "Ramos",
+  "Navarro",
+  "Castillo",
+  "Morales",
+  "Gutierrez",
+  "Aguilar",
+  "Domingo",
+  "Villanueva",
+  "Castro",
+  "Fernandez",
+  "Mendoza",
+  "Silva",
+  "Ortega",
+  "Del Rosario",
+];
 
 export type ScenarioUser = {
   id: string;
@@ -23,23 +71,30 @@ export type ScenarioUser = {
 
 function roleFor(index: number): Pick<ScenarioUser, "role" | "staffRole"> {
   if (index < 4) return { role: "admin", staffRole: "System Administrator" };
-  if (index < 28) return { role: "staff", staffRole: STAFF_ROLES[(index - 4) % STAFF_ROLES.length] ?? "Waiter" };
+  if (index < 28)
+    return {
+      role: "staff",
+      staffRole: STAFF_ROLES[(index - 4) % STAFF_ROLES.length] ?? "Waiter",
+    };
   return { role: "customer", staffRole: null };
 }
 
 export function planScenarioUsers(): ScenarioUser[] {
-  const users = Array.from({ length: SCENARIO_COUNT }, (_, index): ScenarioUser => {
-    const given = GIVEN_NAMES[index % GIVEN_NAMES.length] ?? "Guest";
-    const family = FAMILY_NAMES[index % FAMILY_NAMES.length] ?? "Sample";
-    const role = roleFor(index);
-    return {
-      id: scenarioId(`user:${index}`),
-      email: `scenario.user${scenarioIndex(index)}@clemora.example.test`,
-      displayName: `${given} ${family}`,
-      role: role.role,
-      staffRole: role.staffRole,
-    };
-  });
+  const users = Array.from(
+    { length: SCENARIO_COUNT },
+    (_, index): ScenarioUser => {
+      const given = GIVEN_NAMES[index % GIVEN_NAMES.length] ?? "Guest";
+      const family = FAMILY_NAMES[index % FAMILY_NAMES.length] ?? "Sample";
+      const role = roleFor(index);
+      return {
+        id: scenarioId(`user:${index}`),
+        email: `scenario.user${scenarioIndex(index)}@clemora.example.test`,
+        displayName: `${given} ${family}`,
+        role: role.role,
+        staffRole: role.staffRole,
+      };
+    },
+  );
   expectCount("users", users.length);
   return users;
 }

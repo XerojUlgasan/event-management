@@ -23,7 +23,12 @@ export function Toast({
       role={tone === "danger" ? "alert" : "status"}
       aria-atomic="true"
     >
-      <Icon name={icon ?? (tone === "danger" ? "alert" : tone === "info" ? "info" : "check")} />
+      <Icon
+        name={
+          icon ??
+          (tone === "danger" ? "alert" : tone === "info" ? "info" : "check")
+        }
+      />
       {children}
     </div>
   );

@@ -12,9 +12,14 @@ export function ActionLink({
   className?: string;
 }) {
   return (
-    <a className={`cl-action-link cl-action-link--${variant} ${className}`.trim()} href={href}>
+    <a
+      className={`cl-action-link cl-action-link--${variant} ${className}`.trim()}
+      href={href}
+    >
       <span>{children}</span>
-      <span className="cl-action-link__arrow" aria-hidden="true">↗</span>
+      <span className="cl-action-link__arrow" aria-hidden="true">
+        ↗
+      </span>
     </a>
   );
 }

@@ -13,7 +13,9 @@ export function Avatar({
     size === "sm" ? "avatar small" : size === "lg" ? "avatar large" : "avatar";
 
   return (
-    <span className={`${sizeClass}${tone === "accent" ? " avatar-accent" : ""}${className ? ` ${className}` : ""}`}>
+    <span
+      className={`${sizeClass}${tone === "accent" ? " avatar-accent" : ""}${className ? ` ${className}` : ""}`}
+    >
       {initials}
     </span>
   );

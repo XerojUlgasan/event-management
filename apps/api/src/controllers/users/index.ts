@@ -1,7 +1,10 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
-import { listAdminUsersRoute, listAdminUsersRouteHandler } from "./list-admin-users.js";
+import {
+  listAdminUsersRoute,
+  listAdminUsersRouteHandler,
+} from "./list-admin-users.js";
 
 const routes = new OpenAPIHono<HonoEnv>();
 

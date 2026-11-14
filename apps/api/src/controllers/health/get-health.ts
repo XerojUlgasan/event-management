@@ -16,6 +16,8 @@ export const getHealthRoute = createRoute({
   },
 });
 
-export const getHealthRouteHandler: AppRouteHandler<typeof getHealthRoute> = async (c) => {
+export const getHealthRouteHandler: AppRouteHandler<
+  typeof getHealthRoute
+> = async (c) => {
   return c.json({ status: "ok" }, 200);
 };

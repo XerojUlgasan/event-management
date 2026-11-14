@@ -1,12 +1,12 @@
 @import "tailwindcss";
 @import "@event-management/theme/theme.css";
 @import "@event-management/ui/styles.css";
-@import "./public-preview.css";
-@import "./public-catalog.css";
-@import "./staff-workspace.css";
-@import "./booking-request.css";
-@import "./admin-event-days.css";
-@import "./event-checklists.css";
+@import "./catalog/public-preview.css";
+@import "./catalog/public-catalog.css";
+@import "./workspaces/staff/staff-workspace.css";
+@import "./booking-requests/booking-request.css";
+@import "./event-days/admin-event-days.css";
+@import "./checklists/event-checklists.css";
 
 html:has(.public-site) {
   scrollbar-gutter: stable;

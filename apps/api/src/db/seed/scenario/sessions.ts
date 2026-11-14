@@ -6,17 +6,26 @@ import type { ScenarioUser } from "./users.js";
 
 export type ScenarioSession = { id: string; userId: string; expiresAt: Date };
 
-export function planScenarioSessions(users: ScenarioUser[], now: Date): ScenarioSession[] {
+export function planScenarioSessions(
+  users: ScenarioUser[],
+  now: Date,
+): ScenarioSession[] {
   const sessions = users.map((user, index) => ({
     id: scenarioId(`session:${index}`),
     userId: user.id,
-    expiresAt: index % 5 === 0 ? new Date(now.getTime() - 86_400_000) : new Date(now.getTime() + SESSION_TTL_MS),
+    expiresAt:
+      index % 5 === 0
+        ? new Date(now.getTime() - 86_400_000)
+        : new Date(now.getTime() + SESSION_TTL_MS),
   }));
   expectCount("sessions", sessions.length);
   return sessions;
 }
 
-export async function seedScenarioSessions(db: SeedDb, input: { sessions: ScenarioSession[]; now: Date }) {
+export async function seedScenarioSessions(
+  db: SeedDb,
+  input: { sessions: ScenarioSession[]; now: Date },
+) {
   let inserted = 0;
   for (const session of input.sessions) {
     const created = await insertIfNew(db, "sessions", {

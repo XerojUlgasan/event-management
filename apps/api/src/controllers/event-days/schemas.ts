@@ -5,7 +5,9 @@ import { errors, json } from "../booking-requests/http.js";
 export const id = z.string().uuid(),
   params = z.object({ id });
 export const instant = z.iso.datetime({ offset: true });
-export const daysBefore = z.union(RESPONSE_DEADLINE_DAYS.map(value => z.literal(value)));
+export const daysBefore = z.union(
+  RESPONSE_DEADLINE_DAYS.map((value) => z.literal(value)),
+);
 export const schedule = z.strictObject({
   day: z.iso.date(),
   startsAt: instant,

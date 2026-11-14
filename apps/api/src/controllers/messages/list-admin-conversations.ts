@@ -12,13 +12,21 @@ export const listAdminConversationsRoute = createRoute({
   summary: "List customer conversations for staff",
   request: { query: paginationQuerySchema },
   responses: {
-    200: { content: json(adminConversationsPageSchema), description: "Conversations with unread counts" },
+    200: {
+      content: json(adminConversationsPageSchema),
+      description: "Conversations with unread counts",
+    },
     400: errors[400],
     401: errors[401],
     403: errors[403],
   },
 });
-export const listAdminConversationsRouteHandler: AppRouteHandler<typeof listAdminConversationsRoute> = async (c) => {
+export const listAdminConversationsRouteHandler: AppRouteHandler<
+  typeof listAdminConversationsRoute
+> = async (c) => {
   const { limit, cursor } = c.req.valid("query");
-  return c.json(await listAdminConversationsService(c.get("db"), limit, cursor), 200);
+  return c.json(
+    await listAdminConversationsService(c.get("db"), limit, cursor),
+    200,
+  );
 };

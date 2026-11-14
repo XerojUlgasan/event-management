@@ -9,9 +9,13 @@ import { deleteApp, getApps } from "firebase-admin/app";
 import { getFirebaseAuth } from "../src/utils/firebase-admin.js";
 
 const variables = [
-  "FIREBASE_PROJECT_ID", "FIREBASE_CLIENT_EMAIL", "FIREBASE_PRIVATE_KEY",
-  "FIREBASE_AUTH_EMULATOR_HOST", "GOOGLE_APPLICATION_CREDENTIALS",
-  "GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT",
+  "FIREBASE_PROJECT_ID",
+  "FIREBASE_CLIENT_EMAIL",
+  "FIREBASE_PRIVATE_KEY",
+  "FIREBASE_AUTH_EMULATOR_HOST",
+  "GOOGLE_APPLICATION_CREDENTIALS",
+  "GOOGLE_CLOUD_PROJECT",
+  "GCLOUD_PROJECT",
 ];
 const original = new Map(variables.map((name) => [name, process.env[name]]));
 let directory: string;
@@ -49,7 +53,9 @@ after(async () => {
 
 test("concurrent credential loads return the same Firebase Auth instance", async () => {
   await writeFile(credentialsFile, credentials);
-  const instances = await Promise.all(Array.from({ length: 8 }, () => getFirebaseAuth()));
+  const instances = await Promise.all(
+    Array.from({ length: 8 }, () => getFirebaseAuth()),
+  );
   assert.equal(getApps().length, 1);
   for (const instance of instances) assert.equal(instance, instances[0]);
   assert.equal(instances[0].app.options.projectId, "demo-event-management");

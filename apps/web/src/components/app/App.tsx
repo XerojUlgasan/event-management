@@ -1,78 +1,124 @@
-import { useEffect, useRef } from "react"
-import { Brand, Button, NotificationProvider } from "@event-management/ui"
+import { useEffect, useRef } from "react";
+import { Brand, Button, NotificationProvider } from "@event-management/ui";
 
-import { AuthProvider, useAuth } from "../../lib/auth"
-import { interceptWorkspaceLink, navigateWorkspace, useWorkspaceLocation } from "../../lib/workspace-navigation"
-import { AppShell } from "./AppShell"
-import { AuthPage } from "./AuthPage"
-import { CustomerDashboard } from "./customer/CustomerDashboard"
-import { StaffWorkspaceShell } from "./staff/StaffWorkspaceShell"
-import { adminBookingRequestId, adminKey, allowedWorkspacePath, appHome, isStaffWorkspace, isSystemAdmin, normalizePath, workspaceReturnPath } from "./routes"
+import { AuthProvider, useAuth } from "../../lib/auth/AuthProvider";
+import {
+  interceptWorkspaceLink,
+  navigateWorkspace,
+  useWorkspaceLocation,
+} from "../../lib/navigation/workspace-navigation";
+import { AdminShell } from "../workspaces/admin/AdminShell";
+import { AuthPage } from "../auth/AuthPage";
+import { CustomerDashboard } from "../workspaces/customer/CustomerDashboard";
+import { StaffWorkspaceShell } from "../workspaces/staff/StaffWorkspaceShell";
+import {
+  adminBookingRequestId,
+  adminKey,
+  allowedWorkspacePath,
+  appHome,
+  isStaffWorkspace,
+  isSystemAdmin,
+  normalizePath,
+  workspaceReturnPath,
+} from "./routes";
 
-export default function App({ initialPath, initialSearch }: { initialPath: string; initialSearch: string }) {
-  const location = useWorkspaceLocation(`${initialPath}${initialSearch}`)
-  const previousPath = useRef(location.path)
+export default function App({
+  initialPath,
+  initialSearch,
+}: {
+  initialPath: string;
+  initialSearch: string;
+}) {
+  const location = useWorkspaceLocation(`${initialPath}${initialSearch}`);
+  const previousPath = useRef(location.path);
   useEffect(() => {
-    document.addEventListener("click", interceptWorkspaceLink)
-    return () => document.removeEventListener("click", interceptWorkspaceLink)
-  }, [])
+    document.addEventListener("click", interceptWorkspaceLink);
+    return () => document.removeEventListener("click", interceptWorkspaceLink);
+  }, []);
   useEffect(() => {
-    if (previousPath.current === location.path) return
-    previousPath.current = location.path
+    if (previousPath.current === location.path) return;
+    previousPath.current = location.path;
     if (location.hash) {
-      try { document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView() } catch { /* Invalid fragments retain their URL. */ }
-      return
+      try {
+        document
+          .getElementById(decodeURIComponent(location.hash.slice(1)))
+          ?.scrollIntoView();
+      } catch {
+        /* Invalid fragments retain their URL. */
+      }
+      return;
     }
-    window.scrollTo(0, 0)
-    const heading = document.querySelector<HTMLElement>("main h1, main [role='heading']") ?? document.querySelector<HTMLElement>("main")
+    window.scrollTo(0, 0);
+    const heading =
+      document.querySelector<HTMLElement>("main h1, main [role='heading']") ??
+      document.querySelector<HTMLElement>("main");
     if (heading) {
-      const previous = heading.getAttribute("tabindex")
-      heading.setAttribute("tabindex", "-1")
-      heading.focus({ preventScroll: true })
-      if (previous === null) heading.removeAttribute("tabindex")
-      else heading.setAttribute("tabindex", previous)
+      const previous = heading.getAttribute("tabindex");
+      heading.setAttribute("tabindex", "-1");
+      heading.focus({ preventScroll: true });
+      if (previous === null) heading.removeAttribute("tabindex");
+      else heading.setAttribute("tabindex", previous);
     }
-  }, [location.path, location.hash])
+  }, [location.path, location.hash]);
   return (
     <NotificationProvider>
       <AuthProvider>
-        <Workspace path={normalizePath(location.path)} search={location.search} hash={location.hash} />
+        <Workspace
+          path={normalizePath(location.path)}
+          search={location.search}
+          hash={location.hash}
+        />
       </AuthProvider>
     </NotificationProvider>
-  )
+  );
 }
 
-function Workspace({ path, search, hash }: { path: string; search: string; hash: string }) {
-  const { status, profile, signOut } = useAuth()
-  const mode = new URLSearchParams(search).get("mode") === "register" ? "register" : "signin"
+function Workspace({
+  path,
+  search,
+  hash,
+}: {
+  path: string;
+  search: string;
+  hash: string;
+}) {
+  const { status, profile, signOut } = useAuth();
+  const mode =
+    new URLSearchParams(search).get("mode") === "register"
+      ? "register"
+      : "signin";
 
   useEffect(() => {
-    if (status !== "signed-in" || !profile) return
-    const home = appHome(profile)
-    const params = new URLSearchParams(search)
-    const book = params.get("book")
-    const resume = params.get("booking") === "resume"
+    if (status !== "signed-in" || !profile) return;
+    const home = appHome(profile);
+    const params = new URLSearchParams(search);
+    const book = params.get("book");
+    const resume = params.get("booking") === "resume";
     if (path === "/login") {
       if (profile.role === "customer" && (book || resume)) {
-        const next = new URLSearchParams()
-        if (book) next.set("book", book)
-        if (resume) next.set("booking", "resume")
-        window.location.replace(`/app/home?${next}`)
-      } else window.location.replace(workspaceReturnPath(profile, params.get("next")) ?? home)
-      return
+        const next = new URLSearchParams();
+        if (book) next.set("book", book);
+        if (resume) next.set("booking", "resume");
+        window.location.replace(`/app/home?${next}`);
+      } else
+        window.location.replace(
+          workspaceReturnPath(profile, params.get("next")) ?? home,
+        );
+      return;
     }
-    if (path === "/app") navigateWorkspace(`${home}${search}${hash}`, true)
-    else if (!allowedWorkspacePath(profile, path)) navigateWorkspace(home, true)
-  }, [status, profile, path, search, hash])
+    if (path === "/app") navigateWorkspace(`${home}${search}${hash}`, true);
+    else if (!allowedWorkspacePath(profile, path))
+      navigateWorkspace(home, true);
+  }, [status, profile, path, search, hash]);
 
   const handleSignOut = async () => {
     try {
-      await signOut()
-      window.location.assign("/login")
+      await signOut();
+      window.location.assign("/login");
     } catch {
       // Keep the current account visible until the API confirms logout.
     }
-  }
+  };
 
   if (status === "loading") {
     return (
@@ -80,30 +126,41 @@ function Workspace({ path, search, hash }: { path: string; search: string; hash:
         <Brand />
         <span>Loading your workspace…</span>
       </div>
-    )
+    );
   }
 
   if (status !== "signed-in" || !profile) {
     if (path !== "/login") {
-      const next = `${path}${search}${hash}`
-      window.location.replace(`/login?next=${encodeURIComponent(next)}`)
+      const next = `${path}${search}${hash}`;
+      window.location.replace(`/login?next=${encodeURIComponent(next)}`);
       return (
         <div className="auth-splash">
           <Brand />
           <span>Loading your workspace…</span>
         </div>
-      )
+      );
     }
-    return <AuthPage initialMode={mode} onBack={() => { window.location.assign("/") }} />
+    return (
+      <AuthPage
+        initialMode={mode}
+        onBack={() => {
+          window.location.assign("/");
+        }}
+      />
+    );
   }
 
-  if (path === "/login" || path === "/app" || !allowedWorkspacePath(profile, path)) {
+  if (
+    path === "/login" ||
+    path === "/app" ||
+    !allowedWorkspacePath(profile, path)
+  ) {
     return (
       <div className="auth-splash">
         <Brand />
         <span>Loading your workspace…</span>
       </div>
-    )
+    );
   }
 
   if (isStaffWorkspace(profile)) {
@@ -112,26 +169,46 @@ function Workspace({ path, search, hash }: { path: string; search: string; hash:
         <main className="auth-splash">
           <Brand />
           <h1>Staff access required</h1>
-          <p>Ask a System Administrator to review your account role before using event staffing.</p>
+          <p>
+            Ask a System Administrator to review your account role before using
+            event staffing.
+          </p>
           <Button onClick={handleSignOut}>Sign out</Button>
         </main>
-      )
+      );
     }
-    return <StaffWorkspaceShell key={`${profile.id}:${profile.role}:${profile.staffRole}`} profile={profile} path={path} onSignOut={handleSignOut} />
+    return (
+      <StaffWorkspaceShell
+        key={`${profile.id}:${profile.role}:${profile.staffRole}`}
+        profile={profile}
+        path={path}
+        onSignOut={handleSignOut}
+      />
+    );
   }
   if (isSystemAdmin(profile)) {
-    const active = adminKey(path)
-    return active ? <AppShell key={`${profile.id}:${profile.role}:${profile.staffRole}`} profile={profile} active={active} bookingRequestId={adminBookingRequestId(path) ?? undefined} onSignOut={handleSignOut} /> : null
+    const active = adminKey(path);
+    return active ? (
+      <AdminShell
+        key={`${profile.id}:${profile.role}:${profile.staffRole}`}
+        profile={profile}
+        active={active}
+        bookingRequestId={adminBookingRequestId(path) ?? undefined}
+        onSignOut={handleSignOut}
+      />
+    ) : null;
   }
   return (
     <CustomerDashboard
       key={`${profile.id}:${profile.role}:${profile.staffRole}`}
       path={path}
       search={search}
-      onPublic={() => { window.location.assign("/") }}
+      onPublic={() => {
+        window.location.assign("/");
+      }}
       userName={profile.displayName ?? profile.email}
       userEmail={profile.email}
       onSignOut={handleSignOut}
     />
-  )
+  );
 }

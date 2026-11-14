@@ -39,19 +39,52 @@ type Story = StoryObj<typeof meta>;
 
 function Example(args: ComponentProps<typeof Drawer>) {
   const [open, setOpen] = useState(false);
-  return <><Button onClick={() => setOpen(true)}>Open details</Button>{open && <Drawer {...args} onClose={() => setOpen(false)} />}</>;
+  return (
+    <>
+      <Button onClick={() => setOpen(true)}>Open details</Button>
+      {open && <Drawer {...args} onClose={() => setOpen(false)} />}
+    </>
+  );
 }
-export const Default: Story = { render: args => <Example {...args} /> };
+export const Default: Story = { render: (args) => <Example {...args} /> };
 export const LongContent: Story = {
-  args: { title: "A long event name that should wrap without covering the close button", children: <>{Array.from({ length: 25 }, (_, i) => <p key={i}>Detail {i + 1}: Confirm the contact and venue arrangements.</p>)}<Button variant="secondary">Last action</Button></> },
-  render: args => <Example {...args} />,
+  args: {
+    title:
+      "A long event name that should wrap without covering the close button",
+    children: (
+      <>
+        {Array.from({ length: 25 }, (_, i) => (
+          <p key={i}>
+            Detail {i + 1}: Confirm the contact and venue arrangements.
+          </p>
+        ))}
+        <Button variant="secondary">Last action</Button>
+      </>
+    ),
+  },
+  render: (args) => <Example {...args} />,
 };
 
 function Handoff() {
   const [stage, setStage] = useState<"closed" | "drawer" | "dialog">("closed");
-  return <><Button onClick={() => setStage("drawer")}>Open item details</Button>
-    {stage === "drawer" && <Drawer title="Table linens" onClose={() => setStage("closed")}><p>Review the available stock.</p><Button onClick={() => setStage("dialog")}>Allocate item</Button></Drawer>}
-    {stage === "dialog" && <Dialog title="Allocate inventory" onClose={() => setStage("closed")}><p>The detail panel has closed. Focus belongs to this dialog.</p><Button variant="secondary" onClick={() => setStage("closed")}>Cancel</Button></Dialog>}
-  </>;
+  return (
+    <>
+      <Button onClick={() => setStage("drawer")}>Open item details</Button>
+      {stage === "drawer" && (
+        <Drawer title="Table linens" onClose={() => setStage("closed")}>
+          <p>Review the available stock.</p>
+          <Button onClick={() => setStage("dialog")}>Allocate item</Button>
+        </Drawer>
+      )}
+      {stage === "dialog" && (
+        <Dialog title="Allocate inventory" onClose={() => setStage("closed")}>
+          <p>The detail panel has closed. Focus belongs to this dialog.</p>
+          <Button variant="secondary" onClick={() => setStage("closed")}>
+            Cancel
+          </Button>
+        </Dialog>
+      )}
+    </>
+  );
 }
 export const DialogHandoff: Story = { render: () => <Handoff /> };

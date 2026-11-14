@@ -8,12 +8,20 @@ import { findUserByFirebaseUidData } from "../../data/auth/find-user-by-firebase
 
 type AuthContext = Context<HonoEnv>;
 
-export async function syncFirebaseProfileService(db: Kysely<DB>, firebase: FirebaseUser, displayName?: string) {
+export async function syncFirebaseProfileService(
+  db: Kysely<DB>,
+  firebase: FirebaseUser,
+  displayName?: string,
+) {
   if (!firebase.email) return { kind: "missing-email" as const };
   let row = await findUserByFirebaseUidData(db, firebase.uid);
   if (!row) {
-    row = await createFirebaseUserData(db, firebase.uid, firebase.email.trim().toLowerCase(),
-      displayName ?? firebase.name ?? firebase.email.split("@")[0]);
+    row = await createFirebaseUserData(
+      db,
+      firebase.uid,
+      firebase.email.trim().toLowerCase(),
+      displayName ?? firebase.name ?? firebase.email.split("@")[0],
+    );
     // A simultaneous login may already have created this Firebase account.
     row ??= await findUserByFirebaseUidData(db, firebase.uid);
   }

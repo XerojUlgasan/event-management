@@ -7,7 +7,10 @@ export const messageBodySchema = z.object({
     .string()
     .trim()
     .min(1, "Write a message before sending")
-    .max(MAX_MESSAGE_BODY_LENGTH, `Messages can be at most ${MAX_MESSAGE_BODY_LENGTH} characters`),
+    .max(
+      MAX_MESSAGE_BODY_LENGTH,
+      `Messages can be at most ${MAX_MESSAGE_BODY_LENGTH} characters`,
+    ),
 });
 
 export const messageSchema = z.object({
@@ -21,10 +24,7 @@ export const messageSchema = z.object({
   readAt: z.string().nullable(),
 });
 
-export const conversationStatusSchema = z.enum([
-  "active",
-  "closed",
-]);
+export const conversationStatusSchema = z.enum(["active", "closed"]);
 
 export const conversationSchema = z.object({
   id: z.string().uuid(),
