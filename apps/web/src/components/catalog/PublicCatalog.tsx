@@ -1,4 +1,9 @@
 import { DEFAULT_PAGE_SIZE } from "@event-management/contracts/pagination";
+import {
+  catalogFilterScope,
+  type CatalogFilters,
+  type CatalogKind,
+} from "@event-management/contracts/catalog-filters";
 import { usePagination } from "../../lib/pagination/use-pagination";
 import {
   Button,
@@ -25,8 +30,9 @@ import { priceLabel } from "../../lib/utils/formatting/money";
 import { CatalogDetailPreview } from "./CatalogDetailPreview";
 import { ServiceCanvas, VenueCanvas } from "./CatalogContent";
 import { photos } from "../../demo/catalog/photos";
+import { CatalogFiltersForm } from "./CatalogFiltersForm";
 
-type Kind = "services" | "packages" | "venues";
+type Kind = CatalogKind;
 type Preview = { kind: Kind; id: string } | null;
 
 function PackageCard({
@@ -88,6 +94,13 @@ function ServiceCard({
         <span className="catalog-card-kicker">Event service</span>
         <h3>{item.name}</h3>
         <p>{item.description}</p>
+        <div className="catalog-card-meta">
+          <span>
+            {item.hourlyRatePesos === null
+              ? "Rate on request"
+              : `${new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(item.hourlyRatePesos)} / hour`}
+          </span>
+        </div>
         <Button
           variant="secondary"
           type="button"
@@ -126,6 +139,13 @@ function VenueCard({
         <span className="catalog-card-kicker">{item.location}</span>
         <h3>{item.name}</h3>
         <p>{item.description}</p>
+        <div className="catalog-card-meta">
+          <span>
+            {item.maxGuests === null
+              ? "Ask us about capacity"
+              : `Up to ${item.maxGuests} guests`}
+          </span>
+        </div>
         <Button
           variant="secondary"
           type="button"
@@ -248,18 +268,25 @@ export function PublicCatalog({
   mode = "featured",
   allowBooking = true,
   onViewMore,
+  showFilters = false,
 }: {
   kind: Kind;
   mode?: "featured" | "overview";
   allowBooking?: boolean;
   onViewMore?: () => void;
+  showFilters?: boolean;
 }) {
   const { notifyError } = useNotifications();
+  const [filters, setFilters] = useState<CatalogFilters>({});
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersId = useId();
+  const topRef = useRef<HTMLDivElement>(null);
   const [items, setItems] = useState<(PublicPackage | PublicService | Venue)[]>(
     [],
   );
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const pagination = usePagination(`${kind}:${mode}`);
+  const filterScope = catalogFilterScope(kind, filters);
+  const pagination = usePagination(`${filterScope}:${mode}`);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [initialized, setInitialized] = useState(false);
@@ -276,19 +303,21 @@ export function PublicCatalog({
       busy.current = true;
       setLoading(true);
       setError("");
+      setItems([]);
+      setNextCursor(null);
       try {
         if (kind === "packages") {
-          const result = await getPackages({ limit, cursor });
+          const result = await getPackages({ limit, cursor, ...filters });
           if (current !== generation.current) return;
           setItems(result.packages);
           setNextCursor(result.nextCursor);
         } else if (kind === "venues") {
-          const result = await getVenues({ limit, cursor });
+          const result = await getVenues({ limit, cursor, ...filters });
           if (current !== generation.current) return;
           setItems(result.venues);
           setNextCursor(result.nextCursor);
         } else {
-          const result = await getServices({ limit, cursor });
+          const result = await getServices({ limit, cursor, ...filters });
           if (current !== generation.current) return;
           setItems(result.services);
           setNextCursor(result.nextCursor);
@@ -304,7 +333,7 @@ export function PublicCatalog({
         }
       }
     },
-    [kind, limit, notifyError],
+    [kind, limit, filters, notifyError],
   );
 
   useEffect(() => {
@@ -325,21 +354,68 @@ export function PublicCatalog({
       setParentService(null);
     } else setSelected(null);
   };
+  const scrollToTop = () => {
+    topRef.current?.focus({ preventScroll: true });
+    topRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
+  };
+  const hasFilters = Object.keys(filters).length > 0;
 
   return (
-    <>
-      {!initialized && (
+    <div className="catalog-browser" ref={topRef} tabIndex={-1}>
+      {showFilters && (
+        <>
+          <div className="catalog-toolbar">
+            <p
+              className="catalog-results-summary"
+              role="status"
+              aria-live="polite"
+            >
+              {loading || !initialized
+                ? `Loading ${kind}…`
+                : error
+                  ? `Unable to show ${kind}. Try again below.`
+                  : `Showing ${items.length} ${kind}${hasFilters ? " matching your filters" : ""} · Page ${pagination.page}`}
+            </p>
+            <Button
+              variant="secondary"
+              size="icon"
+              icon="filter"
+              className="catalog-filter-toggle"
+              aria-label={filtersOpen ? "Hide filters" : "Show filters"}
+              title={filtersOpen ? "Hide filters" : "Show filters"}
+              aria-expanded={filtersOpen}
+              aria-controls={filtersId}
+              data-active={hasFilters || undefined}
+              onClick={() => setFiltersOpen((open) => !open)}
+            />
+          </div>
+          <div id={filtersId} hidden={!filtersOpen}>
+            <CatalogFiltersForm
+              key={kind}
+              kind={kind}
+              filters={filters}
+              onApply={(next) => {
+                setFilters(next);
+                pagination.reset();
+              }}
+            />
+          </div>
+        </>
+      )}
+      {(!initialized || loading) && (
         <p className="catalog-status" role="status">
           Loading {kind}…
         </p>
       )}
-      {initialized && items.length === 0 && !error && (
+      {initialized && !loading && items.length === 0 && !error && (
         <p className="catalog-status">
-          {kind === "packages"
-            ? "No packages are published yet."
-            : kind === "venues"
-              ? "No venues are available yet."
-              : "Our service catalog is being prepared. Please check back soon."}
+          {hasFilters
+            ? `No ${kind} match your filters. Adjust your filters or use Clear to see all ${kind}.`
+            : kind === "packages"
+              ? "No packages are published yet."
+              : kind === "venues"
+                ? "No venues are available yet."
+                : "Our service catalog is being prepared. Please check back soon."}
         </p>
       )}
       {items.length > 0 && (
@@ -401,8 +477,14 @@ export function PublicCatalog({
           page={pagination.page}
           hasNextPage={nextCursor !== null}
           pending={loading}
-          onPrevious={pagination.previous}
-          onNext={() => pagination.next(nextCursor)}
+          onPrevious={() => {
+            pagination.previous();
+            scrollToTop();
+          }}
+          onNext={() => {
+            pagination.next(nextCursor);
+            scrollToTop();
+          }}
           label="Catalog pages"
         />
       )}
@@ -416,7 +498,7 @@ export function PublicCatalog({
         }
         onClose={closePreview}
       />
-    </>
+    </div>
   );
 }
 

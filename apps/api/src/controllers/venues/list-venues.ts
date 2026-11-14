@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
-import { paginationQuerySchema } from "../../utils/pagination.js";
+import { venueCatalogQuerySchema } from "../catalog/public-filters.js";
 import { publicSchema } from "./schemas.js";
 import { json, errors } from "./http.js";
 import { listPublicVenuesPageService } from "../../services/venues/list-public-venues-page.js";
@@ -9,7 +9,7 @@ export const listVenuesRoute = createRoute({
   method: "get",
   path: "/venues",
   tags: ["Venues"],
-  request: { query: paginationQuerySchema },
+  request: { query: venueCatalogQuerySchema },
   responses: {
     200: {
       content: json(
@@ -25,8 +25,10 @@ export const listVenuesRoute = createRoute({
 });
 export const listVenuesRouteHandler: AppRouteHandler<
   typeof listVenuesRoute
-> = async (c) =>
-  c.json(
-    await listPublicVenuesPageService(c.get("db"), c.req.valid("query")),
+> = async (c) => {
+  const { limit, cursor, guests } = c.req.valid("query");
+  return c.json(
+    await listPublicVenuesPageService(c.get("db"), { limit, cursor, guests }),
     200,
   );
+};

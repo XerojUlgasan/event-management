@@ -20,6 +20,10 @@ export function listPublicServicesPageData(
       ),
     );
   query = query.where("archived_at", "is", null);
+  if (options.minPricePesos !== undefined)
+    query = query.where("hourly_rate_pesos", ">=", options.minPricePesos);
+  if (options.maxPricePesos !== undefined)
+    query = query.where("hourly_rate_pesos", "<=", options.maxPricePesos);
   if (position)
     query = query.where(
       sql<boolean>`(published_at, id) < (${position.sort}::timestamptz, ${position.id}::uuid)`,

@@ -16,6 +16,8 @@ export function listPublicVenuesPageData(
     .selectAll()
     .select(sql<string>`name`.as("page_sort"));
   query = query.where("archived_at", "is", null);
+  if (options.guests !== undefined)
+    query = query.where("max_guests", ">=", options.guests);
   if (position)
     query = query.where(
       sql<boolean>`(name, id) > (${position.sort}, ${position.id}::uuid)`,

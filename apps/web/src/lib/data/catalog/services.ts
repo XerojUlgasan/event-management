@@ -1,3 +1,4 @@
+import type { PublicCatalogPageQuery } from "@event-management/contracts/catalog-filters";
 import type { CatalogSection } from "@event-management/contracts/catalog";
 import { request } from "../../http/request";
 import { pageQuery, type CatalogPageQuery } from "./page-query";
@@ -25,7 +26,7 @@ export const getAdminServices = (page?: CatalogPageQuery) =>
     nextCursor: string | null;
     counts: { active: number; archived: number; filtered: number };
   }>(`/admin/services${pageQuery(page)}`);
-export const getServices = (page?: CatalogPageQuery) =>
+export const getServices = (page?: PublicCatalogPageQuery) =>
   request<{ services: PublicService[]; nextCursor: string | null }>(
     `/services${pageQuery(page)}`,
   );

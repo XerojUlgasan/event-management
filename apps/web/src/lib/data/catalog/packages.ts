@@ -1,3 +1,4 @@
+import type { PublicCatalogPageQuery } from "@event-management/contracts/catalog-filters";
 import type {
   CatalogPackage,
   PackageContent,
@@ -16,7 +17,7 @@ export type {
 export type PublicPackage = CatalogPackage;
 export type AdminPackage = CatalogPackage;
 
-export const getPackages = (page?: CatalogPageQuery) =>
+export const getPackages = (page?: PublicCatalogPageQuery) =>
   request<{ packages: PublicPackage[]; nextCursor: string | null }>(
     `/packages${pageQuery(page)}`,
   );

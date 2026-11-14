@@ -18,7 +18,7 @@ import {
 
 import { photos } from "../../../demo/catalog/photos";
 import { BookingList } from "../../booking-requests/BookingList";
-import { PublicCatalog } from "../../catalog/PublicCatalog";
+import { CustomerCatalogPage } from "./catalog/CustomerCatalogPage";
 import { BookingRequestDialog } from "../../booking-requests/BookingRequestDialog";
 import { initialsFromName } from "../../../lib/utils/formatting/name";
 import { SignInMethods } from "../../auth/SignInMethods";
@@ -440,7 +440,7 @@ export function CustomerDashboard({
   const customerTabs: { label: CustomerTab; icon: IconName }[] = [
     { label: "Home", icon: "grid" },
     { label: "My events", icon: "calendar" },
-    { label: "Packages", icon: "box" },
+    { label: "Catalogs", icon: "box" },
     { label: "Messages", icon: "users" },
   ];
 
@@ -454,12 +454,13 @@ export function CustomerDashboard({
         >
           <Brand />
         </Button>
-        <nav className="customer-nav">
+        <nav className="customer-nav" aria-label="Customer workspace">
           {customerTabs.map((item) => (
             <Button
               variant="plain"
               className={tab === item.label ? "active" : ""}
               key={item.label}
+              aria-current={tab === item.label ? "page" : undefined}
               onClick={() => go(item.label)}
             >
               <Icon name={item.icon} size={16} />
@@ -527,12 +528,12 @@ export function CustomerDashboard({
                   Let’s bring your plans together
                 </h2>
                 <p>
-                  Explore our packages, share your event details, and follow
-                  your request as our team reviews it.
+                  Browse packages, services, and venues, share your event
+                  details, and follow your request as our team reviews it.
                 </p>
                 <div className="customer-event-actions">
-                  <Button onClick={() => go("Packages")}>
-                    Explore packages
+                  <Button onClick={() => go("Catalogs")}>
+                    Explore catalogs
                   </Button>
                   <Button variant="secondary" onClick={() => go("My events")}>
                     My events
@@ -575,7 +576,7 @@ export function CustomerDashboard({
         {tab === "My events" && (
           <div className="customer-content">
             <BookingList
-              onExplore={() => go("Packages")}
+              onExplore={() => go("Catalogs")}
               onOpenChat={(reference: string) => {
                 navigateWorkspace(
                   `/app/messages?request=${encodeURIComponent(reference)}`,
@@ -585,15 +586,7 @@ export function CustomerDashboard({
           </div>
         )}
 
-        {tab === "Packages" && (
-          <div className="customer-content">
-            <PageHeader
-              title="Explore packages"
-              description="Explore currently published packages."
-            />
-            <PublicCatalog kind="packages" mode="overview" />
-          </div>
-        )}
+        {tab === "Catalogs" && <CustomerCatalogPage search={search} />}
 
         {tab === "Profile" && (
           <div className="customer-content">

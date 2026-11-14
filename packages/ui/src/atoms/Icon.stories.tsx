@@ -11,6 +11,7 @@ const names = [
   "settings",
   "spinner",
   "search",
+  "filter",
   "bell",
   "spark",
   "chevron",

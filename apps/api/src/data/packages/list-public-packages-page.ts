@@ -21,6 +21,12 @@ export function listPublicPackagesPageData(
       ),
     );
   query = query.where("archived_at", "is", null);
+  if (options.minPricePesos !== undefined)
+    query = query.where("price", ">=", options.minPricePesos);
+  if (options.maxPricePesos !== undefined)
+    query = query.where("price", "<=", options.maxPricePesos);
+  if (options.guests !== undefined)
+    query = query.where("max_guests", ">=", options.guests);
   if (position)
     query = query.where(
       sql<boolean>`(published_at, id) < (${position.sort}::timestamptz, ${position.id}::uuid)`,

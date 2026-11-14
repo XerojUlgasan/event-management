@@ -14,15 +14,19 @@ import {
   Input,
   NativeDialog,
   Pagination,
-  Select,
   Textarea,
   useNotifications,
 } from "@event-management/ui";
 import { MAX_BOOKING_REASON_LENGTH } from "@event-management/contracts/limits/booking-requests";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import {
-  Badge,
   Button,
   Icon,
   MonthCalendar,
@@ -37,7 +41,6 @@ import {
   getAdminBookingRequestsPage,
   getBookingRequestCalendar,
   getMyBookingRequests,
-  updateBookingRequestStatus,
   type BookingRequest,
   type BookingStatus,
 } from "../../lib/data/booking-requests/requests";
@@ -48,6 +51,8 @@ import {
   bookingDate as preferredDateLabel,
   BookingStatusBadge,
 } from "./BookingRequestDisplay";
+import { CustomerEventTimeline } from "./CustomerEventTimeline";
+import { latestCustomerEvent } from "../../lib/services/booking-requests/customer-event-timeline";
 import { adminBookingRequestPath } from "../app/routes";
 
 export function BookingList(props: {
@@ -91,385 +96,221 @@ function OperationalSchedule({
   );
 }
 function BookingCards({
-  admin = false,
-  readOnly = false,
   onExplore,
   onOpenChat,
 }: {
-  admin?: boolean;
-  readOnly?: boolean;
   onExplore?: () => void;
   onOpenChat?: (reference: string) => void;
 }) {
   const { notify, notifyError } = useNotifications();
   const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
+  const generation = useRef(0);
   const [items, setItems] = useState<BookingRequest[]>([]);
   const [selected, setSelected] = useState<BookingRequest | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [cancelError, setCancelError] = useState("");
   const [busy, setBusy] = useState("");
-  const pagination = usePagination("my-booking-requests");
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadedCursor, setLoadedCursor] = useState<string | null>(null);
-  const generation = useRef(0);
-  const currentCursor = useRef(pagination.cursor);
-  currentCursor.current = pagination.cursor;
-  const load = useCallback(async () => {
-    const current = ++generation.current;
-    setLoading(true);
-    setError("");
-    try {
-      const result = await getMyBookingRequests(pagination.cursor ?? undefined);
-      if (
-        !mounted.current ||
-        generation.current !== current ||
-        currentCursor.current !== pagination.cursor
-      )
-        return;
-      setItems(result.bookingRequests);
-      setNextCursor(result.nextCursor);
-      setLoadedCursor(pagination.cursor ?? "");
-    } catch (cause) {
-      if (
-        !mounted.current ||
-        generation.current !== current ||
-        currentCursor.current !== pagination.cursor
-      )
-        return;
-      setError(notifyError(cause, "Unable to load requests."));
-    } finally {
-      if (
-        mounted.current &&
-        generation.current === current &&
-        currentCursor.current === pagination.cursor
-      )
-        setLoading(false);
-    }
-  }, [pagination.cursor, notifyError]);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    mounted.current = true;
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => {
+      mounted.current = false;
+      generation.current++;
+      window.clearInterval(timer);
+    };
+  }, []);
+  const load = useCallback(
+    async (cursor?: string) => {
+      const current = ++generation.current;
+      if (cursor) setLoadingMore(true);
+      else setLoading(true);
+      setError("");
+      try {
+        const result = await getMyBookingRequests(cursor);
+        if (!mounted.current || generation.current !== current) return;
+        setItems((rows) => {
+          if (!cursor) return result.bookingRequests;
+          const ids = new Set(rows.map((row) => row.id));
+          return [
+            ...rows,
+            ...result.bookingRequests.filter((row) => !ids.has(row.id)),
+          ];
+        });
+        setNextCursor(result.nextCursor);
+      } catch (cause) {
+        if (mounted.current && generation.current === current)
+          setError(notifyError(cause, "Unable to load your event requests."));
+      } finally {
+        if (mounted.current && generation.current === current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
+      }
+    },
+    [notifyError],
+  );
   useEffect(() => {
     void load();
   }, [load]);
+  const saveItem = (updated: BookingRequest) => {
+    setSelected((current) =>
+      current?.id === updated.id
+        ? latestCustomerEvent(current, updated)
+        : current,
+    );
+    setItems((rows) =>
+      rows.map((row) =>
+        row.id === updated.id ? latestCustomerEvent(row, updated) : row,
+      ),
+    );
+  };
   const cancel = async (id: string, reason: string) => {
     setBusy(id);
-    setError("");
+    setCancelError("");
     try {
       const result = await cancelMyBookingRequest(id, reason.trim());
-      setItems((rows) =>
-        rows.map((row) => (row.id === id ? result.bookingRequest : row)),
-      );
+      if (!mounted.current) return;
+      saveItem(result.bookingRequest);
       notify("Booking request cancelled.");
     } catch (cause) {
-      setError(notifyError(cause, "Unable to cancel request."));
+      if (mounted.current)
+        setCancelError(notifyError(cause, "Unable to cancel request."));
     } finally {
-      setBusy("");
-    }
-  };
-  const update = async (id: string, status: BookingStatus, reason: string) => {
-    setBusy(id);
-    setError("");
-    try {
-      const result = await updateBookingRequestStatus(
-        id,
-        status,
-        reason.trim() || undefined,
-      );
-      setItems((rows) =>
-        rows.map((row) => (row.id === id ? result.bookingRequest : row)),
-      );
-      notify("Booking request status updated.");
-    } catch (cause) {
-      setError(notifyError(cause, "Unable to update request."));
-    } finally {
-      setBusy("");
+      if (mounted.current) setBusy("");
     }
   };
   return (
-    <div className="booking-list">
+    <div className="customer-events-page">
       <PageHeader
-        title={admin ? "Booking requests" : "My events"}
-        description={
-          admin
-            ? "Review requests and follow up on event details."
-            : "Follow your event requests and their review status."
-        }
+        title="My events"
+        description="Your plans, requested dates, and updates from the Clemora team."
         actions={
-          !admin && onExplore ? (
+          onExplore ? (
             <Button icon="calendar" onClick={onExplore}>
-              Explore packages
+              Plan an event
             </Button>
           ) : undefined
         }
       />
-      <p className="booking-list-note">
-        Preferred dates and final prices are subject to staff review. Accepted
-        requests are being processed and are not confirmed bookings.
+      <p className="customer-events-notice">
+        <Icon name="info" size={17} />
+        <span>
+          These are booking requests. Dates and final prices need staff review;
+          acceptance is not a confirmed booking.
+        </span>
       </p>
-      {(loading || loadedCursor !== (pagination.cursor ?? "")) && (
-        <p role="status">Loading requests…</p>
+      {loading && (
+        <div className="customer-events-loading" role="status">
+          <span>Loading your event requests…</span>
+          <div aria-hidden="true" />
+          <div aria-hidden="true" />
+          <div aria-hidden="true" />
+        </div>
+      )}
+      {!loading && !error && items.length === 0 && (
+        <section
+          className="customer-events-empty"
+          aria-labelledby="events-empty-title"
+        >
+          <span className="customer-events-empty-icon">
+            <Icon name="calendar" size={28} />
+          </span>
+          <h2 id="events-empty-title">A place for every celebration</h2>
+          <p>
+            Planning a wedding, birthday, or get-together? Find a package and
+            share your plans. Your requests and updates will appear here.
+          </p>
+          {onExplore && (
+            <Button onClick={onExplore} icon="arrow">
+              Explore packages
+            </Button>
+          )}
+        </section>
+      )}
+      {!loading && items.length > 0 && (
+        <>
+          <p className="customer-events-caption">
+            Grouped by requested date · {items.length}{" "}
+            {nextCursor
+              ? "requests loaded"
+              : items.length === 1
+                ? "request"
+                : "requests"}
+          </p>
+          <CustomerEventTimeline
+            items={items}
+            now={now}
+            hasMore={!!nextCursor}
+            onDetails={(item) => {
+              setCancelError("");
+              setSelected(item);
+            }}
+            onOpenChat={onOpenChat}
+          />
+        </>
       )}
       {error && (
-        <p role="alert">
-          {error}{" "}
-          <Button variant="secondary" type="button" onClick={() => void load()}>
+        <div className="customer-events-error" role="alert">
+          <p>{error}</p>
+          <Button
+            variant="secondary"
+            onClick={() => void load(nextCursor ?? undefined)}
+          >
             Try again
           </Button>
-        </p>
+        </div>
       )}
-      {!loading &&
-        loadedCursor === (pagination.cursor ?? "") &&
-        !error &&
-        items.length === 0 && (
-          <Panel className="booking-empty">
-            <span className="booking-empty-icon">
-              <Icon name="calendar" />
-            </span>
-            <h2>{admin ? "No requests yet" : "Your next event starts here"}</h2>
-            <p>
-              {admin
-                ? "New customer requests will appear here for review."
-                : "Explore our packages and share your plans with the Clemora team."}
-            </p>
-            {!admin && onExplore && (
-              <Button onClick={onExplore}>Explore packages</Button>
-            )}
-          </Panel>
-        )}
-      {!loading &&
-        loadedCursor === (pagination.cursor ?? "") &&
-        !error &&
-        items.map((item) => (
-          <Panel
-            as="article"
-            className="customer-event-record booking-record"
-            key={item.id}
+      {!loading && nextCursor && !error && (
+        <div className="customer-events-load-more">
+          <p>Earlier requests may include more upcoming dates.</p>
+          <Button
+            variant="secondary"
+            pending={loadingMore}
+            onClick={() => void load(nextCursor)}
           >
-            <div className="event-record-top">
-              <div>
-                <Badge
-                  tone={
-                    item.status === "declined" || item.status === "cancelled"
-                      ? "danger"
-                      : item.status === "accepted"
-                        ? "success"
-                        : "warning"
-                  }
-                >
-                  {labels[item.status]}
-                </Badge>
-                <h2 className="customer-event-title">{item.packageName}</h2>
-                <p>Request {item.reference}</p>
-              </div>
-            </div>
-            <div className="event-record-details">
-              <span>
-                <small>Event type</small>
-                <strong>{item.eventType}</strong>
-              </span>
-              <span>
-                <small>Requested dates</small>
-                <strong>{requestedSummary(item)}</strong>
-              </span>
-              {item.requestedDays ? (
-                item.requestedDays.map((day) => (
-                  <span key={day.date}>
-                    <small>Requested {preferredDateLabel(day.date)}</small>
-                    <strong>
-                      {day.startsAt && day.endsAt
-                        ? `${dateLabel(day.startsAt, item.timeZone)} – ${dateLabel(day.endsAt, item.timeZone)} (${item.timeZone})`
-                        : "Time to be confirmed"}
-                    </strong>
-                    <small>Operational schedule</small>
-                    <OperationalSchedule day={day} />
-                  </span>
-                ))
-              ) : (
-                <span>
-                  <small>Estimated event length</small>
-                  <strong>
-                    {durationLabel(
-                      item.estimatedDuration,
-                      item.estimatedDurationDays,
-                    )}
-                  </strong>
-                </span>
-              )}
-              <span>
-                <small>Preferred venue</small>
-                <strong>
-                  {item.preferredVenueLocation || "To be confirmed"}
-                </strong>
-              </span>
-              <span>
-                <small>Time zone</small>
-                <strong>{item.timeZone}</strong>
-              </span>
-              {admin && (
-                <>
-                  <span>
-                    <small>Contact person</small>
-                    <strong>{item.contactName}</strong>
-                  </span>
-                  <span>
-                    <small>Phone number</small>
-                    <strong>{item.phoneNumber}</strong>
-                  </span>
-                </>
-              )}
-            </div>
-            {admin && (
-              <p>
-                <strong>Special requests:</strong>{" "}
-                {item.specialRequests || "None"}
-              </p>
-            )}
-            <div className="event-record-footer">
-              <span>
-                <Icon name="clipboard" />
-                {item.status === "accepted"
-                  ? "The team is processing this request."
-                  : "The preferred date is not reserved."}
-              </span>
-            </div>
-            <BookingStatusHistory
-              id={item.id}
-              admin={admin}
-              revision={item.updatedAt}
-              timeZone={item.timeZone}
-              summary="View status history"
-            />
-            {admin &&
-              !readOnly &&
-              !["declined", "cancelled"].includes(item.status) && (
-                <StatusForm
-                  item={item}
-                  busy={busy === item.id}
-                  onUpdate={update}
-                />
-              )}
-            {!admin && (
-              <Button variant="secondary" onClick={() => setSelected(item)}>
-                View details and times
-              </Button>
-            )}
-            {!admin && onOpenChat && (
-              <div className="booking-cancel">
-                <Button
-                  variant="secondary"
-                  icon="users"
-                  onClick={() => onOpenChat(item.reference)}
-                >
-                  Open chat
-                </Button>
-              </div>
-            )}
-            {!admin && !["declined", "cancelled"].includes(item.status) && (
-              <CancelForm
-                item={item}
-                busy={busy === item.id}
-                onCancel={cancel}
-              />
-            )}
-          </Panel>
-        ))}
-      {!loading && loadedCursor === (pagination.cursor ?? "") && !error && (
-        <Pagination
-          page={pagination.page}
-          hasNextPage={!!nextCursor}
-          onPrevious={pagination.previous}
-          onNext={() => nextCursor && pagination.next(nextCursor)}
-        />
+            {loadingMore
+              ? "Loading earlier requests…"
+              : "Load earlier requests"}
+          </Button>
+        </div>
       )}
+      <p className="customer-events-live" role="status">
+        {loadingMore
+          ? "Loading earlier requests…"
+          : !loading && items.length
+            ? `${items.length} requests loaded.`
+            : ""}
+      </p>
       {selected && (
         <BookingDetails
           item={selected}
           customerCanEditTimes
-          onClose={() => setSelected(null)}
-          onSaved={(updated) => {
-            setSelected(updated);
-            setItems((rows) =>
-              rows.map((row) => (row.id === updated.id ? updated : row)),
-            );
+          onClose={() => {
+            if (!busy) setSelected(null);
           }}
+          onSaved={saveItem}
+          requestActions={
+            <>
+              {cancelError && <p role="alert">{cancelError}</p>}
+              {!["declined", "cancelled"].includes(selected.status) && (
+                <CancelForm
+                  key={selected.id}
+                  item={selected}
+                  busy={busy === selected.id}
+                  onCancel={cancel}
+                />
+              )}
+            </>
+          }
         />
       )}
     </div>
   );
 }
-function StatusForm({
-  item,
-  busy,
-  onUpdate,
-}: {
-  item: BookingRequest;
-  busy: boolean;
-  onUpdate: (
-    id: string,
-    status: BookingStatus,
-    reason: string,
-  ) => Promise<void>;
-}) {
-  const [status, setStatus] = useState<BookingStatus>(item.status);
-  const [reason, setReason] = useState("");
-  const reasonRequired =
-    status === "needs_details" ||
-    status === "declined" ||
-    status === "cancelled";
-  return (
-    <form
-      className="booking-status-form"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (reasonRequired && !reason.trim()) return;
-        void onUpdate(item.id, status, reason);
-      }}
-    >
-      <label>
-        Status
-        <Select
-          value={status}
-          onChange={(event) => setStatus(event.target.value as BookingStatus)}
-        >
-          {Object.entries(labels).map(([value, label]) => (
-            <option
-              key={value}
-              value={value}
-              disabled={
-                value === "under_review" && item.status !== "under_review"
-              }
-            >
-              {label}
-            </option>
-          ))}
-        </Select>
-      </label>
-      <label>
-        Reason {reasonRequired ? "(required)" : "(optional)"}
-        <Input
-          value={reason}
-          maxLength={MAX_BOOKING_REASON_LENGTH}
-          required={reasonRequired}
-          onChange={(event) => setReason(event.target.value)}
-        />
-      </label>
-      <Button
-        variant="primary"
-        type="submit"
-        disabled={
-          busy || status === item.status || (reasonRequired && !reason.trim())
-        }
-      >
-        {busy ? "Saving…" : "Update status"}
-      </Button>
-    </form>
-  );
-}
-
 function CancelForm({
   item,
   busy,
@@ -790,8 +631,10 @@ export function BookingDetails({
   customerCanEditTimes = false,
   onClose,
   onSaved,
+  requestActions,
 }: {
   item: BookingRequest;
+  requestActions?: ReactNode;
   customerCanEditTimes?: boolean;
   onClose: () => void;
   onSaved: (item: BookingRequest) => void;
@@ -987,6 +830,7 @@ export function BookingDetails({
               revision={item.updatedAt}
               timeZone={item.timeZone}
             />
+            {requestActions}
           </div>
         )}
         {pageTab === "package" && (

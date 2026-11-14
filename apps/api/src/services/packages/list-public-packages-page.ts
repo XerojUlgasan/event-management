@@ -1,4 +1,5 @@
 import { createPage } from "@event-management/contracts/pagination";
+import { catalogFilterScope } from "@event-management/contracts/catalog-filters";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 import { listPublicPackagesPageData } from "../../data/packages/list-public-packages-page.js";
@@ -12,7 +13,7 @@ export async function listPublicPackagesPageService(
   db: Kysely<DB>,
   options: CatalogListOptions,
 ) {
-  const scope = "packages:public";
+  const scope = catalogFilterScope("packages", options);
   const { position, cursorFor } = catalogCursor(options.cursor, scope);
   return db
     .transaction()

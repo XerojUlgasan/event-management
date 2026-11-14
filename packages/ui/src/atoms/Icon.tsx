@@ -50,6 +50,7 @@ const iconPaths = {
       <path d="m20 20-4-4" />
     </>
   ),
+  filter: <path d="M4 4h16l-6 7v7l-4 2v-9L4 4Z" />,
   bell: (
     <>
       <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M13.7 21h-3.4" />

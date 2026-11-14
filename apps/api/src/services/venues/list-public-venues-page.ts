@@ -1,4 +1,5 @@
 import { createPage } from "@event-management/contracts/pagination";
+import { catalogFilterScope } from "@event-management/contracts/catalog-filters";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 import { listPublicVenuesPageData } from "../../data/venues/list-public-venues-page.js";
@@ -12,8 +13,8 @@ export async function listPublicVenuesPageService(
   db: Kysely<DB>,
   options: CatalogListOptions,
 ) {
-  const scope = "venues:public";
-  const { position, cursorFor } = catalogCursor(options.cursor, scope);
+  const scope = catalogFilterScope("venues", options);
+  const { position, cursorFor } = catalogCursor(options.cursor, scope, "name");
   const rows = await listPublicVenuesPageData(db, options, position);
   const page = createPage(rows, options.limit, cursorFor);
   return {

@@ -5,6 +5,8 @@ import {
   adminBookingRequestPath,
   adminKey,
   allowedWorkspacePath,
+  customerPaths,
+  customerTab,
   workspaceReturnPath,
 } from "../../src/components/app/routes";
 
@@ -14,6 +16,21 @@ const customer = { role: "customer", staffRole: null };
 const restrictedAdmin = { role: "admin", staffRole: "Coordinator" };
 const id = "01c8d471-f0c5-4b16-8594-3bb08e497761";
 const detail = `/app/bookings/${id}`;
+
+test("customers browse catalogs while old package links and admin routes remain valid", () => {
+  assert.equal(customerPaths.Catalogs, "/app/catalogs");
+  for (const path of ["/app/catalogs", "/app/packages"]) {
+    assert.equal(customerTab(path), "Catalogs");
+    assert.equal(allowedWorkspacePath(customer, path), true);
+    assert.equal(
+      workspaceReturnPath(customer, `${path}?catalog=venues`),
+      `${path}?catalog=venues`,
+    );
+  }
+  assert.equal(adminKey("/app/packages"), "Packages");
+  assert.equal(allowedWorkspacePath(admin, "/app/catalogs"), false);
+  assert.equal(allowedWorkspacePath(staff, "/app/catalogs"), false);
+});
 
 test("admin booking links open the detail workspace with Bookings selected", () => {
   assert.equal(adminBookingRequestPath(id), detail);

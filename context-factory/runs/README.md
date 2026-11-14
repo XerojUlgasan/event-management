@@ -14,4 +14,7 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Customer events timeline](2026-11-14_11-50-00_customer-events-timeline.md) | Customer My events / main | complete | Review or commit the scoped uncommitted changes when requested |
+| [Catalog filter disclosure](2026-11-14_11-33-00_catalog-filter-disclosure.md) | Customer catalog refinement / main | complete | Review or commit together with the preceding catalog changes when requested |
+| [Customer catalog browsing](2026-11-14_11-29-00_customer-catalog-browsing.md) | Customer catalogs / main | complete | Review or commit the scoped uncommitted changes when requested |
 | [Guidance reorganization](2026-11-14_10-59-01_context-factory-reorganization.md) | Context factory / main | complete | Select the next task through the router |

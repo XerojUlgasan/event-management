@@ -5,6 +5,7 @@
 @import "./catalog/public-catalog.css";
 @import "./workspaces/staff/staff-workspace.css";
 @import "./booking-requests/booking-request.css";
+@import "./booking-requests/customer-events.css";
 @import "./event-days/admin-event-days.css";
 @import "./checklists/event-checklists.css";
 
@@ -5080,9 +5081,12 @@ html:has(.public-site) {
     height: 47px;
     order: 3;
     overflow-x: auto;
+    gap: 0;
   }
   .customer-nav button {
     flex: 1;
+    min-width: 0;
+    padding-inline: 8px;
     white-space: nowrap;
   }
   .customer-main {

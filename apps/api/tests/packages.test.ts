@@ -989,6 +989,124 @@ test("service pages preserve microsecond boundaries and filter scope", async () 
     );
 });
 
+test("public package and service filters apply before pagination", async () => {
+  const packages = [];
+  for (const [index, price, guests] of [
+    [0, 765000, 100],
+    [1, 765000, 150],
+    [2, 765001, 200],
+  ]) {
+    packages.push(
+      await read(
+        await call(
+          "/admin/packages",
+          "POST",
+          {
+            ...data,
+            name: `Filter package ${index}`,
+            maxGuests: guests,
+            price: { ...data.price, amountMinor: price * 100 },
+          },
+          adminCookie,
+        ),
+        201,
+      ),
+    );
+  }
+  const first = await read(
+    await call(
+      "/packages?limit=1&minPricePesos=765000&maxPricePesos=765000&guests=100",
+    ),
+    200,
+  );
+  assert.equal(first.packages.length, 1);
+  assert.ok(first.nextCursor);
+  const next = await read(
+    await call(
+      `/packages?limit=1&minPricePesos=765000&maxPricePesos=765000&guests=100&cursor=${encodeURIComponent(first.nextCursor)}`,
+    ),
+    200,
+  );
+  assert.deepEqual(
+    new Set([first.packages[0].id, next.packages[0].id]),
+    new Set(packages.slice(0, 2).map((p) => p.id)),
+  );
+  assert.equal(next.nextCursor, null);
+  const guestResult = await read(
+    await call(
+      "/packages?minPricePesos=765000&maxPricePesos=765001&guests=151",
+    ),
+    200,
+  );
+  assert.deepEqual(
+    guestResult.packages.map((p: { id: string }) => p.id),
+    [packages[2].id],
+  );
+  await read(
+    await call(
+      `/packages?minPricePesos=765000&maxPricePesos=765000&guests=101&cursor=${encodeURIComponent(first.nextCursor)}`,
+    ),
+    400,
+  );
+
+  const services: { id: string }[] = [];
+  for (const [index, rate] of [
+    [0, 765000],
+    [1, 765000],
+    [2, 765001],
+  ]) {
+    services.push(
+      await createServiceWithPhoto({
+        name: `Filter service ${index}`,
+        description: "Filter test",
+        hourlyRatePesos: rate,
+      }),
+    );
+  }
+  await pool.query(
+    "UPDATE services SET hourly_rate_pesos = NULL WHERE id = $1",
+    [services[2].id],
+  );
+  const servicePage = await read(
+    await call("/services?limit=1&minPricePesos=765000&maxPricePesos=765000"),
+    200,
+  );
+  assert.ok(servicePage.nextCursor);
+  const serviceNext = await read(
+    await call(
+      `/services?limit=1&minPricePesos=765000&maxPricePesos=765000&cursor=${encodeURIComponent(servicePage.nextCursor)}`,
+    ),
+    200,
+  );
+  assert.deepEqual(
+    new Set([servicePage.services[0].id, serviceNext.services[0].id]),
+    new Set(services.slice(0, 2).map((s) => s.id)),
+  );
+  assert.equal(serviceNext.nextCursor, null);
+  await read(
+    await call(
+      `/services?minPricePesos=765001&cursor=${encodeURIComponent(servicePage.nextCursor)}`,
+    ),
+    400,
+  );
+  const unfiltered = await read(await call("/services?limit=50"), 200);
+  assert.ok(
+    unfiltered.services.some((s: { id: string }) => s.id === services[2].id),
+  );
+  for (const query of [
+    "minPricePesos=",
+    "maxPricePesos=-1",
+    "minPricePesos=1.5",
+    "guests=0",
+    "guests=2147483648",
+    "minPricePesos=2&maxPricePesos=1",
+    "maxPricePesos=2147483648",
+  ]) {
+    await read(await call(`/packages?${query}`), 400);
+  }
+  await read(await call("/services?guests=10"), 400);
+});
+
 async function uploadCanvas(
   bytes: Uint8Array,
   mime: string,

@@ -1,3 +1,4 @@
+import type { PublicCatalogPageQuery } from "@event-management/contracts/catalog-filters";
 import type { CatalogSection } from "@event-management/contracts/catalog";
 import { request } from "../../http/request";
 import { pageQuery, type CatalogPageQuery } from "./page-query";
@@ -19,7 +20,7 @@ export type Venue = VenueContent & {
 };
 export type AdminVenue = Venue;
 
-export const getVenues = (page?: CatalogPageQuery) =>
+export const getVenues = (page?: PublicCatalogPageQuery) =>
   request<{ venues: Venue[]; nextCursor: string | null }>(
     `/venues${pageQuery(page)}`,
   );

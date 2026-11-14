@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
-import { paginationQuerySchema } from "../../utils/pagination.js";
+import { serviceCatalogQuerySchema } from "../catalog/public-filters.js";
 import { publicSchema } from "./schemas.js";
 import { json, errors } from "../packages/http.js";
 import { listPublicServicesPageService } from "../../services/services/list-public-services-page.js";
@@ -9,7 +9,7 @@ export const listPublicServicesRoute = createRoute({
   method: "get",
   path: "/services",
   tags: ["Services"],
-  request: { query: paginationQuerySchema },
+  request: { query: serviceCatalogQuerySchema },
   responses: {
     200: {
       content: json(
@@ -25,8 +25,15 @@ export const listPublicServicesRoute = createRoute({
 });
 export const listPublicServicesRouteHandler: AppRouteHandler<
   typeof listPublicServicesRoute
-> = async (c) =>
-  c.json(
-    await listPublicServicesPageService(c.get("db"), c.req.valid("query")),
+> = async (c) => {
+  const { limit, cursor, minPricePesos, maxPricePesos } = c.req.valid("query");
+  return c.json(
+    await listPublicServicesPageService(c.get("db"), {
+      limit,
+      cursor,
+      minPricePesos,
+      maxPricePesos,
+    }),
     200,
   );
+};

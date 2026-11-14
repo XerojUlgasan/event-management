@@ -1,11 +1,12 @@
 import { z } from "@hono/zod-openapi";
+import type { CatalogFilters } from "@event-management/contracts/catalog-filters";
 import {
   encodePageCursor,
   parsePageCursor,
   postgresTimestampSchema,
 } from "../../utils/pagination.js";
 
-export type CatalogListOptions = {
+export type CatalogListOptions = CatalogFilters & {
   limit: number;
   cursor?: string;
   search?: string;
@@ -16,11 +17,15 @@ const positionSchema = z.object({
   id: z.string().uuid(),
 });
 export type CatalogPosition = z.infer<typeof positionSchema>;
-export function catalogCursor(cursor: string | undefined, scope: string) {
+export function catalogCursor(
+  cursor: string | undefined,
+  scope: string,
+  sort: "name" | "timestamp" = "timestamp",
+) {
   return {
     position: parsePageCursor(
       cursor,
-      scope === "venues:public"
+      sort === "name"
         ? positionSchema
         : positionSchema.extend({
             sort: postgresTimestampSchema.refine(

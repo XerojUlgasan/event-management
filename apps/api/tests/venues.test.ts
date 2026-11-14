@@ -123,6 +123,67 @@ const content = {
 };
 const photo = (name: string) => `https://images.example.test/${name}.jpg`;
 
+test("public venue capacity filter includes the boundary and binds cursors", async () => {
+  const venues: { id: string }[] = [];
+  for (const [index, capacity] of [
+    [0, 765000],
+    [1, 765000],
+    [2, 765001],
+  ]) {
+    venues.push(
+      await read(
+        await call(
+          "/admin/venues",
+          "POST",
+          {
+            ...content,
+            name: `Filter venue ${index}`,
+            maxGuests: capacity,
+          },
+          adminCookie,
+        ),
+        201,
+      ),
+    );
+  }
+  await pool.query("UPDATE venues SET max_guests = NULL WHERE id = $1", [
+    venues[2].id,
+  ]);
+  const first = await read(await call("/venues?limit=1&guests=765000"), 200);
+  assert.ok(first.nextCursor);
+  const second = await read(
+    await call(
+      `/venues?limit=1&guests=765000&cursor=${encodeURIComponent(first.nextCursor)}`,
+    ),
+    200,
+  );
+  assert.deepEqual(
+    new Set([first.venues[0].id, second.venues[0].id]),
+    new Set(venues.slice(0, 2).map((v) => v.id)),
+  );
+  assert.equal(second.nextCursor, null);
+  await read(
+    await call(
+      `/venues?guests=765001&cursor=${encodeURIComponent(first.nextCursor)}`,
+    ),
+    400,
+  );
+  const unfiltered = await read(await call("/venues?limit=50"), 200);
+  assert.ok(
+    unfiltered.venues.some((v: { id: string }) => v.id === venues[2].id),
+  );
+  for (const query of [
+    "guests=",
+    "guests=0",
+    "guests=1.5",
+    "guests=2147483648",
+    "minPricePesos=0",
+    "maxPricePesos=0",
+  ]) {
+    await read(await call(`/venues?${query}`), 400);
+  }
+});
+
 test("venue catalog requires complete content and protects admin operations", async () => {
   const created = await read(
     await call("/admin/venues", "POST", content, adminCookie),

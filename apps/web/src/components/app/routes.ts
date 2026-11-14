@@ -16,12 +16,12 @@ export const adminPaths: Record<NavKey, string> = {
 };
 
 export type CustomerTab =
-  "Home" | "My events" | "Packages" | "Messages" | "Profile";
+  "Home" | "My events" | "Catalogs" | "Messages" | "Profile";
 
 export const customerPaths: Record<CustomerTab, string> = {
   Home: "/app/home",
   "My events": "/app/events",
-  Packages: "/app/packages",
+  Catalogs: "/app/catalogs",
   Messages: "/app/messages",
   Profile: "/app/settings",
 };
@@ -44,6 +44,7 @@ export function adminBookingRequestId(path: string) {
 }
 
 export function customerTab(path: string): CustomerTab {
+  if (path === "/app/packages") return "Catalogs";
   const found = (Object.entries(customerPaths) as [CustomerTab, string][]).find(
     ([, href]) => href === path,
   );
@@ -80,7 +81,10 @@ export function allowedWorkspacePath(
   path: string,
 ) {
   if (profile.role === "customer")
-    return (Object.values(customerPaths) as string[]).includes(path);
+    return (
+      path === "/app/packages" ||
+      (Object.values(customerPaths) as string[]).includes(path)
+    );
   if (isStaffWorkspace(profile))
     return path === "/app/events" || path === "/app/assignments";
   return isSystemAdmin(profile) && adminKey(path) !== null;
