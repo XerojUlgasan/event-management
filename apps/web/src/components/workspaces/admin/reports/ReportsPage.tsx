@@ -368,7 +368,6 @@ export function ReportsPage() {
             <FormField label="Format">
               <Select>
                 <option>PDF document</option>
-                <option>CSV spreadsheet</option>
               </Select>
             </FormField>
             <FormField label="Date range">

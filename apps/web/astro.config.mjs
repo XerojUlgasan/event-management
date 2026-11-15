@@ -10,6 +10,9 @@ const apiProxyTarget = process.env.API_PROXY_TARGET;
 
 export default defineConfig({
   output: "server",
+  server: {
+    allowedHosts: ["contacting-structural-vessel-doubt.trycloudflare.com"],
+  },
   adapter: node({ mode: "standalone" }),
   integrations: [react()],
   vite: {
