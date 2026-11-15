@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import MarkdownPreview from "@uiw/react-markdown-preview";
 import { Button, Icon, Input } from "@event-management/ui";
+import { sendGuestChat } from "../../../lib/data/ai-chat/public-chat";
 import {
-  sendGuestChat,
-  type GuestChatHistoryItem,
-} from "../../../lib/data/ai-chat/public-chat";
+  saveGuestTurns,
+  loadGuestTurns,
+  type GuestTurn,
+} from "../../../lib/services/ai-chat/guest-storage";
 
 type ChatTurn = {
   role: "user" | "assistant";
   content: string;
+  showBookCta?: boolean;
 };
 
 const QUICK_REPLIES = [
@@ -17,21 +20,35 @@ const QUICK_REPLIES = [
   "What services are available?",
 ];
 
+const LOGIN_URL =
+  "/login?next=" + encodeURIComponent("/app/messages") + "&claimChat=1";
+
 export default function GuestChatbot() {
   const [open, setOpen] = useState(false);
   const [visible, setVisible] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [turns, setTurns] = useState<ChatTurn[]>(() => {
+    // Restore any prior guest conversation from localStorage.
+    return loadGuestTurns().map((t) => ({ role: t.role, content: t.content }));
+  });
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Persist turns to localStorage whenever they change.
+  useEffect(() => {
+    const history: GuestTurn[] = turns.map((t) => ({
+      role: t.role,
+      content: t.content,
+    }));
+    saveGuestTurns(history);
+  }, [turns]);
 
   // Auto-scroll to the newest message after DOM settles.
   useEffect(() => {
     const body = bodyRef.current;
     if (!body) return;
-    // Double rAF ensures layout from markdown rendering is committed.
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         body.scrollTop = body.scrollHeight;
@@ -53,11 +70,9 @@ export default function GuestChatbot() {
 
   function handleToggle() {
     if (open) {
-      // Closing — animate out, then unmount.
       setVisible(false);
       closeTimer.current = setTimeout(() => setOpen(false), 260);
     } else {
-      // Opening — mount, then animate in on next frame.
       setOpen(true);
       requestAnimationFrame(() =>
         requestAnimationFrame(() => setVisible(true)),
@@ -76,14 +91,17 @@ export default function GuestChatbot() {
     const nextTurns = [...turns, userTurn];
     setTurns(nextTurns);
 
-    const history: GuestChatHistoryItem[] = turns.map((t) => ({
+    const history: GuestTurn[] = turns.map((t) => ({
       role: t.role,
       content: t.content,
     }));
 
     try {
-      const { reply } = await sendGuestChat(trimmed, history);
-      setTurns([...nextTurns, { role: "assistant", content: reply }]);
+      const { reply, showBookCta } = await sendGuestChat(trimmed, history);
+      setTurns([
+        ...nextTurns,
+        { role: "assistant", content: reply, showBookCta },
+      ]);
     } catch {
       setTurns([
         ...nextTurns,
@@ -154,27 +172,41 @@ export default function GuestChatbot() {
             )}
 
             {turns.map((turn, i) => (
-              <div
-                key={i}
-                className={`message${turn.role === "user" ? " message-own" : ""}`}
-              >
-                {turn.role === "assistant" ? (
-                  <MarkdownPreview
-                    source={turn.content}
-                    wrapperElement={{ "data-color-mode": "light" }}
-                    disableCopy
-                    components={{
-                      img: ({ src, alt }) => (
-                        <img
-                          src={src}
-                          alt={alt ?? ""}
-                          className="chat-catalog-image"
-                        />
-                      ),
-                    }}
-                  />
-                ) : (
-                  turn.content
+              <div key={i}>
+                <div
+                  className={`message${turn.role === "user" ? " message-own" : ""}`}
+                >
+                  {turn.role === "assistant" ? (
+                    <MarkdownPreview
+                      source={turn.content}
+                      wrapperElement={{ "data-color-mode": "light" }}
+                      disableCopy
+                      components={{
+                        img: ({ src, alt }) => (
+                          <img
+                            src={src}
+                            alt={alt ?? ""}
+                            className="chat-catalog-image"
+                          />
+                        ),
+                      }}
+                    />
+                  ) : (
+                    turn.content
+                  )}
+                </div>
+
+                {turn.role === "assistant" && turn.showBookCta && (
+                  <div className="chat-book-cta">
+                    <div className="chat-book-cta-text">
+                      <Icon name="spark" size={15} />
+                      <span>Ready to get started?</span>
+                    </div>
+                    <a href={LOGIN_URL} className="chat-book-cta-btn">
+                      Book now
+                      <Icon name="arrow" size={14} />
+                    </a>
+                  </div>
                 )}
               </div>
             ))}
@@ -190,7 +222,7 @@ export default function GuestChatbot() {
 
           <div className="handover">
             <span>Need more help?</span>
-            <a href="/login">Talk to a person →</a>
+            <a href={LOGIN_URL}>Talk to a person →</a>
           </div>
 
           <div className="chat-input">

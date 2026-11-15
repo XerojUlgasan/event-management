@@ -7,6 +7,7 @@ import {
   MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
   SMALL_JSON_BODY_LIMIT_BYTES,
   QUOTATION_JSON_BODY_LIMIT_BYTES,
+  AI_CHAT_CLAIM_BODY_LIMIT_BYTES,
   bookingBodyLimit,
 } from "../constants/http.js";
 import type { HonoEnv } from "../types/hono.js";
@@ -50,6 +51,7 @@ const bodyLimits: Partial<
     { path: "/admin/conversations/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
   ],
   "ai-chat": [
+    { path: "/ai-chat/claim", maxSize: AI_CHAT_CLAIM_BODY_LIMIT_BYTES },
     { path: "/ai-chat/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
   ],
   packages: [

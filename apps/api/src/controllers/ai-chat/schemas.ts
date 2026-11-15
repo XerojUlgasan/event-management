@@ -64,4 +64,24 @@ export const publicAiChatRequestSchema = z.object({
 
 export const publicAiChatResponseSchema = z.object({
   reply: z.string(),
+  /** True when the AI reply touches booking, pricing, or availability intent —
+   *  the client should show a Book Now CTA after this message. */
+  showBookCta: z.boolean(),
+});
+
+// --- Claim guest chat (authenticated customer only) ---
+
+export const guestTurnSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().max(MAX_AI_CHAT_MESSAGE_LENGTH),
+});
+
+export const claimGuestChatRequestSchema = z.object({
+  /** The full in-memory conversation from the guest chatbot, oldest turn first. */
+  turns: z.array(guestTurnSchema).max(AI_CHAT_HISTORY_LIMIT * 2),
+});
+
+export const claimGuestChatResponseSchema = z.object({
+  conversationId: z.string().uuid(),
+  savedCount: z.number().int().nonnegative(),
 });

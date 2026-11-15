@@ -19,6 +19,11 @@ import {
   normalizePath,
   workspaceReturnPath,
 } from "./routes";
+import { claimGuestChat } from "../../lib/data/ai-chat/public-chat";
+import {
+  loadGuestTurns,
+  clearGuestTurns,
+} from "../../lib/services/ai-chat/guest-storage";
 
 export default function App({
   initialPath,
@@ -85,6 +90,30 @@ function Workspace({
     new URLSearchParams(search).get("mode") === "register"
       ? "register"
       : "signin";
+  const claimed = useRef(false);
+
+  // After a customer signs in, persist any guest chat conversation that was
+  // saved in localStorage. Runs on every sign-in transition — no flag needed.
+  // On success, navigates to /app/messages so the customer sees the claimed conversation.
+  useEffect(() => {
+    if (status !== "signed-in" || !profile || profile.role !== "customer")
+      return;
+    if (claimed.current) return;
+    const turns = loadGuestTurns();
+    if (!turns.length) return;
+    claimed.current = true;
+    claimGuestChat(turns)
+      .then(() => {
+        clearGuestTurns();
+        // Only navigate if currently on a workspace page, not mid-redirect.
+        if (path !== "/login") {
+          navigateWorkspace("/app/messages");
+        }
+      })
+      .catch(() => {
+        claimed.current = false;
+      });
+  }, [status, profile, path]);
 
   useEffect(() => {
     if (status !== "signed-in" || !profile) return;
@@ -112,6 +141,7 @@ function Workspace({
   const handleSignOut = async () => {
     try {
       await signOut();
+      clearGuestTurns();
       window.location.assign("/login");
     } catch {
       // Keep the current account visible until the API confirms logout.

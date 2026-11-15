@@ -3,6 +3,7 @@ import {
   CATALOG_JSON_BODY_LIMIT_BYTES,
   MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
   QUOTATION_JSON_BODY_LIMIT_BYTES,
+  AI_CHAT_CLAIM_BODY_LIMIT_BYTES,
   bookingBodyLimit,
 } from "./constants/http.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
@@ -56,6 +57,10 @@ app.use("/v1/*", async (c, next) => {
 
 app.use("/v1/auth/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/messages/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.use(
+  "/v1/ai-chat/claim",
+  bodyLimit({ maxSize: AI_CHAT_CLAIM_BODY_LIMIT_BYTES }),
+);
 app.use("/v1/ai-chat/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use(
   "/v1/admin/conversations/*",

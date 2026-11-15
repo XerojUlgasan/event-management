@@ -4,6 +4,10 @@ import { requireSession } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import { aiChatRoute, aiChatRouteHandler } from "./chat.js";
 import { publicAiChatRoute, publicAiChatRouteHandler } from "./public-chat.js";
+import {
+  claimGuestChatRoute,
+  claimGuestChatRouteHandler,
+} from "./claim-chat.js";
 
 const routes = new OpenAPIHono<HonoEnv>({
   defaultHook: (result, c) => {
@@ -25,9 +29,11 @@ const customerOnly = createMiddleware<HonoEnv>(async (c, next) => {
   await next();
 });
 
-// Authenticated route — requires a customer session.
+// Authenticated routes — require a customer session.
 routes.use("/ai-chat/message", requireSession, customerOnly);
+routes.use("/ai-chat/claim", requireSession, customerOnly);
 routes.openapi(aiChatRoute, aiChatRouteHandler);
+routes.openapi(claimGuestChatRoute, claimGuestChatRouteHandler);
 
 // Public route — no auth required.
 routes.openapi(publicAiChatRoute, publicAiChatRouteHandler);

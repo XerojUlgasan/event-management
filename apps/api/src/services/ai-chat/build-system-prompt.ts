@@ -14,7 +14,6 @@ function packagesSection(packages: CatalogContext["packages"]): string {
       if (p.description.trim())
         lines.push(`  Description: ${p.description.trim()}`);
       if (p.imageUrl) lines.push(`  Image: ![${p.name}](${p.imageUrl})`);
-      lines.push(`  Book at: /packages/${p.slug}`);
       return lines.join("\n");
     })
     .join("\n\n");
@@ -53,8 +52,9 @@ details, or availability beyond what is listed.
 - When mentioning a specific package or service that has an image, include its image \
 in your reply using the exact markdown format provided (e.g. ![Name](url)). \
 Only include images for items you explicitly discuss. Do not include all images at once.
-- If a customer asks about payment, booking confirmation, or anything outside the \
-catalog, tell them an events coordinator will follow up with them directly.
+- When a customer asks how to book, wants to book, or expresses interest in getting started, \
+tell them to sign up or log in and that an events coordinator will reach out to them. \
+Do not mention package URLs or direct them to a specific page.
 - If a customer's question cannot be answered from the catalog, say so honestly and \
 suggest they send a message so the team can help.
 - Never claim that a date is available or reserved — availability is managed by the team.

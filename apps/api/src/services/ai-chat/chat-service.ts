@@ -33,11 +33,42 @@ export type AiChatError =
 
 export type PublicAiChatResult = {
   reply: string;
+  showBookCta: boolean;
 };
 
 export type PublicAiChatError =
   | { kind: "ai-not-configured" }
   | { kind: "ai-error"; status: number; message: string };
+
+/** Phrases that indicate the visitor is interested in booking or pricing. */
+const BOOKING_INTENT_PATTERNS = [
+  /\bbook\b/i,
+  /\bbooking\b/i,
+  /\bhow (do|can|to) (i|we|you) book\b/i,
+  /\bprice\b/i,
+  /\bpric(ed?|ing)\b/i,
+  /\bhow much\b/i,
+  /\bcost\b/i,
+  /\bquot(e|ation)\b/i,
+  /\bpackage\b/i,
+  /\bavailab(le|ility)\b/i,
+  /\breserv(e|ation)\b/i,
+  /\bschedul(e|ing)\b/i,
+  /\bevent\b/i,
+  /\bwedding\b/i,
+  /\bbirthday\b/i,
+  /\bcelebrat(e|ion)\b/i,
+  /\bparty\b/i,
+  /\bgath(er|ering)\b/i,
+  /\binterest(ed)?\b/i,
+  /\bsign up\b/i,
+  /\bget started\b/i,
+];
+
+function detectsBookingIntent(userMessage: string, reply: string): boolean {
+  const combined = `${userMessage} ${reply}`;
+  return BOOKING_INTENT_PATTERNS.some((p) => p.test(combined));
+}
 
 /**
  * Stateless AI chat for unsigned-in visitors.
@@ -76,7 +107,10 @@ export async function publicAiChatService(
     throw err;
   }
 
-  return { reply: replyText };
+  return {
+    reply: replyText,
+    showBookCta: detectsBookingIntent(userText, replyText),
+  };
 }
 
 /**
