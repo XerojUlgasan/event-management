@@ -70,6 +70,17 @@ export type BookingRequestFilters = {
 
 export const createBookingRequest = (body: BookingRequestInput) =>
   request<{ bookingRequest: BookingRequest }>("/booking-requests", body);
+
+export type AdminCreateBookingInput = BookingRequestInput & {
+  customerId: string;
+  conversationId?: string;
+};
+
+export const adminCreateBookingForCustomer = (body: AdminCreateBookingInput) =>
+  request<{ bookingRequest: BookingRequest }>(
+    "/admin/booking-requests/for-customer",
+    body,
+  );
 export const getMyBookingRequests = (cursor?: string) =>
   request<{ bookingRequests: BookingRequest[]; nextCursor: string | null }>(
     `/booking-requests/mine${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,

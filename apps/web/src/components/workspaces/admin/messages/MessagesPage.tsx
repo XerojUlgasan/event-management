@@ -8,6 +8,7 @@ import {
   getAdminConversation,
   getAdminConversations,
   sendAdminMessage,
+  type ChatConversation,
   type ChatThread,
 } from "../../../../lib/data/messages/conversations";
 import { useConversationList } from "../../../../lib/services/messages/use-conversation-list";
@@ -16,6 +17,8 @@ import {
   mergePolledThread,
   prependOlder,
 } from "../../../../lib/services/messages/merge-thread";
+import { AdminBookForCustomerDialog } from "../../../messages/AdminBookForCustomerDialog";
+import type { BookingRequest } from "../../../../lib/data/booking-requests/requests";
 
 export function MessagesPage() {
   const { notifyError } = useNotifications();
@@ -43,6 +46,7 @@ export function MessagesPage() {
   const [olderError, setOlderError] = useState("");
   const olderRequest = useRef(0);
   const olderPending = useRef(false);
+  const [bookingTarget, setBookingTarget] = useState<ChatConversation | null>(null);
 
   const loadThread = useCallback(
     async (id: string) => {
@@ -174,6 +178,28 @@ export function MessagesPage() {
     void inbox.refresh();
   };
 
+  const handleBookingCreated = (booking: BookingRequest) => {
+    // Patch the active conversation in both thread and sidebar so the
+    // three context buttons (Details / Package / Quotation) appear immediately.
+    const patch = (conv: ChatConversation): ChatConversation =>
+      conv.id === activeId
+        ? {
+            ...conv,
+            bookingRequestId: booking.id,
+            bookingRequestReference: booking.reference,
+            eventType: booking.eventType,
+          }
+        : conv;
+
+    setThread((current) =>
+      current
+        ? { ...current, conversation: patch(current.conversation) }
+        : current,
+    );
+    setConversations((current) => current.map(patch));
+    setBookingTarget(null);
+  };
+
   return (
     <div className="content-stack admin-messages">
       <MessagesWorkspace
@@ -226,7 +252,15 @@ export function MessagesPage() {
           title: "No messages yet",
           body: "Messages will appear here when the customer or team writes.",
         }}
+        onBookForCustomer={(conv) => setBookingTarget(conv)}
       />
+      {bookingTarget && (
+        <AdminBookForCustomerDialog
+          conversation={bookingTarget}
+          onClose={() => setBookingTarget(null)}
+          onSuccess={handleBookingCreated}
+        />
+      )}
     </div>
   );
 }

@@ -36,6 +36,10 @@ import {
   createBookingRequestRouteHandler,
 } from "./create-booking-request.js";
 import {
+  createBookingRequestForCustomerRoute,
+  createBookingRequestForCustomerRouteHandler,
+} from "./create-booking-request-for-customer.js";
+import {
   listMyBookingRequestsRoute,
   listMyBookingRequestsRouteHandler,
   listAdminBookingRequestsRoute,
@@ -83,6 +87,10 @@ routes.use("/admin/booking-requests", requireSession, requireSystemAdmin);
 routes.use("/admin/booking-requests/*", requireSession, requireSystemAdmin);
 routes.openapi(saveRequestedDayTimesRoute, saveRequestedDayTimesRouteHandler);
 routes.openapi(createBookingRequestRoute, createBookingRequestRouteHandler);
+routes.openapi(
+  createBookingRequestForCustomerRoute,
+  createBookingRequestForCustomerRouteHandler,
+);
 routes.openapi(cancelBookingRequestRoute, cancelBookingRequestRouteHandler);
 routes.openapi(listMyBookingRequestsRoute, listMyBookingRequestsRouteHandler);
 routes.openapi(

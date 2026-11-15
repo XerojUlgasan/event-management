@@ -86,6 +86,7 @@ export function MessagesWorkspace({
   olderError = "",
   onLoadOlder,
   historyNotice = "",
+  onBookForCustomer,
 }: {
   title: string;
   viewerRole: "admin" | "customer";
@@ -117,6 +118,7 @@ export function MessagesWorkspace({
   olderError?: string;
   onLoadOlder?: () => void;
   historyNotice?: string;
+  onBookForCustomer?: (conversation: ChatConversation) => void;
 }) {
   const { notify, notifyError } = useNotifications();
   const [quotationId, setQuotationId] = useState<string | null>(null);
@@ -515,6 +517,24 @@ export function MessagesWorkspace({
               ))}
             </div>
           )}
+          {!active?.bookingRequestId &&
+            viewerRole === "admin" &&
+            onBookForCustomer &&
+            active && (
+              <div
+                className="message-head-actions"
+                aria-label="Conversation actions"
+              >
+                <Button
+                  variant="secondary"
+                  icon="calendar"
+                  aria-label="Create booking for this customer"
+                  onClick={() => onBookForCustomer(active)}
+                >
+                  Add booking
+                </Button>
+              </div>
+            )}
         </div>
         {active?.bookingRequestId && (
           <div className="message-event-context">

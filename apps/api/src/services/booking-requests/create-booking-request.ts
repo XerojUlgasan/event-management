@@ -13,15 +13,18 @@ export async function createBookingRequestService(
   db: Kysely<DB>,
   customerId: string,
   input: CreateInput,
+  options: { conversationId?: string; skipDateGuard?: boolean } = {},
 ) {
-  const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: input.timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-  if (input.requestedDays.some((day) => day.date < today))
-    return error("Choose today or a future date", 400);
+  if (!options.skipDateGuard) {
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: input.timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    if (input.requestedDays.some((day) => day.date < today))
+      return error("Choose today or a future date", 400);
+  }
   const requestedDays = input.requestedDays
     .map(({ date }) => ({ date, startsAt: null, endsAt: null }))
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -37,6 +40,22 @@ export async function createBookingRequestService(
       input.packageUpdatedAt !== pkg.updated_at.toISOString()
     )
       return error("Package changed. Refresh and try again", 409);
+
+    if (options.conversationId) {
+      const conv = await trx
+        .selectFrom("conversations")
+        .select(["id", "customer_id", "booking_request_id"])
+        .where("id", "=", options.conversationId)
+        .forUpdate()
+        .executeTakeFirst();
+      if (!conv)
+        return error("Conversation not found", 404 as 400 | 404 | 409);
+      if (conv.customer_id !== customerId)
+        return error("Conversation does not belong to this customer", 400);
+      if (conv.booking_request_id !== null)
+        return error("Conversation already has a booking", 409);
+    }
+
     const row = await createBookingRequestData(trx, {
       reference: `BR-${randomUUID().toUpperCase()}`,
       customer_id: customerId,
@@ -62,10 +81,20 @@ export async function createBookingRequestService(
         input.guestCount != null && input.guestCount > pkg.max_guests,
     });
     await addStatusHistoryData(trx, row.id, "under_review", customerId, null);
-    await createBookingConversationData(trx, {
-      customer_id: customerId,
-      booking_request_id: row.id,
-    });
+
+    if (options.conversationId) {
+      await trx
+        .updateTable("conversations")
+        .set({ booking_request_id: row.id })
+        .where("id", "=", options.conversationId)
+        .execute();
+    } else {
+      await createBookingConversationData(trx, {
+        customer_id: customerId,
+        booking_request_id: row.id,
+      });
+    }
+
     return (await bookingRequestDtos(trx, [row]))[0]!;
   });
 }

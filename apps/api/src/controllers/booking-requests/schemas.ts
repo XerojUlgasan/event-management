@@ -171,5 +171,11 @@ export const bookingSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+export const adminCreateSchema = createSchema.extend({
+  customerId: z.string().uuid(),
+  conversationId: z.string().uuid().optional(),
+});
+
 export type CreateInput = z.infer<typeof createSchema>;
+export type AdminCreateInput = z.infer<typeof adminCreateSchema>;
 export type Status = z.infer<typeof statusSchema>;
