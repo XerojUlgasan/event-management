@@ -48,7 +48,7 @@ export async function callLLM(messages: ChatMessage[]): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new LLMNotConfiguredError();
 
-  const model = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite";
 
   type GeminiContent = {
     role: "user" | "model";

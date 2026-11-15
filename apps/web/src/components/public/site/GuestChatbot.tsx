@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, CatalogMarkdown, Icon, Input } from "@event-management/ui";
+import MarkdownPreview from "@uiw/react-markdown-preview";
+import { Button, Icon, Input } from "@event-management/ui";
 import {
   sendGuestChat,
   type GuestChatHistoryItem,
@@ -158,7 +159,20 @@ export default function GuestChatbot() {
                 className={`message${turn.role === "user" ? " message-own" : ""}`}
               >
                 {turn.role === "assistant" ? (
-                  <CatalogMarkdown source={turn.content} />
+                  <MarkdownPreview
+                    source={turn.content}
+                    wrapperElement={{ "data-color-mode": "light" }}
+                    disableCopy
+                    components={{
+                      img: ({ src, alt }) => (
+                        <img
+                          src={src}
+                          alt={alt ?? ""}
+                          className="chat-catalog-image"
+                        />
+                      ),
+                    }}
+                  />
                 ) : (
                   turn.content
                 )}
