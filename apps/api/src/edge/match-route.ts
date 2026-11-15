@@ -24,6 +24,7 @@ export const routeFamilies = [
   { id: "messages", prefixes: ["/v1/admin/conversations", "/v1/messages"] },
   { id: "auth", prefixes: ["/v1/auth", "/v1/me"] },
   { id: "users", prefixes: ["/v1/admin/users"] },
+  { id: "ai-chat", prefixes: ["/v1/ai-chat"] },
 ] as const;
 
 export type RouteFamilyId = (typeof routeFamilies)[number]["id"];

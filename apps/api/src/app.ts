@@ -19,6 +19,7 @@ import healthRoutes from "./controllers/health/index.js";
 import userRoutes from "./controllers/users/index.js";
 import catalogMediaRoutes from "./controllers/catalog-media/index.js";
 import { MAX_VIDEO_SIZE_BYTES } from "@event-management/contracts/limits/videos";
+import aiChatRoutes from "./controllers/ai-chat/index.js";
 import type { HonoEnv } from "./types/hono.js";
 
 export const app = new OpenAPIHono<HonoEnv>();
@@ -55,6 +56,7 @@ app.use("/v1/*", async (c, next) => {
 
 app.use("/v1/auth/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/messages/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.use("/v1/ai-chat/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use(
   "/v1/admin/conversations/*",
   bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
@@ -118,6 +120,7 @@ app.route("/v1", eventDayRoutes);
 app.route("/v1", messageRoutes);
 app.route("/v1", authRoutes);
 app.route("/v1", userRoutes);
+app.route("/v1", aiChatRoutes);
 
 app.doc("/openapi.json", {
   openapi: "3.0.0",

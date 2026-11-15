@@ -31,6 +31,7 @@ const loaders = {
   messages: () => import("../controllers/messages/index.js"),
   auth: () => import("../controllers/auth/index.js"),
   users: () => import("../controllers/users/index.js"),
+  "ai-chat": () => import("../controllers/ai-chat/index.js"),
 } satisfies Record<
   RouteFamilyId,
   () => Promise<{ default: OpenAPIHono<HonoEnv> }>
@@ -47,6 +48,9 @@ const bodyLimits: Partial<
   messages: [
     { path: "/messages/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
     { path: "/admin/conversations/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
+  ],
+  "ai-chat": [
+    { path: "/ai-chat/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
   ],
   packages: [
     { path: "/admin/packages", maxSize: CATALOG_JSON_BODY_LIMIT_BYTES },

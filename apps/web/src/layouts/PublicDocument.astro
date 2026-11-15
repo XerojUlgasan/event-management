@@ -1,6 +1,7 @@
 ---
 import "../styles/app.css";
 import { Brand, Icon } from "@event-management/ui";
+import GuestChatbot from "../components/public/site/GuestChatbot.tsx";
 
 interface Props {
   title: string;
@@ -67,5 +68,6 @@ const { title, description } = Astro.props;
         <span>© {new Date().getFullYear()} Styled by AMAC</span>
       </footer>
     </div>
+    <GuestChatbot client:idle />
   </body>
 </html>
