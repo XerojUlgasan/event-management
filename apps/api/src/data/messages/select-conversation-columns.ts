@@ -8,6 +8,7 @@ export function selectConversationColumnsData(db: Database) {
     .selectFrom("conversations as c")
     .innerJoin("users as customer", "customer.id", "c.customer_id")
     .leftJoin("booking_requests as br", "br.id", "c.booking_request_id")
+    .leftJoin("packages as p", "p.id", "br.package_id")
     .select((eb) => [
       "c.id",
       "c.customer_id",
@@ -19,7 +20,7 @@ export function selectConversationColumnsData(db: Database) {
       eb.ref("customer.display_name").as("customer_display_name"),
       eb.ref("customer.email").as("customer_email"),
       eb.ref("br.package_id").as("package_id"),
-      eb.ref("br.package_name").as("package_name"),
+      eb.ref("p.name").as("package_name"),
       eb.ref("br.reference").as("booking_request_reference"),
       eb.ref("br.event_type").as("event_type"),
       eb.ref("br.starts_at").as("event_starts_at"),

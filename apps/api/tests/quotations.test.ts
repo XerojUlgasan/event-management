@@ -127,9 +127,6 @@ async function booking(selectedPackageId = packageId) {
       reference: `Q-${id}`,
       customer_id: customerId,
       package_id: selectedPackageId,
-      package_name: "Quotation package",
-      package_price: 1000,
-      package_max_guests: 100,
       event_type: "Wedding",
       preferred_date: "2099-01-01",
       requested_days: JSON.stringify([

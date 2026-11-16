@@ -234,9 +234,6 @@ model BookingRequest {
   reference String @unique
   customerId String @map("customer_id") @db.Uuid
   packageId String @map("package_id") @db.Uuid
-  packageName String @map("package_name")
-  packagePrice Int @map("package_price")
-  packageMaxGuests Int @map("package_max_guests")
   eventType String @map("event_type")
   preferredDate String @map("preferred_date")
   requestedDays Json? @map("requested_days") @db.JsonB

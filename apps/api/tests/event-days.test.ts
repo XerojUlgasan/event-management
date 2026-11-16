@@ -218,6 +218,19 @@ test("admin schedules ready requested dates, preserves pending times, and reload
     await call(`/admin/event-days?bookingRequestId=${inquiry.id}`),
   );
   assert.equal(list.eventDays.length, 2);
+  await pool.query(
+    "UPDATE packages SET name='Updated schedule package' WHERE id=$1",
+    [packageId],
+  );
+  const renamed = await read(
+    await call(`/admin/event-days?bookingRequestId=${inquiry.id}`),
+  );
+  assert.ok(
+    renamed.eventDays.every(
+      (day: { packageName: string }) =>
+        day.packageName === "Updated schedule package",
+    ),
+  );
 });
 
 test("scheduling validates the complete batch and serializes concurrent attempts", async () => {

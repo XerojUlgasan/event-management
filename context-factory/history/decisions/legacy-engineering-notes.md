@@ -38,6 +38,8 @@ The user approved removing quotation `offered_package_updated_at` and `offered_p
 
 ## 2026-11-11 — Inquiry snapshots and quotation proposals have separate owners
 
+The inquiry snapshot retention rule below is superseded by [current package reads](2026-11-16_booking-package-details.md). The original record remains as historical evidence.
+
 The booking's `package_id`, `package_name`, `package_price`, and `package_max_guests` remain its original inquiry snapshot. Resolve its current proposal through the unique custom package owner, falling back to the original catalog package. [Quotation policy](../../business/quotations.md) owns expiry, revision, administrator access, and conversation-delivery decisions. Quotation items are ordered JSONB; validate the full list and service references, calculate centavo totals on the server, and save both under the quotation revision guard.
 
 **Evidence:** The additive private-package/quotation migration, package and quotation integration suites, populated-migration tests, and local Node/Edge Storage flows passed. The configured application database and hosted environment were not migrated. [Current implementation](../../../README.md#private-packages-and-quotations) records the supported flow.

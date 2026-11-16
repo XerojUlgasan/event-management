@@ -289,7 +289,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
   assert.ok(quotation);
   const violations = await pool.query(`SELECT
     (SELECT count(*)::int FROM booking_requests b JOIN users u ON u.id = b.customer_id WHERE b.reference LIKE 'SCN-%' AND u.role <> 'customer') AS non_customer_bookings,
-    (SELECT count(*)::int FROM booking_requests WHERE reference LIKE 'SCN-%' AND out_of_range IS DISTINCT FROM (guest_count IS NOT NULL AND guest_count > package_max_guests)) AS range_mismatches,
+    (SELECT count(*)::int FROM booking_requests b JOIN packages p ON p.id = b.package_id WHERE b.reference LIKE 'SCN-%' AND b.out_of_range IS DISTINCT FROM (b.guest_count IS NOT NULL AND b.guest_count > p.max_guests)) AS range_mismatches,
     (SELECT count(*)::int FROM events_day d JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%' AND b.status <> 'accepted') AS days_outside_accepted,
     (SELECT count(*)::int FROM events_day d JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%' AND d.status = 'moved' AND NOT EXISTS (SELECT 1 FROM events_day r WHERE r.id = d.replacement_event_day_id AND r.booking_request_id = d.booking_request_id AND r.status = 'scheduled')) AS broken_moves,
     (SELECT count(*)::int FROM messages m JOIN users u ON u.id = m.sender_id JOIN conversations c ON c.id = m.conversation_id JOIN booking_requests b ON b.id = c.booking_request_id WHERE b.reference LIKE 'SCN-%' AND m.sender_role::text <> u.role) AS sender_mismatches,

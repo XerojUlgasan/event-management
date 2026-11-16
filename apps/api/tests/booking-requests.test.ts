@@ -20,6 +20,7 @@ let resetBookingConversationId: string | undefined;
 let preservedGeneralConversationId: string | undefined;
 let dayMigrationSnapshot: unknown;
 let dayMigrationBookingId: string;
+let packageMigrationSnapshot: unknown;
 
 before(async () => {
   assert.ok(
@@ -133,9 +134,26 @@ before(async () => {
         )
       ).rows[0];
     }
+    if (entry.name === "20261116063852_derive_booking_package_details") {
+      packageMigrationSnapshot = (
+        await pool.query(
+          "SELECT to_jsonb(br)-'package_name'-'package_price'-'package_max_guests' AS booking, (SELECT jsonb_agg(h) FROM booking_request_status_history h WHERE h.booking_request_id=br.id) AS history, (SELECT jsonb_agg(d) FROM events_day d WHERE d.booking_request_id=br.id) AS days, (SELECT jsonb_agg(c) FROM conversations c WHERE c.booking_request_id=br.id) AS conversations FROM booking_requests br WHERE br.id=$1",
+          [dayMigrationBookingId],
+        )
+      ).rows[0];
+    }
     await pool.query(
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
+    if (entry.name === "20261116063852_derive_booking_package_details") {
+      const after = (
+        await pool.query(
+          "SELECT to_jsonb(br) AS booking, (SELECT jsonb_agg(h) FROM booking_request_status_history h WHERE h.booking_request_id=br.id) AS history, (SELECT jsonb_agg(d) FROM events_day d WHERE d.booking_request_id=br.id) AS days, (SELECT jsonb_agg(c) FROM conversations c WHERE c.booking_request_id=br.id) AS conversations FROM booking_requests br WHERE br.id=$1",
+          [dayMigrationBookingId],
+        )
+      ).rows[0];
+      assert.deepEqual(after, packageMigrationSnapshot);
+    }
     if (entry.name === "20261111120000_booking_requested_days") {
       const after = (
         await pool.query(
@@ -308,7 +326,7 @@ async function read(response: Response, status: number): Promise<any> {
   return response.status === 204 ? null : response.json();
 }
 
-test("requests enforce roles, published package availability, snapshots, ownership and status history", async () => {
+test("requests enforce roles, published package availability, current package details, ownership and status history", async () => {
   const pkg = await db
     .insertInto("packages")
     .values({
@@ -492,11 +510,10 @@ test("requests enforce roles, published package availability, snapshots, ownersh
   assert.deepEqual(
     (
       await pool.query(
-        "SELECT package_price, package_max_guests FROM booking_requests WHERE id = $1",
-        [created.id],
+        "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='booking_requests' AND column_name IN ('package_name','package_price','package_max_guests')",
       )
-    ).rows[0],
-    { package_price: 150_000, package_max_guests: 100 },
+    ).rows,
+    [],
   );
   const atMaximum = (
     await read(
@@ -956,7 +973,7 @@ test("requests enforce roles, published package availability, snapshots, ownersh
     .where("id", "=", pkg.id)
     .returningAll()
     .executeTakeFirstOrThrow();
-  const persistedSnapshot = (
+  const currentPackage = (
     await read(
       await call(
         `/booking-requests/${created.id}`,
@@ -967,22 +984,25 @@ test("requests enforce roles, published package availability, snapshots, ownersh
       200,
     )
   ).bookingRequest;
-  assert.equal(persistedSnapshot.packageName, "Garden");
-  assert.deepEqual(persistedSnapshot.packagePrice, {
+  assert.equal(currentPackage.packageName, "Updated Garden");
+  assert.deepEqual(currentPackage.packagePrice, {
     kind: "fixed",
     currency: "PHP",
-    amountMinor: 15_000_000,
+    amountMinor: 20_000_000,
   });
-  assert.equal(persistedSnapshot.packageMaxGuests, 100);
-  assert.deepEqual(
-    (
-      await pool.query(
-        "SELECT package_price, package_max_guests FROM booking_requests WHERE id = $1",
-        [created.id],
-      )
-    ).rows[0],
-    { package_price: 150_000, package_max_guests: 100 },
-  );
+  assert.equal(currentPackage.packageMaxGuests, 200);
+  const renamedConversation = (
+    await read(
+      await call(
+        `/admin/conversations/${linkedConversation.id}`,
+        "GET",
+        undefined,
+        adminCookie,
+      ),
+      200,
+    )
+  ).conversation;
+  assert.equal(renamedConversation.packageName, "Updated Garden");
   await read(
     await call("/booking-requests", "POST", input, customerCookie),
     409,
@@ -1007,13 +1027,13 @@ test("requests enforce roles, published package availability, snapshots, ownersh
     )
   ).bookingRequests;
   const original = list.find((item: any) => item.id === created.id);
-  assert.equal(original.packageName, "Garden");
+  assert.equal(original.packageName, "Updated Garden");
   assert.deepEqual(original.packagePrice, {
     kind: "fixed",
     currency: "PHP",
-    amountMinor: 15_000_000,
+    amountMinor: 20_000_000,
   });
-  assert.equal(original.packageMaxGuests, 100);
+  assert.equal(original.packageMaxGuests, 200);
   assert.equal("packageVersionId" in original, false);
   assert.equal("statusHistory" in original, false);
   assert.equal(
@@ -1076,8 +1096,8 @@ test("admin request filters, cursor pages and calendar counts use preferred date
   ];
   for (const [id, date, status] of rows) {
     await pool.query(
-      `INSERT INTO booking_requests (id, reference, customer_id, package_id, package_name, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, package_price, package_max_guests, created_at)
-      VALUES ($1, $2, $3, $4, 'Fixture', 'Wedding', $5, 'undecided', 'Asia/Manila', 20, 'Customer', '123', $6, false, 1000, 100, '2098-01-01T00:00:00.123456Z')`,
+      `INSERT INTO booking_requests (id, reference, customer_id, package_id, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, created_at)
+      VALUES ($1, $2, $3, $4, 'Wedding', $5, 'undecided', 'Asia/Manila', 20, 'Customer', '123', $6, false, '2098-01-01T00:00:00.123456Z')`,
       [id, `TEST-${id}`, customerId, packageId, date, status],
     );
   }
@@ -1155,8 +1175,8 @@ test("booking request pagination crosses the 50-item boundary without duplicates
     )
   ).rows[0].id;
   await pool.query(
-    `INSERT INTO booking_requests (reference, customer_id, package_id, package_name, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, package_price, package_max_guests, created_at)
-    SELECT 'PAGE-' || n, $1, $2, 'Fixture', 'Wedding', '2097-05-10', 'undecided', 'Asia/Manila', 20, 'Customer', '123', 'under_review', false, 1000, 100,
+    `INSERT INTO booking_requests (reference, customer_id, package_id, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, created_at)
+    SELECT 'PAGE-' || n, $1, $2, 'Wedding', '2097-05-10', 'undecided', 'Asia/Manila', 20, 'Customer', '123', 'under_review', false,
       '2097-01-01T00:00:00.123000Z'::timestamptz + (n / 4) * interval '1 microsecond'
     FROM generate_series(1, 53) AS n`,
     [customerId, packageId],
@@ -1834,7 +1854,7 @@ test("migration keeps legacy estimates, timestamps and related operational data 
   assert.equal(booking.estimatedDurationDays, 9);
   assert.equal(booking.startsAt, "2099-01-01T10:00:00.000Z");
   assert.equal(booking.endsAt, "2099-01-01T12:00:00.000Z");
-  assert.equal(booking.packageName, "Original snapshot");
+  assert.equal(booking.packageName, "Days legacy");
   assert.equal(
     (
       await pool.query(

@@ -20,6 +20,7 @@ The [identity reference](identity.md) defines these responsibilities. Admin mean
 
 ## Rules and boundaries
 
+- A request stores the selected catalog `package_id` and reads its current name, price, and maximum guests from that record. Private proposals and saved quotation amounts have separate owners.
 - Requested dates and times express the customer's preferences until the admin creates operational schedules. A schedule does not change the customer's requested details.
 - The preferred location describes the physical event location; it is not selected from a location catalog.
 - Submitting or accepting a request, or scheduling an event day, does not reserve a date, establish a final price, or confirm a booking.

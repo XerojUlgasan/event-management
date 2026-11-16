@@ -4,6 +4,7 @@ import type { BookingEstimatedDuration } from "@event-management/contracts/limit
 import type { Status } from "../../controllers/booking-requests/schemas.js";
 import { requestedDaysSchema } from "../../controllers/booking-requests/schemas.js";
 import { listRequestedDaySchedulesData } from "../../data/booking-requests/list-requested-day-schedules.js";
+import { listBookingPackagesData } from "../../data/booking-requests/list-booking-packages.js";
 
 type Database = Kysely<DB> | Transaction<DB>;
 
@@ -11,6 +12,13 @@ export async function bookingRequestDtos(
   db: Database,
   rows: (Selectable<BookingRequests> & { revision: string })[],
 ) {
+  const packages = new Map(
+    (
+      await listBookingPackagesData(db, [
+        ...new Set(rows.map((r) => r.package_id)),
+      ])
+    ).map((pkg) => [pkg.id, pkg]),
+  );
   const schedules = new Map(
     (
       await listRequestedDaySchedulesData(
@@ -20,6 +28,8 @@ export async function bookingRequestDtos(
     ).map((day) => [day.id, day]),
   );
   return rows.map((r) => {
+    const pkg = packages.get(r.package_id);
+    if (!pkg) throw new Error("Booking request package not found");
     const days =
       r.requested_days === null
         ? null
@@ -32,10 +42,10 @@ export async function bookingRequestDtos(
       packagePrice: {
         kind: "fixed" as const,
         currency: "PHP" as const,
-        amountMinor: r.package_price * 100,
+        amountMinor: pkg.price * 100,
       },
-      packageMaxGuests: r.package_max_guests,
-      packageName: r.package_name,
+      packageMaxGuests: pkg.max_guests,
+      packageName: pkg.name,
       eventType: r.event_type,
       preferredDate: r.preferred_date,
       requestedDays:

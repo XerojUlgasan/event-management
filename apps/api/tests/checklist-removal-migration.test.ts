@@ -103,7 +103,7 @@ test("checklist removal drops populated documents and validation while retaining
       (SELECT jsonb_agg(to_jsonb(h) ORDER BY h.id) FROM booking_request_status_history h WHERE h.booking_request_id=b.id) AS history
       FROM booking_requests b JOIN users u ON u.id=b.customer_id JOIN packages p ON p.id=b.package_id WHERE b.id=$1`;
     const before = (await pool.query(preservedQuery, [booking])).rows;
-    for (const entry of entries.filter((entry) => entry.name >= migrationName))
+    for (const entry of entries.filter((entry) => entry.name === migrationName))
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );

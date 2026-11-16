@@ -16,5 +16,5 @@ Inspect the affected route, service, data query, tests, and callers for the curr
 ## Cross-domain safeguards
 
 - Requested-day scheduling and event-day create/move/cancel routes are registered through the event-day router; quotation routes through the booking-request router. Check both the router and operation middleware before assuming ordinary booking-read access grants administrative access.
-- Booking inquiry snapshots and a private proposal have separate owners. Conversations do not expire automatically; existing closed booking threads retain their status. Read the affected [business reference](../../../business/README.md) and current service before altering these flows.
+- Booking inquiry details use the catalog record referenced by `package_id`; a private proposal has its own owner. Conversations do not expire automatically; existing closed booking threads retain their status. Read the affected [business reference](../../../business/README.md) and current service before altering these flows.
 - When changing a browser-facing route, follow [API and type synchronization](../../contracts/references/api-type-sync.md); inspect response and permission/error paths as well as OpenAPI.

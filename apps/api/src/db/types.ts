@@ -45,9 +45,6 @@ export interface BookingRequests {
   id: Generated<string>;
   out_of_range: boolean;
   package_id: string;
-  package_max_guests: number;
-  package_name: string;
-  package_price: number;
   phone_number: string;
   preferred_date: string;
   preferred_venue_location: string | null;

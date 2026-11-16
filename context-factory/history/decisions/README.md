@@ -8,6 +8,7 @@ Preserve historical reasoning. When a decision changes, link a successor and mar
 
 | Record | Status / purpose |
 | --- | --- |
+| [Booking package details](2026-11-16_booking-package-details.md) | Accepted current-package reads replacing inquiry snapshots |
 | [Guidance organization](2026-11-14_guidance-organization.md) | Accepted structure and routing policy |
 | [Legacy engineering notes](legacy-engineering-notes.md) | Historical pointers; verify against current source |
 | [Legacy documentation notes](legacy-documentation-notes.md) | Historical pointers; verify against current source |

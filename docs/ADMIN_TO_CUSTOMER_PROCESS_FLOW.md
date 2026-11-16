@@ -87,7 +87,7 @@ A catalog save publishes the record immediately. There is no separate editorial 
 
 The server checks duplicate titles, service references, and whether another admin has changed the package since it was loaded. An archived package cannot be edited through the normal update operation. A package referenced by a booking request cannot be deleted.
 
-A later catalog edit does not rewrite the package name, price, and guest-capacity snapshots already recorded on an existing inquiry.
+Existing inquiries read the package name, price, and guest capacity from their referenced catalog package, so later catalog edits appear on those inquiries. Saved quotation amounts remain unchanged.
 
 Source: [package creation](../apps/api/src/services/packages/create-package.ts), [package updates](../apps/api/src/services/packages/update-package.ts), and [package deletion](../apps/api/src/services/packages/delete-package.ts).
 
@@ -239,7 +239,7 @@ Three records remain distinct:
 
 | Record                     | Purpose                                                                                                   |
 | -------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Original inquiry snapshots | Preserve the package name, price, and capacity the customer originally selected                           |
+| Inquiry package reference  | Reads the current name, price, and capacity from the originally selected catalog package                           |
 | Current proposal           | Shows the latest package being discussed; uses the original catalog record until a private package exists |
 | Quotation versions         | Preserve offered prices and adjustments                                                                   |
 
