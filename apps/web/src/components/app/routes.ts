@@ -1,6 +1,7 @@
 import type { NavKey } from "./navigation-types";
 
 export const adminPaths: Record<NavKey, string> = {
+  AI: "/app/ai/knowledge",
   Overview: "/app/overview",
   Bookings: "/app/bookings",
   Messages: "/app/messages",

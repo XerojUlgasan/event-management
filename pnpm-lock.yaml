@@ -47,6 +47,9 @@ importers:
       hono:
         specifier: ^4.13.13
         version: 4.13.13
+      imagescript:
+        specifier: 3.20.3
+        version: 3.20.3
       kysely:
         specifier: ^0.29.7
         version: 0.29.7
@@ -3164,6 +3167,10 @@ packages:
 
   idb@7.1.1:
     resolution: {integrity: sha512-gchesWBzyvGHRO9W8tzUWFDycow5gwjvFKfyV9FF32Y7F50yZMp7mP+T2mJIWFx49zicqyC4uefHM17o6xKIVQ==}
+
+  imagescript@3.20.3:
+    resolution: {integrity: sha512-CtztzjiEPnaQDUR+Nk5OJT6lKsYRCGsIEdXKSmbEh/KJuBntjx/IDBRu4wuYf/2V3FRIJ9DUxCRLsf0mkJW2XQ==}
+    engines: {node: '>=22.13.0'}
 
   import-fresh@3.3.1:
     resolution: {integrity: sha512-TR3KfrTZTYLPB6jUjfx6MF9WcWrHL9su5TObK4ZkYgBdWKPOFoSoQIdEuTuR82pmtxH2spWG9h6etwfr1pLBqQ==}
@@ -8207,6 +8214,8 @@ snapshots:
       safer-buffer: 2.1.2
 
   idb@7.1.1: {}
+
+  imagescript@3.20.3: {}
 
   import-fresh@3.3.1:
     dependencies:

@@ -88,6 +88,7 @@ model Package {
   customForBookingRequest BookingRequest? @relation("CustomBookingPackage", fields: [customForBookingRequestId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   bookingRequests BookingRequest[] @relation("InquiryPackage")
   services PackageService[]
+  knowledge CatalogKnowledge[]
   canvas          Json              @default("[]") @db.JsonB
 
   @@index([canvas(ops: JsonbPathOps)], type: Gin, map: "packages_canvas_idx")
@@ -109,6 +110,7 @@ model Service {
   publishedAt DateTime @default(now()) @map("published_at") @db.Timestamptz(6)
   canvas Json @default("[]") @db.JsonB
   packages PackageService[]
+  knowledge CatalogKnowledge[]
   @@index([canvas(ops: JsonbPathOps)], type: Gin, map: "services_canvas_idx")
   @@map("services")
 }
@@ -124,7 +126,29 @@ model MediaAsset {
   createdBy String? @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   creator User? @relation(fields: [createdBy], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  knowledge CatalogKnowledge[]
   @@map("media_assets")
+}
+
+model CatalogKnowledge {
+  id              String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  packageId       String?                 @map("package_id") @db.Uuid
+  serviceId       String?                 @map("service_id") @db.Uuid
+  chunkKey        String                  @map("chunk_key")
+  contentMarkdown String                  @map("content_markdown")
+  mediaId         String?                 @map("media_id") @db.Uuid
+  contentHash     String                  @map("content_hash")
+  embedding       Unsupported("vector(768)")?
+  embeddingModel  String?                 @map("embedding_model")
+  embeddedAt      DateTime?               @map("embedded_at") @db.Timestamptz(6)
+  package         Package?                @relation(fields: [packageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  service         Service?                @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  media           MediaAsset?             @relation(fields: [mediaId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([packageId, chunkKey])
+  @@unique([serviceId, chunkKey])
+  @@index([mediaId])
+  @@map("catalog_knowledge")
 }
 
 model PackageService {

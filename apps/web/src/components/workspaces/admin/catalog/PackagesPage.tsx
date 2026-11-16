@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   archivePackage,
   deletePackage,
+  getAdminPackage,
   getAdminPackages,
   type AdminPackage,
 } from "../../../../lib/data/catalog/packages";
@@ -66,6 +67,22 @@ export function PackagesPage() {
       requestId.current++;
     };
   }, [load]);
+  // A knowledge-dashboard link opens the exact source listing without editing it.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("listing");
+    if (!id) return;
+    let current = true;
+    void getAdminPackage(id)
+      .then((item) => {
+        if (current) setPreview(item);
+      })
+      .catch((err) => {
+        if (current) setError(notifyError(err, "Could not open listing."));
+      });
+    return () => {
+      current = false;
+    };
+  }, [notifyError]);
   const visible = rows;
   const act = async (item: AdminPackage, action: "archive" | "delete") => {
     if (

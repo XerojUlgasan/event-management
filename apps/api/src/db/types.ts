@@ -66,6 +66,19 @@ export interface BookingRequestStatusHistory {
   status: string;
 }
 
+export interface CatalogKnowledge {
+  chunk_key: string;
+  content_hash: string;
+  content_markdown: string;
+  embedded_at: Timestamp | null;
+  embedding: string | null;
+  embedding_model: string | null;
+  id: Generated<string>;
+  media_id: string | null;
+  package_id: string | null;
+  service_id: string | null;
+}
+
 export interface Conversations {
   ai_enabled: Generated<boolean>;
   ai_version: Generated<number>;
@@ -197,6 +210,7 @@ export interface DB {
   audit_events: AuditEvents;
   booking_request_status_history: BookingRequestStatusHistory;
   booking_requests: BookingRequests;
+  catalog_knowledge: CatalogKnowledge;
   conversations: Conversations;
   events_day: EventsDay;
   media_assets: MediaAssets;

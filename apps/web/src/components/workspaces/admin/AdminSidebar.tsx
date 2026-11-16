@@ -18,6 +18,7 @@ export function AdminSidebar({
   accountMenu: ReactNode;
 }) {
   const iconFor: Record<NavKey, IconName> = {
+    AI: "spark",
     Overview: "grid",
     Bookings: "clipboard",
     Messages: "message",

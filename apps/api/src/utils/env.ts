@@ -105,8 +105,18 @@ export function createEnv(source: EnvSource) {
       if (!apiKey || !model) throw new Error("AI text model is not configured");
       return { apiKey, model };
     },
+    get AI_EMBEDDING() {
+      const apiKey = configured("AI_GATEWAY_API_KEY");
+      const model = configured("EMBEDDING_MODEL");
+      if (!apiKey || !model)
+        throw new Error("AI embedding model is not configured");
+      return { apiKey, model };
+    },
     get SEED_CLOCK() {
       return source.SEED_CLOCK;
+    },
+    get CATALOG_EMBEDDING_AWAIT() {
+      return source.CATALOG_EMBEDDING_AWAIT === "true";
     },
     get SEED_RANDOM_SEED() {
       return source.SEED_RANDOM_SEED ?? "clemora-scenario-v1";

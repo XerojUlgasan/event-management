@@ -11,6 +11,8 @@ import {
   replacePackageServicesData,
 } from "../../data/packages/package-services.js";
 import { packageDto } from "./package-response.js";
+import { syncCatalogKnowledge } from "../ai/retrieval/sync-catalog-knowledge.js";
+import { scheduleCatalogEmbeddingRefresh } from "../ai/retrieval/refresh-catalog-embeddings.js";
 import { error } from "./package-rules.js";
 import {
   duplicateTitle,
@@ -22,7 +24,7 @@ export async function createPackageService(
   actorId: string,
 ) {
   try {
-    return await db.transaction().execute(async (trx) => {
+    const outcome = await db.transaction().execute(async (trx) => {
       const title = await reserveCatalogTitle(trx, "packages", content.name);
       if (!title) return error("A package with this title already exists", 409);
       const invalid = await validatePackageServicesData(
@@ -35,8 +37,14 @@ export async function createPackageService(
       const row = await createPackageData(trx, content, title.slug, now);
       await replacePackageSectionsData(trx, row.id, content, actorId);
       await replacePackageServicesData(trx, row.id, content.services);
+      await syncCatalogKnowledge(trx, { kind: "package", id: row.id });
       return packageDto(trx, row, { includeArchivedServices: true });
     });
+    if (!("status" in outcome))
+      await scheduleCatalogEmbeddingRefresh(db, [
+        { kind: "package", id: outcome.id },
+      ]);
+    return outcome;
   } catch (cause) {
     const duplicate = duplicateTitle(
       cause,

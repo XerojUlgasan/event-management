@@ -10,6 +10,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { db } from "./db/client.js";
+import aiRoutes from "./controllers/ai/index.js";
 import eventDayRoutes from "./controllers/event-days/index.js";
 import bookingRequestRoutes from "./controllers/booking-requests/index.js";
 import authRoutes from "./controllers/auth/index.js";
@@ -52,6 +53,10 @@ app.use("/v1/*", async (c, next) => {
 });
 
 app.use("/v1/auth/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
+app.use(
+  "/v1/admin/ai/knowledge/search",
+  bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
+);
 app.use("/v1/messages/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use(
   "/v1/admin/conversations/*",
@@ -67,6 +72,7 @@ app.use(
   bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }),
 );
 app.route("/v1", healthRoutes);
+app.route("/v1", aiRoutes);
 app.use(
   "/v1/admin/catalog-media",
   bodyLimit({

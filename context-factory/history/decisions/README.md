@@ -8,6 +8,8 @@ Preserve historical reasoning. When a decision changes, link a successor and mar
 
 | Record | Status / purpose |
 | --- | --- |
+| [Catalog embedding ingestion](2026-11-16_catalog-embedding-ingestion.md) | Accepted catalog text and actual-photo ingestion, automatic refresh and backfill; search remains separate |
+| [Catalog knowledge storage](2026-11-16_catalog-knowledge-storage.md) | Accepted one-table catalog corpus with 768-dimensional vectors; migration prepared; ingestion now covered by its successor decision, retrieval pending |
 | [Catalog canvas application validation](2026-11-16_catalog-canvas-application-validation.md) | Accepted shared browser/API document rules replacing the SQL validator |
 | [Booking package details](2026-11-16_booking-package-details.md) | Accepted current-package reads replacing inquiry snapshots |
 | [Entity-owned catalog canvas JSONB](2026-11-16_catalog-canvas-jsonb.md) | Accepted owner JSONB canvas arrays without document versioning |

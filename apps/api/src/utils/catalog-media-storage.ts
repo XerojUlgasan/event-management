@@ -85,12 +85,17 @@ export async function deleteCatalogMedia(key: string) {
   if (!response.ok) throw new Error("Media storage delete failed");
 }
 
-export async function getCatalogMedia(key: string, range?: string) {
+export async function getCatalogMedia(
+  key: string,
+  range?: string,
+  abortSignal?: AbortSignal,
+) {
   const { url, apiKey, bucket } = env.STORAGE;
   const response = await fetch(
     `${url}/storage/v1/object/${objectPath(bucket, key)}`,
     {
       headers: authHeaders(apiKey, range ? { Range: range } : {}),
+      signal: abortSignal,
     },
   );
   if (!response.ok || !response.body)

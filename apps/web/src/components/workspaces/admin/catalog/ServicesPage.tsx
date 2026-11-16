@@ -193,6 +193,22 @@ export function ServicesPage() {
       setBusy(false);
     }
   };
+  // A knowledge-dashboard link opens the exact source listing without editing it.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("listing");
+    if (!id) return;
+    let current = true;
+    void getAdminService(id)
+      .then((item) => {
+        if (current) setPreview(item);
+      })
+      .catch((err) => {
+        if (current) setError(notifyError(err, "Could not open listing."));
+      });
+    return () => {
+      current = false;
+    };
+  }, [notifyError]);
   const visible = rows;
   return (
     <div className="pe-list">

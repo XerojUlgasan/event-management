@@ -20,6 +20,7 @@ import {
 const allowedOrigins = env.WEB_ORIGINS;
 
 const loaders = {
+  ai: () => import("../controllers/ai/index.js"),
   health: () => import("../controllers/health/index.js"),
   "catalog-media": () => import("../controllers/catalog-media/index.js"),
   services: () => import("../controllers/services/index.js"),
@@ -37,6 +38,12 @@ const loaders = {
 const bodyLimits: Partial<
   Record<RouteFamilyId, ReadonlyArray<{ path: string; maxSize: number }>>
 > = {
+  ai: [
+    {
+      path: "/admin/ai/knowledge/search",
+      maxSize: SMALL_JSON_BODY_LIMIT_BYTES,
+    },
+  ],
   "event-days": [
     { path: "/admin/event-days", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
     { path: "/admin/event-days/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },

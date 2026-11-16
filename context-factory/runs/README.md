@@ -14,6 +14,11 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Knowledge search rows](2026-11-16_20-27-00_knowledge-search-rows.md) | Top-five compact results and in-place previews / feat/ai | complete | Refresh Knowledge Catalog; title/thumbnail rows open package/service overlays |
+| [Admin semantic catalog search](2026-11-16_20-13-00_admin-semantic-catalog-search.md) | Explicit-submit embedding search / feat/ai | complete | Admin can test ranked text/photo results; customer assistant retrieval and hosted rollout remain separate |
+| [Admin knowledge catalog](2026-11-16_19-54-37_admin-knowledge-catalog.md) | Admin AI coverage and content inspection / feat/ai | complete | Local API/database and synthetic browser checks passed; hosted rollout and assistant retrieval remain separate |
+| [Catalog embedding ingestion](2026-11-16_19-11-47_catalog-embedding-ingestion.md) | Automatic catalog text/photo embeddings and backfill / feat/ai | complete | Local backfill and automatic Edge flow verified; hosted rollout and search remain separate |
+| [Catalog knowledge migration](2026-11-16_18-34-43_catalog-knowledge-migration.md) | One-table catalog corpus with 768-dimensional vectors / feat/ai | complete | Review migration; tested only in disposable databases, application deployment and ingestion/retrieval remain separate |
 | [Catalog canvas validation](2026-11-16_16-56-00_catalog-canvas-validation.md) | Shared browser/API validation replacing SQL document checks / feat/ai | complete | Review scoped delta; local migration and disposable API/browser checks passed; hosted rollout remains separate |
 | [Conversation AI toggle](2026-11-16_16-41-39_conversation-ai-toggle.md) | Admin toggle and automatic human takeover / feat/ai | complete | Review scoped diff; local migration and disposable API/browser checks passed; hosted rollout remains separate |
 | [Catalog creation details](2026-11-16_16-34-10_catalog-creation-details.md) | Required-details modal before canvas / feat/ai | complete | Review scoped frontend delta; isolated browser checks passed, discard-confirmation cleanup stalled in browser tooling |

@@ -96,3 +96,16 @@ test("getters read current values and normalize Firebase and origins", () => {
   assert.equal(env.FIREBASE_PRIVATE_KEY, "key\nline");
   assert.equal(env.NODE_ENV, "production");
 });
+
+test("embedding configuration is lazy and independent of text replies", () => {
+  const source: Record<string, string | undefined> = {};
+  const env = createEnv(source);
+  assert.throws(() => env.AI_EMBEDDING, /AI embedding model is not configured/);
+  source.AI_GATEWAY_API_KEY = " fixture-key ";
+  source.EMBEDDING_MODEL = " google/gemini-embedding-2 ";
+  assert.deepEqual(env.AI_EMBEDDING, {
+    apiKey: "fixture-key",
+    model: "google/gemini-embedding-2",
+  });
+  assert.throws(() => env.AI_TEXT, /AI text model is not configured/);
+});

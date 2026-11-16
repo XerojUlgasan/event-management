@@ -3,6 +3,8 @@ import type { DB } from "../../db/types.js";
 import type { ServiceContent } from "../../controllers/services/schemas.js";
 import { createServiceData } from "../../data/services/create-service.js";
 import { serviceAdminDto } from "./service-response.js";
+import { syncCatalogKnowledge } from "../ai/retrieval/sync-catalog-knowledge.js";
+import { scheduleCatalogEmbeddingRefresh } from "../ai/retrieval/refresh-catalog-embeddings.js";
 import {
   InvalidPackageMedia,
   replaceCatalogSectionsData,
@@ -24,7 +26,7 @@ export async function createServiceService(
   )
     return error("A service photo is required", 400);
   try {
-    return await db.transaction().execute(async (trx) => {
+    const outcome = await db.transaction().execute(async (trx) => {
       const title = await reserveCatalogTitle(trx, "services", data.name);
       if (!title) return error("A service with this title already exists", 409);
       const row = await createServiceData(trx, data, title.slug);
@@ -34,8 +36,14 @@ export async function createServiceService(
         { sections: data.sections ?? [] },
         actorId,
       );
+      await syncCatalogKnowledge(trx, { kind: "service", id: row.id });
       return serviceAdminDto(trx, row);
     });
+    if (!("status" in outcome))
+      await scheduleCatalogEmbeddingRefresh(db, [
+        { kind: "service", id: outcome.id },
+      ]);
+    return outcome;
   } catch (cause) {
     const duplicate = duplicateTitle(
       cause,

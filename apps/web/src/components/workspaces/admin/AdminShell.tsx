@@ -13,6 +13,7 @@ import {
   firstName,
   initialsFromName,
 } from "../../../lib/utils/formatting/name";
+import { KnowledgePage } from "./ai/KnowledgePage";
 import { BookingsPage } from "./booking-requests/BookingsPage";
 import { CalendarPage } from "./calendar/CalendarPage";
 import { GenericPage } from "./navigation/GenericPage";
@@ -125,6 +126,7 @@ export function AdminShell({
   };
 
   const body = useMemo(() => {
+    if (active === "AI") return <KnowledgePage />;
     if (active === "Overview")
       return <OverviewPage firstName={firstName(name)} onNavigate={go} />;
     if (active === "Bookings")
@@ -211,7 +213,8 @@ export function AdminShell({
         </header>
       }
     >
-      {active !== "Bookings" &&
+      {active !== "AI" &&
+        active !== "Bookings" &&
         active !== "Packages" &&
         active !== "Services" &&
         active !== "Administration" &&

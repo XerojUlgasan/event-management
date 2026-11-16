@@ -4,8 +4,15 @@ import type { DB } from "../../db/types.js";
 import { lockServiceData } from "../../data/services/lock-service.js";
 import { error, nextUpdate } from "../packages/package-rules.js";
 import { serviceAdminDto } from "./service-response.js";
+import {
+  deleteCatalogKnowledgeData,
+  invalidateDependentPackageKnowledgeData,
+  type CatalogKnowledgeOwner,
+} from "../../data/ai/catalog-knowledge.js";
+import { scheduleCatalogEmbeddingRefresh } from "../ai/retrieval/refresh-catalog-embeddings.js";
 export async function archiveServiceService(db: Kysely<DB>, id: string) {
-  return db.transaction().execute(async (trx) => {
+  let dependents: CatalogKnowledgeOwner[] = [];
+  const outcome = await db.transaction().execute(async (trx) => {
     const s = await lockServiceData(trx, id);
     if (!s) return error("Service not found", 404);
     const updated = await archiveServiceData(
@@ -14,6 +21,11 @@ export async function archiveServiceService(db: Kysely<DB>, id: string) {
       s.archived_at ?? new Date(),
       nextUpdate(s.updated_at),
     );
+    await deleteCatalogKnowledgeData(trx, { kind: "service", id });
+    dependents = await invalidateDependentPackageKnowledgeData(trx, id);
     return serviceAdminDto(trx, updated);
   });
+  if (!("status" in outcome))
+    await scheduleCatalogEmbeddingRefresh(db, dependents);
+  return outcome;
 }

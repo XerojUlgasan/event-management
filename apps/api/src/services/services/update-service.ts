@@ -5,6 +5,12 @@ import { lockServiceData } from "../../data/services/lock-service.js";
 import { updateServiceData } from "../../data/services/update-service.js";
 import { error, nextUpdate } from "../packages/package-rules.js";
 import { serviceAdminDto } from "./service-response.js";
+import { syncCatalogKnowledge } from "../ai/retrieval/sync-catalog-knowledge.js";
+import { scheduleCatalogEmbeddingRefresh } from "../ai/retrieval/refresh-catalog-embeddings.js";
+import {
+  invalidateDependentPackageKnowledgeData,
+  type CatalogKnowledgeOwner,
+} from "../../data/ai/catalog-knowledge.js";
 import {
   InvalidPackageMedia,
   readCatalogSectionsData,
@@ -22,6 +28,7 @@ export async function updateServiceService(
   actorId: string,
 ) {
   let previousMedia: string[] = [];
+  let dependents: CatalogKnowledgeOwner[] = [];
   try {
     const outcome = await db.transaction().execute(async (trx) => {
       const current = await lockServiceData(trx, id);
@@ -50,9 +57,16 @@ export async function updateServiceService(
           { sections },
           actorId,
         );
+      await syncCatalogKnowledge(trx, { kind: "service", id });
+      if (current.name !== row.name)
+        dependents = await invalidateDependentPackageKnowledgeData(trx, id);
       return serviceAdminDto(trx, row);
     });
     if (!("status" in outcome)) {
+      await scheduleCatalogEmbeddingRefresh(db, [
+        { kind: "service", id },
+        ...dependents,
+      ]);
       await cleanupCatalogMediaService(db, previousMedia);
     }
     return outcome;

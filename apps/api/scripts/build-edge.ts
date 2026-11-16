@@ -39,6 +39,33 @@ const result = await build({
   plugins: [
     externalPostgres,
     {
+      name: "catalog-sample-photos",
+      setup(configured) {
+        configured.onLoad(
+          { filter: /sample-catalog-photos\.ts$/ },
+          async () => {
+            const paths = ["wedding", "dinner", "dessert", "hero"];
+            const photos: Record<string, string> = {};
+            for (const name of paths)
+              photos[`/images/${name}.jpg`] = (
+                await readFile(
+                  path.resolve(apiRoot, `../web/public/images/${name}.jpg`),
+                )
+              ).toString("base64");
+            return {
+              contents: `const photos = ${JSON.stringify(photos)};
+export const sampleCatalogPhotoPaths = Object.keys(photos);
+export async function readSampleCatalogPhoto(url) {
+  if (!Object.hasOwn(photos, url)) throw new Error("Unknown catalog sample photo");
+  return Buffer.from(photos[url], "base64");
+}`,
+              loader: "js",
+            };
+          },
+        );
+      },
+    },
+    {
       name: "edge-environment",
       setup(configured) {
         // Supabase injects the function environment; dotenv/config would read .env synchronously.

@@ -8,6 +8,9 @@ import {
 } from "../src/constants/http.js";
 
 test("route families follow the longest owned prefix", () => {
+  assert.equal(matchRouteFamily("/v1/admin/ai/knowledge"), "ai");
+  assert.equal(matchRouteFamily("/v1/admin/ai/knowledge/search"), "ai");
+  assert.equal(matchRouteFamily("/v1/admin/ai/knowledge/package/id"), "ai");
   assert.equal(matchRouteFamily("/v1/health"), "health");
   assert.equal(matchRouteFamily("/v1/me"), "auth");
   assert.equal(matchRouteFamily("/v1/auth/login"), "auth");
@@ -61,6 +64,7 @@ test("private canvas payloads use the catalog cap in either runtime path format"
 });
 
 test("unknown paths and near-miss prefixes stay unmatched", () => {
+  assert.equal(matchRouteFamily("/v1/admin/ai/knowledgeable"), null);
   assert.equal(matchRouteFamily("/v1/healthcheck"), null);
   assert.equal(matchRouteFamily("/v1/admin"), null);
   assert.equal(matchRouteFamily("/v1/media"), null);

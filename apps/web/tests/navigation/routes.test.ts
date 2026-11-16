@@ -16,6 +16,17 @@ const customer = { role: "customer" };
 const id = "01c8d471-f0c5-4b16-8594-3bb08e497761";
 const detail = `/app/bookings/${id}`;
 
+test("knowledge catalog is an admin workspace with a role-scoped return path", () => {
+  const path = "/app/ai/knowledge";
+  assert.equal(adminKey(path), "AI");
+  assert.equal(allowedWorkspacePath(admin, path), true);
+  assert.equal(workspaceReturnPath(admin, path), path);
+  for (const profile of [customer, staff]) {
+    assert.equal(allowedWorkspacePath(profile, path), false);
+    assert.equal(workspaceReturnPath(profile, path), null);
+  }
+});
+
 test("customers browse catalogs while old package links and admin routes remain valid", () => {
   assert.equal(customerPaths.Catalogs, "/app/catalogs");
   for (const path of ["/app/catalogs", "/app/packages"]) {
