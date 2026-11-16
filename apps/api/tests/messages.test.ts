@@ -191,6 +191,184 @@ async function read(response: Response, status: number): Promise<any> {
   return response.status === 204 ? null : response.json();
 }
 
+test("customer request IDs replay safely and reject collisions", async () => {
+  const ids = Array.from({ length: 3 }, () => randomUUID());
+  await db
+    .insertInto("conversations")
+    .values([
+      { id: ids[0], customer_id: customerId, ai_enabled: false },
+      { id: ids[1], customer_id: customerId, ai_enabled: false },
+      { id: ids[2], customer_id: otherCustomerId, ai_enabled: false },
+    ])
+    .execute();
+  const requestId = randomUUID();
+  const payload = { conversationId: ids[0], body: "Retry safely", requestId };
+  const responses = await Promise.all([
+    call("/messages/conversation/messages", "POST", payload, customerCookie),
+    call("/messages/conversation/messages", "POST", payload, customerCookie),
+  ]);
+  const results = await Promise.all(
+    responses.map((response) => read(response, 201)),
+  );
+  assert.deepEqual(results[0].message, results[1].message);
+  assert.equal(results[0].message.id, requestId);
+  assert.equal(
+    (
+      await db
+        .selectFrom("messages")
+        .select("id")
+        .where("id", "=", requestId)
+        .execute()
+    ).length,
+    1,
+  );
+  assert.deepEqual(
+    await read(
+      await call(
+        "/messages/conversation/messages",
+        "POST",
+        { ...payload, body: "Changed" },
+        customerCookie,
+      ),
+      409,
+    ),
+    { error: "Message request conflict" },
+  );
+  const adminId = (
+    await db
+      .selectFrom("users")
+      .select("id")
+      .where("role", "=", "admin")
+      .executeTakeFirstOrThrow()
+  ).id;
+  const adminMessageId = randomUUID();
+  await db
+    .insertInto("messages")
+    .values({
+      id: adminMessageId,
+      conversation_id: ids[1],
+      sender_id: adminId,
+      sender_role: "admin",
+      body: "Retry safely",
+    })
+    .execute();
+  assert.deepEqual(
+    await read(
+      await call(
+        "/messages/conversation/messages",
+        "POST",
+        { ...payload, conversationId: ids[1], requestId: adminMessageId },
+        customerCookie,
+      ),
+      409,
+    ),
+    { error: "Message request conflict" },
+  );
+  assert.deepEqual(
+    await read(
+      await call(
+        "/messages/conversation/messages",
+        "POST",
+        { ...payload, conversationId: ids[1] },
+        customerCookie,
+      ),
+      409,
+    ),
+    { error: "Message request conflict" },
+  );
+  assert.deepEqual(
+    await read(
+      await call(
+        "/messages/conversation/messages",
+        "POST",
+        { ...payload, conversationId: ids[2] },
+        otherCustomerCookie,
+      ),
+      409,
+    ),
+    { error: "Message request conflict" },
+  );
+  await read(
+    await call(
+      "/messages/conversation/messages",
+      "POST",
+      { ...payload, conversationId: ids[0] },
+      otherCustomerCookie,
+    ),
+    404,
+  );
+  await read(
+    await call(
+      "/messages/conversation/messages",
+      "POST",
+      { ...payload, requestId: "invalid" },
+      customerCookie,
+    ),
+    400,
+  );
+
+  const closedAt = new Date();
+  const updatedAt = new Date("2020-01-01T00:00:00Z");
+  await db
+    .updateTable("conversations")
+    .set({ status: "closed", closed_at: closedAt, updated_at: updatedAt })
+    .where("id", "=", ids[0])
+    .execute();
+  const replay = await read(
+    await call(
+      "/messages/conversation/messages",
+      "POST",
+      payload,
+      customerCookie,
+    ),
+    201,
+  );
+  assert.deepEqual(replay, {
+    message: results[0].message,
+    assistantMessage: null,
+    assistantError: null,
+  });
+  const closed = await db
+    .selectFrom("conversations")
+    .select(["status", "closed_at", "updated_at"])
+    .where("id", "=", ids[0])
+    .executeTakeFirstOrThrow();
+  assert.equal(closed.status, "closed");
+  assert.equal(closed.closed_at?.getTime(), closedAt.getTime());
+  assert.equal(closed.updated_at.getTime(), updatedAt.getTime());
+
+  const sharedId = randomUUID();
+  const collision = await Promise.all([
+    call(
+      "/messages/conversation/messages",
+      "POST",
+      { conversationId: ids[1], body: "Collision", requestId: sharedId },
+      customerCookie,
+    ),
+    call(
+      "/messages/conversation/messages",
+      "POST",
+      { conversationId: ids[2], body: "Collision", requestId: sharedId },
+      otherCustomerCookie,
+    ),
+  ]);
+  assert.deepEqual(
+    collision.map((response) => response.status).sort(),
+    [201, 409],
+  );
+  assert.equal(
+    (
+      await db
+        .selectFrom("messages")
+        .select("id")
+        .where("id", "=", sharedId)
+        .execute()
+    ).length,
+    1,
+  );
+  await db.deleteFrom("conversations").where("id", "in", ids).execute();
+});
+
 test("customer and admin conversations enforce roles and validate messages", async () => {
   await read(await call("/messages/conversation"), 401);
   await read(await call("/admin/conversations"), 401);

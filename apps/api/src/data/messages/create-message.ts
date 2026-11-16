@@ -13,6 +13,7 @@ export async function createMessageData(
   senderId: string,
   senderRole: "customer" | "admin",
   body: string,
+  requestId?: string,
 ) {
   return db.transaction().execute(async (trx) => {
     const conversation = await trx
@@ -26,6 +27,37 @@ export async function createMessageData(
       (senderRole === "customer" && conversation.customer_id !== senderId)
     )
       throw new Error("Conversation not found");
+    if (requestId) {
+      const previous = await trx
+        .selectFrom("messages")
+        .selectAll()
+        .where("id", "=", requestId)
+        .executeTakeFirst();
+      if (previous) {
+        if (
+          previous.conversation_id !== conversation.id ||
+          previous.sender_id !== senderId ||
+          previous.sender_role !== senderRole ||
+          previous.body !== body
+        )
+          throw new Error("Message request conflict");
+        const sender = await trx
+          .selectFrom("users")
+          .select(["display_name", "email"])
+          .where("id", "=", senderId)
+          .executeTakeFirstOrThrow();
+        return {
+          aiEnabled: conversation.ai_enabled,
+          aiVersion: conversation.ai_version,
+          replayed: true,
+          message: {
+            ...previous,
+            sender_display_name: sender.display_name,
+            sender_email: sender.email,
+          },
+        };
+      }
+    }
     if (
       conversation.status === "closed" &&
       (senderRole === "admin" || conversation.booking_request_id)
@@ -39,6 +71,7 @@ export async function createMessageData(
     const row = await trx
       .insertInto("messages")
       .values({
+        ...(requestId ? { id: requestId } : {}),
         conversation_id: conversation.id,
         created_at: sql<Date>`clock_timestamp()`,
         sender_id: senderId,
@@ -46,8 +79,12 @@ export async function createMessageData(
         body,
         read_at: null,
       })
+      .onConflict((conflict) => conflict.column("id").doNothing())
       .returningAll()
-      .executeTakeFirstOrThrow();
+      .executeTakeFirst();
+    // Another conversation can insert the same globally unique ID while its
+    // row lock is held. Do not expose that message to this customer.
+    if (!row) throw new Error("Message request conflict");
     await trx
       .updateTable("conversations")
       .set({
@@ -70,6 +107,7 @@ export async function createMessageData(
     return {
       aiEnabled,
       aiVersion,
+      replayed: false,
       message: {
         ...row,
         sender_display_name: sender.display_name,

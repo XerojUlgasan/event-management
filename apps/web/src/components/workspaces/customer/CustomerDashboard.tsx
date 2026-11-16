@@ -94,6 +94,12 @@ export function CustomerDashboard({
   const [messageDraft, setMessageDraft] = useState("");
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const [dialogSending, setDialogSending] = useState(false);
+  const [outbox, setOutbox] = useState<
+    Record<
+      string,
+      { conversationId: string; message: ChatMessage; failed: boolean }
+    >
+  >({});
   const [dialogError, setDialogError] = useState("");
   const [messageThread, setMessageThread] = useState<ChatThread | null>(null);
   const inbox = useConversationList(getMyConversations, tab === "Messages");
@@ -232,6 +238,11 @@ export function CustomerDashboard({
         const thread = await getMyConversationById(id);
         if (!active) return;
         const unacknowledged = new Set(localMessages.current);
+        setOutbox((current) => {
+          const next = { ...current };
+          thread.messages.forEach((message) => delete next[message.id]);
+          return next;
+        });
         thread.messages.forEach((message) =>
           localMessages.current.delete(message.id),
         );
@@ -337,44 +348,86 @@ export function CustomerDashboard({
     }
   };
 
-  const sendMessage = async (body: string) => {
-    const conversation = messageThread?.conversation;
-    if (!conversation || conversation.id !== selectedConversationId)
-      throw new Error("Wait for this conversation to load before sending.");
-    const previousStatus = conversation.status;
-    const result = await sendMyMessage(body, conversation.id);
-    const sent = result.assistantMessage
-      ? [result.message, result.assistantMessage]
-      : [result.message];
-    sent.forEach((message) => localMessages.current.add(message.id));
-    appendMessages(sent, conversation.id);
-    showSentInList(
-      conversation,
-      result.assistantMessage ?? result.message,
-      sent,
-    );
-    if (result.assistantError) notifyError(new Error(result.assistantError));
-    // A new message reopens a closed general conversation.
-    if (previousStatus === "closed") {
-      setMessageThread((current) =>
-        current?.conversation.id === conversation.id
+  const deliverMessage = async (
+    conversation: ChatConversation,
+    message: ChatMessage,
+  ) => {
+    setOutbox((current) => ({
+      ...current,
+      [message.id]: { conversationId: conversation.id, message, failed: false },
+    }));
+    localMessages.current.add(message.id);
+    try {
+      const result = await sendMyMessage(
+        message.body,
+        conversation.id,
+        message.id,
+      );
+      const sent = result.assistantMessage
+        ? [result.message, result.assistantMessage]
+        : [result.message];
+      sent.forEach((item) => localMessages.current.add(item.id));
+      appendMessages(sent, conversation.id);
+      setOutbox((current) =>
+        current[message.id]
           ? {
               ...current,
-              conversation: {
-                ...current.conversation,
-                status: "active",
-                closedAt: null,
-                packageId: null,
-                packageName: null,
-                eventType: null,
-                eventStartsAt: null,
-                eventEndsAt: null,
-                guestCount: null,
-              },
+              [message.id]: { ...current[message.id], message: result.message },
+            }
+          : current,
+      );
+      showSentInList(
+        conversation,
+        result.assistantMessage ?? result.message,
+        sent,
+      );
+      if (result.assistantError) notifyError(new Error(result.assistantError));
+      if (conversation.status === "closed") {
+        setMessageThread((current) =>
+          current?.conversation.id === conversation.id
+            ? {
+                ...current,
+                conversation: {
+                  ...current.conversation,
+                  status: "active",
+                  closedAt: null,
+                  packageId: null,
+                  packageName: null,
+                  eventType: null,
+                  eventStartsAt: null,
+                  eventEndsAt: null,
+                  guestCount: null,
+                },
+              }
+            : current,
+        );
+      }
+    } catch {
+      setOutbox((current) =>
+        current[message.id]
+          ? {
+              ...current,
+              [message.id]: { ...current[message.id], failed: true },
             }
           : current,
       );
     }
+  };
+
+  const sendMessage = async (body: string, thread = messageThread) => {
+    const conversation = thread?.conversation;
+    if (!conversation) return;
+    const message: ChatMessage = {
+      id: crypto.randomUUID(),
+      body,
+      quotationId: null,
+      senderId: conversation.customerId,
+      senderRole: "customer",
+      senderName: userName,
+      createdAt: new Date().toISOString(),
+      readAt: null,
+    };
+    await deliverMessage(conversation, message);
   };
 
   const startNewChat = async () => {
@@ -412,33 +465,15 @@ export function CustomerDashboard({
     setDialogError("");
     try {
       const thread = messageThread ?? (await getMyConversation());
-      const result = await sendMyMessage(body, thread.conversation.id);
-      const sent = result.assistantMessage
-        ? [result.message, result.assistantMessage]
-        : [result.message];
-      sent.forEach((message) => localMessages.current.add(message.id));
       setSelectedConversationId(thread.conversation.id);
-      setMessageThread((current) =>
-        addSentMessages(
-          current?.conversation.id === thread.conversation.id
-            ? current
-            : thread,
-          sent,
-        ),
-      );
-      showSentInList(
-        thread.conversation,
-        result.assistantMessage ?? result.message,
-        sent,
-      );
+      setMessageThread(thread);
       setMessageDraft((current) => (current.trim() === body ? "" : current));
       setMessageOpen(false);
       setConversationOpen(true);
-      notify("Message sent.");
-      if (result.assistantError) notifyError(new Error(result.assistantError));
       go("Messages");
+      void sendMessage(body, thread);
     } catch (cause) {
-      setDialogError(notifyError(cause, "Unable to send your message."));
+      setDialogError(notifyError(cause, "Unable to open your conversation."));
     } finally {
       setDialogSending(false);
     }
@@ -652,8 +687,21 @@ export function CustomerDashboard({
               onSelect={(id) => void selectConversation(id)}
               messages={
                 messageThread?.conversation.id === selectedConversationId
-                  ? messageThread.messages
-                  : []
+                  ? addSentMessages(
+                      messageThread,
+                      Object.values(outbox)
+                        .filter(
+                          (item) =>
+                            item.conversationId === selectedConversationId,
+                        )
+                        .map((item) => item.message),
+                    ).messages
+                  : Object.values(outbox)
+                      .filter(
+                        (item) =>
+                          item.conversationId === selectedConversationId,
+                      )
+                      .map((item) => item.message)
               }
               conversationFeed={{
                 hasMore: !!inbox.nextCursor,
@@ -681,6 +729,22 @@ export function CustomerDashboard({
                 !!threadError
               }
               onSend={sendMessage}
+              failedMessageIds={Object.values(outbox)
+                .filter(
+                  (item) =>
+                    item.conversationId === selectedConversationId &&
+                    item.failed &&
+                    !messageThread?.messages.some(
+                      (message) => message.id === item.message.id,
+                    ),
+                )
+                .map((item) => item.message.id)}
+              onRetryMessage={(id) => {
+                const item = outbox[id];
+                const conversation = messageThread?.conversation;
+                if (item && conversation?.id === item.conversationId)
+                  void deliverMessage(conversation, item.message);
+              }}
               onBack={() => setConversationOpen(false)}
               conversationOpen={conversationOpen}
               onNewChat={startNewChat}
@@ -718,9 +782,8 @@ export function CustomerDashboard({
               <Button
                 onClick={sendFromDialog}
                 disabled={!messageDraft.trim() || dialogSending}
-                pending={dialogSending}
               >
-                {dialogSending ? "Waiting for AI…" : "Send message"}
+                Send message
               </Button>
             </>
           }
@@ -732,6 +795,16 @@ export function CustomerDashboard({
               placeholder="Write a message"
               maxLength={MAX_MESSAGE_BODY_LENGTH}
               ref={messageInputRef}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  void sendFromDialog();
+                }
+              }}
             />
           </FormField>
           {dialogError && (

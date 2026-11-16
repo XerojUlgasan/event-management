@@ -13,6 +13,10 @@ export const messageBodySchema = z.object({
     ),
 });
 
+export const customerMessageBodySchema = messageBodySchema.extend({
+  requestId: z.string().uuid().optional(),
+});
+
 export const messageSchema = z.object({
   id: z.string().uuid(),
   body: z.string(),

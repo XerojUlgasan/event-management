@@ -13,6 +13,7 @@ export async function sendCustomerMessageService(
   body: string,
   conversationId?: string,
   abortSignal?: AbortSignal,
+  requestId?: string,
 ) {
   const conversation = conversationId
     ? await findConversationData(db, conversationId)
@@ -29,9 +30,10 @@ export async function sendCustomerMessageService(
     customerId,
     "customer",
     body,
+    requestId,
   );
   const message = messageDto(saved.message);
-  if (!saved.aiEnabled)
+  if (saved.replayed || !saved.aiEnabled)
     return { message, assistantMessage: null, assistantError: null };
   const started = Date.now();
   try {

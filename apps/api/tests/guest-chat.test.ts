@@ -211,6 +211,7 @@ test("five customer writes and five AI replies are allowed; sixth is readable lo
     fifth = result;
   }
   assert.equal(fifth.guest.loginRequired, true);
+  assert.equal(fifth.message.id, requestId);
   assert.equal(model.doGenerateCalls.length, 5);
   const replay = await read(await send(thread, "Question 4", requestId), 201);
   assert.equal(replay.message.id, fifth.message.id);
@@ -255,6 +256,8 @@ test("quota races serialize and concurrent request replays create one history en
     duplicates.map((response) => read(response, 201)),
   );
   assert.equal(new Set(values.map((value) => value.message.id)).size, 1);
+  assert.equal(values[0].message.id, requestId);
+  assert.ok(values.every((value) => value.guest.customerMessageCount === 1));
   assert.equal(model.doGenerateCalls.length, 1);
   const responses = await Promise.all(
     Array.from({ length: 8 }, (_, index) =>
@@ -279,6 +282,120 @@ test("quota races serialize and concurrent request replays create one history en
         .execute()
     ).length,
     5,
+  );
+});
+
+test("guest request IDs preserve historical reservations and reject global collisions without consuming quota", async () => {
+  useReply("Collision test reply");
+  const first = await guest();
+  const second = await guest();
+  const oldRequestId = randomUUID();
+  const oldMessageId = randomUUID();
+  await db
+    .insertInto("messages")
+    .values({
+      id: oldMessageId,
+      conversation_id: first.conversation.id,
+      sender_id: null,
+      sender_role: "customer",
+      guest_origin: true,
+      body: "Historical guest message",
+    })
+    .execute();
+  await db
+    .insertInto("guest_message_requests")
+    .values({
+      conversation_id: first.conversation.id,
+      request_id: oldRequestId,
+      message_id: oldMessageId,
+      completed: true,
+    })
+    .execute();
+  await db
+    .updateTable("conversations")
+    .set({ guest_customer_message_count: 1 })
+    .where("id", "=", first.conversation.id)
+    .execute();
+  const historical = await read(
+    await send(first, "Historical guest message", oldRequestId),
+    201,
+  );
+  assert.equal(historical.message.id, oldMessageId);
+  assert.equal(historical.guest.customerMessageCount, 1);
+  assert.equal(model.doGenerateCalls.length, 0);
+
+  const customerConversation = await db
+    .insertInto("conversations")
+    .values({ customer_id: customer.id })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const signedId = randomUUID();
+  await db
+    .insertInto("messages")
+    .values({
+      id: signedId,
+      conversation_id: customerConversation.id,
+      sender_id: customer.id,
+      sender_role: "customer",
+      body: "Private signed message",
+    })
+    .execute();
+  const signedCollision = await read(
+    await send(second, "Attempt", signedId),
+    409,
+  );
+  assert.equal(signedCollision.code, "request_conflict");
+  assert.ok(
+    !JSON.stringify(signedCollision).includes("Private signed message"),
+  );
+  assert.equal(
+    (
+      await db
+        .selectFrom("conversations")
+        .select("guest_customer_message_count")
+        .where("id", "=", second.conversation.id)
+        .executeTakeFirstOrThrow()
+    ).guest_customer_message_count,
+    0,
+  );
+
+  const sharedId = randomUUID();
+  const collisions = await Promise.all([
+    send(first, "Guest collision", sharedId),
+    send(second, "Guest collision", sharedId),
+  ]);
+  assert.deepEqual(
+    collisions.map((response) => response.status).sort(),
+    [201, 409],
+  );
+  const conflict = await read(
+    collisions[collisions[0].status === 409 ? 0 : 1],
+    409,
+  );
+  assert.equal(conflict.code, "request_conflict");
+  const counts = await db
+    .selectFrom("conversations")
+    .select(["id", "guest_customer_message_count"])
+    .where("id", "in", [first.conversation.id, second.conversation.id])
+    .execute();
+  const loserId =
+    collisions[0].status === 409
+      ? first.conversation.id
+      : second.conversation.id;
+  assert.equal(
+    counts.find((row) => row.id === loserId)?.guest_customer_message_count,
+    loserId === first.conversation.id ? 1 : 0,
+  );
+  assert.equal(model.doGenerateCalls.length, 1);
+  assert.equal(
+    (
+      await db
+        .selectFrom("messages")
+        .select("id")
+        .where("id", "=", sharedId)
+        .execute()
+    ).length,
+    1,
   );
 });
 

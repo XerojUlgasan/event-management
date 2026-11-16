@@ -165,6 +165,56 @@ function setAi(
   });
 }
 
+test("concurrent customer retries start only one assistant turn", async () => {
+  useReply("One reply");
+  const id = await conversation();
+  const requestId = randomUUID();
+  const payload = { conversationId: id, body: "Please help", requestId };
+  const responses = await Promise.all([
+    call("/messages/conversation/messages", customer.cookie, payload),
+    call("/messages/conversation/messages", customer.cookie, payload),
+  ]);
+  assert.deepEqual(
+    responses.map((response) => response.status),
+    [201, 201],
+  );
+  const results = await Promise.all(
+    responses.map(async (response) =>
+      customerMessageResultSchema.parse(await response.json()),
+    ),
+  );
+  assert.deepEqual(
+    results.map((result) => result.message.id),
+    [requestId, requestId],
+  );
+  assert.equal(
+    results.filter((result) => result.assistantMessage?.body === "One reply")
+      .length,
+    1,
+  );
+  assert.equal(
+    results.filter(
+      (result) =>
+        result.assistantMessage === null && result.assistantError === null,
+    ).length,
+    1,
+  );
+  assert.equal(model.doGenerateCalls.length, 1);
+  const messages = await db
+    .selectFrom("messages")
+    .select("sender_role")
+    .where("conversation_id", "=", id)
+    .execute();
+  assert.equal(
+    messages.filter((message) => message.sender_role === "customer").length,
+    1,
+  );
+  assert.equal(
+    messages.filter((message) => message.sender_role === "assistant").length,
+    1,
+  );
+});
+
 test("AI control is per conversation, authorized, versioned, and skips generation while off", async () => {
   useReply("AI is back");
   const id = await conversation();

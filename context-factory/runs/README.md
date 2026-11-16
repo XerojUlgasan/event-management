@@ -14,6 +14,7 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Instant conversation composer](2026-11-17_00-39-13_instant-conversation-composer.md) | Immediate customer/guest bubbles and safe retries / main | complete | Review uncommitted API and browser changes together; checks and synthetic browser verification passed |
 | [Anonymous conversation](2026-11-16_23-55-00_anonymous-conversation.md) | Five-message guest chat and secure account claim / main | complete | Review uncommitted implementation; local migration, API/auth/Edge and desktop/mobile verification passed |
 | [AI file separation](2026-11-16_20-52-19_ai-file-separation.md) | Focused AI services, queries, and knowledge UI / feat/ai | complete | Review uncommitted refactor; behavior suites, builds, and synthetic browser checks passed |
 | [Knowledge search rows](2026-11-16_20-27-00_knowledge-search-rows.md) | Top-five compact results and in-place previews / feat/ai | complete | Refresh Knowledge Catalog; title/thumbnail rows open package/service overlays |

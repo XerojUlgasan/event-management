@@ -60,7 +60,11 @@ export const getMyConversationById = (id: string, cursor?: string) =>
   request<ChatThread>(
     `/messages/conversations/${encodeURIComponent(id)}${cursorQuery(cursor)}`,
   );
-export const sendMyMessage = (body: string, conversationId?: string) =>
+export const sendMyMessage = (
+  body: string,
+  conversationId?: string,
+  requestId?: string,
+) =>
   request<{
     message: ChatMessage;
     assistantMessage: ChatMessage | null;
@@ -68,6 +72,7 @@ export const sendMyMessage = (body: string, conversationId?: string) =>
   }>("/messages/conversation/messages", {
     body,
     conversationId,
+    requestId,
   });
 export const getAdminConversations = (cursor?: string) =>
   request<{ conversations: ChatConversation[]; nextCursor: string | null }>(

@@ -370,3 +370,40 @@
 .public-chat-panel .chat-input button {
   font-size: 12px;
 }
+.public-chat-panel .chat-input textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  max-height: 110px;
+  resize: none;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-button);
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font: inherit;
+}
+.public-chat-panel .message-delivery-error {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.public-chat-panel .message-delivery-error .button-link {
+  min-height: 0;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+}
+
+.public-chat-panel .chat-input textarea:focus-visible {
+  outline: 2px solid var(--wine);
+  outline-offset: 2px;
+}
+
+.public-chat-message-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.public-chat-panel .chat-input textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}

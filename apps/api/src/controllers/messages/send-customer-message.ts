@@ -1,6 +1,9 @@
 import { createRoute } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
-import { messageBodySchema, customerMessageResultSchema } from "./schemas.js";
+import {
+  customerMessageBodySchema,
+  customerMessageResultSchema,
+} from "./schemas.js";
 import { json, errors, body } from "./http.js";
 import { sendCustomerMessageService } from "../../services/messages/send-customer-message.js";
 
@@ -9,7 +12,7 @@ export const sendCustomerMessageRoute = createRoute({
   path: "/messages/conversation/messages",
   tags: ["Messages"],
   summary: "Send a message to the Clemora team",
-  request: { body: body(messageBodySchema) },
+  request: { body: body(customerMessageBodySchema) },
   responses: {
     201: {
       content: json(customerMessageResultSchema),
@@ -33,6 +36,7 @@ export const sendCustomerMessageRouteHandler: AppRouteHandler<
       input.body,
       input.conversationId,
       c.req.raw.signal,
+      input.requestId,
     );
     return c.json(result, 201);
   } catch (error) {
@@ -40,6 +44,12 @@ export const sendCustomerMessageRouteHandler: AppRouteHandler<
       return c.json({ error: error.message }, 404);
     }
     if (error instanceof Error && error.message === "Conversation is closed") {
+      return c.json({ error: error.message }, 409);
+    }
+    if (
+      error instanceof Error &&
+      error.message === "Message request conflict"
+    ) {
       return c.json({ error: error.message }, 409);
     }
     throw error;

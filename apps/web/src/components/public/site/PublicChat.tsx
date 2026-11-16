@@ -1,8 +1,11 @@
-import { Button, Icon, Input } from "@event-management/ui";
+import { Button, Icon, Textarea } from "@event-management/ui";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getMe } from "../../../lib/data/auth/session";
-import { getMyConversation } from "../../../lib/data/messages/conversations";
+import {
+  getMyConversation,
+  type ChatMessage,
+} from "../../../lib/data/messages/conversations";
 import {
   getGuestChat,
   sendGuestMessage,
@@ -11,7 +14,9 @@ import {
 } from "../../../lib/data/messages/guest";
 import { ApiError } from "../../../lib/http/request";
 import {
-  mergeGuestMessages,
+  addGuestSentMessages,
+  guestRemaining,
+  mergeGuestAllowance,
   mergeGuestThread,
   prepareGuestSend,
 } from "../../../lib/services/messages/guest-thread";
@@ -20,7 +25,24 @@ export default function PublicChat() {
   const [open, setOpen] = useState(false);
   const [thread, setThread] = useState<GuestThread | null>(null);
   const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [outbox, setOutbox] = useState<
+    Record<
+      string,
+      {
+        body: string;
+        createdAt: string;
+        failed: boolean;
+        loginRequired?: boolean;
+        expired?: boolean;
+      }
+    >
+  >({});
+  const outboxRef = useRef(outbox);
+  const updateOutbox = (update: (current: typeof outbox) => typeof outbox) => {
+    outboxRef.current = update(outboxRef.current);
+    setOutbox(outboxRef.current);
+  };
+  const draftInput = useRef<HTMLTextAreaElement>(null);
   const [olderBusy, setOlderBusy] = useState(false);
   const [error, setError] = useState("");
   const [expired, setExpired] = useState(false);
@@ -32,10 +54,8 @@ export default function PublicChat() {
   const scrollOnOpen = useRef(true);
   const lastMessageId = useRef<string | null>(null);
   const olderAnchor = useRef<{ id: string; top: number } | null>(null);
-  const pending = useRef<{ body: string; requestId: string } | null>(null);
   const threadRef = useRef(thread);
   threadRef.current = thread;
-  const sending = useRef(false);
   const polling = useRef(false);
   const opening = useRef(false);
   const revision = useRef(0);
@@ -56,13 +76,13 @@ export default function PublicChat() {
       }
       if (profile?.role === "admin") {
         setThread(null);
-        pending.current = null;
+        updateOutbox(() => ({}));
         setAdmin(true);
         return;
       }
       if (profile?.role === "customer") {
         setThread(null);
-        pending.current = null;
+        updateOutbox(() => ({}));
         const result = await getMyConversation();
         window.location.assign(
           `/app/messages?conversation=${encodeURIComponent(result.conversation.id)}`,
@@ -82,10 +102,33 @@ export default function PublicChat() {
         threadRef.current &&
         threadRef.current.conversation.id !== result.conversation.id
       ) {
-        pending.current = null;
+        updateOutbox(() => ({}));
         setDraft("");
       }
-      setThread((current) => mergeGuestThread(current, result));
+      if (threadRef.current?.conversation.id === result.conversation.id) {
+        updateOutbox((current) => {
+          const next = { ...current };
+          result.messages.forEach((message) => delete next[message.id]);
+          return next;
+        });
+      }
+      setThread((current) => {
+        const merged = mergeGuestThread(current, result);
+        if (!current || current.conversation.id !== result.conversation.id)
+          return merged;
+        return {
+          ...merged,
+          guest: {
+            ...merged.guest,
+            remainingMessages: mergeGuestAllowance(
+              current.guest.remainingMessages,
+              merged.guest.remainingMessages,
+            ),
+            loginRequired:
+              current.guest.loginRequired || merged.guest.loginRequired,
+          },
+        };
+      });
     } catch {
       setError("Unable to open chat. Please try again.");
     } finally {
@@ -98,13 +141,33 @@ export default function PublicChat() {
     const id = thread.conversation.id;
     let active = true;
     const poll = async () => {
-      if (polling.current || sending.current) return;
+      if (polling.current) return;
       polling.current = true;
       const started = revision.current;
       try {
         const result = await getGuestChat(id);
         if (active && started === revision.current) {
-          setThread((current) => mergeGuestThread(current, result));
+          updateOutbox((current) => {
+            const next = { ...current };
+            result.messages.forEach((message) => delete next[message.id]);
+            return next;
+          });
+          setThread((current) => {
+            const merged = mergeGuestThread(current, result);
+            if (!current || current.conversation.id !== id) return merged;
+            return {
+              ...merged,
+              guest: {
+                ...merged.guest,
+                remainingMessages: mergeGuestAllowance(
+                  current.guest.remainingMessages,
+                  merged.guest.remainingMessages,
+                ),
+                loginRequired:
+                  current.guest.loginRequired || merged.guest.loginRequired,
+              },
+            };
+          });
           setError("");
         }
       } catch (cause) {
@@ -129,7 +192,8 @@ export default function PublicChat() {
   useLayoutEffect(() => {
     const element = messageList.current;
     if (!open || loading || admin || !thread || !element) return;
-    const last = thread.messages.at(-1)?.id ?? null;
+    const last =
+      Object.keys(outbox).at(-1) ?? thread.messages.at(-1)?.id ?? null;
     const anchor = olderAnchor.current;
     if (anchor) {
       const row = [
@@ -147,31 +211,40 @@ export default function PublicChat() {
     }
     scrollOnOpen.current = false;
     lastMessageId.current = last;
-  }, [open, loading, admin, thread]);
-  const send = async () => {
-    if (!thread || sending.current || expired || thread.guest.loginRequired)
-      return;
-    const item = prepareGuestSend(pending.current, draft, () =>
-      crypto.randomUUID(),
-    );
-    if (!item) return;
+  }, [open, loading, admin, thread, outbox]);
+  const deliver = async (
+    conversationId: string,
+    item: { body: string; requestId: string; createdAt: string },
+  ) => {
+    updateOutbox((current) => ({
+      ...current,
+      [item.requestId]: {
+        body: item.body,
+        createdAt: item.createdAt,
+        failed: false,
+      },
+    }));
     revision.current++;
-    pending.current = item;
-    sending.current = true;
-    setBusy(true);
-    setError("");
     try {
       const result = await sendGuestMessage(
-        thread.conversation.id,
+        conversationId,
         item.body,
         item.requestId,
       );
       setThread((current) =>
-        current && current.conversation.id === thread.conversation.id
+        current && current.conversation.id === conversationId
           ? {
               ...current,
-              guest: result.guest,
-              messages: mergeGuestMessages(
+              guest: {
+                ...result.guest,
+                remainingMessages: mergeGuestAllowance(
+                  current.guest.remainingMessages,
+                  result.guest.remainingMessages,
+                ),
+                loginRequired:
+                  current.guest.loginRequired || result.guest.loginRequired,
+              },
+              messages: addGuestSentMessages(
                 current.messages,
                 result.assistantMessage
                   ? [result.message, result.assistantMessage]
@@ -180,15 +253,36 @@ export default function PublicChat() {
             }
           : current,
       );
-      pending.current = null;
-      setDraft("");
+      updateOutbox((current) => {
+        const next = { ...current };
+        delete next[item.requestId];
+        return next;
+      });
+      if (threadRef.current?.conversation.id !== conversationId) return;
       if (result.assistantError)
         setError(
           "Your message was sent, but an automatic reply is unavailable. Our team can still respond.",
         );
     } catch (cause) {
+      if (threadRef.current?.conversation.id !== conversationId) return;
+      updateOutbox((current) =>
+        current[item.requestId]
+          ? {
+              ...current,
+              [item.requestId]: {
+                body: item.body,
+                createdAt: item.createdAt,
+                failed: true,
+                expired: cause instanceof ApiError && cause.status === 410,
+                loginRequired:
+                  cause instanceof ApiError &&
+                  cause.status === 409 &&
+                  cause.code === "login_required",
+              },
+            }
+          : current,
+      );
       if (cause instanceof ApiError && cause.status === 410) {
-        pending.current = null;
         setExpired(true);
         setError(
           "This conversation has expired. Start a new chat to continue.",
@@ -198,9 +292,8 @@ export default function PublicChat() {
         cause.status === 409 &&
         cause.code === "login_required"
       ) {
-        pending.current = null;
         setThread((current) =>
-          current
+          current?.conversation.id === conversationId
             ? {
                 ...current,
                 guest: {
@@ -212,14 +305,30 @@ export default function PublicChat() {
             : current,
         );
         setError("Sign in to continue this conversation.");
-      } else
-        setError(
-          "Message delivery could not be confirmed. Retry to avoid sending it twice.",
-        );
-    } finally {
-      sending.current = false;
-      setBusy(false);
+      }
     }
+  };
+  const send = () => {
+    const current = threadRef.current;
+    const item = prepareGuestSend(null, draft, () => crypto.randomUUID());
+    if (
+      !current ||
+      !item ||
+      expired ||
+      current.guest.loginRequired ||
+      guestRemaining(
+        current.guest.remainingMessages,
+        Object.keys(outboxRef.current).length,
+      ) === 0
+    )
+      return;
+    setDraft("");
+    setError("");
+    void deliver(current.conversation.id, {
+      ...item,
+      createdAt: new Date().toISOString(),
+    });
+    draftInput.current?.focus();
   };
   const loadOlder = async () => {
     const current = threadRef.current;
@@ -233,6 +342,11 @@ export default function PublicChat() {
       );
       if (older.nextCursor === current.nextCursor) throw new Error();
       if (started === revision.current) {
+        updateOutbox((items) => {
+          const next = { ...items };
+          older.messages.forEach((message) => delete next[message.id]);
+          return next;
+        });
         const row =
           messageList.current?.querySelector<HTMLElement>("[data-message-id]");
         if (row?.dataset.messageId)
@@ -313,23 +427,67 @@ export default function PublicChat() {
                     {olderBusy ? "Loading…" : "Load older messages"}
                   </Button>
                 )}
-                {!thread.messages.length && (
+                {!thread.messages.length && !Object.keys(outbox).length && (
                   <p>Say hello. Ask us about your event or a package.</p>
                 )}
-                {thread.messages.map((message) => (
-                  <div
-                    key={message.id}
-                    data-message-id={message.id}
-                    className={`message ${message.senderRole === "customer" ? "customer-message" : "bot"}`}
-                  >
-                    <strong>
-                      {message.senderRole === "customer"
-                        ? "You"
-                        : message.senderName}
-                    </strong>
-                    <div>{message.body}</div>
-                  </div>
-                ))}
+                {addGuestSentMessages(
+                  thread.messages,
+                  Object.entries(outbox).map(([id, item]): ChatMessage => ({
+                    id,
+                    body: item.body,
+                    createdAt: item.createdAt,
+                    quotationId: null,
+                    senderId: null,
+                    senderRole: "customer",
+                    senderName: "You",
+                    readAt: null,
+                  })),
+                ).map((message) => {
+                  const item = outbox[message.id];
+                  return (
+                    <div
+                      key={message.id}
+                      data-message-id={message.id}
+                      className={`message ${message.senderRole === "customer" ? "customer-message" : "bot"}`}
+                    >
+                      <strong>
+                        {message.senderRole === "customer"
+                          ? "You"
+                          : message.senderName}
+                      </strong>
+                      <div className="public-chat-message-body">
+                        {message.body}
+                      </div>
+                      {item?.failed && (
+                        <div className="message-delivery-error" role="alert">
+                          {item.expired ? (
+                            "Not sent. This conversation has expired."
+                          ) : item.loginRequired ? (
+                            "Not sent. Sign in to continue."
+                          ) : (
+                            <>
+                              Delivery could not be confirmed.{" "}
+                              {!expired && (
+                                <Button
+                                  variant="link"
+                                  onClick={() =>
+                                    void deliver(thread.conversation.id, {
+                                      body: item.body,
+                                      requestId: message.id,
+                                      createdAt: item.createdAt,
+                                    })
+                                  }
+                                >
+                                  Retry
+                                </Button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 {thread.guest.loginRequired && !expired && (
                   <div className="chat-signin">
                     <strong>Continue your conversation</strong>
@@ -349,7 +507,7 @@ export default function PublicChat() {
                   <Button
                     variant="secondary"
                     onClick={() => {
-                      pending.current = null;
+                      updateOutbox(() => ({}));
                       setThread(null);
                       setDraft("");
                       void openChat();
@@ -392,24 +550,38 @@ export default function PublicChat() {
                   void send();
                 }}
               >
-                <Input
+                <Textarea
                   variant="plain"
+                  rows={1}
+                  ref={draftInput}
                   aria-label="Your message"
                   placeholder="Write a message…"
                   value={draft}
                   maxLength={MAX_MESSAGE_BODY_LENGTH}
-                  readOnly={!!pending.current}
                   onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" &&
+                      !event.shiftKey &&
+                      !event.nativeEvent.isComposing
+                    ) {
+                      event.preventDefault();
+                      send();
+                    }
+                  }}
                 />
                 <Button
                   type="submit"
-                  disabled={busy || !draft.trim()}
-                  aria-label={
-                    pending.current ? "Retry sending message" : "Send message"
+                  disabled={
+                    !draft.trim() ||
+                    guestRemaining(
+                      thread.guest.remainingMessages,
+                      Object.keys(outbox).length,
+                    ) === 0
                   }
-                >
-                  {busy ? "…" : pending.current ? "Retry" : "→"}
-                </Button>
+                  aria-label="Send message"
+                  icon="arrow"
+                ></Button>
               </form>
             )}
           {!loading &&
@@ -418,7 +590,11 @@ export default function PublicChat() {
             !thread.guest.loginRequired &&
             !expired && (
               <div className="handover">
-                {thread.guest.remainingMessages} guest messages remaining
+                {guestRemaining(
+                  thread.guest.remainingMessages,
+                  Object.keys(outbox).length,
+                )}{" "}
+                guest messages remaining
               </div>
             )}
         </section>

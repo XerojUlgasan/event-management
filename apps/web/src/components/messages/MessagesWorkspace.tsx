@@ -73,6 +73,8 @@ export function MessagesWorkspace({
   error,
   onRetry,
   onSend,
+  failedMessageIds = [],
+  onRetryMessage,
   onToggleAi,
   pendingAiToggle = false,
   onBack,
@@ -106,6 +108,8 @@ export function MessagesWorkspace({
   error: string | null;
   onRetry?: () => void;
   onSend: (body: string) => Promise<void>;
+  failedMessageIds?: string[];
+  onRetryMessage?: (id: string) => void;
   onToggleAi?: (
     conversationId: string,
     aiEnabled: boolean,
@@ -143,6 +147,7 @@ export function MessagesWorkspace({
   } | null>(null);
   const generation = useRef(0);
   const thread = useRef<HTMLDivElement>(null);
+  const composer = useRef<HTMLTextAreaElement>(null);
   const inbox = useRef<HTMLElement>(null);
   const inboxBoundary = useRef<HTMLDivElement>(null);
   const historyBoundary = useRef<HTMLDivElement>(null);
@@ -308,16 +313,22 @@ export function MessagesWorkspace({
     const body = draft.trim();
     if (
       !body ||
-      sending ||
+      (!isTeam && sending) ||
       readOnly ||
       sendDisabled ||
       !activeId ||
-      pendingSendIds.current.has(activeId)
+      (!isTeam && pendingSendIds.current.has(activeId))
     )
       return;
     const request = generation.current;
     const conversationId = activeId;
     const sentDraft = draft;
+    if (isTeam) {
+      setDrafts((previous) => ({ ...previous, [conversationId]: "" }));
+      void onSend(body);
+      composer.current?.focus();
+      return;
+    }
     pendingSendIds.current.add(conversationId);
     setPendingSends((previous) => ({ ...previous, [conversationId]: true }));
     setSendError("");
@@ -674,6 +685,21 @@ export function MessagesWorkspace({
                   ) : (
                     message.body
                   )}
+                  {failedMessageIds.includes(message.id) && (
+                    <div className="message-delivery-error" role="alert">
+                      Delivery could not be confirmed.{" "}
+                      {!readOnly &&
+                        !closedBookingForCustomer &&
+                        onRetryMessage && (
+                          <Button
+                            variant="link"
+                            onClick={() => onRetryMessage(message.id)}
+                          >
+                            Retry
+                          </Button>
+                        )}
+                    </div>
+                  )}
                   <small className="message-meta">
                     {!mine && `${message.senderName} · `}
                     {timeFormatter.format(new Date(message.createdAt))}
@@ -709,12 +735,16 @@ export function MessagesWorkspace({
         )}
 
         {!readOnly && !closedBookingForCustomer && (
-          <form className="thread-input message-composer" onSubmit={submit}>
+          <form
+            className={`thread-input message-composer ${isTeam ? "customer-composer" : ""}`}
+            onSubmit={submit}
+          >
             <label htmlFor="conversation-message">
               {isTeam ? "Message the Styled by AMAC team" : "Reply to customer"}
             </label>
             <Textarea
               variant="plain"
+              ref={composer}
               rows={2}
               id="conversation-message"
               aria-label="Write a message"
@@ -724,13 +754,13 @@ export function MessagesWorkspace({
                   : "Write a message…"
               }
               value={draft}
-              disabled={!activeId || sending || sendDisabled}
+              disabled={!activeId || (!isTeam && sending) || sendDisabled}
               maxLength={MAX_MESSAGE_BODY_LENGTH}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (
                   event.key === "Enter" &&
-                  (event.ctrlKey || event.metaKey) &&
+                  (isTeam ? !event.shiftKey : event.ctrlKey || event.metaKey) &&
                   !event.nativeEvent.isComposing
                 ) {
                   event.preventDefault();
@@ -739,18 +769,20 @@ export function MessagesWorkspace({
               }}
             />
             <div className="message-composer-actions">
-              <small>Ctrl/⌘ + Enter to send</small>
+              {!isTeam && <small>Ctrl/⌘ + Enter to send</small>}
               <Button
                 type="submit"
                 icon="arrow"
-                pending={sending}
-                disabled={!draft.trim() || !activeId || sending || sendDisabled}
+                pending={!isTeam && sending}
+                aria-label={isTeam ? "Send message" : undefined}
+                disabled={
+                  !draft.trim() ||
+                  !activeId ||
+                  (!isTeam && sending) ||
+                  sendDisabled
+                }
               >
-                {sending
-                  ? viewerRole === "customer"
-                    ? "Waiting for AI…"
-                    : "Sending…"
-                  : "Send message"}
+                {!isTeam && (sending ? "Sending…" : "Send message")}
               </Button>
             </div>
           </form>

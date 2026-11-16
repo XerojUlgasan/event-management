@@ -421,3 +421,36 @@
 .messages-workspace .message-thread {
   overflow-anchor: none;
 }
+
+.messages-workspace .customer-composer {
+  flex-direction: row;
+  align-items: end;
+  gap: 10px;
+}
+.customer-composer > label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.customer-composer textarea {
+  min-height: 44px;
+  max-height: 120px;
+  resize: none;
+}
+.messages-workspace .customer-composer .button {
+  width: 44px;
+  padding: 0;
+  flex: none;
+}
+.message-delivery-error {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.message-delivery-error .button-link {
+  min-height: 0;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+}

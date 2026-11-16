@@ -57,6 +57,7 @@ export async function saveGuestMessageData(
     const message = await trx
       .insertInto("messages")
       .values({
+        id: requestId,
         conversation_id: id,
         sender_id: null,
         sender_role: "customer",
@@ -64,8 +65,15 @@ export async function saveGuestMessageData(
         body,
         created_at: sql<Date>`clock_timestamp()`,
       })
+      .onConflict((conflict) => conflict.column("id").doNothing())
       .returningAll()
-      .executeTakeFirstOrThrow();
+      .executeTakeFirst();
+    if (!message)
+      throw new GuestChatError(
+        409,
+        "Request ID was already used for a different message",
+        "request_conflict",
+      );
     const updated = await trx
       .updateTable("conversations")
       .set({
