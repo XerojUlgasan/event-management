@@ -6,6 +6,7 @@ import { listConversationHistoryData } from "../../data/messages/list-conversati
 import { createAssistantMessageData } from "../../data/messages/create-assistant-message.js";
 import { messageDto } from "../messages/message-response.js";
 import { getTextModel } from "./models.js";
+import { buildAssistantContext } from "./assistant-context.js";
 import { customerServicePrompt } from "./prompts/customer-service-prompt.js";
 
 export async function runAssistantTurnService({
@@ -35,18 +36,31 @@ export async function runAssistantTurnService({
   );
   if (history.at(-1)?.id !== customerMessageId)
     throw new Error("Customer message not found");
+  const context = JSON.stringify(
+    await buildAssistantContext({
+      db,
+      customerId,
+      bookingRequestId: conversation.booking_request_id,
+    }),
+  );
   // Never silently discard older history. Reject an oversized context explicitly.
   if (
-    history.reduce((size, message) => size + message.body.length, 0) > 200_000
+    history.reduce(
+      (size, message) => size + message.body.length,
+      context.length,
+    ) > 200_000
   )
     throw new Error("Conversation is too long for an AI reply");
-  const messages: ModelMessage[] = history.map((message) => ({
-    role: message.sender_role === "customer" ? "user" : "assistant",
-    content:
-      message.sender_role === "admin"
-        ? `AMAC team: ${message.body}`
-        : message.body,
-  }));
+  const messages: ModelMessage[] = [
+    { role: "user", content: context },
+    ...history.map((message): ModelMessage => ({
+      role: message.sender_role === "customer" ? "user" : "assistant",
+      content:
+        message.sender_role === "admin"
+          ? `AMAC team: ${message.body}`
+          : message.body,
+    })),
+  ];
   const { text, usage } = await generateText({
     model: getTextModel(),
     system: customerServicePrompt,

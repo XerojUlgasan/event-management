@@ -14,6 +14,7 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [AI message context](2026-11-16_14-53-07_ai-message-context.md) | Per-turn timestamp and customer-owned booking projection / feat/ai | complete | Review scoped implementation; live provider and browser behavior remain unverified |
 | [Booking package details](2026-11-16_14-41-10_booking-package-details.md) | Derived inquiry package details / feat/ai | complete | Review scoped diff; migration applied locally, hosted rollout remains separate |
 | [Automatic text replies](2026-11-16_14-21-59_automatic-text-replies.md) | Customer Messages history → text model → saved assistant reply / feat/ai | complete | Review scoped changes when requested; production and Gateway dashboard logs remain unverified |
 | [AI domain guidance](2026-11-16_13-47-50_ai-domain-guidance.md) | AI structure, standards, examples, and task prompt / feat/ai | complete | Use the AI area for the next authorized slice; implementation remains a separate task |

@@ -23,6 +23,7 @@ let customer: { id: string; cookie: string };
 let other: { id: string; cookie: string };
 let team: { id: string; cookie: string };
 let model: MockLanguageModelV4;
+let packageId: string;
 
 function useReply(text: string) {
   model = new MockLanguageModelV4({
@@ -96,6 +97,18 @@ before(async () => {
   customer = await session("customer");
   other = await session("customer");
   team = await session("admin");
+  packageId = (
+    await db
+      .insertInto("packages")
+      .values({
+        slug: `ai-context-${randomUUID()}`,
+        name: "Private package marker",
+        max_guests: 100,
+        price: 1000,
+      })
+      .returning("id")
+      .executeTakeFirstOrThrow()
+  ).id;
 });
 
 after(async () => {
@@ -138,6 +151,215 @@ async function send(conversationId: string, body: string) {
   assert.equal(response.status, 201);
   return customerMessageResultSchema.parse(await response.json());
 }
+
+function turnContext(callIndex: number) {
+  const message = model.doGenerateCalls[callIndex].prompt[1];
+  assert.equal(message.role, "user");
+  assert.equal(message.content.length, 1);
+  const part = message.content[0];
+  assert.equal(part.type, "text");
+  const context: unknown = JSON.parse(part.text);
+  assert.ok(context && typeof context === "object");
+  assert.ok("currentDateTime" in context);
+  assert.ok(typeof context.currentDateTime === "string");
+  const now = Date.parse(context.currentDateTime);
+  assert.equal(new Date(now).toISOString(), context.currentDateTime);
+  return { context, now };
+}
+
+async function booking(ownerId: string, reference: string) {
+  return (
+    await db
+      .insertInto("booking_requests")
+      .values({
+        reference,
+        customer_id: ownerId,
+        package_id: packageId,
+        event_type: "Wedding",
+        preferred_date: "2099-01-01",
+        requested_days: JSON.stringify([
+          { date: "2099-01-01", startsAt: null, endsAt: null },
+          { date: "2099-01-03", startsAt: null, endsAt: null },
+        ]),
+        time_zone: "Asia/Tokyo",
+        guest_count: 75,
+        contact_name: "Private contact marker",
+        phone_number: "private-phone-marker",
+        preferred_venue_location: "Garden",
+        special_requests: "Outdoor setup",
+        out_of_range: false,
+      })
+      .returning("id")
+      .executeTakeFirstOrThrow()
+  ).id;
+}
+
+test("general chat sends current time and null booking context without persisting it", async () => {
+  useReply("General reply");
+  const id = await conversation();
+  const before = Date.now();
+  await send(id, "General question");
+  const after = Date.now();
+  const { context, now } = turnContext(0);
+  assert.ok(now >= before && now <= after);
+  assert.deepEqual(context, {
+    currentDateTime: new Date(now).toISOString(),
+    timeZone: "Asia/Manila",
+    bookingRequest: null,
+  });
+  const messages = await db
+    .selectFrom("messages")
+    .select(["body", "sender_role"])
+    .where("conversation_id", "=", id)
+    .orderBy("created_at")
+    .execute();
+  assert.deepEqual(messages, [
+    { body: "General question", sender_role: "customer" },
+    { body: "General reply", sender_role: "assistant" },
+  ]);
+});
+
+test("linked booking context is projected, scoped, and refreshed for each turn", async () => {
+  useReply("Booking reply");
+  const reference = `AI-${randomUUID()}`;
+  const bookingId = await booking(customer.id, reference);
+  const otherBookingId = await booking(other.id, `PRIVATE-${randomUUID()}`);
+  const id = (
+    await db
+      .insertInto("conversations")
+      .values({ customer_id: customer.id, booking_request_id: bookingId })
+      .returning("id")
+      .executeTakeFirstOrThrow()
+  ).id;
+  const scheduleId = randomUUID();
+  await db
+    .insertInto("events_day")
+    .values({
+      id: scheduleId,
+      booking_request_id: bookingId,
+      day: new Date("2099-01-01T00:00:00Z"),
+      starts_at: new Date("2099-01-01T01:00:00Z"),
+      ends_at: new Date("2099-01-01T04:00:00Z"),
+    })
+    .execute();
+  await db
+    .updateTable("booking_requests")
+    .set({
+      requested_days: JSON.stringify([
+        {
+          date: "2099-01-01",
+          startsAt: "2099-01-01T00:00:00.000Z",
+          endsAt: "2099-01-01T03:00:00.000Z",
+          eventDayId: scheduleId,
+        },
+        { date: "2099-01-03", startsAt: null, endsAt: null },
+      ]),
+    })
+    .where("id", "=", bookingId)
+    .execute();
+  const before = Date.now();
+  await send(id, "Booking question");
+  const after = Date.now();
+  const first = turnContext(0);
+  assert.ok(first.now >= before && first.now <= after);
+  assert.deepEqual(first.context, {
+    currentDateTime: new Date(first.now).toISOString(),
+    timeZone: "Asia/Tokyo",
+    bookingRequest: {
+      reference,
+      status: "under_review",
+      eventType: "Wedding",
+      guestCount: 75,
+      timeZone: "Asia/Tokyo",
+      requestedDays: [
+        {
+          date: "2099-01-01",
+          startsAt: "2099-01-01T00:00:00.000Z",
+          endsAt: "2099-01-01T03:00:00.000Z",
+          operationalSchedule: {
+            day: "2099-01-01",
+            startsAt: "2099-01-01T01:00:00.000Z",
+            endsAt: "2099-01-01T04:00:00.000Z",
+            timeZone: "Asia/Tokyo",
+            status: "scheduled",
+          },
+        },
+        {
+          date: "2099-01-03",
+          startsAt: null,
+          endsAt: null,
+          operationalSchedule: null,
+        },
+      ],
+      preferredVenueLocation: "Garden",
+      specialRequests: "Outdoor setup",
+    },
+  });
+  assert.doesNotMatch(
+    JSON.stringify(first.context),
+    new RegExp(
+      `${bookingId}|${otherBookingId}|${scheduleId}|${packageId}|Private package marker|Private contact marker|private-phone-marker`,
+    ),
+  );
+  await db
+    .updateTable("booking_requests")
+    .set({
+      status: "needs_details",
+      guest_count: 90,
+      requested_days: null,
+      starts_at: new Date("2099-01-01T02:00:00Z"),
+      ends_at: new Date("2099-01-01T05:00:00Z"),
+      special_requests: "Updated setup",
+    })
+    .where("id", "=", bookingId)
+    .execute();
+  await send(id, "Follow-up booking question");
+  const second = turnContext(1);
+  assert.deepEqual(second.context, {
+    currentDateTime: new Date(second.now).toISOString(),
+    timeZone: "Asia/Tokyo",
+    bookingRequest: {
+      reference,
+      status: "needs_details",
+      eventType: "Wedding",
+      guestCount: 90,
+      timeZone: "Asia/Tokyo",
+      requestedDays: null,
+      preferredDate: "2099-01-01",
+      startsAt: "2099-01-01T02:00:00.000Z",
+      endsAt: "2099-01-01T05:00:00.000Z",
+      preferredVenueLocation: "Garden",
+      specialRequests: "Updated setup",
+    },
+  });
+  assert.match(
+    JSON.stringify(model.doGenerateCalls[1].prompt.slice(2)),
+    /Booking reply/,
+  );
+  const persisted = await db
+    .selectFrom("messages")
+    .select("body")
+    .where("conversation_id", "=", id)
+    .execute();
+  assert.equal(persisted.length, 4);
+  assert.ok(persisted.every(({ body }) => !body.includes(reference)));
+});
+
+test("a conversation linked to another customer's booking fails before generation", async () => {
+  useReply("Should not run");
+  const bookingId = await booking(other.id, `PRIVATE-${randomUUID()}`);
+  const id = (
+    await db
+      .insertInto("conversations")
+      .values({ customer_id: customer.id, booking_request_id: bookingId })
+      .returning("id")
+      .executeTakeFirstOrThrow()
+  ).id;
+  const result = await send(id, "Question about this request");
+  assert.equal(result.assistantMessage, null);
+  assert.match(result.assistantError ?? "", /message was saved/);
+  assert.equal(model.doGenerateCalls.length, 0);
+});
 
 test("customer sends generate persisted AI replies, visible after refresh with correct unread ownership", async () => {
   useReply("Hello from AMAC AI");
@@ -200,11 +422,11 @@ test("model receives all ordered history beyond the UI page, including human tea
   const result = await send(id, "Latest question");
   assert.equal(result.assistantError, null);
   const prompt = model.doGenerateCalls[0].prompt;
-  assert.equal(prompt.length, 24); // system + 22 stored messages + latest customer
+  assert.equal(prompt.length, 25); // system + context + 22 stored messages + latest customer
   assert.equal(prompt[1].role, "user");
-  assert.equal(prompt[21].role, "assistant");
   assert.equal(prompt[22].role, "assistant");
-  assert.match(JSON.stringify(prompt[21]), /AMAC team: history-20/);
+  assert.equal(prompt[23].role, "assistant");
+  assert.match(JSON.stringify(prompt[22]), /AMAC team: history-20/);
   assert.match(JSON.stringify(prompt.at(-1)), /Latest question/);
   assert.doesNotMatch(JSON.stringify(prompt), /unrelated-private-marker/);
   await send(id, "Follow-up");
@@ -323,6 +545,21 @@ test("cancelled generation and oversized history keep the saved customer message
   await db
     .updateTable("messages")
     .set({ body: "x".repeat(200_001) })
+    .where("id", "=", trigger.id)
+    .execute();
+  await assert.rejects(
+    runAssistantTurnService({
+      db,
+      customerId: customer.id,
+      conversationId: id,
+      customerMessageId: trigger.id,
+    }),
+    /Conversation is too long/,
+  );
+  // History alone fits, but the per-turn context makes the full input too large.
+  await db
+    .updateTable("messages")
+    .set({ body: "x".repeat(199_950) })
     .where("id", "=", trigger.id)
     .execute();
   await assert.rejects(
