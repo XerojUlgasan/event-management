@@ -39,6 +39,8 @@ const conversation = (
   guestCount: null,
   status: "active",
   closedAt: null,
+  aiEnabled: true,
+  aiVersion: 0,
   lastMessage: body === null ? null : message(`message-${id}`, body),
   unreadCount: 0,
   updatedAt: "2026-11-14T09:00:00.000Z",

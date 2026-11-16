@@ -28,6 +28,8 @@ export type ConversationDto = {
   eventEndsAt: string | null;
   guestCount: number | null;
   status: "active" | "closed";
+  aiEnabled: boolean;
+  aiVersion: number;
   closedAt: string | null;
   lastMessage: MessageDto | null;
   unreadCount: number;
@@ -79,6 +81,8 @@ export function conversationDto(
       : null,
     guestCount: row.guest_count,
     status: row.status as ConversationDto["status"],
+    aiEnabled: row.ai_enabled,
+    aiVersion: row.ai_version,
     closedAt: row.closed_at ? new Date(row.closed_at).toISOString() : null,
     lastMessage,
     unreadCount,

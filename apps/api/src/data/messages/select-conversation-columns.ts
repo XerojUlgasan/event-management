@@ -13,6 +13,8 @@ export function selectConversationColumnsData(db: Database) {
       "c.id",
       "c.customer_id",
       "c.status",
+      "c.ai_enabled",
+      "c.ai_version",
       "c.closed_at",
       "c.booking_request_id",
       "c.created_at",

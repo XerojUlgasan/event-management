@@ -13,7 +13,10 @@ import type {
 import type { ReactNode } from "react";
 import type { ServiceContent } from "../../lib/data/catalog/services";
 import { catalogMediaSrc } from "../../lib/data/catalog/media";
-import { priceLabel } from "../../lib/utils/formatting/money";
+import {
+  priceLabel,
+  servicePricingLabels,
+} from "../../lib/utils/formatting/money";
 import "../../styles/catalog/catalog-content.css";
 
 const resolveWidget = (widget: CatalogWidget): CatalogWidget =>
@@ -91,12 +94,8 @@ export function PackageCanvas({
   );
 }
 
-export const serviceRateLabel = (rate: number | null) =>
-  rate == null
-    ? "Rate not set"
-    : `${new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(rate)} / hour`;
-
 export function ServiceCanvas({ item }: { item: ServiceContent }) {
+  const pricing = servicePricingLabels(item);
   return (
     <CatalogCanvas>
       <div className="catalog-detail-intro">
@@ -105,7 +104,8 @@ export function ServiceCanvas({ item }: { item: ServiceContent }) {
           <CatalogMarkdown source={item.description} />
         </div>
         <div className="catalog-detail-meta">
-          <strong>{serviceRateLabel(item.hourlyRatePesos)}</strong>
+          <strong>{pricing.price}</strong>
+          {pricing.excess && <span>{pricing.excess}</span>}
         </div>
       </div>
       <CatalogSections sections={resolveSections(item.sections)} />

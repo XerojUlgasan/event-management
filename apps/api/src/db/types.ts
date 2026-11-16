@@ -66,38 +66,9 @@ export interface BookingRequestStatusHistory {
   status: string;
 }
 
-export interface CatalogPages {
-  created_at: Generated<Timestamp>;
-  id: Generated<string>;
-  package_id: string | null;
-  service_id: string | null;
-  updated_at: Generated<Timestamp>;
-}
-
-export interface CatalogSections {
-  id: Generated<string>;
-  page_id: string;
-  sort_order: number;
-  title: Generated<string>;
-}
-
-export interface CatalogWidgets {
-  alt: Generated<string>;
-  autoplay: Generated<boolean>;
-  caption: Generated<string>;
-  h: number;
-  id: Generated<string>;
-  markdown: Generated<string>;
-  media_id: string | null;
-  section_id: string;
-  sort_order: number;
-  type: string;
-  w: number;
-  x: number;
-  y: number;
-}
-
 export interface Conversations {
+  ai_enabled: Generated<boolean>;
+  ai_version: Generated<number>;
   booking_request_id: string | null;
   closed_at: Timestamp | null;
   created_at: Generated<Timestamp>;
@@ -144,6 +115,7 @@ export interface Messages {
 
 export interface Packages {
   archived_at: Timestamp | null;
+  canvas: Generated<Json>;
   created_at: Generated<Timestamp>;
   custom_for_booking_request_id: string | null;
   description: Generated<string>;
@@ -189,10 +161,13 @@ export interface Quotations {
 
 export interface Services {
   archived_at: Timestamp | null;
+  canvas: Generated<Json>;
   created_at: Generated<Timestamp>;
   description: string;
+  fixed_price_pesos: number | null;
   hourly_rate_pesos: number | null;
   id: Generated<string>;
+  included_hours: number | null;
   name: string;
   published_at: Generated<Timestamp>;
   slug: string;
@@ -222,9 +197,6 @@ export interface DB {
   audit_events: AuditEvents;
   booking_request_status_history: BookingRequestStatusHistory;
   booking_requests: BookingRequests;
-  catalog_pages: CatalogPages;
-  catalog_sections: CatalogSections;
-  catalog_widgets: CatalogWidgets;
   conversations: Conversations;
   events_day: EventsDay;
   media_assets: MediaAssets;

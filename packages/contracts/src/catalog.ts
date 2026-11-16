@@ -29,6 +29,16 @@ export type CatalogSection = {
   title: string;
   widgets: CatalogWidget[];
 };
+export type ServicePricing = {
+  hourlyRatePesos: number | null;
+  fixedPricePesos: number | null;
+  includedHours: number | null;
+};
+export type ServiceContent = ServicePricing & {
+  name: string;
+  description: string;
+  sections: CatalogSection[];
+};
 export type PackagePrice = {
   kind: "fixed";
   currency: "PHP";

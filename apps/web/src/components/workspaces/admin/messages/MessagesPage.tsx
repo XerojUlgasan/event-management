@@ -8,14 +8,20 @@ import {
   getAdminConversation,
   getAdminConversations,
   sendAdminMessage,
+  updateAdminConversationAi,
+  type ChatConversation,
   type ChatThread,
 } from "../../../../lib/data/messages/conversations";
+import { ApiError } from "../../../../lib/http/request";
 import { useConversationList } from "../../../../lib/services/messages/use-conversation-list";
 import { MessagesWorkspace } from "../../../messages/MessagesWorkspace";
 import {
+  mergeAiStateByVersion,
   mergePolledThread,
   prependOlder,
 } from "../../../../lib/services/messages/merge-thread";
+
+type ConversationAiState = Pick<ChatConversation, "aiEnabled" | "aiVersion">;
 
 export function MessagesPage() {
   const { notifyError } = useNotifications();
@@ -30,7 +36,36 @@ export function MessagesPage() {
   const activeIdRef = useRef<string | null>(null);
   const loadingThreadId = useRef<string | null>(null);
   const localMessages = useRef(new Set<string>());
-  const inbox = useConversationList(getAdminConversations);
+  const aiStateByConversation = useRef(new Map<string, ConversationAiState>());
+  const rememberAiState = useCallback(
+    (id: string, incoming: ConversationAiState) => {
+      const next = mergeAiStateByVersion(
+        aiStateByConversation.current.get(id) ?? null,
+        { aiEnabled: incoming.aiEnabled, aiVersion: incoming.aiVersion },
+      );
+      aiStateByConversation.current.set(id, next);
+      return next;
+    },
+    [],
+  );
+  const normalizeConversation = useCallback(
+    (conversation: ChatConversation) => ({
+      ...conversation,
+      ...rememberAiState(conversation.id, conversation),
+    }),
+    [rememberAiState],
+  );
+  const loadConversations = useCallback(
+    async (cursor?: string) => {
+      const page = await getAdminConversations(cursor);
+      return {
+        ...page,
+        conversations: page.conversations.map(normalizeConversation),
+      };
+    },
+    [normalizeConversation],
+  );
+  const inbox = useConversationList(loadConversations);
   const { conversations, setConversations } = inbox;
   const [activeId, setActiveId] = useState<string | null>(null);
   activeIdRef.current = activeId;
@@ -41,6 +76,8 @@ export function MessagesPage() {
   const [historyNotice, setHistoryNotice] = useState("");
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [olderError, setOlderError] = useState("");
+  const [aiPending, setAiPending] = useState<Record<string, boolean>>({});
+  const aiPendingRef = useRef(new Set<string>());
   const olderRequest = useRef(0);
   const olderPending = useRef(false);
 
@@ -50,8 +87,12 @@ export function MessagesPage() {
       loadingThreadId.current = id;
       setLoadingThread(true);
       try {
-        const result = await getAdminConversation(id);
+        const response = await getAdminConversation(id);
         if (!mounted.current || activeIdRef.current !== id) return;
+        const result = {
+          ...response,
+          conversation: normalizeConversation(response.conversation),
+        };
         const unacknowledged = new Set(localMessages.current);
         result.messages.forEach((message) =>
           localMessages.current.delete(message.id),
@@ -65,7 +106,14 @@ export function MessagesPage() {
           return merged.thread;
         });
         setConversations((current) =>
-          current.map((item) => (item.id === id ? result.conversation : item)),
+          current.map((item) =>
+            item.id === id
+              ? {
+                  ...result.conversation,
+                  ...mergeAiStateByVersion(item, result.conversation),
+                }
+              : item,
+          ),
         );
         setThreadError("");
         threadFailure.current = "";
@@ -87,7 +135,7 @@ export function MessagesPage() {
           setLoadingThread(false);
       }
     },
-    [notifyError, setConversations],
+    [normalizeConversation, notifyError, setConversations],
   );
 
   useEffect(() => {
@@ -155,14 +203,17 @@ export function MessagesPage() {
 
   const send = async (body: string) => {
     if (!activeId) return;
-    const result = await sendAdminMessage(activeId, body);
+    const conversationId = activeId;
+    const result = await sendAdminMessage(conversationId, body);
+    const aiState = rememberAiState(conversationId, result);
     localMessages.current.add(result.message.id);
     setThread((current) =>
-      current && current.conversation.id === activeId
+      current && current.conversation.id === conversationId
         ? {
             ...current,
             conversation: {
               ...current.conversation,
+              ...aiState,
               status: "active",
               lastMessage: result.message,
               updatedAt: result.message.createdAt,
@@ -171,7 +222,91 @@ export function MessagesPage() {
           }
         : current,
     );
+    setConversations((current) =>
+      current.map((item) =>
+        item.id === conversationId ? { ...item, ...aiState } : item,
+      ),
+    );
     void inbox.refresh();
+  };
+
+  const toggleAi = async (
+    id: string,
+    aiEnabled: boolean,
+    expectedAiVersion: number,
+  ) => {
+    if (aiPendingRef.current.has(id)) return;
+    aiPendingRef.current.add(id);
+    setAiPending((current) => ({ ...current, [id]: true }));
+    try {
+      const result = await updateAdminConversationAi(
+        id,
+        aiEnabled,
+        expectedAiVersion,
+      );
+      const aiState = rememberAiState(id, result);
+      setThread((current) =>
+        current && current.conversation.id === id
+          ? {
+              ...current,
+              conversation: { ...current.conversation, ...aiState },
+            }
+          : current,
+      );
+      setConversations((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, ...aiState } : item,
+        ),
+      );
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 409) {
+        try {
+          const response = await getAdminConversation(id);
+          const result = {
+            ...response,
+            conversation: normalizeConversation(response.conversation),
+          };
+          const unacknowledged = new Set(localMessages.current);
+          result.messages.forEach((message) =>
+            localMessages.current.delete(message.id),
+          );
+          setThread((current) =>
+            current?.conversation.id === id
+              ? mergePolledThread(current, result, unacknowledged).thread
+              : current,
+          );
+          setConversations((current) =>
+            current.map((item) =>
+              item.id === id
+                ? {
+                    ...result.conversation,
+                    ...mergeAiStateByVersion(item, result.conversation),
+                  }
+                : item,
+            ),
+          );
+          notifyError(
+            new Error(
+              "The AI setting changed elsewhere. The current value was refreshed.",
+            ),
+          );
+        } catch (refreshCause) {
+          notifyError(
+            refreshCause,
+            "The AI setting changed, but its current value could not be loaded.",
+          );
+        }
+      } else {
+        notifyError(cause, "Unable to update the AI reply setting.");
+      }
+    } finally {
+      aiPendingRef.current.delete(id);
+      setAiPending((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+    }
   };
 
   return (
@@ -211,6 +346,8 @@ export function MessagesPage() {
         }}
         sendDisabled={thread?.conversation.id !== activeId || !!threadError}
         onSend={send}
+        onToggleAi={toggleAi}
+        pendingAiToggle={!!aiPending[activeId ?? ""]}
         onBack={() => {
           setConversationOpen(false);
           setActiveId(null);

@@ -1,4 +1,4 @@
-import type { Database } from "./catalog-page.js";
+import type { Database } from "./catalog-canvas.js";
 export function hasPackageBookingReferenceData(db: Database, id: string) {
   return db
     .selectFrom("booking_requests")

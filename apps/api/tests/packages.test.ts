@@ -233,6 +233,8 @@ async function createServiceWithPhoto(content: unknown) {
       "/admin/services",
       "POST",
       {
+        fixedPricePesos: null,
+        includedHours: null,
         ...(content as object),
         sections: [
           {
@@ -266,6 +268,8 @@ test("services save directly, validate complete content, and enforce permissions
     name: "Photo",
     description: "Coverage",
     hourlyRatePesos: 500,
+    fixedPricePesos: null,
+    includedHours: null,
   };
   await read(await call("/admin/services", "POST", content), 401);
   for (const cookie of [customerCookie, otherCustomerCookie])
@@ -397,11 +401,163 @@ test("services save directly, validate complete content, and enforce permissions
   assert.equal(spec.paths["/v1/admin/services/{id}/publish"], undefined);
 });
 
+test("service pricing validates and switches between fixed and hourly modes", async () => {
+  const hourly = {
+    name: "Pricing service",
+    description: "Coverage",
+    hourlyRatePesos: 500,
+    fixedPricePesos: null,
+    includedHours: null,
+  };
+  const created = await createServiceWithPhoto(hourly);
+  const fixedCreated = await createServiceWithPhoto({
+    ...hourly,
+    name: "Fixed pricing service",
+    fixedPricePesos: 3000,
+    includedHours: 3,
+  });
+  assert.deepEqual(
+    [
+      fixedCreated.fixedPricePesos,
+      fixedCreated.includedHours,
+      fixedCreated.hourlyRatePesos,
+    ],
+    [3000, 3, 500],
+  );
+  for (const pricing of [
+    { fixedPricePesos: 2000, includedHours: null },
+    { fixedPricePesos: null, includedHours: 2 },
+    { fixedPricePesos: 0, includedHours: 2 },
+    { fixedPricePesos: 2000, includedHours: 0 },
+    { fixedPricePesos: 2000, includedHours: 1.5 },
+    { fixedPricePesos: 2000, includedHours: 2, hourlyRatePesos: null },
+  ]) {
+    await read(
+      await call(
+        "/admin/services",
+        "POST",
+        {
+          ...hourly,
+          ...pricing,
+          sections: created.sections,
+        },
+        adminCookie,
+      ),
+      400,
+    );
+    await read(
+      await call(
+        `/admin/services/${created.id}`,
+        "PATCH",
+        {
+          ...hourly,
+          ...pricing,
+          expectedUpdatedAt: created.updatedAt,
+        },
+        adminCookie,
+      ),
+      400,
+    );
+  }
+  const { fixedPricePesos: omitted, ...missingFixed } = hourly;
+  await read(
+    await call(
+      "/admin/services",
+      "POST",
+      {
+        ...missingFixed,
+        sections: created.sections,
+      },
+      adminCookie,
+    ),
+    400,
+  );
+  const { includedHours: omittedHours, ...missingHours } = hourly;
+  await read(
+    await call(
+      "/admin/services",
+      "POST",
+      {
+        ...missingHours,
+        sections: created.sections,
+      },
+      adminCookie,
+    ),
+    400,
+  );
+  await read(
+    await call(
+      `/admin/services/${created.id}`,
+      "PATCH",
+      {
+        ...missingFixed,
+        expectedUpdatedAt: created.updatedAt,
+      },
+      adminCookie,
+    ),
+    400,
+  );
+  const fixed = await read(
+    await call(
+      `/admin/services/${created.id}`,
+      "PATCH",
+      {
+        ...hourly,
+        fixedPricePesos: 2000,
+        includedHours: 2,
+        expectedUpdatedAt: created.updatedAt,
+      },
+      adminCookie,
+    ),
+    200,
+  );
+  const publicFixed = await read(await call(`/services/${created.id}`), 200);
+  assert.deepEqual(
+    [
+      publicFixed.fixedPricePesos,
+      publicFixed.includedHours,
+      publicFixed.hourlyRatePesos,
+    ],
+    [2000, 2, 500],
+  );
+  const persisted = await pool.query(
+    "SELECT fixed_price_pesos, included_hours, hourly_rate_pesos FROM services WHERE id=$1",
+    [created.id],
+  );
+  assert.deepEqual(persisted.rows[0], {
+    fixed_price_pesos: 2000,
+    included_hours: 2,
+    hourly_rate_pesos: 500,
+  });
+  const backToHourly = await read(
+    await call(
+      `/admin/services/${created.id}`,
+      "PATCH",
+      {
+        ...hourly,
+        expectedUpdatedAt: fixed.updatedAt,
+      },
+      adminCookie,
+    ),
+    200,
+  );
+  assert.deepEqual(
+    [
+      backToHourly.fixedPricePesos,
+      backToHourly.includedHours,
+      backToHourly.hourlyRatePesos,
+    ],
+    [null, null, 500],
+  );
+});
+
 test("service canvas photos replace legacy image uploads and clean up removed media", async () => {
   const content = {
     name: "Uploaded service",
     description: "Description",
     hourlyRatePesos: 300,
+    fixedPricePesos: null,
+    includedHours: null,
   };
   const created = await createServiceWithPhoto(content);
   const oldPhoto = created.sections[0].widgets[0].media;
@@ -561,11 +717,8 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
     expectedGeometry,
   );
   const before = (
-    await pool.query(
-      "SELECT count(*) FROM catalog_sections WHERE page_id=(SELECT id FROM catalog_pages WHERE package_id=$1)",
-      [created.id],
-    )
-  ).rows[0].count;
+    await pool.query("SELECT canvas FROM packages WHERE id=$1", [created.id])
+  ).rows[0].canvas;
   const bad = structuredClone(data);
   bad.sections[0].widgets[0].media = {
     kind: "image",
@@ -586,13 +739,9 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
     (await read(await call(`/packages/${created.id}`), 200)).name,
     current.name,
   );
-  assert.equal(
-    (
-      await pool.query(
-        "SELECT count(*) FROM catalog_sections WHERE page_id=(SELECT id FROM catalog_pages WHERE package_id=$1)",
-        [created.id],
-      )
-    ).rows[0].count,
+  assert.deepEqual(
+    (await pool.query("SELECT canvas FROM packages WHERE id=$1", [created.id]))
+      .rows[0].canvas,
     before,
   );
   assert.equal(
@@ -640,10 +789,9 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
   );
   assert.equal(
     (
-      await pool.query(
-        "SELECT count(*) FROM catalog_pages WHERE package_id=$1",
-        [created.id],
-      )
+      await pool.query("SELECT count(*) FROM packages WHERE id=$1", [
+        created.id,
+      ])
     ).rows[0].count,
     "0",
   );
@@ -1065,13 +1213,15 @@ test("public package and service filters apply before pagination", async () => {
     [services[2].id],
   );
   const servicePage = await read(
-    await call("/services?limit=1&minPricePesos=765000&maxPricePesos=765000"),
+    await call(
+      "/services?pricingType=hourly&limit=1&minPricePesos=765000&maxPricePesos=765000",
+    ),
     200,
   );
   assert.ok(servicePage.nextCursor);
   const serviceNext = await read(
     await call(
-      `/services?limit=1&minPricePesos=765000&maxPricePesos=765000&cursor=${encodeURIComponent(servicePage.nextCursor)}`,
+      `/services?pricingType=hourly&limit=1&minPricePesos=765000&maxPricePesos=765000&cursor=${encodeURIComponent(servicePage.nextCursor)}`,
     ),
     200,
   );
@@ -1082,10 +1232,64 @@ test("public package and service filters apply before pagination", async () => {
   assert.equal(serviceNext.nextCursor, null);
   await read(
     await call(
-      `/services?minPricePesos=765001&cursor=${encodeURIComponent(servicePage.nextCursor)}`,
+      `/services?pricingType=hourly&minPricePesos=765001&cursor=${encodeURIComponent(servicePage.nextCursor)}`,
     ),
     400,
   );
+  const fixedServices = [];
+  for (const index of [0, 1])
+    fixedServices.push(
+      await createServiceWithPhoto({
+        name: `Filter fixed service ${index}`,
+        description: "Filter test",
+        fixedPricePesos: 765000,
+        includedHours: 6,
+        hourlyRatePesos: 12,
+      }),
+    );
+  const fixedPage = await read(
+    await call(
+      "/services?pricingType=fixed&limit=1&minPricePesos=765000&maxPricePesos=765000",
+    ),
+    200,
+  );
+  assert.equal(fixedPage.services.length, 1);
+  assert.ok(fixedPage.nextCursor);
+  const fixedNext = await read(
+    await call(
+      `/services?pricingType=fixed&limit=1&minPricePesos=765000&maxPricePesos=765000&cursor=${encodeURIComponent(fixedPage.nextCursor)}`,
+    ),
+    200,
+  );
+  assert.deepEqual(
+    new Set([fixedPage.services[0].id, fixedNext.services[0].id]),
+    new Set(fixedServices.map((s) => s.id)),
+  );
+  assert.equal(fixedNext.nextCursor, null);
+  await read(
+    await call(
+      `/services?pricingType=hourly&limit=1&minPricePesos=765000&maxPricePesos=765000&cursor=${encodeURIComponent(fixedPage.nextCursor)}`,
+    ),
+    400,
+  );
+  const hourlyWithSmallRate = await read(
+    await call(
+      "/services?pricingType=hourly&minPricePesos=12&maxPricePesos=12",
+    ),
+    200,
+  );
+  assert.ok(
+    hourlyWithSmallRate.services.every(
+      (s: { fixedPricePesos: number | null }) => s.fixedPricePesos === null,
+    ),
+  );
+  for (const query of [
+    "minPricePesos=765000",
+    "pricingType=unknown",
+    "pricingType=fixed&minPricePesos=2&maxPricePesos=1",
+    "pricingType=hourly&minPricePesos=1.5",
+  ])
+    await read(await call(`/services?${query}`), 400);
   const unfiltered = await read(await call("/services?limit=50"), 200);
   assert.ok(
     unfiltered.services.some((s: { id: string }) => s.id === services[2].id),
@@ -1315,11 +1519,21 @@ test("video autoplay is opt-in, persists on public reads, and cannot be enabled 
       400,
     );
   }
-  await assert.rejects(
-    pool.query("UPDATE catalog_widgets SET autoplay=true WHERE id=$1", [
-      ordinary.sections[0].widgets[0].id,
-    ]),
-    /catalog_widgets_video_autoplay/,
+  const invalidEdit = structuredClone(data);
+  Object.assign(invalidEdit.sections[0].widgets[0], { autoplay: true });
+  await read(
+    await call(
+      `/admin/packages/${ordinary.id}`,
+      "PATCH",
+      { ...invalidEdit, expectedUpdatedAt: ordinary.updatedAt },
+      adminCookie,
+    ),
+    400,
+  );
+  assert.equal(
+    (await read(await call(`/packages/${ordinary.id}`), 200)).sections[0]
+      .widgets[0].autoplay,
+    false,
   );
   const mp4 = new Uint8Array([
     0, 0, 0, 20, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0, 105, 115,
@@ -1353,11 +1567,12 @@ test("video autoplay is opt-in, persists on public reads, and cannot be enabled 
   assert.equal(published.sections[0].widgets[0].caption, "Event film");
   assert.equal(
     (
-      await pool.query("SELECT autoplay FROM catalog_widgets WHERE id=$1", [
-        published.sections[0].widgets[0].id,
-      ])
+      await pool.query(
+        "SELECT canvas->0->'widgets'->0->>'autoplay' AS autoplay FROM packages WHERE id=$1",
+        [created.id],
+      )
     ).rows[0].autoplay,
-    true,
+    "true",
   );
   const invalid = {
     ...content,
@@ -1579,9 +1794,25 @@ test("admin archived media is private and unclaimed uploads cannot be taken by a
   const c = structuredClone(data);
   c.sections[0].widgets[0].media = media;
   await read(await call("/admin/packages", "POST", c, other), 400);
+  const uppercase = structuredClone(c);
+  assert.ok(uppercase.sections[0].widgets[0].media);
+  Object.assign(uppercase.sections[0].widgets[0].media, {
+    id: media.id.toUpperCase(),
+  });
+  await read(await call("/admin/packages", "POST", uppercase, other), 400);
   const pkg = await read(
-    await call("/admin/packages", "POST", c, adminCookie),
+    await call("/admin/packages", "POST", uppercase, adminCookie),
     201,
+  );
+  assert.equal(pkg.sections[0].widgets[0].media.id, media.id);
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT canvas->0->'widgets'->0->>'mediaId' AS id FROM packages WHERE id=$1",
+        [pkg.id],
+      )
+    ).rows[0].id,
+    media.id,
   );
   const edit = await read(
     await call(
@@ -1775,16 +2006,51 @@ test("service canvases save rich content directly and enforce media ownership", 
         },
       ],
     },
+    {
+      id: randomUUID(),
+      title: "More details",
+      widgets: [
+        {
+          id: randomUUID(),
+          type: "markdown",
+          x: 1,
+          y: 2,
+          w: 5,
+          h: 3,
+          markdown: "Additional details",
+          media: null,
+          alt: "",
+          caption: "",
+          autoplay: false,
+        },
+      ],
+    },
   ];
   const service = {
     name: "Canvas service",
     description: "Summary",
     hourlyRatePesos: 100,
+    fixedPricePesos: null,
+    includedHours: null,
     sections,
   };
   const created = await read(
     await call("/admin/services", "POST", service, adminCookie),
     201,
+  );
+  const savedCanvas = (
+    await pool.query("SELECT canvas FROM services WHERE id=$1", [created.id])
+  ).rows[0].canvas;
+  assert.deepEqual(
+    savedCanvas,
+    sections.map((section) => ({
+      id: section.id,
+      title: section.title,
+      widgets: section.widgets.map(({ media, ...widget }) => ({
+        ...widget,
+        mediaId: media?.id ?? null,
+      })),
+    })),
   );
   const visible = await read(await call(`/services/${created.id}`), 200);
   assert.equal(visible.imageUrl, photo.url);
@@ -1811,6 +2077,29 @@ test("service canvases save rich content directly and enforce media ownership", 
       adminCookie,
     ),
     200,
+  );
+  assert.deepEqual(
+    (await pool.query("SELECT canvas FROM services WHERE id=$1", [created.id]))
+      .rows[0].canvas,
+    savedCanvas,
+  );
+  await read(
+    await call(
+      `/admin/services/${created.id}`,
+      "PATCH",
+      {
+        ...legacy,
+        name: "Stale edit",
+        expectedUpdatedAt: created.updatedAt,
+      },
+      adminCookie,
+    ),
+    409,
+  );
+  assert.deepEqual(
+    (await pool.query("SELECT canvas FROM services WHERE id=$1", [created.id]))
+      .rows[0].canvas,
+    savedCanvas,
   );
   assert.equal(edited.sections[0].widgets[0].media.id, photo.id);
   assert.deepEqual(

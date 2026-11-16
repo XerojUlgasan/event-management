@@ -4,7 +4,7 @@ import type { Packages } from "../../db/types.js";
 import {
   readPackageSectionsData,
   type Database,
-} from "../../data/packages/catalog-page.js";
+} from "../../data/packages/catalog-canvas.js";
 import { listPackageServicesData } from "../../data/packages/package-services.js";
 export async function packageDto(
   db: Database,

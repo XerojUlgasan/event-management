@@ -95,9 +95,6 @@ const tables = [
   "users",
   "sessions",
   "packages",
-  "catalog_pages",
-  "catalog_sections",
-  "catalog_widgets",
   "media_assets",
   "services",
   "booking_requests",
@@ -115,6 +112,14 @@ async function ids() {
       `SELECT id FROM ${table} ORDER BY id`,
     );
     snapshot[table] = result.rows.map((row) => row.id);
+  }
+  for (const table of ["packages", "services"]) {
+    const result = await pool.query<{ id: string; canvas: unknown }>(
+      `SELECT id, canvas FROM ${table} ORDER BY id`,
+    );
+    snapshot[`${table}_canvas`] = result.rows.map((row) =>
+      JSON.stringify([row.id, row.canvas]),
+    );
   }
   return snapshot;
 }
@@ -184,16 +189,24 @@ test("seed creates demo users and conversations while preserving unrelated data 
     (SELECT count(*)::int FROM packages WHERE name LIKE 'Scenario Celebration %') AS packages,
     (SELECT count(*)::int FROM services WHERE name LIKE 'Scenario Service %') AS services,
     (SELECT count(*)::int FROM media_assets m WHERE NOT EXISTS (
-      SELECT 1 FROM catalog_widgets w JOIN catalog_sections cs ON cs.id=w.section_id
-      JOIN catalog_pages cp ON cp.id=cs.page_id JOIN packages p ON p.id=cp.package_id
-      WHERE w.media_id=m.id AND p.name IN ('The Grand Celebration', 'The Intimate Gathering', 'The Sweet Soirée')
+      SELECT 1 FROM packages p, jsonb_array_elements(p.canvas) section,
+        jsonb_array_elements(section->'widgets') widget
+      WHERE p.name IN ('The Grand Celebration', 'The Intimate Gathering', 'The Sweet Soirée')
+        AND widget->>'mediaId'=m.id::text
     )) AS media,
-    (SELECT count(*)::int FROM catalog_pages cp LEFT JOIN packages p ON p.id=cp.package_id LEFT JOIN services s ON s.id=cp.service_id
-      WHERE p.name LIKE 'Scenario Celebration %' OR s.name LIKE 'Scenario Service %') AS pages,
-    (SELECT count(*)::int FROM catalog_sections cs JOIN catalog_pages cp ON cp.id=cs.page_id LEFT JOIN packages p ON p.id=cp.package_id LEFT JOIN services s ON s.id=cp.service_id
-      WHERE p.name LIKE 'Scenario Celebration %' OR s.name LIKE 'Scenario Service %') AS sections,
-    (SELECT count(*)::int FROM catalog_widgets w JOIN catalog_sections cs ON cs.id=w.section_id JOIN catalog_pages cp ON cp.id=cs.page_id LEFT JOIN packages p ON p.id=cp.package_id LEFT JOIN services s ON s.id=cp.service_id
-      WHERE p.name LIKE 'Scenario Celebration %' OR s.name LIKE 'Scenario Service %') AS widgets,
+    (SELECT count(*)::int FROM (
+      SELECT canvas FROM packages WHERE name LIKE 'Scenario Celebration %'
+      UNION ALL SELECT canvas FROM services WHERE name LIKE 'Scenario Service %'
+    ) owners WHERE jsonb_array_length(canvas)>0) AS pages,
+    (SELECT count(*)::int FROM (
+      SELECT canvas FROM packages WHERE name LIKE 'Scenario Celebration %'
+      UNION ALL SELECT canvas FROM services WHERE name LIKE 'Scenario Service %'
+    ) owners CROSS JOIN LATERAL jsonb_array_elements(canvas) section) AS sections,
+    (SELECT count(*)::int FROM (
+      SELECT canvas FROM packages WHERE name LIKE 'Scenario Celebration %'
+      UNION ALL SELECT canvas FROM services WHERE name LIKE 'Scenario Service %'
+    ) owners CROSS JOIN LATERAL jsonb_array_elements(canvas) section
+      CROSS JOIN LATERAL jsonb_array_elements(section->'widgets') widget) AS widgets,
     (SELECT count(*)::int FROM booking_requests WHERE reference LIKE 'SCN-%') AS bookings,
     (SELECT count(*)::int FROM booking_request_status_history h JOIN booking_requests b ON b.id = h.booking_request_id WHERE b.reference LIKE 'SCN-%') AS history,
     (SELECT count(*)::int FROM conversations c JOIN booking_requests b ON b.id = c.booking_request_id WHERE b.reference LIKE 'SCN-%') AS booking_conversations,
@@ -293,7 +306,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
     (SELECT count(*)::int FROM events_day d JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%' AND b.status <> 'accepted') AS days_outside_accepted,
     (SELECT count(*)::int FROM events_day d JOIN booking_requests b ON b.id = d.booking_request_id WHERE b.reference LIKE 'SCN-%' AND d.status = 'moved' AND NOT EXISTS (SELECT 1 FROM events_day r WHERE r.id = d.replacement_event_day_id AND r.booking_request_id = d.booking_request_id AND r.status = 'scheduled')) AS broken_moves,
     (SELECT count(*)::int FROM messages m JOIN users u ON u.id = m.sender_id JOIN conversations c ON c.id = m.conversation_id JOIN booking_requests b ON b.id = c.booking_request_id WHERE b.reference LIKE 'SCN-%' AND m.sender_role::text <> u.role) AS sender_mismatches,
-    (SELECT count(*)::int FROM services s WHERE s.name LIKE 'Scenario Service %' AND s.archived_at IS NULL AND NOT EXISTS (SELECT 1 FROM catalog_pages p JOIN catalog_sections cs ON cs.page_id = p.id JOIN catalog_widgets w ON w.section_id = cs.id WHERE p.service_id = s.id AND w.type = 'photo')) AS services_without_photos,
+    (SELECT count(*)::int FROM services s WHERE s.name LIKE 'Scenario Service %' AND s.archived_at IS NULL AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(s.canvas) section CROSS JOIN LATERAL jsonb_array_elements(section->'widgets') widget WHERE widget->>'type' = 'photo')) AS services_without_photos,
     (SELECT count(*)::int FROM booking_requests b JOIN packages p ON p.id = b.package_id WHERE b.reference LIKE 'SCN-%' AND p.archived_at IS NOT NULL) AS archived_package_bookings`);
   assert.deepEqual(violations.rows[0], {
     non_customer_bookings: 0,
@@ -377,14 +390,13 @@ test("seed creates demo users and conversations while preserving unrelated data 
   assert.ok(grandCelebration);
   const packagePageContent = await pool.query(`
     SELECT p.name,
-      count(DISTINCT s.id)::int AS sections,
-      count(DISTINCT w.id) FILTER (WHERE w.type = 'markdown')::int AS markdown_widgets,
-      count(DISTINCT w.id) FILTER (WHERE w.type = 'photo' AND m.source = 'sample')::int AS sample_photo_widgets
+      count(DISTINCT section->>'id')::int AS sections,
+      count(DISTINCT widget->>'id') FILTER (WHERE widget->>'type' = 'markdown')::int AS markdown_widgets,
+      count(DISTINCT widget->>'id') FILTER (WHERE widget->>'type' = 'photo' AND m.source = 'sample')::int AS sample_photo_widgets
     FROM packages p
-    LEFT JOIN catalog_pages cp ON cp.package_id = p.id
-    LEFT JOIN catalog_sections s ON s.page_id = cp.id
-    LEFT JOIN catalog_widgets w ON w.section_id = s.id
-    LEFT JOIN media_assets m ON m.id = w.media_id
+    LEFT JOIN LATERAL jsonb_array_elements(p.canvas) section ON true
+    LEFT JOIN LATERAL jsonb_array_elements(section->'widgets') widget ON true
+    LEFT JOIN media_assets m ON m.id::text = widget->>'mediaId'
     WHERE p.name IN ('The Grand Celebration', 'The Intimate Gathering', 'The Sweet Soirée')
     GROUP BY p.id, p.name
     ORDER BY p.name`);
@@ -507,8 +519,32 @@ test("seed creates demo users and conversations while preserving unrelated data 
     "INSERT INTO users (email, display_name, role, password_hash) VALUES ($1, $2, 'customer', 'unused') RETURNING id",
     ["unrelated-seed-test@example.test", "Unrelated person"],
   );
+  // Canvas children now belong to the owner: reruns must preserve an intentional
+  // removal as well as edits inside a saved document.
+  await pool.query(
+    "UPDATE packages SET canvas='[]'::jsonb WHERE name='Scenario Celebration 001'",
+  );
+  await pool.query(`UPDATE services SET canvas=jsonb_set(canvas, '{0,title}', '"Edited service canvas"'::jsonb)
+    WHERE name='Scenario Service 001'`);
   const beforeRerun = await ids();
   await runSeed();
+  assert.deepEqual(
+    (
+      await pool.query(
+        "SELECT canvas FROM packages WHERE name='Scenario Celebration 001'",
+      )
+    ).rows[0].canvas,
+    [],
+  );
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT canvas->0->>'title' AS title FROM services WHERE name='Scenario Service 001'",
+      )
+    ).rows[0].title,
+    "Edited service canvas",
+  );
+
   assert.deepEqual(await ids(), beforeRerun);
   assert.deepEqual(
     (await pool.query("SELECT * FROM quotations ORDER BY id")).rows,

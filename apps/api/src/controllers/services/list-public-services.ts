@@ -26,13 +26,15 @@ export const listPublicServicesRoute = createRoute({
 export const listPublicServicesRouteHandler: AppRouteHandler<
   typeof listPublicServicesRoute
 > = async (c) => {
-  const { limit, cursor, minPricePesos, maxPricePesos } = c.req.valid("query");
+  const { limit, cursor, minPricePesos, maxPricePesos, pricingType } =
+    c.req.valid("query");
   return c.json(
     await listPublicServicesPageService(c.get("db"), {
       limit,
       cursor,
       minPricePesos,
       maxPricePesos,
+      pricingType,
     }),
     200,
   );

@@ -23,7 +23,7 @@
     "media:cleanup": "tsx src/db/cleanup-catalog-media.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:seed-admin": "tsx src/db/seed-admin.ts",
-    "test:packages": "tsx --test tests/packages.test.ts",
+    "test:packages": "tsx --test tests/packages.test.ts tests/canvas-jsonb-migration.test.ts tests/service-pricing-migration.test.ts tests/catalog-canvas-validation.test.ts tests/canvas-validation-migration.test.ts",
     "test:quotations": "tsx --test tests/quotations.test.ts",
     "test:proposal-migration": "tsx --test tests/proposal-migration.test.ts",
     "test:messages": "tsx --test tests/messages.test.ts",

@@ -1,0 +1,32 @@
+import type { Kysely } from "kysely";
+import type { DB } from "../../db/types.js";
+
+export function updateConversationAiData(
+  db: Kysely<DB>,
+  id: string,
+  aiEnabled: boolean,
+  expectedAiVersion: number,
+) {
+  return db.transaction().execute(async (trx) => {
+    const conversation = await trx
+      .selectFrom("conversations")
+      .select(["status", "ai_enabled", "ai_version"])
+      .where("id", "=", id)
+      .forUpdate()
+      .executeTakeFirst();
+    if (!conversation) return { kind: "not-found" as const };
+    if (conversation.status !== "active") return { kind: "closed" as const };
+    if (conversation.ai_version !== expectedAiVersion)
+      return { kind: "stale" as const };
+    const aiVersion =
+      conversation.ai_version + (conversation.ai_enabled !== aiEnabled ? 1 : 0);
+    if (conversation.ai_enabled !== aiEnabled)
+      await trx
+        .updateTable("conversations")
+        .set({ ai_enabled: aiEnabled, ai_version: aiVersion })
+        .where("id", "=", id)
+        .execute();
+    // Preferences do not bump the inbox's last-message ordering.
+    return { kind: "ok" as const, aiEnabled, aiVersion };
+  });
+}

@@ -38,3 +38,22 @@ test("catalog history scopes separate categories and applied filters", () => {
     catalogFilterScope("services", {}),
   );
 });
+
+test("service price filters preserve their pricing type and isolate cursor histories", () => {
+  const fixed = {
+    pricingType: "fixed",
+    minPricePesos: 0,
+    maxPricePesos: 6000,
+  } as const;
+  const params = new URLSearchParams(pageQuery(fixed));
+  assert.equal(params.get("pricingType"), "fixed");
+  assert.equal(params.get("minPricePesos"), "0");
+  assert.notEqual(
+    catalogFilterScope("services", fixed),
+    catalogFilterScope("services", { ...fixed, pricingType: "hourly" }),
+  );
+  assert.notEqual(
+    catalogFilterScope("services", { pricingType: "fixed" }),
+    catalogFilterScope("services", {}),
+  );
+});

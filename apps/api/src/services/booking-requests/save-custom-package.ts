@@ -13,7 +13,7 @@ import {
   InvalidPackageMedia,
   listPackageMediaIdsData,
   replacePackageSectionsData,
-} from "../../data/packages/catalog-page.js";
+} from "../../data/packages/catalog-canvas.js";
 import {
   validatePackageServicesData,
   replacePackageServicesData,
@@ -200,7 +200,6 @@ export async function saveCustomPackageService(
         saved.id,
         content,
         actorId,
-        now,
       );
       await replacePackageServicesData(trx, saved.id, content.services);
       await touchBookingRevisionData(trx, id);

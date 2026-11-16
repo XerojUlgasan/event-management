@@ -3,5 +3,7 @@ export const columns = (v: ServiceContent, slug: string) => ({
   name: v.name.trim(),
   slug,
   hourly_rate_pesos: v.hourlyRatePesos,
+  fixed_price_pesos: v.fixedPricePesos,
+  included_hours: v.includedHours,
   description: v.description,
 });

@@ -6,7 +6,7 @@ import { findConversationData } from "../../data/messages/find-conversation.js";
 import { messageDto, type MessageDto } from "./message-response.js";
 
 export type SendAdminMessageResult =
-  | { kind: "ok"; message: MessageDto }
+  | { kind: "ok"; message: MessageDto; aiEnabled: boolean; aiVersion: number }
   | { kind: "not-found" }
   | { kind: "closed" };
 
@@ -19,12 +19,25 @@ export async function sendAdminMessageService(
   const conversation = await findConversationData(db, id);
   if (!conversation) return { kind: "not-found" };
   if (conversation.status === "closed") return { kind: "closed" };
-  const message = await createMessageData(
-    db,
-    conversation,
-    senderId,
-    "admin",
-    body,
-  );
-  return { kind: "ok", message: messageDto(message) };
+  try {
+    const saved = await createMessageData(
+      db,
+      conversation.id,
+      senderId,
+      "admin",
+      body,
+    );
+    return {
+      kind: "ok",
+      message: messageDto(saved.message),
+      aiEnabled: saved.aiEnabled,
+      aiVersion: saved.aiVersion,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message === "Conversation is closed")
+      return { kind: "closed" };
+    if (error instanceof Error && error.message === "Conversation not found")
+      return { kind: "not-found" };
+    throw error;
+  }
 }

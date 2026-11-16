@@ -7,7 +7,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
-    "test:catalog": "node --test tests/catalog/catalog-ssr.test.mjs"
+    "test:catalog": "node --test tests/catalog/catalog-ssr.test.mjs tests/catalog/details-validation.test.ts tests/catalog/canvas-validation.test.ts"
   },
   "dependencies": {
     "@astrojs/node": "^11.1.11",

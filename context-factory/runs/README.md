@@ -14,6 +14,11 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Catalog canvas validation](2026-11-16_16-56-00_catalog-canvas-validation.md) | Shared browser/API validation replacing SQL document checks / feat/ai | complete | Review scoped delta; local migration and disposable API/browser checks passed; hosted rollout remains separate |
+| [Conversation AI toggle](2026-11-16_16-41-39_conversation-ai-toggle.md) | Admin toggle and automatic human takeover / feat/ai | complete | Review scoped diff; local migration and disposable API/browser checks passed; hosted rollout remains separate |
+| [Catalog creation details](2026-11-16_16-34-10_catalog-creation-details.md) | Required-details modal before canvas / feat/ai | complete | Review scoped frontend delta; isolated browser checks passed, discard-confirmation cleanup stalled in browser tooling |
+| [Service pricing](2026-11-16_16-19-15_service-pricing.md) | One fixed duration plus excess rate, or hourly-only / feat/ai | complete | Review unstaged pricing diff; migration applied locally and disposable browser/API checks passed; hosted rollout unverified |
+| [Catalog canvas JSONB](2026-11-16_15-43-53_catalog-canvas-jsonb.md) | Entity-owned canvas arrays without document versioning / feat/ai | complete | Review scoped diff; migration applied locally, hosted deployment and real Storage uploads remain unverified |
 | [AI message context](2026-11-16_14-53-07_ai-message-context.md) | Per-turn timestamp and customer-owned booking projection / feat/ai | complete | Review scoped implementation; live provider and browser behavior remain unverified |
 | [Booking package details](2026-11-16_14-41-10_booking-package-details.md) | Derived inquiry package details / feat/ai | complete | Review scoped diff; migration applied locally, hosted rollout remains separate |
 | [Automatic text replies](2026-11-16_14-21-59_automatic-text-replies.md) | Customer Messages history → text model → saved assistant reply / feat/ai | complete | Review scoped changes when requested; production and Gateway dashboard logs remain unverified |

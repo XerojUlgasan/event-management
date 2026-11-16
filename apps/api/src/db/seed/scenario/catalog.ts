@@ -1,4 +1,6 @@
+import { storedSectionsSchema } from "@event-management/contracts/catalog-canvas";
 import { catalogSlug } from "@event-management/contracts/catalog-slug";
+import { sql } from "kysely";
 import type { SeedDb } from "../context.js";
 import {
   expectCount,
@@ -36,7 +38,7 @@ export type ScenarioCatalog = {
 };
 
 type WidgetKind = "photo" | "markdown" | "video";
-type PagePlan = {
+type CanvasPlan = {
   key: string;
   owner: { packageId?: string; serviceId?: string };
   widget: WidgetKind;
@@ -54,7 +56,9 @@ function hourlyRate(index: number) {
   return 800 + (index % 25) * 150;
 }
 
-export function planScenarioCatalog(): ScenarioCatalog & { pages: PagePlan[] } {
+export function planScenarioCatalog(): ScenarioCatalog & {
+  canvases: CanvasPlan[];
+} {
   const packages = Array.from(
     { length: SCENARIO_COUNT },
     (_, index): ScenarioPackage => {
@@ -78,7 +82,7 @@ export function planScenarioCatalog(): ScenarioCatalog & { pages: PagePlan[] } {
       archived: index >= 60,
     }),
   );
-  const pages: PagePlan[] = [
+  const canvases: CanvasPlan[] = [
     ...services
       .filter((_, index) => index < 60)
       .map((service, index) => ({
@@ -100,8 +104,8 @@ export function planScenarioCatalog(): ScenarioCatalog & { pages: PagePlan[] } {
   ];
   expectCount("packages", packages.length);
   expectCount("services", services.length);
-  expectCount("catalog pages", pages.length, 80);
-  return { packages, services, pages };
+  expectCount("catalog canvases", canvases.length, 80);
+  return { packages, services, canvases };
 }
 
 export async function seedScenarioCatalog(
@@ -117,9 +121,8 @@ export async function seedScenarioCatalog(
   let packages = 0;
   let services = 0;
   let media = 0;
-  let pages = 0;
-  let sections = 0;
-  let widgets = 0;
+  let canvases = 0;
+  const insertedOwners = new Set<string>();
 
   for (const pkg of input.catalog.packages) {
     if (
@@ -135,8 +138,10 @@ export async function seedScenarioCatalog(
         created_at: input.now,
         updated_at: input.now,
       })
-    )
+    ) {
       packages += 1;
+      insertedOwners.add(pkg.id);
+    }
   }
   for (const service of input.catalog.services) {
     if (
@@ -151,15 +156,19 @@ export async function seedScenarioCatalog(
         created_at: input.now,
         updated_at: input.now,
       })
-    )
+    ) {
       services += 1;
+      insertedOwners.add(service.id);
+    }
   }
 
   const attachedMedia = new Map<string, string>();
-  for (const [index, page] of input.catalog.pages.entries()) {
+  for (const [index, page] of input.catalog.canvases.entries()) {
     if (page.widget === "markdown") continue;
     const id = scenarioId(`media:${page.key}`);
     attachedMedia.set(page.key, id);
+    if (!insertedOwners.has(page.owner.packageId ?? page.owner.serviceId ?? ""))
+      continue;
     const sample = page.widget === "photo";
     if (
       await insertIfNew(db, "media_assets", {
@@ -197,57 +206,49 @@ export async function seedScenarioCatalog(
   }
   expectCount("media", attachedMedia.size + 20, 80);
 
-  for (const page of input.catalog.pages) {
-    const pageId = scenarioId(`page:${page.key}`);
-    const sectionId = scenarioId(`section:${page.key}`);
-    const widgetId = scenarioId(`widget:${page.key}`);
-    const mediaId = attachedMedia.get(page.key) ?? null;
-    if (
-      await insertIfNew(db, "catalog_pages", {
-        id: pageId,
-        package_id: page.owner.packageId ?? null,
-        service_id: page.owner.serviceId ?? null,
-        created_at: input.now,
-        updated_at: input.now,
+  for (const canvas of input.catalog.canvases) {
+    const ownerId = canvas.owner.packageId ?? canvas.owner.serviceId;
+    if (!ownerId || !insertedOwners.has(ownerId)) continue;
+    const content = [
+      {
+        id: scenarioId(`section:${canvas.key}`),
+        title: canvas.title,
+        widgets: [
+          {
+            id: scenarioId(`widget:${canvas.key}`),
+            type: canvas.widget,
+            x: 0,
+            y: 0,
+            w: canvas.widget === "markdown" ? 12 : 6,
+            h: canvas.widget === "markdown" ? 4 : 6,
+            markdown:
+              canvas.widget === "markdown"
+                ? `## ${canvas.label}\n\nSynthetic demonstration copy. Availability has not been checked.`
+                : "",
+            mediaId: attachedMedia.get(canvas.key) ?? null,
+            alt:
+              canvas.widget === "markdown"
+                ? ""
+                : `Sample media for ${canvas.label}`,
+            caption: "",
+            autoplay: canvas.widget === "video" && canvas.key.endsWith("0"),
+          },
+        ],
+      },
+    ];
+    await db
+      .updateTable(canvas.owner.packageId ? "packages" : "services")
+      .set({
+        canvas: sql`${JSON.stringify(storedSectionsSchema.parse(content))}::jsonb`,
       })
-    )
-      pages += 1;
-    if (
-      await insertIfNew(db, "catalog_sections", {
-        id: sectionId,
-        page_id: pageId,
-        title: page.title,
-        sort_order: 0,
-      })
-    )
-      sections += 1;
-    const video = page.widget === "video";
-    if (
-      await insertIfNew(db, "catalog_widgets", {
-        id: widgetId,
-        section_id: sectionId,
-        type: page.widget,
-        sort_order: 0,
-        x: 0,
-        y: 0,
-        w: page.widget === "markdown" ? 12 : 6,
-        h: page.widget === "markdown" ? 4 : 6,
-        markdown:
-          page.widget === "markdown"
-            ? `## ${page.label}\n\nSynthetic demonstration copy. Availability has not been checked.`
-            : "",
-        media_id: mediaId,
-        alt: page.widget === "markdown" ? "" : `Sample media for ${page.label}`,
-        caption: "",
-        autoplay: video && page.key.endsWith("0"),
-      })
-    )
-      widgets += 1;
+      .where("id", "=", ownerId)
+      .execute();
+    canvases += 1;
   }
 
   return {
     packages: input.catalog.packages,
     services: input.catalog.services,
-    inserted: { packages, services, media, pages, sections, widgets },
+    inserted: { packages, services, media, canvases },
   };
 }

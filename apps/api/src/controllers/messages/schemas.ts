@@ -40,6 +40,8 @@ export const conversationSchema = z.object({
   eventEndsAt: z.string().nullable(),
   guestCount: z.number().int().positive().nullable(),
   status: conversationStatusSchema,
+  aiEnabled: z.boolean(),
+  aiVersion: z.number().int().nonnegative(),
   closedAt: z.string().nullable(),
   lastMessage: messageSchema.nullable(),
   unreadCount: z.number().int().nonnegative(),
@@ -63,6 +65,20 @@ export const adminConversationsPageSchema = conversationsSchema.extend({
 
 export const messageResultSchema = z.object({
   message: messageSchema,
+});
+
+export const conversationAiSchema = z.object({
+  aiEnabled: z.boolean(),
+  aiVersion: z.number().int().nonnegative(),
+});
+
+export const adminMessageResultSchema = messageResultSchema.extend(
+  conversationAiSchema.shape,
+);
+
+export const updateConversationAiSchema = z.object({
+  aiEnabled: z.boolean(),
+  expectedAiVersion: z.number().int().nonnegative(),
 });
 
 export const customerMessageResultSchema = messageResultSchema.extend({

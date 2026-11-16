@@ -1,20 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  getAdminServices,
-  type AdminService,
-} from "../../lib/data/catalog/services";
-import {
-  Button,
-  Input,
-  Select,
-  Textarea,
-  useNotifications,
-} from "@event-management/ui";
-import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
+import { Button, Select, useNotifications } from "@event-management/ui";
 import {
   MAX_PACKAGE_SERVICES,
   type PackageContent,
 } from "@event-management/contracts/catalog";
+import {
+  getAdminServices,
+  type AdminService,
+} from "../../lib/data/catalog/services";
+import { CatalogCreateDialog } from "./CatalogCreateDialog";
+import { PackageDetailsFields } from "./PackageDetailsFields";
+import { validatePackageDetails } from "../../lib/utils/catalog/details-validation";
 import { CatalogEditor, newCatalogSection } from "./CatalogEditor";
 import { CatalogCard } from "./CatalogCard";
 import {
@@ -23,11 +19,7 @@ import {
   packageImageSrc,
   type AdminPackage,
 } from "../../lib/data/catalog/packages";
-import {
-  centavosToPesos,
-  pesosToCentavos,
-  priceLabel,
-} from "../../lib/utils/formatting/money";
+import { priceLabel } from "../../lib/utils/formatting/money";
 import { PackageCanvas } from "./CatalogContent";
 import { photos } from "../../demo/catalog/photos";
 import "../../styles/catalog/package-editor.css";
@@ -80,11 +72,7 @@ export function PackageEditor({
   initial: AdminPackage | null;
   onClose: () => void;
   onSaved: () => void;
-  saveCustom?: (
-    content: PackageContent & {
-      services: { serviceId: string; role: "included" | "optional" }[];
-    },
-  ) => Promise<void>;
+  saveCustom?: (content: PackageContent) => Promise<void>;
 }) {
   const { notify, notifyError } = useNotifications();
   const [serviceOptions, setServiceOptions] = useState<AdminService[]>([]);
@@ -111,16 +99,33 @@ export function PackageEditor({
   }
   useEffect(() => {
     alive.current = true;
-    void loadServices();
+    if (saveCustom) void loadServices();
     return () => {
       alive.current = false;
     };
-  }, []);
-  type EditorContent = PackageContent & {
-    services: { serviceId: string; role: "included" | "optional" }[];
-  };
+  }, [saveCustom]);
+
+  const [draft, setDraft] = useState(blank);
+  const [prepared, setPrepared] = useState(false);
+  if (!initial && !prepared) {
+    return (
+      <CatalogCreateDialog
+        entity="package"
+        initial={draft}
+        onClose={onClose}
+        onContinue={(content) => {
+          setDraft(content);
+          setPrepared(true);
+        }}
+        validate={validatePackageDetails}
+        renderDetails={(content, setContent) => (
+          <PackageDetailsFields content={content} onChange={setContent} />
+        )}
+      />
+    );
+  }
   return (
-    <CatalogEditor<EditorContent>
+    <CatalogEditor<PackageContent>
       initial={
         initial
           ? {
@@ -134,21 +139,12 @@ export function PackageEditor({
                 role,
               })),
             }
-          : { ...blank(), services: [] }
+          : draft
       }
       entity="package"
       onClose={onClose}
       onSaved={onSaved}
-      validate={(content) =>
-        !content.name.trim() ||
-        !Number.isInteger(content.maxGuests) ||
-        content.maxGuests < 1 ||
-        !Number.isInteger(content.price.amountMinor) ||
-        content.price.amountMinor < 1 ||
-        content.price.amountMinor % 100 !== 0
-          ? "Enter a package name, a positive whole number of guests, and a whole peso price."
-          : undefined
-      }
+      validate={validatePackageDetails}
       onSave={async (content) => {
         if (saveCustom) await saveCustom(content);
         else if (initial)
@@ -157,181 +153,144 @@ export function PackageEditor({
       }}
       renderDetails={(content, setContent) => (
         <>
-          <fieldset>
-            <legend>Package services</legend>
-            {content.services.map((link, index) => (
-              <div key={link.serviceId}>
-                <span>
-                  {serviceOptions.find((s) => s.id === link.serviceId)?.name ??
-                    initial?.services.find(
-                      (s) => s.serviceId === link.serviceId,
-                    )?.name ??
-                    link.serviceId}
-                </span>{" "}
-                <Select
-                  aria-label="Service inclusion"
-                  value={link.role}
-                  onChange={(e) =>
+          {saveCustom && (
+            <fieldset>
+              <legend>Package services</legend>
+              {content.services.map((link, index) => (
+                <div key={link.serviceId}>
+                  <span>
+                    {serviceOptions.find((s) => s.id === link.serviceId)
+                      ?.name ??
+                      initial?.services.find(
+                        (s) => s.serviceId === link.serviceId,
+                      )?.name ??
+                      link.serviceId}
+                  </span>{" "}
+                  <Select
+                    aria-label="Service inclusion"
+                    value={link.role}
+                    onChange={(e) =>
+                      setContent({
+                        ...content,
+                        services: content.services.map((v, i) =>
+                          i === index
+                            ? {
+                                ...v,
+                                role:
+                                  e.target.value === "optional"
+                                    ? "optional"
+                                    : "included",
+                              }
+                            : v,
+                        ),
+                      })
+                    }
+                  >
+                    <option value="included">Included</option>
+                    <option value="optional">Optional</option>
+                  </Select>{" "}
+                  <Button
+                    variant="secondary"
+                    aria-label={`Move ${serviceOptions.find((s) => s.id === link.serviceId)?.name ?? "service"} up`}
+                    disabled={index === 0}
+                    onClick={() => {
+                      const services = [...content.services];
+                      [services[index - 1], services[index]] = [
+                        services[index],
+                        services[index - 1],
+                      ];
+                      setContent({ ...content, services });
+                    }}
+                  >
+                    ↑
+                  </Button>{" "}
+                  <Button
+                    variant="secondary"
+                    aria-label={`Move ${serviceOptions.find((s) => s.id === link.serviceId)?.name ?? "service"} down`}
+                    disabled={index === content.services.length - 1}
+                    onClick={() => {
+                      const services = [...content.services];
+                      [services[index + 1], services[index]] = [
+                        services[index],
+                        services[index + 1],
+                      ];
+                      setContent({ ...content, services });
+                    }}
+                  >
+                    ↓
+                  </Button>{" "}
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      setContent({
+                        ...content,
+                        services: content.services.filter(
+                          (_, i) => i !== index,
+                        ),
+                      })
+                    }
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+              <Select
+                aria-label="Add service"
+                disabled={content.services.length >= MAX_PACKAGE_SERVICES}
+                value=""
+                onChange={(e) => {
+                  if (e.target.value)
                     setContent({
                       ...content,
-                      services: content.services.map((v, i) =>
-                        i === index
-                          ? {
-                              ...v,
-                              role:
-                                e.target.value === "optional"
-                                  ? "optional"
-                                  : "included",
-                            }
-                          : v,
-                      ),
-                    })
-                  }
-                >
-                  <option value="included">Included</option>
-                  <option value="optional">Optional</option>
-                </Select>{" "}
-                <Button
-                  variant="secondary"
-                  aria-label={`Move ${serviceOptions.find((s) => s.id === link.serviceId)?.name ?? "service"} up`}
-                  disabled={index === 0}
-                  onClick={() => {
-                    const services = [...content.services];
-                    [services[index - 1], services[index]] = [
-                      services[index],
-                      services[index - 1],
-                    ];
-                    setContent({ ...content, services });
-                  }}
-                >
-                  ↑
-                </Button>{" "}
-                <Button
-                  variant="secondary"
-                  aria-label={`Move ${serviceOptions.find((s) => s.id === link.serviceId)?.name ?? "service"} down`}
-                  disabled={index === content.services.length - 1}
-                  onClick={() => {
-                    const services = [...content.services];
-                    [services[index + 1], services[index]] = [
-                      services[index],
-                      services[index + 1],
-                    ];
-                    setContent({ ...content, services });
-                  }}
-                >
-                  ↓
-                </Button>{" "}
-                <Button
-                  variant="secondary"
-                  onClick={() =>
-                    setContent({
-                      ...content,
-                      services: content.services.filter((_, i) => i !== index),
-                    })
-                  }
-                >
-                  Remove
-                </Button>
-              </div>
-            ))}
-            <Select
-              aria-label="Add service"
-              disabled={content.services.length >= MAX_PACKAGE_SERVICES}
-              value=""
-              onChange={(e) => {
-                if (e.target.value)
-                  setContent({
-                    ...content,
-                    services: [
-                      ...content.services,
-                      { serviceId: e.target.value, role: "included" },
-                    ],
-                  });
-              }}
-            >
-              <option value="">Add a service…</option>
-              {serviceOptions
-                .filter(
-                  (s) =>
-                    !s.archivedAt &&
-                    !content.services.some((v) => v.serviceId === s.id),
-                )
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-            </Select>
-            {serviceError && (
-              <p role="alert">
-                {serviceError}{" "}
-                <Button
-                  variant="secondary"
-                  onClick={() =>
-                    void loadServices(
-                      serviceOptions.length
-                        ? (serviceCursor ?? undefined)
-                        : undefined,
-                    )
-                  }
-                >
-                  Retry
-                </Button>
-              </p>
-            )}
-            {serviceCursor && !serviceError && (
-              <Button
-                variant="secondary"
-                disabled={serviceLoading}
-                onClick={() => void loadServices(serviceCursor)}
+                      services: [
+                        ...content.services,
+                        { serviceId: e.target.value, role: "included" },
+                      ],
+                    });
+                }}
               >
-                Load more services
-              </Button>
-            )}
-          </fieldset>
-          <label>
-            Catalog description
-            <Textarea
-              maxLength={MAX_CATALOG_TEXT_LENGTH}
-              value={content.description}
-              onChange={(e) =>
-                setContent({ ...content, description: e.target.value })
-              }
-            />
-          </label>
-          <label>
-            Maximum guests
-            <Input
-              type="number"
-              min="1"
-              value={content.maxGuests || ""}
-              onChange={(e) =>
-                setContent({ ...content, maxGuests: Number(e.target.value) })
-              }
-            />
-          </label>
-          <label>
-            Package price (PHP)
-            <Input
-              type="number"
-              min="1"
-              step="1"
-              value={
-                content.price.amountMinor
-                  ? centavosToPesos(content.price.amountMinor)
-                  : ""
-              }
-              onChange={(e) =>
-                setContent({
-                  ...content,
-                  price: {
-                    ...content.price,
-                    amountMinor: pesosToCentavos(Number(e.target.value)),
-                  },
-                })
-              }
-            />
-          </label>
+                <option value="">Add a service…</option>
+                {serviceOptions
+                  .filter(
+                    (s) =>
+                      !s.archivedAt &&
+                      !content.services.some((v) => v.serviceId === s.id),
+                  )
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+              </Select>
+              {serviceError && (
+                <p role="alert">
+                  {serviceError}{" "}
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      void loadServices(
+                        serviceOptions.length
+                          ? (serviceCursor ?? undefined)
+                          : undefined,
+                      )
+                    }
+                  >
+                    Retry
+                  </Button>
+                </p>
+              )}
+              {serviceCursor && !serviceError && (
+                <Button
+                  variant="secondary"
+                  disabled={serviceLoading}
+                  onClick={() => void loadServices(serviceCursor)}
+                >
+                  Load more services
+                </Button>
+              )}
+            </fieldset>
+          )}
+          <PackageDetailsFields content={content} onChange={setContent} />
         </>
       )}
       renderPreview={(content, mode) =>

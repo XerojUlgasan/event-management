@@ -117,6 +117,8 @@ const service = {
   name: "Catering",
   description: "Service **summary**",
   hourlyRatePesos: 321,
+  fixedPricePesos: null,
+  includedHours: null,
   sections,
 };
 
@@ -214,11 +216,29 @@ test("private package canvas retains description while hiding services and booki
   assert.match(html, /Up to 120 guests/);
 });
 
+test("fixed service renders its price, included hours and excess billing terms", () => {
+  const item = {
+    ...service,
+    fixedPricePesos: 6000,
+    includedHours: 6,
+    hourlyRatePesos: 800,
+  };
+  const html = render(publicDetails.PublicServiceDetail, { item });
+  assert.equal(html, render(canvas.ServiceCanvas, { item }));
+  assert.match(html, /6,000 for 6 hours/);
+  assert.match(html, /800 \/ additional hour/);
+  assert.doesNotMatch(html, /round up/);
+  const single = render(canvas.ServiceCanvas, {
+    item: { ...item, includedHours: 1 },
+  });
+  assert.match(single, /for 1 hour</);
+});
+
 test("legacy null service rate renders safely", () => {
   const serviceHtml = render(publicDetails.PublicServiceDetail, {
     item: { ...service, hourlyRatePesos: null },
   });
-  assert.match(serviceHtml, /Rate not set/);
+  assert.match(serviceHtml, /Rate on request/);
 });
 
 test("empty media has meaningful fallback and Markdown requests light mode", () => {

@@ -28,6 +28,8 @@ export type ChatConversation = {
   guestCount: number | null;
   status: ConversationStatus;
   closedAt: string | null;
+  aiEnabled: boolean;
+  aiVersion: number;
   lastMessage: ChatMessage | null;
   unreadCount: number;
   updatedAt: string;
@@ -76,7 +78,19 @@ export const getAdminConversation = (id: string, cursor?: string) =>
     `/admin/conversations/${encodeURIComponent(id)}${cursorQuery(cursor)}`,
   );
 export const sendAdminMessage = (id: string, body: string) =>
-  request<{ message: ChatMessage }>(
-    `/admin/conversations/${encodeURIComponent(id)}/messages`,
-    { body },
+  request<{
+    message: ChatMessage;
+    aiEnabled: boolean;
+    aiVersion: number;
+  }>(`/admin/conversations/${encodeURIComponent(id)}/messages`, { body });
+export const updateAdminConversationAi = (
+  id: string,
+  aiEnabled: boolean,
+  expectedAiVersion: number,
+) =>
+  request<{ aiEnabled: boolean; aiVersion: number }>(
+    `/admin/conversations/${encodeURIComponent(id)}/ai`,
+    { aiEnabled, expectedAiVersion },
+    undefined,
+    "PATCH",
   );

@@ -1,4 +1,5 @@
 import { sql } from "kysely";
+import { anyCanvasContainsMedia } from "./canvas-reference.js";
 import type { Kysely, Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 type Database = Kysely<DB> | Transaction<DB>;
@@ -16,7 +17,7 @@ export const findAdminCatalogMediaData = (
     .where((eb) =>
       eb.or([
         eb("m.created_by", "=", actorId),
-        sql<boolean>`EXISTS (SELECT 1 FROM catalog_widgets w WHERE w.media_id=m.id)`,
+        anyCanvasContainsMedia(sql.ref("m.id")),
       ]),
     )
     .executeTakeFirst();

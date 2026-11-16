@@ -1,6 +1,6 @@
 import { createRoute } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
-import { messageBodySchema, messageResultSchema } from "./schemas.js";
+import { messageBodySchema, adminMessageResultSchema } from "./schemas.js";
 import { json, errors, idParams, body } from "./http.js";
 import { sendAdminMessageService } from "../../services/messages/send-admin-message.js";
 
@@ -11,7 +11,10 @@ export const sendAdminMessageRoute = createRoute({
   summary: "Reply to a customer as an admin",
   request: { params: idParams, body: body(messageBodySchema) },
   responses: {
-    201: { content: json(messageResultSchema), description: "Reply sent" },
+    201: {
+      content: json(adminMessageResultSchema),
+      description: "Reply sent; AI disabled",
+    },
     ...errors,
   },
 });
@@ -24,7 +27,15 @@ export const sendAdminMessageRouteHandler: AppRouteHandler<
     c.get("session").user.id,
     c.req.valid("json").body,
   );
-  if (result.kind === "ok") return c.json({ message: result.message }, 201);
+  if (result.kind === "ok")
+    return c.json(
+      {
+        message: result.message,
+        aiEnabled: result.aiEnabled,
+        aiVersion: result.aiVersion,
+      },
+      201,
+    );
   return result.kind === "closed"
     ? c.json({ error: "Conversation is closed" }, 409)
     : c.json({ error: "Conversation not found" }, 404);

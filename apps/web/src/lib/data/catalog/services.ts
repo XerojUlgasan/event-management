@@ -1,14 +1,9 @@
 import type { PublicCatalogPageQuery } from "@event-management/contracts/catalog-filters";
-import type { CatalogSection } from "@event-management/contracts/catalog";
+import type { ServiceContent } from "@event-management/contracts/catalog";
 import { request } from "../../http/request";
 import { pageQuery, type CatalogPageQuery } from "./page-query";
 
-export type ServiceContent = {
-  name: string;
-  description: string;
-  hourlyRatePesos: number | null;
-  sections: CatalogSection[];
-};
+export type { ServiceContent } from "@event-management/contracts/catalog";
 export type PublicService = ServiceContent & {
   imageUrl: string | null;
   id: string;

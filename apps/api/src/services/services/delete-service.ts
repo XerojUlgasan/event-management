@@ -3,7 +3,7 @@ import type { DB } from "../../db/types.js";
 import { deleteServiceData } from "../../data/services/delete-service.js";
 import { lockServiceData } from "../../data/services/lock-service.js";
 import { error } from "../packages/package-rules.js";
-import { listCatalogMediaIdsData } from "../../data/packages/catalog-page.js";
+import { listCatalogMediaIdsData } from "../../data/packages/catalog-canvas.js";
 import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
 export async function deleteServiceService(db: Kysely<DB>, id: string) {
   let media: string[] = [];

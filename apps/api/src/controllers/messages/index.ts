@@ -3,6 +3,10 @@ import { createMiddleware } from "hono/factory";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import {
+  updateConversationAiRoute,
+  updateConversationAiRouteHandler,
+} from "./update-conversation-ai.js";
+import {
   getCustomerConversationRoute,
   getCustomerConversationRouteHandler,
 } from "./get-customer-conversation.js";
@@ -79,4 +83,5 @@ routes.openapi(sendCustomerMessageRoute, sendCustomerMessageRouteHandler);
 routes.openapi(listAdminConversationsRoute, listAdminConversationsRouteHandler);
 routes.openapi(getAdminConversationRoute, getAdminConversationRouteHandler);
 routes.openapi(sendAdminMessageRoute, sendAdminMessageRouteHandler);
+routes.openapi(updateConversationAiRoute, updateConversationAiRouteHandler);
 export default routes;

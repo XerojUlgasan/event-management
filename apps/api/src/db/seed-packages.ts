@@ -1,6 +1,7 @@
 import { catalogSlug } from "@event-management/contracts/catalog-slug";
+import { storedSectionsSchema } from "@event-management/contracts/catalog-canvas";
 import { randomUUID } from "node:crypto";
-import type { Transaction } from "kysely";
+import { sql, type Transaction } from "kysely";
 import type { DB } from "./types.js";
 
 export async function seedSamplePackages(db: Transaction<DB>) {
@@ -49,17 +50,8 @@ export async function seedSamplePackages(db: Transaction<DB>) {
       .returning("id")
       .executeTakeFirst();
     if (!row) continue;
-    const pageId = randomUUID(),
-      sectionId = randomUUID(),
+    const sectionId = randomUUID(),
       mediaId = randomUUID();
-    await db
-      .insertInto("catalog_pages")
-      .values({ id: pageId, package_id: row.id })
-      .execute();
-    await db
-      .insertInto("catalog_sections")
-      .values({ id: sectionId, page_id: pageId, title: "", sort_order: 0 })
-      .execute();
     await db
       .insertInto("media_assets")
       .values({
@@ -69,31 +61,46 @@ export async function seedSamplePackages(db: Transaction<DB>) {
         url: `/images/${sample.photo}.jpg`,
       })
       .execute();
+    const canvas = [
+      {
+        id: sectionId,
+        title: "",
+        widgets: [
+          {
+            id: randomUUID(),
+            type: "photo",
+            x: 0,
+            y: 0,
+            w: 6,
+            h: 6,
+            markdown: "",
+            mediaId,
+            alt: "Sample event table setting",
+            caption: "",
+            autoplay: false,
+          },
+          {
+            id: randomUUID(),
+            type: "markdown",
+            x: 6,
+            y: 0,
+            w: 6,
+            h: 6,
+            markdown: `## ${sample.heading}\n\n${sample.text}`,
+            mediaId: null,
+            alt: "",
+            caption: "",
+            autoplay: false,
+          },
+        ],
+      },
+    ];
     await db
-      .insertInto("catalog_widgets")
-      .values([
-        {
-          section_id: sectionId,
-          type: "photo",
-          sort_order: 0,
-          x: 0,
-          y: 0,
-          w: 6,
-          h: 6,
-          media_id: mediaId,
-          alt: "Sample event table setting",
-        },
-        {
-          section_id: sectionId,
-          type: "markdown",
-          sort_order: 1,
-          x: 6,
-          y: 0,
-          w: 6,
-          h: 6,
-          markdown: `## ${sample.heading}\n\n${sample.text}`,
-        },
-      ])
+      .updateTable("packages")
+      .set({
+        canvas: sql`${JSON.stringify(storedSectionsSchema.parse(canvas))}::jsonb`,
+      })
+      .where("id", "=", row.id)
       .execute();
     count++;
   }

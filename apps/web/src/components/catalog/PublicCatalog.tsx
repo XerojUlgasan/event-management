@@ -25,7 +25,10 @@ import {
   type PublicService,
 } from "../../lib/data/catalog/services";
 import { PackagePreview } from "./PackagePreview";
-import { priceLabel } from "../../lib/utils/formatting/money";
+import {
+  priceLabel,
+  servicePricingLabels,
+} from "../../lib/utils/formatting/money";
 import { CatalogDetailPreview } from "./CatalogDetailPreview";
 import { ServiceCanvas } from "./CatalogContent";
 import { photos } from "../../demo/catalog/photos";
@@ -82,6 +85,7 @@ function ServiceCard({
   item: PublicService;
   onPreview: () => void;
 }) {
+  const pricing = servicePricingLabels(item);
   return (
     <article className="catalog-card">
       <div className="catalog-card-image">
@@ -94,11 +98,8 @@ function ServiceCard({
         <h3>{item.name}</h3>
         <p>{item.description}</p>
         <div className="catalog-card-meta">
-          <span>
-            {item.hourlyRatePesos === null
-              ? "Rate on request"
-              : `${new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(item.hourlyRatePesos)} / hour`}
-          </span>
+          <span>{pricing.price}</span>
+          {pricing.excess && <span>{pricing.excess}</span>}
         </div>
         <Button
           variant="secondary"
@@ -223,9 +224,7 @@ export function PublicCatalog({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersId = useId();
   const topRef = useRef<HTMLDivElement>(null);
-  const [items, setItems] = useState<(PublicPackage | PublicService)[]>(
-    [],
-  );
+  const [items, setItems] = useState<(PublicPackage | PublicService)[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const filterScope = catalogFilterScope(kind, filters);
   const pagination = usePagination(`${filterScope}:${mode}`);

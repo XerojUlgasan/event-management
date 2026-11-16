@@ -27,6 +27,8 @@ model Conversation {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   customerId      String    @map("customer_id") @db.Uuid
   status          String    @default("active")
+  aiEnabled       Boolean   @default(true) @map("ai_enabled")
+  aiVersion       Int       @default(0) @map("ai_version")
   closedAt        DateTime? @map("closed_at") @db.Timestamptz(6)
   bookingRequestId String?  @unique @map("booking_request_id") @db.Uuid
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -86,8 +88,9 @@ model Package {
   customForBookingRequest BookingRequest? @relation("CustomBookingPackage", fields: [customForBookingRequestId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   bookingRequests BookingRequest[] @relation("InquiryPackage")
   services PackageService[]
-  page            CatalogPage?
+  canvas          Json              @default("[]") @db.JsonB
 
+  @@index([canvas(ops: JsonbPathOps)], type: Gin, map: "packages_canvas_idx")
   @@map("packages")
 }
 
@@ -101,54 +104,13 @@ model Service {
   slug String @unique
   description String
   hourlyRatePesos Int? @map("hourly_rate_pesos")
+  fixedPricePesos Int? @map("fixed_price_pesos")
+  includedHours Int? @map("included_hours")
   publishedAt DateTime @default(now()) @map("published_at") @db.Timestamptz(6)
-  page CatalogPage?
+  canvas Json @default("[]") @db.JsonB
   packages PackageService[]
+  @@index([canvas(ops: JsonbPathOps)], type: Gin, map: "services_canvas_idx")
   @@map("services")
-}
-
-model CatalogPage {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  packageId String? @unique @map("package_id") @db.Uuid
-  serviceId String? @unique @map("service_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-  package Package? @relation(fields: [packageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  service Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  sections CatalogSection[]
-  @@map("catalog_pages")
-}
-
-model CatalogSection {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  pageId String @map("page_id") @db.Uuid
-  title String @default("")
-  sortOrder Int @map("sort_order")
-  page CatalogPage @relation(fields: [pageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  widgets CatalogWidget[]
-  @@unique([pageId, sortOrder])
-  @@map("catalog_sections")
-}
-
-model CatalogWidget {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sectionId String @map("section_id") @db.Uuid
-  type String
-  sortOrder Int @map("sort_order")
-  x Int
-  y Int
-  w Int
-  h Int
-  markdown String @default("")
-  mediaId String? @map("media_id") @db.Uuid
-  alt String @default("")
-  caption String @default("")
-  autoplay Boolean @default(false)
-  section CatalogSection @relation(fields: [sectionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  media MediaAsset? @relation(fields: [mediaId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  @@unique([sectionId, sortOrder])
-  @@index([mediaId])
-  @@map("catalog_widgets")
 }
 
 model MediaAsset {
@@ -162,7 +124,6 @@ model MediaAsset {
   createdBy String? @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   creator User? @relation(fields: [createdBy], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  widgets CatalogWidget[]
   @@map("media_assets")
 }
 

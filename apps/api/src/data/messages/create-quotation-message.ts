@@ -29,7 +29,11 @@ export async function createQuotationMessageData(
     .executeTakeFirstOrThrow();
   await trx
     .updateTable("conversations")
-    .set({ updated_at: message.created_at })
+    .set({
+      updated_at: message.created_at,
+      ai_enabled: false,
+      ai_version: conversation.ai_version + (conversation.ai_enabled ? 1 : 0),
+    })
     .where("id", "=", conversation.id)
     .execute();
   return true;

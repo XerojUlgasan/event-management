@@ -1,18 +1,14 @@
 import { usePagination } from "../../../../lib/pagination/use-pagination";
 import { CatalogCard, CatalogCardActions } from "../../../catalog/CatalogCard";
 import type { ReactNode } from "react";
-import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Button,
   Pagination,
   Dialog,
-  FormField,
-  Input,
   PageHeader,
   SearchField,
   Tabs,
-  Textarea,
   useNotifications,
 } from "@event-management/ui";
 import { ApiError } from "../../../../lib/http/request";
@@ -27,23 +23,28 @@ import {
   type AdminService,
   type ServiceContent,
 } from "../../../../lib/data/catalog/services";
-import {
-  ServiceCanvas,
-  serviceRateLabel as rateLabel,
-} from "../../../catalog/CatalogContent";
+import { ServiceCanvas } from "../../../catalog/CatalogContent";
+import { servicePricingLabels } from "../../../../lib/utils/formatting/money";
 import { CatalogDetailPreview } from "../../../catalog/CatalogDetailPreview";
 import { CatalogEditor } from "../../../catalog/CatalogEditor";
+import { CatalogCreateDialog } from "../../../catalog/CatalogCreateDialog";
+import { ServiceDetailsFields } from "../../../catalog/ServiceDetailsFields";
+import { validateServiceDetails } from "../../../../lib/utils/catalog/details-validation";
 
 const empty = (): ServiceContent => ({
   name: "",
   description: "",
   hourlyRatePesos: null,
+  fixedPricePesos: null,
+  includedHours: null,
   sections: [{ id: crypto.randomUUID(), title: "", widgets: [] }],
 });
 const content = (version: AdminService): ServiceContent => ({
   name: version.name,
   description: version.description,
   hourlyRatePesos: version.hourlyRatePesos,
+  fixedPricePesos: version.fixedPricePesos,
+  includedHours: version.includedHours,
   sections: version.sections?.length
     ? version.sections
     : [{ id: crypto.randomUUID(), title: "", widgets: [] }],
@@ -62,6 +63,7 @@ function ServiceCard({
   item: ServiceContent;
   action?: ReactNode;
 }) {
+  const pricing = servicePricingLabels(item);
   return (
     <CatalogCard
       image={cover(item)}
@@ -70,7 +72,10 @@ function ServiceCard({
       title={item.name || "Untitled service"}
       description={item.description}
       metadata={[
-        { label: "Hourly rate", value: rateLabel(item.hourlyRatePesos) },
+        { label: "Price", value: pricing.price },
+        ...(pricing.excess
+          ? [{ label: "Extra time", value: pricing.excess }]
+          : []),
       ]}
       action={action}
     />
@@ -95,6 +100,7 @@ export function ServicesPage() {
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState("Services");
   const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState<ServiceContent | null>(null);
   const [editing, setEditing] = useState<ServiceContent | null>(null);
   const savedRef = useRef<{ id: string | null; updatedAt: string | null }>({
     id: null,
@@ -201,7 +207,7 @@ export function ServicesPage() {
               onClick={() => {
                 savedDuringEditRef.current = false;
                 savedRef.current = { id: null, updatedAt: null };
-                setEditing(empty());
+                setCreating(empty());
               }}
             >
               + Create service
@@ -312,6 +318,21 @@ export function ServicesPage() {
           <ServiceCanvas item={preview} />
         </CatalogDetailPreview>
       )}
+      {creating && (
+        <CatalogCreateDialog
+          entity="service"
+          initial={creating}
+          onClose={() => setCreating(null)}
+          onContinue={(form) => {
+            setCreating(null);
+            setEditing(form);
+          }}
+          validate={validateServiceDetails}
+          renderDetails={(form, setForm) => (
+            <ServiceDetailsFields content={form} onChange={setForm} />
+          )}
+        />
+      )}
       {editing && (
         <CatalogEditor
           initial={editing}
@@ -326,18 +347,8 @@ export function ServicesPage() {
             void load();
           }}
           validate={(form) => {
-            if (
-              form.hourlyRatePesos != null &&
-              (!Number.isInteger(form.hourlyRatePesos) ||
-                form.hourlyRatePesos <= 0 ||
-                form.hourlyRatePesos > 2147483647)
-            )
-              return "Hourly rate must be a whole number greater than zero.";
-            if (!form.name.trim()) return "Enter a service name before saving.";
-            if (!form.description.trim())
-              return "Enter a description before saving.";
-            if (form.hourlyRatePesos == null)
-              return "Enter an hourly rate before saving.";
+            const detailsError = validateServiceDetails(form);
+            if (detailsError) return detailsError;
             if (
               !form.sections.some((section) =>
                 section.widgets.some(
@@ -348,33 +359,7 @@ export function ServicesPage() {
               return "Add a service image before saving.";
           }}
           renderDetails={(form, setForm) => (
-            <div className="form-grid">
-              <FormField className="full" label="Catalog description *">
-                <Textarea
-                  maxLength={MAX_CATALOG_TEXT_LENGTH}
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm({ ...form, description: e.target.value })
-                  }
-                />
-              </FormField>
-              <FormField className="full" label="Hourly rate (PHP)">
-                <Input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={form.hourlyRatePesos ?? ""}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      hourlyRatePesos:
-                        e.target.value === "" ? null : Number(e.target.value),
-                    })
-                  }
-                />
-                <small>Enter whole pesos. A rate is required.</small>
-              </FormField>
-            </div>
+            <ServiceDetailsFields content={form} onChange={setForm} />
           )}
           renderPreview={(form, mode) =>
             mode === "customer" ? (

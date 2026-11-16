@@ -9,7 +9,7 @@ import {
   InvalidPackageMedia,
   readCatalogSectionsData,
   replaceCatalogSectionsData,
-} from "../../data/packages/catalog-page.js";
+} from "../../data/packages/catalog-canvas.js";
 import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
 import {
   duplicateTitle,
@@ -49,7 +49,6 @@ export async function updateServiceService(
           { kind: "service", id },
           { sections },
           actorId,
-          now,
         );
       return serviceAdminDto(trx, row);
     });

@@ -14,6 +14,8 @@ export function pageQuery(page?: CatalogPageQuery) {
   if (page?.maxPricePesos !== undefined)
     params.set("maxPricePesos", String(page.maxPricePesos));
   if (page?.guests !== undefined) params.set("guests", String(page.guests));
+  if (page?.pricingType !== undefined)
+    params.set("pricingType", page.pricingType);
   const query = params.toString();
   return query ? `?${query}` : "";
 }

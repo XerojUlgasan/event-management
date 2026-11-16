@@ -34,6 +34,7 @@ import type {
   CatalogWidget,
 } from "@event-management/contracts/catalog";
 import { deleteCatalogMedia } from "../../lib/data/catalog/media";
+import { validateCatalogCanvas } from "../../lib/utils/catalog/canvas-validation";
 import {
   unreferencedUploadIds,
   uploadPendingCatalogMedia,
@@ -566,6 +567,16 @@ export function CatalogEditor<T extends CanvasContent>({
       setSettings(true);
       return;
     }
+    const canvasError = validateCatalogCanvas(
+      content.sections,
+      new Set(Object.keys(files)),
+    );
+    if (canvasError) {
+      setError(notifyError(canvasError));
+      setSettings(false);
+      setPreview(false);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -590,6 +601,8 @@ export function CatalogEditor<T extends CanvasContent>({
           });
         },
       );
+      const uploadedCanvasError = validateCatalogCanvas(next.sections);
+      if (uploadedCanvasError) throw new Error(uploadedCanvasError);
       await onSave(next);
       void Promise.allSettled(
         unreferencedUploadIds(next.sections, pending.current).map(

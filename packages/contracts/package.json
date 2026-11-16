@@ -5,6 +5,7 @@
   "exports": {
     "./pagination": "./src/pagination.ts",
     "./catalog": "./src/catalog.ts",
+    "./catalog-canvas": "./src/catalog-canvas.ts",
     "./catalog-filters": "./src/catalog-filters.ts",
     "./catalog-slug": "./src/catalog-slug.ts",
     "./quotations": "./src/quotations.ts",
@@ -14,5 +15,8 @@
     "./limits/auth": "./src/limits/auth.ts",
     "./limits/booking-requests": "./src/limits/booking-requests.ts",
     "./limits/catalog": "./src/limits/catalog.ts"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
   }
 }

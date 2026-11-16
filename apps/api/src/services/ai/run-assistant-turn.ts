@@ -14,12 +14,14 @@ export async function runAssistantTurnService({
   customerId,
   conversationId,
   customerMessageId,
+  aiVersion,
   abortSignal,
 }: {
   db: Kysely<DB>;
   customerId: string;
   conversationId: string;
   customerMessageId: string;
+  aiVersion: number;
   abortSignal?: AbortSignal;
 }) {
   const started = Date.now();
@@ -29,6 +31,8 @@ export async function runAssistantTurnService({
     throw new Error("Conversation not found");
   if (conversation.status !== "active")
     throw new Error("Conversation is closed");
+  if (!conversation.ai_enabled || conversation.ai_version !== aiVersion)
+    return null;
   const history = await listConversationHistoryData(
     db,
     conversationId,
@@ -74,9 +78,15 @@ export async function runAssistantTurnService({
   const reply = text.trim();
   if (!reply) throw new Error("AI returned an empty reply");
   abortSignal?.throwIfAborted();
-  const message = messageDto(
-    await createAssistantMessageData(db, conversationId, customerId, reply),
+  const saved = await createAssistantMessageData(
+    db,
+    conversationId,
+    customerId,
+    reply,
+    aiVersion,
   );
+  if (!saved) return null;
+  const message = messageDto(saved);
   console.info("assistant-turn", {
     messageId: customerMessageId,
     modelRole: "text",

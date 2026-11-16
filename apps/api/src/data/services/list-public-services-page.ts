@@ -20,10 +20,16 @@ export function listPublicServicesPageData(
       ),
     );
   query = query.where("archived_at", "is", null);
+  if (options.pricingType === "fixed")
+    query = query.where("fixed_price_pesos", "is not", null);
+  if (options.pricingType === "hourly")
+    query = query.where("fixed_price_pesos", "is", null);
+  const priceColumn =
+    options.pricingType === "fixed" ? "fixed_price_pesos" : "hourly_rate_pesos";
   if (options.minPricePesos !== undefined)
-    query = query.where("hourly_rate_pesos", ">=", options.minPricePesos);
+    query = query.where(priceColumn, ">=", options.minPricePesos);
   if (options.maxPricePesos !== undefined)
-    query = query.where("hourly_rate_pesos", "<=", options.maxPricePesos);
+    query = query.where(priceColumn, "<=", options.maxPricePesos);
   if (position)
     query = query.where(
       sql<boolean>`(published_at, id) < (${position.sort}::timestamptz, ${position.id}::uuid)`,

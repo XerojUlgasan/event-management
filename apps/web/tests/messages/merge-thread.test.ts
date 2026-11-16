@@ -56,6 +56,30 @@ test("send response deduplicates both messages already received by polling", () 
   assert.equal(result.conversation.lastMessage?.id, "3");
 });
 
+test("an older polled thread cannot replace a newer confirmed AI setting", () => {
+  const current = {
+    ...thread([1, 2], null),
+    conversation: {
+      id: "thread",
+      aiEnabled: false,
+      aiVersion: 3,
+    } as ChatThread["conversation"],
+  };
+  const olderPoll = {
+    ...thread([2], null),
+    conversation: {
+      id: "thread",
+      aiEnabled: true,
+      aiVersion: 2,
+    } as ChatThread["conversation"],
+  };
+
+  const result = mergePolledThread(current, olderPoll, new Set());
+
+  assert.equal(result.thread.conversation.aiEnabled, false);
+  assert.equal(result.thread.conversation.aiVersion, 3);
+});
+
 test("send response places a missing customer message before its polled assistant reply", () => {
   const customer = datedMessage(2, 2);
   const assistant = datedMessage(3, 2);

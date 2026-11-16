@@ -152,6 +152,162 @@ async function send(conversationId: string, body: string) {
   return customerMessageResultSchema.parse(await response.json());
 }
 
+function setAi(
+  id: string,
+  aiEnabled: unknown,
+  expectedAiVersion: unknown,
+  cookie = team.cookie,
+) {
+  return app.request(`/v1/admin/conversations/${id}/ai`, {
+    method: "PATCH",
+    headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ aiEnabled, expectedAiVersion }),
+  });
+}
+
+test("AI control is per conversation, authorized, versioned, and skips generation while off", async () => {
+  useReply("AI is back");
+  const id = await conversation();
+  const otherId = await conversation();
+  const initial = threadSchema.parse(
+    await (await call(`/admin/conversations/${id}`, team.cookie)).json(),
+  );
+  assert.equal(initial.conversation.aiEnabled, true);
+  assert.equal(initial.conversation.aiVersion, 0);
+  assert.equal((await setAi(id, false, 0, "")).status, 401);
+  assert.equal((await setAi(id, false, 0, customer.cookie)).status, 403);
+  assert.equal((await setAi(id, "false", 0)).status, 400);
+  assert.equal((await setAi(id, false, -1)).status, 400);
+  assert.equal((await setAi(randomUUID(), false, 0)).status, 404);
+
+  const off = await setAi(id, false, 0);
+  assert.equal(off.status, 200);
+  assert.deepEqual(await off.json(), { aiEnabled: false, aiVersion: 1 });
+  const noop = await setAi(id, false, 1);
+  assert.equal(noop.status, 200);
+  assert.deepEqual(await noop.json(), { aiEnabled: false, aiVersion: 1 });
+  assert.equal((await setAi(id, true, 0)).status, 409);
+
+  const held = await send(id, "A human can answer this");
+  assert.equal(held.assistantMessage, null);
+  assert.equal(held.assistantError, null);
+  assert.equal(model.doGenerateCalls.length, 0);
+  await db
+    .updateTable("conversations")
+    .set({ status: "closed", closed_at: new Date() })
+    .where("id", "=", id)
+    .execute();
+  const reopened = await send(id, "Continue with the human team");
+  assert.equal(reopened.assistantMessage, null);
+  assert.equal(reopened.assistantError, null);
+  assert.equal(model.doGenerateCalls.length, 0);
+  const reopenedConversation = await db
+    .selectFrom("conversations")
+    .select(["status", "closed_at", "ai_enabled", "ai_version"])
+    .where("id", "=", id)
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(reopenedConversation, {
+    status: "active",
+    closed_at: null,
+    ai_enabled: false,
+    ai_version: 1,
+  });
+  const otherThread = threadSchema.parse(
+    await (await call(`/admin/conversations/${otherId}`, team.cookie)).json(),
+  );
+  assert.equal(otherThread.conversation.aiEnabled, true);
+  assert.equal(otherThread.conversation.aiVersion, 0);
+
+  const on = await setAi(id, true, 1);
+  assert.equal(on.status, 200);
+  assert.deepEqual(await on.json(), { aiEnabled: true, aiVersion: 2 });
+  assert.equal(model.doGenerateCalls.length, 0);
+  const answered = await send(id, "Now please answer");
+  assert.equal(answered.assistantMessage?.body, "AI is back");
+  assert.equal(answered.assistantError, null);
+  assert.equal(model.doGenerateCalls.length, 1);
+
+  await db
+    .updateTable("conversations")
+    .set({ status: "closed" })
+    .where("id", "=", id)
+    .execute();
+  assert.equal((await setAi(id, false, 2)).status, 409);
+});
+
+test("simultaneous toggle requests with the same version cannot overwrite each other", async () => {
+  const id = await conversation();
+  const responses = await Promise.all([
+    setAi(id, false, 0),
+    setAi(id, false, 0),
+  ]);
+  assert.deepEqual(
+    responses.map((response) => response.status).sort(),
+    [200, 409],
+  );
+  const thread = threadSchema.parse(
+    await (await call(`/admin/conversations/${id}`, team.cookie)).json(),
+  );
+  assert.equal(thread.conversation.aiEnabled, false);
+  assert.equal(thread.conversation.aiVersion, 1);
+});
+
+test("admin takeover discards an in-flight AI reply even after AI is re-enabled", async () => {
+  useReply("Old reply must not be saved");
+  let started!: () => void;
+  let release!: () => void;
+  const generating = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const resume = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const originalGenerate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    started();
+    await resume;
+    return originalGenerate(...args);
+  };
+  const id = await conversation();
+  const pending = send(id, "Question before takeover");
+  await Promise.race([
+    generating,
+    pending.then(() => {
+      throw new Error("Customer send completed before generation began");
+    }),
+  ]);
+  try {
+    const response = await call(
+      `/admin/conversations/${id}/messages`,
+      team.cookie,
+      {
+        body: "A human is here",
+      },
+    );
+    assert.equal(response.status, 201);
+    const takeover = await response.json();
+    assert.equal(takeover.aiEnabled, false);
+    assert.equal(takeover.aiVersion, 1);
+    const on = await setAi(id, true, 1);
+    assert.equal(on.status, 200);
+    assert.deepEqual(await on.json(), { aiEnabled: true, aiVersion: 2 });
+  } finally {
+    release();
+  }
+  const result = await pending;
+  assert.equal(result.assistantMessage, null);
+  assert.equal(result.assistantError, null);
+  const thread = threadSchema.parse(
+    await (await call(`/admin/conversations/${id}`, team.cookie)).json(),
+  );
+  assert.deepEqual(
+    thread.messages.map((message) => message.senderRole),
+    ["customer", "admin"],
+  );
+  assert.equal(thread.conversation.aiEnabled, true);
+  assert.equal(thread.conversation.aiVersion, 2);
+});
+
 function turnContext(callIndex: number) {
   const message = model.doGenerateCalls[callIndex].prompt[1];
   assert.equal(message.role, "user");
@@ -481,6 +637,7 @@ test("unauthorized/closed sends fail before generation, and admin messages do no
       conversationId: id,
       customerId: customer.id,
       customerMessageId: randomUUID(),
+      aiVersion: 0,
     }),
     /Conversation is closed/,
   );
@@ -492,11 +649,29 @@ test("unauthorized/closed sends fail before generation, and admin messages do no
   assert.equal(
     (
       await call(`/admin/conversations/${id}/messages`, team.cookie, {
+        body: " ",
+      })
+    ).status,
+    400,
+  );
+  const unchanged = threadSchema.parse(
+    await (await call(`/admin/conversations/${id}`, team.cookie)).json(),
+  );
+  assert.equal(unchanged.conversation.aiEnabled, true);
+  assert.equal(unchanged.conversation.aiVersion, 0);
+  assert.equal(
+    (
+      await call(`/admin/conversations/${id}/messages`, team.cookie, {
         body: "Human response",
       })
     ).status,
     201,
   );
+  const afterTakeover = threadSchema.parse(
+    await (await call(`/admin/conversations/${id}`, team.cookie)).json(),
+  );
+  assert.equal(afterTakeover.conversation.aiEnabled, false);
+  assert.equal(afterTakeover.conversation.aiVersion, 1);
   assert.equal(model.doGenerateCalls.length, 0);
 });
 
@@ -539,6 +714,7 @@ test("cancelled generation and oversized history keep the saved customer message
       customerId: customer.id,
       conversationId: id,
       customerMessageId: trigger.id,
+      aiVersion: 0,
       abortSignal: cancellation.signal,
     }),
   );
@@ -553,6 +729,7 @@ test("cancelled generation and oversized history keep the saved customer message
       customerId: customer.id,
       conversationId: id,
       customerMessageId: trigger.id,
+      aiVersion: 0,
     }),
     /Conversation is too long/,
   );
@@ -568,6 +745,7 @@ test("cancelled generation and oversized history keep the saved customer message
       customerId: customer.id,
       conversationId: id,
       customerMessageId: trigger.id,
+      aiVersion: 0,
     }),
     /Conversation is too long/,
   );
@@ -610,6 +788,7 @@ test("history snapshots stop at the triggering customer message and reject other
       conversationId: id,
       customerId: other.id,
       customerMessageId: trigger.id,
+      aiVersion: 0,
     }),
     /Conversation not found/,
   );
@@ -618,6 +797,7 @@ test("history snapshots stop at the triggering customer message and reject other
     conversationId: id,
     customerId: customer.id,
     customerMessageId: trigger.id,
+    aiVersion: 0,
   });
   assert.match(
     JSON.stringify(model.doGenerateCalls[0].prompt),

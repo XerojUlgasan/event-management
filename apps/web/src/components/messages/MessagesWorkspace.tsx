@@ -73,6 +73,8 @@ export function MessagesWorkspace({
   error,
   onRetry,
   onSend,
+  onToggleAi,
+  pendingAiToggle = false,
   onBack,
   conversationOpen,
   listEmpty,
@@ -104,6 +106,12 @@ export function MessagesWorkspace({
   error: string | null;
   onRetry?: () => void;
   onSend: (body: string) => Promise<void>;
+  onToggleAi?: (
+    conversationId: string,
+    aiEnabled: boolean,
+    expectedAiVersion: number,
+  ) => void;
+  pendingAiToggle?: boolean;
   onBack: () => void;
   conversationOpen: boolean;
   listEmpty: { title: string; body: string };
@@ -483,6 +491,24 @@ export function MessagesWorkspace({
             </span>
             <small>{activeDetail}</small>
           </div>
+          {viewerRole === "admin" && active && onToggleAi && (
+            <div className="message-head-actions" aria-label="AI reply setting">
+              <Button
+                variant="secondary"
+                size="small"
+                aria-label="AI replies"
+                aria-pressed={active.aiEnabled}
+                title="Automatically reply to customer messages with AI"
+                pending={pendingAiToggle}
+                disabled={active.status !== "active"}
+                onClick={() =>
+                  onToggleAi(active.id, !active.aiEnabled, active.aiVersion)
+                }
+              >
+                {active.aiEnabled ? "AI on" : "AI off (Human)"}
+              </Button>
+            </div>
+          )}
           {active?.bookingRequestId && (
             <div
               className="message-head-actions"

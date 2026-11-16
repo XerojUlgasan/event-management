@@ -8,7 +8,9 @@ Preserve historical reasoning. When a decision changes, link a successor and mar
 
 | Record | Status / purpose |
 | --- | --- |
+| [Catalog canvas application validation](2026-11-16_catalog-canvas-application-validation.md) | Accepted shared browser/API document rules replacing the SQL validator |
 | [Booking package details](2026-11-16_booking-package-details.md) | Accepted current-package reads replacing inquiry snapshots |
+| [Entity-owned catalog canvas JSONB](2026-11-16_catalog-canvas-jsonb.md) | Accepted owner JSONB canvas arrays without document versioning |
 | [Guidance organization](2026-11-14_guidance-organization.md) | Accepted structure and routing policy |
 | [Legacy engineering notes](legacy-engineering-notes.md) | Historical pointers; verify against current source |
 | [Legacy documentation notes](legacy-documentation-notes.md) | Historical pointers; verify against current source |

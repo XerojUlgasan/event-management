@@ -1,7 +1,19 @@
 import type {
+  ChatConversation,
   ChatMessage,
   ChatThread,
 } from "../../data/messages/conversations";
+
+type ConversationAiState = Pick<ChatConversation, "aiEnabled" | "aiVersion">;
+
+export function mergeAiStateByVersion<T extends ConversationAiState>(
+  current: ConversationAiState | null,
+  next: T,
+): T {
+  return current && current.aiVersion > next.aiVersion
+    ? { ...next, aiEnabled: current.aiEnabled, aiVersion: current.aiVersion }
+    : next;
+}
 
 // Keep fetched order intact. Serialized dates lose microseconds, so insert after
 // equal timestamps unless a known following sent message anchors the position.
@@ -62,9 +74,14 @@ export function mergeThread(
   next: ChatThread,
 ): ChatThread {
   if (!current || current.conversation.id !== next.conversation.id) return next;
+  const conversation = mergeAiStateByVersion(
+    current.conversation,
+    next.conversation,
+  );
   if (!next.messages.length)
     return {
       ...next,
+      conversation,
       messages: current.messages,
       nextCursor: current.nextCursor,
     };
@@ -87,6 +104,7 @@ export function mergeThread(
           .filter((message) => !nextIds.has(message.id));
   return {
     ...next,
+    conversation,
     messages: [...prefix, ...next.messages, ...suffix],
     nextCursor: current.nextCursor,
   };
@@ -142,6 +160,10 @@ export function mergePolledThread(
   return {
     thread: {
       ...next,
+      conversation: mergeAiStateByVersion(
+        current.conversation,
+        next.conversation,
+      ),
       messages: [
         ...next.messages,
         ...current.messages.filter(

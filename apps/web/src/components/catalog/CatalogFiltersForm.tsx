@@ -4,8 +4,9 @@ import {
   MAX_CATALOG_FILTER_PRICE_PESOS,
   type CatalogFilters,
   type CatalogKind,
+  type ServicePricingType,
 } from "@event-management/contracts/catalog-filters";
-import { Button, FormField, Input } from "@event-management/ui";
+import { Button, FormField, Input, Select } from "@event-management/ui";
 
 /** Catalog-specific composition; shared controls own presentation and feedback. */
 export function CatalogFiltersForm({
@@ -17,11 +18,18 @@ export function CatalogFiltersForm({
   filters: CatalogFilters;
   onApply: (filters: CatalogFilters) => void;
 }) {
-  const [minPrice, setMinPrice] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
-  const [guests, setGuests] = useState("");
+  const [minPrice, setMinPrice] = useState(
+    filters.minPricePesos?.toString() ?? "",
+  );
+  const [maxPrice, setMaxPrice] = useState(
+    filters.maxPricePesos?.toString() ?? "",
+  );
+  const [guests, setGuests] = useState(filters.guests?.toString() ?? "");
+  const [pricingType, setPricingType] = useState<ServicePricingType | "">(
+    filters.pricingType ?? "",
+  );
   const [error, setError] = useState("");
-  const hasPrice = true;
+  const hasPrice = kind === "packages" || pricingType !== "";
   const hasGuests = kind !== "services";
   const apply = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -31,6 +39,7 @@ export function CatalogFiltersForm({
     }
     setError("");
     onApply({
+      ...(kind === "services" && pricingType !== "" ? { pricingType } : {}),
       ...(hasPrice && minPrice !== ""
         ? { minPricePesos: Number(minPrice) }
         : {}),
@@ -49,16 +58,47 @@ export function CatalogFiltersForm({
         setMinPrice("");
         setMaxPrice("");
         setGuests("");
+        setPricingType("");
         setError("");
         onApply({});
       }}
     >
       <div className="catalog-filter-fields">
+        {kind === "services" && (
+          <FormField
+            label="Pricing type"
+            description="Choose a type to filter its price range."
+          >
+            {(field) => (
+              <Select
+                {...field}
+                value={pricingType}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === "" || value === "fixed" || value === "hourly") {
+                    setPricingType(value);
+                    setMinPrice("");
+                    setMaxPrice("");
+                    setError("");
+                  }
+                }}
+              >
+                <option value="">All service pricing</option>
+                <option value="fixed">Fixed price + excess hours</option>
+                <option value="hourly">Hourly only</option>
+              </Select>
+            )}
+          </FormField>
+        )}
         {hasPrice && (
           <>
             <FormField
               label={
-                kind === "services" ? "Min hourly rate (₱)" : "Min price (₱)"
+                kind === "services"
+                  ? pricingType === "fixed"
+                    ? "Min fixed price (₱)"
+                    : "Min hourly rate (₱)"
+                  : "Min price (₱)"
               }
             >
               {(field) => (
@@ -80,7 +120,11 @@ export function CatalogFiltersForm({
             </FormField>
             <FormField
               label={
-                kind === "services" ? "Max hourly rate (₱)" : "Max price (₱)"
+                kind === "services"
+                  ? pricingType === "fixed"
+                    ? "Max fixed price (₱)"
+                    : "Max hourly rate (₱)"
+                  : "Max price (₱)"
               }
               error={error}
             >
@@ -126,7 +170,11 @@ export function CatalogFiltersForm({
             type="reset"
             variant="secondary"
             disabled={
-              !minPrice && !maxPrice && !guests && !Object.keys(filters).length
+              !minPrice &&
+              !maxPrice &&
+              !guests &&
+              !pricingType &&
+              !Object.keys(filters).length
             }
           >
             Clear
@@ -136,7 +184,11 @@ export function CatalogFiltersForm({
       <p className="catalog-filter-hint">
         {kind === "packages"
           ? "Prices are package totals. Enter your guest count to see packages that can fit your event."
-          : "Rates are per hour, not the total event price. Services without a listed rate are excluded when filtering by price."}
+          : pricingType === "fixed"
+            ? "Filter the fixed price covering the listed hours. Excess hourly rates are shown separately."
+            : pricingType === "hourly"
+              ? "Filter hourly-only services by their hourly rate. Services without a listed rate are excluded when filtering by price."
+              : "Choose fixed-price or hourly-only services to filter prices separately."}
       </p>
     </form>
   );

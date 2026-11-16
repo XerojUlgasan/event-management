@@ -26,3 +26,10 @@ The customer and admin use the conversation to communicate and create transactio
 - Existing closed conversations retain their status and history. This policy change does not reopen old booking threads because their closure reason was not recorded.
 - Submitting a request and creating its conversation do not reserve a date, establish a final price, or confirm a booking.
 - Quotations are an implemented transaction type; this does not define a payment workflow. The [product scope](../../README.md#product-scope) still governs payment exclusions and other commitments; define transaction details before implementing them.
+
+## AI and human handling
+
+- AI replies are enabled by default per conversation. Only a System Administrator can change the toggle.
+- A successfully sent admin message or quotation switches that conversation to human handling. AI stays off until an admin explicitly re-enables it; failed sends do not change the preference.
+- Customers can continue messaging while AI is off. Re-enabling AI applies to future customer messages, without generating replies to the backlog.
+- Takeover suppresses any unfinished AI reply. Conversation history stays intact, and closing or reopening a conversation does not reset its AI preference. Closed conversations cannot be toggled.

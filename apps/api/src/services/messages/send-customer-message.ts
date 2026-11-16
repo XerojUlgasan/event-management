@@ -2,7 +2,6 @@ import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 import { createMessageData } from "../../data/messages/create-message.js";
 import { ensureConversationData } from "../../data/messages/ensure-conversation.js";
-import { updateConversationData } from "../../data/messages/update-conversation.js";
 import { findConversationData } from "../../data/messages/find-conversation.js";
 
 import { messageDto } from "./message-response.js";
@@ -22,19 +21,18 @@ export async function sendCustomerMessageService(
     throw new Error("Conversation not found");
   }
 
-  // General conversations can reopen, but closed booking threads remain closed.
-  if (conversation.status === "closed") {
-    if (conversation.booking_request_id)
-      throw new Error("Conversation is closed");
-    await updateConversationData(db, conversation.id, {
-      status: "active",
-      closed_at: null,
-    });
-  }
-
-  const message = messageDto(
-    await createMessageData(db, conversation, customerId, "customer", body),
+  // The message and AI state snapshot share a lock with admin takeover.
+  // General conversations reopen here without resetting their AI preference.
+  const saved = await createMessageData(
+    db,
+    conversation.id,
+    customerId,
+    "customer",
+    body,
   );
+  const message = messageDto(saved.message);
+  if (!saved.aiEnabled)
+    return { message, assistantMessage: null, assistantError: null };
   const started = Date.now();
   try {
     const assistantMessage = await runAssistantTurnService({
@@ -42,10 +40,19 @@ export async function sendCustomerMessageService(
       customerId,
       conversationId: conversation.id,
       customerMessageId: message.id,
+      aiVersion: saved.aiVersion,
       abortSignal,
     });
     return { message, assistantMessage, assistantError: null };
   } catch {
+    const current = await findConversationData(db, conversation.id).catch(
+      () => undefined,
+    );
+    if (
+      current &&
+      (!current.ai_enabled || current.ai_version !== saved.aiVersion)
+    )
+      return { message, assistantMessage: null, assistantError: null };
     // The customer write already committed. Do not invite a duplicate resend.
     console.warn("assistant-turn", {
       messageId: message.id,

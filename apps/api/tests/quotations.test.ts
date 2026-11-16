@@ -164,6 +164,11 @@ async function create(b: any) {
 test("quotation delivery, ownership, removed customer actions and admin revision history", async () => {
   const b = await booking();
   let q = await create(b);
+  const linkedConversation = await db
+    .selectFrom("conversations")
+    .select("id")
+    .where("booking_request_id", "=", b.id)
+    .executeTakeFirstOrThrow();
   assert.deepEqual(q.items, []);
   assert.equal(q.totalAmountMinor, 100000);
   assert.deepEqual(
@@ -240,6 +245,12 @@ test("quotation delivery, ownership, removed customer actions and admin revision
     ).status,
     409,
   );
+  const beforeDelivery = await read(
+    await call(`/admin/conversations/${linkedConversation.id}`),
+    200,
+  );
+  assert.equal(beforeDelivery.conversation.aiEnabled, true);
+  assert.equal(beforeDelivery.conversation.aiVersion, 0);
   q = (
     await read(
       await call(`/admin/quotations/${q.id}/send`, "POST", {
@@ -248,6 +259,12 @@ test("quotation delivery, ownership, removed customer actions and admin revision
       200,
     )
   ).quotation;
+  const afterDelivery = await read(
+    await call(`/admin/conversations/${linkedConversation.id}`),
+    200,
+  );
+  assert.equal(afterDelivery.conversation.aiEnabled, false);
+  assert.equal(afterDelivery.conversation.aiVersion, 1);
   const msg = await db
     .selectFrom("messages")
     .selectAll()
@@ -730,6 +747,12 @@ test("message failure rolls back send status, message and audit", async () => {
       ).length,
       0,
     );
+    const conversation = await db
+      .selectFrom("conversations")
+      .select(["ai_enabled", "ai_version"])
+      .where("booking_request_id", "=", b.id)
+      .executeTakeFirstOrThrow();
+    assert.deepEqual(conversation, { ai_enabled: true, ai_version: 0 });
     assert.equal(
       (
         await db

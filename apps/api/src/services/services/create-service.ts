@@ -6,7 +6,7 @@ import { serviceAdminDto } from "./service-response.js";
 import {
   InvalidPackageMedia,
   replaceCatalogSectionsData,
-} from "../../data/packages/catalog-page.js";
+} from "../../data/packages/catalog-canvas.js";
 import { error } from "../packages/package-rules.js";
 import {
   duplicateTitle,
@@ -33,7 +33,6 @@ export async function createServiceService(
         { kind: "service", id: row.id },
         { sections: data.sections ?? [] },
         actorId,
-        new Date(),
       );
       return serviceAdminDto(trx, row);
     });

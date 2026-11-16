@@ -5,7 +5,7 @@ import { createPackageData } from "../../data/packages/create-package.js";
 import {
   InvalidPackageMedia,
   replacePackageSectionsData,
-} from "../../data/packages/catalog-page.js";
+} from "../../data/packages/catalog-canvas.js";
 import {
   validatePackageServicesData,
   replacePackageServicesData,
@@ -33,7 +33,7 @@ export async function createPackageService(
       if (invalid) return invalid;
       const now = new Date();
       const row = await createPackageData(trx, content, title.slug, now);
-      await replacePackageSectionsData(trx, row.id, content, actorId, now);
+      await replacePackageSectionsData(trx, row.id, content, actorId);
       await replacePackageServicesData(trx, row.id, content.services);
       return packageDto(trx, row, { includeArchivedServices: true });
     });

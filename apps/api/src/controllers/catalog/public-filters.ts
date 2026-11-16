@@ -31,8 +31,19 @@ export const packageCatalogQuerySchema = paginationQuerySchema
   .refine(priceRange, rangeMessage);
 export const serviceCatalogQuerySchema = paginationQuerySchema
   .extend({
+    pricingType: z.enum(["fixed", "hourly"]).optional(),
     minPricePesos: price,
     maxPricePesos: price,
   })
   .strict()
-  .refine(priceRange, rangeMessage);
+  .refine(priceRange, rangeMessage)
+  .refine(
+    (value) =>
+      value.pricingType !== undefined ||
+      (value.minPricePesos === undefined && value.maxPricePesos === undefined),
+    {
+      message:
+        "Choose fixed-price or hourly-only pricing before filtering by price",
+      path: ["pricingType"],
+    },
+  );

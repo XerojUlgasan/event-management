@@ -6,7 +6,7 @@ import { updatePackageData } from "../../data/packages/update-package.js";
 import {
   InvalidPackageMedia,
   replacePackageSectionsData,
-} from "../../data/packages/catalog-page.js";
+} from "../../data/packages/catalog-canvas.js";
 import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
 import {
   validatePackageServicesData,
@@ -53,7 +53,6 @@ export async function updatePackageService(
         id,
         content,
         actorId,
-        now,
       );
       await replacePackageServicesData(trx, id, content.services);
       return packageDto(trx, row, { includeArchivedServices: true });
