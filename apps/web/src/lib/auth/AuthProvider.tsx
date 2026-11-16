@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { ApiError } from "../http/request";
+import { env } from "../env/env";
 import {
   addPassword,
   endSession,
@@ -22,11 +23,7 @@ import type { Profile } from "../data/auth/session";
 
 type Status = "loading" | "signed-out" | "signed-in";
 type FirebaseMethod = "google" | "password";
-export const firebaseConfigured = Boolean(
-  import.meta.env.PUBLIC_FIREBASE_API_KEY &&
-  import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN &&
-  import.meta.env.PUBLIC_FIREBASE_PROJECT_ID,
-);
+export const firebaseConfigured = env.firebaseConfigured;
 
 type AuthContextValue = {
   status: Status;

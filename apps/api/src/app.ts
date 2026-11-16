@@ -1,3 +1,4 @@
+import { env } from "./utils/env.js";
 import {
   SMALL_JSON_BODY_LIMIT_BYTES,
   CATALOG_JSON_BODY_LIMIT_BYTES,
@@ -23,10 +24,7 @@ import type { HonoEnv } from "./types/hono.js";
 
 export const app = new OpenAPIHono<HonoEnv>();
 
-const allowedOrigins = (process.env.WEB_ORIGIN ?? "http://localhost:4321")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const allowedOrigins = env.WEB_ORIGINS;
 
 app.use(
   "*",

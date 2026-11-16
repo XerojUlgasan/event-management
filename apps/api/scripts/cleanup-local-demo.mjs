@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import pg from "pg";
+import { env } from "../src/utils/env.ts";
 
 dotenv.config({
   path: fileURLToPath(new URL("../.env", import.meta.url)),
@@ -17,13 +18,17 @@ if (
   throw new Error(
     "Usage: node apps/api/scripts/cleanup-local-demo.mjs --execute /absolute/new-private-backup.json",
   );
-if (!process.env.DB_NAME || !process.env.DB_USER || !process.env.DB_PASSWORD)
+let databaseConfig;
+try {
+  databaseConfig = {
+    database: env.DB_NAME,
+    user: env.DB_USER,
+    password: env.DB_PASSWORD,
+  };
+} catch {
   throw new Error("DB_NAME, DB_USER, and DB_PASSWORD are required");
-if (
-  !["localhost", "127.0.0.1", "::1"].includes(
-    process.env.DB_HOST ?? "localhost",
-  )
-)
+}
+if (!["localhost", "127.0.0.1", "::1"].includes(env.DB_HOST))
   throw new Error("Only local PostgreSQL is allowed");
 const services = [
   "03b6b27f-4364-5741-ac96-0285a868c6f2",
@@ -69,11 +74,9 @@ const conversations = [
   "aaeb190c-3699-443b-8ca2-fe03ecd7b5c7",
 ];
 const pool = new pg.Pool({
-  host: process.env.DB_HOST ?? "localhost",
-  port: Number(process.env.DB_PORT ?? 5432),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  host: env.DB_HOST,
+  port: Number(env.DB_PORT),
+  ...databaseConfig,
 });
 const client = await pool.connect();
 const sameIds = (rows, expected, label) => {

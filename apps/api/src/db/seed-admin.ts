@@ -1,8 +1,9 @@
 import "dotenv/config";
+import { env } from "../utils/env.js";
 import { db } from "./client.js";
 import { getFirebaseAuth } from "../utils/firebase-admin.js";
 
-const email = process.argv[2] ?? process.env.ADMIN_EMAIL;
+const email = process.argv[2] ?? env.ADMIN_EMAIL;
 
 if (!email) {
   console.error("Usage: pnpm db:seed-admin <email>");
@@ -23,7 +24,7 @@ try {
     throw error;
   }
 
-  const password = process.env.ADMIN_PASSWORD;
+  const password = env.ADMIN_PASSWORD;
   if (!password) {
     console.error(
       `No Firebase user exists for ${email}. Add ADMIN_PASSWORD to create one, or create it in the Firebase console first.`,

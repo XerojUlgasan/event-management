@@ -14,6 +14,7 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Centralized app env](2026-11-16_13-07-35_centralized-app-env.md) | API/web environment owners / feat/ai | complete | Review or commit the scoped change when requested; live Edge and database flows remain unverified |
 | [Checklist removal](2026-11-14_23-46-07_checklist-removal.md) | Complete checklist removal after venue/staff cleanup / main | complete | Review combined local diff and additive migrations before publication |
 | [Venue catalog and staff removal](2026-11-14_23-28-10_catalog-staff-removal.md) | PR #26 merge and complete local removal / main | complete | Review local cleanup and coordinate its additive migration before deployment |
 | [Styled by AMAC rebrand](2026-11-14_14-02-28_styled-by-amac-rebrand.md) | Visible website identity / main | complete | Review or commit the scoped rebrand when requested |

@@ -151,9 +151,19 @@ The Node API, Prisma, seeds, and integration tests still use Compose PostgreSQL 
 
 ### Configuration
 
+Environment access, parsing, and defaults are centralized per app:
+
+- API, including the Edge bundle and API commands: [`apps/api/src/utils/env.ts`](apps/api/src/utils/env.ts). Getters preserve on-demand reads; importing the utility does not require database, Firebase, or Storage configuration. Existing entry points still load dotenv.
+- Browser: [`apps/web/src/lib/env/env.ts`](apps/web/src/lib/env/env.ts). Only explicit `PUBLIC_*` settings enter this module; they are captured at build time. Firebase setup stays optional.
+- Web server and Astro config: [`apps/web/src/lib/server/config/env.ts`](apps/web/src/lib/server/config/env.ts). Server getters read the runtime environment. Astro config reads shell-provided variables before Astro loads `.env` files.
+
+Use these utilities instead of reading `process.env` or `import.meta.env` in consumers. `pnpm check:env` enforces the source boundary and runs in `pnpm check`; tests and generated Edge bundles are excluded. Compose and Supabase configuration still use their native environment loading. The standalone cleanup script uses the API utility with Node's built-in TypeScript support, keeping its own dotenv path and local-only guards.
+
 Use the checked-in [API environment example](apps/api/.env.example) and [web environment example](apps/web/.env.example) for variable names. Keep `.env`, `.secrets/`, database values, session tokens, and service-account contents out of chat and commits.
 
 - Database: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` configure the API, Prisma, and type generator. A separate `DATABASE_URL` is unnecessary. Compose reads `apps/api/.env`; its project name remains `event_management_v2` to reuse the existing volume.
+- API listener: `API_PORT` defaults to `3000`. Browser/server API URLs remain separately configured; changing the listener port does not rewrite them.
+- Web proxy: optional `API_PROXY_TARGET` points to the Supabase gateway. `pnpm dev` sets it for both Astro config and request-time proxying. The catalog server loader prefers this proxy; otherwise it uses an absolute `PUBLIC_API_URL`, with `http://127.0.0.1:3000/v1` as its server fallback.
 - Browser API: `PUBLIC_API_URL` points to the API including `/v1`. `pnpm dev` sets it to `/v1` on the website origin. `pnpm all` uses the web environment value, which defaults to `http://localhost:3000/v1`.
 - Catalog media: set the Supabase Storage variables in the API example before testing Node API uploads. Built-in package sample photos do not require uploads. Existing stored files are left in place.
 - Database clients such as DBeaver: use PostgreSQL on `localhost:5432` with the configured database name/user/password. The local defaults use no SSL. A containerized client may require `host.docker.internal` instead of `localhost`.
@@ -262,6 +272,8 @@ Run the checks matching the changed area:
 | `pnpm build`                                                     | Web production bundle and API types                                                                                                                                   |
 | `pnpm build:storybook`                                           | Shared UI rendering build                                                                                                                                             |
 | `pnpm db:validate`                                               | Prisma schema                                                                                                                                                         |
+| `pnpm check:env`                                                 | Raw environment reads remain in designated per-app utilities; excludes tests and generated bundles                                                                    |
+| `pnpm test:env`                                                  | Environment defaults, lazy reads, Firebase initialization, and deliberate env-check failures without a database                                                       |
 | `pnpm check:web-structure`                                       | Web placement, naming, and runtime import rules; does not establish domain semantics or browser behavior                                                              |
 | `pnpm check:guidance`                                            | Context-factory links, anchors, skill metadata, registration, and reachability; does not verify agent compliance or application behavior                              |
 | `pnpm --filter @event-management/api test:auth`                  | Authentication and sessions with PostgreSQL and Firebase Auth emulator                                                                                                |

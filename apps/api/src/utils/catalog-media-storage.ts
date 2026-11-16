@@ -1,35 +1,4 @@
-const DEFAULT_BUCKET = "event-management";
-
-function configuredValue(name: string) {
-  const value = process.env[name]?.trim();
-  return value || undefined;
-}
-
-function serviceRoleKey() {
-  const direct =
-    configuredValue("SUPABASE_SERVICE_ROLE_KEY") ??
-    configuredValue("SUPABASE_SECRET_KEY");
-  if (direct) return direct;
-  const raw = configuredValue("SUPABASE_SECRET_KEYS");
-  if (!raw) return undefined;
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const candidate = parsed.default ?? Object.values(parsed)[0];
-    return typeof candidate === "string" && candidate.trim()
-      ? candidate.trim()
-      : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function storage() {
-  const url = configuredValue("SUPABASE_URL")?.replace(/\/$/, "");
-  const apiKey = serviceRoleKey();
-  const bucket = configuredValue("SUPABASE_STORAGE_BUCKET") ?? DEFAULT_BUCKET;
-  if (!url || !apiKey) throw new Error("Media storage is not configured");
-  return { url, apiKey, bucket };
-}
+import { env } from "./env.js";
 
 function objectPath(bucket: string, key: string) {
   return `${bucket}/${key
@@ -90,7 +59,7 @@ export async function putCatalogMedia(
   bytes: Uint8Array,
   contentType: string,
 ) {
-  const { url, apiKey, bucket } = storage();
+  const { url, apiKey, bucket } = env.STORAGE;
   const response = await fetch(
     `${url}/storage/v1/object/${objectPath(bucket, key)}`,
     {
@@ -106,7 +75,7 @@ export async function putCatalogMedia(
 }
 
 export async function deleteCatalogMedia(key: string) {
-  const { url, apiKey, bucket } = storage();
+  const { url, apiKey, bucket } = env.STORAGE;
   const response = await fetch(`${url}/storage/v1/object/${bucket}`, {
     method: "DELETE",
     headers: authHeaders(apiKey, { "Content-Type": "application/json" }),
@@ -117,7 +86,7 @@ export async function deleteCatalogMedia(key: string) {
 }
 
 export async function getCatalogMedia(key: string, range?: string) {
-  const { url, apiKey, bucket } = storage();
+  const { url, apiKey, bucket } = env.STORAGE;
   const response = await fetch(
     `${url}/storage/v1/object/${objectPath(bucket, key)}`,
     {

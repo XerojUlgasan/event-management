@@ -1,4 +1,5 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
+import { env } from "../env/env";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -6,14 +7,7 @@ import {
   setPersistence,
 } from "firebase/auth";
 
-const firebaseConfig = {
-  apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY,
-  authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.PUBLIC_FIREBASE_APP_ID,
-};
+const firebaseConfig = env.firebaseConfig;
 
 // Imported only when the user chooses a Firebase sign-in method.
 const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);

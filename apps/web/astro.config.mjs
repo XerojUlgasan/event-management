@@ -2,16 +2,17 @@ import { defineConfig } from "astro/config";
 import node from "@astrojs/node";
 import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
+import { env } from "./src/lib/server/config/env.ts";
 
 // The local Supabase gateway forces Access-Control-Allow-Origin: *, which browsers
 // reject when the page sends cookies. pnpm dev sets API_PROXY_TARGET so browser
 // calls stay on the website origin and this server forwards them to the gateway.
-const apiProxyTarget = process.env.API_PROXY_TARGET;
+const apiProxyTarget = env.API_PROXY_TARGET;
 
 export default defineConfig({
   output: "server",
   server: {
-    allowedHosts: ["contacting-structural-vessel-doubt.trycloudflare.com"],
+    allowedHosts: ["localhost:4322", "amac.zxero.dev"],
   },
   adapter: node({ mode: "standalone" }),
   integrations: [react()],

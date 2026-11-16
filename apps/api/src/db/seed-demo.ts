@@ -1,3 +1,4 @@
+import { env } from "../utils/env.js";
 import { createHash } from "node:crypto";
 import type { Transaction } from "kysely";
 import type { DB } from "./types.js";
@@ -17,7 +18,7 @@ function seedId(key: string) {
 }
 
 function seedClock() {
-  const value = process.env.SEED_CLOCK;
+  const value = env.SEED_CLOCK;
   if (!value) return new Date();
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) {
     throw new Error(

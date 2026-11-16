@@ -148,7 +148,9 @@ function checkPlacement(path) {
           path,
           "Place library files in lib/<layer>/<domain>/<responsibility>.",
         );
-    } else if (["auth", "http", "navigation", "pagination"].includes(group)) {
+    } else if (
+      ["auth", "env", "http", "navigation", "pagination"].includes(group)
+    ) {
       if (tail.length !== 2)
         report(
           path,

@@ -1,4 +1,5 @@
 import { defineMiddleware } from "astro:middleware";
+import { env } from "./lib/server/config/env";
 
 const dropped = [
   "connection",
@@ -13,7 +14,7 @@ const dropped = [
 ];
 
 export const onRequest = defineMiddleware(async (context, next) => {
-  const target = process.env.API_PROXY_TARGET;
+  const target = env.API_PROXY_TARGET;
   if (!target || !context.url.pathname.startsWith("/v1")) return next();
 
   const path = context.url.pathname.replace(

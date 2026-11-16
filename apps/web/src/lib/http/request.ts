@@ -1,5 +1,6 @@
-const configuredApiUrl =
-  import.meta.env?.PUBLIC_API_URL ?? "http://localhost:3000/v1";
+import { env } from "../env/env";
+
+const configuredApiUrl = env.PUBLIC_API_URL;
 
 export function apiBase() {
   const trimmed = configuredApiUrl.replace(/\/$/, "");

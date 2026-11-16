@@ -1,16 +1,9 @@
 import type { PublicPackage } from "../../data/catalog/packages";
 import type { PublicService } from "../../data/catalog/services";
-
-function serverApiBase() {
-  const proxy = process.env.API_PROXY_TARGET?.replace(/\/$/, "");
-  if (proxy) return `${proxy}/functions/v1/api/v1`;
-  const configured = process.env.PUBLIC_API_URL ?? "http://127.0.0.1:3000/v1";
-  if (/^https?:\/\//.test(configured)) return configured.replace(/\/$/, "");
-  return "http://127.0.0.1:3000/v1";
-}
+import { env } from "../config/env";
 
 async function serverGet<T>(path: string): Promise<T | null> {
-  const response = await fetch(`${serverApiBase()}${path}`);
+  const response = await fetch(`${env.SERVER_API_URL}${path}`);
   if (response.status === 404) return null;
   if (!response.ok)
     throw new Error(`Catalog request failed (${response.status})`);

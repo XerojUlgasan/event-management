@@ -1,3 +1,4 @@
+import { env } from "../utils/env.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
@@ -16,10 +17,7 @@ import {
   type RouteFamilyId,
 } from "./match-route.js";
 
-const allowedOrigins = (process.env.WEB_ORIGIN ?? "http://localhost:4321")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const allowedOrigins = env.WEB_ORIGINS;
 
 const loaders = {
   health: () => import("../controllers/health/index.js"),

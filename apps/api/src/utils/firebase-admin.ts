@@ -9,6 +9,8 @@ import {
 } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
+import { env } from "./env.js";
+
 const apiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const configurationError =
@@ -21,14 +23,11 @@ type ServiceAccount = {
 };
 
 async function initialize() {
-  const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(
-    /\\n/g,
-    "\n",
-  ).trim();
+  const projectId = env.FIREBASE_PROJECT_ID;
+  const clientEmail = env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = env.FIREBASE_PRIVATE_KEY;
 
-  if (process.env.FIREBASE_AUTH_EMULATOR_HOST && projectId) {
+  if (env.FIREBASE_AUTH_EMULATOR_HOST && projectId) {
     initializeApp({ projectId });
     return;
   }
@@ -41,7 +40,7 @@ async function initialize() {
     return;
   }
 
-  const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  const credentialsPath = env.GOOGLE_APPLICATION_CREDENTIALS;
 
   if (credentialsPath) {
     const credentialsFile = isAbsolute(credentialsPath)
@@ -67,7 +66,7 @@ async function initialize() {
     return;
   }
 
-  if (process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT) {
+  if (env.GOOGLE_CLOUD_PROJECT || env.GCLOUD_PROJECT) {
     initializeApp({
       credential: applicationDefault(),
       ...(projectId ? { projectId } : {}),

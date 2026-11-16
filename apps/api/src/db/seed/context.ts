@@ -1,3 +1,4 @@
+import { env } from "../../utils/env.js";
 import { createHash } from "node:crypto";
 import type { Insertable, Transaction } from "kysely";
 import type { DB } from "../types.js";
@@ -23,7 +24,7 @@ export function scenarioIndex(index: number) {
 }
 
 export function seedClock() {
-  const value = process.env.SEED_CLOCK;
+  const value = env.SEED_CLOCK;
   if (!value) return new Date();
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) {
     throw new Error(
@@ -37,9 +38,7 @@ export function seedClock() {
 }
 
 /** Deterministic unit interval. SEED_RANDOM_SEED changes the shuffle only. */
-export function seedRandom(
-  seedText = process.env.SEED_RANDOM_SEED ?? "clemora-scenario-v1",
-) {
+export function seedRandom(seedText = env.SEED_RANDOM_SEED) {
   let hash = 2166136261;
   for (let i = 0; i < seedText.length; i += 1)
     hash = Math.imul(hash ^ seedText.charCodeAt(i), 16777619);

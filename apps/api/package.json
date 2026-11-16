@@ -36,6 +36,7 @@
     "@event-management/contracts": "workspace:*",
     "@hono/node-server": "^2.1.5",
     "@hono/zod-openapi": "^1.6.3",
+    "ai": "^7.0.173",
     "dotenv": "^18.0.8",
     "firebase-admin": "^14.5.0",
     "hash-wasm": "4.13.0",
