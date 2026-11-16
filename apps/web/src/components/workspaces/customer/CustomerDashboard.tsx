@@ -25,6 +25,8 @@ import { SignInMethods } from "../../auth/SignInMethods";
 import { useConversationList } from "../../../lib/services/messages/use-conversation-list";
 import { MessagesWorkspace } from "../../messages/MessagesWorkspace";
 import {
+  addSentMessages,
+  addSentMessagesToConversation,
   mergePolledThread,
   prependOlder,
 } from "../../../lib/services/messages/merge-thread";
@@ -263,10 +265,17 @@ export function CustomerDashboard({
   const showSentInList = (
     conversation: ChatConversation,
     message: ChatMessage,
+    sent: ChatMessage[],
   ) => {
     setMessageConversations((current) =>
       current.map((item) =>
-        item.id === conversation.id
+        item.id === conversation.id &&
+        (!item.lastMessage ||
+          item.lastMessage.createdAt < message.createdAt ||
+          (item.lastMessage.createdAt === message.createdAt &&
+            sent.some(
+              (sentMessage) => sentMessage.id === item.lastMessage?.id,
+            )))
           ? {
               ...item,
               status: "active",
@@ -278,22 +287,10 @@ export function CustomerDashboard({
     );
   };
 
-  const appendMessage = (message: ChatMessage, conversationId: string) => {
-    setMessageThread((current) => {
-      if (!current || current.conversation.id !== conversationId)
-        return current;
-      if (current.messages.some((item) => item.id === message.id))
-        return current;
-      return {
-        ...current,
-        conversation: {
-          ...current.conversation,
-          lastMessage: message,
-          updatedAt: message.createdAt,
-        },
-        messages: [...current.messages, message],
-      };
-    });
+  const appendMessages = (messages: ChatMessage[], conversationId: string) => {
+    setMessageThread((current) =>
+      addSentMessagesToConversation(current, conversationId, messages),
+    );
   };
 
   const loadOlder = async () => {
@@ -334,9 +331,17 @@ export function CustomerDashboard({
       throw new Error("Wait for this conversation to load before sending.");
     const previousStatus = conversation.status;
     const result = await sendMyMessage(body, conversation.id);
-    localMessages.current.add(result.message.id);
-    appendMessage(result.message, conversation.id);
-    showSentInList(conversation, result.message);
+    const sent = result.assistantMessage
+      ? [result.message, result.assistantMessage]
+      : [result.message];
+    sent.forEach((message) => localMessages.current.add(message.id));
+    appendMessages(sent, conversation.id);
+    showSentInList(
+      conversation,
+      result.assistantMessage ?? result.message,
+      sent,
+    );
+    if (result.assistantError) notifyError(new Error(result.assistantError));
     // A new message reopens a closed general conversation.
     if (previousStatus === "closed") {
       setMessageThread((current) =>
@@ -396,23 +401,29 @@ export function CustomerDashboard({
     try {
       const thread = messageThread ?? (await getMyConversation());
       const result = await sendMyMessage(body, thread.conversation.id);
-      localMessages.current.add(result.message.id);
+      const sent = result.assistantMessage
+        ? [result.message, result.assistantMessage]
+        : [result.message];
+      sent.forEach((message) => localMessages.current.add(message.id));
       setSelectedConversationId(thread.conversation.id);
-      setMessageThread({
-        ...thread,
-        conversation: {
-          ...thread.conversation,
-          status: "active",
-          lastMessage: result.message,
-          updatedAt: result.message.createdAt,
-        },
-        messages: [...thread.messages, result.message],
-      });
-      showSentInList(thread.conversation, result.message);
-      setMessageDraft("");
+      setMessageThread((current) =>
+        addSentMessages(
+          current?.conversation.id === thread.conversation.id
+            ? current
+            : thread,
+          sent,
+        ),
+      );
+      showSentInList(
+        thread.conversation,
+        result.assistantMessage ?? result.message,
+        sent,
+      );
+      setMessageDraft((current) => (current.trim() === body ? "" : current));
       setMessageOpen(false);
       setConversationOpen(true);
       notify("Message sent.");
+      if (result.assistantError) notifyError(new Error(result.assistantError));
       go("Messages");
     } catch (cause) {
       setDialogError(notifyError(cause, "Unable to send your message."));
@@ -695,8 +706,9 @@ export function CustomerDashboard({
               <Button
                 onClick={sendFromDialog}
                 disabled={!messageDraft.trim() || dialogSending}
+                pending={dialogSending}
               >
-                {dialogSending ? "Sending…" : "Send message"}
+                {dialogSending ? "Waiting for AI…" : "Send message"}
               </Button>
             </>
           }

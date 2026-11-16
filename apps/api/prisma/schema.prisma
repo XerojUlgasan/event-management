@@ -44,14 +44,14 @@ model Conversation {
 model Message {
   id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   conversationId String       @map("conversation_id") @db.Uuid
-  senderId       String       @map("sender_id") @db.Uuid
+  senderId       String?      @map("sender_id") @db.Uuid
   senderRole     String       @default("customer") @map("sender_role")
   body           String
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   readAt         DateTime?    @map("read_at") @db.Timestamptz(6)
   quotationId    String?      @unique @map("quotation_id") @db.Uuid
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  sender         User?        @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   quotation      Quotation?   @relation(fields: [quotationId], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
   @@index([conversationId, createdAt])

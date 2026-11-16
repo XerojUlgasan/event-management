@@ -61,6 +61,22 @@ test("storage is checked on use and keys use existing precedence", () => {
   assert.throws(() => env.STORAGE, /Media storage is not configured/);
 });
 
+test("AI text configuration is lazy and does not require unused model roles", () => {
+  const source: Record<string, string | undefined> = {};
+  const env = createEnv(source);
+  assert.equal(env.API_PORT, 3000);
+  assert.throws(() => env.AI_TEXT, /AI text model is not configured/);
+  source.AI_GATEWAY_API_KEY = " fixture-key ";
+  assert.throws(() => env.AI_TEXT, /AI text model is not configured/);
+  source.TEXT_MODEL = " fixture/model ";
+  assert.deepEqual(env.AI_TEXT, {
+    apiKey: "fixture-key",
+    model: "fixture/model",
+  });
+  source.TEXT_MODEL = " ";
+  assert.throws(() => env.AI_TEXT, /AI text model is not configured/);
+});
+
 test("getters read current values and normalize Firebase and origins", () => {
   const source: Record<string, string | undefined> = {};
   const env = createEnv(source);

@@ -734,7 +734,7 @@ textarea.ui-control {
   position: fixed;
   z-index: 80;
   right: 25px;
-  bottom: 25px;
+  top: 25px;
   max-width: calc(100vw - 50px);
   min-height: 45px;
   padding: 12px 16px;
@@ -773,7 +773,7 @@ textarea.ui-control {
   position: fixed;
   z-index: 80;
   right: 25px;
-  bottom: 25px;
+  top: 25px;
   width: min(420px, calc(100vw - 50px));
   max-height: calc(100dvh - 50px);
   overflow-y: auto;

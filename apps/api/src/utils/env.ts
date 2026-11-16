@@ -99,6 +99,12 @@ export function createEnv(source: EnvSource) {
       if (!url || !apiKey) throw new Error("Media storage is not configured");
       return { url, apiKey, bucket };
     },
+    get AI_TEXT() {
+      const apiKey = configured("AI_GATEWAY_API_KEY");
+      const model = configured("TEXT_MODEL");
+      if (!apiKey || !model) throw new Error("AI text model is not configured");
+      return { apiKey, model };
+    },
     get SEED_CLOCK() {
       return source.SEED_CLOCK;
     },

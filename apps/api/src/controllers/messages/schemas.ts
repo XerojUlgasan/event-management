@@ -17,8 +17,8 @@ export const messageSchema = z.object({
   id: z.string().uuid(),
   body: z.string(),
   quotationId: z.string().uuid().nullable(),
-  senderId: z.string().uuid(),
-  senderRole: z.enum(["admin", "customer"]),
+  senderId: z.string().uuid().nullable(),
+  senderRole: z.enum(["admin", "customer", "assistant"]),
   senderName: z.string(),
   createdAt: z.string(),
   readAt: z.string().nullable(),
@@ -63,6 +63,11 @@ export const adminConversationsPageSchema = conversationsSchema.extend({
 
 export const messageResultSchema = z.object({
   message: messageSchema,
+});
+
+export const customerMessageResultSchema = messageResultSchema.extend({
+  assistantMessage: messageSchema.nullable(),
+  assistantError: z.string().nullable(),
 });
 
 export const errorSchema = z.object({ error: z.string() });

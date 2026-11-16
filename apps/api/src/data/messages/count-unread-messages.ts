@@ -13,7 +13,11 @@ export async function countUnreadMessagesData(
     .selectFrom("messages as m")
     .select((eb) => ["m.conversation_id", eb.fn.count("m.id").as("count")])
     .where("m.conversation_id", "in", conversationIds)
-    .where("m.sender_role", "=", viewer === "admin" ? "customer" : "admin")
+    .where(
+      "m.sender_role",
+      "in",
+      viewer === "admin" ? ["customer"] : ["admin", "assistant"],
+    )
     .where("m.read_at", "is", null)
     .groupBy("m.conversation_id")
     .execute();

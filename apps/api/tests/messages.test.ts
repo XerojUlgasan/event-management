@@ -107,17 +107,14 @@ before(async () => {
         /null value in column "sender_id"/,
       );
       await pool.query("DELETE FROM users WHERE id = $1", [legacyCustomerId]);
+      // Replay this historical cleanup before later migrations extend senders.
+      await pool.query(
+        await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
+      );
     }
   }
-  const cleanupSql = await readFile(
-    new URL(
-      "20261101130000_remove_deferred_ai_conversation_state/migration.sql",
-      root,
-    ),
-    "utf8",
-  );
-  // Forward cleanup is safe to reapply and never touches human transcripts.
-  await pool.query(cleanupSql);
+  // This human-messaging suite must never make live provider requests.
+  delete process.env.AI_GATEWAY_API_KEY;
   process.env.DB_NAME = database;
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
@@ -780,7 +777,7 @@ test("admin conversation pages include empty threads and order by precise update
   await db.deleteFrom("conversations").where("id", "in", ids).execute();
 });
 
-test("deferred AI routes are absent and cannot create automated replies", async () => {
+test("legacy AI routes remain absent and unconfigured generation creates no assistant messages", async () => {
   const spec: any = await (await app.request("/openapi.json")).json();
   const customerThread = await read(
     await call("/messages/conversation", "GET", undefined, customerCookie),

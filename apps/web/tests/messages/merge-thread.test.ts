@@ -5,6 +5,8 @@ import type {
   ChatThread,
 } from "../../src/lib/data/messages/conversations";
 import {
+  addSentMessages,
+  addSentMessagesToConversation,
   mergePolledThread,
   prependOlder,
 } from "../../src/lib/services/messages/merge-thread";
@@ -28,6 +30,75 @@ const range = (start: number, end: number) =>
   Array.from({ length: end - start + 1 }, (_, index) => start + index);
 const ids = (value: ChatThread) =>
   value.messages.map((item) => Number(item.id));
+
+const datedMessage = (id: number, second: number): ChatMessage => ({
+  ...message(id),
+  createdAt: `2090-01-01T00:00:${String(second).padStart(2, "0")}.000Z`,
+});
+const datedThread = (messages: ChatMessage[]): ChatThread => ({
+  ...thread([], "older"),
+  conversation: {
+    ...thread([], null).conversation,
+    lastMessage: messages.at(-1) ?? null,
+    updatedAt: messages.at(-1)?.createdAt ?? "2090-01-01T00:00:00.000Z",
+  },
+  messages,
+});
+
+test("send response deduplicates both messages already received by polling", () => {
+  const sent = [datedMessage(2, 2), datedMessage(3, 3)];
+  const result = addSentMessages(
+    datedThread([datedMessage(1, 1), ...sent]),
+    sent,
+  );
+  assert.deepEqual(ids(result), [1, 2, 3]);
+  assert.equal(result.nextCursor, "older");
+  assert.equal(result.conversation.lastMessage?.id, "3");
+});
+
+test("send response places a missing customer message before its polled assistant reply", () => {
+  const customer = datedMessage(2, 2);
+  const assistant = datedMessage(3, 2);
+  const result = addSentMessages(datedThread([datedMessage(1, 1), assistant]), [
+    customer,
+    assistant,
+  ]);
+  assert.deepEqual(ids(result), [1, 2, 3]);
+});
+
+test("send response appends a missing assistant after the polled customer message", () => {
+  const customer = datedMessage(2, 2);
+  const assistant = datedMessage(3, 2);
+  const result = addSentMessages(datedThread([datedMessage(1, 1), customer]), [
+    customer,
+    assistant,
+  ]);
+  assert.deepEqual(ids(result), [1, 2, 3]);
+  assert.equal(result.conversation.lastMessage?.id, "3");
+});
+
+test("a timestamp tie does not replace an unrelated server-reported latest message", () => {
+  const latest = datedMessage(5, 5);
+  const result = addSentMessages(datedThread([latest]), [datedMessage(2, 5)]);
+  assert.equal(result.conversation.lastMessage?.id, "5");
+});
+
+test("a late failed AI response inserts the older customer message before newer polled messages", () => {
+  const newer = [datedMessage(4, 4), datedMessage(5, 5)];
+  const result = addSentMessages(datedThread(newer), [datedMessage(2, 2)]);
+  assert.deepEqual(ids(result), [2, 4, 5]);
+  assert.equal(result.conversation.lastMessage?.id, "5");
+  assert.equal(result.conversation.updatedAt, newer[1].createdAt);
+  assert.equal(result.nextCursor, "older");
+});
+
+test("a send completing after a conversation switch does not alter the visible thread", () => {
+  const current = datedThread([datedMessage(8, 8)]);
+  assert.equal(
+    addSentMessagesToConversation(current, "other", [datedMessage(2, 2)]),
+    current,
+  );
+});
 
 test("a local send alone cannot bridge a gap in a burst of server messages", () => {
   const current = thread([...range(1, 15), 35], null);

@@ -141,7 +141,7 @@ export interface Messages {
   id: Generated<string>;
   quotation_id: string | null;
   read_at: Timestamp | null;
-  sender_id: string;
+  sender_id: string | null;
   sender_role: Generated<string>;
 }
 

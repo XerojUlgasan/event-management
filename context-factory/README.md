@@ -14,6 +14,7 @@ Follow the standing rules in [AGENTS.md](../AGENTS.md). Select all rows that mat
 | Work | Required area |
 | --- | --- |
 | HTTP routes, auth/sessions, API services, SQL, schema, migrations | [API](areas/api/SKILL.md); authentication/permission work also reads [auth/sessions](areas/api/references/auth-and-sessions.md) |
+| AI agents, tools, prompts, model decisions, knowledge retrieval, or AI Gateway | [AI](areas/ai/SKILL.md); API integration also reads [API](areas/api/SKILL.md); product actions also read the matching [business rules](business/README.md) |
 | Astro pages, React views, client requests/auth, app CSS | [Frontend](areas/frontend/SKILL.md) |
 | Any UI change; shared components, Storybook, tokens | [Packages](areas/packages/SKILL.md); UI changes also require [frontend](areas/frontend/SKILL.md) and [package reuse](areas/packages/references/reuse.md) |
 | Shared DTOs, field/file/collection limits, API body caps | [Contracts](areas/contracts/SKILL.md), [API/type sync](areas/contracts/references/api-type-sync.md), and [limits](areas/contracts/references/shared-limits.md) as applicable |

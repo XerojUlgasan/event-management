@@ -7,8 +7,8 @@ export type MessageDto = {
   id: string;
   body: string;
   quotationId: string | null;
-  senderId: string;
-  senderRole: "admin" | "customer";
+  senderId: string | null;
+  senderRole: "admin" | "customer" | "assistant";
   senderName: string;
   createdAt: string;
   readAt: string | null;
@@ -36,14 +36,21 @@ export type ConversationDto = {
 
 export function messageDto(row: MessageWithSender): MessageDto {
   const role: MessageDto["senderRole"] =
-    row.sender_role === "admin" ? "admin" : "customer";
+    row.sender_role === "assistant"
+      ? "assistant"
+      : row.sender_role === "admin"
+        ? "admin"
+        : "customer";
   return {
     id: row.id,
     body: row.body,
     quotationId: row.quotation_id,
     senderId: row.sender_id,
     senderRole: role,
-    senderName: row.sender_display_name ?? row.sender_email ?? "Clemora team",
+    senderName:
+      role === "assistant"
+        ? "AMAC AI"
+        : (row.sender_display_name ?? row.sender_email ?? "Clemora team"),
     createdAt: row.created_at.toISOString(),
     readAt: row.read_at?.toISOString() ?? null,
   };

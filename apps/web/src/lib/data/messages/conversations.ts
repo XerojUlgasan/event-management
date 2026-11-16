@@ -6,8 +6,8 @@ export type ChatMessage = {
   id: string;
   quotationId: string | null;
   body: string;
-  senderId: string;
-  senderRole: "admin" | "customer";
+  senderId: string | null;
+  senderRole: "admin" | "customer" | "assistant";
   senderName: string;
   createdAt: string;
   readAt: string | null;
@@ -59,7 +59,11 @@ export const getMyConversationById = (id: string, cursor?: string) =>
     `/messages/conversations/${encodeURIComponent(id)}${cursorQuery(cursor)}`,
   );
 export const sendMyMessage = (body: string, conversationId?: string) =>
-  request<{ message: ChatMessage }>("/messages/conversation/messages", {
+  request<{
+    message: ChatMessage;
+    assistantMessage: ChatMessage | null;
+    assistantError: string | null;
+  }>("/messages/conversation/messages", {
     body,
     conversationId,
   });

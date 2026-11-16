@@ -19,6 +19,8 @@ let customerId: string;
 let packageId: string;
 
 before(async () => {
+  // Customer chat in this domain suite must not call the live AI provider.
+  delete process.env.AI_GATEWAY_API_KEY;
   assert.ok(
     ["localhost", "127.0.0.1", "::1"].includes(
       process.env.DB_HOST ?? "localhost",

@@ -1,4 +1,59 @@
-import type { ChatThread } from "../../data/messages/conversations";
+import type {
+  ChatMessage,
+  ChatThread,
+} from "../../data/messages/conversations";
+
+// Keep fetched order intact. Serialized dates lose microseconds, so insert after
+// equal timestamps unless a known following sent message anchors the position.
+export function addSentMessages(thread: ChatThread, sent: ChatMessage[]) {
+  const messages = [...thread.messages];
+  for (const [index, message] of sent.entries()) {
+    if (messages.some((item) => item.id === message.id)) continue;
+    const followingIds = new Set(sent.slice(index + 1).map((item) => item.id));
+    const insertAt = messages.findIndex(
+      (item) => followingIds.has(item.id) || item.createdAt > message.createdAt,
+    );
+    messages.splice(insertAt < 0 ? messages.length : insertAt, 0, message);
+  }
+  const lastMessage = messages[messages.length - 1];
+  const previousLast = thread.conversation.lastMessage;
+  const previousSentIndex = sent.findIndex(
+    (item) => item.id === previousLast?.id,
+  );
+  const lastSentIndex = sent.findIndex((item) => item.id === lastMessage?.id);
+  const latest =
+    previousLast &&
+    (!lastMessage ||
+      previousLast.createdAt > lastMessage.createdAt ||
+      (previousLast.createdAt === lastMessage.createdAt &&
+        previousLast.id !== lastMessage.id &&
+        !(previousSentIndex >= 0 && lastSentIndex > previousSentIndex)))
+      ? previousLast
+      : lastMessage;
+  return {
+    ...thread,
+    conversation: {
+      ...thread.conversation,
+      status: "active" as const,
+      lastMessage: latest ?? previousLast,
+      updatedAt:
+        latest && latest.createdAt > thread.conversation.updatedAt
+          ? latest.createdAt
+          : thread.conversation.updatedAt,
+    },
+    messages,
+  };
+}
+
+export function addSentMessagesToConversation(
+  current: ChatThread | null,
+  conversationId: string,
+  sent: ChatMessage[],
+) {
+  return current?.conversation.id === conversationId
+    ? addSentMessages(current, sent)
+    : current;
+}
 
 // Page order comes from PostgreSQL, whose microsecond precision is lost in DTO dates.
 // Keep that order rather than sorting serialized timestamps in the browser.

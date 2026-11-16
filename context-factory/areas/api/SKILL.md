@@ -13,3 +13,4 @@ For `apps/api` work, read [structure and routes](references/structure-and-routes
 - Shared constraints or HTTP body caps: [contracts](../contracts/SKILL.md).
 - Browser-facing contract or client auth: [API and type synchronization](../contracts/references/api-type-sync.md) and [frontend](../frontend/SKILL.md).
 - Business behavior: [business domain router](../../business/README.md); distinguish intended policy from current code.
+- AI agents, tool execution, prompts, model decisions, retrieval, or Gateway integration: [AI](../ai/SKILL.md), including its placement and execution standards.

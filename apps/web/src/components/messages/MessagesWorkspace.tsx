@@ -713,9 +713,14 @@ export function MessagesWorkspace({
               <Button
                 type="submit"
                 icon="arrow"
+                pending={sending}
                 disabled={!draft.trim() || !activeId || sending || sendDisabled}
               >
-                {sending ? "Sending…" : "Send message"}
+                {sending
+                  ? viewerRole === "customer"
+                    ? "Waiting for AI…"
+                    : "Sending…"
+                  : "Send message"}
               </Button>
             </div>
           </form>

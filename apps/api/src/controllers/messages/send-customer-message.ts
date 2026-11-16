@@ -1,6 +1,6 @@
 import { createRoute } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
-import { messageBodySchema, messageResultSchema } from "./schemas.js";
+import { messageBodySchema, customerMessageResultSchema } from "./schemas.js";
 import { json, errors, body } from "./http.js";
 import { sendCustomerMessageService } from "../../services/messages/send-customer-message.js";
 
@@ -11,7 +11,10 @@ export const sendCustomerMessageRoute = createRoute({
   summary: "Send a message to the Clemora team",
   request: { body: body(messageBodySchema) },
   responses: {
-    201: { content: json(messageResultSchema), description: "Message sent" },
+    201: {
+      content: json(customerMessageResultSchema),
+      description: "Customer message saved with assistant outcome",
+    },
     400: errors[400],
     401: errors[401],
     403: errors[403],
@@ -24,13 +27,14 @@ export const sendCustomerMessageRouteHandler: AppRouteHandler<
 > = async (c) => {
   const input = c.req.valid("json");
   try {
-    const message = await sendCustomerMessageService(
+    const result = await sendCustomerMessageService(
       c.get("db"),
       c.get("session").user.id,
       input.body,
       input.conversationId,
+      c.req.raw.signal,
     );
-    return c.json({ message }, 201);
+    return c.json(result, 201);
   } catch (error) {
     if (error instanceof Error && error.message === "Conversation not found") {
       return c.json({ error: error.message }, 404);

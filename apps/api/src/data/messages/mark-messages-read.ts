@@ -18,6 +18,6 @@ export async function markMessagesReadData(
   if (viewer === "admin") {
     await query.where("sender_role", "=", "customer").execute();
   } else {
-    await query.where("sender_role", "=", "admin").execute();
+    await query.where("sender_role", "in", ["admin", "assistant"]).execute();
   }
 }
