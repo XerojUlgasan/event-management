@@ -3,8 +3,8 @@ import type { DB } from "../../db/types.js";
 import type { ServiceContent } from "../../controllers/services/schemas.js";
 import { createServiceData } from "../../data/services/create-service.js";
 import { serviceAdminDto } from "./service-response.js";
-import { syncCatalogKnowledge } from "../ai/retrieval/sync-catalog-knowledge.js";
-import { scheduleCatalogEmbeddingRefresh } from "../ai/retrieval/refresh-catalog-embeddings.js";
+import { syncCatalogKnowledge } from "../ai/workflows/sync-catalog-knowledge.js";
+import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
 import {
   InvalidPackageMedia,
   replaceCatalogSectionsData,

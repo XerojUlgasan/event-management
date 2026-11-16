@@ -6,7 +6,7 @@ import {
 import type { Kysely } from "kysely";
 import type { DB } from "../../../db/types.js";
 import { searchCatalogKnowledgeData } from "../../../data/ai/search-catalog-knowledge.js";
-import { loadKnowledgeDashboardData } from "./catalog-knowledge-dashboard.js";
+import { loadCatalogKnowledge } from "../load-catalog-knowledge.js";
 import { embedCatalogContent } from "./embed-catalog-content.js";
 
 export class KnowledgeSearchUnavailable extends Error {}
@@ -31,12 +31,12 @@ export async function searchCatalogKnowledgeService(
     .transaction()
     .setIsolationLevel("repeatable read")
     .execute(async (trx) => {
-      const dashboard = await loadKnowledgeDashboardData(trx);
+      const knowledge = await loadCatalogKnowledge(trx);
       const eligible = new Map<
         string,
         Omit<KnowledgeSearchResult, "similarity">
       >(
-        dashboard.entries.flatMap(({ listing, chunks }) =>
+        knowledge.entries.flatMap(({ listing, chunks }) =>
           chunks
             .filter((chunk) => chunk.status === "indexed" && !chunk.withdrawn)
             .map(

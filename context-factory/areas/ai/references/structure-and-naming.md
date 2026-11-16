@@ -31,6 +31,15 @@ apps/api/src/services/ai/
 
 The [code examples](code-examples.md) demonstrate every file above. The full tree explains the available responsibilities; creating empty folders or unused functions is not part of adopting it.
 
+The implemented catalog knowledge slice keeps admin list/detail operations in
+`services/ai/`, with shared source loading, freshness assessment, and hashing in
+purpose-named files there. `workflows/` owns catalog preparation, transactional
+synchronization, embedding refresh, and its separate after-commit scheduler.
+`retrieval/` owns semantic search and embedding/image adapters. Search and admin
+inspection share knowledge assessment rather than depending on a dashboard
+builder. Queries live in operation-named files under `data/ai/`; import them
+directly, with shared database/owner types in `catalog-knowledge-types.ts`.
+
 | Owner                   | Responsibility                                                                                             | Keep elsewhere                                                             |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | `run-assistant-turn.ts` | Public application entry; coordinate the authorized context, selected path, agent result, and turn outcome | HTTP parsing/response mapping in controllers; SQL in data                  |

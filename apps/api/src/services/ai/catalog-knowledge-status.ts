@@ -1,21 +1,17 @@
 import type {
   KnowledgeChunk,
   KnowledgeListing,
-  KnowledgeSummary,
 } from "@event-management/contracts/catalog-knowledge";
-import { type Kysely, type Transaction } from "kysely";
-import type { DB, MediaAssets } from "../../../db/types.js";
 import type { Selectable } from "kysely";
-import { loadKnowledgeSourcesData } from "../../../data/ai/catalog-knowledge-dashboard.js";
-import { sampleCatalogPhotoPaths } from "../../../utils/sample-catalog-photos.js";
-import { prepareCatalogKnowledge } from "./prepare-catalog-knowledge.js";
+import type { MediaAssets } from "../../db/types.js";
+import { sampleCatalogPhotoPaths } from "../../utils/sample-catalog-photos.js";
+import { prepareCatalogKnowledge } from "./workflows/prepare-catalog-knowledge.js";
 import {
   catalogKnowledgeDigest,
   catalogKnowledgeSourceHash,
-} from "./sync-catalog-knowledge.js";
+} from "./catalog-knowledge-hash.js";
 
 const model = "google/gemini-embedding-2";
-type Database = Kysely<DB> | Transaction<DB>;
 type Asset = Selectable<MediaAssets>;
 type Row = {
   chunk_key: string;
@@ -146,69 +142,4 @@ export function assessKnowledgeListing(
       embeddedAt: row.embedded_at?.toISOString() ?? null,
     }));
   return { listing, chunks: [...chunks, ...withdrawn] };
-}
-
-export async function loadKnowledgeDashboardData(
-  db: Database,
-  owner?: { kind: "package" | "service"; id: string },
-) {
-  const {
-    packages,
-    services,
-    servicesByPackage,
-    assetMap,
-    rowsByOwner,
-    sections,
-  } = await loadKnowledgeSourcesData(db, owner);
-  const entries = [
-    ...packages.map((record) => {
-      const owner = {
-        id: record.id,
-        name: record.name,
-        kind: "package" as const,
-      };
-      return assessKnowledgeListing(
-        owner,
-        prepareCatalogKnowledge({
-          kind: "package",
-          record,
-          sections: sections(record.canvas),
-          services: servicesByPackage.get(record.id) ?? [],
-        }),
-        rowsByOwner.get(`package:${record.id}`) ?? [],
-        assetMap,
-      );
-    }),
-    ...services.map((record) => {
-      const owner = {
-        id: record.id,
-        name: record.name,
-        kind: "service" as const,
-      };
-      return assessKnowledgeListing(
-        owner,
-        prepareCatalogKnowledge({
-          kind: "service",
-          record,
-          sections: sections(record.canvas),
-        }),
-        rowsByOwner.get(`service:${record.id}`) ?? [],
-        assetMap,
-      );
-    }),
-  ];
-  const summary: KnowledgeSummary = {
-    packages: { total: 0, indexed: 0 },
-    services: { total: 0, indexed: 0 },
-    attention: 0,
-    total: entries.length,
-  };
-  for (const { listing } of entries) {
-    const group =
-      listing.kind === "package" ? summary.packages : summary.services;
-    group.total++;
-    if (listing.status === "indexed") group.indexed++;
-    else summary.attention++;
-  }
-  return { entries, summary };
 }

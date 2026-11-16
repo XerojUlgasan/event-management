@@ -5,8 +5,8 @@ import type {
   CatalogWidget,
 } from "@event-management/contracts/catalog";
 import type { PackageServiceRow } from "../../src/data/packages/package-services.js";
-import type { PrepareCatalogKnowledgeInput } from "../../src/services/ai/retrieval/prepare-catalog-knowledge.js";
-import { prepareCatalogKnowledge } from "../../src/services/ai/retrieval/prepare-catalog-knowledge.js";
+import type { PrepareCatalogKnowledgeInput } from "../../src/services/ai/workflows/prepare-catalog-knowledge.js";
+import { prepareCatalogKnowledge } from "../../src/services/ai/workflows/prepare-catalog-knowledge.js";
 
 const packageRecord = {
   id: "package-id",

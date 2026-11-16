@@ -38,5 +38,5 @@ Credentials remain server-only through the API environment owner: Node uses `app
 - [Current implementation and setup](../../../README.md#current-implementation)
 - [AI knowledge standards](../../areas/ai/references/standards-and-verification.md#retrieval-and-knowledge)
 - [Ingestion run](../../runs/2026-11-16_19-11-47_catalog-embedding-ingestion.md)
-- [Refresh service](../../../apps/api/src/services/ai/retrieval/refresh-catalog-embeddings.ts)
-- [Data ownership and guarded writes](../../../apps/api/src/data/ai/catalog-knowledge.ts)
+- [Refresh service](../../../apps/api/src/services/ai/workflows/refresh-catalog-embeddings.ts)
+- [Owner locking](../../../apps/api/src/data/ai/lock-catalog-knowledge-owner.ts) and [guarded embedding writes](../../../apps/api/src/data/ai/save-catalog-knowledge-embedding.ts)

@@ -10,11 +10,9 @@ import type { DB } from "../../src/db/types.js";
 import type { HonoEnv } from "../../src/types/hono.js";
 import routes from "../../src/controllers/ai/index.js";
 import { hashSessionToken } from "../../src/utils/session.js";
-import {
-  catalogKnowledgeDigest,
-  syncCatalogKnowledge,
-} from "../../src/services/ai/retrieval/sync-catalog-knowledge.js";
-import { saveCatalogKnowledgeEmbeddingData } from "../../src/data/ai/catalog-knowledge.js";
+import { catalogKnowledgeDigest } from "../../src/services/ai/catalog-knowledge-hash.js";
+import { syncCatalogKnowledge } from "../../src/services/ai/workflows/sync-catalog-knowledge.js";
+import { saveCatalogKnowledgeEmbeddingData } from "../../src/data/ai/save-catalog-knowledge-embedding.js";
 
 const database = `em_knowledge_search_${randomUUID().replaceAll("-", "")}`;
 const originalFetch = globalThis.fetch;

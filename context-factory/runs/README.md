@@ -14,6 +14,7 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [AI file separation](2026-11-16_20-52-19_ai-file-separation.md) | Focused AI services, queries, and knowledge UI / feat/ai | complete | Review uncommitted refactor; behavior suites, builds, and synthetic browser checks passed |
 | [Knowledge search rows](2026-11-16_20-27-00_knowledge-search-rows.md) | Top-five compact results and in-place previews / feat/ai | complete | Refresh Knowledge Catalog; title/thumbnail rows open package/service overlays |
 | [Admin semantic catalog search](2026-11-16_20-13-00_admin-semantic-catalog-search.md) | Explicit-submit embedding search / feat/ai | complete | Admin can test ranked text/photo results; customer assistant retrieval and hosted rollout remain separate |
 | [Admin knowledge catalog](2026-11-16_19-54-37_admin-knowledge-catalog.md) | Admin AI coverage and content inspection / feat/ai | complete | Local API/database and synthetic browser checks passed; hosted rollout and assistant retrieval remain separate |

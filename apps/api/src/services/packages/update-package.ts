@@ -13,8 +13,8 @@ import {
   replacePackageServicesData,
 } from "../../data/packages/package-services.js";
 import { packageDto } from "./package-response.js";
-import { syncCatalogKnowledge } from "../ai/retrieval/sync-catalog-knowledge.js";
-import { scheduleCatalogEmbeddingRefresh } from "../ai/retrieval/refresh-catalog-embeddings.js";
+import { syncCatalogKnowledge } from "../ai/workflows/sync-catalog-knowledge.js";
+import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
 import { error, nextUpdate } from "./package-rules.js";
 import {
   duplicateTitle,
@@ -61,9 +61,7 @@ export async function updatePackageService(
       return packageDto(trx, row, { includeArchivedServices: true });
     });
     if (!("status" in outcome)) {
-      await scheduleCatalogEmbeddingRefresh(db, [
-        { kind: "package", id },
-      ]);
+      await scheduleCatalogEmbeddingRefresh(db, [{ kind: "package", id }]);
       await cleanupCatalogMediaService(db, previousMediaIds);
     }
     return outcome;

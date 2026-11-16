@@ -13,8 +13,8 @@ import { hashSessionToken } from "../../src/utils/session.js";
 import {
   catalogKnowledgeDigest,
   catalogKnowledgeSourceHash,
-} from "../../src/services/ai/retrieval/sync-catalog-knowledge.js";
-import { assessKnowledgeListing } from "../../src/services/ai/retrieval/catalog-knowledge-dashboard.js";
+} from "../../src/services/ai/catalog-knowledge-hash.js";
+import { assessKnowledgeListing } from "../../src/services/ai/catalog-knowledge-status.js";
 
 const chunk = {
   chunkKey: "overview",

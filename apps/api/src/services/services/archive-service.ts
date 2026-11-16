@@ -4,12 +4,10 @@ import type { DB } from "../../db/types.js";
 import { lockServiceData } from "../../data/services/lock-service.js";
 import { error, nextUpdate } from "../packages/package-rules.js";
 import { serviceAdminDto } from "./service-response.js";
-import {
-  deleteCatalogKnowledgeData,
-  invalidateDependentPackageKnowledgeData,
-  type CatalogKnowledgeOwner,
-} from "../../data/ai/catalog-knowledge.js";
-import { scheduleCatalogEmbeddingRefresh } from "../ai/retrieval/refresh-catalog-embeddings.js";
+import { deleteCatalogKnowledgeData } from "../../data/ai/delete-catalog-knowledge.js";
+import { invalidateDependentPackageKnowledgeData } from "../../data/ai/invalidate-dependent-package-knowledge.js";
+import type { CatalogKnowledgeOwner } from "../../data/ai/catalog-knowledge-types.js";
+import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
 export async function archiveServiceService(db: Kysely<DB>, id: string) {
   let dependents: CatalogKnowledgeOwner[] = [];
   const outcome = await db.transaction().execute(async (trx) => {

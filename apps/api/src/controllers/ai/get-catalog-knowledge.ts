@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { paginationQuerySchema } from "../../utils/pagination.js";
-import { getCatalogKnowledgeService } from "../../services/ai/retrieval/list-catalog-knowledge.js";
+import { getCatalogKnowledgeService } from "../../services/ai/get-catalog-knowledge.js";
 import {
   kindSchema,
   listingSchema,

@@ -7,11 +7,9 @@ import { after, before, test } from "node:test";
 import { Kysely, PostgresDialect, sql } from "kysely";
 import { Pool } from "pg";
 import type { DB } from "../../src/db/types.js";
-import {
-  listCatalogKnowledgeData,
-  listCatalogKnowledgeOwnersData,
-  type CatalogKnowledgeOwner,
-} from "../../src/data/ai/catalog-knowledge.js";
+import { listCatalogKnowledgeData } from "../../src/data/ai/list-catalog-knowledge.js";
+import { listCatalogKnowledgeOwnersData } from "../../src/data/ai/list-catalog-knowledge-owners.js";
+import type { CatalogKnowledgeOwner } from "../../src/data/ai/catalog-knowledge-types.js";
 import { createPackageService } from "../../src/services/packages/create-package.js";
 import { updatePackageService } from "../../src/services/packages/update-package.js";
 import { archivePackageService } from "../../src/services/packages/archive-package.js";
@@ -19,12 +17,10 @@ import { createServiceService } from "../../src/services/services/create-service
 import { updateServiceService } from "../../src/services/services/update-service.js";
 import { archiveServiceService } from "../../src/services/services/archive-service.js";
 import { deleteServiceService } from "../../src/services/services/delete-service.js";
-import {
-  refreshCatalogEmbeddingsService,
-  waitForCatalogEmbeddingRefresh,
-} from "../../src/services/ai/retrieval/refresh-catalog-embeddings.js";
+import { refreshCatalogEmbeddingsService } from "../../src/services/ai/workflows/refresh-catalog-embeddings.js";
+import { waitForCatalogEmbeddingRefresh } from "../../src/services/ai/workflows/schedule-catalog-embedding-refresh.js";
 import { readCatalogEmbeddingImage } from "../../src/services/ai/retrieval/read-catalog-embedding-image.js";
-import { syncCatalogKnowledge } from "../../src/services/ai/retrieval/sync-catalog-knowledge.js";
+import { syncCatalogKnowledge } from "../../src/services/ai/workflows/sync-catalog-knowledge.js";
 import {
   sectionsSchema,
   type Content,

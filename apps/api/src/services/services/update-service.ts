@@ -5,12 +5,10 @@ import { lockServiceData } from "../../data/services/lock-service.js";
 import { updateServiceData } from "../../data/services/update-service.js";
 import { error, nextUpdate } from "../packages/package-rules.js";
 import { serviceAdminDto } from "./service-response.js";
-import { syncCatalogKnowledge } from "../ai/retrieval/sync-catalog-knowledge.js";
-import { scheduleCatalogEmbeddingRefresh } from "../ai/retrieval/refresh-catalog-embeddings.js";
-import {
-  invalidateDependentPackageKnowledgeData,
-  type CatalogKnowledgeOwner,
-} from "../../data/ai/catalog-knowledge.js";
+import { syncCatalogKnowledge } from "../ai/workflows/sync-catalog-knowledge.js";
+import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
+import { invalidateDependentPackageKnowledgeData } from "../../data/ai/invalidate-dependent-package-knowledge.js";
+import type { CatalogKnowledgeOwner } from "../../data/ai/catalog-knowledge-types.js";
 import {
   InvalidPackageMedia,
   readCatalogSectionsData,

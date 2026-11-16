@@ -1,11 +1,9 @@
 import "dotenv/config";
 import { db } from "./client.js";
 import { env } from "../utils/env.js";
-import {
-  listCatalogKnowledgeOwnersData,
-  pruneIneligibleCatalogKnowledgeData,
-} from "../data/ai/catalog-knowledge.js";
-import { refreshCatalogEmbeddingsService } from "../services/ai/retrieval/refresh-catalog-embeddings.js";
+import { listCatalogKnowledgeOwnersData } from "../data/ai/list-catalog-knowledge-owners.js";
+import { pruneIneligibleCatalogKnowledgeData } from "../data/ai/prune-ineligible-catalog-knowledge.js";
+import { refreshCatalogEmbeddingsService } from "../services/ai/workflows/refresh-catalog-embeddings.js";
 
 const controller = new AbortController();
 const stop = () => controller.abort();

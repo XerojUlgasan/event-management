@@ -5,11 +5,9 @@ import { lockServiceData } from "../../data/services/lock-service.js";
 import { error } from "../packages/package-rules.js";
 import { listCatalogMediaIdsData } from "../../data/packages/catalog-canvas.js";
 import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
-import {
-  invalidateDependentPackageKnowledgeData,
-  type CatalogKnowledgeOwner,
-} from "../../data/ai/catalog-knowledge.js";
-import { scheduleCatalogEmbeddingRefresh } from "../ai/retrieval/refresh-catalog-embeddings.js";
+import { invalidateDependentPackageKnowledgeData } from "../../data/ai/invalidate-dependent-package-knowledge.js";
+import type { CatalogKnowledgeOwner } from "../../data/ai/catalog-knowledge-types.js";
+import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
 export async function deleteServiceService(db: Kysely<DB>, id: string) {
   let media: string[] = [];
   let dependents: CatalogKnowledgeOwner[] = [];
