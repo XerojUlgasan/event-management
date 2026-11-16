@@ -107,6 +107,13 @@ export function CustomerDashboard({
     string | null
   >(null);
   const pendingBookingReference = new URLSearchParams(search).get("request");
+  const requestedConversation = new URLSearchParams(search).get("conversation");
+  useEffect(() => {
+    if (tab === "Messages" && requestedConversation) {
+      setSelectedConversationId(requestedConversation);
+      setConversationOpen(true);
+    }
+  }, [tab, requestedConversation]);
   const [bookingItem, setBookingItem] = useState<PublicPackage | null>(() =>
     new URLSearchParams(search).get("booking") === "resume"
       ? (readBookingDraft()?.item ?? null)
@@ -165,11 +172,16 @@ export function CustomerDashboard({
       handledReference.current !== pendingBookingReference
     )
       return;
-    if (!selectedConversationId && messageConversations[0])
+    if (
+      !requestedConversation &&
+      !selectedConversationId &&
+      messageConversations[0]
+    )
       setSelectedConversationId(messageConversations[0].id);
   }, [
     tab,
     pendingBookingReference,
+    requestedConversation,
     selectedConversationId,
     messageConversations,
   ]);

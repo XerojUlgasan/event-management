@@ -1,4 +1,5 @@
 ---
+import PublicChat from "../components/public/site/PublicChat";
 import PublicDocument from "../layouts/PublicDocument.astro";
 import {
   PackageCards,
@@ -40,9 +41,7 @@ const description =
         <a class="button button-primary" href="/packages">
           Explore packages <span aria-hidden="true">↗</span>
         </a>
-        <a class="amac-text-link" href="/about">
-          Meet Styled by AMAC
-        </a>
+        <PublicChat client:only="react" />
       </div>
     </div>
     <figure class="amac-hero-photo">

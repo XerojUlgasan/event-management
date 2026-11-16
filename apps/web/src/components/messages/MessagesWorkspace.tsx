@@ -163,7 +163,11 @@ export function MessagesWorkspace({
   const activeDetail = isTeam
     ? active?.eventType || "Events and catering support"
     : [active?.eventType, active?.customerEmail].filter(Boolean).join(" · ") ||
-      "Choose a conversation to reply";
+      (active
+        ? active.customerId
+          ? "General inquiry"
+          : "Anonymous inquiry"
+        : "Choose a conversation to reply");
   const avatar =
     active && !isTeam ? initialsFromName(active.customerName) : "CT";
   const closedBookingForCustomer =

@@ -81,11 +81,9 @@ export function manilaInterval(day: string) {
   };
 }
 
-export async function insertIfNew<T extends keyof DB>(
-  db: SeedDb,
-  table: T,
-  values: Insertable<DB[T]>,
-) {
+export async function insertIfNew<
+  T extends Exclude<keyof DB, "guest_message_requests">,
+>(db: SeedDb, table: T, values: Insertable<DB[T]>) {
   const inserted = await db
     .insertInto(table)
     .values(values)

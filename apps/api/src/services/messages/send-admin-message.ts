@@ -1,4 +1,5 @@
 import type { Kysely } from "kysely";
+import { GuestChatError } from "../../data/guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
 import { createMessageData } from "../../data/messages/create-message.js";
 import { findConversationData } from "../../data/messages/find-conversation.js";
@@ -34,7 +35,10 @@ export async function sendAdminMessageService(
       aiVersion: saved.aiVersion,
     };
   } catch (error) {
-    if (error instanceof Error && error.message === "Conversation is closed")
+    if (
+      error instanceof GuestChatError ||
+      (error instanceof Error && error.message === "Conversation is closed")
+    )
       return { kind: "closed" };
     if (error instanceof Error && error.message === "Conversation not found")
       return { kind: "not-found" };

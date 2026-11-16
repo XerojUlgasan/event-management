@@ -83,9 +83,13 @@ export interface Conversations {
   ai_enabled: Generated<boolean>;
   ai_version: Generated<number>;
   booking_request_id: string | null;
+  claimed_guest_identity_id: string | null;
   closed_at: Timestamp | null;
   created_at: Generated<Timestamp>;
-  customer_id: string;
+  customer_id: string | null;
+  guest_customer_message_count: Generated<number>;
+  guest_expires_at: Timestamp | null;
+  guest_identity_id: string | null;
   id: Generated<string>;
   status: Generated<string>;
   updated_at: Generated<Timestamp>;
@@ -101,6 +105,21 @@ export interface EventsDay {
   starts_at: Timestamp;
   status: Generated<string>;
   updated_at: Generated<Timestamp>;
+}
+
+export interface GuestChatIdentities {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  token_hash: string;
+}
+
+export interface GuestMessageRequests {
+  assistant_error: string | null;
+  assistant_message_id: string | null;
+  completed: Generated<boolean>;
+  conversation_id: string;
+  message_id: string;
+  request_id: string;
 }
 
 export interface MediaAssets {
@@ -119,6 +138,7 @@ export interface Messages {
   body: string;
   conversation_id: string;
   created_at: Generated<Timestamp>;
+  guest_origin: Generated<boolean>;
   id: Generated<string>;
   quotation_id: string | null;
   read_at: Timestamp | null;
@@ -213,6 +233,8 @@ export interface DB {
   catalog_knowledge: CatalogKnowledge;
   conversations: Conversations;
   events_day: EventsDay;
+  guest_chat_identities: GuestChatIdentities;
+  guest_message_requests: GuestMessageRequests;
   media_assets: MediaAssets;
   messages: Messages;
   package_services: PackageServices;

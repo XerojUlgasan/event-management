@@ -16,9 +16,9 @@ export type MessageDto = {
 
 export type ConversationDto = {
   id: string;
-  customerId: string;
+  customerId: string | null;
   customerName: string;
-  customerEmail: string;
+  customerEmail: string | null;
   packageId: string | null;
   packageName: string | null;
   bookingRequestId: string | null;
@@ -52,7 +52,9 @@ export function messageDto(row: MessageWithSender): MessageDto {
     senderName:
       role === "assistant"
         ? "AMAC AI"
-        : (row.sender_display_name ?? row.sender_email ?? "Clemora team"),
+        : (row.sender_display_name ??
+          row.sender_email ??
+          (role === "customer" ? "Guest" : "Clemora team")),
     createdAt: row.created_at.toISOString(),
     readAt: row.read_at?.toISOString() ?? null,
   };
@@ -66,7 +68,7 @@ export function conversationDto(
   return {
     id: row.id,
     customerId: row.customer_id,
-    customerName: row.customer_display_name ?? row.customer_email,
+    customerName: row.customer_display_name ?? row.customer_email ?? "Guest",
     customerEmail: row.customer_email,
     packageId: row.package_id,
     packageName: row.package_name,

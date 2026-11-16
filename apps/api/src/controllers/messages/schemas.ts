@@ -28,9 +28,9 @@ export const conversationStatusSchema = z.enum(["active", "closed"]);
 
 export const conversationSchema = z.object({
   id: z.string().uuid(),
-  customerId: z.string().uuid(),
+  customerId: z.string().uuid().nullable(),
   customerName: z.string(),
-  customerEmail: z.string(),
+  customerEmail: z.string().nullable(),
   packageId: z.string().uuid().nullable(),
   packageName: z.string().nullable(),
   bookingRequestId: z.string().uuid().nullable(),

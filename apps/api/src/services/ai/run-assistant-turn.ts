@@ -1,5 +1,6 @@
 import { generateText, type ModelMessage } from "ai";
 import type { Kysely } from "kysely";
+import { assertGuestActive } from "../../data/guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
 import { findConversationData } from "../../data/messages/find-conversation.js";
 import { listConversationHistoryData } from "../../data/messages/list-conversation-history.js";
@@ -15,20 +16,28 @@ export async function runAssistantTurnService({
   conversationId,
   customerMessageId,
   aiVersion,
+  guestIdentityId,
   abortSignal,
 }: {
   db: Kysely<DB>;
-  customerId: string;
+  customerId: string | null;
   conversationId: string;
   customerMessageId: string;
   aiVersion: number;
+  guestIdentityId?: string;
   abortSignal?: AbortSignal;
 }) {
   const started = Date.now();
   abortSignal?.throwIfAborted();
   const conversation = await findConversationData(db, conversationId);
-  if (!conversation || conversation.customer_id !== customerId)
-    throw new Error("Conversation not found");
+  const owned =
+    conversation &&
+    (guestIdentityId
+      ? conversation.guest_identity_id === guestIdentityId ||
+        conversation.claimed_guest_identity_id === guestIdentityId
+      : conversation.customer_id === customerId && customerId !== null);
+  if (!owned) throw new Error("Conversation not found");
+  if (conversation.guest_identity_id) assertGuestActive(conversation);
   if (conversation.status !== "active")
     throw new Error("Conversation is closed");
   if (!conversation.ai_enabled || conversation.ai_version !== aiVersion)
@@ -41,11 +50,17 @@ export async function runAssistantTurnService({
   if (history.at(-1)?.id !== customerMessageId)
     throw new Error("Customer message not found");
   const context = JSON.stringify(
-    await buildAssistantContext({
-      db,
-      customerId,
-      bookingRequestId: conversation.booking_request_id,
-    }),
+    guestIdentityId
+      ? {
+          currentDateTime: new Date().toISOString(),
+          timeZone: "Asia/Manila",
+          bookingRequest: null,
+        }
+      : await buildAssistantContext({
+          db,
+          customerId: customerId!,
+          bookingRequestId: conversation.booking_request_id,
+        }),
   );
   // Never silently discard older history. Reject an oversized context explicitly.
   if (
@@ -84,6 +99,7 @@ export async function runAssistantTurnService({
     customerId,
     reply,
     aiVersion,
+    guestIdentityId,
   );
   if (!saved) return null;
   const message = messageDto(saved);

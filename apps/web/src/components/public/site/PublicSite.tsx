@@ -32,7 +32,6 @@ export function PublicSite({
           <Button variant="link" onClick={onEnterCustomer}>
             Sign in
           </Button>
-          <Button onClick={onEnterCustomer}>Get started</Button>
           <Button
             variant="plain"
             className="icon-button mobile-menu"

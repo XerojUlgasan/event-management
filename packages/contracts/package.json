@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./guest-chat": "./src/guest-chat.ts",
     "./pagination": "./src/pagination.ts",
     "./catalog": "./src/catalog.ts",
     "./catalog-knowledge": "./src/catalog-knowledge.ts",

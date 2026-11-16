@@ -1,4 +1,8 @@
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
+import {
+  assertGuestActive,
+  guestExpiry,
+} from "../guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
 
 type Database = Kysely<DB>;
@@ -27,6 +31,7 @@ export async function createMessageData(
       (senderRole === "admin" || conversation.booking_request_id)
     )
       throw new Error("Conversation is closed");
+    if (conversation.guest_identity_id) assertGuestActive(conversation);
     const aiEnabled = senderRole === "admin" ? false : conversation.ai_enabled;
     const aiVersion =
       conversation.ai_version +
@@ -35,6 +40,7 @@ export async function createMessageData(
       .insertInto("messages")
       .values({
         conversation_id: conversation.id,
+        created_at: sql<Date>`clock_timestamp()`,
         sender_id: senderId,
         sender_role: senderRole,
         body,
@@ -46,6 +52,9 @@ export async function createMessageData(
       .updateTable("conversations")
       .set({
         updated_at: row.created_at,
+        ...(conversation.guest_identity_id
+          ? { guest_expires_at: guestExpiry(row.created_at) }
+          : {}),
         status: "active",
         closed_at: null,
         ai_enabled: aiEnabled,

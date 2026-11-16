@@ -6,11 +6,15 @@ type Database = Kysely<DB>;
 export function selectConversationColumnsData(db: Database) {
   return db
     .selectFrom("conversations as c")
-    .innerJoin("users as customer", "customer.id", "c.customer_id")
+    .leftJoin("users as customer", "customer.id", "c.customer_id")
     .leftJoin("booking_requests as br", "br.id", "c.booking_request_id")
     .leftJoin("packages as p", "p.id", "br.package_id")
     .select((eb) => [
       "c.id",
+      "c.guest_identity_id",
+      "c.claimed_guest_identity_id",
+      "c.guest_expires_at",
+      "c.guest_customer_message_count",
       "c.customer_id",
       "c.status",
       "c.ai_enabled",

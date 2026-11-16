@@ -356,3 +356,17 @@
     transition: none;
   }
 }
+
+.public-chat-trigger {
+  color: inherit;
+  cursor: pointer;
+}
+.public-chat-panel {
+  height: min(560px, calc(100dvh - 108px));
+}
+.public-chat-panel .chat-messages {
+  overflow-y: auto;
+}
+.public-chat-panel .chat-input button {
+  font-size: 12px;
+}

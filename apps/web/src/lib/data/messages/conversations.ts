@@ -15,9 +15,9 @@ export type ChatMessage = {
 
 export type ChatConversation = {
   id: string;
-  customerId: string;
+  customerId: string | null;
   customerName: string;
-  customerEmail: string;
+  customerEmail: string | null;
   packageId: string | null;
   packageName: string | null;
   bookingRequestId: string | null;

@@ -1,4 +1,5 @@
 import type { Kysely } from "kysely";
+import { assertGuestActive } from "../guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
 
 export function updateConversationAiData(
@@ -10,11 +11,18 @@ export function updateConversationAiData(
   return db.transaction().execute(async (trx) => {
     const conversation = await trx
       .selectFrom("conversations")
-      .select(["status", "ai_enabled", "ai_version"])
+      .selectAll()
       .where("id", "=", id)
       .forUpdate()
       .executeTakeFirst();
     if (!conversation) return { kind: "not-found" as const };
+    if (conversation.guest_identity_id) {
+      try {
+        assertGuestActive(conversation);
+      } catch {
+        return { kind: "closed" as const };
+      }
+    }
     if (conversation.status !== "active") return { kind: "closed" as const };
     if (conversation.ai_version !== expectedAiVersion)
       return { kind: "stale" as const };

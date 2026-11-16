@@ -16,6 +16,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
+    public code?: string,
   ) {
     super(message);
   }
@@ -53,6 +54,7 @@ export async function request<T>(
     }
     const result = (await response.json().catch(() => ({}))) as {
       success?: boolean;
+      code?: string;
       error?:
         | string
         | { issues?: { path?: (string | number)[]; message?: string }[] };
@@ -69,6 +71,7 @@ export async function request<T>(
               .join("; ")
           : "Please check the form and try again.",
       response.status,
+      result.code,
     );
   }
   return response.status === 204

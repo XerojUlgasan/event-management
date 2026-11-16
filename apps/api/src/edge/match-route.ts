@@ -1,4 +1,5 @@
 export const routeFamilies = [
+  { id: "guest-chat", prefixes: ["/v1/guest"] },
   { id: "ai", prefixes: ["/v1/admin/ai/knowledge"] },
   { id: "health", prefixes: ["/v1/health"] },
   {

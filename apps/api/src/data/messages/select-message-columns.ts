@@ -9,6 +9,7 @@ export function selectMessageColumnsData(db: Database, conversationId: string) {
     .leftJoin("users as sender", "sender.id", "m.sender_id")
     .select((eb) => [
       "m.id",
+      "m.guest_origin",
       "m.conversation_id",
       "m.sender_id",
       "m.sender_role",

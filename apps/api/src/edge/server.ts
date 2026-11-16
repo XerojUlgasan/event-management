@@ -20,6 +20,7 @@ import {
 const allowedOrigins = env.WEB_ORIGINS;
 
 const loaders = {
+  "guest-chat": () => import("../controllers/guest-chat/index.js"),
   ai: () => import("../controllers/ai/index.js"),
   health: () => import("../controllers/health/index.js"),
   "catalog-media": () => import("../controllers/catalog-media/index.js"),
@@ -38,6 +39,7 @@ const loaders = {
 const bodyLimits: Partial<
   Record<RouteFamilyId, ReadonlyArray<{ path: string; maxSize: number }>>
 > = {
+  "guest-chat": [{ path: "/guest/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES }],
   ai: [
     {
       path: "/admin/ai/knowledge/search",

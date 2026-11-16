@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
-import { Brand, NotificationProvider } from "@event-management/ui";
+import { useEffect, useRef, useState } from "react";
+import { Brand, Button, NotificationProvider } from "@event-management/ui";
 
+import { claimGuestChat } from "../../lib/data/messages/guest";
 import { AuthProvider, useAuth } from "../../lib/auth/AuthProvider";
 import {
   interceptWorkspaceLink,
@@ -81,6 +82,10 @@ function Workspace({
   hash: string;
 }) {
   const { status, profile, signOut } = useAuth();
+  const guestId =
+    path === "/login" ? new URLSearchParams(search).get("guest") : null;
+  const [claimAttempt, setClaimAttempt] = useState(0);
+  const [claimError, setClaimError] = useState("");
   const mode =
     new URLSearchParams(search).get("mode") === "register"
       ? "register"
@@ -88,6 +93,32 @@ function Workspace({
 
   useEffect(() => {
     if (status !== "signed-in" || !profile) return;
+    if (path === "/login" && guestId) {
+      if (profile.role !== "customer") {
+        setClaimError(
+          "This conversation can only be continued with a customer account. You are signed in as an administrator.",
+        );
+        return;
+      }
+      let active = true;
+      setClaimError("");
+      void claimGuestChat(guestId)
+        .then(({ conversationId }) => {
+          if (active)
+            window.location.replace(
+              `/app/messages?conversation=${encodeURIComponent(conversationId)}`,
+            );
+        })
+        .catch(() => {
+          if (active)
+            setClaimError(
+              "You are signed in, but we could not attach this conversation. Retry, or continue to your workspace.",
+            );
+        });
+      return () => {
+        active = false;
+      };
+    }
     const home = appHome(profile);
     const params = new URLSearchParams(search);
     const book = params.get("book");
@@ -107,7 +138,7 @@ function Workspace({
     if (path === "/app") navigateWorkspace(`${home}${search}${hash}`, true);
     else if (!allowedWorkspacePath(profile, path))
       navigateWorkspace(home, true);
-  }, [status, profile, path, search, hash]);
+  }, [status, profile, path, search, hash, guestId, claimAttempt]);
 
   const handleSignOut = async () => {
     try {
@@ -145,6 +176,42 @@ function Workspace({
           window.location.assign("/");
         }}
       />
+    );
+  }
+
+  if (path === "/login" && guestId) {
+    return (
+      <main className="auth-splash">
+        <Brand />
+        <span>{claimError || "Continuing your conversation…"}</span>
+        {claimError && (
+          <>
+            <Button onClick={() => setClaimAttempt((value) => value + 1)}>
+              Retry
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => window.location.assign(appHome(profile))}
+            >
+              Continue to workspace
+            </Button>
+            <Button
+              variant="link"
+              onClick={() => {
+                void signOut()
+                  .then(() =>
+                    window.location.assign(
+                      `/login?guest=${encodeURIComponent(guestId)}`,
+                    ),
+                  )
+                  .catch(() => {});
+              }}
+            >
+              Sign in with another account
+            </Button>
+          </>
+        )}
+      </main>
     );
   }
 

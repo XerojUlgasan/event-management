@@ -158,6 +158,52 @@ function changeClaims(token: string, changes: Record<string, unknown>) {
   return `${header}.${Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(encoded, "base64url").toString()), ...changes })).toString("base64url")}.`;
 }
 
+async function assertGuestClaimAfterAuthentication(
+  authenticate: (guestCookie: string) => Response | Promise<Response>,
+  expectedAuthStatus: number,
+) {
+  const bootstrap = await call("/guest/conversation", {});
+  assert.equal(bootstrap.status, 200, await bootstrap.clone().text());
+  const guestCookie = bootstrap.headers.get("set-cookie")?.split(";")[0];
+  assert.ok(guestCookie);
+  assert.ok(guestCookie.startsWith("em_guest="));
+  const guest = (await bootstrap.json()) as { conversation: { id: string } };
+
+  const authentication = await authenticate(guestCookie);
+  const sessionCookie = cookieOf(authentication);
+  const profile = await profileOf(authentication, expectedAuthStatus);
+  const claim = await call(
+    `/guest/conversations/${guest.conversation.id}/claim`,
+    {},
+    `${guestCookie}; ${sessionCookie}`,
+  );
+  assert.equal(claim.status, 200, await claim.clone().text());
+  assert.deepEqual(await claim.json(), {
+    conversationId: guest.conversation.id,
+  });
+  assert.equal(
+    (
+      await call(
+        `/guest/conversations/${guest.conversation.id}`,
+        undefined,
+        guestCookie,
+      )
+    ).status,
+    404,
+  );
+  const owned = await call(
+    `/messages/conversations/${guest.conversation.id}`,
+    undefined,
+    sessionCookie,
+  );
+  assert.equal(owned.status, 200, await owned.clone().text());
+  const thread = (await owned.json()) as {
+    conversation: { id: string; customerId: string };
+  };
+  assert.equal(thread.conversation.id, guest.conversation.id);
+  assert.equal(thread.conversation.customerId, profile.id);
+}
+
 test("eight-character passwords register, hash securely and restore the customer session", async () => {
   const response = await call("/auth/register", {
     email: "  LOCAL@example.com  ",
@@ -578,6 +624,43 @@ test("Firebase tokens for disabled users and malformed tokens are rejected", asy
     (await call("/auth/sync", {}, undefined, identity.idToken)).status,
     401,
   );
+});
+
+test("a local registration session claims the existing anonymous conversation", async () => {
+  await assertGuestClaimAfterAuthentication(
+    (guestCookie) =>
+      call(
+        "/auth/register",
+        {
+          email: "guest-registration@example.com",
+          password,
+          displayName: "Guest Registration",
+        },
+        guestCookie,
+      ),
+    201,
+  );
+});
+
+test("a local password login session claims the existing anonymous conversation", async () => {
+  const account = await register("guest-login@example.com");
+  await call("/auth/logout", {}, account.cookie);
+  await assertGuestClaimAfterAuthentication(
+    (guestCookie) =>
+      call(
+        "/auth/login",
+        { email: account.profile.email, password },
+        guestCookie,
+      ),
+    200,
+  );
+});
+
+test("a Firebase emulator sign-in session claims the existing anonymous conversation", async () => {
+  await assertGuestClaimAfterAuthentication(async (guestCookie) => {
+    const identity = await google("guest-firebase@example.com");
+    return call("/auth/sync", {}, guestCookie, identity.idToken);
+  }, 200);
 });
 
 test("validation, origin checks, body size limits and throttling protect password endpoints", async () => {

@@ -14,6 +14,7 @@ import aiRoutes from "./controllers/ai/index.js";
 import eventDayRoutes from "./controllers/event-days/index.js";
 import bookingRequestRoutes from "./controllers/booking-requests/index.js";
 import authRoutes from "./controllers/auth/index.js";
+import guestChatRoutes from "./controllers/guest-chat/index.js";
 import messageRoutes from "./controllers/messages/index.js";
 import serviceRoutes from "./controllers/services/index.js";
 import packageRoutes from "./controllers/packages/index.js";
@@ -57,6 +58,7 @@ app.use(
   "/v1/admin/ai/knowledge/search",
   bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
 );
+app.use("/v1/guest/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/messages/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use(
   "/v1/admin/conversations/*",
@@ -120,6 +122,7 @@ app.use(
 );
 app.route("/v1", eventDayRoutes);
 app.route("/v1", messageRoutes);
+app.route("/v1", guestChatRoutes);
 app.route("/v1", authRoutes);
 app.route("/v1", userRoutes);
 

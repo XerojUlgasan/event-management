@@ -25,7 +25,7 @@ model User {
 
 model Conversation {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  customerId      String    @map("customer_id") @db.Uuid
+  customerId      String?   @map("customer_id") @db.Uuid
   status          String    @default("active")
   aiEnabled       Boolean   @default(true) @map("ai_enabled")
   aiVersion       Int       @default(0) @map("ai_version")
@@ -33,10 +33,18 @@ model Conversation {
   bookingRequestId String?  @unique @map("booking_request_id") @db.Uuid
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  customer        User      @relation("CustomerConversations", fields: [customerId], references: [id], onDelete: Cascade)
+  customer        User?     @relation("CustomerConversations", fields: [customerId], references: [id], onDelete: Cascade)
   bookingRequest  BookingRequest? @relation("BookingRequestConversation", fields: [bookingRequestId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  guestIdentityId String? @map("guest_identity_id") @db.Uuid
+  guestIdentity GuestChatIdentity? @relation("GuestOwner", fields: [guestIdentityId], references: [id], onDelete: Restrict)
+  claimedGuestIdentityId String? @map("claimed_guest_identity_id") @db.Uuid
+  claimedGuestIdentity GuestChatIdentity? @relation("GuestClaim", fields: [claimedGuestIdentityId], references: [id], onDelete: Restrict)
+  guestExpiresAt DateTime? @map("guest_expires_at") @db.Timestamptz(6)
+  guestCustomerMessageCount Int @default(0) @map("guest_customer_message_count")
+  guestRequests GuestMessageRequest[]
   messages        Message[]
 
+  @@index([claimedGuestIdentityId], map: "conversations_claimed_guest_identity_idx")
   @@index([status])
   @@index([customerId, createdAt])
   @@index([updatedAt(sort: Desc), id(sort: Desc)])
@@ -51,6 +59,7 @@ model Message {
   body           String
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   readAt         DateTime?    @map("read_at") @db.Timestamptz(6)
+  guestOrigin Boolean @default(false) @map("guest_origin")
   quotationId    String?      @unique @map("quotation_id") @db.Uuid
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User?        @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
@@ -279,4 +288,25 @@ model EventDay {
   @@index([bookingRequestId, day])
   @@index([replacementEventDayId, bookingRequestId])
   @@map("events_day")
+}
+
+model GuestChatIdentity {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tokenHash String @unique @map("token_hash")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  conversations Conversation[] @relation("GuestOwner")
+  claimedConversations Conversation[] @relation("GuestClaim")
+  @@map("guest_chat_identities")
+}
+
+model GuestMessageRequest {
+  conversationId String @map("conversation_id") @db.Uuid
+  requestId String @map("request_id") @db.Uuid
+  messageId String @unique @map("message_id") @db.Uuid
+  assistantMessageId String? @map("assistant_message_id") @db.Uuid
+  assistantError String? @map("assistant_error")
+  completed Boolean @default(false)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  @@id([conversationId, requestId])
+  @@map("guest_message_requests")
 }
