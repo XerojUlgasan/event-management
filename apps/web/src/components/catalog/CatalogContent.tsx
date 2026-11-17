@@ -18,13 +18,21 @@ import {
   servicePricingLabels,
 } from "../../lib/utils/formatting/money";
 import "../../styles/catalog/catalog-content.css";
-import { useServiceNavigation } from "./service-navigation-context";
+import { useCatalogNavigation } from "./catalog-navigation-context";
 
 const resolveWidget = (widget: CatalogWidget): CatalogWidget => ({
   ...widget,
   media: widget.media
     ? { ...widget.media, url: catalogMediaSrc(widget.media.url) }
     : null,
+  package: widget.package
+    ? {
+        ...widget.package,
+        imageUrl: widget.package.imageUrl
+          ? catalogMediaSrc(widget.package.imageUrl)
+          : null,
+      }
+    : widget.package,
   service: widget.service
     ? {
         ...widget.service,
@@ -70,7 +78,7 @@ export function PackageCanvas({
   hideServices?: boolean;
   bookingAction?: ReactNode;
 }) {
-  const onOpenService = useServiceNavigation();
+  const openCatalog = useCatalogNavigation();
   return (
     <CatalogCanvas>
       <div className="catalog-detail-intro">
@@ -100,7 +108,16 @@ export function PackageCanvas({
       )}
       <CatalogSections
         sections={resolveSections(item.sections)}
-        onOpenService={onOpenService}
+        onOpenService={
+          openCatalog
+            ? (id) => openCatalog({ entity: "service", id })
+            : undefined
+        }
+        onOpenPackage={
+          openCatalog
+            ? (id) => openCatalog({ entity: "package", id })
+            : undefined
+        }
       />
     </CatalogCanvas>
   );
@@ -108,7 +125,7 @@ export function PackageCanvas({
 
 export function ServiceCanvas({ item }: { item: ServiceContent }) {
   const pricing = servicePricingLabels(item);
-  const onOpenService = useServiceNavigation();
+  const openCatalog = useCatalogNavigation();
   return (
     <CatalogCanvas>
       <div className="catalog-detail-intro">
@@ -123,7 +140,16 @@ export function ServiceCanvas({ item }: { item: ServiceContent }) {
       </div>
       <CatalogSections
         sections={resolveSections(item.sections)}
-        onOpenService={onOpenService}
+        onOpenService={
+          openCatalog
+            ? (id) => openCatalog({ entity: "service", id })
+            : undefined
+        }
+        onOpenPackage={
+          openCatalog
+            ? (id) => openCatalog({ entity: "package", id })
+            : undefined
+        }
       />
     </CatalogCanvas>
   );

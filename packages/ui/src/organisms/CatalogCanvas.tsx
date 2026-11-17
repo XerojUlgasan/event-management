@@ -87,31 +87,35 @@ export function CatalogWidgetContent({
   mediaPlaceholder,
   servicePlaceholder,
   onOpenService,
+  onOpenPackage,
 }: {
   widget: CatalogWidget;
   editor?: boolean;
   mediaPlaceholder?: ReactNode;
   servicePlaceholder?: ReactNode;
   onOpenService?: (id: string) => void;
+  onOpenPackage?: (id: string) => void;
 }) {
   const url = widget.media?.url || "";
   const autoplay = !editor && widget.autoplay;
-  if (widget.type === "service" && widget.service) {
-    const service = widget.service;
+  const reference = widget.type === "package" ? widget.package : widget.service;
+  const entity = widget.type === "package" ? "package" : "service";
+  const onOpen = entity === "package" ? onOpenPackage : onOpenService;
+  if ((widget.type === "service" || widget.type === "package") && reference) {
     const content = (
       <>
-        {service.imageUrl && (
-          <img src={service.imageUrl} alt="" loading="lazy" />
+        {reference.imageUrl && (
+          <img src={reference.imageUrl} alt="" loading="lazy" />
         )}
-        <span className="ui-catalog-service-details">
-          <span className="ui-catalog-service-name">{service.name}</span>
-          {service.description && (
-            <span className="ui-catalog-service-description">
-              {service.description}
+        <span className="ui-catalog-reference-details">
+          <span className="ui-catalog-reference-name">{reference.name}</span>
+          {reference.description && (
+            <span className="ui-catalog-reference-description">
+              {reference.description}
             </span>
           )}
           {!editor && (
-            <span className="ui-catalog-service-link">View service</span>
+            <span className="ui-catalog-reference-link">View {entity}</span>
           )}
         </span>
         {widget.caption && (
@@ -120,23 +124,23 @@ export function CatalogWidgetContent({
       </>
     );
     return (
-      <div className="ui-catalog-widget-content ui-catalog-service">
+      <div className="ui-catalog-widget-content ui-catalog-reference">
         {editor ? (
-          <div className="ui-catalog-service-card">{content}</div>
-        ) : onOpenService ? (
+          <div className="ui-catalog-reference-card">{content}</div>
+        ) : onOpen ? (
           <button
-            className="ui-catalog-service-card ui-catalog-service-action"
+            className="ui-catalog-reference-card ui-catalog-reference-action"
             type="button"
-            aria-label={`View service: ${service.name}`}
-            onClick={() => onOpenService(service.id)}
+            aria-label={`View ${entity}: ${reference.name}`}
+            onClick={() => onOpen(reference.id)}
           >
             {content}
           </button>
         ) : (
           <a
-            className="ui-catalog-service-card ui-catalog-service-action"
-            href={`/services/${encodeURIComponent(service.slug)}`}
-            aria-label={`View service: ${service.name}`}
+            className="ui-catalog-reference-card ui-catalog-reference-action"
+            href={`/${entity === "package" ? "packages" : "services"}/${encodeURIComponent(reference.slug)}`}
+            aria-label={`View ${entity}: ${reference.name}`}
           >
             {content}
           </a>
@@ -145,7 +149,9 @@ export function CatalogWidgetContent({
     );
   }
   return (
-    <div className={`ui-catalog-widget-content ui-catalog-${widget.type}`}>
+    <div
+      className={`ui-catalog-widget-content ui-catalog-${widget.type === "service" || widget.type === "package" ? "reference" : widget.type}`}
+    >
       {widget.type === "markdown" && (
         <CatalogMarkdown source={widget.markdown || ""} />
       )}
@@ -179,6 +185,13 @@ export function CatalogWidgetContent({
               : "Choose a service"}
           </div>
         ))}
+      {widget.type === "package" && (
+        <div className="ui-catalog-empty">
+          {widget.packageId
+            ? "This package is unavailable."
+            : "Choose a package"}
+        </div>
+      )}
       {widget.caption && <p className="ui-catalog-caption">{widget.caption}</p>}
     </div>
   );
@@ -187,9 +200,11 @@ export function CatalogWidgetContent({
 export function CatalogSections({
   sections,
   onOpenService,
+  onOpenPackage,
 }: {
   sections: CatalogSection[];
   onOpenService?: (id: string) => void;
+  onOpenPackage?: (id: string) => void;
 }) {
   return (
     <>
@@ -214,6 +229,7 @@ export function CatalogSections({
                     <CatalogWidgetContent
                       widget={widget}
                       onOpenService={onOpenService}
+                      onOpenPackage={onOpenPackage}
                     />
                   </div>
                 );

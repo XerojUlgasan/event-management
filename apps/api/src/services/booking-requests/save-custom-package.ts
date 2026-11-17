@@ -9,11 +9,11 @@ import { findCustomPackageData } from "../../data/booking-requests/find-custom-p
 import { findAnyPackageData } from "../../data/booking-requests/find-any-package.js";
 import { lockAnyPackageData } from "../../data/booking-requests/lock-any-package.js";
 import { createCustomPackageData } from "../../data/booking-requests/create-custom-package.js";
+import { listCatalogMediaIdsService } from "../catalog-canvas/read-catalog-sections.js";
 import {
-  InvalidPackageMedia,
-  listPackageMediaIdsData,
-  replacePackageSectionsData,
-} from "../../data/packages/catalog-canvas.js";
+  InvalidCatalogMedia,
+  replaceCatalogSectionsService,
+} from "../catalog-canvas/replace-catalog-sections.js";
 import {
   validatePackageServicesData,
   replacePackageServicesData,
@@ -47,7 +47,10 @@ async function stageSourceMedia(
   actorId: string,
   stagedIds: string[],
 ) {
-  const sourceIds = await listPackageMediaIdsData(db, sourceId);
+  const sourceIds = await listCatalogMediaIdsService(db, {
+    kind: "package",
+    id: sourceId,
+  });
   const requestedIds = [
     ...new Set(
       content.sections.flatMap((section) =>
@@ -63,7 +66,7 @@ async function stageSourceMedia(
   for (const sourceMediaId of requestedIds) {
     const source = await findCatalogMediaData(db, sourceMediaId);
     if (!source?.storage_key || !source.mime_type || source.source !== "upload")
-      throw new InvalidPackageMedia(
+      throw new InvalidCatalogMedia(
         "Source media is unavailable. Refresh and try again",
       );
     const id = randomUUID(),
@@ -149,7 +152,7 @@ export async function saveCustomPackageService(
           stagedIds,
         );
       } catch (cause) {
-        if (cause instanceof InvalidPackageMedia) throw cause;
+        if (cause instanceof InvalidCatalogMedia) throw cause;
         await cleanupCatalogMediaService(db, stagedIds);
         return error("Could not copy package media. Try again", 502);
       }
@@ -209,9 +212,9 @@ export async function saveCustomPackageService(
           ? await updatePackageData(trx, current.id, content, current.slug, now)
           : undefined;
       if (!saved) throw new Error("Custom package state is unavailable");
-      previousMediaIds = await replacePackageSectionsData(
+      previousMediaIds = await replaceCatalogSectionsService(
         trx,
-        saved.id,
+        { kind: "package", id: saved.id },
         content,
         actorId,
       );
@@ -247,7 +250,7 @@ export async function saveCustomPackageService(
     return outcome;
   } catch (cause) {
     await cleanupCatalogMediaService(db, stagedIds);
-    if (cause instanceof InvalidPackageMedia) return error(cause.message, 400);
+    if (cause instanceof InvalidCatalogMedia) return error(cause.message, 400);
     if (
       typeof cause === "object" &&
       cause !== null &&

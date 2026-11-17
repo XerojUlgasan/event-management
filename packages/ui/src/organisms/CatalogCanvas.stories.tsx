@@ -152,6 +152,89 @@ export const ServiceWidgets: Story = {
     ],
   },
 };
+export const PackageWidgets: Story = {
+  args: {
+    sections: [
+      {
+        id: "packages",
+        title: "Explore our packages",
+        widgets: [
+          widget("linked-package", "package", {
+            h: 6,
+            packageId: "celebration",
+            package: {
+              id: "celebration",
+              slug: "celebration",
+              name: "Celebration package",
+              description: "A thoughtful setting for your celebration.",
+              imageUrl: "/images/wedding.jpg",
+            },
+            caption: "Explore this package with our team.",
+          }),
+          widget("unavailable-package", "package", {
+            x: 6,
+            packageId: "archived-package",
+            package: null,
+          }),
+          widget("package-without-photo", "package", {
+            y: 6,
+            packageId: "intimate",
+            package: {
+              id: "intimate",
+              slug: "intimate",
+              name: "Intimate gathering",
+              description: "For a smaller celebration.",
+              imageUrl: null,
+            },
+          }),
+        ],
+      },
+    ],
+  },
+};
+function WorkspacePackageExample() {
+  const [selected, setSelected] = useState<string | null>(null);
+  return (
+    <>
+      <CatalogCanvas>
+        <CatalogSections
+          sections={PackageWidgets.args?.sections ?? []}
+          onOpenPackage={setSelected}
+        />
+      </CatalogCanvas>
+      <p role="status">
+        {selected
+          ? `Open workspace preview for ${selected}`
+          : "Select a package to open its workspace preview."}
+      </p>
+    </>
+  );
+}
+export const WorkspacePackageAction: Story = {
+  render: () => <WorkspacePackageExample />,
+};
+export const PackageEditor: Story = {
+  render: () => (
+    <div style={{ width: 320, height: 244 }}>
+      <CatalogWidgetContent
+        widget={widget("choose-package", "package", {
+          caption: "Optional context for this package.",
+        })}
+        editor
+      />
+    </div>
+  ),
+};
+export const NarrowPackages: Story = {
+  args: PackageWidgets.args,
+  render: (args) => (
+    <div style={{ width: 380 }}>
+      <CatalogCanvas>
+        <CatalogSections {...args} />
+      </CatalogCanvas>
+    </div>
+  ),
+};
 function WorkspaceServiceExample() {
   const [selected, setSelected] = useState<string | null>(null);
   return (

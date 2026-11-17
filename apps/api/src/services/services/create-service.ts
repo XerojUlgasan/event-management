@@ -6,14 +6,12 @@ import { serviceAdminDto } from "./service-response.js";
 import { syncCatalogKnowledge } from "../ai/workflows/sync-catalog-knowledge.js";
 import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
 import {
-  InvalidPackageMedia,
-  replaceCatalogSectionsData,
-} from "../../data/packages/catalog-canvas.js";
+  InvalidCatalogMedia,
+  replaceCatalogSectionsService,
+} from "../catalog-canvas/replace-catalog-sections.js";
 import { error } from "../packages/package-rules.js";
-import {
-  duplicateTitle,
-  reserveCatalogTitle,
-} from "../../utils/catalog-title.js";
+import { duplicateTitle, catalogTitle } from "../../utils/catalog-title.js";
+import { findCatalogTitleData } from "../../data/catalog/find-catalog-title.js";
 export async function createServiceService(
   db: Kysely<DB>,
   data: ServiceContent,
@@ -27,10 +25,11 @@ export async function createServiceService(
     return error("A service photo is required", 400);
   try {
     const outcome = await db.transaction().execute(async (trx) => {
-      const title = await reserveCatalogTitle(trx, "services", data.name);
-      if (!title) return error("A service with this title already exists", 409);
+      const title = catalogTitle(data.name);
+      if (await findCatalogTitleData(trx, "services", title))
+        return error("A service with this title already exists", 409);
       const row = await createServiceData(trx, data, title.slug);
-      await replaceCatalogSectionsData(
+      await replaceCatalogSectionsService(
         trx,
         { kind: "service", id: row.id },
         { sections: data.sections ?? [] },
@@ -50,7 +49,7 @@ export async function createServiceService(
       "A service with this title already exists",
     );
     if (duplicate) return duplicate;
-    if (cause instanceof InvalidPackageMedia) return error(cause.message, 400);
+    if (cause instanceof InvalidCatalogMedia) return error(cause.message, 400);
     throw cause;
   }
 }

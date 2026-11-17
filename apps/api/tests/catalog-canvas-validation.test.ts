@@ -161,6 +161,45 @@ test("service widgets require a service and persist only the reference", () => {
   );
 });
 
+test("package widgets validate references and canonical storage", () => {
+  const widget = {
+    ...markdown(),
+    type: "package",
+    markdown: "",
+    packageId: randomUUID(),
+  };
+  assert.equal(sectionsSchema.safeParse([section([widget])]).success, true);
+  for (const bad of [
+    { ...widget, packageId: null },
+    { ...widget, media: photo().media },
+    { ...widget, markdown: "text" },
+    { ...widget, autoplay: true },
+    { ...widget, serviceId: randomUUID() },
+    { ...markdown(), packageId: widget.packageId },
+  ])
+    assert.equal(sectionsSchema.safeParse([section([bad])]).success, false);
+  const { media: _media, ...stored } = widget;
+  assert.equal(
+    storedSectionsSchema.safeParse([section([{ ...stored, mediaId: null }])])
+      .success,
+    true,
+  );
+  assert.equal(
+    storedSectionsSchema.safeParse([
+      section([
+        { ...stored, mediaId: null, packageId: widget.packageId.toUpperCase() },
+      ]),
+    ]).success,
+    false,
+  );
+  assert.equal(
+    storedSectionsSchema.safeParse([
+      section([{ ...stored, mediaId: null, package: {} }]),
+    ]).success,
+    false,
+  );
+});
+
 test("IDs are unique across sections and widgets", () => {
   const first = section([markdown()]);
   const widget = first.widgets[0] as ReturnType<typeof markdown>;

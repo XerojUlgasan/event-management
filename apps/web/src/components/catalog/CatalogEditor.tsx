@@ -42,7 +42,7 @@ import {
 } from "../../lib/services/catalog/save-catalog-media";
 import { WidgetContent } from "./CatalogContent";
 import { PackageMediaSettings } from "./PackageMediaSettings";
-import { CatalogServicePickerDialog } from "./CatalogServicePickerDialog";
+import { CatalogReferencePickerDialog } from "./CatalogReferencePickerDialog";
 import "react-grid-layout/css/styles.css";
 import "../../styles/catalog/package-editor.css";
 
@@ -245,7 +245,7 @@ export function CatalogEditor<T extends CanvasContent>({
     sectionId: string;
     widgetId: string;
   } | null>(null);
-  const [serviceEditing, setServiceEditing] = useState<{
+  const [referenceEditing, setReferenceEditing] = useState<{
     sectionId: string;
     widgetId: string;
   } | null>(null);
@@ -362,11 +362,11 @@ export function CatalogEditor<T extends CanvasContent>({
     displayContent.sections
       .find((s) => s.id === mediaEditing.sectionId)
       ?.widgets.find((w) => w.id === mediaEditing.widgetId);
-  const editingService =
-    serviceEditing &&
+  const editingReference =
+    referenceEditing &&
     displayContent.sections
-      .find((s) => s.id === serviceEditing.sectionId)
-      ?.widgets.find((w) => w.id === serviceEditing.widgetId);
+      .find((s) => s.id === referenceEditing.sectionId)
+      ?.widgets.find((w) => w.id === referenceEditing.widgetId);
   const editingMarkdown =
     markdownEditing &&
     displayContent.sections
@@ -765,7 +765,9 @@ export function CatalogEditor<T extends CanvasContent>({
                   </Select>
                 </label>
               )}
-              {(["photo", "markdown", "video", "service"] as const).map((t) => (
+              {(
+                ["photo", "markdown", "video", "service", "package"] as const
+              ).map((t) => (
                 <Button
                   variant="secondary"
                   key={t}
@@ -822,7 +824,7 @@ export function CatalogEditor<T extends CanvasContent>({
                           ? "Share the details"
                           : t === "video"
                             ? "Bring it to life"
-                            : "Feature a service"}
+                            : `Feature a ${t}`}
                     </small>
                   </span>
                 </Button>
@@ -1107,19 +1109,24 @@ export function CatalogEditor<T extends CanvasContent>({
                             <div className="pe-widget-body">
                               {w.type === "markdown" ? (
                                 <WidgetContent widget={w} editor />
-                              ) : w.type === "service" ? (
+                              ) : w.type === "service" ||
+                                w.type === "package" ? (
                                 <Button
                                   variant="plain"
                                   type="button"
-                                  className="pe-service-widget-button"
+                                  className="pe-reference-widget-button"
                                   aria-label={
-                                    w.serviceId
-                                      ? "Change featured service"
-                                      : "Choose a service"
+                                    (
+                                      w.type === "package"
+                                        ? w.packageId
+                                        : w.serviceId
+                                    )
+                                      ? `Change featured ${w.type}`
+                                      : `Choose a ${w.type}`
                                   }
                                   aria-haspopup="dialog"
                                   onClick={() =>
-                                    setServiceEditing({
+                                    setReferenceEditing({
                                       sectionId: section.id,
                                       widgetId: w.id,
                                     })
@@ -1194,31 +1201,35 @@ export function CatalogEditor<T extends CanvasContent>({
           onClose={() => setMediaEditing(null)}
         />
       )}
-      {serviceEditing && editingService && (
-        <CatalogServicePickerDialog
-          selectedId={editingService.serviceId}
-          caption={editingService.caption}
-          onCaptionChange={(caption) =>
-            changeWidget(serviceEditing.sectionId, editingService.id, {
-              caption,
-            })
-          }
-          onSelect={(service) => {
-            changeWidget(serviceEditing.sectionId, editingService.id, {
-              serviceId: service.id,
-              service: {
-                id: service.id,
-                slug: service.slug,
-                name: service.name,
-                description: service.description,
-                imageUrl: service.imageUrl,
-              },
-            });
-            setServiceEditing(null);
-          }}
-          onClose={() => setServiceEditing(null)}
-        />
-      )}
+      {referenceEditing &&
+        editingReference &&
+        (editingReference.type === "service" ||
+          editingReference.type === "package") && (
+          <CatalogReferencePickerDialog
+            key={editingReference.id}
+            kind={editingReference.type}
+            selectedId={
+              editingReference.type === "package"
+                ? editingReference.packageId
+                : editingReference.serviceId
+            }
+            caption={editingReference.caption}
+            onCaptionChange={(caption) =>
+              changeWidget(referenceEditing.sectionId, editingReference.id, {
+                caption,
+              })
+            }
+            onSelect={(item) => {
+              changeWidget(referenceEditing.sectionId, editingReference.id, {
+                ...(editingReference.type === "package"
+                  ? { packageId: item.id, package: item }
+                  : { serviceId: item.id, service: item }),
+              });
+              setReferenceEditing(null);
+            }}
+            onClose={() => setReferenceEditing(null)}
+          />
+        )}
       {markdownEditing && editingMarkdown && (
         <MarkdownSettings
           widget={editingMarkdown}

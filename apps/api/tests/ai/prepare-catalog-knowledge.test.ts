@@ -335,3 +335,45 @@ test("preparation leaves the source input unchanged", () => {
 
   assert.deepEqual(input, before);
 });
+
+test("linked catalog widgets index captions without copying target details or photos", () => {
+  const target = {
+    id: "target",
+    slug: "target",
+    name: "TARGET NAME",
+    description: "TARGET DESCRIPTION",
+    imageUrl: "/images/wedding.jpg",
+  };
+  const chunks = prepareCatalogKnowledge({
+    kind: "package",
+    record: packageRecord,
+    services: [],
+    sections: [
+      section("Explore", [
+        widget("package", "linked-package", 0, 0, {
+          packageId: target.id,
+          package: target,
+          caption: "Discuss this package with our team.",
+        }),
+        widget("service", "linked-service", 6, 0, {
+          serviceId: target.id,
+          service: target,
+          caption: "Ask about this service.",
+        }),
+        widget("package", "no-caption", 0, 5, {
+          packageId: target.id,
+          package: target,
+        }),
+      ]),
+    ],
+  });
+  const linked = chunks.filter((chunk) => chunk.chunkKey !== "overview");
+  assert.equal(linked.length, 2);
+  assert.match(linked[0].contentMarkdown, /Discuss this package with our team/);
+  assert.match(linked[1].contentMarkdown, /Ask about this service/);
+  assert.ok(linked.every((chunk) => chunk.mediaId === null));
+  assert.doesNotMatch(
+    JSON.stringify(chunks),
+    /TARGET NAME|TARGET DESCRIPTION|wedding\.jpg/,
+  );
+});

@@ -3,7 +3,7 @@ import type { DB } from "../../db/types.js";
 import type {
   CatalogListOptions,
   CatalogPosition,
-} from "../catalog/list-page.js";
+} from "../../utils/catalog-pagination.js";
 
 type Database = Kysely<DB> | Transaction<DB>;
 export function listAdminPackagesPageData(

@@ -8,7 +8,7 @@ export function CatalogDetailPreview({
   children,
   onClose,
 }: {
-  entity: "service";
+  entity: "service" | "package";
   children: ReactNode;
   onClose: () => void;
 }) {

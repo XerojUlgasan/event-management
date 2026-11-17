@@ -1,4 +1,4 @@
-import type { Database } from "./catalog-canvas.js";
+import type { Database } from "../catalog-canvas/catalog-canvas-types.js";
 export function listPublicPackagesData(db: Database, id: string) {
   let query = db
     .selectFrom("packages")

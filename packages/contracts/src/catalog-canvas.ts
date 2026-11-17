@@ -51,7 +51,7 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
   return z
     .object({
       id: z.string().uuid(),
-      type: z.enum(["photo", "markdown", "video", "service"]),
+      type: z.enum(["photo", "markdown", "video", "service", "package"]),
       x: z
         .number()
         .int()
@@ -66,6 +66,18 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
       caption: text,
       autoplay: z.boolean().default(false),
       serviceId: z.string().uuid().nullable().optional(),
+      packageId: z.string().uuid().nullable().optional(),
+      package: z
+        .object({
+          id: z.string().uuid(),
+          slug: z.string(),
+          name: z.string(),
+          description: z.string(),
+          imageUrl: z.string().nullable(),
+        })
+        .strict()
+        .nullable()
+        .optional(),
       service: z
         .object({
           id: z.string().uuid(),
@@ -111,7 +123,27 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
           code: "custom",
           message: "Only service widgets can reference a service",
         });
-      if (widget.type === "service") {
+      if (
+        widget.type !== "package" &&
+        (widget.packageId != null || widget.package != null)
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "Only package widgets can reference a package",
+        });
+      if (widget.type === "package") {
+        if (!widget.packageId)
+          ctx.addIssue({
+            code: "custom",
+            message: "Choose a package for this widget before saving.",
+            path: ["packageId"],
+          });
+        if (widget.media !== null || widget.markdown !== "")
+          ctx.addIssue({
+            code: "custom",
+            message: "Package widgets cannot contain media or Markdown",
+          });
+      } else if (widget.type === "service") {
         if (!widget.serviceId)
           ctx.addIssue({
             code: "custom",
@@ -202,6 +234,12 @@ const storedWidgetSchema = z
     alt: widgetSchema.shape.alt,
     caption: widgetSchema.shape.caption,
     autoplay: z.boolean(),
+    packageId: z
+      .string()
+      .uuid()
+      .refine((id) => id === id.toLowerCase(), "Package ID must be canonical")
+      .nullable()
+      .optional(),
     serviceId: z
       .string()
       .uuid()

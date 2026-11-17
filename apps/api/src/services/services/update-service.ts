@@ -9,16 +9,14 @@ import { syncCatalogKnowledge } from "../ai/workflows/sync-catalog-knowledge.js"
 import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
 import { invalidateDependentPackageKnowledgeData } from "../../data/ai/invalidate-dependent-package-knowledge.js";
 import type { CatalogKnowledgeOwner } from "../../data/ai/catalog-knowledge-types.js";
+import { readCatalogSectionsService } from "../catalog-canvas/read-catalog-sections.js";
 import {
-  InvalidPackageMedia,
-  readCatalogSectionsData,
-  replaceCatalogSectionsData,
-} from "../../data/packages/catalog-canvas.js";
+  InvalidCatalogMedia,
+  replaceCatalogSectionsService,
+} from "../catalog-canvas/replace-catalog-sections.js";
 import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
-import {
-  duplicateTitle,
-  reserveCatalogTitle,
-} from "../../utils/catalog-title.js";
+import { duplicateTitle, catalogTitle } from "../../utils/catalog-title.js";
+import { findCatalogTitleData } from "../../data/catalog/find-catalog-title.js";
 export async function updateServiceService(
   db: Kysely<DB>,
   id: string,
@@ -37,19 +35,20 @@ export async function updateServiceService(
         return error("Service changed. Refresh and try again", 409);
       const sections =
         data.sections ??
-        (await readCatalogSectionsData(trx, { kind: "service", id }));
+        (await readCatalogSectionsService(trx, { kind: "service", id }));
       if (
         !sections.some((s) =>
           s.widgets.some((w) => w.type === "photo" && w.media),
         )
       )
         return error("A service photo is required", 400);
-      const title = await reserveCatalogTitle(trx, "services", data.name, id);
-      if (!title) return error("A service with this title already exists", 409);
+      const title = catalogTitle(data.name);
+      if (await findCatalogTitleData(trx, "services", title, id))
+        return error("A service with this title already exists", 409);
       const now = nextUpdate(current.updated_at);
       const row = await updateServiceData(trx, id, data, title.slug, now);
       if (data.sections !== undefined)
-        previousMedia = await replaceCatalogSectionsData(
+        previousMedia = await replaceCatalogSectionsService(
           trx,
           { kind: "service", id },
           { sections },
@@ -74,7 +73,7 @@ export async function updateServiceService(
       "A service with this title already exists",
     );
     if (duplicate) return duplicate;
-    if (cause instanceof InvalidPackageMedia) return error(cause.message, 400);
+    if (cause instanceof InvalidCatalogMedia) return error(cause.message, 400);
     throw cause;
   }
 }

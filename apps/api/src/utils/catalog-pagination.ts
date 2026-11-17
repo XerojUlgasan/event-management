@@ -4,7 +4,7 @@ import {
   encodePageCursor,
   parsePageCursor,
   postgresTimestampSchema,
-} from "../../utils/pagination.js";
+} from "./pagination.js";
 
 export type CatalogListOptions = CatalogFilters & {
   limit: number;

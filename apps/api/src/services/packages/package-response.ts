@@ -1,10 +1,8 @@
 import type { Selectable } from "kysely";
 import type { CatalogPackage } from "@event-management/contracts/catalog";
 import type { Packages } from "../../db/types.js";
-import {
-  readPackageSectionsData,
-  type Database,
-} from "../../data/packages/catalog-canvas.js";
+import { readCatalogSectionsService } from "../catalog-canvas/read-catalog-sections.js";
+import type { Database } from "../../data/catalog-canvas/catalog-canvas-types.js";
 import { listPackageServicesData } from "../../data/packages/package-services.js";
 export async function packageDto(
   db: Database,
@@ -12,7 +10,7 @@ export async function packageDto(
   options?: { includeArchivedServices?: boolean },
 ): Promise<CatalogPackage> {
   const [sections, services] = await Promise.all([
-    readPackageSectionsData(db, row.id),
+    readCatalogSectionsService(db, { kind: "package", id: row.id }),
     listPackageServicesData(db, [row.id]),
   ]);
   const widgets = sections.flatMap((section) => section.widgets);

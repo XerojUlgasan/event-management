@@ -11,7 +11,7 @@ import {
 import { AdminShell } from "../workspaces/admin/AdminShell";
 import { AuthPage } from "../auth/AuthPage";
 import { CustomerDashboard } from "../workspaces/customer/CustomerDashboard";
-import { ServiceNavigationProvider } from "../catalog/ServiceNavigationProvider";
+import { CatalogNavigationProvider } from "../catalog/CatalogNavigationProvider";
 import {
   adminBookingRequestId,
   adminKey,
@@ -232,7 +232,7 @@ function Workspace({
   if (isSystemAdmin(profile)) {
     const active = adminKey(path);
     return active ? (
-      <ServiceNavigationProvider
+      <CatalogNavigationProvider
         key={`${profile.id}:${profile.role}`}
         route={`${path}${search}`}
       >
@@ -242,11 +242,11 @@ function Workspace({
           bookingRequestId={adminBookingRequestId(path) ?? undefined}
           onSignOut={handleSignOut}
         />
-      </ServiceNavigationProvider>
+      </CatalogNavigationProvider>
     ) : null;
   }
   return (
-    <ServiceNavigationProvider
+    <CatalogNavigationProvider
       key={`${profile.id}:${profile.role}`}
       route={`${path}${search}`}
     >
@@ -260,6 +260,6 @@ function Workspace({
         userEmail={profile.email}
         onSignOut={handleSignOut}
       />
-    </ServiceNavigationProvider>
+    </CatalogNavigationProvider>
   );
 }

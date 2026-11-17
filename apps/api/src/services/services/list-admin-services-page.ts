@@ -8,7 +8,7 @@ import {
 import {
   catalogCursor,
   type CatalogListOptions,
-} from "../../data/catalog/list-page.js";
+} from "../../utils/catalog-pagination.js";
 import { serviceAdminDto } from "./service-response.js";
 
 export async function listAdminServicesPageService(

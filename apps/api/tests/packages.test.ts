@@ -20,6 +20,8 @@ let failStorageDeletes = false;
 const storedImages = new Map<string, { bytes: Buffer; contentType: string }>();
 
 before(async () => {
+  // Catalog regressions must not schedule requests to a live AI provider.
+  delete process.env.AI_GATEWAY_API_KEY;
   assert.ok(
     ["localhost", "127.0.0.1", "::1"].includes(
       process.env.DB_HOST ?? "localhost",
@@ -2245,6 +2247,35 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
   assert.notEqual(custom.id, original.id);
   assert.equal(custom.name, original.name);
   assert.equal(custom.packageType, "custom");
+  const privateWidget = {
+    id: randomUUID(),
+    type: "package",
+    x: 0,
+    y: 0,
+    w: 6,
+    h: 4,
+    markdown: "",
+    media: null,
+    alt: "",
+    caption: "",
+    autoplay: false,
+    packageId: custom.id,
+  };
+  await read(
+    await call(
+      "/admin/packages",
+      "POST",
+      {
+        ...data,
+        name: `Private link ${randomUUID()}`,
+        sections: [{ id: randomUUID(), title: "", widgets: [privateWidget] }],
+        services: [],
+      },
+      adminCookie,
+    ),
+    400,
+  );
+
   assert.equal(custom.services[0].serviceId, includedService.id);
   assert.equal(custom.services[0].role, "included");
   assert.equal(custom.sections[0].widgets[1].service.id, includedService.id);
@@ -2603,6 +2634,15 @@ test("linked service widgets are validated, hydrated, and protect references", a
     await call("/admin/packages", "POST", content, adminCookie),
     201,
   );
+  await read(
+    await call(
+      `/admin/services/${service.id.toUpperCase()}`,
+      "DELETE",
+      undefined,
+      adminCookie,
+    ),
+    409,
+  );
   const stored = await pool.query("select canvas from packages where id = $1", [
     pkg.id,
   ]);
@@ -2702,7 +2742,7 @@ test("linked service widgets are validated, hydrated, and protect references", a
     200,
   );
   assert.equal(unavailable.sections[0].widgets[0].service, null);
-  await read(
+  const retained = await read(
     await call(
       `/admin/packages/${replacement.id}`,
       "PATCH",
@@ -2711,6 +2751,8 @@ test("linked service widgets are validated, hydrated, and protect references", a
     ),
     200,
   );
+  assert.equal(retained.sections[0].widgets[0].serviceId, service.id);
+  assert.equal(retained.sections[0].widgets[0].service, null);
   await read(
     await call(
       "/admin/packages",
@@ -2721,4 +2763,249 @@ test("linked service widgets are validated, hydrated, and protect references", a
     400,
   );
   assert.ok(renamed.id);
+});
+
+test("linked package widgets hydrate public records and protect both owner types", async () => {
+  const target = await read(
+    await call(
+      "/admin/packages",
+      "POST",
+      { ...data, name: `Target ${randomUUID()}`, services: [] },
+      adminCookie,
+    ),
+    201,
+  );
+  const widget = {
+    id: randomUUID(),
+    type: "package",
+    x: 0,
+    y: 0,
+    w: 6,
+    h: 4,
+    markdown: "",
+    media: null,
+    alt: "",
+    caption: "Recommended",
+    autoplay: false,
+    packageId: target.id.toUpperCase(),
+    package: {
+      id: target.id,
+      slug: "forged",
+      name: "Forged",
+      description: "Forged",
+      imageUrl: null,
+    },
+  };
+  const sections = [{ id: randomUUID(), title: "Packages", widgets: [widget] }];
+  const content = {
+    ...data,
+    name: `Owner ${randomUUID()}`,
+    sections,
+    services: [],
+  };
+  await read(
+    await call(
+      "/admin/packages",
+      "POST",
+      {
+        ...content,
+        sections: [
+          { ...sections[0], widgets: [{ ...widget, packageId: randomUUID() }] },
+        ],
+      },
+      adminCookie,
+    ),
+    400,
+  );
+  const owner = await read(
+    await call("/admin/packages", "POST", content, adminCookie),
+    201,
+  );
+  await read(
+    await call(
+      `/admin/packages/${target.id.toUpperCase()}`,
+      "DELETE",
+      undefined,
+      adminCookie,
+    ),
+    409,
+  );
+  const stored = (
+    await pool.query("select canvas from packages where id = $1", [owner.id])
+  ).rows[0].canvas[0].widgets[0];
+  assert.equal(stored.packageId, target.id);
+  assert.equal("package" in stored, false);
+  const visible = await read(await call(`/packages/${owner.id}`), 200);
+  assert.equal(visible.sections[0].widgets[0].package.name, target.name);
+  assert.equal(
+    visible.sections[0].widgets[0].package.imageUrl,
+    "/images/wedding.jpg",
+  );
+  await read(
+    await call(
+      `/admin/packages/${target.id}`,
+      "DELETE",
+      undefined,
+      adminCookie,
+    ),
+    409,
+  );
+  const service = await read(
+    await call(
+      "/admin/services",
+      "POST",
+      {
+        name: `Owner service ${randomUUID()}`,
+        description: "Coverage",
+        hourlyRatePesos: 500,
+        fixedPricePesos: null,
+        includedHours: null,
+        sections: [data.sections[0], sections[0]],
+      },
+      adminCookie,
+    ),
+    201,
+  );
+  await read(
+    await call(`/admin/packages/${owner.id}`, "DELETE", undefined, adminCookie),
+    204,
+  );
+  await read(
+    await call(
+      `/admin/packages/${target.id}`,
+      "DELETE",
+      undefined,
+      adminCookie,
+    ),
+    409,
+  );
+  await read(
+    await call(
+      `/admin/services/${service.id}`,
+      "DELETE",
+      undefined,
+      adminCookie,
+    ),
+    204,
+  );
+  const replacement = await read(
+    await call("/admin/packages", "POST", content, adminCookie),
+    201,
+  );
+  await read(
+    await call(
+      `/admin/packages/${target.id}/archive`,
+      "POST",
+      undefined,
+      adminCookie,
+    ),
+    200,
+  );
+  const unavailable = await read(
+    await call(`/packages/${replacement.id}`),
+    200,
+  );
+  assert.equal(unavailable.sections[0].widgets[0].package, null);
+  const retained = await read(
+    await call(
+      `/admin/packages/${replacement.id}`,
+      "PATCH",
+      { ...content, expectedUpdatedAt: replacement.updatedAt },
+      adminCookie,
+    ),
+    200,
+  );
+  assert.equal(retained.sections[0].widgets[0].packageId, target.id);
+  assert.equal(retained.sections[0].widgets[0].package, null);
+  await read(
+    await call(
+      "/admin/packages",
+      "POST",
+      { ...content, name: `New link ${randomUUID()}` },
+      adminCookie,
+    ),
+    400,
+  );
+});
+
+test("catalog title conflicts preserve names, slugs, and unchanged-title edits", async () => {
+  const name = `Café title ${randomUUID()}`;
+  for (const kind of ["packages", "services"] as const) {
+    const content =
+      kind === "packages"
+        ? { ...data, name }
+        : {
+            name,
+            description: "Title validation",
+            hourlyRatePesos: 500,
+            fixedPricePesos: null,
+            includedHours: null,
+            sections: data.sections,
+          };
+    const created = await read(
+      await call(`/admin/${kind}`, "POST", content, adminCookie),
+      201,
+    );
+    for (const conflictingName of [
+      name.toUpperCase(),
+      name.replace("Café", "Cafe"),
+    ]) {
+      await read(
+        await call(
+          `/admin/${kind}`,
+          "POST",
+          { ...content, name: conflictingName },
+          adminCookie,
+        ),
+        409,
+      );
+    }
+    const unchanged = await read(
+      await call(
+        `/admin/${kind}/${created.id}`,
+        "PATCH",
+        {
+          ...content,
+          expectedUpdatedAt: created.updatedAt,
+        },
+        adminCookie,
+      ),
+      200,
+    );
+    assert.equal(unchanged.slug, created.slug);
+    const other = await read(
+      await call(
+        `/admin/${kind}`,
+        "POST",
+        { ...content, name: `${name} other` },
+        adminCookie,
+      ),
+      201,
+    );
+    for (const conflictingName of [
+      name.toUpperCase(),
+      name.replace("Café", "Cafe"),
+    ]) {
+      await read(
+        await call(
+          `/admin/${kind}/${other.id}`,
+          "PATCH",
+          {
+            ...content,
+            name: conflictingName,
+            expectedUpdatedAt: other.updatedAt,
+          },
+          adminCookie,
+        ),
+        409,
+      );
+    }
+    const preserved = await read(
+      await call(`/admin/${kind}/${other.id}`, "GET", undefined, adminCookie),
+      200,
+    );
+    assert.equal(preserved.name, other.name);
+    assert.equal(preserved.slug, other.slug);
+    assert.equal(preserved.updatedAt, other.updatedAt);
+  }
 });

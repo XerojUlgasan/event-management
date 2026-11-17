@@ -382,3 +382,88 @@ test("stacked catalog scroll locks restore the original overflow in either close
     else globalThis.document = originalDocument;
   }
 });
+
+const packageWidget = {
+  ...photo,
+  id: "package-widget",
+  type: "package",
+  media: null,
+  caption: "Explore this arrangement with our team.",
+  packageId: "celebration",
+  package: {
+    id: "celebration",
+    slug: "celebration",
+    name: "Celebration package",
+    description: "A thoughtful setting for your celebration",
+    imageUrl: "/images/wedding.jpg",
+  },
+};
+test("linked package cards share public and private canvases without prices or inclusion claims", () => {
+  const sections = [
+    { id: "linked-packages", title: "Explore", widgets: [packageWidget] },
+  ];
+  for (const html of [
+    render(publicPackage.PublicPackageDetail, {
+      item: { ...packageItem, services: [], sections },
+    }),
+    render(canvas.PackageCanvas, {
+      item: { ...packageItem, services: [], sections },
+      hideServices: true,
+    }),
+    render(canvas.ServiceCanvas, { item: { ...service, sections } }),
+  ]) {
+    assert.match(html, /Celebration package/);
+    assert.match(html, /A thoughtful setting for your celebration/);
+    assert.match(html, /href="\/packages\/celebration"/);
+    assert.match(html, /Explore this arrangement with our team/);
+    assert.match(html, /src="\/images\/wedding.jpg"/);
+    assert.doesNotMatch(html, /Included|Optional|additional charge/);
+  }
+  assert.doesNotMatch(
+    render(ui.CatalogWidgetContent, { widget: packageWidget }),
+    /₱|PHP|hour|rate|price/i,
+  );
+});
+test("package cards use a single whole-card action and inert editor or unavailable content", () => {
+  const publicCard = render(ui.CatalogWidgetContent, { widget: packageWidget });
+  assert.match(
+    publicCard,
+    /<a\b[^>]*href="\/packages\/celebration"[^>]*>[\s\S]*<img[\s\S]*Celebration package[\s\S]*Explore this arrangement[\s\S]*<\/a>/,
+  );
+  assert.equal((publicCard.match(/<a\b/g) ?? []).length, 1);
+  const workspace = render(ui.CatalogWidgetContent, {
+    widget: packageWidget,
+    onOpenPackage: () => {},
+  });
+  assert.match(
+    workspace,
+    /<button\b[^>]*aria-label="View package: Celebration package"/,
+  );
+  assert.doesNotMatch(workspace, /<a\b/);
+  const editor = render(ui.CatalogWidgetContent, {
+    widget: packageWidget,
+    editor: true,
+    onOpenPackage: () => {},
+  });
+  assert.doesNotMatch(editor, /<a\b|<button\b/);
+  const unavailable = render(ui.CatalogWidgetContent, {
+    widget: { ...packageWidget, package: null },
+  });
+  assert.match(unavailable, /This package is unavailable/);
+  assert.doesNotMatch(unavailable, /<a\b|<button\b/);
+  assert.match(
+    render(ui.CatalogWidgetContent, {
+      widget: { ...packageWidget, package: null, packageId: null },
+    }),
+    /Choose a package/,
+  );
+  assert.doesNotMatch(
+    render(ui.CatalogWidgetContent, {
+      widget: {
+        ...packageWidget,
+        package: { ...packageWidget.package, imageUrl: null },
+      },
+    }),
+    /<img/,
+  );
+});

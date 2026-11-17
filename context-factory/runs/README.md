@@ -14,6 +14,8 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Catalog/canvas API ownership](2026-11-18_00-07-56_catalog-canvas-layers.md) | Query, service, and utility separation / main | complete | Review scoped backend refactor; disposable regressions and Edge build passed |
+| [Package canvas widget](2026-11-17_23-57-38_package-widget.md) | Package picker, linked previews and mixed workspace navigation / main | complete | Review scoped delta; local API/browser/build checks passed, hosted rollout separate |
 | [Service widget navigation](2026-11-17_23-28-00_service-widget-navigation.md) | Whole-card service links and workspace overlays / main | complete | Review scoped uncommitted delta; local browser, tests, and builds passed, hosted rollout separate |
 | [Service canvas widget](2026-11-17_23-12-00_service-widget.md) | Linked previews and direct service picker / main | complete | Review scoped delta; local API/browser checks passed, deploy matching contracts/API/frontend together |
 | [Conversation-based booking intake](2026-11-17_00-55-00_conversation-booking-intake.md) | Existing chat to request, optional package, administrator preparation / main | complete | Review scoped diff; local migration and API/browser verification complete, hosted rollout separate |

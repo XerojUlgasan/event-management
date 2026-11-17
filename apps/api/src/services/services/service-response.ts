@@ -1,9 +1,9 @@
 import type { Kysely, Selectable, Transaction } from "kysely";
 import type { DB, Services } from "../../db/types.js";
-import { readCatalogSectionsData } from "../../data/packages/catalog-canvas.js";
+import { readCatalogSectionsService } from "../catalog-canvas/read-catalog-sections.js";
 type Database = Kysely<DB> | Transaction<DB>;
 export async function serviceAdminDto(db: Database, s: Selectable<Services>) {
-  const sections = await readCatalogSectionsData(db, {
+  const sections = await readCatalogSectionsService(db, {
     kind: "service",
     id: s.id,
   });

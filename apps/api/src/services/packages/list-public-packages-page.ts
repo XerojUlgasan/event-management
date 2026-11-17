@@ -6,7 +6,7 @@ import { listPublicPackagesPageData } from "../../data/packages/list-public-pack
 import {
   catalogCursor,
   type CatalogListOptions,
-} from "../../data/catalog/list-page.js";
+} from "../../utils/catalog-pagination.js";
 import { packageDto } from "./package-response.js";
 
 export async function listPublicPackagesPageService(

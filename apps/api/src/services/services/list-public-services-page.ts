@@ -6,7 +6,7 @@ import { listPublicServicesPageData } from "../../data/services/list-public-serv
 import {
   catalogCursor,
   type CatalogListOptions,
-} from "../../data/catalog/list-page.js";
+} from "../../utils/catalog-pagination.js";
 import { publicDto } from "./service-response.js";
 
 export async function listPublicServicesPageService(

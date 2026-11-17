@@ -25,5 +25,5 @@ Customers browse the available packages and services. They can start a booking r
 
 - The admin manages listings and prepares custom packages; customers communicate their choices and requests to the admin.
 - A service lists either an hourly-only rate or one fixed price covering a positive whole number of included hours, plus an hourly rate for excess time. No rounding rule is specified for partial excess hours. These are catalog terms and do not automatically calculate quotation amounts.
-- A service widget features a linked catalog service within a package or service page. Its placement does not itself establish inclusion, an additional charge, or availability; the administrator can explain the context in its caption. Package pricing and quotations retain their existing owners.
+- A service or package widget features a linked catalog listing within a package or service page. Private custom packages are not selectable linked listings. Its placement does not itself establish inclusion, an additional charge, or availability; the administrator can explain the context in its caption. Package pricing and quotations retain their existing owners.
 - Browsing or submitting a booking request does not reserve a date, establish a final price, or confirm a booking. The [product scope](../../README.md#product-scope) governs those later decisions.
