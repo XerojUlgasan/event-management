@@ -14,6 +14,7 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Public catalog search tool](2026-11-18_00-28-54_catalog-search-tool.md) | Public assistant search and execution audit / main | complete | Review uncommitted diff; local additive migration and focused checks passed, hosted rollout separate |
 | [Catalog/canvas API ownership](2026-11-18_00-07-56_catalog-canvas-layers.md) | Query, service, and utility separation / main | complete | Review scoped backend refactor; disposable regressions and Edge build passed |
 | [Package canvas widget](2026-11-17_23-57-38_package-widget.md) | Package picker, linked previews and mixed workspace navigation / main | complete | Review scoped delta; local API/browser/build checks passed, hosted rollout separate |
 | [Service widget navigation](2026-11-17_23-28-00_service-widget-navigation.md) | Whole-card service links and workspace overlays / main | complete | Review scoped uncommitted delta; local browser, tests, and builds passed, hosted rollout separate |

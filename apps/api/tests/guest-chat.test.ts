@@ -188,6 +188,60 @@ test("bootstrap issues opaque httponly cookies, rejects caller-chosen identities
   assert.notEqual(unknown.cookie, `em_guest=${"A".repeat(43)}`);
 });
 
+test("guest catalog calls are persisted under the guest message and replay does not execute them twice", async () => {
+  useReply("Here are the catalog options");
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+    if (model.doGenerateCalls.length !== 1) return result;
+    return {
+      ...result,
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "guest-catalog-call",
+          toolName: "searchPublicCatalog",
+          input: JSON.stringify({ catalogType: "package" }),
+        },
+      ],
+      finishReason: { unified: "tool-calls", raw: undefined },
+    };
+  };
+  const thread = await guest();
+  const requestId = randomUUID();
+  const response = await read(
+    await send(thread, "Show your packages", requestId),
+    201,
+  );
+  assert.ok(response.assistantMessage);
+  const row = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", response.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(row.tool_name, "searchPublicCatalog");
+  assert.equal(row.tool_call_id, "guest-catalog-call");
+  assert.equal(row.assistant_message_id, response.assistantMessage.id);
+  const message = await db
+    .selectFrom("messages")
+    .select("sender_id")
+    .where("id", "=", row.customer_message_id)
+    .executeTakeFirstOrThrow();
+  assert.equal(message.sender_id, null);
+  await read(await send(thread, "Show your packages", requestId), 201);
+  assert.equal(model.doGenerateCalls.length, 2);
+  assert.equal(
+    (
+      await db
+        .selectFrom("ai_tool_calls")
+        .select("id")
+        .where("customer_message_id", "=", response.message.id)
+        .execute()
+    ).length,
+    1,
+  );
+});
+
 test("five customer writes and five AI replies are allowed; sixth is readable login_required; replay never calls provider again", async () => {
   useReply("Guest reply");
   const thread = await guest();

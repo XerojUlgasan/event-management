@@ -4,6 +4,7 @@ import {
   guestExpiry,
 } from "../guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
+import { linkToolCallsToReplyData } from "../ai/link-tool-calls-to-reply.js";
 
 export function createAssistantMessageData(
   db: Kysely<DB>,
@@ -12,6 +13,7 @@ export function createAssistantMessageData(
   body: string,
   aiVersion: number,
   guestIdentityId?: string,
+  toolTurn?: { turnId: string; customerMessageId: string },
 ) {
   return db.transaction().execute(async (trx) => {
     const conversation = await trx
@@ -42,6 +44,11 @@ export function createAssistantMessageData(
       })
       .returningAll()
       .executeTakeFirstOrThrow();
+    if (toolTurn)
+      await linkToolCallsToReplyData(trx, {
+        ...toolTurn,
+        assistantMessageId: message.id,
+      });
     await trx
       .updateTable("conversations")
       .set({

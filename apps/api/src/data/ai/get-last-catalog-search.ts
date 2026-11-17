@@ -1,0 +1,54 @@
+import { sql, type Kysely } from "kysely";
+import type { DB } from "../../db/types.js";
+import {
+  validateLastCatalogSearch,
+  type LastCatalogSearchInput,
+} from "./tool-call-validation.js";
+
+export function getLastCatalogSearchData(
+  db: Kysely<DB>,
+  value: LastCatalogSearchInput,
+) {
+  const input = validateLastCatalogSearch(value);
+  return db
+    .selectFrom("ai_tool_calls as tool_call")
+    .innerJoin(
+      "messages as reply",
+      "reply.id",
+      "tool_call.assistant_message_id",
+    )
+    .innerJoin(
+      "messages as search_message",
+      "search_message.id",
+      "tool_call.customer_message_id",
+    )
+    .innerJoin("messages as current_message", (join) =>
+      join.on("current_message.id", "=", input.customerMessageId),
+    )
+    .select(["tool_call.input", "tool_call.output"])
+    .where("tool_call.tool_name", "=", "searchPublicCatalog")
+    .where("tool_call.status", "=", "succeeded")
+    .where("tool_call.assistant_message_id", "is not", null)
+    .where("current_message.conversation_id", "=", input.conversationId)
+    .where("current_message.sender_role", "=", "customer")
+    .whereRef(
+      "search_message.conversation_id",
+      "=",
+      "current_message.conversation_id",
+    )
+    .where("search_message.sender_role", "=", "customer")
+    .whereRef("reply.conversation_id", "=", "current_message.conversation_id")
+    .where("reply.sender_role", "=", "assistant")
+    .where(
+      sql<boolean>`(search_message.created_at, search_message.id) < (reply.created_at, reply.id)`,
+    )
+    .where(
+      sql<boolean>`(reply.created_at, reply.id) < (current_message.created_at, current_message.id)`,
+    )
+    .orderBy("reply.created_at", "desc")
+    .orderBy("reply.id", "desc")
+    .orderBy("tool_call.started_at", "desc")
+    .orderBy("tool_call.id", "desc")
+    .limit(1)
+    .executeTakeFirst();
+}

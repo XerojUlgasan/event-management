@@ -23,6 +23,21 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface AiToolCalls {
+  assistant_message_id: string | null;
+  completed_at: Timestamp | null;
+  customer_message_id: string;
+  error_code: string | null;
+  id: Generated<string>;
+  input: Json;
+  output: Json | null;
+  started_at: Generated<Timestamp>;
+  status: Generated<string>;
+  tool_call_id: string;
+  tool_name: string;
+  turn_id: string;
+}
+
 export interface AuditEvents {
   action: string;
   actor_id: string | null;
@@ -227,6 +242,7 @@ export interface Users {
 }
 
 export interface DB {
+  ai_tool_calls: AiToolCalls;
   audit_events: AuditEvents;
   booking_request_status_history: BookingRequestStatusHistory;
   booking_requests: BookingRequests;

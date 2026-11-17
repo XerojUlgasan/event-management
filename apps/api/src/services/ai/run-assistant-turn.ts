@@ -1,4 +1,5 @@
-import { generateText, type ModelMessage } from "ai";
+import { randomUUID } from "node:crypto";
+import type { ModelMessage } from "ai";
 import type { Kysely } from "kysely";
 import { assertGuestActive } from "../../data/guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
@@ -6,9 +7,11 @@ import { findConversationData } from "../../data/messages/find-conversation.js";
 import { listConversationHistoryData } from "../../data/messages/list-conversation-history.js";
 import { createAssistantMessageData } from "../../data/messages/create-assistant-message.js";
 import { messageDto } from "../messages/message-response.js";
-import { getTextModel } from "./models.js";
-import { buildAssistantContext } from "./assistant-context.js";
-import { customerServicePrompt } from "./prompts/customer-service-prompt.js";
+import {
+  buildAssistantContext,
+  buildPreviousCatalogSearchContext,
+} from "./assistant-context.js";
+import { createCustomerServiceAgent } from "./agents/create-customer-service-agent.js";
 
 export async function runAssistantTurnService({
   db,
@@ -49,8 +52,13 @@ export async function runAssistantTurnService({
   );
   if (history.at(-1)?.id !== customerMessageId)
     throw new Error("Customer message not found");
-  const context = JSON.stringify(
-    guestIdentityId
+  const previousCatalogSearch = await buildPreviousCatalogSearchContext({
+    db,
+    conversationId,
+    customerMessageId,
+  });
+  const context = JSON.stringify({
+    ...(guestIdentityId
       ? {
           currentDateTime: new Date().toISOString(),
           timeZone: "Asia/Manila",
@@ -60,8 +68,9 @@ export async function runAssistantTurnService({
           db,
           customerId: customerId!,
           bookingRequestId: conversation.booking_request_id,
-        }),
-  );
+        })),
+    ...(previousCatalogSearch ? { previousCatalogSearch } : {}),
+  });
   // Never silently discard older history. Reject an oversized context explicitly.
   if (
     history.reduce(
@@ -80,19 +89,45 @@ export async function runAssistantTurnService({
           : message.body,
     })),
   ];
-  const { text, usage } = await generateText({
-    model: getTextModel(),
-    system: customerServicePrompt,
-    messages,
-    maxRetries: 0,
-    maxOutputTokens: 800,
-    reasoning: "none",
-    timeout: 30_000,
-    abortSignal,
+  const turnId = randomUUID();
+  let persistenceFailed = false;
+  const agent = createCustomerServiceAgent({
+    db,
+    customerMessageId,
+    turnId,
+    onPersistenceFailure: () => {
+      persistenceFailed = true;
+    },
+    assertActive: async () => {
+      const current = await findConversationData(db, conversationId);
+      const stillOwned =
+        current &&
+        (guestIdentityId
+          ? current.guest_identity_id === guestIdentityId ||
+            current.claimed_guest_identity_id === guestIdentityId
+          : current.customer_id === customerId && customerId !== null);
+      if (
+        !stillOwned ||
+        current.status !== "active" ||
+        !current.ai_enabled ||
+        current.ai_version !== aiVersion
+      )
+        throw new Error("Assistant turn is no longer active");
+      if (current.guest_identity_id) assertGuestActive(current);
+    },
   });
+  const deadline = AbortSignal.timeout(30_000);
+  const signal = abortSignal
+    ? AbortSignal.any([abortSignal, deadline])
+    : deadline;
+  const { text, usage, steps } = await agent.generate({
+    messages,
+    abortSignal: signal,
+  });
+  if (persistenceFailed) throw new Error("Tool-call tracking is unavailable");
   const reply = text.trim();
   if (!reply) throw new Error("AI returned an empty reply");
-  abortSignal?.throwIfAborted();
+  signal.throwIfAborted();
   const saved = await createAssistantMessageData(
     db,
     conversationId,
@@ -100,6 +135,7 @@ export async function runAssistantTurnService({
     reply,
     aiVersion,
     guestIdentityId,
+    { turnId, customerMessageId },
   );
   if (!saved) return null;
   const message = messageDto(saved);
@@ -108,6 +144,8 @@ export async function runAssistantTurnService({
     modelRole: "text",
     outcome: "replied",
     durationMs: Date.now() - started,
+    steps: steps.length,
+    toolCalls: steps.reduce((count, step) => count + step.toolCalls.length, 0),
     inputTokens: usage.inputTokens,
     outputTokens: usage.outputTokens,
   });

@@ -31,6 +31,8 @@ apps/api/src/services/ai/
 
 The [code examples](code-examples.md) demonstrate every file above. The full tree explains the available responsibilities; creating empty folders or unused functions is not part of adopting it.
 
+The implemented customer-service agent lives in `agents/create-customer-service-agent.ts`; `tools/search-public-catalog.ts` owns the SDK definition, execution bounds, and audit lifecycle. `services/ai/search-public-catalog.ts` owns search validation, exact filtering, semantic freshness/ranking, pagination, and the small public projection. Focused query and audit operations live in `data/ai/`. The application entry retains trusted conversation scope and reply coordination; resulting tool-call links share the assistant-message transaction.
+
 The implemented catalog knowledge slice keeps admin list/detail operations in
 `services/ai/`, with shared source loading, freshness assessment, and hashing in
 purpose-named files there. `workflows/` owns catalog preparation, transactional

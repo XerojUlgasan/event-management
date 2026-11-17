@@ -64,9 +64,34 @@ model Message {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User?        @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   quotation      Quotation?   @relation(fields: [quotationId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  aiToolCallsAsCustomerMessage AiToolCall[] @relation("AiToolCallCustomerMessage")
+  aiToolCallsAsAssistantMessage AiToolCall[] @relation("AiToolCallAssistantMessage")
 
   @@index([conversationId, createdAt])
   @@map("messages")
+}
+
+model AiToolCall {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turnId             String    @map("turn_id") @db.Uuid
+  toolCallId         String    @map("tool_call_id")
+  toolName           String    @map("tool_name")
+  customerMessageId  String    @map("customer_message_id") @db.Uuid
+  assistantMessageId String?   @map("assistant_message_id") @db.Uuid
+  status             String    @default("started")
+  input              Json      @db.JsonB
+  output             Json?     @db.JsonB
+  errorCode          String?   @map("error_code")
+  startedAt          DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt        DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  customerMessage  Message  @relation("AiToolCallCustomerMessage", fields: [customerMessageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  assistantMessage Message? @relation("AiToolCallAssistantMessage", fields: [assistantMessageId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@unique([turnId, toolCallId], map: "ai_tool_calls_turn_id_tool_call_id_key")
+  @@index([customerMessageId], map: "ai_tool_calls_customer_message_id_idx")
+  @@index([assistantMessageId], map: "ai_tool_calls_assistant_message_id_idx")
+  @@map("ai_tool_calls")
 }
 
 model Session {

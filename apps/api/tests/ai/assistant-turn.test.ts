@@ -47,6 +47,30 @@ function useReply(text: string) {
   });
 }
 
+function useCatalogCalls(
+  inputs: Record<string, unknown>[],
+  beforeAnswer?: () => Promise<void>,
+) {
+  useReply("Catalog results are ready");
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+    if (model.doGenerateCalls.length === 1)
+      return {
+        ...result,
+        content: inputs.map((input, index) => ({
+          type: "tool-call" as const,
+          toolCallId: `catalog-call-${index}`,
+          toolName: "searchPublicCatalog",
+          input: JSON.stringify(input),
+        })),
+        finishReason: { unified: "tool-calls" as const, raw: undefined },
+      };
+    await beforeAnswer?.();
+    return result;
+  };
+}
+
 before(async () => {
   const host = process.env.DB_HOST ?? "localhost";
   assert.ok(["localhost", "127.0.0.1", "::1"].includes(host));
@@ -857,4 +881,335 @@ test("history snapshots stop at the triggering customer message and reject other
     JSON.stringify(model.doGenerateCalls[0].prompt),
     /later-turn-marker/,
   );
+});
+
+test("multiple searches belong to one customer turn and one resulting reply without replaying them", async () => {
+  useCatalogCalls([
+    { catalogType: "package", maxPricePesos: 10000, pax: 80 },
+    { catalogType: "service", pricingType: "hourly", maxPricePesos: 3000 },
+  ]);
+  const id = await conversation();
+  const requestId = randomUUID();
+  const payload = {
+    conversationId: id,
+    body: "Find packages and services",
+    requestId,
+  };
+  const result = customerMessageResultSchema.parse(
+    await (
+      await call("/messages/conversation/messages", customer.cookie, payload)
+    ).json(),
+  );
+  assert.equal(result.assistantError, null);
+  assert.ok(result.assistantMessage);
+  const calls = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", requestId)
+    .orderBy("tool_call_id")
+    .execute();
+  assert.equal(calls.length, 2);
+  assert.equal(new Set(calls.map((item) => item.id)).size, 2);
+  assert.equal(new Set(calls.map((item) => item.turn_id)).size, 1);
+  assert.deepEqual(
+    calls.map((item) => item.tool_call_id),
+    ["catalog-call-0", "catalog-call-1"],
+  );
+  assert.ok(
+    calls.every(
+      (item) =>
+        item.tool_name === "searchPublicCatalog" &&
+        item.status === "succeeded" &&
+        item.assistant_message_id === result.assistantMessage?.id &&
+        item.completed_at !== null &&
+        item.error_code === null,
+    ),
+  );
+  assert.match(JSON.stringify(model.doGenerateCalls[1].prompt), /tool-result/);
+  const replay = await call(
+    "/messages/conversation/messages",
+    customer.cookie,
+    payload,
+  );
+  assert.equal(replay.status, 201);
+  assert.equal(model.doGenerateCalls.length, 2);
+  assert.equal(
+    (
+      await db
+        .selectFrom("ai_tool_calls")
+        .select("id")
+        .where("customer_message_id", "=", requestId)
+        .execute()
+    ).length,
+    2,
+  );
+});
+
+test("failed searches record sanitized errors and distinguish unavailable from empty results", async () => {
+  useCatalogCalls([{ catalogType: "package", cursor: "invalid" }]);
+  const id = await conversation();
+  const result = await send(id, "Find more packages");
+  assert.ok(result.assistantMessage);
+  const call = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", result.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(call.status, "failed");
+  assert.equal(call.output, null);
+  assert.equal(call.error_code, "search_unavailable");
+  assert.equal(call.assistant_message_id, result.assistantMessage.id);
+  const prompt = JSON.stringify(model.doGenerateCalls[1].prompt);
+  assert.match(prompt, /search is unavailable/);
+  assert.doesNotMatch(
+    prompt,
+    /Invalid pagination cursor|HTTPException|postgres|password/i,
+  );
+});
+
+test("tool records survive provider failure without a resulting assistant message", async () => {
+  useCatalogCalls([{ catalogType: "package" }], async () => {
+    throw new Error("private-provider-payload-after-tool");
+  });
+  const id = await conversation();
+  const result = await send(id, "Find a package");
+  assert.equal(result.assistantMessage, null);
+  assert.ok(result.assistantError);
+  assert.doesNotMatch(JSON.stringify(result), /private-provider-payload/);
+  const call = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", result.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(call.status, "succeeded");
+  assert.equal(call.assistant_message_id, null);
+});
+
+test("human takeover after a search preserves its audit record and suppresses the reply", async () => {
+  const id = await conversation();
+  useCatalogCalls([{ catalogType: "package" }], async () => {
+    const response = await call(
+      `/admin/conversations/${id}/messages`,
+      team.cookie,
+      { body: "The team will handle this" },
+    );
+    assert.equal(response.status, 201);
+  });
+  const result = await send(id, "Find a package before takeover");
+  assert.equal(result.assistantMessage, null);
+  assert.equal(result.assistantError, null);
+  const record = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", result.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(record.status, "succeeded");
+  assert.equal(record.assistant_message_id, null);
+});
+
+test("turn tool budget bounds execution and records rejected calls", async () => {
+  useCatalogCalls(
+    Array.from({ length: 7 }, () => ({ catalogType: "package" })),
+  );
+  const result = await send(await conversation(), "Compare several searches");
+  assert.ok(result.assistantMessage);
+  const calls = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", result.message.id)
+    .execute();
+  assert.equal(calls.filter((item) => item.status === "succeeded").length, 6);
+  assert.equal(
+    calls.filter(
+      (item) => item.status === "failed" && item.error_code === "call_limit",
+    ).length,
+    1,
+  );
+  assert.ok(
+    calls.every(
+      (item) => item.assistant_message_id === result.assistantMessage?.id,
+    ),
+  );
+});
+
+test("the agent reserves a final answer step after repeated searches", async () => {
+  useReply("Here are the available catalog choices");
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+    if (args[0].toolChoice?.type === "none") return result;
+    return {
+      ...result,
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: `step-${model.doGenerateCalls.length}`,
+          toolName: "searchPublicCatalog",
+          input: JSON.stringify({ catalogType: "package" }),
+        },
+      ],
+      finishReason: { unified: "tool-calls", raw: undefined },
+    };
+  };
+  const result = await send(await conversation(), "Keep looking for packages");
+  assert.equal(result.assistantError, null);
+  assert.equal(
+    result.assistantMessage?.body,
+    "Here are the available catalog choices",
+  );
+  assert.equal(model.doGenerateCalls.length, 4);
+  const calls = await db
+    .selectFrom("ai_tool_calls")
+    .select("id")
+    .where("customer_message_id", "=", result.message.id)
+    .execute();
+  assert.equal(calls.length, 3);
+});
+
+test("invalid tool arguments cannot execute a search", async () => {
+  useCatalogCalls([
+    { catalogType: "service", pax: 80, conversationId: randomUUID() },
+  ]);
+  const result = await send(await conversation(), "Find a service");
+  const calls = await db
+    .selectFrom("ai_tool_calls")
+    .select("id")
+    .where("customer_message_id", "=", result.message.id)
+    .execute();
+  assert.equal(calls.length, 0);
+});
+
+test("oversized model tool batches are rejected before recording or searching", async () => {
+  useCatalogCalls(
+    Array.from({ length: 13 }, () => ({ catalogType: "package" })),
+  );
+  const result = await send(await conversation(), "Find many packages");
+  assert.equal(result.assistantMessage, null);
+  assert.ok(result.assistantError);
+  const calls = await db
+    .selectFrom("ai_tool_calls")
+    .select("id")
+    .where("customer_message_id", "=", result.message.id)
+    .execute();
+  assert.equal(calls.length, 0);
+});
+
+test("later turns receive only their conversation's delivered search pagination, without stale prices", async () => {
+  for (let index = 0; index < 6; index++)
+    await db
+      .insertInto("packages")
+      .values({
+        name: `Continuation ${index}`,
+        slug: `continuation-${randomUUID()}`,
+        max_guests: 100,
+        price: 3333,
+      })
+      .execute();
+  const id = await conversation();
+  const input = {
+    catalogType: "package",
+    minPricePesos: 3333,
+    maxPricePesos: 3333,
+    pax: 80,
+  };
+  useCatalogCalls([input]);
+  const first = await send(id, "Find packages for 80 guests");
+  assert.ok(first.assistantMessage);
+  const saved = await db
+    .selectFrom("ai_tool_calls")
+    .select("output")
+    .where("customer_message_id", "=", first.message.id)
+    .executeTakeFirstOrThrow();
+  assert.ok(
+    saved.output &&
+      typeof saved.output === "object" &&
+      "nextCursor" in saved.output,
+  );
+  const nextCursor = saved.output.nextCursor;
+  assert.equal(typeof nextCursor, "string");
+  useCatalogCalls([{ ...input, cursor: nextCursor }]);
+  await send(id, "Show more");
+  const snapshot = turnContext(0).context;
+  assert.ok("previousCatalogSearch" in snapshot);
+  const pagination = snapshot.previousCatalogSearch;
+  assert.ok(pagination && typeof pagination === "object");
+  assert.ok("input" in pagination && "nextCursor" in pagination);
+  assert.deepEqual(pagination.input, input);
+  assert.equal(typeof pagination.nextCursor, "string");
+  assert.doesNotMatch(JSON.stringify(pagination), /amountPesos|Continuation/);
+  useReply("A different conversation");
+  await send(await conversation(), "Show more");
+  assert.equal("previousCatalogSearch" in turnContext(0).context, false);
+});
+
+test("tracking failure preserves the customer message and never publishes an untracked result", async () => {
+  await pool.query(`CREATE FUNCTION reject_fixture_tool_tracking() RETURNS trigger
+    LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'private-tracking-payload'; END $$;
+    CREATE TRIGGER reject_fixture_tool_tracking BEFORE INSERT ON ai_tool_calls
+    FOR EACH ROW EXECUTE FUNCTION reject_fixture_tool_tracking()`);
+  try {
+    useCatalogCalls([{ catalogType: "package" }]);
+    const result = await send(await conversation(), "Show catalog packages");
+    assert.equal(result.assistantMessage, null);
+    assert.ok(result.assistantError);
+    assert.doesNotMatch(JSON.stringify(result), /private-tracking-payload/);
+    assert.doesNotMatch(
+      JSON.stringify(model.doGenerateCalls.at(-1)?.prompt),
+      /private-tracking-payload/,
+    );
+    assert.ok(
+      await db
+        .selectFrom("messages")
+        .select("id")
+        .where("id", "=", result.message.id)
+        .executeTakeFirst(),
+    );
+  } finally {
+    await pool.query(`DROP TRIGGER reject_fixture_tool_tracking ON ai_tool_calls;
+      DROP FUNCTION reject_fixture_tool_tracking()`);
+  }
+});
+
+test("takeover during search prevents its result from entering the answer", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalEmbeddingModel = process.env.EMBEDDING_MODEL;
+  const id = await conversation();
+  process.env.EMBEDDING_MODEL = "google/gemini-embedding-2";
+  globalThis.fetch = async () => {
+    assert.equal(
+      (
+        await call(`/admin/conversations/${id}/messages`, team.cookie, {
+          body: "I will handle this inquiry",
+        })
+      ).status,
+      201,
+    );
+    return new Response(
+      JSON.stringify({
+        embeddings: [[1, ...Array(767).fill(0)]],
+        warnings: [],
+      }),
+      { headers: { "content-type": "application/json" } },
+    );
+  };
+  try {
+    useCatalogCalls([{ catalogType: "package", query: "garden" }]);
+    const result = await send(id, "Find a garden package");
+    assert.equal(result.assistantMessage, null);
+    assert.equal(result.assistantError, null);
+    const record = await db
+      .selectFrom("ai_tool_calls")
+      .selectAll()
+      .where("customer_message_id", "=", result.message.id)
+      .executeTakeFirstOrThrow();
+    assert.equal(record.status, "failed");
+    assert.equal(record.error_code, "turn_inactive");
+    assert.equal(record.output, null);
+    assert.equal(record.assistant_message_id, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalEmbeddingModel === undefined)
+      delete process.env.EMBEDDING_MODEL;
+    else process.env.EMBEDDING_MODEL = originalEmbeddingModel;
+  }
 });
