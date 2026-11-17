@@ -18,14 +18,22 @@ import {
   servicePricingLabels,
 } from "../../lib/utils/formatting/money";
 import "../../styles/catalog/catalog-content.css";
+import { useServiceNavigation } from "./service-navigation-context";
 
-const resolveWidget = (widget: CatalogWidget): CatalogWidget =>
-  widget.media
+const resolveWidget = (widget: CatalogWidget): CatalogWidget => ({
+  ...widget,
+  media: widget.media
+    ? { ...widget.media, url: catalogMediaSrc(widget.media.url) }
+    : null,
+  service: widget.service
     ? {
-        ...widget,
-        media: { ...widget.media, url: catalogMediaSrc(widget.media.url) },
+        ...widget.service,
+        imageUrl: widget.service.imageUrl
+          ? catalogMediaSrc(widget.service.imageUrl)
+          : null,
       }
-    : widget;
+    : widget.service,
+});
 const resolveSections = (sections: CatalogSection[]): CatalogSection[] =>
   sections.map((section) => ({
     ...section,
@@ -62,6 +70,7 @@ export function PackageCanvas({
   hideServices?: boolean;
   bookingAction?: ReactNode;
 }) {
+  const onOpenService = useServiceNavigation();
   return (
     <CatalogCanvas>
       <div className="catalog-detail-intro">
@@ -89,13 +98,17 @@ export function PackageCanvas({
           </ul>
         </section>
       )}
-      <CatalogSections sections={resolveSections(item.sections)} />
+      <CatalogSections
+        sections={resolveSections(item.sections)}
+        onOpenService={onOpenService}
+      />
     </CatalogCanvas>
   );
 }
 
 export function ServiceCanvas({ item }: { item: ServiceContent }) {
   const pricing = servicePricingLabels(item);
+  const onOpenService = useServiceNavigation();
   return (
     <CatalogCanvas>
       <div className="catalog-detail-intro">
@@ -108,7 +121,10 @@ export function ServiceCanvas({ item }: { item: ServiceContent }) {
           {pricing.excess && <span>{pricing.excess}</span>}
         </div>
       </div>
-      <CatalogSections sections={resolveSections(item.sections)} />
+      <CatalogSections
+        sections={resolveSections(item.sections)}
+        onOpenService={onOpenService}
+      />
     </CatalogCanvas>
   );
 }

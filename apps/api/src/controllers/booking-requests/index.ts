@@ -1,4 +1,8 @@
 import {
+  attachBookingPackageRoute,
+  attachBookingPackageRouteHandler,
+} from "./attach-booking-package.js";
+import {
   getMyStatusHistoryRoute,
   getMyStatusHistoryRouteHandler,
   getAdminStatusHistoryRoute,
@@ -97,6 +101,7 @@ routes.openapi(getAdminBookingRequestRoute, getAdminBookingRequestRouteHandler);
 routes.openapi(updateBookingStatusRoute, updateBookingStatusRouteHandler);
 routes.openapi(getMyBookingPackageRoute, getMyBookingPackageRouteHandler);
 routes.openapi(getAdminBookingPackageRoute, getAdminBookingPackageRouteHandler);
+routes.openapi(attachBookingPackageRoute, attachBookingPackageRouteHandler);
 routes.openapi(
   getAdminBookingPackageHistoryRoute,
   getAdminBookingPackageHistoryRouteHandler,

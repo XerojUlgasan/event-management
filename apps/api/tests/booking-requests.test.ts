@@ -1930,3 +1930,314 @@ test("customer directory searches and pages customers while keeping population s
   );
   await read(await call(base, "GET", undefined, customerCookie), 403);
 });
+
+test("general conversation can become one package-less request atomically", async () => {
+  const input = {
+    eventType: "Wedding",
+    durationMode: "one_day",
+    requestedDays: [{ date: "2099-04-01" }],
+    timeZone: "Asia/Manila",
+    contactName: "Customer",
+    phoneNumber: "123",
+  };
+  const thread = await db
+    .insertInto("conversations")
+    .values({ customer_id: customerId, ai_enabled: false })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  await db
+    .insertInto("messages")
+    .values({
+      conversation_id: thread.id,
+      sender_id: customerId,
+      sender_role: "customer",
+      body: "Preserve this",
+    })
+    .execute();
+  assert.equal(
+    (
+      await call(
+        "/booking-requests",
+        "POST",
+        { ...input, conversationId: thread.id },
+        otherCustomerCookie,
+      )
+    ).status,
+    409,
+  );
+  const attempts = await Promise.all(
+    [1, 2].map(() =>
+      call(
+        "/booking-requests",
+        "POST",
+        { ...input, conversationId: thread.id },
+        customerCookie,
+      ),
+    ),
+  );
+  assert.deepEqual(attempts.map((x) => x.status).sort(), [201, 409]);
+  const created = (
+    await read(
+      attempts.find((x) => x.status === 201)!,
+      201,
+    )
+  ).bookingRequest;
+  assert.equal(created.packageId, null);
+  assert.equal(created.packageName, null);
+  assert.equal(created.packagePrice, null);
+  assert.equal(created.packageMaxGuests, null);
+  const linked = await db
+    .selectFrom("conversations")
+    .selectAll()
+    .where("id", "=", thread.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(linked.booking_request_id, created.id);
+  assert.equal(linked.ai_enabled, false);
+  assert.equal(
+    (
+      await db
+        .selectFrom("messages")
+        .selectAll()
+        .where("conversation_id", "=", thread.id)
+        .execute()
+    ).length,
+    1,
+  );
+  assert.equal(
+    (
+      await db
+        .selectFrom("conversations")
+        .selectAll()
+        .where("booking_request_id", "=", created.id)
+        .execute()
+    ).length,
+    1,
+  );
+  assert.equal(
+    (
+      await call(
+        `/booking-requests/${created.id}/package`,
+        "GET",
+        undefined,
+        otherCustomerCookie,
+      )
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await read(
+        await call(
+          `/booking-requests/${created.id}/package`,
+          "GET",
+          undefined,
+          customerCookie,
+        ),
+        200,
+      )
+    ).package,
+    null,
+  );
+  const closed = await db
+    .insertInto("conversations")
+    .values({ customer_id: customerId, status: "closed" })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  assert.equal(
+    (
+      await call(
+        "/booking-requests",
+        "POST",
+        { ...input, conversationId: closed.id },
+        customerCookie,
+      )
+    ).status,
+    409,
+  );
+  const unbound = await db
+    .insertInto("conversations")
+    .values({ customer_id: customerId })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const countsBefore = Number(
+    (await pool.query("SELECT count(*) FROM booking_requests")).rows[0].count,
+  );
+  assert.equal(
+    (
+      await call(
+        "/booking-requests",
+        "POST",
+        { ...input, packageId: randomUUID(), conversationId: unbound.id },
+        customerCookie,
+      )
+    ).status,
+    409,
+  );
+  assert.equal(
+    Number(
+      (await pool.query("SELECT count(*) FROM booking_requests")).rows[0].count,
+    ),
+    countsBefore,
+  );
+  assert.equal(
+    (
+      await db
+        .selectFrom("conversations")
+        .select("booking_request_id")
+        .where("id", "=", unbound.id)
+        .executeTakeFirstOrThrow()
+    ).booking_request_id,
+    null,
+  );
+  const guest = await db
+    .insertInto("guest_chat_identities")
+    .values({ token_hash: randomUUID() })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const guestThread = await db
+    .insertInto("conversations")
+    .values({
+      guest_identity_id: guest.id,
+      guest_expires_at: new Date(Date.now() + 60000),
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  assert.equal(
+    (
+      await call(
+        "/booking-requests",
+        "POST",
+        { ...input, conversationId: guestThread.id },
+        customerCookie,
+      )
+    ).status,
+    409,
+  );
+  await pool.query(
+    "CREATE FUNCTION reject_booking_link_test() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.booking_request_id IS NOT NULL THEN RAISE EXCEPTION 'test link failure'; END IF; RETURN NEW; END $$",
+  );
+  await pool.query(
+    "CREATE TRIGGER reject_booking_link_test BEFORE UPDATE OF booking_request_id ON conversations FOR EACH ROW EXECUTE FUNCTION reject_booking_link_test()",
+  );
+  try {
+    assert.equal(
+      (
+        await call(
+          "/booking-requests",
+          "POST",
+          { ...input, conversationId: unbound.id },
+          customerCookie,
+        )
+      ).status,
+      500,
+    );
+    assert.equal(
+      Number(
+        (await pool.query("SELECT count(*) FROM booking_requests")).rows[0]
+          .count,
+      ),
+      countsBefore,
+    );
+    assert.equal(
+      (
+        await db
+          .selectFrom("conversations")
+          .select("booking_request_id")
+          .where("id", "=", unbound.id)
+          .executeTakeFirstOrThrow()
+      ).booking_request_id,
+      null,
+    );
+  } finally {
+    await pool.query("DROP TRIGGER reject_booking_link_test ON conversations");
+    await pool.query("DROP FUNCTION reject_booking_link_test()");
+  }
+  const plain = (
+    await read(
+      await call("/booking-requests", "POST", input, customerCookie),
+      201,
+    )
+  ).bookingRequest;
+  assert.equal(plain.packageId, null);
+  const day = await db
+    .insertInto("events_day")
+    .values({
+      booking_request_id: plain.id,
+      day: "2099-04-01",
+      starts_at: new Date("2099-04-01T01:00:00Z"),
+      ends_at: new Date("2099-04-01T02:00:00Z"),
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const schedule = await read(
+    await call(
+      `/admin/event-days?bookingRequestId=${plain.id}`,
+      "GET",
+      undefined,
+      adminCookie,
+    ),
+    200,
+  );
+  assert.equal(
+    schedule.eventDays.find((item: { id: string }) => item.id === day.id)
+      ?.packageName,
+    null,
+  );
+  const pkg = await db
+    .insertInto("packages")
+    .values({
+      name: "Attachment",
+      slug: `attachment-${randomUUID()}`,
+      max_guests: 10,
+      price: 1000,
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  const attach = {
+    packageId: pkg.id,
+    expectedBookingUpdatedAt: created.updatedAt,
+    packageUpdatedAt: pkg.updated_at.toISOString(),
+  };
+  assert.equal(
+    (
+      await call(
+        `/admin/booking-requests/${created.id}/package`,
+        "POST",
+        attach,
+        customerCookie,
+      )
+    ).status,
+    403,
+  );
+  const updated = (
+    await read(
+      await call(
+        `/admin/booking-requests/${created.id}/package`,
+        "POST",
+        attach,
+        adminCookie,
+      ),
+      200,
+    )
+  ).bookingRequest;
+  assert.equal(updated.packageId, pkg.id);
+  const audit = await db
+    .selectFrom("audit_events")
+    .selectAll()
+    .where("entity_id", "=", created.id)
+    .where("action", "=", "booking.catalog_package_attached")
+    .execute();
+  assert.equal(audit.length, 1);
+
+  assert.equal(
+    (
+      await call(
+        `/admin/booking-requests/${created.id}/package`,
+        "POST",
+        { ...attach, expectedBookingUpdatedAt: updated.updatedAt },
+        adminCookie,
+      )
+    ).status,
+    409,
+  );
+});

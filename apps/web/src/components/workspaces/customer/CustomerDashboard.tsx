@@ -677,6 +677,21 @@ export function CustomerDashboard({
             <MessagesWorkspace
               title="Messages"
               viewerRole="customer"
+              resumeBooking={
+                new URLSearchParams(search).get("createRequest") === "1" &&
+                selectedConversationId === requestedConversation
+              }
+              onBookingSubmitted={() => setThreadRevision((value) => value + 1)}
+              onBookingClosed={() => {
+                const url = new URL(window.location.href);
+                if (url.searchParams.has("createRequest")) {
+                  url.searchParams.delete("createRequest");
+                  navigateWorkspace(
+                    `${url.pathname}${url.search}${url.hash}`,
+                    true,
+                  );
+                }
+              }}
               conversations={messageConversations}
               activeConversation={
                 messageThread?.conversation.id === selectedConversationId

@@ -16,14 +16,14 @@ export async function getBookingPackageService(
       const booking = await findBookingRequestData(trx, id, customerId);
       if (!booking) return null;
       const pkg = await resolveBookingPackageData(trx, booking);
-      return pkg
-        ? {
-            package: await packageDto(trx, pkg, {
+      return {
+        package: pkg
+          ? await packageDto(trx, pkg, {
               includeArchivedServices:
                 !customerId || pkg.package_type === "custom",
-            }),
-            bookingUpdatedAt: booking.revision,
-          }
-        : null;
+            })
+          : null,
+        bookingUpdatedAt: booking.revision,
+      };
     });
 }

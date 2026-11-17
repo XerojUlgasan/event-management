@@ -227,7 +227,7 @@ model BookingRequest {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   reference String @unique
   customerId String @map("customer_id") @db.Uuid
-  packageId String @map("package_id") @db.Uuid
+  packageId String? @map("package_id") @db.Uuid
   eventType String @map("event_type")
   preferredDate String @map("preferred_date")
   requestedDays Json? @map("requested_days") @db.JsonB
@@ -246,7 +246,7 @@ model BookingRequest {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   customer User @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  package Package @relation("InquiryPackage", fields: [packageId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  package Package? @relation("InquiryPackage", fields: [packageId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   customPackage Package? @relation("CustomBookingPackage")
   quotations Quotation[]
   history BookingRequestStatusHistory[]

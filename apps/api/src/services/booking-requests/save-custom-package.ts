@@ -37,7 +37,7 @@ const error = (message: string, status: 400 | 404 | 409 | 502) => ({
 });
 export type CustomPackageInput = Content & {
   expectedBookingUpdatedAt: string;
-  expectedUpdatedAt: string;
+  expectedUpdatedAt?: string;
   sourcePackageId?: string;
 };
 async function stageSourceMedia(
@@ -122,23 +122,24 @@ export async function saveCustomPackageService(
     const source = sourceId
       ? await findAnyPackageData(db, sourceId)
       : undefined;
-    if (!source) return error("Package not found", 404);
+    if (sourceId && !source) return error("Package not found", 404);
+    if (!create && !source) return error("Package not found", 404);
     if (["declined", "cancelled"].includes(booking.status))
       return error("Closed booking requests cannot be customized", 409);
     if (
       booking.revision !== input.expectedBookingUpdatedAt ||
-      source.updated_at.toISOString() !== input.expectedUpdatedAt
+      (source && source.updated_at.toISOString() !== input.expectedUpdatedAt)
     )
       return error("Booking or package changed. Refresh and try again", 409);
     if (
-      (create && (custom || source.package_type !== "catalog")) ||
-      (!create && (!custom || source.id !== custom.id))
+      (create && (custom || (source && source.package_type !== "catalog"))) ||
+      (!create && (!custom || source?.id !== custom.id))
     )
       return error("Custom package state changed. Refresh and try again", 409);
-    if (source.archived_at)
+    if (source?.archived_at)
       return error("Archived packages cannot be customized", 409);
     let content: Content = input;
-    if (create) {
+    if (create && source) {
       try {
         content = await stageSourceMedia(
           db,
@@ -156,21 +157,24 @@ export async function saveCustomPackageService(
     const outcome = await db.transaction().execute(async (trx) => {
       const currentBooking = await lockBookingRequestData(trx, id);
       if (!currentBooking) return error("Booking request not found", 404);
-      const current = await lockAnyPackageData(trx, source.id);
+      const current = source
+        ? await lockAnyPackageData(trx, source.id)
+        : undefined;
       const currentCustom = await findCustomPackageData(trx, id);
       if (
-        !current ||
+        (source && !current) ||
         currentBooking.revision !== input.expectedBookingUpdatedAt ||
-        current.updated_at.toISOString() !== input.expectedUpdatedAt
+        (current &&
+          current.updated_at.toISOString() !== input.expectedUpdatedAt)
       )
         return error("Booking or package changed. Refresh and try again", 409);
       if (["declined", "cancelled"].includes(currentBooking.status))
         return error("Closed booking requests cannot be customized", 409);
       if (
-        current.archived_at ||
+        current?.archived_at ||
         (create
-          ? current.package_type !== "catalog" || !!currentCustom
-          : currentCustom?.id !== current.id)
+          ? (current && current.package_type !== "catalog") || !!currentCustom
+          : !current || currentCustom?.id !== current.id)
       )
         return error(
           "Custom package state changed. Refresh and try again",
@@ -178,14 +182,21 @@ export async function saveCustomPackageService(
         );
       const invalid = await validatePackageServicesData(
         trx,
-        current.id,
+        current?.id ?? null,
         content.services,
       );
       if (invalid) return invalid;
-      const before = await packageDto(trx, current, {
-        includeArchivedServices: true,
-      });
-      const now = nextUpdate(current.updated_at);
+      const before = current
+        ? await packageDto(trx, current, {
+            includeArchivedServices: true,
+          })
+        : null;
+      const now = current ? nextUpdate(current.updated_at) : new Date();
+      if (!create && !current)
+        return error(
+          "Custom package state changed. Refresh and try again",
+          409,
+        );
       const saved = create
         ? await createCustomPackageData(
             trx,
@@ -194,7 +205,10 @@ export async function saveCustomPackageService(
             now,
             `private:${randomUUID()}`,
           )
-        : await updatePackageData(trx, current.id, content, current.slug, now);
+        : current
+          ? await updatePackageData(trx, current.id, content, current.slug, now)
+          : undefined;
+      if (!saved) throw new Error("Custom package state is unavailable");
       previousMediaIds = await replacePackageSectionsData(
         trx,
         saved.id,
@@ -217,7 +231,7 @@ export async function saveCustomPackageService(
         entity_type: "booking_request",
         entity_id: id,
         metadata: JSON.stringify({
-          previousPackageId: current.id,
+          previousPackageId: current?.id ?? null,
           packageId: saved.id,
           before,
           after: pkg,

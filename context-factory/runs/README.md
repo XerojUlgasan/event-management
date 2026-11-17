@@ -14,6 +14,9 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Service widget navigation](2026-11-17_23-28-00_service-widget-navigation.md) | Whole-card service links and workspace overlays / main | complete | Review scoped uncommitted delta; local browser, tests, and builds passed, hosted rollout separate |
+| [Service canvas widget](2026-11-17_23-12-00_service-widget.md) | Linked previews and direct service picker / main | complete | Review scoped delta; local API/browser checks passed, deploy matching contracts/API/frontend together |
+| [Conversation-based booking intake](2026-11-17_00-55-00_conversation-booking-intake.md) | Existing chat to request, optional package, administrator preparation / main | complete | Review scoped diff; local migration and API/browser verification complete, hosted rollout separate |
 | [Instant conversation composer](2026-11-17_00-39-13_instant-conversation-composer.md) | Immediate customer/guest bubbles and safe retries / main | complete | Review uncommitted API and browser changes together; checks and synthetic browser verification passed |
 | [Anonymous conversation](2026-11-16_23-55-00_anonymous-conversation.md) | Five-message guest chat and secure account claim / main | complete | Review uncommitted implementation; local migration, API/auth/Edge and desktop/mobile verification passed |
 | [AI file separation](2026-11-16_20-52-19_ai-file-separation.md) | Focused AI services, queries, and knowledge UI / feat/ai | complete | Review uncommitted refactor; behavior suites, builds, and synthetic browser checks passed |

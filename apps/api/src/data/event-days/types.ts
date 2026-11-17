@@ -13,7 +13,7 @@ export type DayRow = Pick<
 > &
   Pick<Selectable<BookingRequests>, "event_type" | "time_zone"> & {
     booking_reference: string;
-    package_name: string;
+    package_name: string | null;
     day: string;
     booking_status: string;
   };

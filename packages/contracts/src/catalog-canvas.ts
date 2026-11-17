@@ -51,7 +51,7 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
   return z
     .object({
       id: z.string().uuid(),
-      type: z.enum(["photo", "markdown", "video"]),
+      type: z.enum(["photo", "markdown", "video", "service"]),
       x: z
         .number()
         .int()
@@ -65,6 +65,18 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
       alt: text,
       caption: text,
       autoplay: z.boolean().default(false),
+      serviceId: z.string().uuid().nullable().optional(),
+      service: z
+        .object({
+          id: z.string().uuid(),
+          slug: z.string(),
+          name: z.string(),
+          description: z.string(),
+          imageUrl: z.string().nullable(),
+        })
+        .strict()
+        .nullable()
+        .optional(),
     })
     .strict()
     .superRefine((widget, ctx) => {
@@ -91,7 +103,27 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
           message: "Widget exceeds the page width",
           path: ["w"],
         });
-      if (widget.type === "markdown") {
+      if (
+        widget.type !== "service" &&
+        (widget.serviceId != null || widget.service != null)
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "Only service widgets can reference a service",
+        });
+      if (widget.type === "service") {
+        if (!widget.serviceId)
+          ctx.addIssue({
+            code: "custom",
+            message: "Choose a service for this widget before saving.",
+            path: ["serviceId"],
+          });
+        if (widget.media !== null || widget.markdown !== "")
+          ctx.addIssue({
+            code: "custom",
+            message: "Service widgets cannot contain media or Markdown",
+          });
+      } else if (widget.type === "markdown") {
         if (!widget.markdown.trim() || widget.media !== null)
           ctx.addIssue({
             code: "custom",
@@ -170,6 +202,12 @@ const storedWidgetSchema = z
     alt: widgetSchema.shape.alt,
     caption: widgetSchema.shape.caption,
     autoplay: z.boolean(),
+    serviceId: z
+      .string()
+      .uuid()
+      .refine((id) => id === id.toLowerCase(), "Service ID must be canonical")
+      .nullable()
+      .optional(),
   })
   .strict();
 

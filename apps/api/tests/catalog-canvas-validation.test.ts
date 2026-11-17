@@ -113,6 +113,54 @@ test("canvas request rules and defaults", () => {
   );
 });
 
+test("service widgets require a service and persist only the reference", () => {
+  const widget = {
+    ...markdown(),
+    type: "service",
+    markdown: "",
+    serviceId: randomUUID(),
+  };
+  assert.equal(sectionsSchema.safeParse([section([widget])]).success, true);
+  for (const bad of [
+    { ...widget, serviceId: null },
+    { ...widget, media: photo().media },
+    { ...widget, markdown: "text" },
+    { ...widget, autoplay: true },
+    { ...markdown(), serviceId: widget.serviceId },
+    {
+      ...markdown(),
+      service: {
+        id: widget.serviceId,
+        slug: "x",
+        name: "x",
+        description: "x",
+        imageUrl: null,
+      },
+    },
+  ])
+    assert.equal(sectionsSchema.safeParse([section([bad])]).success, false);
+  const { media: _media, ...rest } = widget;
+  assert.equal(
+    storedSectionsSchema.safeParse([section([{ ...rest, mediaId: null }])])
+      .success,
+    true,
+  );
+  assert.equal(
+    storedSectionsSchema.safeParse([
+      section([{ ...rest, mediaId: null, service: {} }]),
+    ]).success,
+    false,
+  );
+  assert.equal(
+    storedSectionsSchema.safeParse([
+      section([
+        { ...rest, mediaId: null, serviceId: widget.serviceId.toUpperCase() },
+      ]),
+    ]).success,
+    false,
+  );
+});
+
 test("IDs are unique across sections and widgets", () => {
   const first = section([markdown()]);
   const widget = first.widgets[0] as ReturnType<typeof markdown>;

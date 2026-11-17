@@ -1,3 +1,4 @@
+import { lockCatalogScroll } from "./catalog-scroll-lock";
 import { DEFAULT_PAGE_SIZE } from "@event-management/contracts/pagination";
 import {
   catalogFilterScope,
@@ -437,13 +438,12 @@ export function CatalogOverlay({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    const previousOverflow = document.body.style.overflow;
+    const unlockScroll = lockCatalogScroll();
     dialog?.showModal();
-    document.body.style.overflow = "hidden";
     dialog?.querySelector<HTMLButtonElement>(".package-preview-close")?.focus();
     return () => {
       dialog?.close();
-      document.body.style.overflow = previousOverflow;
+      unlockScroll();
       trigger?.focus();
     };
   }, []);

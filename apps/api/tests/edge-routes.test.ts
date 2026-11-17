@@ -70,3 +70,14 @@ test("unknown paths and near-miss prefixes stay unmatched", () => {
   assert.equal(matchRouteFamily("/v1/media"), null);
   assert.equal(matchRouteFamily("/openapi.json"), null);
 });
+
+test("package attachment uses the booking route family and small body cap", () => {
+  assert.equal(
+    matchRouteFamily("/v1/admin/booking-requests/id/package"),
+    "booking-requests",
+  );
+  assert.equal(
+    bookingBodyLimit("/v1/admin/booking-requests/id/package"),
+    SMALL_JSON_BODY_LIMIT_BYTES,
+  );
+});

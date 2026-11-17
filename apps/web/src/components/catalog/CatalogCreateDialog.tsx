@@ -9,8 +9,10 @@ export function CatalogCreateDialog<T extends { name: string }>({
   onContinue,
   validate,
   renderDetails,
+  privateProposal = false,
 }: {
   entity: "package" | "service";
+  privateProposal?: boolean;
   initial: T;
   onClose: () => void;
   onContinue: (content: T) => void;
@@ -22,9 +24,13 @@ export function CatalogCreateDialog<T extends { name: string }>({
   const nameInput = useRef<HTMLInputElement>(null);
   return (
     <Dialog
-      title={`Create ${entity}`}
+      title={privateProposal ? "Create private package" : `Create ${entity}`}
       initialFocus={nameInput}
-      intro={`Fill in the details first. Fields marked * are required. Next, add ${entity === "service" ? "the required service photo and " : ""}content in the editor. Your ${entity} is published only when you save.`}
+      intro={
+        privateProposal
+          ? "Fill in the details first. Fields marked * are required. Next, add content in the editor. Saving creates a private package for this request."
+          : `Fill in the details first. Fields marked * are required. Next, add ${entity === "service" ? "the required service photo and " : ""}content in the editor. Your ${entity} is published only when you save.`
+      }
       onClose={onClose}
     >
       <form

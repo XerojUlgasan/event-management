@@ -6,7 +6,7 @@ import type { BookingRequest } from "./requests";
 import { request } from "../../http/request";
 
 export type BookingPackageResult = {
-  package: CatalogPackage;
+  package: CatalogPackage | null;
   bookingUpdatedAt: string;
 };
 export const getBookingPackage = (id: string, admin: boolean) =>
@@ -20,7 +20,7 @@ export const saveBookingPackage = (
   },
   revisions: {
     expectedBookingUpdatedAt: string;
-    expectedUpdatedAt: string;
+    expectedUpdatedAt?: string;
     sourcePackageId?: string;
   },
   exists: boolean,
@@ -36,11 +36,24 @@ export type PackageHistoryEntry = {
   id: string;
   actorId: string | null;
   action: string;
-  before: CatalogPackage;
+  before: CatalogPackage | null;
   after: CatalogPackage;
   createdAt: string;
 };
 export const getBookingPackageHistory = (id: string, cursor?: string) =>
   request<{ history: PackageHistoryEntry[]; nextCursor: string | null }>(
     `/admin/booking-requests/${encodeURIComponent(id)}/package-history${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+  );
+
+export const assignBookingPackage = (
+  id: string,
+  body: {
+    packageId: string;
+    expectedBookingUpdatedAt: string;
+    packageUpdatedAt?: string;
+  },
+) =>
+  request<{ bookingRequest: BookingRequest }>(
+    `/admin/booking-requests/${encodeURIComponent(id)}/package`,
+    body,
   );

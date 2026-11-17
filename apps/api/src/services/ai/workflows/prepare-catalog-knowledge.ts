@@ -133,6 +133,15 @@ function prepareSections(
       if (widget.type === "video") continue;
 
       const context = `${listingLabel(input)}\nSection: ${section.title}`;
+      if (widget.type === "service") {
+        if (widget.caption)
+          chunks.push({
+            chunkKey: `service:${widget.id}`,
+            contentMarkdown: `${context}\nCaption: ${widget.caption}`,
+            mediaId: null,
+          });
+        continue;
+      }
       if (widget.type === "markdown") {
         for (const [index, markdown] of splitMarkdown(
           widget.markdown,

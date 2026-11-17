@@ -49,7 +49,8 @@ export const requestedDayResponseSchema = requestedDaySchema.safeExtend({
 export const durationModeSchema = z.enum(["one_day", "multi_day"]);
 export const createSchema = z
   .object({
-    packageId: z.string().uuid(),
+    packageId: z.string().uuid().nullable().optional(),
+    conversationId: z.string().uuid().optional(),
     packageUpdatedAt: z.string().datetime().optional(),
     eventType: text(MAX_EVENT_TYPE_LENGTH),
     durationMode: durationModeSchema,
@@ -147,10 +148,10 @@ export const bookingSchema = z.object({
   id: z.string().uuid(),
   reference: z.string(),
   customerId: z.string().uuid(),
-  packageId: z.string().uuid(),
-  packagePrice: priceSchema,
-  packageMaxGuests: z.number().int().positive(),
-  packageName: z.string(),
+  packageId: z.string().uuid().nullable(),
+  packagePrice: priceSchema.nullable(),
+  packageMaxGuests: z.number().int().positive().nullable(),
+  packageName: z.string().nullable(),
   eventType: z.string(),
   preferredDate: z.string(),
   estimatedDuration: estimatedDurationSchema,

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type {
   CatalogSection,
@@ -120,6 +121,74 @@ export const EmptyMedia: Story = {
       },
     ],
   },
+};
+export const ServiceWidgets: Story = {
+  args: {
+    sections: [
+      {
+        id: "services",
+        title: "Explore our services",
+        widgets: [
+          widget("linked-service", "service", {
+            h: 6,
+            serviceId: "photo-booth",
+            service: {
+              id: "photo-booth",
+              slug: "photo-booth",
+              name: "Photo booth",
+              description:
+                "A photo corner for guests to capture the celebration.",
+              imageUrl: "/images/wedding.jpg",
+            },
+            caption: "Ask our team about a photo booth for your event.",
+          }),
+          widget("unavailable-service", "service", {
+            x: 6,
+            serviceId: "archived-service",
+            service: null,
+          }),
+        ],
+      },
+    ],
+  },
+};
+function WorkspaceServiceExample() {
+  const [selected, setSelected] = useState<string | null>(null);
+  return (
+    <>
+      <CatalogCanvas>
+        <CatalogSections
+          sections={ServiceWidgets.args?.sections ?? []}
+          onOpenService={setSelected}
+        />
+      </CatalogCanvas>
+      <p role="status">
+        {selected
+          ? `Open workspace preview for ${selected}`
+          : "Select a service to open its workspace preview."}
+      </p>
+    </>
+  );
+}
+export const WorkspaceServiceAction: Story = {
+  render: () => <WorkspaceServiceExample />,
+};
+export const ServiceEditor: Story = {
+  render: () => (
+    <div style={{ width: 320, height: 244 }}>
+      <CatalogWidgetContent
+        widget={widget("choose-service", "service", {
+          caption: "Optional context for this service.",
+        })}
+        editor
+        servicePlaceholder={
+          <Button className="ui-catalog-empty" variant="plain">
+            Choose a service
+          </Button>
+        }
+      />
+    </div>
+  ),
 };
 export const EmptyMediaWithCaption: Story = {
   render: () => (

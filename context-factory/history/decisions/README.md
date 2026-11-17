@@ -8,6 +8,8 @@ Preserve historical reasoning. When a decision changes, link a successor and mar
 
 | Record | Status / purpose |
 | --- | --- |
+| [Linked service canvas widget](2026-11-17_service-widget.md) | Accepted service previews with direct picker access and no price/inclusion calculations; local implementation verified |
+| [Conversation-based booking intake](2026-11-17_conversation-booking-intake.md) | Accepted existing-thread binding, optional package, and administrator preparation; local migration and verification complete |
 | [Catalog embedding ingestion](2026-11-16_catalog-embedding-ingestion.md) | Accepted catalog text and actual-photo ingestion, automatic refresh and backfill; search remains separate |
 | [Catalog knowledge storage](2026-11-16_catalog-knowledge-storage.md) | Accepted one-table catalog corpus with 768-dimensional vectors; migration prepared; ingestion now covered by its successor decision, retrieval pending |
 | [Catalog canvas application validation](2026-11-16_catalog-canvas-application-validation.md) | Accepted shared browser/API document rules replacing the SQL validator |

@@ -2,7 +2,7 @@ import { createRoute } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { idParams } from "./schemas.js";
 import { json } from "./http.js";
-import { saveSchema, saveResponses } from "./custom-package-schemas.js";
+import { updateSchema, saveResponses } from "./custom-package-schemas.js";
 import { saveCustomPackageService } from "../../services/booking-requests/save-custom-package.js";
 
 export const updateBookingCustomPackageRoute = createRoute({
@@ -11,7 +11,7 @@ export const updateBookingCustomPackageRoute = createRoute({
   tags: ["Booking requests"],
   request: {
     params: idParams,
-    body: { required: true, content: json(saveSchema) },
+    body: { required: true, content: json(updateSchema) },
   },
   responses: saveResponses,
 });

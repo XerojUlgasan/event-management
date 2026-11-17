@@ -85,13 +85,65 @@ export function CatalogWidgetContent({
   widget,
   editor = false,
   mediaPlaceholder,
+  servicePlaceholder,
+  onOpenService,
 }: {
   widget: CatalogWidget;
   editor?: boolean;
   mediaPlaceholder?: ReactNode;
+  servicePlaceholder?: ReactNode;
+  onOpenService?: (id: string) => void;
 }) {
   const url = widget.media?.url || "";
   const autoplay = !editor && widget.autoplay;
+  if (widget.type === "service" && widget.service) {
+    const service = widget.service;
+    const content = (
+      <>
+        {service.imageUrl && (
+          <img src={service.imageUrl} alt="" loading="lazy" />
+        )}
+        <span className="ui-catalog-service-details">
+          <span className="ui-catalog-service-name">{service.name}</span>
+          {service.description && (
+            <span className="ui-catalog-service-description">
+              {service.description}
+            </span>
+          )}
+          {!editor && (
+            <span className="ui-catalog-service-link">View service</span>
+          )}
+        </span>
+        {widget.caption && (
+          <span className="ui-catalog-caption">{widget.caption}</span>
+        )}
+      </>
+    );
+    return (
+      <div className="ui-catalog-widget-content ui-catalog-service">
+        {editor ? (
+          <div className="ui-catalog-service-card">{content}</div>
+        ) : onOpenService ? (
+          <button
+            className="ui-catalog-service-card ui-catalog-service-action"
+            type="button"
+            aria-label={`View service: ${service.name}`}
+            onClick={() => onOpenService(service.id)}
+          >
+            {content}
+          </button>
+        ) : (
+          <a
+            className="ui-catalog-service-card ui-catalog-service-action"
+            href={`/services/${encodeURIComponent(service.slug)}`}
+            aria-label={`View service: ${service.name}`}
+          >
+            {content}
+          </a>
+        )}
+      </div>
+    );
+  }
   return (
     <div className={`ui-catalog-widget-content ui-catalog-${widget.type}`}>
       {widget.type === "markdown" && (
@@ -119,12 +171,26 @@ export function CatalogWidgetContent({
             <div className="ui-catalog-empty">Add a video</div>
           ))
         ))}
+      {widget.type === "service" &&
+        (servicePlaceholder ?? (
+          <div className="ui-catalog-empty">
+            {widget.serviceId
+              ? "This service is unavailable."
+              : "Choose a service"}
+          </div>
+        ))}
       {widget.caption && <p className="ui-catalog-caption">{widget.caption}</p>}
     </div>
   );
 }
 
-export function CatalogSections({ sections }: { sections: CatalogSection[] }) {
+export function CatalogSections({
+  sections,
+  onOpenService,
+}: {
+  sections: CatalogSection[];
+  onOpenService?: (id: string) => void;
+}) {
   return (
     <>
       {sections.map((section) => (
@@ -145,7 +211,10 @@ export function CatalogSections({ sections }: { sections: CatalogSection[] }) {
                     className="ui-catalog-widget"
                     style={style}
                   >
-                    <CatalogWidgetContent widget={widget} />
+                    <CatalogWidgetContent
+                      widget={widget}
+                      onOpenService={onOpenService}
+                    />
                   </div>
                 );
               })}

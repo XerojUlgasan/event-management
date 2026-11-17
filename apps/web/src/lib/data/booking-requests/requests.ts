@@ -5,8 +5,9 @@ import { request } from "../../http/request";
 export type BookingStatus =
   "under_review" | "needs_details" | "accepted" | "declined" | "cancelled";
 export type BookingRequestInput = {
-  packageId: string;
+  packageId?: string | null;
   packageUpdatedAt?: string;
+  conversationId?: string;
   eventType: string;
   durationMode: "one_day" | "multi_day";
   requestedDays: { date: string }[];
@@ -17,6 +18,9 @@ export type BookingRequestInput = {
 };
 export type BookingRequest = Omit<
   BookingRequestInput,
+  | "packageId"
+  | "conversationId"
+  | "packageUpdatedAt"
   | "specialRequests"
   | "preferredDate"
   | "estimatedDuration"
@@ -53,9 +57,10 @@ export type BookingRequest = Omit<
   id: string;
   reference: string;
   customerId: string;
-  packageName: string;
-  packagePrice: PackagePrice;
-  packageMaxGuests: number;
+  packageId: string | null;
+  packageName: string | null;
+  packagePrice: PackagePrice | null;
+  packageMaxGuests: number | null;
   status: BookingStatus;
   outOfRange: boolean;
   createdAt: string;

@@ -36,6 +36,11 @@ export async function reviseQuotationService(
     if (rows.has_other_draft)
       return failure("A quotation draft already exists", 409);
     const pkg = await proposalPackage(trx, booking);
+    if (!pkg)
+      return failure(
+        "Choose or create a package before preparing a quotation",
+        409,
+      );
     const base = basePrice(pkg.price);
     if (base === null)
       return failure("Package price is outside the supported range", 400);

@@ -8,7 +8,10 @@ import { getBookingPackageService } from "../../services/booking-requests/get-bo
 const readResponses = {
   200: {
     content: json(
-      z.object({ package: publicSchema, bookingUpdatedAt: z.string() }),
+      z.object({
+        package: publicSchema.nullable(),
+        bookingUpdatedAt: z.string(),
+      }),
     ),
     description: "Current booking package",
   },

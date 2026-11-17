@@ -5,8 +5,11 @@ import { errors, json } from "./http.js";
 
 export const saveSchema = contentSchema.extend({
   expectedBookingUpdatedAt: z.string(),
-  expectedUpdatedAt: z.string().datetime(),
+  expectedUpdatedAt: z.string().datetime().optional(),
   sourcePackageId: z.string().uuid().optional(),
+});
+export const updateSchema = saveSchema.extend({
+  expectedUpdatedAt: z.string().datetime(),
 });
 export const saveResponses = {
   200: {

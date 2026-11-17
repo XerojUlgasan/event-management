@@ -585,7 +585,9 @@ function AdminBookingList() {
                     <td>{item.reference}</td>
                     <td>
                       {item.eventType}
-                      <small>{item.packageName}</small>
+                      <small>
+                        {item.packageName ?? "No catalog package selected"}
+                      </small>
                     </td>
                     <td>{item.contactName}</td>
                     <td>
@@ -719,14 +721,20 @@ export function BookingDetails({
                     <dd>{item.eventType}</dd>
                   </div>
                   <div>
-                    <dt>Original inquiry package</dt>
+                    <dt>Catalog package</dt>
                     <dd>
-                      {item.packageName} ·{" "}
-                      {new Intl.NumberFormat("en-PH", {
-                        style: "currency",
-                        currency: "PHP",
-                      }).format(item.packagePrice.amountMinor / 100)}{" "}
-                      · up to {item.packageMaxGuests} guests
+                      {item.packageName && item.packagePrice ? (
+                        <>
+                          {item.packageName} ·{" "}
+                          {new Intl.NumberFormat("en-PH", {
+                            style: "currency",
+                            currency: "PHP",
+                          }).format(item.packagePrice.amountMinor / 100)}{" "}
+                          · up to {item.packageMaxGuests} guests
+                        </>
+                      ) : (
+                        "No catalog package selected · Amount to be discussed"
+                      )}
                     </dd>
                   </div>
                   {item.requestedDays ? (

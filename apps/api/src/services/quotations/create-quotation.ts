@@ -26,6 +26,11 @@ export async function createQuotationService(
       return failure("Booking request changed. Refresh and try again", 409);
     if (closed(booking)) return failure("This request is closed", 409);
     const pkg = await proposalPackage(trx, booking);
+    if (!pkg)
+      return failure(
+        "Choose or create a package before preparing a quotation",
+        409,
+      );
     const base = basePrice(pkg.price);
     if (base === null)
       return failure("Package price is outside the supported range", 400);

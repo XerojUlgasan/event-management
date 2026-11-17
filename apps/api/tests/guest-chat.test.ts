@@ -800,6 +800,71 @@ test("guest database invariants reject ambiguous ownership, over-quota counts an
   }
 });
 
+test("claimed guest conversation retains its history when a catalog request binds to it", async () => {
+  useReply("Guest response");
+  const thread = await guest();
+  const id = thread.conversation.id;
+  const sent = await read(await send(thread, "I need an event"), 201);
+  await read(
+    await call(`/admin/conversations/${id}/messages`, team.cookie, {
+      body: "Let us help",
+    }),
+    201,
+  );
+  await read(
+    await call(
+      `/guest/conversations/${id}/claim`,
+      `${customer.cookie}; ${thread.cookie}`,
+      {},
+    ),
+    200,
+  );
+  const created = await read(
+    await call("/booking-requests", customer.cookie, {
+      conversationId: id,
+      packageId,
+      eventType: "Wedding",
+      durationMode: "one_day",
+      requestedDays: [{ date: "2099-07-01" }],
+      timeZone: "Asia/Manila",
+      contactName: "Customer",
+      phoneNumber: "123",
+    }),
+    201,
+  );
+  assert.equal(created.bookingRequest.packageId, packageId);
+  const row = await db
+    .selectFrom("conversations")
+    .selectAll()
+    .where("id", "=", id)
+    .executeTakeFirstOrThrow();
+  assert.equal(row.booking_request_id, created.bookingRequest.id);
+  assert.equal(row.customer_id, customer.id);
+  assert.equal(row.guest_identity_id, null);
+  assert.equal(row.ai_enabled, false);
+  const owned = await read(
+    await call(`/messages/conversations/${id}`, customer.cookie),
+    200,
+  );
+  assert.ok(
+    owned.messages.some(
+      (message: { id: string }) => message.id === sent.message.id,
+    ),
+  );
+  await read(await call(`/guest/conversations/${id}`, thread.cookie), 404);
+  await read(await send(thread), 404);
+  assert.equal(
+    (
+      await db
+        .selectFrom("conversations")
+        .select("id")
+        .where("booking_request_id", "=", created.bookingRequest.id)
+        .execute()
+    ).length,
+    1,
+  );
+});
+
 test("validation, foreign cookie isolation, body caps, OpenAPI and Edge route registration match", async () => {
   const thread = await guest();
   const another = await guest();

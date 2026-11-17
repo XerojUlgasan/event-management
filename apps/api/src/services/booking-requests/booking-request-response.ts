@@ -15,7 +15,7 @@ export async function bookingRequestDtos(
   const packages = new Map(
     (
       await listBookingPackagesData(db, [
-        ...new Set(rows.map((r) => r.package_id)),
+        ...new Set(rows.flatMap((r) => (r.package_id ? [r.package_id] : []))),
       ])
     ).map((pkg) => [pkg.id, pkg]),
   );
@@ -28,8 +28,9 @@ export async function bookingRequestDtos(
     ).map((day) => [day.id, day]),
   );
   return rows.map((r) => {
-    const pkg = packages.get(r.package_id);
-    if (!pkg) throw new Error("Booking request package not found");
+    const pkg = r.package_id ? packages.get(r.package_id) : undefined;
+    if (r.package_id && !pkg)
+      throw new Error("Booking request package not found");
     const days =
       r.requested_days === null
         ? null
@@ -39,13 +40,15 @@ export async function bookingRequestDtos(
       reference: r.reference,
       customerId: r.customer_id,
       packageId: r.package_id,
-      packagePrice: {
-        kind: "fixed" as const,
-        currency: "PHP" as const,
-        amountMinor: pkg.price * 100,
-      },
-      packageMaxGuests: pkg.max_guests,
-      packageName: pkg.name,
+      packagePrice: pkg
+        ? {
+            kind: "fixed" as const,
+            currency: "PHP" as const,
+            amountMinor: pkg.price * 100,
+          }
+        : null,
+      packageMaxGuests: pkg?.max_guests ?? null,
+      packageName: pkg?.name ?? null,
       eventType: r.event_type,
       preferredDate: r.preferred_date,
       requestedDays:

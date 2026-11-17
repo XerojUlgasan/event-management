@@ -17,12 +17,13 @@ Customers browse the available packages and services. They can start a booking r
 ## Main workflow and handoffs
 
 1. The admin creates catalog listings so customers can see the available options.
-2. The customer browses the catalog and can submit a booking request for a chosen package.
+2. The customer browses the catalog and can submit a booking request for a chosen package. They can also submit from a conversation without selecting a package and discuss a custom arrangement.
 3. The customer can also ask the admin for a package or service to be added for their event and explain what they need.
-4. The admin discusses the request with the customer and may prepare a custom package to suit those requirements. The admin shares the package details with the customer for discussion and agreement.
+4. The admin discusses the request with the customer and may prepare a private custom package from scratch or a catalog copy. For a request without any package, the admin may instead assign an available catalog package. The admin shares the package details with the customer for discussion and agreement.
 
 ## Rules and boundaries
 
 - The admin manages listings and prepares custom packages; customers communicate their choices and requests to the admin.
 - A service lists either an hourly-only rate or one fixed price covering a positive whole number of included hours, plus an hourly rate for excess time. No rounding rule is specified for partial excess hours. These are catalog terms and do not automatically calculate quotation amounts.
+- A service widget features a linked catalog service within a package or service page. Its placement does not itself establish inclusion, an additional charge, or availability; the administrator can explain the context in its caption. Package pricing and quotations retain their existing owners.
 - Browsing or submitting a booking request does not reserve a date, establish a final price, or confirm a booking. The [product scope](../../README.md#product-scope) governs those later decisions.

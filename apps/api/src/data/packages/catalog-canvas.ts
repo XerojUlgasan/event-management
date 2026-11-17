@@ -29,12 +29,39 @@ export async function readCatalogSectionsData(
   owner: CanvasOwner,
 ) {
   const sections = await readStoredCanvas(db, owner);
-  const ids = [
+  const serviceIds = [
     ...new Set(
       sections.flatMap((s) =>
-        s.widgets.flatMap((w) => (w.mediaId ? [w.mediaId] : [])),
+        s.widgets.flatMap((w) =>
+          w.type === "service" && w.serviceId ? [w.serviceId] : [],
+        ),
       ),
     ),
+  ];
+  const services = serviceIds.length
+    ? await db
+        .selectFrom("services")
+        .select(["id", "slug", "name", "description", "canvas"])
+        .where("id", "in", serviceIds)
+        .where("archived_at", "is", null)
+        .execute()
+    : [];
+  const servicePhotos = new Map(
+    services.map((service) => [
+      service.id,
+      storedSectionsSchema
+        .parse(service.canvas)
+        .flatMap((s) => s.widgets)
+        .find((w) => w.type === "photo" && w.mediaId)?.mediaId ?? null,
+    ]),
+  );
+  const ids = [
+    ...new Set([
+      ...sections.flatMap((s) =>
+        s.widgets.flatMap((w) => (w.mediaId ? [w.mediaId] : [])),
+      ),
+      ...[...servicePhotos.values()].filter((id): id is string => id !== null),
+    ]),
   ];
   const assets = ids.length
     ? await db
@@ -44,10 +71,36 @@ export async function readCatalogSectionsData(
         .execute()
     : [];
   const byId = new Map(assets.map((asset) => [asset.id, asset]));
+  const serviceById = new Map(
+    services.map((service) => {
+      const photoId = servicePhotos.get(service.id);
+      const photo = photoId ? byId.get(photoId) : undefined;
+      return [
+        service.id,
+        {
+          id: service.id,
+          slug: service.slug,
+          name: service.name,
+          description: service.description,
+          imageUrl: photo
+            ? photo.source === "upload"
+              ? `/v1/catalog-media/${photo.id}`
+              : photo.url
+            : null,
+        },
+      ];
+    }),
+  );
   return sectionsSchema.parse(
     sections.map((section) => ({
       ...section,
       widgets: section.widgets.map(({ mediaId, ...widget }) => {
+        if (widget.type === "service")
+          return {
+            ...widget,
+            media: null,
+            service: serviceById.get(widget.serviceId ?? "") ?? null,
+          };
         if (!mediaId) return { ...widget, media: null };
         const media = byId.get(mediaId);
         if (!media) throw new Error(`Catalog media ${mediaId} is unavailable`);
@@ -92,6 +145,38 @@ export async function replaceCatalogSectionsData(
   content: Pick<Content, "sections">,
   actorId: string,
 ) {
+  const previous = await readStoredCanvas(db, owner);
+  const existing = new Set(
+    previous.flatMap((s) =>
+      s.widgets.flatMap((w) =>
+        w.type === "service" && w.serviceId ? [`${w.id}:${w.serviceId}`] : [],
+      ),
+    ),
+  );
+  const refs = content.sections.flatMap((s) =>
+    s.widgets.filter((w) => w.type === "service" && w.serviceId),
+  );
+  const serviceIds = [
+    ...new Set(
+      refs.flatMap((w) => (w.serviceId ? [w.serviceId.toLowerCase()] : [])),
+    ),
+  ].sort();
+  for (const id of serviceIds) {
+    const service = await db
+      .selectFrom("services")
+      .select(["id", "archived_at"])
+      .where("id", "=", id)
+      .forUpdate()
+      .executeTakeFirst();
+    if (
+      (!service || service.archived_at) &&
+      refs.some(
+        (w) =>
+          w.serviceId?.toLowerCase() === id && !existing.has(`${w.id}:${id}`),
+      )
+    )
+      throw new InvalidPackageMedia("Selected service is unavailable");
+  }
   const previousMediaIds = await listCatalogMediaIdsData(db, owner);
   const uploadIds = [
     ...new Set(
@@ -156,7 +241,12 @@ export async function replaceCatalogSectionsData(
   const sections = [];
   for (const section of content.sections) {
     const widgets = [];
-    for (const { media, ...widget } of section.widgets) {
+    for (const {
+      media,
+      service: _service,
+      serviceId,
+      ...widget
+    } of section.widgets) {
       let mediaId: string | null = null;
       if (media?.source === "upload") {
         if (!media.id)
@@ -175,7 +265,13 @@ export async function replaceCatalogSectionsData(
           })
           .execute();
       }
-      widgets.push({ ...widget, mediaId });
+      widgets.push({
+        ...widget,
+        mediaId,
+        ...(widget.type === "service"
+          ? { serviceId: serviceId?.toLowerCase() }
+          : {}),
+      });
     }
     sections.push({ id: section.id, title: section.title, widgets });
   }

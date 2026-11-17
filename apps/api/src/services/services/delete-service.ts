@@ -8,6 +8,7 @@ import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-med
 import { invalidateDependentPackageKnowledgeData } from "../../data/ai/invalidate-dependent-package-knowledge.js";
 import type { CatalogKnowledgeOwner } from "../../data/ai/catalog-knowledge-types.js";
 import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
+import { sql } from "kysely";
 export async function deleteServiceService(db: Kysely<DB>, id: string) {
   let media: string[] = [];
   let dependents: CatalogKnowledgeOwner[] = [];
@@ -15,6 +16,16 @@ export async function deleteServiceService(db: Kysely<DB>, id: string) {
     const outcome = await db.transaction().execute(async (trx) => {
       const row = await lockServiceData(trx, id);
       if (!row) return error("Service not found", 404);
+      const ref = sql<boolean>`canvas @> jsonb_build_array(jsonb_build_object('widgets', jsonb_build_array(jsonb_build_object('serviceId', ${id}::text))))`;
+      const [packageRef, serviceRef] = await Promise.all([
+        trx.selectFrom("packages").select("id").where(ref).executeTakeFirst(),
+        trx.selectFrom("services").select("id").where(ref).executeTakeFirst(),
+      ]);
+      if (packageRef || serviceRef)
+        return error(
+          "Referenced services cannot be deleted; archive instead",
+          409,
+        );
       media = await listCatalogMediaIdsData(trx, { kind: "service", id });
       dependents = await invalidateDependentPackageKnowledgeData(trx, id);
       await deleteServiceData(trx, id);

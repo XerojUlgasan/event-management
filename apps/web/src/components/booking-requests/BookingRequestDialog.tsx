@@ -77,8 +77,12 @@ export function BookingRequestDialog({
   item,
   resume = false,
   onClose,
+  conversationId,
+  onSubmitted,
 }: {
-  item: PublicPackage;
+  item: PublicPackage | null;
+  conversationId?: string;
+  onSubmitted?: () => void;
   resume?: boolean;
   onClose: () => void;
 }) {
@@ -207,8 +211,9 @@ export function BookingRequestDialog({
     setError("");
     try {
       const result = await createBookingRequest({
-        packageId: item.id,
-        packageUpdatedAt: item.updatedAt,
+        packageId: item?.id ?? null,
+        ...(item ? { packageUpdatedAt: item.updatedAt } : {}),
+        ...(conversationId ? { conversationId } : {}),
         eventType: (fields.eventType === OTHER
           ? fields.customEventType
           : fields.eventType
@@ -224,6 +229,7 @@ export function BookingRequestDialog({
       });
       clearBookingDraft();
       setReference(result.bookingRequest.reference);
+      onSubmitted?.();
       notify(
         "Booking request submitted. Your preferred dates are not reserved.",
       );
@@ -242,6 +248,15 @@ export function BookingRequestDialog({
   const next = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (auth === "signed-out") {
+      if (conversationId) {
+        setError(
+          notifyError(
+            "Your session ended. Sign in again and reopen this conversation to submit your request.",
+          ),
+        );
+        return;
+      }
+      if (!item) return;
       saveBookingDraft({ item, fields, timeZone });
       window.location.assign("/login?booking=resume");
       return;
@@ -319,7 +334,9 @@ export function BookingRequestDialog({
               ? "Review your request"
               : "Let’s plan your event"}
         </h2>
-        <p className="booking-intro">{item.name}</p>
+        <p className="booking-intro">
+          {item?.name ?? "Package to be discussed"}
+        </p>
         {reference ? (
           <>
             <p>

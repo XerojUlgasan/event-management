@@ -2179,6 +2179,20 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
             alt: "",
             caption: "",
           },
+          {
+            id: randomUUID(),
+            type: "service",
+            x: 0,
+            y: 6,
+            w: 6,
+            h: 3,
+            markdown: "",
+            media: null,
+            alt: "",
+            caption: "Included service",
+            autoplay: false,
+            serviceId: includedService.id,
+          },
         ],
       },
     ],
@@ -2233,6 +2247,8 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
   assert.equal(custom.packageType, "custom");
   assert.equal(custom.services[0].serviceId, includedService.id);
   assert.equal(custom.services[0].role, "included");
+  assert.equal(custom.sections[0].widgets[1].service.id, includedService.id);
+  assert.equal(custom.sections[0].widgets[1].caption, "Included service");
   assert.equal(custom.customForBookingRequestId, booking.id);
   assert.equal(saved.bookingRequest.packageId, original.id);
   assert.equal(saved.bookingRequest.packageName, original.name);
@@ -2376,6 +2392,29 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
     ),
     png,
   );
+  await read(
+    await call(
+      `/admin/services/${includedService.id}/archive`,
+      "POST",
+      undefined,
+      adminCookie,
+    ),
+    200,
+  );
+  const privatePackage = await read(
+    await call(
+      `/booking-requests/${booking.id}/package`,
+      "GET",
+      undefined,
+      customerCookie,
+    ),
+    200,
+  );
+  assert.equal(privatePackage.package.sections[0].widgets[1].service, null);
+  assert.equal(
+    privatePackage.package.sections[0].widgets[1].caption,
+    "Included service",
+  );
 });
 
 test("quotations do not retain removed package media or grant historical media access", async () => {
@@ -2501,4 +2540,185 @@ test("quotations do not retain removed package media or grant historical media a
   ).quotations;
   assert.equal(history[0].id, sent.id);
   assert.equal(history[0].totalAmountMinor, sent.totalAmountMinor);
+});
+
+test("linked service widgets are validated, hydrated, and protect references", async () => {
+  const serviceInput = {
+    name: "Linked service",
+    description: "Actual description",
+    hourlyRatePesos: 500,
+    fixedPricePesos: null,
+    includedHours: null,
+    sections: [data.sections[0]],
+  };
+  const service = await read(
+    await call("/admin/services", "POST", serviceInput, adminCookie),
+    201,
+  );
+  const widget = {
+    id: randomUUID(),
+    type: "service",
+    x: 0,
+    y: 0,
+    w: 6,
+    h: 4,
+    markdown: "",
+    media: null,
+    alt: "",
+    caption: "Our recommendation",
+    autoplay: false,
+    serviceId: service.id,
+    service: {
+      id: service.id,
+      slug: "forged",
+      name: "Forged",
+      description: "Forged",
+      imageUrl: null,
+    },
+  };
+  const sections = [{ id: randomUUID(), title: "Services", widgets: [widget] }];
+  const content = { ...data, name: "Linked package", sections, services: [] };
+  await read(
+    await call("/admin/packages", "POST", content, customerCookie),
+    403,
+  );
+  for (const bad of [
+    { ...widget, serviceId: null },
+    { ...widget, markdown: "bad" },
+    { ...widget, autoplay: true },
+    { ...widget, type: "markdown", markdown: "bad" },
+    { ...widget, serviceId: randomUUID() },
+  ]) {
+    await read(
+      await call(
+        "/admin/packages",
+        "POST",
+        { ...content, sections: [{ ...sections[0], widgets: [bad] }] },
+        adminCookie,
+      ),
+      400,
+    );
+  }
+  const pkg = await read(
+    await call("/admin/packages", "POST", content, adminCookie),
+    201,
+  );
+  const stored = await pool.query("select canvas from packages where id = $1", [
+    pkg.id,
+  ]);
+  assert.equal(stored.rows[0].canvas[0].widgets[0].serviceId, service.id);
+  assert.equal("service" in stored.rows[0].canvas[0].widgets[0], false);
+  const chunks = await pool.query(
+    "select chunk_key, content_markdown, media_id from catalog_knowledge where package_id = $1",
+    [pkg.id],
+  );
+  const serviceChunk = chunks.rows.find(
+    (row) => row.chunk_key === `service:${widget.id}`,
+  );
+  assert.match(serviceChunk.content_markdown, /Our recommendation/);
+  assert.doesNotMatch(serviceChunk.content_markdown, /Forged|Linked service/);
+  assert.equal(serviceChunk.media_id, null);
+  const publicPackage = await read(await call(`/packages/${pkg.id}`), 200);
+  assert.equal(
+    publicPackage.sections[0].widgets[0].service.name,
+    "Linked service",
+  );
+  assert.equal(
+    publicPackage.sections[0].widgets[0].service.imageUrl,
+    "/images/wedding.jpg",
+  );
+  await read(
+    await call(
+      `/admin/services/${service.id}`,
+      "DELETE",
+      undefined,
+      adminCookie,
+    ),
+    409,
+  );
+  const other = await read(
+    await call(
+      "/admin/services",
+      "POST",
+      {
+        ...serviceInput,
+        name: "Service owner",
+        sections: [data.sections[0], sections[0]],
+      },
+      adminCookie,
+    ),
+    201,
+  );
+  await read(
+    await call(`/admin/packages/${pkg.id}`, "DELETE", undefined, adminCookie),
+    204,
+  );
+  await read(
+    await call(
+      `/admin/services/${service.id}`,
+      "DELETE",
+      undefined,
+      adminCookie,
+    ),
+    409,
+  );
+  await read(
+    await call(`/admin/services/${other.id}`, "DELETE", undefined, adminCookie),
+    204,
+  );
+  const replacement = await read(
+    await call("/admin/packages", "POST", content, adminCookie),
+    201,
+  );
+  const renamed = await read(
+    await call(
+      `/admin/services/${service.id}`,
+      "PATCH",
+      {
+        ...serviceInput,
+        name: "Renamed service",
+        expectedUpdatedAt: service.updatedAt,
+      },
+      adminCookie,
+    ),
+    200,
+  );
+  assert.equal(
+    (await read(await call(`/packages/${replacement.id}`), 200)).sections[0]
+      .widgets[0].service.name,
+    "Renamed service",
+  );
+  await read(
+    await call(
+      `/admin/services/${service.id}/archive`,
+      "POST",
+      undefined,
+      adminCookie,
+    ),
+    200,
+  );
+  const unavailable = await read(
+    await call(`/packages/${replacement.id}`),
+    200,
+  );
+  assert.equal(unavailable.sections[0].widgets[0].service, null);
+  await read(
+    await call(
+      `/admin/packages/${replacement.id}`,
+      "PATCH",
+      { ...content, expectedUpdatedAt: replacement.updatedAt },
+      adminCookie,
+    ),
+    200,
+  );
+  await read(
+    await call(
+      "/admin/packages",
+      "POST",
+      { ...content, name: "New link" },
+      adminCookie,
+    ),
+    400,
+  );
+  assert.ok(renamed.id);
 });

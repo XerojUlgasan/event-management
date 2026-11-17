@@ -96,7 +96,8 @@ export function CustomerEventTimeline({
                               {item.eventType}
                             </p>
                             <h3 id={`event-title-${item.id}`}>
-                              {item.packageName}
+                              {item.packageName ??
+                                "No catalog package selected"}
                             </h3>
                           </div>
                           <BookingStatusBadge status={item.status} />

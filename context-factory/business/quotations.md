@@ -11,8 +11,8 @@ This reference describes intended business behavior. The [current implementation
 
 ## Main workflow and handoffs
 
-1. The customer submits a [booking request](booking-requests.md). Its linked [conversation](messages.md) gives the customer and admin a place to discuss requirements.
-2. The admin prepares the proposal using the selected catalog package or a private custom package for that booking. A private package can be tailored without changing the public catalog.
+1. The customer submits a [booking request](booking-requests.md), with or without an initial package. Its linked [conversation](messages.md) gives the customer and admin a place to discuss requirements.
+2. The admin prepares the proposal using a selected catalog package or a private custom package for that booking. A private package can be built from scratch or tailored from a catalog package without changing the public catalog. Requests without a package must have one prepared before quotation creation.
 3. The admin creates a quotation draft from the current proposal price and enters any manual additions or deductions. Clemora calculates the total; a package-only offer is also valid.
 4. The admin saves and sends the offer. The customer can review that exact version from the booking details or its message in the linked conversation.
 5. The customer responds through chat. A reply records the conversation without changing quotation status or creating a draft. When a new offer is needed, the admin starts a revision with a reason. Starting it immediately marks the previous offer as superseded; it remains in history.

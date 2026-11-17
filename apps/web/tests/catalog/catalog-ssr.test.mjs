@@ -10,7 +10,7 @@ import { join } from "node:path";
 
 // Vite processes the real TSX and its CSS imports, as the Astro SSR build does.
 const root = fileURLToPath(new URL("../../", import.meta.url));
-let server, cacheDir, canvas, publicDetails, publicPackage, ui;
+let server, cacheDir, canvas, publicDetails, publicPackage, ui, scrollLock;
 before(async () => {
   cacheDir = await mkdtemp(join(tmpdir(), "clemora-catalog-ssr-"));
   server = await createServer({
@@ -26,6 +26,9 @@ before(async () => {
     },
     logLevel: "silent",
   });
+  scrollLock = await server.ssrLoadModule(
+    "/src/components/catalog/catalog-scroll-lock.ts",
+  );
   canvas = await server.ssrLoadModule(
     "/src/components/catalog/CatalogContent.tsx",
   );
@@ -270,4 +273,112 @@ test("an editor media chooser retains the shared caption", () => {
   assert.match(html, /<button[^>]*>Choose photo<\/button>/);
   assert.match(html, /Photo caption/);
   assert.doesNotMatch(html, /<img/);
+});
+
+const serviceWidget = {
+  ...photo,
+  id: "service-widget",
+  type: "service",
+  media: null,
+  caption: "Ask us about a photo booth for your event.",
+  serviceId: "photo-booth",
+  service: {
+    id: "photo-booth",
+    slug: "photo-booth",
+    name: "Photo booth",
+    description: "Portraits for your guests",
+    imageUrl: "/images/wedding.jpg",
+  },
+};
+test("linked service cards render on public and private canvases without prices or inclusion claims", () => {
+  const item = {
+    ...packageItem,
+    services: [],
+    sections: [
+      { id: "linked-services", title: "Explore", widgets: [serviceWidget] },
+    ],
+  };
+  for (const html of [
+    render(publicPackage.PublicPackageDetail, { item }),
+    render(canvas.PackageCanvas, { item, hideServices: true }),
+    render(canvas.ServiceCanvas, {
+      item: { ...service, sections: item.sections },
+    }),
+  ]) {
+    assert.match(html, /Photo booth/);
+    assert.match(html, /Portraits for your guests/);
+    assert.match(html, /href="\/services\/photo-booth"/);
+    assert.match(html, /Ask us about a photo booth for your event/);
+    assert.match(html, /src="\/images\/wedding.jpg"/);
+    assert.doesNotMatch(html, /Included|Optional|additional charge/);
+  }
+  const card = render(ui.CatalogWidgetContent, { widget: serviceWidget });
+  assert.doesNotMatch(card, /₱|PHP|hour|rate|price/i);
+});
+
+test("service card uses one whole-card action for public and workspace contexts", () => {
+  const publicCard = render(ui.CatalogWidgetContent, { widget: serviceWidget });
+  assert.match(
+    publicCard,
+    /<a\b[^>]*href="\/services\/photo-booth"[^>]*>[\s\S]*<img[\s\S]*Photo booth[\s\S]*Portraits for your guests[\s\S]*Ask us about[\s\S]*<\/a>/,
+  );
+  assert.equal((publicCard.match(/<a\b/g) ?? []).length, 1);
+  const workspaceCard = render(ui.CatalogWidgetContent, {
+    widget: serviceWidget,
+    onOpenService: () => {},
+  });
+  assert.match(
+    workspaceCard,
+    /<button\b[^>]*type="button"[^>]*>[\s\S]*<img[\s\S]*Photo booth[\s\S]*Ask us about[\s\S]*<\/button>/,
+  );
+  assert.doesNotMatch(workspaceCard, /<a\b/);
+});
+
+test("service editor content has no nested link and preserves captions and unavailable states", () => {
+  const html = render(ui.CatalogWidgetContent, {
+    widget: serviceWidget,
+    editor: true,
+  });
+  assert.match(html, /Photo booth/);
+  assert.match(html, /Ask us about/);
+  assert.doesNotMatch(html, /<a\b|<button\b/);
+  const unavailable = render(ui.CatalogWidgetContent, {
+    widget: { ...serviceWidget, service: null },
+  });
+  assert.match(unavailable, /This service is unavailable/);
+  assert.doesNotMatch(unavailable, /Photo booth|<a\b|<button\b|<img\b/);
+  const empty = render(ui.CatalogWidgetContent, {
+    widget: { ...serviceWidget, service: null, serviceId: null },
+    editor: true,
+    servicePlaceholder: createElement(
+      "button",
+      { type: "button" },
+      "Choose a service",
+    ),
+  });
+  assert.match(empty, /<button[^>]*>Choose a service<\/button>/);
+  assert.match(empty, /Ask us about/);
+});
+
+test("stacked catalog scroll locks restore the original overflow in either close order", () => {
+  const originalDocument = globalThis.document;
+  globalThis.document = { body: { style: { overflow: "auto" } } };
+  try {
+    const releaseParent = scrollLock.lockCatalogScroll();
+    const releaseChild = scrollLock.lockCatalogScroll();
+    releaseParent();
+    assert.equal(document.body.style.overflow, "hidden");
+    releaseChild();
+    assert.equal(document.body.style.overflow, "auto");
+    releaseChild();
+    const releaseFirst = scrollLock.lockCatalogScroll();
+    const releaseSecond = scrollLock.lockCatalogScroll();
+    releaseSecond();
+    assert.equal(document.body.style.overflow, "hidden");
+    releaseFirst();
+    assert.equal(document.body.style.overflow, "auto");
+  } finally {
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
+  }
 });

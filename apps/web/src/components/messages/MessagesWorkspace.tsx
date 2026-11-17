@@ -22,6 +22,7 @@ import type {
   ChatConversation,
   ChatMessage,
 } from "../../lib/data/messages/conversations";
+import { ConversationBooking } from "../booking-requests/ConversationBooking";
 import { Quotations } from "../quotations/Quotations";
 import {
   ConversationContext,
@@ -90,7 +91,13 @@ export function MessagesWorkspace({
   olderError = "",
   onLoadOlder,
   historyNotice = "",
+  resumeBooking = false,
+  onBookingSubmitted,
+  onBookingClosed,
 }: {
+  resumeBooking?: boolean;
+  onBookingSubmitted?: () => void;
+  onBookingClosed?: () => void;
   title: string;
   viewerRole: "admin" | "customer";
   conversations: ChatConversation[];
@@ -175,6 +182,18 @@ export function MessagesWorkspace({
         : "Choose a conversation to reply");
   const avatar =
     active && !isTeam ? initialsFromName(active.customerName) : "CT";
+  const [bookingConversationId, setBookingConversationId] = useState<
+    string | null
+  >(null);
+  useEffect(() => {
+    if (
+      resumeBooking &&
+      active?.id &&
+      !active.bookingRequestId &&
+      active.status === "active"
+    )
+      setBookingConversationId(active.id);
+  }, [resumeBooking, active?.id, active?.bookingRequestId, active?.status]);
   const closedBookingForCustomer =
     isTeam && active?.status === "closed" && !!active.bookingRequestId;
   const closedForCustomer =
@@ -524,6 +543,17 @@ export function MessagesWorkspace({
               </Button>
             </div>
           )}
+          {viewerRole === "customer" &&
+            active &&
+            !active.bookingRequestId &&
+            active.status === "active" && (
+              <Button
+                variant="secondary"
+                onClick={() => setBookingConversationId(active.id)}
+              >
+                Create booking request
+              </Button>
+            )}
           {active?.bookingRequestId && (
             <div
               className="message-head-actions"
@@ -797,6 +827,16 @@ export function MessagesWorkspace({
             admin={!isTeam}
           />
         </Dialog>
+      )}
+      {bookingConversationId && bookingConversationId === active?.id && (
+        <ConversationBooking
+          conversationId={bookingConversationId}
+          onClose={() => {
+            setBookingConversationId(null);
+            onBookingClosed?.();
+          }}
+          onSubmitted={() => onBookingSubmitted?.()}
+        />
       )}
       {context?.conversationId === activeId && active?.bookingRequestId && (
         <ConversationContext

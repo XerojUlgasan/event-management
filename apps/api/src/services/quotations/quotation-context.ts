@@ -24,7 +24,7 @@ type Quote = Selectable<Quotations> & { revision: string };
 const iso = (v: Date | null) => v?.toISOString() ?? null;
 export async function proposalPackage(trx: Transaction<DB>, booking: Booking) {
   const resolved = await resolveBookingPackageData(trx, booking);
-  if (!resolved) throw new Error("Linked package not found");
+  if (!resolved) return null;
   const pkg = await lockAnyPackageData(trx, resolved.id);
   if (!pkg) throw new Error("Linked package not found");
   return pkg;

@@ -9,7 +9,9 @@ import {
 export function PackageDetailsFields({
   content,
   onChange,
+  privateProposal = false,
 }: {
+  privateProposal?: boolean;
   content: PackageContent;
   onChange: (content: PackageContent) => void;
 }) {
@@ -17,8 +19,12 @@ export function PackageDetailsFields({
     <div className="form-grid">
       <FormField
         className="full"
-        label="Catalog description"
-        description="Optional. A short introduction for the catalog card."
+        label={privateProposal ? "Package description" : "Catalog description"}
+        description={
+          privateProposal
+            ? "Optional. A short introduction for this package."
+            : "Optional. A short introduction for the catalog card."
+        }
       >
         {(field) => (
           <Textarea

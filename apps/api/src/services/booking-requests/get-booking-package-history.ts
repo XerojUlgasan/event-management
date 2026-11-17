@@ -34,7 +34,7 @@ export async function getBookingPackageHistoryService(
   return {
     history: page.items.map((row) => {
       const metadata = z
-        .object({ before: publicSchema, after: publicSchema })
+        .object({ before: publicSchema.nullable(), after: publicSchema })
         .parse(row.metadata);
       return {
         id: row.id,

@@ -11,9 +11,16 @@ export type CatalogMedia = {
   url: string;
   mimeType?: string;
 };
+export type CatalogServicePreview = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  imageUrl: string | null;
+};
 export type CatalogWidget = {
   id: string;
-  type: "photo" | "markdown" | "video";
+  type: "photo" | "markdown" | "video" | "service";
   x: number;
   y: number;
   w: number;
@@ -23,6 +30,8 @@ export type CatalogWidget = {
   alt: string;
   caption: string;
   autoplay: boolean;
+  serviceId?: string | null;
+  service?: CatalogServicePreview | null;
 };
 export type CatalogSection = {
   id: string;

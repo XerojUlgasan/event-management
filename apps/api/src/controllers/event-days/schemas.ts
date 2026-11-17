@@ -13,7 +13,7 @@ export const dto = z.object({
   id,
   bookingRequestId: id,
   bookingReference: z.string(),
-  packageName: z.string(),
+  packageName: z.string().nullable(),
   eventType: z.string(),
   timezone: z.string(),
   day: z.string(),

@@ -4,7 +4,7 @@ export type EventDay = {
   id: string;
   bookingRequestId: string;
   bookingReference: string;
-  packageName: string;
+  packageName: string | null;
   eventType: string;
   timezone: string;
   day: string;

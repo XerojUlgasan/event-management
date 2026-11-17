@@ -1,3 +1,4 @@
+import { lockCatalogScroll } from "./catalog-scroll-lock";
 import { Button, NativeDialog } from "@event-management/ui";
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
@@ -16,13 +17,12 @@ export function CatalogDetailPreview({
   useEffect(() => {
     const dialog = dialogRef.current;
     const trigger = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
+    const unlockScroll = lockCatalogScroll();
     dialog?.showModal();
-    document.body.style.overflow = "hidden";
     dialog?.querySelector<HTMLButtonElement>("button")?.focus();
     return () => {
       dialog?.close();
-      document.body.style.overflow = overflow;
+      unlockScroll();
       trigger?.focus();
     };
   }, []);
@@ -33,6 +33,7 @@ export function CatalogDetailPreview({
       aria-label={title}
       onCancel={(event) => {
         event.preventDefault();
+        event.stopPropagation();
         onClose();
       }}
     >

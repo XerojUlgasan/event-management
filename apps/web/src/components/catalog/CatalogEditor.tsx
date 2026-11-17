@@ -1,3 +1,4 @@
+import { lockCatalogScroll } from "./catalog-scroll-lock";
 import {
   Button,
   Icon,
@@ -41,6 +42,7 @@ import {
 } from "../../lib/services/catalog/save-catalog-media";
 import { WidgetContent } from "./CatalogContent";
 import { PackageMediaSettings } from "./PackageMediaSettings";
+import { CatalogServicePickerDialog } from "./CatalogServicePickerDialog";
 import "react-grid-layout/css/styles.css";
 import "../../styles/catalog/package-editor.css";
 
@@ -202,6 +204,7 @@ export function CatalogEditor<T extends CanvasContent>({
   renderPreview,
   saveLabel = "Save changes",
   nameMaxLength = MAX_CATALOG_TEXT_LENGTH,
+  privateProposal = false,
 }: {
   initial: T;
   entity: "package" | "service";
@@ -216,9 +219,12 @@ export function CatalogEditor<T extends CanvasContent>({
   renderPreview: (content: T, mode: "customer" | "card") => ReactNode;
   nameMaxLength?: number;
   saveLabel?: string;
+  privateProposal?: boolean;
 }) {
   const { notify, notifyError } = useNotifications();
-  const title = entity[0].toUpperCase() + entity.slice(1);
+  const title = privateProposal
+    ? "Private package"
+    : entity[0].toUpperCase() + entity.slice(1);
   const [content, setContentState] = useState<T>(() =>
     structuredClone(initial),
   );
@@ -236,6 +242,10 @@ export function CatalogEditor<T extends CanvasContent>({
     [canRedo, setCanRedo] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [markdownEditing, setMarkdownEditing] = useState<{
+    sectionId: string;
+    widgetId: string;
+  } | null>(null);
+  const [serviceEditing, setServiceEditing] = useState<{
     sectionId: string;
     widgetId: string;
   } | null>(null);
@@ -352,6 +362,11 @@ export function CatalogEditor<T extends CanvasContent>({
     displayContent.sections
       .find((s) => s.id === mediaEditing.sectionId)
       ?.widgets.find((w) => w.id === mediaEditing.widgetId);
+  const editingService =
+    serviceEditing &&
+    displayContent.sections
+      .find((s) => s.id === serviceEditing.sectionId)
+      ?.widgets.find((w) => w.id === serviceEditing.widgetId);
   const editingMarkdown =
     markdownEditing &&
     displayContent.sections
@@ -524,13 +539,12 @@ export function CatalogEditor<T extends CanvasContent>({
   };
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlockScroll = lockCatalogScroll();
     dialogRef.current?.showModal();
     document.querySelector<HTMLInputElement>(".pe-name input")?.focus();
     return () => {
       dialogRef.current?.close();
-      document.body.style.overflow = previousOverflow;
+      unlockScroll();
       trigger?.focus();
     };
   }, []);
@@ -715,14 +729,14 @@ export function CatalogEditor<T extends CanvasContent>({
                 aria-pressed={mode === "customer"}
                 onClick={() => setMode("customer")}
               >
-                Customer page
+                {privateProposal ? "Package preview" : "Customer page"}
               </Button>
               <Button
                 variant="secondary"
                 aria-pressed={mode === "card"}
                 onClick={() => setMode("card")}
               >
-                Admin card
+                {privateProposal ? "Package card" : "Admin card"}
               </Button>
             </div>
             {renderPreview(displayContent, mode)}
@@ -751,7 +765,7 @@ export function CatalogEditor<T extends CanvasContent>({
                   </Select>
                 </label>
               )}
-              {(["photo", "markdown", "video"] as const).map((t) => (
+              {(["photo", "markdown", "video", "service"] as const).map((t) => (
                 <Button
                   variant="secondary"
                   key={t}
@@ -784,7 +798,17 @@ export function CatalogEditor<T extends CanvasContent>({
                       }));
                   }}
                 >
-                  <b>{t === "photo" ? "▧" : t === "markdown" ? "T" : "▷"}</b>
+                  <b>
+                    {t === "photo" ? (
+                      "▧"
+                    ) : t === "markdown" ? (
+                      "T"
+                    ) : t === "video" ? (
+                      "▷"
+                    ) : (
+                      <Icon name="box" size={18} />
+                    )}
+                  </b>
                   <span>
                     <strong>
                       {t === "markdown"
@@ -796,7 +820,9 @@ export function CatalogEditor<T extends CanvasContent>({
                         ? "Set the scene"
                         : t === "markdown"
                           ? "Share the details"
-                          : "Bring it to life"}
+                          : t === "video"
+                            ? "Bring it to life"
+                            : "Feature a service"}
                     </small>
                   </span>
                 </Button>
@@ -1030,7 +1056,7 @@ export function CatalogEditor<T extends CanvasContent>({
                                   </Button>
                                 </span>
                               )}
-                              {w.type !== "markdown" && (
+                              {(w.type === "photo" || w.type === "video") && (
                                 <Button
                                   variant="plain"
                                   className="pe-widget-settings"
@@ -1081,6 +1107,26 @@ export function CatalogEditor<T extends CanvasContent>({
                             <div className="pe-widget-body">
                               {w.type === "markdown" ? (
                                 <WidgetContent widget={w} editor />
+                              ) : w.type === "service" ? (
+                                <Button
+                                  variant="plain"
+                                  type="button"
+                                  className="pe-service-widget-button"
+                                  aria-label={
+                                    w.serviceId
+                                      ? "Change featured service"
+                                      : "Choose a service"
+                                  }
+                                  aria-haspopup="dialog"
+                                  onClick={() =>
+                                    setServiceEditing({
+                                      sectionId: section.id,
+                                      widgetId: w.id,
+                                    })
+                                  }
+                                >
+                                  <WidgetContent widget={w} editor />
+                                </Button>
                               ) : (
                                 <MediaWidget
                                   widget={
@@ -1146,6 +1192,31 @@ export function CatalogEditor<T extends CanvasContent>({
             selectFile(mediaEditing.sectionId, editingMedia, file)
           }
           onClose={() => setMediaEditing(null)}
+        />
+      )}
+      {serviceEditing && editingService && (
+        <CatalogServicePickerDialog
+          selectedId={editingService.serviceId}
+          caption={editingService.caption}
+          onCaptionChange={(caption) =>
+            changeWidget(serviceEditing.sectionId, editingService.id, {
+              caption,
+            })
+          }
+          onSelect={(service) => {
+            changeWidget(serviceEditing.sectionId, editingService.id, {
+              serviceId: service.id,
+              service: {
+                id: service.id,
+                slug: service.slug,
+                name: service.name,
+                description: service.description,
+                imageUrl: service.imageUrl,
+              },
+            });
+            setServiceEditing(null);
+          }}
+          onClose={() => setServiceEditing(null)}
         />
       )}
       {markdownEditing && editingMarkdown && (

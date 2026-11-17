@@ -28,7 +28,7 @@ import { adminBookingRequestPath, customerPaths } from "../app/routes";
 export type ConversationContextView = "details" | "package" | "quotation";
 type Content =
   | { kind: "details"; booking: BookingRequest }
-  | { kind: "package"; package: CatalogPackage }
+  | { kind: "package"; package: CatalogPackage | null }
   | { kind: "quotation"; quotation: Quotation | null };
 
 function EventDetails({
@@ -185,6 +185,12 @@ export function ConversationContext({
     };
   }, [bookingId, admin, view, attempt, notifyError]);
   const retry = () => setAttempt((value) => value + 1);
+  if (view === "package" && content?.kind === "package" && !content.package)
+    return (
+      <Dialog title="Current package" onClose={onClose}>
+        <p>Package to be prepared. Amount to be discussed.</p>
+      </Dialog>
+    );
   if (view === "package")
     return (
       <PackagePreview

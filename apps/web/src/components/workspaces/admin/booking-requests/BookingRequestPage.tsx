@@ -22,6 +22,7 @@ import {
   updateBookingRequestStatus,
   type BookingRequest,
 } from "../../../../lib/data/booking-requests/requests";
+import { getBookingPackage } from "../../../../lib/data/booking-requests/packages";
 import { ApiError } from "../../../../lib/http/request";
 import { durationLabel } from "../../../../lib/utils/booking-requests/duration";
 import {
@@ -169,6 +170,43 @@ function RequestStatusForm({
   );
 }
 
+function BookingQuotations({ bookingId }: { bookingId: string }) {
+  const [state, setState] = useState<"loading" | "ready" | "missing" | "error">(
+    "loading",
+  );
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setState("loading");
+    void getBookingPackage(bookingId, true)
+      .then((result) => {
+        if (active) setState(result.package ? "ready" : "missing");
+      })
+      .catch(() => {
+        if (active) setState("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, [bookingId, attempt]);
+  if (state === "loading") return <p role="status">Checking package…</p>;
+  if (state === "error")
+    return (
+      <p role="alert">
+        Unable to load the current package.{" "}
+        <Button
+          variant="secondary"
+          onClick={() => setAttempt((value) => value + 1)}
+        >
+          Retry
+        </Button>
+      </p>
+    );
+  if (state === "missing")
+    return <p>Prepare or choose a package before creating a quotation.</p>;
+  return <Quotations bookingId={bookingId} admin />;
+}
+
 export function BookingRequestPage({
   bookingRequestId,
 }: {
@@ -291,7 +329,7 @@ export function BookingRequestPage({
           <div className="booking-request-heading">
             <PageHeader
               title={`Booking request ${item.reference}`}
-              description={`${item.eventType} · ${item.packageName}`}
+              description={`${item.eventType} · ${item.packageName ?? "No catalog package selected"}`}
             />
             <BookingStatusBadge status={item.status} />
           </div>
@@ -366,14 +404,20 @@ export function BookingRequestPage({
                       <dd>{item.eventType}</dd>
                     </div>
                     <div>
-                      <dt>Original inquiry package</dt>
+                      <dt>Catalog package</dt>
                       <dd>
-                        {item.packageName} ·{" "}
-                        {new Intl.NumberFormat("en-PH", {
-                          style: "currency",
-                          currency: "PHP",
-                        }).format(item.packagePrice.amountMinor / 100)}{" "}
-                        · up to {item.packageMaxGuests} guests
+                        {item.packageName && item.packagePrice ? (
+                          <>
+                            {item.packageName} ·{" "}
+                            {new Intl.NumberFormat("en-PH", {
+                              style: "currency",
+                              currency: "PHP",
+                            }).format(item.packagePrice.amountMinor / 100)}{" "}
+                            · up to {item.packageMaxGuests} guests
+                          </>
+                        ) : (
+                          "No catalog package selected · Amount to be discussed"
+                        )}
                       </dd>
                     </div>
                     {item.requestedDays ? (
@@ -502,7 +546,10 @@ export function BookingRequestPage({
                 id={item.id}
                 admin
                 editable={!["declined", "cancelled"].includes(item.status)}
-                onChanged={() => setProposalRevision((value) => value + 1)}
+                onChanged={() => {
+                  setProposalRevision((value) => value + 1);
+                  refreshWithNotice("Unable to refresh the booking.");
+                }}
               />
             </div>
           )}
@@ -513,10 +560,9 @@ export function BookingRequestPage({
               tabIndex={0}
               aria-labelledby="booking-tab-quotation"
             >
-              <Quotations
+              <BookingQuotations
                 key={`${item.id}:${proposalRevision}`}
                 bookingId={item.id}
-                admin
               />
             </div>
           )}

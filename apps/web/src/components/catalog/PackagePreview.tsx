@@ -1,3 +1,4 @@
+import { lockCatalogScroll } from "./catalog-scroll-lock";
 import {
   Badge,
   Button,
@@ -36,12 +37,11 @@ export function PackagePreview({
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
     const dialog = dialogRef.current;
-    const overflow = document.body.style.overflow;
+    const unlockScroll = lockCatalogScroll();
     dialog?.showModal();
-    document.body.style.overflow = "hidden";
     return () => {
       dialog?.close();
-      document.body.style.overflow = overflow;
+      unlockScroll();
       trigger?.focus();
     };
   }, []);

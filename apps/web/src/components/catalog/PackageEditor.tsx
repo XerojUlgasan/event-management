@@ -111,6 +111,7 @@ export function PackageEditor({
     return (
       <CatalogCreateDialog
         entity="package"
+        privateProposal={!!saveCustom}
         initial={draft}
         onClose={onClose}
         onContinue={(content) => {
@@ -119,7 +120,11 @@ export function PackageEditor({
         }}
         validate={validatePackageDetails}
         renderDetails={(content, setContent) => (
-          <PackageDetailsFields content={content} onChange={setContent} />
+          <PackageDetailsFields
+            content={content}
+            onChange={setContent}
+            privateProposal={!!saveCustom}
+          />
         )}
       />
     );
@@ -142,6 +147,8 @@ export function PackageEditor({
           : draft
       }
       entity="package"
+      privateProposal={!!saveCustom}
+      saveLabel={saveCustom ? "Save private package" : undefined}
       onClose={onClose}
       onSaved={onSaved}
       validate={validatePackageDetails}
@@ -290,23 +297,29 @@ export function PackageEditor({
               )}
             </fieldset>
           )}
-          <PackageDetailsFields content={content} onChange={setContent} />
+          <PackageDetailsFields
+            content={content}
+            onChange={setContent}
+            privateProposal={!!saveCustom}
+          />
         </>
       )}
       renderPreview={(content, mode) =>
         mode === "customer" ? (
           <PackageCanvas
             bookingAction={
-              <Button
-                onClick={() =>
-                  notify(
-                    "Booking is available after saving and opening the package.",
-                    "info",
-                  )
-                }
-              >
-                Book now
-              </Button>
+              !saveCustom ? (
+                <Button
+                  onClick={() =>
+                    notify(
+                      "Booking is available after saving and opening the package.",
+                      "info",
+                    )
+                  }
+                >
+                  Book now
+                </Button>
+              ) : undefined
             }
             item={{
               ...content,

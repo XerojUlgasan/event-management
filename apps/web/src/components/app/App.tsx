@@ -11,6 +11,7 @@ import {
 import { AdminShell } from "../workspaces/admin/AdminShell";
 import { AuthPage } from "../auth/AuthPage";
 import { CustomerDashboard } from "../workspaces/customer/CustomerDashboard";
+import { ServiceNavigationProvider } from "../catalog/ServiceNavigationProvider";
 import {
   adminBookingRequestId,
   adminKey,
@@ -106,7 +107,7 @@ function Workspace({
         .then(({ conversationId }) => {
           if (active)
             window.location.replace(
-              `/app/messages?conversation=${encodeURIComponent(conversationId)}`,
+              `/app/messages?conversation=${encodeURIComponent(conversationId)}${new URLSearchParams(search).get("createRequest") === "1" ? "&createRequest=1" : ""}`,
             );
         })
         .catch(() => {
@@ -201,7 +202,7 @@ function Workspace({
                 void signOut()
                   .then(() =>
                     window.location.assign(
-                      `/login?guest=${encodeURIComponent(guestId)}`,
+                      `/login?guest=${encodeURIComponent(guestId)}${new URLSearchParams(search).get("createRequest") === "1" ? "&createRequest=1" : ""}`,
                     ),
                   )
                   .catch(() => {});
@@ -231,26 +232,34 @@ function Workspace({
   if (isSystemAdmin(profile)) {
     const active = adminKey(path);
     return active ? (
-      <AdminShell
+      <ServiceNavigationProvider
         key={`${profile.id}:${profile.role}`}
-        profile={profile}
-        active={active}
-        bookingRequestId={adminBookingRequestId(path) ?? undefined}
-        onSignOut={handleSignOut}
-      />
+        route={`${path}${search}`}
+      >
+        <AdminShell
+          profile={profile}
+          active={active}
+          bookingRequestId={adminBookingRequestId(path) ?? undefined}
+          onSignOut={handleSignOut}
+        />
+      </ServiceNavigationProvider>
     ) : null;
   }
   return (
-    <CustomerDashboard
+    <ServiceNavigationProvider
       key={`${profile.id}:${profile.role}`}
-      path={path}
-      search={search}
-      onPublic={() => {
-        window.location.assign("/");
-      }}
-      userName={profile.displayName ?? profile.email}
-      userEmail={profile.email}
-      onSignOut={handleSignOut}
-    />
+      route={`${path}${search}`}
+    >
+      <CustomerDashboard
+        path={path}
+        search={search}
+        onPublic={() => {
+          window.location.assign("/");
+        }}
+        userName={profile.displayName ?? profile.email}
+        userEmail={profile.email}
+        onSignOut={handleSignOut}
+      />
+    </ServiceNavigationProvider>
   );
 }

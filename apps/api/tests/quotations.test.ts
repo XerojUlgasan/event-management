@@ -118,7 +118,7 @@ async function read(response: Response, status: number): Promise<any> {
   assert.equal(response.status, status, await response.clone().text());
   return response.json();
 }
-async function booking(selectedPackageId = packageId) {
+async function booking(selectedPackageId: string | null = packageId) {
   const id = randomUUID();
   await db
     .insertInto("booking_requests")
@@ -1187,4 +1187,112 @@ test("quotation and package histories paginate independently without losing curr
     400,
   );
   await read(await call(historyBase, "GET", undefined, customerCookie), 403);
+});
+
+test("package-less inquiries require a proposal and support private custom packages", async () => {
+  const b = await booking(null);
+  assert.equal(b.packageId, null);
+  assert.equal(
+    (
+      await call(`/admin/booking-requests/${b.id}/quotations`, "POST", {
+        expectedUpdatedAt: b.updatedAt,
+      })
+    ).status,
+    409,
+  );
+  assert.deepEqual(
+    (await read(await call(`/admin/booking-requests/${b.id}/quotations`), 200))
+      .quotations,
+    [],
+  );
+  const result = await read(
+    await call(`/admin/booking-requests/${b.id}/custom-package`, "POST", {
+      name: "Private proposal",
+      description: "Custom",
+      maxGuests: 50,
+      price: { kind: "fixed", currency: "PHP", amountMinor: 100000 },
+      sections: [],
+      services: [],
+      expectedBookingUpdatedAt: b.updatedAt,
+    }),
+    200,
+  );
+  assert.equal(result.bookingRequest.packageId, null);
+  assert.equal(result.package.packageType, "custom");
+  assert.equal(
+    (
+      await call(
+        `/packages/${result.package.id}`,
+        "GET",
+        undefined,
+        customerCookie,
+      )
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await call(
+        `/booking-requests/${b.id}/package`,
+        "GET",
+        undefined,
+        otherCookie,
+      )
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await call(`/admin/booking-requests/${b.id}/package`, "POST", {
+        packageId,
+        expectedBookingUpdatedAt: result.bookingRequest.updatedAt,
+      })
+    ).status,
+    409,
+  );
+  const history = await read(
+    await call(`/admin/booking-requests/${b.id}/package-history`),
+    200,
+  );
+  assert.equal(history.history[0].before, null);
+  await create(result.bookingRequest);
+});
+
+test("catalog attachment and scratch proposal serialize on the same inquiry", async () => {
+  const b = await booking(null);
+  const [catalog, custom] = await Promise.all([
+    call(`/admin/booking-requests/${b.id}/package`, "POST", {
+      packageId,
+      expectedBookingUpdatedAt: b.updatedAt,
+    }),
+    call(`/admin/booking-requests/${b.id}/custom-package`, "POST", {
+      name: "Concurrent proposal",
+      maxGuests: 50,
+      price: { kind: "fixed", currency: "PHP", amountMinor: 100000 },
+      sections: [],
+      services: [],
+      expectedBookingUpdatedAt: b.updatedAt,
+    }),
+  ]);
+  assert.deepEqual([catalog.status, custom.status].sort(), [200, 409]);
+  const row = await db
+    .selectFrom("booking_requests")
+    .select("package_id")
+    .where("id", "=", b.id)
+    .executeTakeFirstOrThrow();
+  const privatePackages = await db
+    .selectFrom("packages")
+    .select("id")
+    .where("custom_for_booking_request_id", "=", b.id)
+    .execute();
+  assert.equal(row.package_id === packageId, catalog.status === 200);
+  assert.equal(privatePackages.length, custom.status === 200 ? 1 : 0);
+  const current = await read(
+    await call(`/admin/booking-requests/${b.id}/package`),
+    200,
+  );
+  assert.equal(
+    current.package.id,
+    catalog.status === 200 ? packageId : privatePackages[0].id,
+  );
 });

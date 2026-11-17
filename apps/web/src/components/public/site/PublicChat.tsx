@@ -1,4 +1,4 @@
-import { Button, Icon, Textarea } from "@event-management/ui";
+import { ActionLink, Button, Icon, Textarea } from "@event-management/ui";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getMe } from "../../../lib/data/auth/session";
@@ -418,6 +418,15 @@ export default function PublicChat() {
             )}
             {!loading && !admin && thread && (
               <>
+                {!expired && (
+                  <p>
+                    <ActionLink
+                      href={`/login?guest=${encodeURIComponent(thread.conversation.id)}&createRequest=1`}
+                    >
+                      Create booking request
+                    </ActionLink>
+                  </p>
+                )}
                 {thread.nextCursor && (
                   <Button
                     variant="link"
