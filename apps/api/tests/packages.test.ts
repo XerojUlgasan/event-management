@@ -17,6 +17,10 @@ let otherCustomerCookie: string;
 let customerCookie: string;
 let storageServer: Server;
 let failStorageDeletes = false;
+let failStorageWrites = false;
+let missingStorageGetAs400 = false;
+let beforeStorageGet:
+  { path: string; callback: () => Promise<void> } | undefined;
 const storedImages = new Map<string, { bytes: Buffer; contentType: string }>();
 
 before(async () => {
@@ -50,6 +54,19 @@ before(async () => {
     if (req.method === "POST" || req.method === "PUT") {
       const chunks: Buffer[] = [];
       for await (const chunk of req) chunks.push(Buffer.from(chunk));
+      if (failStorageWrites) {
+        res.statusCode = 503;
+        res.end();
+        return;
+      }
+      if (
+        storedImages.has(path) &&
+        String(req.headers["x-upsert"]).toLowerCase() !== "true"
+      ) {
+        res.statusCode = 409;
+        res.end();
+        return;
+      }
       storedImages.set(path, {
         bytes: Buffer.concat(chunks),
         contentType: String(req.headers["content-type"]),
@@ -78,10 +95,21 @@ before(async () => {
         res.end();
       }
     } else {
+      if (beforeStorageGet?.path === path) {
+        const callback = beforeStorageGet.callback;
+        beforeStorageGet = undefined;
+        await callback();
+      }
       const image = storedImages.get(path);
       if (!image) {
-        res.statusCode = 404;
-        res.end();
+        if (missingStorageGetAs400) {
+          res.statusCode = 400;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ code: "NoSuchKey", statusCode: "404" }));
+        } else {
+          res.statusCode = 404;
+          res.end();
+        }
       } else {
         res.setHeader("Content-Type", image.contentType);
         const range = req.headers.range?.match(/^bytes=(\d+)-(\d+)$/);
@@ -1324,6 +1352,49 @@ async function uploadCanvas(
   });
 }
 
+function storageObjectPath(key: string) {
+  return `/storage/v1/object/test/${key
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")}`;
+}
+
+function assertStoredMedia(
+  key: string,
+  bytes: Uint8Array,
+  contentType: string,
+) {
+  const stored = storedImages.get(storageObjectPath(key));
+  assert.ok(stored, `Storage object is missing at ${key}`);
+  assert.equal(stored.contentType, contentType);
+  assert.deepEqual(stored.bytes, Buffer.from(bytes));
+}
+
+async function mediaStorageRecord(id: string) {
+  const result = await pool.query(
+    "SELECT id, created_by, storage_key, mime_type, kind FROM media_assets WHERE id=$1",
+    [id],
+  );
+  assert.equal(result.rowCount, 1, `Media asset ${id} is missing`);
+  return result.rows[0] as {
+    id: string;
+    created_by: string | null;
+    storage_key: string | null;
+    mime_type: string | null;
+    kind: string;
+  };
+}
+
+async function actorIdForCookie(cookie: string) {
+  const token = cookie.slice("em_session=".length);
+  const result = await pool.query(
+    "SELECT user_id FROM sessions WHERE token_hash=$1",
+    [hashSessionToken(token)],
+  );
+  assert.equal(result.rowCount, 1);
+  return result.rows[0].user_id as string;
+}
+
 test("catalog media retains validation, streaming, permissions, and OpenAPI contracts", async () => {
   assert.deepEqual(await read(await call("/catalog-media/not-a-uuid"), 404), {
     error: "Media not found.",
@@ -1628,12 +1699,29 @@ test("pending media stays private, published video streams ranges, and cleanup p
     0, 0, 0, 20, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0, 105, 115,
     111, 109,
   ]);
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
   await read(await uploadCanvas(mp4, "video/mp4", customerCookie), 403);
   await read(await uploadCanvas(mp4, "image/png"), 400);
   const media = await read(await uploadCanvas(mp4, "video/mp4"), 201);
+  const thumbnail = await read(await uploadCanvas(png, "image/png"), 201);
+  const adminId = await actorIdForCookie(adminCookie);
+  const pendingVideoKey = `pending/${adminId}/${media.id}.mp4`;
+  const pendingThumbnailKey = `pending/${adminId}/${thumbnail.id}.png`;
+  assert.equal(
+    (await mediaStorageRecord(media.id)).storage_key,
+    pendingVideoKey,
+  );
+  assert.equal((await mediaStorageRecord(media.id)).created_by, adminId);
+  assert.equal(
+    (await mediaStorageRecord(thumbnail.id)).storage_key,
+    pendingThumbnailKey,
+  );
+  assertStoredMedia(pendingVideoKey, mp4, "video/mp4");
+  assertStoredMedia(pendingThumbnailKey, png, "image/png");
   await read(await app.request(media.url), 404);
   const c = {
     ...data,
+    thumbnailMediaId: thumbnail.id,
     sections: [
       {
         id: randomUUID(),
@@ -1659,6 +1747,20 @@ test("pending media stays private, published video streams ranges, and cleanup p
     await call("/admin/packages", "POST", c, adminCookie),
     201,
   );
+  const packageVideoKey = `packages/${saved.id}/videos/${media.id}.mp4`;
+  const packageThumbnailKey = `packages/${saved.id}/images/${thumbnail.id}.png`;
+  assert.equal(
+    (await mediaStorageRecord(media.id)).storage_key,
+    packageVideoKey,
+  );
+  assert.equal(
+    (await mediaStorageRecord(thumbnail.id)).storage_key,
+    packageThumbnailKey,
+  );
+  assertStoredMedia(packageVideoKey, mp4, "video/mp4");
+  assertStoredMedia(packageThumbnailKey, png, "image/png");
+  assert.equal(storedImages.has(storageObjectPath(pendingVideoKey)), false);
+  assert.equal(storedImages.has(storageObjectPath(pendingThumbnailKey)), false);
   const stream = await app.request(media.url);
   assert.equal(stream.status, 200);
   assert.equal(stream.headers.get("accept-ranges"), "bytes");
@@ -1764,6 +1866,212 @@ test("stale pending uploads can be swept while referenced media survives", async
     await call(`/admin/packages/${saved.id}`, "DELETE", undefined, adminCookie),
     204,
   );
+});
+
+test("catalog media promotion retries failed copies and reads through relocation", async () => {
+  const { promoteOwnerCatalogMediaService } =
+    await import("../src/services/catalog-media/promote-catalog-media.js");
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
+  const media = await read(await uploadCanvas(png, "image/png"), 201);
+  const pendingKey = `pending/${await actorIdForCookie(adminCookie)}/${media.id}.png`;
+  const sections = structuredClone(data.sections);
+  sections[0].widgets[0] = { ...sections[0].widgets[0], media };
+  sections[0].widgets[1] = { ...sections[0].widgets[1] };
+  const content = {
+    ...data,
+    name: `Promotion retry ${randomUUID()}`,
+    sections,
+  };
+
+  let saved: any;
+  failStorageWrites = true;
+  try {
+    saved = await read(
+      await call("/admin/packages", "POST", content, adminCookie),
+      201,
+    );
+  } finally {
+    failStorageWrites = false;
+  }
+  const destinationKey = `packages/${saved.id}/images/${media.id}.png`;
+  assert.equal((await mediaStorageRecord(media.id)).storage_key, pendingKey);
+  assertStoredMedia(pendingKey, png, "image/png");
+  assert.equal(storedImages.has(storageObjectPath(destinationKey)), false);
+
+  let promotionResult: unknown;
+  beforeStorageGet = {
+    path: storageObjectPath(pendingKey),
+    callback: async () => {
+      promotionResult = await promoteOwnerCatalogMediaService(db, {
+        kind: "package",
+        id: saved.id,
+      });
+    },
+  };
+  const readDuringMove = await app.request(media.url);
+  assert.equal(beforeStorageGet, undefined);
+  assert.ok(promotionResult !== undefined);
+  assert.equal(readDuringMove.status, 200);
+  assert.deepEqual(new Uint8Array(await readDuringMove.arrayBuffer()), png);
+  assert.equal(
+    (await mediaStorageRecord(media.id)).storage_key,
+    destinationKey,
+  );
+  assertStoredMedia(destinationKey, png, "image/png");
+  assert.equal(storedImages.has(storageObjectPath(pendingKey)), false);
+
+  const noSuchKeyMedia = await read(await uploadCanvas(png, "image/png"), 201);
+  const noSuchKeyPendingKey = `pending/${await actorIdForCookie(adminCookie)}/${noSuchKeyMedia.id}.png`;
+  const noSuchKeySections = structuredClone(data.sections);
+  noSuchKeySections[0].widgets[0] = {
+    ...noSuchKeySections[0].widgets[0],
+    media: noSuchKeyMedia,
+  };
+  const noSuchKeyContent = {
+    ...data,
+    name: `NoSuchKey promotion retry ${randomUUID()}`,
+    sections: noSuchKeySections,
+  };
+  let noSuchKeyPackage: any;
+  failStorageWrites = true;
+  try {
+    noSuchKeyPackage = await read(
+      await call("/admin/packages", "POST", noSuchKeyContent, adminCookie),
+      201,
+    );
+  } finally {
+    failStorageWrites = false;
+  }
+  const noSuchKeyDestinationKey = `packages/${noSuchKeyPackage.id}/images/${noSuchKeyMedia.id}.png`;
+  assert.equal(
+    (await mediaStorageRecord(noSuchKeyMedia.id)).storage_key,
+    noSuchKeyPendingKey,
+  );
+  assertStoredMedia(noSuchKeyPendingKey, png, "image/png");
+  beforeStorageGet = {
+    path: storageObjectPath(noSuchKeyPendingKey),
+    callback: () =>
+      promoteOwnerCatalogMediaService(db, {
+        kind: "package",
+        id: noSuchKeyPackage.id,
+      }).then(() => undefined),
+  };
+  let noSuchKeyRead: Response;
+  missingStorageGetAs400 = true;
+  try {
+    noSuchKeyRead = await app.request(noSuchKeyMedia.url);
+  } finally {
+    missingStorageGetAs400 = false;
+  }
+  assert.equal(beforeStorageGet, undefined);
+  assert.equal(noSuchKeyRead!.status, 200);
+  assert.deepEqual(new Uint8Array(await noSuchKeyRead!.arrayBuffer()), png);
+  assert.equal(
+    (await mediaStorageRecord(noSuchKeyMedia.id)).storage_key,
+    noSuchKeyDestinationKey,
+  );
+  assert.equal(storedImages.has(storageObjectPath(noSuchKeyPendingKey)), false);
+  assertStoredMedia(noSuchKeyDestinationKey, png, "image/png");
+
+  const retainedMedia = await read(await uploadCanvas(png, "image/png"), 201);
+  const retainedPendingKey = `pending/${await actorIdForCookie(adminCookie)}/${retainedMedia.id}.png`;
+  const retainedSections = structuredClone(data.sections);
+  retainedSections[0].widgets[0] = {
+    ...retainedSections[0].widgets[0],
+    media: retainedMedia,
+  };
+  const retainedContent = {
+    ...data,
+    name: `Promotion delete retry ${randomUUID()}`,
+    sections: retainedSections,
+  };
+  let retainedPackage: any;
+  failStorageDeletes = true;
+  try {
+    retainedPackage = await read(
+      await call("/admin/packages", "POST", retainedContent, adminCookie),
+      201,
+    );
+  } finally {
+    failStorageDeletes = false;
+  }
+  const retainedDestinationKey = `packages/${retainedPackage.id}/images/${retainedMedia.id}.png`;
+  assert.equal(
+    (await mediaStorageRecord(retainedMedia.id)).storage_key,
+    retainedDestinationKey,
+  );
+  assertStoredMedia(retainedPendingKey, png, "image/png");
+  assertStoredMedia(retainedDestinationKey, png, "image/png");
+  const retainedRead = await app.request(retainedMedia.url);
+  assert.equal(retainedRead.status, 200);
+  assert.deepEqual(new Uint8Array(await retainedRead.arrayBuffer()), png);
+
+  await read(
+    await call(
+      `/admin/packages/${retainedPackage.id}`,
+      "PATCH",
+      { ...retainedContent, expectedUpdatedAt: retainedPackage.updatedAt },
+      adminCookie,
+    ),
+    200,
+  );
+  assert.equal(storedImages.has(storageObjectPath(retainedPendingKey)), false);
+  assertStoredMedia(retainedDestinationKey, png, "image/png");
+});
+
+test("stale package saves leave new media pending and untouched", async () => {
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
+  const packageContent = {
+    ...data,
+    name: `Stale media save ${randomUUID()}`,
+  };
+  const created = await read(
+    await call("/admin/packages", "POST", packageContent, adminCookie),
+    201,
+  );
+  const advanced = await read(
+    await call(
+      `/admin/packages/${created.id}`,
+      "PATCH",
+      {
+        ...packageContent,
+        name: `${packageContent.name} updated`,
+        expectedUpdatedAt: created.updatedAt,
+      },
+      adminCookie,
+    ),
+    200,
+  );
+  const media = await read(await uploadCanvas(png, "image/png"), 201);
+  const pendingKey = `pending/${await actorIdForCookie(adminCookie)}/${media.id}.png`;
+  const sections = structuredClone(data.sections);
+  sections[0].widgets[0].media = media;
+  await read(
+    await call(
+      `/admin/packages/${created.id}`,
+      "PATCH",
+      {
+        ...packageContent,
+        sections,
+        expectedUpdatedAt: created.updatedAt,
+      },
+      adminCookie,
+    ),
+    409,
+  );
+  assert.equal((await mediaStorageRecord(media.id)).storage_key, pendingKey);
+  assertStoredMedia(pendingKey, png, "image/png");
+  assert.equal(advanced.name, `${packageContent.name} updated`);
+  await read(
+    await call(
+      `/admin/catalog-media/${media.id}`,
+      "DELETE",
+      undefined,
+      adminCookie,
+    ),
+    204,
+  );
+  assert.equal(storedImages.has(storageObjectPath(pendingKey)), false);
 });
 
 test("admin archived media is private and unclaimed uploads cannot be taken by another admin", async () => {
@@ -2040,6 +2348,27 @@ test("service canvases save rich content directly and enforce media ownership", 
     await call("/admin/services", "POST", service, adminCookie),
     201,
   );
+  const adminId = await actorIdForCookie(adminCookie);
+  const servicePhotoKey = `services/${created.id}/images/${photo.id}.png`;
+  const serviceVideoKey = `services/${created.id}/videos/${video.id}.mp4`;
+  assert.equal(
+    (await mediaStorageRecord(photo.id)).storage_key,
+    servicePhotoKey,
+  );
+  assert.equal(
+    (await mediaStorageRecord(video.id)).storage_key,
+    serviceVideoKey,
+  );
+  assertStoredMedia(servicePhotoKey, image, "image/png");
+  assertStoredMedia(serviceVideoKey, mp4, "video/mp4");
+  assert.equal(
+    storedImages.has(storageObjectPath(`pending/${adminId}/${photo.id}.png`)),
+    false,
+  );
+  assert.equal(
+    storedImages.has(storageObjectPath(`pending/${adminId}/${video.id}.mp4`)),
+    false,
+  );
   const savedCanvas = (
     await pool.query("SELECT canvas FROM services WHERE id=$1", [created.id])
   ).rows[0].canvas;
@@ -2155,6 +2484,7 @@ test("service canvases save rich content directly and enforce media ownership", 
 test("booking-owned packages retain the inquiry and isolate copied media", async () => {
   const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
   const media = await read(await uploadCanvas(png, "image/png"), 201);
+  const thumbnail = await read(await uploadCanvas(png, "image/png"), 201);
   const includedService = await createServiceWithPhoto({
     name: `Included ${randomUUID()}`,
     description: "Coverage",
@@ -2163,6 +2493,7 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
   const content = {
     ...data,
     name: `Original ${randomUUID()}`,
+    thumbnailMediaId: thumbnail.id,
     services: [{ serviceId: includedService.id, role: "included" }],
     sections: [
       {
@@ -2202,6 +2533,29 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
   const original = await read(
     await call("/admin/packages", "POST", content, adminCookie),
     201,
+  );
+  const adminId = await actorIdForCookie(adminCookie);
+  const sourceMediaKey = `packages/${original.id}/images/${media.id}.png`;
+  const sourceThumbnailKey = `packages/${original.id}/images/${thumbnail.id}.png`;
+  assert.equal(
+    (await mediaStorageRecord(media.id)).storage_key,
+    sourceMediaKey,
+  );
+  assertStoredMedia(sourceMediaKey, png, "image/png");
+  assert.equal(
+    (await mediaStorageRecord(thumbnail.id)).storage_key,
+    sourceThumbnailKey,
+  );
+  assertStoredMedia(sourceThumbnailKey, png, "image/png");
+  assert.equal(
+    storedImages.has(storageObjectPath(`pending/${adminId}/${media.id}.png`)),
+    false,
+  );
+  assert.equal(
+    storedImages.has(
+      storageObjectPath(`pending/${adminId}/${thumbnail.id}.png`),
+    ),
+    false,
   );
   const bookingInput = {
     packageId: original.id,
@@ -2244,7 +2598,30 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
     200,
   );
   const custom = saved.package;
+  const copiedMediaId = custom.sections[0].widgets[0].media.id;
+  const copiedMediaKey = `bookings/${booking.id}/custom-package/images/${copiedMediaId}.png`;
+  const copiedThumbnailId = custom.imageUrl.split("/").at(-1)!;
+  const copiedThumbnailKey = `bookings/${booking.id}/custom-package/images/${copiedThumbnailId}.png`;
   assert.notEqual(custom.id, original.id);
+  assert.notEqual(copiedMediaId, media.id);
+  assert.notEqual(copiedThumbnailId, thumbnail.id);
+  assert.equal(
+    (await mediaStorageRecord(copiedMediaId)).storage_key,
+    copiedMediaKey,
+  );
+  assert.equal((await mediaStorageRecord(copiedMediaId)).created_by, adminId);
+  assertStoredMedia(copiedMediaKey, png, "image/png");
+  assertStoredMedia(sourceMediaKey, png, "image/png");
+  assert.equal(
+    (await mediaStorageRecord(copiedThumbnailId)).storage_key,
+    copiedThumbnailKey,
+  );
+  assert.equal(
+    (await mediaStorageRecord(copiedThumbnailId)).created_by,
+    adminId,
+  );
+  assertStoredMedia(copiedThumbnailKey, png, "image/png");
+  assertStoredMedia(sourceThumbnailKey, png, "image/png");
   assert.equal(custom.name, original.name);
   assert.equal(custom.packageType, "custom");
   const privateWidget = {
@@ -2362,6 +2739,7 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
         ...content,
         name: "Changed",
         sections: custom.sections,
+        thumbnailMediaId: copiedThumbnailId,
         expectedUpdatedAt: custom.updatedAt,
         expectedBookingUpdatedAt: before.bookingUpdatedAt,
       },
@@ -2377,6 +2755,7 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
         ...content,
         name: "Changed",
         sections: custom.sections,
+        thumbnailMediaId: copiedThumbnailId,
         expectedUpdatedAt: custom.updatedAt,
         expectedBookingUpdatedAt: saved.bookingRequest.updatedAt,
       },
@@ -2407,12 +2786,21 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
     await call(
       `/admin/packages/${original.id}`,
       "PATCH",
-      { ...content, sections: [], expectedUpdatedAt: original.updatedAt },
+      {
+        ...content,
+        sections: [],
+        thumbnailMediaId: null,
+        expectedUpdatedAt: original.updatedAt,
+      },
       adminCookie,
     ),
     200,
   );
   assert.equal((await app.request(media.url)).status, 404);
+  assert.equal(storedImages.has(storageObjectPath(sourceMediaKey)), false);
+  assert.equal(storedImages.has(storageObjectPath(sourceThumbnailKey)), false);
+  assertStoredMedia(copiedMediaKey, png, "image/png");
+  assertStoredMedia(copiedThumbnailKey, png, "image/png");
   assert.deepEqual(
     new Uint8Array(
       await (

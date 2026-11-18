@@ -1,4 +1,6 @@
 import { createRoute } from "@hono/zod-openapi";
+import { openapiJson } from "../../utils/openapi.js";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { profileSchema, toProfile } from "./profile.js";
 import { credentialsSchema, errors } from "./http.js";
@@ -13,12 +15,12 @@ export const loginUserRoute = createRoute({
   request: {
     body: {
       required: true,
-      content: { "application/json": { schema: credentialsSchema } },
+      content: openapiJson(credentialsSchema),
     },
   },
   responses: {
     200: {
-      content: { "application/json": { schema: profileSchema } },
+      content: openapiJson(profileSchema),
       description: "Profile and session cookie",
     },
     ...errors,
@@ -31,12 +33,9 @@ export const loginUserRouteHandler: AppRouteHandler<
   const { email, password } = c.req.valid("json");
   const result = await loginUserService(c.get("db"), email, password);
   if (result.kind === "rate-limited")
-    return c.json(
-      { error: "Too many attempts. Try again in 15 minutes." },
-      429,
-    );
+    return jsonError(c, "Too many attempts. Try again in 15 minutes.", 429);
   if (result.kind === "invalid")
-    return c.json({ error: "Incorrect email or password." }, 401);
+    return jsonError(c, "Incorrect email or password.", 401);
   await startSessionService(c, result.row.id);
   return c.json(toProfile(result.row), 200);
 };

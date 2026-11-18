@@ -3,6 +3,7 @@ import type { BookingRequest } from "../../lib/data/booking-requests/requests";
 import { groupCustomerEvents } from "../../lib/services/booking-requests/customer-event-timeline";
 import { bookingDate, BookingStatusBadge } from "./BookingRequestDisplay";
 import { localInput } from "../../lib/utils/event-days/event-day-time";
+import { formatEnPh } from "../../lib/utils/formatting/dates";
 
 function requestedTime(item: BookingRequest, date: string | null) {
   const day = item.requestedDays?.find((day) => day.date === date);
@@ -12,15 +13,15 @@ function requestedTime(item: BookingRequest, date: string | null) {
   const overnight =
     localInput(startsAt, item.timeZone).slice(0, 10) !==
     localInput(endsAt, item.timeZone).slice(0, 10);
-  const start = new Intl.DateTimeFormat("en-PH", {
+  const start = formatEnPh(new Date(startsAt), {
     timeStyle: "short",
     timeZone: item.timeZone,
-  }).format(new Date(startsAt));
-  const end = new Intl.DateTimeFormat("en-PH", {
+  });
+  const end = formatEnPh(new Date(endsAt), {
     ...(overnight ? { dateStyle: "medium" } : {}),
     timeStyle: "short",
     timeZone: item.timeZone,
-  }).format(new Date(endsAt));
+  });
   return `${start} – ${end}`;
 }
 

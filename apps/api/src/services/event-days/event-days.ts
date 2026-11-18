@@ -1,3 +1,4 @@
+import { calendarDateInTimeZone } from "@event-management/contracts/calendar-date";
 import type { Transaction } from "kysely";
 import type { DayRow } from "../../data/event-days/types.js";
 import type { Database } from "../../data/event-days/types.js";
@@ -26,14 +27,7 @@ export const fail = (message: string, status: 400 | 404 | 409): never => {
 export function validateSchedule(input: Schedule, timeZone: string) {
   const start = new Date(input.startsAt),
     end = new Date(input.endsAt);
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(start);
-  const part = (name: string) => parts.find((p) => p.type === name)?.value;
-  if (`${part("year")}-${part("month")}-${part("day")}` !== input.day)
+  if (calendarDateInTimeZone(start, timeZone) !== input.day)
     fail("Day must match the start date in the booking time zone", 400);
   if (end <= start) fail("End must be after start", 400);
   return input;

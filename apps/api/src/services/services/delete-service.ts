@@ -27,6 +27,7 @@ export async function deleteServiceService(db: Kysely<DB>, id: string) {
           409,
         );
       media = await listCatalogMediaIdsService(trx, { kind: "service", id });
+      if (row.thumbnail_media_id) media.push(row.thumbnail_media_id);
       dependents = await invalidateDependentPackageKnowledgeData(trx, id);
       await deleteServiceData(trx, id);
       return null;

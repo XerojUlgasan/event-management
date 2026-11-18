@@ -18,6 +18,7 @@ import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalo
 import { error, nextUpdate } from "./package-rules.js";
 import { duplicateTitle, catalogTitle } from "../../utils/catalog-title.js";
 import { findCatalogTitleData } from "../../data/catalog/find-catalog-title.js";
+import { promoteOwnerCatalogMediaService } from "../catalog-media/promote-catalog-media.js";
 export async function updatePackageService(
   db: Kysely<DB>,
   id: string,
@@ -50,11 +51,14 @@ export async function updatePackageService(
         content,
         actorId,
       );
+      if (current.thumbnail_media_id)
+        previousMediaIds.push(current.thumbnail_media_id);
       await replacePackageServicesData(trx, id, content.services);
       await syncCatalogKnowledge(trx, { kind: "package", id });
       return packageDto(trx, row, { includeArchivedServices: true });
     });
     if (!("status" in outcome)) {
+      await promoteOwnerCatalogMediaService(db, { kind: "package", id });
       await scheduleCatalogEmbeddingRefresh(db, [{ kind: "package", id }]);
       await cleanupCatalogMediaService(db, previousMediaIds);
     }

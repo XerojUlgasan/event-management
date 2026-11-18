@@ -15,7 +15,7 @@ export function catalogKnowledgeSourceHash(
   media:
     | Pick<
         Selectable<MediaAssets>,
-        "source" | "storage_key" | "url" | "mime_type"
+        "id" | "source" | "storage_key" | "url" | "mime_type"
       >
     | undefined,
 ) {
@@ -24,7 +24,13 @@ export function catalogKnowledgeSourceHash(
       pipeline: catalogKnowledgePipeline,
       content,
       media: media
-        ? [media.source, media.storage_key, media.url, media.mime_type]
+        ? [
+            media.source,
+            // Immutable photo freshness depends on its identity, not its folder.
+            media.source === "upload" ? media.id : media.storage_key,
+            media.url,
+            media.mime_type,
+          ]
         : null,
     }),
   )}`;

@@ -1,3 +1,4 @@
+import { calendarDateInTimeZone } from "@event-management/contracts/calendar-date";
 import { randomUUID } from "node:crypto";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
@@ -14,12 +15,7 @@ export async function createBookingRequestService(
   customerId: string,
   input: CreateInput,
 ) {
-  const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: input.timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+  const today = calendarDateInTimeZone(new Date(), input.timeZone);
   if (input.requestedDays.some((day) => day.date < today))
     return error("Choose today or a future date", 400);
   const requestedDays = input.requestedDays

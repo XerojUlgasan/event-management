@@ -10,12 +10,23 @@ import {
   deleteCatalogMedia,
 } from "../../utils/catalog-media-storage.js";
 import { cleanupStaleCatalogMediaService } from "./cleanup-stale-catalog-media.js";
+import { pendingCatalogMediaKey } from "../../utils/catalog-media-paths.js";
+
+type CatalogMediaUpload =
+  | { status: 400 | 413 | 502; message: string }
+  | {
+      id: string;
+      kind: "image" | "video";
+      source: "upload";
+      url: string;
+      mimeType: string;
+    };
 
 export async function uploadCatalogMediaService(
   db: Kysely<DB>,
   actorId: string,
   file: File,
-) {
+): Promise<CatalogMediaUpload> {
   if (!file.size || file.size > MAX_VIDEO_SIZE_BYTES)
     return {
       status: 413 as const,
@@ -35,7 +46,7 @@ export async function uploadCatalogMediaService(
       message: "Images must be 10 MiB or smaller.",
     };
   const id = randomUUID(),
-    key = `catalog-media/${id}`;
+    key = pendingCatalogMediaKey(actorId, id, detected.mimeType);
   try {
     await putCatalogMedia(key, bytes, detected.mimeType);
   } catch {

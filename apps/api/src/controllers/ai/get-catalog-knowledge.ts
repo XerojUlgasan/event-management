@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { paginationQuerySchema } from "../../utils/pagination.js";
 import { getCatalogKnowledgeService } from "../../services/ai/get-catalog-knowledge.js";
@@ -39,5 +40,5 @@ export const detailRouteHandler: AppRouteHandler<typeof detailRoute> = async (
   );
   return result
     ? c.json(result, 200)
-    : c.json({ error: "Listing not found" }, 404);
+    : jsonError(c, "Listing not found", 404);
 };

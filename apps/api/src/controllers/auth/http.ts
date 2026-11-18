@@ -4,6 +4,7 @@ import {
   MAX_PASSWORD_LENGTH,
 } from "@event-management/contracts/limits/auth";
 import { z } from "@hono/zod-openapi";
+import { openapiJson } from "../../utils/openapi.js";
 import { errorSchema } from "./profile.js";
 
 export const emailSchema = z
@@ -22,19 +23,19 @@ export const credentialsSchema = z.object({
 });
 export const errors = {
   400: {
-    content: { "application/json": { schema: errorSchema } },
+    content: openapiJson(errorSchema),
     description: "Invalid request",
   },
   401: {
-    content: { "application/json": { schema: errorSchema } },
+    content: openapiJson(errorSchema),
     description: "Incorrect credentials",
   },
   409: {
-    content: { "application/json": { schema: errorSchema } },
+    content: openapiJson(errorSchema),
     description: "Account already exists",
   },
   429: {
-    content: { "application/json": { schema: errorSchema } },
+    content: openapiJson(errorSchema),
     description: "Too many attempts",
   },
 };

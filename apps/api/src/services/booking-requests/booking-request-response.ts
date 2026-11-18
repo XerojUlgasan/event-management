@@ -1,3 +1,4 @@
+import { pesosToCentavos } from "@event-management/contracts/money";
 import type { Kysely, Selectable, Transaction } from "kysely";
 import type { DB, BookingRequests } from "../../db/types.js";
 import type { BookingEstimatedDuration } from "@event-management/contracts/limits/booking-requests";
@@ -44,7 +45,7 @@ export async function bookingRequestDtos(
         ? {
             kind: "fixed" as const,
             currency: "PHP" as const,
-            amountMinor: pkg.price * 100,
+            amountMinor: pesosToCentavos(pkg.price),
           }
         : null,
       packageMaxGuests: pkg?.max_guests ?? null,

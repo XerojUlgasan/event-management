@@ -17,6 +17,7 @@ import {
 import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
 import { duplicateTitle, catalogTitle } from "../../utils/catalog-title.js";
 import { findCatalogTitleData } from "../../data/catalog/find-catalog-title.js";
+import { promoteOwnerCatalogMediaService } from "../catalog-media/promote-catalog-media.js";
 export async function updateServiceService(
   db: Kysely<DB>,
   id: string,
@@ -54,12 +55,15 @@ export async function updateServiceService(
           { sections },
           actorId,
         );
+      if (current.thumbnail_media_id)
+        previousMedia.push(current.thumbnail_media_id);
       await syncCatalogKnowledge(trx, { kind: "service", id });
       if (current.name !== row.name)
         dependents = await invalidateDependentPackageKnowledgeData(trx, id);
       return serviceAdminDto(trx, row);
     });
     if (!("status" in outcome)) {
+      await promoteOwnerCatalogMediaService(db, { kind: "service", id });
       await scheduleCatalogEmbeddingRefresh(db, [
         { kind: "service", id },
         ...dependents,

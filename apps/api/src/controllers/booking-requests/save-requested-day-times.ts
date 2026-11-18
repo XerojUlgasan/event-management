@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { saveRequestedDayTimesService } from "../../services/booking-requests/save-requested-day-times.js";
 import {
@@ -35,6 +36,6 @@ export const saveRequestedDayTimesRouteHandler: AppRouteHandler<
     c.req.valid("json"),
   );
   if ("message" in result)
-    return c.json({ error: result.message }, result.status);
+    return jsonError(c, result.message, result.status);
   return c.json({ bookingRequest: result }, 200);
 };

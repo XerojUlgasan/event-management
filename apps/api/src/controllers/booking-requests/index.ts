@@ -13,6 +13,7 @@ import {
   saveRequestedDayTimesRouteHandler,
 } from "./save-requested-day-times.js";
 import quotationRoutes from "../quotations/index.js";
+import { jsonError } from "../../utils/service-result.js";
 import {
   getMyBookingPackageRoute,
   getMyBookingPackageRouteHandler,
@@ -78,7 +79,7 @@ const routes = new OpenAPIHono<HonoEnv>({
 });
 const customer = createMiddleware<HonoEnv>(async (c, next) => {
   if (c.get("session").user.role !== "customer")
-    return c.json({ error: "Customer access required" }, 403);
+    return jsonError(c, "Customer access required", 403);
   await next();
 });
 routes.use("/booking-requests", requireSession, customer);

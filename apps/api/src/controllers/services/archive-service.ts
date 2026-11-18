@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { json, errors, body, idParams } from "../packages/http.js";
 import { contentSchema, adminSchema, publicSchema } from "./schemas.js";
@@ -20,6 +21,6 @@ export const archiveServiceRouteHandler: AppRouteHandler<
     c.get("db"),
     c.req.valid("param").id,
   );
-  if ("status" in value) return c.json({ error: value.message }, value.status);
+  if ("status" in value) return jsonError(c, value.message, value.status);
   return c.json(value, 200);
 };

@@ -1,4 +1,6 @@
 import { MAX_DISPLAY_NAME_LENGTH } from "@event-management/contracts/limits/auth";
+import { openapiJson } from "../../utils/openapi.js";
+import { jsonError } from "../../utils/service-result.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { errorSchema, profileSchema, toProfile } from "./profile.js";
@@ -13,40 +15,38 @@ export const syncFirebaseProfileRoute = createRoute({
     "Verify a Firebase identity and start a session without merging accounts by email",
   request: {
     body: {
-      content: {
-        "application/json": {
-          schema: z.object({
-            displayName: z
-              .string()
-              .trim()
-              .min(1)
-              .max(MAX_DISPLAY_NAME_LENGTH)
-              .optional(),
-          }),
-        },
-      },
+      content: openapiJson(
+        z.object({
+          displayName: z
+            .string()
+            .trim()
+            .min(1)
+            .max(MAX_DISPLAY_NAME_LENGTH)
+            .optional(),
+        }),
+      ),
       required: true,
     },
   },
   responses: {
     200: {
-      content: { "application/json": { schema: profileSchema } },
+      content: openapiJson(profileSchema),
       description: "Profile and session cookie",
     },
     400: {
-      content: { "application/json": { schema: errorSchema } },
+      content: openapiJson(errorSchema),
       description: "Missing email",
     },
     401: {
-      content: { "application/json": { schema: errorSchema } },
+      content: openapiJson(errorSchema),
       description: "Invalid Firebase identity",
     },
     409: {
-      content: { "application/json": { schema: errorSchema } },
+      content: openapiJson(errorSchema),
       description: "Email belongs to another account",
     },
     503: {
-      content: { "application/json": { schema: errorSchema } },
+      content: openapiJson(errorSchema),
       description: "Firebase is not configured",
     },
   },
@@ -61,18 +61,17 @@ export const syncFirebaseProfileRouteHandler: AppRouteHandler<
     c.req.valid("json").displayName,
   );
   if (result.kind === "missing-email") {
-    return c.json(
-      { error: "The signed-in account does not have an email address" },
+    return jsonError(
+      c,
+      "The signed-in account does not have an email address",
       400,
     );
   }
 
   if (result.kind === "conflict") {
-    return c.json(
-      {
-        error:
-          "An account already uses this email. Sign in with its existing method, then connect Firebase in Sign-in methods.",
-      },
+    return jsonError(
+      c,
+      "An account already uses this email. Sign in with its existing method, then connect Firebase in Sign-in methods.",
       409,
     );
   }

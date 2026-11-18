@@ -6,6 +6,7 @@ import {
   type CatalogKind,
 } from "@event-management/contracts/catalog-filters";
 import { usePagination } from "../../lib/pagination/use-pagination";
+import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
 import {
   Button,
   Pagination,
@@ -235,13 +236,13 @@ export function PublicCatalog({
   const [selected, setSelected] = useState<Preview>(null);
   const [parentService, setParentService] = useState<string | null>(null);
   const busy = useRef(false);
-  const generation = useRef(0);
+  const generation = useRequestGeneration();
   const limit = mode === "featured" ? 3 : DEFAULT_PAGE_SIZE;
 
   const load = useCallback(
     async (cursor: string | undefined) => {
       if (busy.current) return;
-      const current = generation.current;
+      const current = generation.current();
       busy.current = true;
       setLoading(true);
       setError("");
@@ -250,20 +251,20 @@ export function PublicCatalog({
       try {
         if (kind === "packages") {
           const result = await getPackages({ limit, cursor, ...filters });
-          if (current !== generation.current) return;
+          if (!generation.isCurrent(current)) return;
           setItems(result.packages);
           setNextCursor(result.nextCursor);
         } else {
           const result = await getServices({ limit, cursor, ...filters });
-          if (current !== generation.current) return;
+          if (!generation.isCurrent(current)) return;
           setItems(result.services);
           setNextCursor(result.nextCursor);
         }
       } catch (reason) {
-        if (current === generation.current)
+        if (generation.isCurrent(current))
           setError(notifyError(reason, `Unable to load ${kind}.`));
       } finally {
-        if (current === generation.current) {
+        if (generation.isCurrent(current)) {
           busy.current = false;
           setLoading(false);
           setInitialized(true);
@@ -276,7 +277,7 @@ export function PublicCatalog({
   useEffect(() => {
     void load(pagination.cursor);
     return () => {
-      generation.current++;
+      generation.bump();
       busy.current = false;
     };
   }, [load, pagination.cursor]);

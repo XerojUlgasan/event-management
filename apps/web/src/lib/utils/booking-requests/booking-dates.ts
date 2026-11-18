@@ -1,15 +1,7 @@
+import { calendarDateInTimeZone } from "@event-management/contracts/calendar-date";
+
 export function todayInZone(zone: string) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-CA", {
-      timeZone: zone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    })
-      .formatToParts(new Date())
-      .map((p) => [p.type, p.value]),
-  );
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  return calendarDateInTimeZone(new Date(), zone);
 }
 export function dateError(
   date: string,

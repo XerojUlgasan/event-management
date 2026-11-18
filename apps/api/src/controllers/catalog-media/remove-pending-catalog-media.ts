@@ -1,4 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { removePendingCatalogMediaService } from "../../services/catalog-media/remove-pending-catalog-media.js";
 import { idParams } from "./schemas.js";
@@ -26,6 +27,6 @@ export const removePendingCatalogMediaRouteHandler: AppRouteHandler<
     c.get("session").user.id,
   );
   return result
-    ? c.json({ error: result.message }, result.status)
+    ? jsonError(c, result.message, result.status)
     : c.body(null, 204);
 };

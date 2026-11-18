@@ -20,6 +20,7 @@ import {
   mergeGuestThread,
   prepareGuestSend,
 } from "../../../lib/services/messages/guest-thread";
+import { assertCursorMoved } from "../../../lib/services/messages/older-page";
 
 export default function PublicChat() {
   const [open, setOpen] = useState(false);
@@ -340,7 +341,7 @@ export default function PublicChat() {
         current.conversation.id,
         current.nextCursor,
       );
-      if (older.nextCursor === current.nextCursor) throw new Error();
+      assertCursorMoved(older.nextCursor, current.nextCursor);
       if (started === revision.current) {
         updateOutbox((items) => {
           const next = { ...items };

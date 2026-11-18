@@ -25,6 +25,8 @@ import {
 import { getBookingPackage } from "../../../../lib/data/booking-requests/packages";
 import { ApiError } from "../../../../lib/http/request";
 import { durationLabel } from "../../../../lib/utils/booking-requests/duration";
+import { useRequestGeneration } from "../../../../lib/pagination/use-request-generation";
+import { formatPesosFromMinor } from "../../../../lib/utils/formatting/money";
 import {
   bookingDate,
   bookingDateTime,
@@ -227,23 +229,23 @@ export function BookingRequestPage({
   const detailsPanelId = "booking-request-details-panel";
   const packagePanelId = "booking-request-package-panel";
   const quotationPanelId = "booking-request-quotation-panel";
-  const generation = useRef(0);
+  const generation = useRequestGeneration();
 
   const refresh = useCallback(async () => {
-    const current = ++generation.current;
+    const current = generation.bump();
     setRefreshing(true);
     setError("");
     setNeedsSignIn(false);
     try {
       const result = await getAdminBookingRequest(bookingRequestId);
-      if (current !== generation.current)
+      if (!generation.isCurrent(current))
         throw new Error(
           "The request changed while refreshing. Please try again.",
         );
       setItem(result.bookingRequest);
       setRefreshKey((value) => value + 1);
     } catch (cause) {
-      if (current === generation.current) {
+      if (generation.isCurrent(current)) {
         setNeedsSignIn(cause instanceof ApiError && cause.status === 401);
         setError(
           cause instanceof ApiError && cause.status === 404
@@ -255,15 +257,15 @@ export function BookingRequestPage({
       }
       throw cause;
     } finally {
-      if (current === generation.current) setRefreshing(false);
+      if (generation.isCurrent(current)) setRefreshing(false);
     }
-  }, [bookingRequestId]);
+  }, [bookingRequestId, generation]);
 
   const refreshWithNotice = (fallback: string) => {
     const pending = refresh();
-    const current = generation.current;
+    const current = generation.current();
     void pending.catch((cause) => {
-      if (current === generation.current) notifyError(cause, fallback);
+      if (generation.isCurrent(current)) notifyError(cause, fallback);
     });
   };
 
@@ -272,15 +274,15 @@ export function BookingRequestPage({
     setNotice("");
     setPageTab("details");
     const pending = refresh();
-    const current = generation.current;
+    const current = generation.current();
     void pending.catch((cause) => {
-      if (current === generation.current)
+      if (generation.isCurrent(current))
         notifyError(cause, "Unable to load this booking request.");
     });
     return () => {
-      generation.current++;
+      generation.bump();
     };
-  }, [refresh, notifyError]);
+  }, [refresh, notifyError, generation]);
 
   return (
     <div className="booking-request-page">
@@ -409,10 +411,7 @@ export function BookingRequestPage({
                         {item.packageName && item.packagePrice ? (
                           <>
                             {item.packageName} ·{" "}
-                            {new Intl.NumberFormat("en-PH", {
-                              style: "currency",
-                              currency: "PHP",
-                            }).format(item.packagePrice.amountMinor / 100)}{" "}
+                            {formatPesosFromMinor(item.packagePrice.amountMinor)}{" "}
                             · up to {item.packageMaxGuests} guests
                           </>
                         ) : (
@@ -510,7 +509,7 @@ export function BookingRequestPage({
                       onClose={() => setEditStatus(false)}
                       onBusyChange={setSavingStatus}
                       onSaved={(updated) => {
-                        generation.current++;
+                        generation.bump();
                         setItem(updated);
                         setEditStatus(false);
                         setNotice(

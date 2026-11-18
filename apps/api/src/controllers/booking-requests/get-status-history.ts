@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { paginationQuerySchema } from "../../utils/pagination.js";
 import { getStatusHistoryService } from "../../services/booking-requests/get-status-history.js";
@@ -44,7 +45,7 @@ export const getMyStatusHistoryRouteHandler: AppRouteHandler<
     c.req.valid("query"),
     c.get("session").user.id,
   );
-  if (!result) return c.json({ error: "Booking request not found" }, 404);
+  if (!result) return jsonError(c, "Booking request not found", 404);
   c.header("Cache-Control", "private, no-store");
   return c.json(result, 200);
 };
@@ -63,7 +64,7 @@ export const getAdminStatusHistoryRouteHandler: AppRouteHandler<
     c.req.valid("param").id,
     c.req.valid("query"),
   );
-  if (!result) return c.json({ error: "Booking request not found" }, 404);
+  if (!result) return jsonError(c, "Booking request not found", 404);
   c.header("Cache-Control", "private, no-store");
   return c.json(result, 200);
 };

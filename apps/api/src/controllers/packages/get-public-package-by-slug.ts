@@ -1,4 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { publicSchema } from "./schemas.js";
 import { json, errors, slugParams } from "./http.js";
@@ -22,5 +23,5 @@ export const getPublicPackageBySlugRouteHandler: AppRouteHandler<
     c.get("db"),
     c.req.valid("param").slug,
   );
-  return row ? c.json(row, 200) : c.json({ error: "Package not found" }, 404);
+  return row ? c.json(row, 200) : jsonError(c, "Package not found", 404);
 };

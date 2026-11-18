@@ -1,4 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import { reviseQuotationService } from "../../services/quotations/revise-quotation.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { body, errors } from "../booking-requests/http.js";
@@ -23,6 +24,6 @@ export const reviseAdminQuotationRouteHandler: AppRouteHandler<
     input.reason,
   );
   return "message" in r
-    ? c.json({ error: r.message }, r.status)
+    ? jsonError(c, r.message, r.status)
     : c.json({ quotation: r }, 201);
 };

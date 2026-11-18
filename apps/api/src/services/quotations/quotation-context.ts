@@ -15,10 +15,11 @@ import {
 } from "../../data/quotations/find-quotation.js";
 import type { BookingRequests, DB, Quotations } from "../../db/types.js";
 
-export const failure = (message: string, status: 400 | 404 | 409) => ({
-  message,
-  status,
-});
+import { pesosToCentavos } from "@event-management/contracts/money";
+import { serviceError } from "../../utils/service-result.js";
+
+export const failure = (message: string, status: 400 | 404 | 409) =>
+  serviceError(message, status);
 type Booking = Selectable<BookingRequests> & { revision: string };
 type Quote = Selectable<Quotations> & { revision: string };
 const iso = (v: Date | null) => v?.toISOString() ?? null;
@@ -42,7 +43,7 @@ export function amount(base: number, items: QuotationItem[]) {
     : null;
 }
 export function basePrice(price: number) {
-  const value = price * 100;
+  const value = pesosToCentavos(price);
   return Number.isSafeInteger(value) && value > 0 && value <= 2147483647
     ? value
     : null;

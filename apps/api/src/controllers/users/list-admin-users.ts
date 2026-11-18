@@ -5,15 +5,12 @@ import {
   listUsersData,
   userDirectoryStats,
 } from "../../data/auth/list-users.js";
+import { openapiJson as json } from "../../utils/openapi.js";
 import {
   encodePageCursor,
   parsePageCursor,
   paginationQuerySchema,
 } from "../../utils/pagination.js";
-
-const json = <T extends z.ZodType>(schema: T) => ({
-  "application/json": { schema },
-});
 const errorSchema = z.object({ error: z.string() });
 const userSchema = z.object({
   id: z.string().uuid(),

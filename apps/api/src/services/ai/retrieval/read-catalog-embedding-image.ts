@@ -10,6 +10,7 @@ import { readSampleCatalogPhoto } from "../../../utils/sample-catalog-photos.js"
 export async function readCatalogEmbeddingImage(
   asset: Selectable<MediaAssets>,
   abortSignal?: AbortSignal,
+  readUpload: typeof getCatalogMedia = getCatalogMedia,
 ) {
   abortSignal?.throwIfAborted();
   if (asset.kind !== "image") throw new Error("Catalog photo is unavailable");
@@ -17,11 +18,7 @@ export async function readCatalogEmbeddingImage(
   if (asset.source === "sample" && asset.url) {
     bytes = await readSampleCatalogPhoto(asset.url);
   } else if (asset.source === "upload" && asset.storage_key) {
-    const stream = await getCatalogMedia(
-      asset.storage_key,
-      undefined,
-      abortSignal,
-    );
+    const stream = await readUpload(asset.storage_key, undefined, abortSignal);
     const reader = stream.getReader();
     const chunks: Uint8Array[] = [];
     let size = 0;

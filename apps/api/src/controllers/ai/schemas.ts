@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+import { openapiJson } from "../../utils/openapi.js";
 export const kindSchema = z.enum(["package", "service"]);
 export const statusSchema = z.enum([
   "indexed",
@@ -38,6 +39,6 @@ export const errors = {
   400: { description: "Invalid request or cursor" },
 };
 export const response = (schema: z.ZodType) => ({
-  content: { "application/json": { schema } },
+  content: openapiJson(schema),
   description: "Knowledge catalog",
 });

@@ -15,6 +15,8 @@ import {
   type PackageHistoryEntry,
 } from "../../lib/data/booking-requests/packages";
 import { usePagination } from "../../lib/pagination/use-pagination";
+import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
+import { centavosToPesos } from "../../lib/utils/formatting/money";
 import {
   getPackages,
   type PublicPackage,
@@ -34,7 +36,7 @@ export function BookingPackage({
   onChanged?: () => void;
 }) {
   const { notifyError } = useNotifications();
-  const generation = useRef(0);
+  const generation = useRequestGeneration();
   const [loaded, setLoaded] = useState<BookingPackageResult | null>(null);
   const [history, setHistory] = useState<PackageHistoryEntry[]>([]);
   const [editing, setEditing] = useState(false);
@@ -66,7 +68,7 @@ export function BookingPackage({
   const [error, setError] = useState("");
 
   async function load() {
-    const current = generation.current;
+    const current = generation.current();
     const sequence = ++request.current;
     const requestKey = key;
     setBusy(true);
@@ -79,7 +81,7 @@ export function BookingPackage({
           : Promise.resolve(null),
       ]);
       if (
-        current !== generation.current ||
+        !generation.isCurrent(current) ||
         sequence !== request.current ||
         keyRef.current !== requestKey
       )
@@ -91,7 +93,7 @@ export function BookingPackage({
       setLoadedIdentity(identity);
     } catch (cause) {
       if (
-        current !== generation.current ||
+        !generation.isCurrent(current) ||
         sequence !== request.current ||
         keyRef.current !== requestKey
       )
@@ -99,7 +101,7 @@ export function BookingPackage({
       setError(notifyError(cause, "Unable to load the proposed package."));
     } finally {
       if (
-        current === generation.current &&
+        generation.isCurrent(current) &&
         sequence === request.current &&
         keyRef.current === requestKey
       )
@@ -110,7 +112,7 @@ export function BookingPackage({
   useEffect(() => {
     void load();
     return () => {
-      generation.current++;
+      generation.bump();
     };
   }, [id, admin, pagination.cursor]);
 
@@ -224,12 +226,12 @@ export function BookingPackage({
                 <p>
                   Previous:{" "}
                   {entry.before
-                    ? `${entry.before.name} · ${entry.before.maxGuests} guests · ${entry.before.price.amountMinor / 100} PHP`
+                    ? `${entry.before.name} · ${entry.before.maxGuests} guests · ${centavosToPesos(entry.before.price.amountMinor)} PHP`
                     : "No package"}
                 </p>
                 <p>
                   Saved: {entry.after.name} · {entry.after.maxGuests} guests ·{" "}
-                  {entry.after.price.amountMinor / 100} PHP
+                  {centavosToPesos(entry.after.price.amountMinor)} PHP
                 </p>
                 <p>
                   Historical media may no longer be available unless retained in

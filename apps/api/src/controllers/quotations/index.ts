@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import { createMiddleware } from "hono/factory";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
@@ -44,7 +45,7 @@ const routes = new OpenAPIHono<HonoEnv>({
 });
 const customer = createMiddleware<HonoEnv>(async (c, next) => {
   if (c.get("session").user.role !== "customer")
-    return c.json({ error: "Customer access required" }, 403);
+    return jsonError(c, "Customer access required", 403);
   await next();
 });
 routes.use(

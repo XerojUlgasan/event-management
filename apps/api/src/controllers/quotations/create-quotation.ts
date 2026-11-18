@@ -1,4 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import { createQuotationService } from "../../services/quotations/create-quotation.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { body, errors } from "../booking-requests/http.js";
@@ -21,6 +22,6 @@ export const createQuotationRouteHandler: AppRouteHandler<
     c.req.valid("json").expectedUpdatedAt,
   );
   return "message" in r
-    ? c.json({ error: r.message }, r.status)
+    ? jsonError(c, r.message, r.status)
     : c.json({ quotation: r }, 201);
 };

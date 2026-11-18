@@ -1,4 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { messageBodySchema, adminMessageResultSchema } from "./schemas.js";
 import { json, errors, idParams, body } from "./http.js";
@@ -37,6 +38,6 @@ export const sendAdminMessageRouteHandler: AppRouteHandler<
       201,
     );
   return result.kind === "closed"
-    ? c.json({ error: "Conversation is closed" }, 409)
-    : c.json({ error: "Conversation not found" }, 404);
+    ? jsonError(c, "Conversation is closed", 409)
+    : jsonError(c, "Conversation not found", 404);
 };

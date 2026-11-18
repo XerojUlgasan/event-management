@@ -1,5 +1,7 @@
 import { env } from "./env.js";
 
+export class CatalogMediaNotFound extends Error {}
+
 function objectPath(bucket: string, key: string) {
   return `${bucket}/${key
     .split("/")
@@ -58,6 +60,7 @@ export async function putCatalogMedia(
   key: string,
   bytes: Uint8Array,
   contentType: string,
+  options: { upsert?: boolean } = {},
 ) {
   const { url, apiKey, bucket } = env.STORAGE;
   const response = await fetch(
@@ -66,9 +69,10 @@ export async function putCatalogMedia(
       method: "POST",
       headers: authHeaders(apiKey, {
         "Content-Type": contentType,
-        "x-upsert": "false",
+        "x-upsert": options.upsert ? "true" : "false",
       }),
       body: Buffer.from(bytes),
+      signal: AbortSignal.timeout(30_000),
     },
   );
   if (!response.ok) throw new Error("Media storage write failed");
@@ -80,6 +84,7 @@ export async function deleteCatalogMedia(key: string) {
     method: "DELETE",
     headers: authHeaders(apiKey, { "Content-Type": "application/json" }),
     body: JSON.stringify({ prefixes: [key] }),
+    signal: AbortSignal.timeout(30_000),
   });
   if (response.status === 404) return;
   if (!response.ok) throw new Error("Media storage delete failed");
@@ -98,6 +103,21 @@ export async function getCatalogMedia(
       signal: abortSignal,
     },
   );
+  if (response.status === 400) {
+    const error: unknown = await response.json().catch(() => null);
+    // Some Storage versions wrap NoSuchKey (404) in an HTTP 400 response.
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "NoSuchKey"
+    )
+      throw new CatalogMediaNotFound("Media object not found");
+  }
+  if (response.status === 404) {
+    await response.body?.cancel();
+    throw new CatalogMediaNotFound("Media object not found");
+  }
   if (!response.ok || !response.body)
     throw new Error("Media storage read failed");
   return response.body;

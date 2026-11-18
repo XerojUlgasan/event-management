@@ -1,5 +1,10 @@
 import { sql, type Kysely, type Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
+import {
+  catalogTextMatch,
+  keysetPredicate,
+  utcTimestampSql,
+} from "../../utils/sql-page.js";
 import type {
   CatalogListOptions,
   CatalogPosition,
@@ -16,21 +21,23 @@ export function listAdminPackagesPageData(
     .selectAll()
     .where("package_type", "=", "catalog")
     .select(
-      sql<string>`to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`.as(
-        "page_sort",
-      ),
+      utcTimestampSql("created_at").as("page_sort"),
     );
   if (options.archived === "active")
     query = query.where("archived_at", "is", null);
   if (options.archived === "archived")
     query = query.where("archived_at", "is not", null);
   if (options.search)
-    query = query.where(
-      sql<boolean>`strpos(lower(name || ' ' || description), lower(${options.search})) > 0`,
-    );
+    query = query.where(catalogTextMatch(options.search));
   if (position)
     query = query.where(
-      sql<boolean>`(created_at, id) < (${position.sort}::timestamptz, ${position.id}::uuid)`,
+      keysetPredicate(
+        "created_at",
+        "id",
+        position.sort,
+        position.id,
+        "<",
+      ),
     );
   return query
     .orderBy("created_at", "desc")
@@ -63,9 +70,7 @@ export async function countAdminPackagesData(
   if (options.archived === "archived")
     matching = matching.where("archived_at", "is not", null);
   if (options.search)
-    matching = matching.where(
-      sql<boolean>`strpos(lower(name || ' ' || description), lower(${options.search})) > 0`,
-    );
+    matching = matching.where(catalogTextMatch(options.search));
   const filtered = await matching
     .select(sql<string>`count(*)`.as("count"))
     .executeTakeFirstOrThrow();

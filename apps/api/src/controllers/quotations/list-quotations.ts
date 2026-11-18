@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import { listQuotationService } from "../../services/quotations/list-quotation.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { errors } from "../booking-requests/http.js";
@@ -26,7 +27,7 @@ export const listAdminQuotationsRouteHandler: AppRouteHandler<
     c.req.valid("query"),
   );
   return "message" in r
-    ? c.json({ error: r.message }, r.status)
+    ? jsonError(c, r.message, r.status)
     : c.json(r, 200);
 };
 
@@ -48,6 +49,6 @@ export const listCustomerQuotationsRouteHandler: AppRouteHandler<
     c.req.valid("query"),
   );
   return "message" in r
-    ? c.json({ error: r.message }, r.status)
+    ? jsonError(c, r.message, r.status)
     : c.json(r, 200);
 };

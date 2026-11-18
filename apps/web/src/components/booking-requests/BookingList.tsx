@@ -1,5 +1,8 @@
 import { BookingStatusHistory } from "./BookingStatusHistory";
 import { usePagination } from "../../lib/pagination/use-pagination";
+import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
+import { formatPesosFromMinor } from "../../lib/utils/formatting/money";
+import { formatEnPhDate } from "../../lib/utils/formatting/dates";
 import { navigateWorkspace } from "../../lib/navigation/workspace-navigation";
 import { BookingPackage } from "./BookingPackage";
 import { Quotations } from "../quotations/Quotations";
@@ -104,7 +107,7 @@ function BookingCards({
 }) {
   const { notify, notifyError } = useNotifications();
   const mounted = useRef(true);
-  const generation = useRef(0);
+  const generation = useRequestGeneration();
   const [items, setItems] = useState<BookingRequest[]>([]);
   const [selected, setSelected] = useState<BookingRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,19 +122,19 @@ function BookingCards({
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     return () => {
       mounted.current = false;
-      generation.current++;
+      generation.bump();
       window.clearInterval(timer);
     };
   }, []);
   const load = useCallback(
     async (cursor?: string) => {
-      const current = ++generation.current;
+      const current = generation.bump();
       if (cursor) setLoadingMore(true);
       else setLoading(true);
       setError("");
       try {
         const result = await getMyBookingRequests(cursor);
-        if (!mounted.current || generation.current !== current) return;
+        if (!mounted.current || !generation.isCurrent(current)) return;
         setItems((rows) => {
           if (!cursor) return result.bookingRequests;
           const ids = new Set(rows.map((row) => row.id));
@@ -142,10 +145,10 @@ function BookingCards({
         });
         setNextCursor(result.nextCursor);
       } catch (cause) {
-        if (mounted.current && generation.current === current)
+        if (mounted.current && generation.isCurrent(current))
           setError(notifyError(cause, "Unable to load your event requests."));
       } finally {
-        if (mounted.current && generation.current === current) {
+        if (mounted.current && generation.isCurrent(current)) {
           setLoading(false);
           setLoadingMore(false);
         }
@@ -375,10 +378,7 @@ function CancelForm({
 
 const dateKey = (year: number, month: number, day: number) =>
   `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-const shortDate = (value: string) =>
-  new Intl.DateTimeFormat("en-PH", { dateStyle: "medium" }).format(
-    new Date(value),
-  );
+const shortDate = (value: string) => formatEnPhDate(new Date(value));
 
 function AdminBookingList() {
   const { notifyError } = useNotifications();
@@ -726,10 +726,7 @@ export function BookingDetails({
                       {item.packageName && item.packagePrice ? (
                         <>
                           {item.packageName} ·{" "}
-                          {new Intl.NumberFormat("en-PH", {
-                            style: "currency",
-                            currency: "PHP",
-                          }).format(item.packagePrice.amountMinor / 100)}{" "}
+                          {formatPesosFromMinor(item.packagePrice.amountMinor)}{" "}
                           · up to {item.packageMaxGuests} guests
                         </>
                       ) : (

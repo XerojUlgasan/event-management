@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { cancelBookingRequestService } from "../../services/booking-requests/cancel-booking-request.js";
 import { bookingSchema, cancelSchema, idParams } from "./schemas.js";
@@ -26,6 +27,6 @@ export const cancelBookingRequestRouteHandler: AppRouteHandler<
     c.req.valid("json").reason,
   );
   if ("message" in result)
-    return c.json({ error: result.message }, result.status);
+    return jsonError(c, result.message, result.status);
   return c.json({ bookingRequest: result }, 200);
 };

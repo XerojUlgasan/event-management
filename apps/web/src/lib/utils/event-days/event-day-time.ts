@@ -1,3 +1,8 @@
+import {
+  zonedFormat,
+  zonedPartValues,
+} from "@event-management/contracts/calendar-date";
+
 // Interpret wall-clock values in the booking zone, never in the administrator's browser zone.
 export function zonedInstant(value: string, zone: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
@@ -20,15 +25,7 @@ export function zonedInstant(value: string, zone: string): string {
   ) {
     throw new Error("Enter a valid date and time.");
   }
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: zone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  });
+  const formatter = zonedFormat(zone, "minute");
   let instant = desired;
   for (let i = 0; i < 4; i++) {
     const parts = Object.fromEntries(
@@ -67,18 +64,7 @@ export function zonedInstant(value: string, zone: string): string {
 }
 export function localInput(value: string | null, zone: string) {
   if (!value) return "";
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-CA", {
-      timeZone: zone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    })
-      .formatToParts(new Date(value))
-      .map((part) => [part.type, part.value]),
-  );
+  const formatter = zonedFormat(zone, "minute");
+  const parts = zonedPartValues(formatter, new Date(value));
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }

@@ -10,6 +10,7 @@ import {
   refreshConversations,
   type ConversationLoader,
 } from "./conversation-pages";
+import { assertCursorMoved } from "./older-page";
 
 type Inbox = {
   conversations: ChatConversation[];
@@ -100,8 +101,11 @@ export function useConversationList(load: ConversationLoader, enabled = true) {
     try {
       const page = await load(cursor);
       if (request !== epoch.current) return;
-      if (page.nextCursor === cursor)
-        throw new Error("Unable to load more conversations. Please try again.");
+      assertCursorMoved(
+        page.nextCursor,
+        cursor,
+        "Unable to load more conversations. Please try again.",
+      );
       commit((value) => ({
         ...value,
         conversations: appendConversations(

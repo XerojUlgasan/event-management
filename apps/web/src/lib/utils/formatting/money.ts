@@ -1,9 +1,23 @@
-export function pesosToCentavos(pesos: number) {
-  return Math.round(pesos * 100);
+import type { ServicePricing } from "@event-management/contracts/catalog";
+import {
+  centavosToPesos,
+  pesosToCentavos,
+} from "@event-management/contracts/money";
+
+export { centavosToPesos, pesosToCentavos };
+
+export function formatPesosFromMinor(amountMinor: number) {
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+  }).format(centavosToPesos(amountMinor));
 }
 
-export function centavosToPesos(amountMinor: number) {
-  return amountMinor / 100;
+export function formatSignedPesosFromMinor(amountMinor: number) {
+  const formatted = formatPesosFromMinor(Math.abs(amountMinor));
+  if (amountMinor > 0) return `+${formatted}`;
+  if (amountMinor < 0) return `−${formatted}`;
+  return formatted;
 }
 
 export function priceLabel(price: { amountMinor: number } | null) {
@@ -11,7 +25,6 @@ export function priceLabel(price: { amountMinor: number } | null) {
     ? `${new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(centavosToPesos(price.amountMinor))} total`
     : "Price on request";
 }
-import type { ServicePricing } from "@event-management/contracts/catalog";
 
 export function servicePricingLabels(service: ServicePricing) {
   const pesos = (amount: number) =>

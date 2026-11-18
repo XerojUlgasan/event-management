@@ -8,6 +8,8 @@ Preserve historical reasoning. When a decision changes, link a successor and mar
 
 | Record | Status / purpose |
 | --- | --- |
+| [Shared peso conversion and civil dates](2026-11-18_shared-money-and-dates.md) | Accepted shared money and calendar helpers; display, SQL, and request guards stay in their apps |
+| [Catalog media owner folders](2026-11-18_catalog-media-folders.md) | Accepted owner paths for new uploads; development scope excludes existing-file migration and a move journal |
 | [Public catalog search and tool-call records](2026-11-18_catalog-search-and-tool-calls.md)   | Accepted public discovery tool and many execution records per message; local implementation and verification                                           |
 | [Linked service canvas widget](2026-11-17_service-widget.md) | Accepted service previews with direct picker access and no price/inclusion calculations; local implementation verified |
 | [Conversation-based booking intake](2026-11-17_conversation-booking-intake.md) | Accepted existing-thread binding, optional package, and administrator preparation; local migration and verification complete |

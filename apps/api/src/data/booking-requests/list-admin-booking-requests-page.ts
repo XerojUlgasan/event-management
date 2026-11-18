@@ -1,6 +1,7 @@
 import { bookingRevision } from "./booking-revision.js";
 import { sql, type Kysely, type Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
+import { keysetPredicate, utcTimestampSql } from "../../utils/sql-page.js";
 type Database = Kysely<DB> | Transaction<DB>;
 
 export const listAdminBookingRequestsPageData = (
@@ -18,9 +19,7 @@ export const listAdminBookingRequestsPageData = (
     .selectAll()
     .select(bookingRevision.as("revision"))
     .select(
-      sql<string>`to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`.as(
-        "cursor_created_at",
-      ),
+      utcTimestampSql("created_at").as("cursor_created_at"),
     );
   if (input.status) query = query.where("status", "=", input.status);
   if (input.customerId)
@@ -32,7 +31,13 @@ export const listAdminBookingRequestsPageData = (
   )`);
   if (input.position)
     query = query.where(
-      sql<boolean>`(created_at, id) < (${input.position.createdAt}::timestamptz, ${input.position.id}::uuid)`,
+      keysetPredicate(
+        "created_at",
+        "id",
+        input.position.createdAt,
+        input.position.id,
+        "<",
+      ),
     );
   return query
     .orderBy("created_at", "desc")

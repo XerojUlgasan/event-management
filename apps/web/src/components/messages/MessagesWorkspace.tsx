@@ -30,16 +30,11 @@ import {
 } from "./ConversationContext";
 import "../../styles/messages/messages.css";
 import { initialsFromName } from "../../lib/utils/formatting/name";
-
-const dayFormatter = new Intl.DateTimeFormat("en-PH", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
-const timeFormatter = new Intl.DateTimeFormat("en-PH", {
-  hour: "numeric",
-  minute: "2-digit",
-});
+import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
+import {
+  enPhDayFormatter,
+  enPhTimeFormatter,
+} from "../../lib/utils/formatting/dates";
 
 function dayKey(value: string) {
   return new Date(value).toDateString();
@@ -52,7 +47,7 @@ function dayLabel(value: string) {
   yesterday.setDate(today.getDate() - 1);
   if (dayKey(value) === dayKey(today.toISOString())) return "Today";
   if (dayKey(value) === dayKey(yesterday.toISOString())) return "Yesterday";
-  return dayFormatter.format(date);
+  return enPhDayFormatter.format(date);
 }
 
 function preview(conversation: ChatConversation) {
@@ -152,7 +147,7 @@ export function MessagesWorkspace({
     conversationId: string;
     view: ConversationContextView;
   } | null>(null);
-  const generation = useRef(0);
+  const generation = useRequestGeneration();
   const thread = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const inbox = useRef<HTMLElement>(null);
@@ -203,11 +198,11 @@ export function MessagesWorkspace({
     setSendError("");
     setContext(null);
     setQuotationId(null);
-    generation.current++;
+    generation.bump();
     return () => {
-      generation.current++;
+      generation.bump();
     };
-  }, [activeId]);
+  }, [activeId, generation]);
 
   const olderScroll = useRef<{
     id?: string;
@@ -339,7 +334,7 @@ export function MessagesWorkspace({
       (!isTeam && pendingSendIds.current.has(activeId))
     )
       return;
-    const request = generation.current;
+    const request = generation.current();
     const conversationId = activeId;
     const sentDraft = draft;
     if (isTeam) {
@@ -358,10 +353,10 @@ export function MessagesWorkspace({
           ? { ...previous, [conversationId]: "" }
           : previous,
       );
-      if (request !== generation.current) return;
+      if (!generation.isCurrent(request)) return;
       notify("Message sent.");
     } catch (cause) {
-      if (request !== generation.current) return;
+      if (!generation.isCurrent(request)) return;
       setSendError(
         notifyError(cause, "Unable to send your message. Please try again."),
       );
@@ -421,7 +416,7 @@ export function MessagesWorkspace({
                   <small className="conversation-reference">
                     {conversation.bookingRequestReference}
                     {conversation.eventStartsAt
-                      ? ` · ${dayFormatter.format(new Date(conversation.eventStartsAt))}`
+                      ? ` · ${enPhDayFormatter.format(new Date(conversation.eventStartsAt))}`
                       : ""}
                   </small>
                 )}
@@ -437,8 +432,8 @@ export function MessagesWorkspace({
                 >
                   {dayKey(conversation.updatedAt) ===
                   dayKey(new Date().toISOString())
-                    ? timeFormatter.format(new Date(conversation.updatedAt))
-                    : `${dayLabel(conversation.updatedAt)} · ${timeFormatter.format(new Date(conversation.updatedAt))}`}
+                    ? enPhTimeFormatter.format(new Date(conversation.updatedAt))
+                    : `${dayLabel(conversation.updatedAt)} · ${enPhTimeFormatter.format(new Date(conversation.updatedAt))}`}
                 </time>
                 {conversation.unreadCount > 0 && (
                   <Badge
@@ -594,7 +589,7 @@ export function MessagesWorkspace({
             <span>{active.bookingRequestReference}</span>
             {active.eventStartsAt && (
               <span>
-                Requested {dayFormatter.format(new Date(active.eventStartsAt))}
+                Requested {enPhDayFormatter.format(new Date(active.eventStartsAt))}
               </span>
             )}
           </div>
@@ -732,7 +727,7 @@ export function MessagesWorkspace({
                   )}
                   <small className="message-meta">
                     {!mine && `${message.senderName} · `}
-                    {timeFormatter.format(new Date(message.createdAt))}
+                    {enPhTimeFormatter.format(new Date(message.createdAt))}
                   </small>
                 </div>
               </Fragment>

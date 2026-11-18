@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { json, errors, body, idParams } from "../packages/http.js";
 import { contentSchema, adminSchema, publicSchema } from "./schemas.js";
@@ -20,6 +21,6 @@ export const getPublicServiceRouteHandler: AppRouteHandler<
     c.get("db"),
     c.req.valid("param").id,
   );
-  if (!value[0]) return c.json({ error: "Service not found" }, 404);
+  if (!value[0]) return jsonError(c, "Service not found", 404);
   return c.json(value[0], 200);
 };

@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import {
@@ -17,7 +18,7 @@ import {
 const routes = new OpenAPIHono<HonoEnv>({
   // Malformed media IDs have always returned the same 404 as missing assets.
   defaultHook: (result, c) => {
-    if (!result.success) return c.json({ error: "Media not found." }, 404);
+    if (!result.success) return jsonError(c, "Media not found.", 404);
   },
 });
 routes.use("/admin/catalog-media", requireSession, requireSystemAdmin);

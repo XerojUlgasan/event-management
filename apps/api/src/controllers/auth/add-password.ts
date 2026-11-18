@@ -1,4 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { openapiJson } from "../../utils/openapi.js";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { errorSchema, profileSchema, toProfile } from "./profile.js";
 import { newPasswordSchema, errors } from "./http.js";
@@ -14,21 +16,17 @@ export const addPasswordRoute = createRoute({
   request: {
     body: {
       required: true,
-      content: {
-        "application/json": {
-          schema: z.object({ password: newPasswordSchema }),
-        },
-      },
+      content: openapiJson(z.object({ password: newPasswordSchema })),
     },
   },
   responses: {
     200: {
-      content: { "application/json": { schema: profileSchema } },
+      content: openapiJson(profileSchema),
       description: "Password added",
     },
     ...errors,
     503: {
-      content: { "application/json": { schema: errorSchema } },
+      content: openapiJson(errorSchema),
       description: "Firebase is not configured",
     },
   },
@@ -45,21 +43,16 @@ export const addPasswordRouteHandler: AppRouteHandler<
     c.req.valid("json").password,
   );
   if (result.kind === "rate-limited")
-    return c.json(
-      { error: "Too many attempts. Try again in 15 minutes." },
-      429,
-    );
+    return jsonError(c, "Too many attempts. Try again in 15 minutes.", 429);
   if (result.kind === "invalid") {
-    return c.json(
-      {
-        error:
-          "Sign in again with the connected Firebase account and verify its email before adding a password.",
-      },
+    return jsonError(
+      c,
+      "Sign in again with the connected Firebase account and verify its email before adding a password.",
       401,
     );
   }
   if (result.kind === "conflict")
-    return c.json({ error: "This account already has a local password." }, 409);
+    return jsonError(c, "This account already has a local password.", 409);
   await startSessionService(c, result.row.id);
   return c.json(toProfile(result.row), 200);
 };

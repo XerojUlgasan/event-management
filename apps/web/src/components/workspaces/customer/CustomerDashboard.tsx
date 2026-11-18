@@ -23,6 +23,7 @@ import { BookingRequestDialog } from "../../booking-requests/BookingRequestDialo
 import { initialsFromName } from "../../../lib/utils/formatting/name";
 import { SignInMethods } from "../../auth/SignInMethods";
 import { useConversationList } from "../../../lib/services/messages/use-conversation-list";
+import { assertCursorMoved } from "../../../lib/services/messages/older-page";
 import { MessagesWorkspace } from "../../messages/MessagesWorkspace";
 import {
   addSentMessages,
@@ -327,8 +328,7 @@ export function CustomerDashboard({
     try {
       const older = await getMyConversationById(id, cursor);
       if (!mounted.current || request !== olderRequest.current) return;
-      if (older.nextCursor === cursor)
-        throw new Error("Unable to load older messages. Please try again.");
+      assertCursorMoved(older.nextCursor, cursor);
       older.messages.forEach((message) =>
         localMessages.current.delete(message.id),
       );

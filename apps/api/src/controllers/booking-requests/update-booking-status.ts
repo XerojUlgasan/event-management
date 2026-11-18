@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { updateBookingStatusService } from "../../services/booking-requests/update-booking-status.js";
 import { bookingSchema, idParams, updateStatusSchema } from "./schemas.js";
@@ -28,6 +29,6 @@ export const updateBookingStatusRouteHandler: AppRouteHandler<
     input.reason,
   );
   if ("message" in result)
-    return c.json({ error: result.message }, result.status);
+    return jsonError(c, result.message, result.status);
   return c.json({ bookingRequest: result }, 200);
 };

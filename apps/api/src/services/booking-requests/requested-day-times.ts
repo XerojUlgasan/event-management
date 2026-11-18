@@ -1,21 +1,14 @@
+import {
+  zonedFormat,
+  zonedPartValues,
+} from "@event-management/contracts/calendar-date";
 import type { RequestedDay } from "../../controllers/booking-requests/schemas.js";
 
 function localParts(instant: Date, timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(instant);
-  const value = (name: string) =>
-    parts.find((p) => p.type === name)?.value ?? "";
+  const parts = zonedPartValues(zonedFormat(timeZone, "second"), instant);
   return {
-    date: `${value("year")}-${value("month")}-${value("day")}`,
-    clock: `${value("hour")}:${value("minute")}:${value("second")}`,
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    clock: `${parts.hour}:${parts.minute}:${parts.second}`,
   };
 }
 

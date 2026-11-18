@@ -14,6 +14,7 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Catalog media folders](2026-11-18_18-44-03_catalog-media-folders.md) | New upload ownership paths / main | complete | Review scoped diff; 71 focused tests and local Storage passed; no existing-file migration or new table |
 | [Public catalog search tool](2026-11-18_00-28-54_catalog-search-tool.md) | Public assistant search and execution audit / main | complete | Review uncommitted diff; local additive migration and focused checks passed, hosted rollout separate |
 | [Catalog/canvas API ownership](2026-11-18_00-07-56_catalog-canvas-layers.md) | Query, service, and utility separation / main | complete | Review scoped backend refactor; disposable regressions and Edge build passed |
 | [Package canvas widget](2026-11-17_23-57-38_package-widget.md) | Package picker, linked previews and mixed workspace navigation / main | complete | Review scoped delta; local API/browser/build checks passed, hosted rollout separate |

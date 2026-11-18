@@ -10,6 +10,7 @@ import { embedCatalogContent } from "../retrieval/embed-catalog-content.js";
 import { readCatalogEmbeddingImage } from "../retrieval/read-catalog-embedding-image.js";
 import { syncCatalogKnowledge } from "./sync-catalog-knowledge.js";
 import { catalogKnowledgeDigest } from "../catalog-knowledge-hash.js";
+import { readCatalogMediaService } from "../../catalog-media/read-catalog-media.js";
 
 export async function refreshCatalogEmbeddingsService({
   db,
@@ -42,7 +43,9 @@ export async function refreshCatalogEmbeddingsService({
       if (row.media_id && !media)
         throw new Error("Catalog photo is unavailable");
       const image = media
-        ? await readCatalogEmbeddingImage(media, signal)
+        ? await readCatalogEmbeddingImage(media, signal, (key, range, signal) =>
+            readCatalogMediaService(db, media.id, key, range, signal),
+          )
         : undefined;
       const inputHash = `${sourceHash}:${catalogKnowledgeDigest(image ? image.bytes : row.content_markdown)}`;
       const stage = await db.transaction().execute(async (trx) => {

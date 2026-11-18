@@ -10,6 +10,7 @@ import {
   scenarioIndex,
 } from "../context.js";
 import type { ScenarioUser } from "./users.js";
+import { ownedCatalogMediaKey } from "../../../utils/catalog-media-paths.js";
 
 const SAMPLE_PHOTOS = [
   "/images/wedding.jpg",
@@ -178,7 +179,15 @@ export async function seedScenarioCatalog(
         url: sample
           ? (SAMPLE_PHOTOS[index % SAMPLE_PHOTOS.length] ?? SAMPLE_PHOTOS[0])
           : null,
-        storage_key: sample ? null : `catalog-media/${id}`,
+        storage_key: sample
+          ? null
+          : ownedCatalogMediaKey(
+              {
+                kind: page.owner.packageId ? "package" : "service",
+                id: page.owner.packageId ?? page.owner.serviceId ?? "",
+              },
+              { id, kind: "video", mime_type: "video/mp4" },
+            ),
         mime_type: sample ? null : "video/mp4",
         byte_size: sample ? null : 8_388_608,
         created_by: index % 2 === 0 ? admin.id : null,

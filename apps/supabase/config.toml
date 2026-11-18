@@ -118,7 +118,7 @@ enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
 
-# Catalog uploads use this private bucket. Object keys stay catalog-media/<id>.
+# Catalog uploads use this private bucket with pending/ and owner folders.
 [storage.buckets.event-management]
 public = false
 file_size_limit = "25MiB"

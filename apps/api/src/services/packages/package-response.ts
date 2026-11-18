@@ -1,3 +1,4 @@
+import { pesosToCentavos } from "@event-management/contracts/money";
 import type { Selectable } from "kysely";
 import type { CatalogPackage } from "@event-management/contracts/catalog";
 import type { Packages } from "../../db/types.js";
@@ -38,7 +39,11 @@ export async function packageDto(
       })),
     name: row.name,
     maxGuests: row.max_guests,
-    price: { kind: "fixed", currency: "PHP", amountMinor: row.price * 100 },
+    price: {
+      kind: "fixed",
+      currency: "PHP",
+      amountMinor: pesosToCentavos(row.price),
+    },
     sections,
     description: row.description,
     imageUrl: thumbnailUrl ?? canvasPhotoUrl,

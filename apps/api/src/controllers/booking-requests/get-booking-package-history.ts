@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { publicSchema } from "../packages/schemas.js";
 import { idParams } from "./schemas.js";
@@ -41,13 +42,13 @@ export const getAdminBookingPackageHistoryRouteHandler: AppRouteHandler<
 > = async (c) => {
   const user = c.get("session").user;
   if (user.role !== "admin")
-    return c.json({ error: "Booking request not found" }, 404);
+    return jsonError(c, "Booking request not found", 404);
   const history = await getBookingPackageHistoryService(
     c.get("db"),
     c.req.valid("param").id,
     c.req.valid("query"),
   );
-  if (!history) return c.json({ error: "Booking request not found" }, 404);
+  if (!history) return jsonError(c, "Booking request not found", 404);
   c.header("Cache-Control", "private, no-store");
   return c.json(history, 200);
 };

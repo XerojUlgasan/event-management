@@ -1,9 +1,10 @@
 import { createRoute } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { findPublicCatalogMediaData } from "../../data/catalog-media/find-public-catalog-media.js";
 import { findCustomerCatalogMediaData } from "../../data/catalog-media/find-customer-catalog-media.js";
 import { findAdminCatalogMediaData } from "../../data/catalog-media/find-admin-catalog-media.js";
-import { getCatalogMedia } from "../../utils/catalog-media-storage.js";
+import { readCatalogMediaService } from "../../services/catalog-media/read-catalog-media.js";
 import { getCookie } from "hono/cookie";
 import { SESSION_COOKIE } from "../../utils/session.js";
 import { resolveSessionService } from "../../services/auth/resolve-session.js";
@@ -54,7 +55,7 @@ export const getCatalogMediaRouteHandler: AppRouteHandler<
     }
   }
   if (!media?.storage_key || !media.mime_type || !media.byte_size)
-    return c.json({ error: "Media not found." }, 404);
+    return jsonError(c, "Media not found.", 404);
   const headers: Record<string, string> = {
     "Content-Type": media.mime_type,
     "X-Content-Type-Options": "nosniff",
@@ -94,9 +95,14 @@ export const getCatalogMediaRouteHandler: AppRouteHandler<
     headers["Content-Length"] = String(end - start + 1);
   } else headers["Content-Length"] = String(media.byte_size);
   try {
-    const body = await getCatalogMedia(media.storage_key, range);
+    const body = await readCatalogMediaService(
+      c.get("db"),
+      id,
+      media.storage_key,
+      range,
+    );
     return new Response(body, { status: range ? 206 : 200, headers });
   } catch {
-    return c.json({ error: "Media unavailable. Try again." }, 502);
+    return jsonError(c, "Media unavailable. Try again.", 502);
   }
 };

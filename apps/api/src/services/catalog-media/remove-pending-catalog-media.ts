@@ -3,7 +3,7 @@ import type { DB } from "../../db/types.js";
 import { lockCatalogMediaData } from "../../data/catalog-media/lock-catalog-media.js";
 import { hasCatalogMediaReferenceData } from "../../data/catalog-media/has-catalog-media-reference.js";
 import { deleteCatalogMediaData } from "../../data/catalog-media/delete-catalog-media.js";
-import { deleteCatalogMedia } from "../../utils/catalog-media-storage.js";
+import { deleteCatalogMediaObjectsService } from "./delete-catalog-media-objects.js";
 
 export async function removePendingCatalogMediaService(
   db: Kysely<DB>,
@@ -20,7 +20,7 @@ export async function removePendingCatalogMediaService(
         message: "This media is saved in a listing and cannot be discarded.",
       };
     try {
-      if (media.storage_key) await deleteCatalogMedia(media.storage_key);
+      await deleteCatalogMediaObjectsService(media);
     } catch {
       return {
         status: 502 as const,

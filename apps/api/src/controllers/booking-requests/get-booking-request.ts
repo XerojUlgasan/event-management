@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { getBookingRequestService } from "../../services/booking-requests/get-booking-request.js";
 import { bookingSchema, idParams } from "./schemas.js";
@@ -30,7 +31,7 @@ export const getMyBookingRequestRouteHandler: AppRouteHandler<
     c.get("session").user.id,
   );
   if (!bookingRequest)
-    return c.json({ error: "Booking request not found" }, 404);
+    return jsonError(c, "Booking request not found", 404);
   return c.json({ bookingRequest }, 200);
 };
 export const getAdminBookingRequestRoute = createRoute({
@@ -48,6 +49,6 @@ export const getAdminBookingRequestRouteHandler: AppRouteHandler<
     c.req.valid("param").id,
   );
   if (!bookingRequest)
-    return c.json({ error: "Booking request not found" }, 404);
+    return jsonError(c, "Booking request not found", 404);
   return c.json({ bookingRequest }, 200);
 };

@@ -1,4 +1,5 @@
 import type { BookingRequest } from "../../data/booking-requests/requests";
+import { calendarDateInTimeZone } from "@event-management/contracts/calendar-date";
 
 // A delayed time-save response must not undo a newer cancellation or edit.
 export function latestCustomerEvent(
@@ -40,12 +41,7 @@ type CustomerEventGroup = (typeof customerEventGroups)[number]["key"];
 
 // Requested dates stay separate from operational schedules, which can move.
 export function customerEventPosition(item: BookingRequest, now = new Date()) {
-  const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: item.timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
+  const today = calendarDateInTimeZone(now, item.timeZone);
   const dates = (
     item.requestedDays?.map((day) => day.date) ??
     (item.preferredDate ? [item.preferredDate] : [])

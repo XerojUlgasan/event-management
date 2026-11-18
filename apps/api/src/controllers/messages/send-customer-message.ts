@@ -1,4 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import {
   customerMessageBodySchema,
@@ -41,16 +42,16 @@ export const sendCustomerMessageRouteHandler: AppRouteHandler<
     return c.json(result, 201);
   } catch (error) {
     if (error instanceof Error && error.message === "Conversation not found") {
-      return c.json({ error: error.message }, 404);
+      return jsonError(c, error.message, 404);
     }
     if (error instanceof Error && error.message === "Conversation is closed") {
-      return c.json({ error: error.message }, 409);
+      return jsonError(c, error.message, 409);
     }
     if (
       error instanceof Error &&
       error.message === "Message request conflict"
     ) {
-      return c.json({ error: error.message }, 409);
+      return jsonError(c, error.message, 409);
     }
     throw error;
   }

@@ -18,6 +18,7 @@ import { lockCatalogMediaData } from "../../data/catalog-media/lock-catalog-medi
 import { createCatalogMediaData } from "../../data/catalog-media/create-catalog-media.js";
 import { storedCanvasWidget } from "../../utils/catalog-canvas.js";
 import { listCatalogMediaIdsService } from "./read-catalog-sections.js";
+import { listOwnerMediaIdsData } from "../../data/catalog-media/catalog-media-ownership.js";
 
 export class InvalidCatalogMedia extends Error {}
 
@@ -99,6 +100,11 @@ export async function replaceCatalogSectionsService(
       ),
     ),
   ].sort();
+  // Include the existing canvas and dedicated thumbnail before taking any
+  // media lock, so attachment, relocation and cleanup acquire them in ID order.
+  const ownerMediaIds = await listOwnerMediaIdsData(db, owner);
+  for (const id of [...new Set([...uploadIds, ...ownerMediaIds])].sort())
+    await lockCatalogMediaData(db, id);
   for (const id of uploadIds) {
     const media = await lockCatalogMediaData(db, id);
     if (!media || media.source !== "upload")

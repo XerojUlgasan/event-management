@@ -143,7 +143,7 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` starts the local Supabase stack, serves the edge function, and starts the website at <http://localhost:4321/>. `pnpm all` remains the Compose PostgreSQL path: it creates `apps/api/.env` from its example if missing, starts PostgreSQL and waits for its healthcheck, applies committed migrations, then starts the Node API and web servers. Local email/password sign-in works without Firebase configuration. Catalog uploads use the private Supabase Storage bucket `event-management`; object keys stay `catalog-media/<id>`. The edge runtime supplies its own Storage URL and service role. The Node API needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from the API example.
+`pnpm dev` starts the local Supabase stack, serves the edge function, and starts the website at <http://localhost:4321/>. `pnpm all` remains the Compose PostgreSQL path: it creates `apps/api/.env` from its example if missing, starts PostgreSQL and waits for its healthcheck, applies committed migrations, then starts the Node API and web servers. Local email/password sign-in works without Firebase configuration. Catalog uploads use the private Supabase Storage bucket `event-management`; uploads start at `pending/<admin-id>/<media-id>.<ext>` and move into package, service, or booking folders when saved. The edge runtime supplies its own Storage URL and service role. The Node API needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from the API example.
 
 **Existing databases:** review pending migrations and back up affected data before `pnpm all`, `pnpm dev:prepare`, or `pnpm db:deploy`; these commands apply migrations. See [migration impact](README.md#migration-impact).
 
@@ -175,7 +175,7 @@ pnpm dev
 
 ### Local Supabase
 
-`apps/supabase` is the local Supabase CLI project, pinned to CLI 3.0.0. `pnpm supabase:start` requires Docker and starts its own Postgres 17, Studio, and Storage. Postgres listens on `127.0.0.1:54322`, the API gateway on `54321`, and Studio on `54323`. This stack can run beside `pnpm db:up`. Local Storage declares the private `event-management` bucket in `apps/supabase/config.toml`. Restart the stack after pulling that bucket so Storage creates it. New catalog objects use the key `catalog-media/<id>`; this change does not copy objects already stored elsewhere.
+`apps/supabase` is the local Supabase CLI project, pinned to CLI 3.0.0. `pnpm supabase:start` requires Docker and starts its own Postgres 17, Studio, and Storage. Postgres listens on `127.0.0.1:54322`, the API gateway on `54321`, and Studio on `54323`. This stack can run beside `pnpm db:up`. Local Storage declares the private `event-management` bucket in `apps/supabase/config.toml`. Restart the stack after pulling that bucket so Storage creates it. Catalog uploads use owner folders described in [catalog media](context-factory/areas/api/references/external-image-urls.md). The folder structure applies to new uploads; existing development files do not need relocation.
 
 The Node API, Prisma, seeds, and integration tests still use Compose PostgreSQL from `apps/api/compose.yaml` on port 5432. Do not point that API's `DB_HOST` at the Supabase database until that cutover is explicit. Supabase Auth is not the application sign-in.
 
@@ -243,7 +243,24 @@ The shared editor uses photo, Markdown, video, and linked service/package widget
 
 Service and package widgets feature an existing catalog listing without creating a package inclusion or changing package/quotation prices. In edit mode, clicking the widget body opens active choices of that kind directly, with search, photos, descriptions, pagination, an optional caption, and keyboard dismissal/focus restoration. Private custom packages are excluded. In public pages and previews, the whole card links to the selected listing's detail page. Inside `/app`, the whole card instead opens a detail preview overlay while preserving the current route and underlying preview or editor. Following another service or package replaces the overlay content; closing it returns focus to the original card. Workspace navigation closes the overlay and restores page scrolling. Saved widgets store a service or package ID; reads resolve its current name, description, photo, and public link without pricing or nested canvases. Archived targets show an unavailable placeholder; existing references remain editable, but new unavailable references cannot be saved. A listing referenced by a package or service canvas cannot be deleted. Knowledge ingestion indexes the widget caption only, so renames do not leave copied listing details in another listing. No database migration is needed; deploy the matching shared contracts, API, and frontend together.
 
-Public media streaming requires a reference from a published, non-archived catalog record. System Administrators can preview pending uploads and saved private media under the API access rules. Owners can preview media currently referenced by their private package; private responses use no-store caching. Quotations do not retain historical media or grant media access. Removing uploaded media triggers cleanup only when no current widget references it; storage failures can leave unreferenced assets for retry. See [catalog media](context-factory/areas/api/references/external-image-urls.md) for storage, cleanup, and migration details, and [shared limits](context-factory/areas/contracts/SKILL.md) for validation ownership.
+The private bucket uses this filing structure (IDs remain stable when names change):
+
+```text
+event-management/
+├── packages/<package-id>/images/<media-id>.<ext>
+├── packages/<package-id>/videos/<media-id>.<ext>
+├── services/<service-id>/images/<media-id>.<ext>
+├── services/<service-id>/videos/<media-id>.<ext>
+├── bookings/<booking-id>/custom-package/images/<media-id>.<ext>
+├── bookings/<booking-id>/custom-package/videos/<media-id>.<ext>
+└── pending/<admin-id>/<media-id>.<ext>
+```
+
+Saving a listing promotes its new pending uploads by copying bytes into the owner folder, switching the stored key, then removing the pending copy. A failed copy leaves the saved listing using its readable pending file; a later save retries promotion. Dedicated thumbnails use the same owner folders. API media URLs and access checks remain unchanged; folder names do not grant access. Original filenames are not retained.
+
+**Development scope:** Clemora has not reached production. Existing documents and uploaded files do not need migration or preservation for this redesign. There is no storage backfill command or move-tracking table, and this change does not delete existing bucket objects. The folder structure applies to new uploads and their subsequent saves. Interrupted promotion can leave an unreferenced object; this development implementation does not add a durable recovery queue. See [catalog media](context-factory/areas/api/references/external-image-urls.md) for lifecycle details.
+
+Public media streaming requires a reference from a published, non-archived catalog record. System Administrators can preview pending uploads and saved private media under the API access rules. Owners can preview media currently referenced by their private package; private responses use no-store caching. Quotations do not retain historical media or grant media access. Removing uploaded media triggers cleanup only when no current canvas or thumbnail references it; storage failures can leave unreferenced assets for retry. See [catalog media](context-factory/areas/api/references/external-image-urls.md) for storage, cleanup, and migration details, and [shared limits](context-factory/areas/contracts/SKILL.md) for validation ownership.
 
 ## Database workflow
 

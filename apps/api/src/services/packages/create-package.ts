@@ -16,6 +16,7 @@ import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalo
 import { error } from "./package-rules.js";
 import { duplicateTitle, catalogTitle } from "../../utils/catalog-title.js";
 import { findCatalogTitleData } from "../../data/catalog/find-catalog-title.js";
+import { promoteOwnerCatalogMediaService } from "../catalog-media/promote-catalog-media.js";
 export async function createPackageService(
   db: Kysely<DB>,
   content: Content,
@@ -44,10 +45,15 @@ export async function createPackageService(
       await syncCatalogKnowledge(trx, { kind: "package", id: row.id });
       return packageDto(trx, row, { includeArchivedServices: true });
     });
-    if (!("status" in outcome))
+    if (!("status" in outcome)) {
+      await promoteOwnerCatalogMediaService(db, {
+        kind: "package",
+        id: outcome.id,
+      });
       await scheduleCatalogEmbeddingRefresh(db, [
         { kind: "package", id: outcome.id },
       ]);
+    }
     return outcome;
   } catch (cause) {
     const duplicate = duplicateTitle(

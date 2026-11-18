@@ -11,6 +11,14 @@ import type {
   QuotationStatus,
 } from "@event-management/contracts/quotations";
 import { usePagination } from "../../lib/pagination/use-pagination";
+import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
+import {
+  centavosToPesos,
+  formatPesosFromMinor,
+  formatSignedPesosFromMinor,
+  pesosToCentavos,
+} from "../../lib/utils/formatting/money";
+import { formatEnPhDateTime } from "../../lib/utils/formatting/dates";
 import {
   getAdminServices,
   type AdminService,
@@ -36,23 +44,7 @@ import {
 } from "../../lib/data/quotations/quotations";
 import { getAdminBookingRequest } from "../../lib/data/booking-requests/requests";
 
-const money = (amountMinor: number) =>
-  new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(
-    amountMinor / 100,
-  );
-
-const signedMoney = (amountMinor: number) => {
-  const formatted = money(Math.abs(amountMinor));
-  if (amountMinor > 0) return `+${formatted}`;
-  if (amountMinor < 0) return `−${formatted}`;
-  return formatted;
-};
-
-const formatWhen = (value: string) =>
-  new Intl.DateTimeFormat("en-PH", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+const formatWhen = (value: string) => formatEnPhDateTime(new Date(value));
 
 const statusLabel: Record<QuotationStatus, string> = {
   draft: "Draft",
@@ -114,7 +106,7 @@ export function QuotationSummaryRead({ quotation }: { quotation: Quotation }) {
             Offer total · Version {quotation.version}
           </p>
           <strong className="quotation-hero-total">
-            {money(quotation.totalAmountMinor)}
+            {formatPesosFromMinor(quotation.totalAmountMinor)}
           </strong>
         </div>
         <QuotationStatusBadge status={quotation.status} />
@@ -131,7 +123,7 @@ export function QuotationSummaryRead({ quotation }: { quotation: Quotation }) {
             <b>Package base</b>
             <span className="quotation-item-note">Included</span>
           </div>
-          <b>{money(quotation.baseAmountMinor)}</b>
+          <b>{formatPesosFromMinor(quotation.baseAmountMinor)}</b>
         </div>
         {quotation.items.map((line) => (
           <div className="quotation-summary-line" key={line.id}>
@@ -150,7 +142,7 @@ export function QuotationSummaryRead({ quotation }: { quotation: Quotation }) {
                   : undefined
               }
             >
-              {signedMoney(
+              {formatSignedPesosFromMinor(
                 line.direction === "deduct"
                   ? -line.amountMinor
                   : line.amountMinor,
@@ -181,21 +173,21 @@ function QuotationMathBox({
       <div className="quotation-math" aria-live="polite">
         <div>
           <span>Package base</span>
-          <span>{money(baseAmountMinor)}</span>
+          <span>{formatPesosFromMinor(baseAmountMinor)}</span>
         </div>
         <div>
           <span>Additions</span>
-          <span>{signedMoney(additions)}</span>
+          <span>{formatSignedPesosFromMinor(additions)}</span>
         </div>
         <div>
           <span>Deductions</span>
           <span className="quotation-amount-deduct">
-            {signedMoney(-deductions)}
+            {formatSignedPesosFromMinor(-deductions)}
           </span>
         </div>
         <div className="quotation-math-grand">
           <span>Offer total</span>
-          <span>{money(totalMinor)}</span>
+          <span>{formatPesosFromMinor(totalMinor)}</span>
         </div>
       </div>
       {totalMinor < 0 && (
@@ -319,11 +311,11 @@ function QuotationAdjustmentCard({
               inputMode="decimal"
               min="0"
               step="0.01"
-              max={MAX_QUOTATION_AMOUNT_MINOR / 100}
-              value={line.amountMinor / 100 || ""}
+              max={centavosToPesos(MAX_QUOTATION_AMOUNT_MINOR)}
+              value={centavosToPesos(line.amountMinor) || ""}
               onChange={(event) =>
                 onChange({
-                  amountMinor: Math.round(Number(event.target.value) * 100),
+                  amountMinor: pesosToCentavos(Number(event.target.value)),
                 })
               }
             />
@@ -344,27 +336,27 @@ export function Quotations({
   quotationId?: string;
 }) {
   const { notify, notifyError } = useNotifications();
-  const generation = useRef(0);
+  const generation = useRequestGeneration();
   const [services, setServices] = useState<AdminService[]>([]);
   const [serviceError, setServiceError] = useState("");
   const [serviceCursor, setServiceCursor] = useState<string | null>(null);
   const [serviceLoading, setServiceLoading] = useState(false);
   async function loadServices(cursor?: string) {
-    const current = generation.current;
+    const current = generation.current();
     setServiceLoading(true);
     try {
       const result = await getAdminServices({ cursor });
-      if (current !== generation.current) return;
+      if (!generation.isCurrent(current)) return;
       setServices((previous) =>
         cursor ? [...previous, ...result.services] : result.services,
       );
       setServiceCursor(result.nextCursor);
       setServiceError("");
     } catch (cause) {
-      if (current !== generation.current) return;
+      if (!generation.isCurrent(current)) return;
       setServiceError(notifyError(cause, "Unable to load services."));
     } finally {
-      if (current === generation.current) setServiceLoading(false);
+      if (generation.isCurrent(current)) setServiceLoading(false);
     }
   }
   const [rows, setRows] = useState<Quotation[]>([]),
@@ -404,7 +396,7 @@ export function Quotations({
   );
 
   async function load(cursor = pagination.cursor) {
-    const currentGeneration = generation.current;
+    const currentGeneration = generation.current();
     const sequence = ++pageRequest.current;
     const key = JSON.stringify([
       bookingId ?? null,
@@ -439,7 +431,7 @@ export function Quotations({
               };
       const resolved = await result;
       if (
-        currentGeneration !== generation.current ||
+        !generation.isCurrent(currentGeneration) ||
         sequence !== pageRequest.current ||
         pageKeyRef.current !== key
       )
@@ -458,7 +450,7 @@ export function Quotations({
       setDraft(resolved.currentDraft);
     } catch (cause) {
       if (
-        currentGeneration !== generation.current ||
+        !generation.isCurrent(currentGeneration) ||
         sequence !== pageRequest.current ||
         pageKeyRef.current !== key
       )
@@ -466,7 +458,7 @@ export function Quotations({
       setError(notifyError(cause, "Unable to load quotations."));
     } finally {
       if (
-        currentGeneration === generation.current &&
+        generation.isCurrent(currentGeneration) &&
         sequence === pageRequest.current &&
         pageKeyRef.current === key
       )
@@ -482,7 +474,7 @@ export function Quotations({
   useEffect(() => {
     if (admin) void loadServices();
     return () => {
-      generation.current++;
+      generation.bump();
     };
   }, [bookingId, admin, quotationId]);
 
@@ -642,7 +634,7 @@ export function Quotations({
             </p>
           )}
           <p className="quotation-lede">
-            Package base stays {money(draft.baseAmountMinor)}. Each adjustment
+            Package base stays {formatPesosFromMinor(draft.baseAmountMinor)}. Each adjustment
             below is added to it or taken off it.
           </p>
 
@@ -878,7 +870,7 @@ export function Quotations({
                         : `Created ${formatWhen(quotation.createdAt)}`}
                     </span>
                   </span>
-                  <b>{money(quotation.totalAmountMinor)}</b>
+                  <b>{formatPesosFromMinor(quotation.totalAmountMinor)}</b>
                 </Button>
                 {expanded && (
                   <div className="quotation-history-body">

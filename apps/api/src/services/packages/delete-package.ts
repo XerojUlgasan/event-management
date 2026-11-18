@@ -28,6 +28,8 @@ export async function deletePackageService(db: Kysely<DB>, id: string) {
         kind: "package",
         id,
       });
+      if (current.thumbnail_media_id)
+        previousMediaIds.push(current.thumbnail_media_id);
       await deletePackageData(trx, id);
       return null;
     });

@@ -1,3 +1,4 @@
+import { centavosToPesos } from "@event-management/contracts/money";
 import type { Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 import type { Content } from "../../controllers/packages/schemas.js";
@@ -8,7 +9,7 @@ export const packageColumns = (content: Content, slug: string) => ({
     ? { description: content.description }
     : {}),
   max_guests: content.maxGuests,
-  price: content.price.amountMinor / 100,
+  price: centavosToPesos(content.price.amountMinor),
   ...(content.thumbnailMediaId !== undefined
     ? { thumbnail_media_id: content.thumbnailMediaId ?? null }
     : {}),

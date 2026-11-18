@@ -9,7 +9,7 @@ import { findCustomPackageData } from "../../data/booking-requests/find-custom-p
 import { findAnyPackageData } from "../../data/booking-requests/find-any-package.js";
 import { lockAnyPackageData } from "../../data/booking-requests/lock-any-package.js";
 import { createCustomPackageData } from "../../data/booking-requests/create-custom-package.js";
-import { listCatalogMediaIdsService } from "../catalog-canvas/read-catalog-sections.js";
+import { listOwnerMediaIdsData } from "../../data/catalog-media/catalog-media-ownership.js";
 import {
   InvalidCatalogMedia,
   replaceCatalogSectionsService,
@@ -26,15 +26,14 @@ import { packageDto } from "../packages/package-response.js";
 import { nextUpdate } from "../packages/package-rules.js";
 import { bookingRequestDtos } from "./booking-request-response.js";
 import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
-import {
-  getCatalogMedia,
-  putCatalogMedia,
-} from "../../utils/catalog-media-storage.js";
+import { pendingCatalogMediaKey } from "../../utils/catalog-media-paths.js";
+import { promoteOwnerCatalogMediaService } from "../catalog-media/promote-catalog-media.js";
+import { readCatalogMediaService } from "../catalog-media/read-catalog-media.js";
+import { putCatalogMedia } from "../../utils/catalog-media-storage.js";
+import { serviceError } from "../../utils/service-result.js";
 
-const error = (message: string, status: 400 | 404 | 409 | 502) => ({
-  message,
-  status,
-});
+const error = (message: string, status: 400 | 404 | 409 | 502) =>
+  serviceError(message, status);
 export type CustomPackageInput = Content & {
   expectedBookingUpdatedAt: string;
   expectedUpdatedAt?: string;
@@ -47,20 +46,21 @@ async function stageSourceMedia(
   actorId: string,
   stagedIds: string[],
 ) {
-  const sourceIds = await listCatalogMediaIdsService(db, {
+  const sourceIds = await listOwnerMediaIdsData(db, {
     kind: "package",
     id: sourceId,
   });
   const requestedIds = [
-    ...new Set(
-      content.sections.flatMap((section) =>
+    ...new Set([
+      ...content.sections.flatMap((section) =>
         section.widgets.flatMap((widget) =>
           widget.media?.source === "upload" && widget.media.id
             ? [widget.media.id]
             : [],
         ),
       ),
-    ),
+      ...(content.thumbnailMediaId ? [content.thumbnailMediaId] : []),
+    ]),
   ].filter((id) => sourceIds.includes(id));
   const replacements = new Map<string, string>();
   for (const sourceMediaId of requestedIds) {
@@ -70,7 +70,7 @@ async function stageSourceMedia(
         "Source media is unavailable. Refresh and try again",
       );
     const id = randomUUID(),
-      key = `catalog-media/${id}`;
+      key = pendingCatalogMediaKey(actorId, id, source.mime_type);
     await createCatalogMediaData(db, {
       id,
       kind: source.kind,
@@ -81,7 +81,13 @@ async function stageSourceMedia(
       created_by: actorId,
     });
     stagedIds.push(id);
-    const stream = await getCatalogMedia(source.storage_key);
+    const stream = await readCatalogMediaService(
+      db,
+      sourceMediaId,
+      source.storage_key,
+      undefined,
+      AbortSignal.timeout(30_000),
+    );
     await putCatalogMedia(
       key,
       new Uint8Array(await new Response(stream).arrayBuffer()),
@@ -91,6 +97,9 @@ async function stageSourceMedia(
   }
   return {
     ...content,
+    thumbnailMediaId: content.thumbnailMediaId
+      ? (replacements.get(content.thumbnailMediaId) ?? content.thumbnailMediaId)
+      : content.thumbnailMediaId,
     sections: content.sections.map((section) => ({
       ...section,
       widgets: section.widgets.map((widget) => {
@@ -218,6 +227,8 @@ export async function saveCustomPackageService(
         content,
         actorId,
       );
+      if (!create && current?.thumbnail_media_id)
+        previousMediaIds.push(current.thumbnail_media_id);
       await replacePackageServicesData(trx, saved.id, content.services);
       await touchBookingRevisionData(trx, id);
       const updatedBooking = await findBookingRequestData(trx, id);
@@ -243,6 +254,11 @@ export async function saveCustomPackageService(
       const [bookingRequest] = await bookingRequestDtos(trx, [updatedBooking]);
       return { package: pkg, bookingRequest };
     });
+    if (!("status" in outcome))
+      await promoteOwnerCatalogMediaService(db, {
+        kind: "package",
+        id: outcome.package.id,
+      });
     await cleanupCatalogMediaService(
       db,
       "status" in outcome ? stagedIds : previousMediaIds,

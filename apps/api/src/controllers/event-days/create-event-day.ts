@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import * as service from "../../services/event-days/create-event-day.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { body, json } from "../booking-requests/http.js";
@@ -33,6 +34,6 @@ export const createEventDayRouteHandler: AppRouteHandler<
     );
   } catch (e) {
     const error = errorResponse(e);
-    return c.json({ error: error.message }, error.status);
+    return jsonError(c, error.message, error.status);
   }
 };

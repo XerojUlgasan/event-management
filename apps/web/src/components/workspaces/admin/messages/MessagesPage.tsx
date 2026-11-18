@@ -14,6 +14,7 @@ import {
 } from "../../../../lib/data/messages/conversations";
 import { ApiError } from "../../../../lib/http/request";
 import { useConversationList } from "../../../../lib/services/messages/use-conversation-list";
+import { assertCursorMoved } from "../../../../lib/services/messages/older-page";
 import { MessagesWorkspace } from "../../../messages/MessagesWorkspace";
 import {
   mergeAiStateByVersion,
@@ -180,8 +181,7 @@ export function MessagesPage() {
         activeIdRef.current !== id
       )
         return;
-      if (older.nextCursor === cursor)
-        throw new Error("Unable to load older messages. Please try again.");
+      assertCursorMoved(older.nextCursor, cursor);
       older.messages.forEach((message) =>
         localMessages.current.delete(message.id),
       );

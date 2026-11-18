@@ -1,4 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { json, errors, idParams, result } from "./http.js";
 import { archivePackageService } from "../../services/packages/archive-package.js";
@@ -18,6 +19,6 @@ export const archivePackageRouteHandler: AppRouteHandler<
     c.req.valid("param").id,
   );
   if ("status" in outcome)
-    return c.json({ error: outcome.message }, outcome.status);
+    return jsonError(c, outcome.message, outcome.status);
   return c.json(outcome, 200);
 };

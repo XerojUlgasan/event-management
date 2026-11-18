@@ -1,5 +1,6 @@
 import { sql, type Kysely, type Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
+import { keysetPredicate, utcTimestampSql } from "../../utils/sql-page.js";
 import type {
   CatalogListOptions,
   CatalogPosition,
@@ -15,9 +16,7 @@ export function listPublicServicesPageData(
     .selectFrom("services")
     .selectAll()
     .select(
-      sql<string>`to_char(published_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`.as(
-        "page_sort",
-      ),
+      utcTimestampSql("published_at").as("page_sort"),
     );
   query = query.where("archived_at", "is", null);
   if (options.pricingType === "fixed")
@@ -32,7 +31,13 @@ export function listPublicServicesPageData(
     query = query.where(priceColumn, "<=", options.maxPricePesos);
   if (position)
     query = query.where(
-      sql<boolean>`(published_at, id) < (${position.sort}::timestamptz, ${position.id}::uuid)`,
+      keysetPredicate(
+        "published_at",
+        "id",
+        position.sort,
+        position.id,
+        "<",
+      ),
     );
   return query
     .orderBy("published_at", "desc")

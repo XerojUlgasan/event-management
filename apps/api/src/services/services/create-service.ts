@@ -12,6 +12,7 @@ import {
 import { error } from "../packages/package-rules.js";
 import { duplicateTitle, catalogTitle } from "../../utils/catalog-title.js";
 import { findCatalogTitleData } from "../../data/catalog/find-catalog-title.js";
+import { promoteOwnerCatalogMediaService } from "../catalog-media/promote-catalog-media.js";
 export async function createServiceService(
   db: Kysely<DB>,
   data: ServiceContent,
@@ -38,10 +39,15 @@ export async function createServiceService(
       await syncCatalogKnowledge(trx, { kind: "service", id: row.id });
       return serviceAdminDto(trx, row);
     });
-    if (!("status" in outcome))
+    if (!("status" in outcome)) {
+      await promoteOwnerCatalogMediaService(db, {
+        kind: "service",
+        id: outcome.id,
+      });
       await scheduleCatalogEmbeddingRefresh(db, [
         { kind: "service", id: outcome.id },
       ]);
+    }
     return outcome;
   } catch (cause) {
     const duplicate = duplicateTitle(
