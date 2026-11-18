@@ -10,6 +10,7 @@ export function CatalogCreateDialog<T extends { name: string }>({
   validate,
   renderDetails,
   privateProposal = false,
+  uploading = false,
 }: {
   entity: "package" | "service";
   privateProposal?: boolean;
@@ -18,6 +19,8 @@ export function CatalogCreateDialog<T extends { name: string }>({
   onContinue: (content: T) => void;
   validate: (content: T) => string | undefined;
   renderDetails: (content: T, setContent: (content: T) => void) => ReactNode;
+  /** When true the Continue button is disabled (e.g. a thumbnail upload is in progress). */
+  uploading?: boolean;
 }) {
   const [content, setContent] = useState(initial);
   const [error, setError] = useState("");
@@ -66,7 +69,9 @@ export function CatalogCreateDialog<T extends { name: string }>({
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit">Continue to editor</Button>
+          <Button type="submit" disabled={uploading}>
+            {uploading ? "Uploading…" : "Continue to editor"}
+          </Button>
         </div>
       </form>
     </Dialog>

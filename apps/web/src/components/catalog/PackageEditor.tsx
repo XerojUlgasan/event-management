@@ -22,6 +22,7 @@ import {
 import { priceLabel } from "../../lib/utils/formatting/money";
 import { PackageCanvas } from "./CatalogContent";
 import { photos } from "../../demo/catalog/photos";
+import { useThumbnail } from "../../lib/utils/catalog/use-thumbnail";
 import "../../styles/catalog/package-editor.css";
 
 const blank = (): PackageContent => ({
@@ -32,23 +33,16 @@ const blank = (): PackageContent => ({
   sections: [newCatalogSection()],
   services: [],
 });
-function cover(item: PackageContent) {
-  return (
-    item.sections
-      .flatMap((s) => s.widgets)
-      .find((w) => w.type === "photo" && w.media)?.media?.url || null
-  );
-}
 export function PackageCard({
   item,
   action,
 }: {
-  item: PackageContent;
+  item: PackageContent & { imageUrl?: string | null };
   action?: React.ReactNode;
 }) {
   return (
     <CatalogCard
-      image={packageImageSrc(cover(item)) || photos.dinner}
+      image={packageImageSrc(item.imageUrl ?? null) || photos.dinner}
       eyebrow="Event package"
       title={item.name || "Untitled package"}
       description={item.description}
@@ -107,13 +101,23 @@ export function PackageEditor({
 
   const [draft, setDraft] = useState(blank);
   const [prepared, setPrepared] = useState(false);
+
+  // Seed the preview URL from the existing imageUrl when editing.
+  const thumbnail = useThumbnail(
+    initial ? (packageImageSrc(initial.imageUrl ?? null) ?? null) : null,
+  );
+
   if (!initial && !prepared) {
     return (
       <CatalogCreateDialog
         entity="package"
         privateProposal={!!saveCustom}
         initial={draft}
-        onClose={onClose}
+        uploading={thumbnail.uploading}
+        onClose={() => {
+          thumbnail.cancelAndCleanup();
+          onClose();
+        }}
         onContinue={(content) => {
           setDraft(content);
           setPrepared(true);
@@ -124,6 +128,10 @@ export function PackageEditor({
             content={content}
             onChange={setContent}
             privateProposal={!!saveCustom}
+            thumbnailPreviewUrl={thumbnail.previewUrl}
+            onThumbnailChange={thumbnail.handleChange}
+            onThumbnailError={(msg) => notifyError(msg)}
+            onThumbnailBusyChange={thumbnail.setUploading}
           />
         )}
       />
@@ -155,8 +163,8 @@ export function PackageEditor({
       onSave={async (content) => {
         if (saveCustom) await saveCustom(content);
         else if (initial)
-          await updatePackage(initial.id, content, initial.updatedAt);
-        else await createPackage(content);
+          await updatePackage(initial.id, content, initial.updatedAt, thumbnail.mediaIdRef.current);
+        else await createPackage(content, thumbnail.mediaIdRef.current);
       }}
       renderDetails={(content, setContent) => (
         <>
@@ -301,6 +309,10 @@ export function PackageEditor({
             content={content}
             onChange={setContent}
             privateProposal={!!saveCustom}
+            thumbnailPreviewUrl={thumbnail.previewUrl}
+            onThumbnailChange={thumbnail.handleChange}
+            onThumbnailError={(msg) => notifyError(msg)}
+            onThumbnailBusyChange={thumbnail.setUploading}
           />
         </>
       )}

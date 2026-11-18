@@ -5,15 +5,24 @@ import {
   centavosToPesos,
   pesosToCentavos,
 } from "../../lib/utils/formatting/money";
+import { ThumbnailField } from "./ThumbnailField";
 
 export function PackageDetailsFields({
   content,
   onChange,
   privateProposal = false,
+  thumbnailPreviewUrl,
+  onThumbnailChange,
+  onThumbnailError,
+  onThumbnailBusyChange,
 }: {
   privateProposal?: boolean;
   content: PackageContent;
   onChange: (content: PackageContent) => void;
+  thumbnailPreviewUrl: string | null;
+  onThumbnailChange: (mediaId: string | null, previewUrl: string | null) => void;
+  onThumbnailError: (message: string) => void;
+  onThumbnailBusyChange: (busy: boolean) => void;
 }) {
   return (
     <div className="form-grid">
@@ -82,6 +91,12 @@ export function PackageDetailsFields({
           />
         )}
       </FormField>
+      <ThumbnailField
+        previewUrl={thumbnailPreviewUrl}
+        onChange={onThumbnailChange}
+        onError={onThumbnailError}
+        onBusyChange={onThumbnailBusyChange}
+      />
     </div>
   );
 }

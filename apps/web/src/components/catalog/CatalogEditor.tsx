@@ -22,7 +22,6 @@ import {
   MAX_CATALOG_WIDGET_ROWS,
   MAX_CATALOG_WIDGET_Y,
 } from "@event-management/contracts/limits/catalog";
-import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images";
 import { MAX_VIDEO_SIZE_BYTES } from "@event-management/contracts/limits/videos";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
@@ -36,6 +35,7 @@ import type {
 } from "@event-management/contracts/catalog";
 import { deleteCatalogMedia } from "../../lib/data/catalog/media";
 import { validateCatalogCanvas } from "../../lib/utils/catalog/canvas-validation";
+import { validateImageFile } from "../../lib/utils/catalog/media-validation";
 import {
   unreferencedUploadIds,
   uploadPendingCatalogMedia,
@@ -508,18 +508,16 @@ export function CatalogEditor<T extends CanvasContent>({
     file?: File,
   ): string | undefined => {
     if (!file) return;
-    const max =
-      w.type === "photo" ? MAX_IMAGE_SIZE_BYTES : MAX_VIDEO_SIZE_BYTES;
-    const types =
-      w.type === "photo"
-        ? ["image/jpeg", "image/png", "image/webp"]
-        : ["video/mp4", "video/webm"];
-    if (!types.includes(file.type))
-      return w.type === "photo"
-        ? "Choose a JPEG, PNG, or WebP image."
-        : "Choose an MP4 or WebM video.";
-    if (!file.size || file.size > max)
-      return `File must be ${Math.floor(max / 1024 / 1024)} MiB or smaller.`;
+    if (w.type === "photo") {
+      const photoError = validateImageFile(file);
+      if (photoError) return photoError;
+    } else {
+      const max = MAX_VIDEO_SIZE_BYTES;
+      const types = ["video/mp4", "video/webm"];
+      if (!types.includes(file.type)) return "Choose an MP4 or WebM video.";
+      if (!file.size || file.size > max)
+        return `File must be ${Math.floor(max / 1024 / 1024)} MiB or smaller.`;
+    }
     const url = URL.createObjectURL(file);
     objectUrls.current.push(url);
     setLocalUrls((f) => ({ ...f, [w.id]: url }));

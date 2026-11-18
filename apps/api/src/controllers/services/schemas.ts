@@ -9,6 +9,7 @@ export const contentSchema = z.object({
   includedHours: z.number().int().positive().max(2147483647).nullable(),
   description: text,
   sections: sectionsSchema.optional(),
+  thumbnailMediaId: z.string().uuid().nullable().optional(),
 });
 export type ServiceContent = z.infer<typeof contentSchema>;
 const validPricing = (value: {

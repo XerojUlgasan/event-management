@@ -9,5 +9,21 @@ export const hasCatalogMediaReferenceData = (db: Database, id: string) =>
     .selectFrom("media_assets as m")
     .select("m.id")
     .where("m.id", "=", id)
-    .where(anyCanvasContainsMedia(sql.ref("m.id")))
+    .where((eb) =>
+      eb.or([
+        anyCanvasContainsMedia(sql.ref("m.id")),
+        eb.exists(
+          eb
+            .selectFrom("packages")
+            .select("id")
+            .where("thumbnail_media_id", "=", id),
+        ),
+        eb.exists(
+          eb
+            .selectFrom("services")
+            .select("id")
+            .where("thumbnail_media_id", "=", id),
+        ),
+      ]),
+    )
     .executeTakeFirst();

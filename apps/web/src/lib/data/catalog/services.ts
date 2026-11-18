@@ -29,16 +29,27 @@ export const getService = (id: string) =>
   request<PublicService>(`/services/${encodeURIComponent(id)}`);
 export const getAdminService = (id: string) =>
   request<AdminService>(`/admin/services/${encodeURIComponent(id)}`);
-export const createService = (content: ServiceContent) =>
-  request<AdminService>("/admin/services", content);
+export const createService = (
+  content: ServiceContent,
+  thumbnailMediaId?: string | null,
+) =>
+  request<AdminService>("/admin/services", {
+    ...content,
+    ...(thumbnailMediaId !== undefined ? { thumbnailMediaId } : {}),
+  });
 export const updateService = (
   id: string,
   content: ServiceContent,
   expectedUpdatedAt: string,
+  thumbnailMediaId?: string | null,
 ) =>
   request<AdminService>(
     `/admin/services/${encodeURIComponent(id)}`,
-    { ...content, expectedUpdatedAt },
+    {
+      ...content,
+      expectedUpdatedAt,
+      ...(thumbnailMediaId !== undefined ? { thumbnailMediaId } : {}),
+    },
     undefined,
     "PATCH",
   );

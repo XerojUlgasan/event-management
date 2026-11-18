@@ -50,6 +50,7 @@ export const contentSchema = z
     price: packagePriceSchema,
     sections: sectionsSchema,
     services: packageServicesSchema.default([]),
+    thumbnailMediaId: z.string().uuid().nullable().optional(),
   })
   .strict();
 export type Content = z.infer<typeof contentSchema>;

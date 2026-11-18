@@ -9,6 +9,9 @@ export const packageColumns = (content: Content, slug: string) => ({
     : {}),
   max_guests: content.maxGuests,
   price: content.price.amountMinor / 100,
+  ...(content.thumbnailMediaId !== undefined
+    ? { thumbnail_media_id: content.thumbnailMediaId ?? null }
+    : {}),
 });
 export function createPackageData(
   db: Transaction<DB>,

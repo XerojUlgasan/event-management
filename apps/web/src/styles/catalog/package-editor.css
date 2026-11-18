@@ -918,3 +918,111 @@ dialog.pe-media-dialog::backdrop {
   color: var(--text-muted);
   font-size: 13px;
 }
+
+/* ── Thumbnail field ─────────────────────────────────────────────────────── */
+.thumbnail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.thumbnail-field-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Clickable thumbnail — acts as a button to open the lightbox */
+.thumbnail-field-thumb-btn {
+  position: relative;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: block;
+  width: 80px;
+  height: 60px;
+}
+
+.thumbnail-field-thumb-btn img {
+  width: 80px;
+  height: 60px;
+  object-fit: cover;
+  display: block;
+}
+
+/* Hover overlay hint */
+.thumbnail-field-thumb-hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--overlay-black) 46%, var(--transparent));
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.thumbnail-field-thumb-btn:hover .thumbnail-field-thumb-hint,
+.thumbnail-field-thumb-btn:focus-visible .thumbnail-field-thumb-hint {
+  opacity: 1;
+}
+
+.thumbnail-field-thumb-btn:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+.thumbnail-field-uploading {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ── Thumbnail lightbox ──────────────────────────────────────────────────── */
+dialog.thumbnail-lightbox {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+dialog.thumbnail-lightbox::backdrop {
+  background: color-mix(in srgb, var(--overlay-black) 80%, var(--transparent));
+}
+
+dialog.thumbnail-lightbox:not([open]) {
+  display: none;
+}
+
+.thumbnail-lightbox-img {
+  max-width: min(90vw, 1200px);
+  max-height: 85dvh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 6px;
+  display: block;
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--overlay-black) 60%, var(--transparent));
+}
+
+.thumbnail-lightbox-close {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+}

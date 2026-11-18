@@ -1,0 +1,2 @@
+-- Migration file was never committed to git.
+-- Recorded as applied in the database; restored as a no-op placeholder.

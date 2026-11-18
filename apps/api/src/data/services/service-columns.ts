@@ -6,4 +6,7 @@ export const columns = (v: ServiceContent, slug: string) => ({
   fixed_price_pesos: v.fixedPricePesos,
   included_hours: v.includedHours,
   description: v.description,
+  ...(v.thumbnailMediaId !== undefined
+    ? { thumbnail_media_id: v.thumbnailMediaId ?? null }
+    : {}),
 });
