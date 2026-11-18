@@ -5,20 +5,19 @@ description: Design, implement, investigate, or review AI agents, tools, prompts
 
 # AI
 
-Use this area for the application's AI domain. The agreed starting location is `apps/api/src/services/ai/`, using Vercel AI SDK and AI Gateway. This guide establishes placement and engineering standards; it does not implement an assistant or approve new business actions. The root [README](../../../README.md#product-scope) owns product scope, open decisions, and implementation status.
+The assistant uses Vercel AI SDK and AI Gateway in `apps/api/src/services/ai/`. This area explains how to extend that implementation. The root [README](../../../README.md#product-scope) owns product scope, open decisions, implementation status, and setup; this guide grants no new business actions.
 
 ## Read for the task
 
-- For any AI change, read [structure and naming](references/structure-and-naming.md) and [standards and verification](references/standards-and-verification.md). Inspect the current caller, model configuration, relevant services, and tests before choosing an implementation.
-- When building or examining the individual files, use the [connected code examples](references/code-examples.md). They demonstrate all proposed files and mark future dependencies; adapt them to the installed SDK and actual task rather than copying the complete tree.
-- When assigning a scoped AI task, use the [one-shot prompt example](references/one-shot-prompt.md). A saved prompt is a template, not authorization to execute it.
-- For HTTP routes, service/data ownership, configuration, or runtime integration, also read [API](../api/SKILL.md). For private customer context or tools, read [auth and sessions](../api/references/auth-and-sessions.md) and the matching [business references](../../business/README.md); verify enforced permissions separately.
-- For request/response contracts or shared limits, add [contracts](../contracts/SKILL.md). For chat UI or browser consumers, add [frontend](../frontend/SKILL.md) and [packages](../packages/SKILL.md), including their required reuse references.
+- For any AI task, read [structure and naming](references/structure-and-naming.md) for ownership and [standards and verification](references/standards-and-verification.md) for invariants and checks. Inspect the affected source and tests before choosing a change.
+- To understand registration, tool definitions, or the turn lifecycle, follow the [current code walkthrough](references/code-examples.md).
+- To assign an extension, adapt the [task prompt](references/one-shot-prompt.md) to the authorized outcome.
+- For HTTP integration, services/data, configuration, or runtime changes, also read [API](../api/SKILL.md). For customer context, private tools, or business actions, add [auth and sessions](../api/references/auth-and-sessions.md) and the matching [business references](../../business/README.md); verify implemented permissions separately.
+- For shared contracts or limits, add [contracts](../contracts/SKILL.md). For chat UI or browser consumers, add [frontend](../frontend/SKILL.md) and [packages](../packages/SKILL.md), including their mandatory reuse references.
 
 ## Work in order
 
-1. Establish the authorized slice and current state. Follow the selected [workflow](../../README.md#choose-the-task); investigation and review remain read-only. For continuation, inspect the newest relevant [run](../../runs/README.md) and current source.
-2. Read the installed `ai` package's version-matched docs and source. Check the exact model's modality and capability in the live Gateway catalog when introducing or changing model use. Credentials remain server-side in the existing env owner.
-3. Keep one application entry for an assistant turn. Give its tools only the capabilities and trusted scope required for that task; reuse existing business services and data owners. Add a separate decision, retrieval step, or workflow when it has a concrete responsibility.
-4. Before enabling persistence or handoff, resolve the relevant source, ownership, lifecycle, and replay requirements. Draft examples remain drafts until the application has a defined and verified submission path.
-5. Complete the relevant checks from [standards and verification](references/standards-and-verification.md#verification), inspect the final diff, and update affected current docs. Report source/type/test/API/database/browser/provider evidence separately, including limits and skipped checks.
+1. Establish scope and current state through the selected [workflow](../../README.md#choose-the-task). Investigation and review remain read-only. For continuation, verify the newest relevant [run](../../runs/README.md) against the checkout.
+2. Trace the existing caller through the application entry, agent, tool, service, and data owner. Choose the smallest change at the responsible layer; the ownership guide identifies when another layer is needed.
+3. Apply the standards for access, execution records, evidence, and failure handling. Resolve missing ownership or lifecycle decisions before enabling a dependent action.
+4. Run the [checks for the changed responsibility](references/standards-and-verification.md#verification), inspect the final diff and affected documentation, and report the evidence and its limits.

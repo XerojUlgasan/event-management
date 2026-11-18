@@ -1,59 +1,37 @@
-# One-shot AI task prompt
+# Scoped AI extension prompt
 
-Use this example when assigning a first bounded implementation slice. Replace the outcome and acceptance cases for the actual task; keep its authorization and exclusions explicit. Read [AI](../SKILL.md), [structure and naming](structure-and-naming.md), [standards and verification](standards-and-verification.md), and the [code examples](code-examples.md) before adapting it. Copying this document into the repository does not start an implementation.
+Use this template when assigning work on the existing assistant. Replace the bracketed fields with the actual task and authorization; the template grants no actions by itself.
 
-## Example prompt
+Use [structure and naming](structure-and-naming.md) to place the change, the [code walkthrough](code-examples.md) to trace integration, and [standards and verification](standards-and-verification.md) to choose invariants and acceptance checks.
 
 ```text
-Implement the first signed-in, read-only customer catalog assistant in this
-repository. Follow AGENTS.md -> context-factory/README.md -> areas/ai/SKILL.md
-and its applicable references, API guidance, and the implementation workflow.
-Read the current README for scope and actual implementation status.
+Outcome: [customer need and expected observable behavior].
+Authorized scope: [implementation/review/investigation, affected capability, allowed side effects].
 
-Outcome:
-- A signed-in customer can POST a single text message to /v1/ai/reply and
-  receive a grounded text answer using published package information.
-- Use the existing Vercel AI SDK and AI Gateway. Read the installed SDK docs
-  and verify the selected TEXT_MODEL supports the required tool calls.
-- Define the request/response and reachable error outcomes using existing
-  Hono/OpenAPI conventions. Scope this slice to one message without persisted
-  chat history or client-supplied system/tool messages.
-- Keep the public application entry in services/ai/run-assistant-turn.ts.
-  Compose one customer service agent with listPublicPackages/getPublicPackage
-  tools that call the current public package services with bounded projections.
-- Put model setup, the prompt, and tool definitions in the agreed locations.
-  Extend the existing typed env owner only for settings this slice actually
-  uses. Missing AI configuration must not break unrelated API imports/routes.
+Start with AGENTS.md and context-factory/README.md. Read the AI area's structure,
+current code walkthrough, and standards; select API/business/auth/contracts/UI
+references only when their task conditions apply. Verify current branch, diff,
+source, callers, configuration, and tests; preserve unrelated work.
 
-Scope and authority:
-- Inspect branch, revision, dirty worktree, callers, current services, tests,
-  contracts, Node registration, and Edge dispatch before edits. Preserve
-  unrelated changes, including pre-existing environment example changes.
-- This prompt authorizes the described application changes and focused local
-  verification. It does not authorize billable model calls, DB data changes,
-  notifications, deployment, commits, or pushing.
-- Keep inquiry submission, private inquiry tools, Jev routing, embeddings/RAG,
-  handoff, guest access, and UI outside this first slice. Do not create unused
-  folders or wire every example merely because it is documented.
-- Keep quotation changes and commitments with the administrator. Missing
-  evidence must produce an honest answer, not an invented price or promise.
+Trace the existing Messages → runAssistantTurnService → customer-service agent
+path. Extend the responsible owner rather than creating a parallel assistant.
 
-Acceptance and proof:
-- Verify unauthenticated/non-customer rejection, published-only tool results,
-  bounded outputs, invalid input, tool failure, unavailable model configuration,
-  cancellation, and step-limit/empty-answer handling at the relevant seams.
-- Use synthetic provider responses to exercise orchestration without spending
-  credits. Clearly distinguish that proof from live model behavior.
-- Register the route for both Node and Edge and verify affected API types,
-  configuration checks, focused behavior, and Edge build/runtime as applicable.
-- Inspect test side effects before execution; use actual package scripts.
-- Update affected current docs and create/update this work's own run, linking
-  the relevant predecessor without rewriting an earlier run. Report the final
-  diff, checks and evidence boundaries, skipped checks, and remaining decisions.
+Capability contract:
+- Audience and access: [guest/customer/admin; ownership and conversation boundaries].
+- Model arguments: [choices the model may make and their validation].
+- Server-bound values: [identity, conversation/message/turn scope and dependencies].
+- Result and failures: [minimal projection, empty/unavailable behavior, action meaning].
+- Persistence: [existing execution records; any new state and replay requirements].
 
-Proceed with routine implementation choices inside this scope. If a missing
-business decision affects correctness, identify it and continue independent
-work that does not depend on the answer.
+Follow the existing explicit tool registration and execution-record lifecycle when
+adding a callable tool. Keep domain behavior in services and SQL in data. Resolve
+missing business decisions before enabling dependent behavior.
+
+Acceptance: [representative success, access, invalid input, failure, cancellation,
+takeover, and multiple-call cases relevant to this change]. Run the closest checks
+from the standards guide, inspect affected docs and the final diff, and report
+what each check proves plus remaining limits. Use synthetic providers unless live
+calls are explicitly within the task's authorization.
 ```
 
-For a planning-only assignment, replace the implementation authorization and acceptance work with a read-only investigation and proposal. For a later feature, name the actual new behavior and its permission/persistence/verification requirements instead of silently expanding this initial slice.
+Choose concrete acceptance cases for the capability. For example, a new conversation-bound read needs proof that the model cannot select another conversation, that private data stays scoped, and that its calls link correctly when one reply uses several tools. Do not request unrelated drafts, handoff, UI, decisions, or retrieval simply because the architecture can support them.
