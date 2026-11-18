@@ -174,6 +174,7 @@ export interface Packages {
   price: number;
   published_at: Generated<Timestamp | null>;
   slug: string;
+  thumbnail_media_id: string | null;
   updated_at: Generated<Timestamp>;
 }
 
@@ -219,6 +220,7 @@ export interface Services {
   name: string;
   published_at: Generated<Timestamp>;
   slug: string;
+  thumbnail_media_id: string | null;
   updated_at: Generated<Timestamp>;
 }
 

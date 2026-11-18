@@ -33,16 +33,29 @@ export const getAdminPackages = (page?: CatalogPageQuery) =>
   }>(`/admin/packages${pageQuery(page)}`);
 export const getAdminPackage = (id: string) =>
   request<AdminPackage>(`/admin/packages/${encodeURIComponent(id)}`);
-export const createPackage = (content: PackageContent) =>
-  request<AdminPackage>("/admin/packages", content);
+export const createPackage = (
+  content: PackageContent,
+  thumbnailMediaId?: string | null,
+) =>
+  request<AdminPackage>("/admin/packages", {
+    ...content,
+    ...(thumbnailMediaId !== undefined ? { thumbnailMediaId } : {}),
+  });
 export const updatePackage = (
   id: string,
   content: PackageContent,
   expectedUpdatedAt: string,
+  thumbnailMediaId?: string | null,
 ) =>
   request<AdminPackage>(
     `/admin/packages/${encodeURIComponent(id)}`,
-    { ...content, expectedUpdatedAt },
+    {
+      ...content,
+      expectedUpdatedAt,
+      // Only include thumbnailMediaId when the user explicitly changed it this
+      // session. `undefined` means untouched — omitting it preserves the DB value.
+      ...(thumbnailMediaId !== undefined ? { thumbnailMediaId } : {}),
+    },
     undefined,
     "PATCH",
   );

@@ -36,8 +36,12 @@ export async function packageDto(
     sections,
     description: row.description,
     imageUrl:
+      (row.thumbnail_media_id
+        ? `/v1/catalog-media/${row.thumbnail_media_id}`
+        : null) ??
       widgets.find((widget) => widget.type === "photo" && widget.media)?.media
-        ?.url ?? null,
+        ?.url ??
+      null,
     archivedAt: row.archived_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),

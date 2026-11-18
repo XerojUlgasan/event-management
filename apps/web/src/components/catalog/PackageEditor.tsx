@@ -19,6 +19,7 @@ import {
   packageImageSrc,
   type AdminPackage,
 } from "../../lib/data/catalog/packages";
+import { deleteCatalogMedia } from "../../lib/data/catalog/media";
 import { priceLabel } from "../../lib/utils/formatting/money";
 import { PackageCanvas } from "./CatalogContent";
 import { photos } from "../../demo/catalog/photos";
@@ -32,23 +33,16 @@ const blank = (): PackageContent => ({
   sections: [newCatalogSection()],
   services: [],
 });
-function cover(item: PackageContent) {
-  return (
-    item.sections
-      .flatMap((s) => s.widgets)
-      .find((w) => w.type === "photo" && w.media)?.media?.url || null
-  );
-}
 export function PackageCard({
   item,
   action,
 }: {
-  item: PackageContent;
+  item: PackageContent & { imageUrl?: string | null };
   action?: React.ReactNode;
 }) {
   return (
     <CatalogCard
-      image={packageImageSrc(cover(item)) || photos.dinner}
+      image={packageImageSrc(item.imageUrl ?? null) || photos.dinner}
       eyebrow="Event package"
       title={item.name || "Untitled package"}
       description={item.description}
@@ -107,13 +101,40 @@ export function PackageEditor({
 
   const [draft, setDraft] = useState(blank);
   const [prepared, setPrepared] = useState(false);
+
+  // Thumbnail state — lives here so it survives the create→editor transition.
+  // `null` means "explicitly cleared". `undefined` means "user has not touched it
+  // this session" — in that case we omit it from the save so the DB value is preserved.
+  const [thumbnailMediaId, setThumbnailMediaId] = useState<string | null | undefined>(undefined);
+  // Seed previewUrl from initial.imageUrl so an existing thumbnail shows in the field.
+  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<string | null>(
+    initial ? (packageImageSrc(initial.imageUrl ?? null) ?? null) : null,
+  );
+  const [thumbnailUploading, setThumbnailUploading] = useState(false);
+  // Ref mirrors the state so onSave closures always read the latest value.
+  const thumbnailMediaIdRef = useRef<string | null | undefined>(undefined);
+
+  const handleThumbnailChange = (
+    mediaId: string | null,
+    previewUrl: string | null,
+  ) => {
+    thumbnailMediaIdRef.current = mediaId;
+    setThumbnailMediaId(mediaId);
+    setThumbnailPreviewUrl(previewUrl);
+  };
+
   if (!initial && !prepared) {
     return (
       <CatalogCreateDialog
         entity="package"
         privateProposal={!!saveCustom}
         initial={draft}
-        onClose={onClose}
+        uploading={thumbnailUploading}
+        onClose={() => {
+          // Clean up any uploaded-but-unsaved thumbnail asset (AC-07).
+          if (thumbnailMediaIdRef.current) void deleteCatalogMedia(thumbnailMediaIdRef.current);
+          onClose();
+        }}
         onContinue={(content) => {
           setDraft(content);
           setPrepared(true);
@@ -124,6 +145,11 @@ export function PackageEditor({
             content={content}
             onChange={setContent}
             privateProposal={!!saveCustom}
+            thumbnailMediaId={thumbnailMediaId ?? null}
+            thumbnailPreviewUrl={thumbnailPreviewUrl}
+            onThumbnailChange={handleThumbnailChange}
+            onThumbnailError={(msg) => notifyError(msg)}
+            onThumbnailBusyChange={setThumbnailUploading}
           />
         )}
       />
@@ -155,8 +181,8 @@ export function PackageEditor({
       onSave={async (content) => {
         if (saveCustom) await saveCustom(content);
         else if (initial)
-          await updatePackage(initial.id, content, initial.updatedAt);
-        else await createPackage(content);
+          await updatePackage(initial.id, content, initial.updatedAt, thumbnailMediaIdRef.current);
+        else await createPackage(content, thumbnailMediaIdRef.current);
       }}
       renderDetails={(content, setContent) => (
         <>
@@ -301,6 +327,11 @@ export function PackageEditor({
             content={content}
             onChange={setContent}
             privateProposal={!!saveCustom}
+            thumbnailMediaId={thumbnailMediaId ?? null}
+            thumbnailPreviewUrl={thumbnailPreviewUrl}
+            onThumbnailChange={handleThumbnailChange}
+            onThumbnailError={(msg) => notifyError(msg)}
+            onThumbnailBusyChange={setThumbnailUploading}
           />
         </>
       )}
