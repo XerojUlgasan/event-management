@@ -12,6 +12,7 @@ export function CatalogCard({
   description,
   metadata,
   action,
+  eventTypeBadge,
 }: {
   image?: string;
   imageFallback?: string;
@@ -20,13 +21,28 @@ export function CatalogCard({
   description: string;
   metadata: { label: string; value: ReactNode }[];
   action?: ReactNode;
+  eventTypeBadge?: string | null;
 }) {
   return (
     <article className="pe-card">
       {image ? (
-        <img src={image} alt="" />
+        <div className="pe-card-image-wrap">
+          <img src={image} alt="" />
+          {eventTypeBadge && (
+            <span className="pe-card-event-badge" aria-label={`Event type: ${eventTypeBadge}`}>
+              {eventTypeBadge}
+            </span>
+          )}
+        </div>
       ) : (
-        <div className="pe-card-image-placeholder">{imageFallback}</div>
+        <div className="pe-card-image-placeholder">
+          {eventTypeBadge && (
+            <span className="pe-card-event-badge" aria-label={`Event type: ${eventTypeBadge}`}>
+              {eventTypeBadge}
+            </span>
+          )}
+          {imageFallback}
+        </div>
       )}
       <div className="pe-card-body">
         <span>{eyebrow}</span>

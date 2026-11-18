@@ -6,6 +6,7 @@ import {
   pesosToCentavos,
 } from "../../lib/utils/formatting/money";
 import { ThumbnailField } from "./ThumbnailField";
+import { EventTypeField } from "./EventTypeField";
 
 export function PackageDetailsFields({
   content,
@@ -91,6 +92,11 @@ export function PackageDetailsFields({
           />
         )}
       </FormField>
+      <EventTypeField
+        allowNull
+        value={content.eventType ?? null}
+        onChange={(v) => onChange({ ...content, eventType: v })}
+      />
       <ThumbnailField
         previewUrl={thumbnailPreviewUrl}
         onChange={onThumbnailChange}

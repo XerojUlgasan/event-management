@@ -1,5 +1,6 @@
 import type { Kysely, Selectable, Transaction } from "kysely";
 import type { DB, Services } from "../../db/types.js";
+import type { EventType } from "@event-management/contracts/catalog-filters";
 import { readCatalogSectionsService } from "../catalog-canvas/read-catalog-sections.js";
 type Database = Kysely<DB> | Transaction<DB>;
 export async function serviceAdminDto(db: Database, s: Selectable<Services>) {
@@ -28,6 +29,7 @@ export async function serviceAdminDto(db: Database, s: Selectable<Services>) {
     updatedAt: s.updated_at.toISOString(),
     archivedAt: s.archived_at?.toISOString() ?? null,
     publishedAt: s.published_at.toISOString(),
+    eventType: (s.event_type as EventType | null) ?? null,
   };
 }
 export const publicDto = serviceAdminDto;

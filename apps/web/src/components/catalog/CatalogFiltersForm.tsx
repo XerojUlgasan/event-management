@@ -4,9 +4,11 @@ import {
   MAX_CATALOG_FILTER_PRICE_PESOS,
   type CatalogFilters,
   type CatalogKind,
+  type EventType,
   type ServicePricingType,
 } from "@event-management/contracts/catalog-filters";
 import { Button, FormField, Input, Select } from "@event-management/ui";
+import { EventTypeField } from "./EventTypeField";
 
 /** Catalog-specific composition; shared controls own presentation and feedback. */
 export function CatalogFiltersForm({
@@ -28,6 +30,9 @@ export function CatalogFiltersForm({
   const [pricingType, setPricingType] = useState<ServicePricingType | "">(
     filters.pricingType ?? "",
   );
+  const [eventType, setEventType] = useState<EventType | "">(
+    filters.eventType ?? "",
+  );
   const [error, setError] = useState("");
   const hasPrice = kind === "packages" || pricingType !== "";
   const hasGuests = kind !== "services";
@@ -39,6 +44,7 @@ export function CatalogFiltersForm({
     }
     setError("");
     onApply({
+      ...(eventType !== "" ? { eventType } : {}),
       ...(kind === "services" && pricingType !== "" ? { pricingType } : {}),
       ...(hasPrice && minPrice !== ""
         ? { minPricePesos: Number(minPrice) }
@@ -59,11 +65,13 @@ export function CatalogFiltersForm({
         setMaxPrice("");
         setGuests("");
         setPricingType("");
+        setEventType("");
         setError("");
         onApply({});
       }}
     >
       <div className="catalog-filter-fields">
+        <EventTypeField value={eventType} onChange={setEventType} />
         {kind === "services" && (
           <FormField
             label="Pricing type"
@@ -174,6 +182,7 @@ export function CatalogFiltersForm({
               !maxPrice &&
               !guests &&
               !pricingType &&
+              !eventType &&
               !Object.keys(filters).length
             }
           >

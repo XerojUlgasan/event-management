@@ -125,6 +125,7 @@ model Package {
   knowledge CatalogKnowledge[]
   canvas          Json              @default("[]") @db.JsonB
   thumbnailMediaId String?          @map("thumbnail_media_id") @db.Uuid
+  eventType       String?           @map("event_type")
 
   @@index([canvas(ops: JsonbPathOps)], type: Gin, map: "packages_canvas_idx")
   @@map("packages")
@@ -145,6 +146,7 @@ model Service {
   publishedAt DateTime @default(now()) @map("published_at") @db.Timestamptz(6)
   canvas Json @default("[]") @db.JsonB
   thumbnailMediaId String? @map("thumbnail_media_id") @db.Uuid
+  eventType String? @map("event_type")
   packages PackageService[]
   knowledge CatalogKnowledge[]
   @@index([canvas(ops: JsonbPathOps)], type: Gin, map: "services_canvas_idx")

@@ -19,6 +19,11 @@ export function PackageCards({ items }: { items: PublicPackage[] }) {
                 alt=""
                 loading="lazy"
               />
+              {item.eventType && (
+                <span className="catalog-card-event-badge" aria-label={`Event type: ${item.eventType}`}>
+                  {item.eventType}
+                </span>
+              )}
             </div>
             <div className="catalog-card-body">
               <span className="catalog-card-kicker">Event package</span>
@@ -54,6 +59,11 @@ export function ServiceCards({ items }: { items: PublicService[] }) {
                     alt=""
                     loading="lazy"
                   />
+                )}
+                {item.eventType && (
+                  <span className="catalog-card-event-badge" aria-label={`Event type: ${item.eventType}`}>
+                    {item.eventType}
+                  </span>
                 )}
               </div>
               <div className="catalog-card-body">

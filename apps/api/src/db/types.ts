@@ -167,6 +167,7 @@ export interface Packages {
   created_at: Generated<Timestamp>;
   custom_for_booking_request_id: string | null;
   description: Generated<string>;
+  event_type: string | null;
   id: Generated<string>;
   max_guests: number;
   name: string;
@@ -213,6 +214,7 @@ export interface Services {
   canvas: Generated<Json>;
   created_at: Generated<Timestamp>;
   description: string;
+  event_type: string | null;
   fixed_price_pesos: number | null;
   hourly_rate_pesos: number | null;
   id: Generated<string>;

@@ -2,6 +2,7 @@ import type { ServiceContent } from "@event-management/contracts/catalog";
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 import { FormField, Input, Textarea } from "@event-management/ui";
 import { ThumbnailField } from "./ThumbnailField";
+import { EventTypeField } from "./EventTypeField";
 
 export function ServiceDetailsFields({
   content,
@@ -119,6 +120,11 @@ export function ServiceDetailsFields({
           />
         )}
       </FormField>
+      <EventTypeField
+        allowNull
+        value={content.eventType ?? null}
+        onChange={(v) => onChange({ ...content, eventType: v })}
+      />
       <ThumbnailField
         previewUrl={thumbnailPreviewUrl}
         onChange={onThumbnailChange}

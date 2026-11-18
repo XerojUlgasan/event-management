@@ -1,9 +1,12 @@
 import { z } from "@hono/zod-openapi";
 import {
+  EVENT_TYPES,
   MAX_CATALOG_FILTER_GUESTS,
   MAX_CATALOG_FILTER_PRICE_PESOS,
 } from "@event-management/contracts/catalog-filters";
 import { paginationQuerySchema } from "../../utils/pagination.js";
+
+const eventType = z.enum(EVENT_TYPES).optional();
 
 const integer = (minimum: number, maximum: number) =>
   z
@@ -27,13 +30,14 @@ const rangeMessage = {
 };
 
 export const packageCatalogQuerySchema = paginationQuerySchema
-  .extend({ minPricePesos: price, maxPricePesos: price, guests })
+  .extend({ minPricePesos: price, maxPricePesos: price, guests, eventType })
   .refine(priceRange, rangeMessage);
 export const serviceCatalogQuerySchema = paginationQuerySchema
   .extend({
     pricingType: z.enum(["fixed", "hourly"]).optional(),
     minPricePesos: price,
     maxPricePesos: price,
+    eventType,
   })
   .strict()
   .refine(priceRange, rangeMessage)

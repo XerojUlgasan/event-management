@@ -30,6 +30,8 @@ export function listPublicServicesPageData(
     query = query.where(priceColumn, ">=", options.minPricePesos);
   if (options.maxPricePesos !== undefined)
     query = query.where(priceColumn, "<=", options.maxPricePesos);
+  if (options.eventType !== undefined)
+    query = query.where("event_type", "=", options.eventType);
   if (position)
     query = query.where(
       sql<boolean>`(published_at, id) < (${position.sort}::timestamptz, ${position.id}::uuid)`,

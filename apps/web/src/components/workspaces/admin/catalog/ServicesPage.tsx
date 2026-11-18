@@ -39,6 +39,7 @@ const empty = (): ServiceContent => ({
   fixedPricePesos: null,
   includedHours: null,
   sections: [{ id: crypto.randomUUID(), title: "", widgets: [] }],
+  eventType: null,
 });
 const content = (version: AdminService): ServiceContent => ({
   name: version.name,
@@ -49,6 +50,7 @@ const content = (version: AdminService): ServiceContent => ({
   sections: version.sections?.length
     ? version.sections
     : [{ id: crypto.randomUUID(), title: "", widgets: [] }],
+  eventType: version.eventType ?? null,
 });
 
 function ServiceCard({
@@ -72,6 +74,7 @@ function ServiceCard({
           ? [{ label: "Extra time", value: pricing.excess }]
           : []),
       ]}
+      eventTypeBadge={item.eventType ?? null}
       action={action}
     />
   );
@@ -370,6 +373,7 @@ export function ServicesPage() {
         <CatalogEditor
           initial={editing}
           entity="service"
+          nameBadge={(c) => c.eventType ? <span>{c.eventType}</span> : null}
           onClose={() => {
             setEditing(null);
             if (savedDuringEditRef.current) void load();

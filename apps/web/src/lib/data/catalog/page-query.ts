@@ -16,6 +16,7 @@ export function pageQuery(page?: CatalogPageQuery) {
   if (page?.guests !== undefined) params.set("guests", String(page.guests));
   if (page?.pricingType !== undefined)
     params.set("pricingType", page.pricingType);
+  if (page?.eventType !== undefined) params.set("eventType", page.eventType);
   const query = params.toString();
   return query ? `?${query}` : "";
 }

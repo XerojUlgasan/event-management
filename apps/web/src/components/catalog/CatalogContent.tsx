@@ -88,6 +88,9 @@ export function PackageCanvas({
         <div className="catalog-detail-meta">
           <strong>{priceLabel(item.price)}</strong>
           <strong>Up to {item.maxGuests} guests</strong>
+          {item.eventType && (
+            <span>{item.eventType}</span>
+          )}
         </div>
         {bookingAction && (
           <div className="catalog-detail-action">{bookingAction}</div>
@@ -136,6 +139,7 @@ export function ServiceCanvas({ item }: { item: ServiceContent }) {
         <div className="catalog-detail-meta">
           <strong>{pricing.price}</strong>
           {pricing.excess && <span>{pricing.excess}</span>}
+          {item.eventType && <span>{item.eventType}</span>}
         </div>
       </div>
       <CatalogSections

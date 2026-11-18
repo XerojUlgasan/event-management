@@ -9,4 +9,5 @@ export const columns = (v: ServiceContent, slug: string) => ({
   ...(v.thumbnailMediaId !== undefined
     ? { thumbnail_media_id: v.thumbnailMediaId ?? null }
     : {}),
+  ...(v.eventType !== undefined ? { event_type: v.eventType ?? null } : {}),
 });

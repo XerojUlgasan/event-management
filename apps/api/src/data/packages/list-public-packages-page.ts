@@ -27,6 +27,8 @@ export function listPublicPackagesPageData(
     query = query.where("price", "<=", options.maxPricePesos);
   if (options.guests !== undefined)
     query = query.where("max_guests", ">=", options.guests);
+  if (options.eventType !== undefined)
+    query = query.where("event_type", "=", options.eventType);
   if (position)
     query = query.where(
       sql<boolean>`(published_at, id) < (${position.sort}::timestamptz, ${position.id}::uuid)`,

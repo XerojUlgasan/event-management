@@ -136,6 +136,22 @@
   width: 340px;
   background: var(--transparent);
 }
+.pe-name-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 5px;
+  padding: 2px 9px;
+  border-radius: 20px;
+  background: var(--accent-faint);
+  border: 1px solid var(--accent-border);
+  color: var(--wine);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.6;
+  width: fit-content;
+}
 .pe-settings {
   position: absolute;
   right: 290px;
@@ -803,6 +819,35 @@ dialog.pe-media-dialog::backdrop {
 .pe-card > img,
 .pe-card-image-placeholder {
   flex-shrink: 0;
+}
+.pe-card-image-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.pe-card-image-wrap > img {
+  width: 100%;
+  height: 210px;
+  object-fit: cover;
+  display: block;
+}
+.pe-card-event-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--overlay-black) 52%, var(--transparent));
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  line-height: 1.5;
+}
+.pe-card-image-placeholder {
+  position: relative;
 }
 .pe-card-body {
   display: flex;

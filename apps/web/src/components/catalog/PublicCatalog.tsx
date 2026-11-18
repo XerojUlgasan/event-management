@@ -59,7 +59,9 @@ function PackageCard({
         />
       </div>
       <div className="catalog-card-body">
-        <span className="catalog-card-kicker">Event package</span>
+        <span className="catalog-card-kicker">
+          {item.eventType ? `${item.eventType} · Event package` : "Event package"}
+        </span>
         <h3>{item.name}</h3>
         <p>{item.description}</p>
         <div className="catalog-card-meta">
@@ -95,7 +97,9 @@ function ServiceCard({
         )}
       </div>
       <div className="catalog-card-body">
-        <span className="catalog-card-kicker">Event service</span>
+        <span className="catalog-card-kicker">
+          {item.eventType ? `${item.eventType} · Event service` : "Event service"}
+        </span>
         <h3>{item.name}</h3>
         <p>{item.description}</p>
         <div className="catalog-card-meta">

@@ -1,3 +1,5 @@
+import type { EventType } from "./catalog-filters.js";
+
 export const MAX_CATALOG_SECTIONS = 20;
 export const MAX_CATALOG_WIDGETS = 100;
 export const MAX_WIDGET_MARKDOWN_LENGTH = 20000;
@@ -50,6 +52,7 @@ export type ServiceContent = ServicePricing & {
   name: string;
   description: string;
   sections: CatalogSection[];
+  eventType?: EventType | null;
 };
 export type PackagePrice = {
   kind: "fixed";
@@ -73,6 +76,7 @@ export type PackageContent = {
   price: PackagePrice;
   sections: CatalogSection[];
   services: PackageServiceInput[];
+  eventType?: EventType | null;
 };
 export type CatalogPackage = Omit<PackageContent, "services"> & {
   services: PackageService[];
@@ -85,4 +89,5 @@ export type CatalogPackage = Omit<PackageContent, "services"> & {
   createdAt: string;
   updatedAt: string;
   publishedAt: string | null;
+  eventType: EventType | null;
 };

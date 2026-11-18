@@ -1,5 +1,6 @@
 import type { Selectable } from "kysely";
 import type { CatalogPackage } from "@event-management/contracts/catalog";
+import type { EventType } from "@event-management/contracts/catalog-filters";
 import type { Packages } from "../../db/types.js";
 import { readCatalogSectionsService } from "../catalog-canvas/read-catalog-sections.js";
 import type { Database } from "../../data/catalog-canvas/catalog-canvas-types.js";
@@ -46,5 +47,6 @@ export async function packageDto(
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
     publishedAt: row.published_at?.toISOString() ?? null,
+    eventType: (row.event_type as EventType | null) ?? null,
   };
 }

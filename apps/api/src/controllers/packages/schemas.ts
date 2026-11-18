@@ -11,6 +11,9 @@ export {
 import { z } from "@hono/zod-openapi";
 import { MAX_PACKAGE_SERVICES } from "@event-management/contracts/catalog";
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
+import { EVENT_TYPES } from "@event-management/contracts/catalog-filters";
+
+const eventTypeSchema = z.enum(EVENT_TYPES).nullable().optional();
 
 const text = z.string().trim().max(MAX_CATALOG_TEXT_LENGTH);
 export const priceSchema = z.object({
@@ -51,6 +54,7 @@ export const contentSchema = z
     sections: sectionsSchema,
     services: packageServicesSchema.default([]),
     thumbnailMediaId: z.string().uuid().nullable().optional(),
+    eventType: eventTypeSchema,
   })
   .strict();
 export type Content = z.infer<typeof contentSchema>;
@@ -70,6 +74,7 @@ export const publicSchema = z.object({
   publishedAt: z.string().nullable(),
   packageType: z.enum(["catalog", "custom"]),
   customForBookingRequestId: z.string().uuid().nullable(),
+  eventType: z.enum(EVENT_TYPES).nullable(),
   services: z.array(
     z.object({
       serviceId: z.string().uuid(),

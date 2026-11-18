@@ -192,7 +192,7 @@ function MarkdownSettings({
     document.body,
   );
 }
-type CanvasContent = { name: string; sections: CatalogSection[] };
+type CanvasContent = { name: string; sections: CatalogSection[]; eventType?: string | null };
 export function CatalogEditor<T extends CanvasContent>({
   initial,
   entity,
@@ -205,6 +205,7 @@ export function CatalogEditor<T extends CanvasContent>({
   saveLabel = "Save changes",
   nameMaxLength = MAX_CATALOG_TEXT_LENGTH,
   privateProposal = false,
+  nameBadge,
 }: {
   initial: T;
   entity: "package" | "service";
@@ -219,6 +220,8 @@ export function CatalogEditor<T extends CanvasContent>({
   renderPreview: (content: T, mode: "customer" | "card") => ReactNode;
   nameMaxLength?: number;
   saveLabel?: string;
+  /** Optional small badge shown beside the name in the editor header. */
+  nameBadge?: (content: T) => ReactNode;
   privateProposal?: boolean;
 }) {
   const { notify, notifyError } = useNotifications();
@@ -661,6 +664,7 @@ export function CatalogEditor<T extends CanvasContent>({
               placeholder={`Untitled ${entity}`}
               onChange={(e) => setContent({ ...content, name: e.target.value })}
             />
+            {nameBadge && <span className="pe-name-badge">{nameBadge(content)}</span>}
           </label>
           <div className="pe-bar-actions">
             <Button
