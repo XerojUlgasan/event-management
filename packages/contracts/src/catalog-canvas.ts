@@ -12,12 +12,19 @@ import {
 } from "@event-management/contracts/limits/catalog";
 
 const text = z.string().trim().max(MAX_CATALOG_TEXT_LENGTH);
-const sampleImages = new Set([
+export const sampleCatalogPhotoPaths: readonly string[] = [
   "/images/wedding.jpg",
   "/images/dinner.jpg",
   "/images/dessert.jpg",
   "/images/hero.jpg",
-]);
+  "/images/catalog-greenery.jpg",
+  "/images/catalog-birthday.jpg",
+  "/images/catalog-conference.jpg",
+  "/images/catalog-dj.jpg",
+  "/images/catalog-coastal.jpg",
+  "/images/catalog-ballroom.jpg",
+];
+const sampleImages = new Set(sampleCatalogPhotoPaths);
 function createMediaSchema(allowMissingUploadId: boolean) {
   return z
     .object({

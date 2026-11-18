@@ -4,6 +4,12 @@ import { createServer, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { after, before, test } from "node:test";
+import { OpenAPIHono } from "@hono/zod-openapi";
+import type { HonoEnv } from "../../src/types/hono.js";
+import routes from "../../src/controllers/ai/index.js";
+import { searchCatalogKnowledgeService } from "../../src/services/ai/retrieval/search-catalog-knowledge.js";
+import { indexPendingCatalogKnowledgeService } from "../../src/services/ai/workflows/index-pending-catalog-knowledge.js";
+import { hashSessionToken } from "../../src/utils/session.js";
 import { Kysely, PostgresDialect, sql } from "kysely";
 import { Pool } from "pg";
 import type { DB } from "../../src/db/types.js";
@@ -461,6 +467,231 @@ after(async () => {
     if (value === undefined) delete process.env[name];
     else process.env[name] = value;
   }
+});
+
+test("admin indexing traverses pending chunks, advances failures and retries", async () => {
+  const app = new OpenAPIHono<HonoEnv>();
+  app.use("*", async (c, next) => {
+    c.set("db", getDb());
+    await next();
+  });
+  app.route("/v1", routes);
+  async function session(role: string) {
+    const token = randomUUID();
+    const user = await getDb()
+      .insertInto("users")
+      .values({
+        email: `${randomUUID()}@example.test`,
+        password_hash: "unused",
+        role,
+      })
+      .returning("id")
+      .executeTakeFirstOrThrow();
+    await getDb()
+      .insertInto("sessions")
+      .values({
+        user_id: user.id,
+        token_hash: hashSessionToken(token),
+        expires_at: new Date(Date.now() + 3600000),
+      })
+      .execute();
+    return `em_session=${token}`;
+  }
+  const admin = await session("admin");
+  const customer = await session("customer");
+  const request = (body: object, cookie?: string) =>
+    app.request("/v1/admin/ai/knowledge/index", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(cookie ? { cookie } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+  assert.equal((await request({})).status, 401);
+  assert.equal((await request({}, customer)).status, 403);
+  const apiKey = process.env.AI_GATEWAY_API_KEY;
+  delete process.env.AI_GATEWAY_API_KEY;
+  try {
+    const empty = await request({}, admin);
+    assert.equal(empty.status, 200);
+    assert.deepEqual(await empty.json(), {
+      embedded: 0,
+      unchanged: 0,
+      superseded: 0,
+      failed: 0,
+      nextCursor: null,
+    });
+    const first = await createServiceRow({ name: "Index first" });
+    const second = await createServiceRow({ name: "Index second" });
+    const archived = await createServiceRow({
+      name: "Index archived",
+      archived: true,
+    });
+    const media = await createMediaAsset("upload");
+    await setCanvas({ kind: "service", id: first }, [
+      section("Photos", [mediaWidget(randomUUID(), media, { alt: "Fixture" })]),
+    ]);
+    let unlock = () => {};
+    let locked = () => {};
+    const ready = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const release = new Promise<void>((resolve) => {
+      unlock = resolve;
+    });
+    const holdingLock = getDb()
+      .transaction()
+      .execute(async (trx) => {
+        await trx
+          .selectFrom("services")
+          .select("id")
+          .where("id", "in", [first, second])
+          .forUpdate()
+          .execute();
+        locked();
+        await release;
+      });
+    await ready;
+    try {
+      const started = Date.now();
+      const blocked = await request({}, admin);
+      assert.equal(blocked.status, 503);
+      assert.ok(Date.now() - started < 9_000);
+      assert.deepEqual(await blocked.json(), {
+        error: "Knowledge indexing is temporarily unavailable",
+      });
+    } finally {
+      unlock();
+      await holdingLock;
+    }
+    assert.equal((await request({}, admin)).status, 503);
+    assert.equal((await request({ cursor: "bad" }, admin)).status, 400);
+    process.env.AI_GATEWAY_API_KEY = "fixture-gateway-key";
+    setGatewayHandler(
+      () =>
+        new Response(
+          JSON.stringify({ error: { message: "private failure" } }),
+          { status: 503, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    const failedResponse = await request({}, admin);
+    assert.equal(failedResponse.status, 200);
+    const failed = (await failedResponse.json()) as {
+      failed: number;
+      nextCursor: string | null;
+    };
+    assert.equal(failed.failed, 1);
+    assert.ok(failed.nextCursor);
+    setGatewayHandler();
+    let cursor: string | null = failed.nextCursor;
+    let embedded = 0;
+    while (cursor) {
+      const response = await request({ cursor }, admin);
+      assert.equal(response.status, 200);
+      const result = (await response.json()) as {
+        embedded: number;
+        nextCursor: string | null;
+      };
+      embedded += result.embedded;
+      cursor = result.nextCursor;
+    }
+    assert.equal(embedded, 2);
+    assert.equal(gatewayCalls.length, 2);
+    const retry = await request({}, admin);
+    assert.equal(((await retry.json()) as { embedded: number }).embedded, 1);
+    assert.equal(gatewayCalls.length, 3);
+    const search = await searchCatalogKnowledgeService(getDb(), "fixture");
+    assert.ok(search.results.some((item) => item.listing.id === first));
+    assert.equal(gatewayCalls.length, 4);
+    const done = await request({}, admin);
+    assert.equal(
+      ((await done.json()) as { nextCursor: string | null }).nextCursor,
+      null,
+    );
+    assert.equal(gatewayCalls.length, 4);
+    await getDb()
+      .updateTable("catalog_knowledge")
+      .set({ embedding_model: "fixture-old-model" })
+      .where("service_id", "=", first)
+      .where("chunk_key", "=", "overview")
+      .execute();
+    const outdated = await request({}, admin);
+    assert.equal(outdated.status, 200);
+    assert.equal(((await outdated.json()) as { embedded: number }).embedded, 1);
+    assert.equal(gatewayCalls.length, 5);
+    assert.equal(
+      (await knowledgeRows({ kind: "service", id: archived })).length,
+      0,
+    );
+    await setCanvas({ kind: "service", id: first }, []);
+    const cleanup = await request({}, admin);
+    assert.equal(cleanup.status, 200);
+    assert.equal(
+      (await knowledgeRows({ kind: "service", id: first })).length,
+      1,
+    );
+    assert.equal(gatewayCalls.length, 5);
+    await getDb()
+      .deleteFrom("services")
+      .where("id", "in", [first, second, archived])
+      .execute();
+  } finally {
+    if (apiKey === undefined) delete process.env.AI_GATEWAY_API_KEY;
+    else process.env.AI_GATEWAY_API_KEY = apiKey;
+    setGatewayHandler();
+    storageRequests = 0;
+  }
+});
+
+test("bounded index scan resumes across already indexed owners", async () => {
+  const ids = Array.from(
+    { length: 7 },
+    (_, index) =>
+      `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+  );
+  for (const [index, id] of ids.entries()) {
+    await getDb()
+      .insertInto("services")
+      .values({
+        id,
+        name: `Bounded ${index}`,
+        slug: `bounded-${randomUUID()}`,
+        description: "Fixture",
+        hourly_rate_pesos: 1,
+      })
+      .execute();
+    if (index < 6)
+      await refreshCatalogEmbeddingsService({
+        db: getDb(),
+        owner: { kind: "service", id },
+      });
+  }
+  setGatewayHandler();
+  const signal = new AbortController().signal;
+  const first = await indexPendingCatalogKnowledgeService(
+    getDb(),
+    undefined,
+    signal,
+  );
+  assert.equal(first.embedded, 0);
+  assert.ok(first.nextCursor);
+  const second = await indexPendingCatalogKnowledgeService(
+    getDb(),
+    first.nextCursor,
+    signal,
+  );
+  assert.equal(second.embedded, 1);
+  assert.equal(gatewayCalls.length, 1);
+  assert.ok(second.nextCursor);
+  const last = await indexPendingCatalogKnowledgeService(
+    getDb(),
+    second.nextCursor,
+    signal,
+  );
+  assert.equal(last.nextCursor, null);
+  await getDb().deleteFrom("services").where("id", "in", ids).execute();
+  setGatewayHandler();
 });
 
 test("embeds only eligible catalog owners with text and actual sample/upload images", async () => {

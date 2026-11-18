@@ -1,7 +1,11 @@
 import { catalogSlug } from "@event-management/contracts/catalog-slug";
-import { storedSectionsSchema } from "@event-management/contracts/catalog-canvas";
 import { randomUUID } from "node:crypto";
 import { sql, type Transaction } from "kysely";
+import {
+  buildCatalogCanvas,
+  requireCatalogEditorial,
+} from "./seed/curated-catalog.js";
+import { packageEditorial } from "./seed/package-editorial.js";
 import type { DB } from "./types.js";
 
 export async function seedSamplePackages(db: Transaction<DB>) {
@@ -11,38 +15,41 @@ export async function seedSamplePackages(db: Transaction<DB>) {
       name: "The Grand Celebration",
       guests: 150,
       price: 185000,
-      photo: "wedding",
-      heading: "An occasion to remember",
-      text: "Gather your favorite people for a celebration filled with thoughtful details, beautiful food, and moments worth keeping.",
+      photo: "/images/wedding.jpg",
+      alt: "Illustrative wedding reception setting",
+      description:
+        "A formal wedding reception for a large family gathering. Fictional demo concept.",
     },
     {
       id: "a4e55db2-745b-4bdb-bf92-38e7d29261d2",
       name: "The Intimate Gathering",
       guests: 50,
       price: 68000,
-      photo: "dinner",
-      heading: "Gather around the table",
-      text: "A warm, welcoming experience for the people closest to you.",
+      photo: "/images/dinner.jpg",
+      alt: "Illustrative dining table setting",
+      description:
+        "An intimate family dinner for a milestone celebration. Fictional demo concept.",
     },
     {
       id: "a4e55db2-745b-4bdb-bf92-38e7d29261d3",
       name: "The Sweet Soirée",
       guests: 80,
       price: 95000,
-      photo: "dessert",
-      heading: "A little more to celebrate",
-      text: "Make the occasion yours with a memorable gathering.",
+      photo: "/images/dessert.jpg",
+      alt: "Illustrative dessert display",
+      description:
+        "A pastel birthday celebration with a dessert focal point. Fictional demo concept.",
     },
   ];
   let count = 0;
-  for (const sample of samples) {
+  for (const [index, sample] of samples.entries()) {
     const row = await db
       .insertInto("packages")
       .values({
         id: sample.id,
         name: sample.name,
         slug: catalogSlug(sample.name),
-        description: `${sample.heading} ${sample.text}`,
+        description: sample.description,
         max_guests: sample.guests,
         price: sample.price,
       })
@@ -50,55 +57,27 @@ export async function seedSamplePackages(db: Transaction<DB>) {
       .returning("id")
       .executeTakeFirst();
     if (!row) continue;
-    const sectionId = randomUUID(),
-      mediaId = randomUUID();
+    const mediaId = randomUUID();
     await db
       .insertInto("media_assets")
       .values({
         id: mediaId,
         kind: "image",
         source: "sample",
-        url: `/images/${sample.photo}.jpg`,
+        url: sample.photo,
       })
       .execute();
-    const canvas = [
-      {
-        id: sectionId,
-        title: "",
-        widgets: [
-          {
-            id: randomUUID(),
-            type: "photo",
-            x: 0,
-            y: 0,
-            w: 6,
-            h: 6,
-            markdown: "",
-            mediaId,
-            alt: "Sample event table setting",
-            caption: "",
-            autoplay: false,
-          },
-          {
-            id: randomUUID(),
-            type: "markdown",
-            x: 6,
-            y: 0,
-            w: 6,
-            h: 6,
-            markdown: `## ${sample.heading}\n\n${sample.text}`,
-            mediaId: null,
-            alt: "",
-            caption: "",
-            autoplay: false,
-          },
-        ],
-      },
-    ];
+    const canvas = buildCatalogCanvas(
+      { ...sample, ...requireCatalogEditorial(packageEditorial, sample.name) },
+      mediaId,
+      () => randomUUID(),
+      index,
+    );
     await db
       .updateTable("packages")
       .set({
-        canvas: sql`${JSON.stringify(storedSectionsSchema.parse(canvas))}::jsonb`,
+        canvas: sql`${JSON.stringify(canvas)}::jsonb`,
+        thumbnail_media_id: mediaId,
       })
       .where("id", "=", row.id)
       .execute();

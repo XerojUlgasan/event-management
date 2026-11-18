@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { sampleCatalogPhotoPaths } from "@event-management/contracts/catalog-canvas";
 
 const externalPostgres: Plugin = {
   name: "external-postgres",
@@ -44,13 +45,10 @@ const result = await build({
         configured.onLoad(
           { filter: /sample-catalog-photos\.ts$/ },
           async () => {
-            const paths = ["wedding", "dinner", "dessert", "hero"];
             const photos: Record<string, string> = {};
-            for (const name of paths)
-              photos[`/images/${name}.jpg`] = (
-                await readFile(
-                  path.resolve(apiRoot, `../web/public/images/${name}.jpg`),
-                )
+            for (const url of sampleCatalogPhotoPaths)
+              photos[url] = (
+                await readFile(path.resolve(apiRoot, `../web/public${url}`))
               ).toString("base64");
             return {
               contents: `const photos = ${JSON.stringify(photos)};

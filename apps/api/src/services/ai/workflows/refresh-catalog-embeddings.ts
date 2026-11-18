@@ -1,4 +1,4 @@
-import type { Kysely } from "kysely";
+import { sql, type Kysely, type Transaction } from "kysely";
 import { APICallError } from "ai";
 import type { DB } from "../../../db/types.js";
 import { findCatalogKnowledgeMediaData } from "../../../data/ai/find-catalog-knowledge-media.js";
@@ -16,14 +16,30 @@ export async function refreshCatalogEmbeddingsService({
   db,
   owner,
   abortSignal,
+  chunkKeys,
 }: {
   db: Kysely<DB>;
   owner: CatalogKnowledgeOwner;
   abortSignal?: AbortSignal;
+  chunkKeys?: readonly string[];
 }) {
-  const rows = await db
-    .transaction()
-    .execute((trx) => syncCatalogKnowledge(trx, owner));
+  async function refreshTransaction<T>(
+    action: (trx: Transaction<DB>) => Promise<T>,
+  ): Promise<T> {
+    abortSignal?.throwIfAborted();
+    return db.transaction().execute(async (trx) => {
+      await sql`SET LOCAL statement_timeout = '10s'`.execute(trx);
+      await sql`SET LOCAL lock_timeout = '5s'`.execute(trx);
+      abortSignal?.throwIfAborted();
+      return action(trx);
+    });
+  }
+  const synced = await refreshTransaction((trx) =>
+    syncCatalogKnowledge(trx, owner),
+  );
+  const rows = chunkKeys
+    ? synced.filter((row) => chunkKeys.includes(row.chunk_key))
+    : synced;
   const result = { embedded: 0, unchanged: 0, superseded: 0, failed: 0 };
   if (!rows.length) return result;
   const { model } = env.AI_EMBEDDING;
@@ -48,7 +64,7 @@ export async function refreshCatalogEmbeddingsService({
           )
         : undefined;
       const inputHash = `${sourceHash}:${catalogKnowledgeDigest(image ? image.bytes : row.content_markdown)}`;
-      const stage = await db.transaction().execute(async (trx) => {
+      const stage = await refreshTransaction(async (trx) => {
         const current = (await syncCatalogKnowledge(trx, owner)).find(
           (item) => item.id === row.id,
         );
@@ -79,7 +95,7 @@ export async function refreshCatalogEmbeddingsService({
         abortSignal,
       });
       abortSignal?.throwIfAborted();
-      const saved = await db.transaction().execute(async (trx) => {
+      const saved = await refreshTransaction(async (trx) => {
         const current = (await syncCatalogKnowledge(trx, owner)).find(
           (item) => item.id === row.id,
         );

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Badge,
   Button,
   DataTable,
   PageHeader,
@@ -8,12 +7,16 @@ import {
   Panel,
   SearchField,
   Select,
+  useNotifications,
 } from "@event-management/ui";
 import type {
   KnowledgeListing,
   KnowledgePage as Page,
 } from "@event-management/contracts/catalog-knowledge";
-import { getKnowledge } from "../../../../lib/data/ai/knowledge";
+import {
+  getKnowledge,
+  indexPendingKnowledge,
+} from "../../../../lib/data/ai/knowledge";
 import { navigateWorkspace } from "../../../../lib/navigation/workspace-navigation";
 import { usePagination } from "../../../../lib/pagination/use-pagination";
 import { KnowledgeDetailDrawer } from "./KnowledgeDetailDrawer";
@@ -27,6 +30,7 @@ import { KnowledgeSearch } from "./KnowledgeSearch";
 import "../../../../styles/ai/knowledge.css";
 
 export function KnowledgePage() {
+  const { notify, notifyError } = useNotifications();
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState("");
   const [status, setStatus] = useState("");
@@ -35,9 +39,70 @@ export function KnowledgePage() {
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
   const [detail, setDetail] = useState<KnowledgeListing | null>(null);
+  const [indexing, setIndexing] = useState(false);
+  const [indexMessage, setIndexMessage] = useState("");
+  const [indexError, setIndexError] = useState(false);
+  const indexRun = useRef<{ stopped: boolean } | null>(null);
   const seq = useRef(0);
   const pages = usePagination(`${search}:${kind}:${status}`);
   const load = useCallback(() => setRetry((n) => n + 1), []);
+  useEffect(
+    () => () => {
+      if (indexRun.current) indexRun.current.stopped = true;
+    },
+    [],
+  );
+  async function indexPending() {
+    if (indexRun.current) return;
+    const run = { stopped: false };
+    indexRun.current = run;
+    setIndexing(true);
+    setIndexError(false);
+    setIndexMessage("Indexing pending knowledge across the catalog…");
+    setDetail(null);
+    let embedded = 0;
+    let failed = 0;
+    let cursor: string | undefined;
+    try {
+      do {
+        const result = await indexPendingKnowledge(cursor);
+        if (run.stopped) return;
+        embedded += result.embedded;
+        failed += result.failed;
+        setIndexMessage(
+          `Indexing… ${embedded} chunks indexed; ${failed} failed.`,
+        );
+        load();
+        cursor = result.nextCursor ?? undefined;
+      } while (cursor);
+      const message = failed
+        ? `${embedded} chunks indexed; ${failed} failed. Select Index pending to retry. Failed chunks remain unavailable to semantic search.`
+        : embedded
+          ? `${embedded} chunks indexed for semantic search.`
+          : "Indexing pass finished. Any listings still needing attention can be retried.";
+      setIndexMessage(message);
+      setIndexError(failed > 0);
+      notify(message, failed ? "info" : "success");
+    } catch (cause) {
+      if (!run.stopped) {
+        setIndexError(true);
+        const message = notifyError(
+          cause,
+          "Unable to index pending knowledge. Select Index pending to retry; completed chunks are saved.",
+        );
+        setIndexMessage(
+          `${embedded} chunks indexed before stopping. Select Index pending to retry. ${message}`,
+        );
+      }
+    } finally {
+      if (indexRun.current === run) indexRun.current = null;
+      if (!run.stopped) {
+        setIndexing(false);
+        pages.reset();
+        load();
+      }
+    }
+  }
   useEffect(() => {
     const current = ++seq.current;
     setLoading(true);
@@ -62,16 +127,33 @@ export function KnowledgePage() {
         title="Knowledge Catalog"
         actions={
           <div className="knowledge-header-actions">
-            <Badge tone="neutral">
-              Assistant catalog search: Not connected
-            </Badge>
-            <KnowledgeHelp text="The assistant is not connected to catalog search." />
-            <Button variant="secondary" onClick={load} pending={loading}>
+            <Button
+              onClick={() => void indexPending()}
+              pending={indexing}
+              disabled={loading || !data || data.summary.attention === 0}
+            >
+              {indexing ? "Indexing pending…" : "Index pending"}
+            </Button>
+            <KnowledgeHelp text="Index pending and outdated text and photos across all eligible catalog listings using the configured embedding model. Keep this page open until finished; completed chunks are saved and failures can be retried." />
+            <Button
+              variant="secondary"
+              onClick={load}
+              pending={loading}
+              disabled={indexing}
+            >
               Refresh
             </Button>
           </div>
         }
       />
+      {indexMessage && (
+        <p
+          role={indexError ? "alert" : "status"}
+          className={indexError ? "knowledge-error" : undefined}
+        >
+          {indexMessage}
+        </p>
+      )}
       <KnowledgeSearch />
       {error && (
         <div role="alert" className="knowledge-error">

@@ -14,6 +14,9 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Catalog editorial depth](2026-11-18_21-12-00_catalog-editorial-depth.md) | Detailed package/service copy / main | complete | Supersedes the initial short copy; 43 authored canvases, independent review, focused tests and 129 preview cases pass; existing databases unchanged |
+| [Index pending knowledge](2026-11-18_21-10-22_knowledge-index-pending.md) | Dashboard embedding recovery / main | complete | Review scoped diff; API/browser checks pass, live provider and hosted rollout separate |
+| [Curated catalog seeds](2026-11-18_20-49-00_curated-catalog-seeds.md) | Diverse demo canvases and real photographs / main | complete | Review scoped diff; 50 tests and 80 preview cases pass; existing databases and live embedding backfill remain separate |
 | [Public catalog item tool](2026-11-18_20-29-13_public-catalog-item-tool.md) | Current catalog/canvas detail as Markdown / main | complete | Review scoped diff; 59 synthetic API/database checks, types and Edge build passed; live provider/hosted rollout separate |
 | [Remove package service assignments](2026-11-18_20-23-00_remove-package-service-assignments.md) | Relational assignment removal; canvas widgets preserved / main | complete | Review diff; migration applied locally, focused checks pass; hosted rollout separate |
 | [AI architecture guidance](2026-11-18_19-40-01_ai-architecture-guidance.md) | Current tool architecture and extension instructions / main | complete | Use the AI area for extensions; source audit, routing walkthrough, and documentation checks passed |

@@ -45,6 +45,10 @@ const bodyLimits: Partial<
       path: "/admin/ai/knowledge/search",
       maxSize: SMALL_JSON_BODY_LIMIT_BYTES,
     },
+    {
+      path: "/admin/ai/knowledge/index",
+      maxSize: SMALL_JSON_BODY_LIMIT_BYTES,
+    },
   ],
   "event-days": [
     { path: "/admin/event-days", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },

@@ -54,3 +54,11 @@ export type KnowledgeSearchResponse = {
   model: string;
   results: KnowledgeSearchResult[];
 };
+
+export type KnowledgeIndexResponse = {
+  embedded: number;
+  unchanged: number;
+  superseded: number;
+  failed: number;
+  nextCursor: string | null;
+};

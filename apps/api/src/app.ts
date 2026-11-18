@@ -58,6 +58,10 @@ app.use(
   "/v1/admin/ai/knowledge/search",
   bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
 );
+app.use(
+  "/v1/admin/ai/knowledge/index",
+  bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
+);
 app.use("/v1/guest/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use("/v1/messages/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
 app.use(

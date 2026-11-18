@@ -1,5 +1,6 @@
 import type {
   KnowledgeDetail,
+  KnowledgeIndexResponse,
   KnowledgePage,
   KnowledgeSearchResponse,
 } from "@event-management/contracts/catalog-knowledge";
@@ -19,6 +20,11 @@ export function getKnowledge(query: {
 export function searchKnowledge(query: string) {
   return request<KnowledgeSearchResponse>("/admin/ai/knowledge/search", {
     query,
+  });
+}
+export function indexPendingKnowledge(cursor?: string) {
+  return request<KnowledgeIndexResponse>("/admin/ai/knowledge/index", {
+    cursor,
   });
 }
 export function getKnowledgeDetail(kind: string, id: string, cursor?: string) {
