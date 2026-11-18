@@ -16,6 +16,10 @@ export const findPublicCatalogMediaData = (db: Database, id: string) =>
     AND ${canvasContainsMedia(sql.ref("p.canvas"), sql.ref("m.id"))})
   OR EXISTS (SELECT 1 FROM services sv WHERE sv.archived_at IS NULL
     AND ${canvasContainsMedia(sql.ref("sv.canvas"), sql.ref("m.id"))})
+  OR EXISTS (SELECT 1 FROM packages p WHERE p.package_type='catalog' AND p.archived_at IS NULL
+    AND p.thumbnail_media_id = m.id)
+  OR EXISTS (SELECT 1 FROM services sv WHERE sv.archived_at IS NULL
+    AND sv.thumbnail_media_id = m.id)
 )`,
     )
     .executeTakeFirst();
