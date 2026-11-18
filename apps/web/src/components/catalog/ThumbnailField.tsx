@@ -5,14 +5,12 @@ import { uploadCatalogMedia } from "../../lib/data/catalog/media";
 import { validateImageFile } from "../../lib/utils/catalog/media-validation";
 
 export function ThumbnailField({
-  mediaId,
   previewUrl,
   onChange,
   onError,
   onBusyChange,
   disabled = false,
 }: {
-  mediaId: string | null;
   /** Absolute or object URL for preview display. Managed by the parent. */
   previewUrl: string | null;
   /** Called with the new mediaId + previewUrl after a successful upload, or
@@ -35,7 +33,6 @@ export function ThumbnailField({
       return;
     }
 
-    // Revoke any previous object URL to prevent memory leaks.
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
@@ -49,7 +46,6 @@ export function ThumbnailField({
       const result = await uploadCatalogMedia(file);
       onChange(result.id ?? null, preview);
     } catch {
-      // On failure revoke preview and clear — do not clear other fields (BR-05).
       URL.revokeObjectURL(preview);
       objectUrlRef.current = null;
       onError("Thumbnail upload failed. Try again.");
@@ -67,8 +63,15 @@ export function ThumbnailField({
     onChange(null, null);
   };
 
-  const openLightbox = () => lightboxRef.current?.showModal();
-  const closeLightbox = () => lightboxRef.current?.close();
+  // stopPropagation prevents the dialog close from bubbling to the file input.
+  const openLightbox = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    lightboxRef.current?.showModal();
+  };
+  const closeLightbox = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    lightboxRef.current?.close();
+  };
 
   const isDisabled = disabled || uploading;
 
@@ -80,9 +83,10 @@ export function ThumbnailField({
     >
       {(field) => (
         <div className="thumbnail-field">
-          {previewUrl && (
+          {previewUrl ? (
+            /* Thumbnail exists — show preview + Remove only.
+               The file input is hidden: the user must Remove before uploading a new one. */
             <div className="thumbnail-field-preview">
-              {/* Clicking the thumbnail opens the full-screen lightbox */}
               <button
                 type="button"
                 className="thumbnail-field-thumb-btn"
@@ -104,20 +108,21 @@ export function ThumbnailField({
                 Remove
               </Button>
             </div>
+          ) : (
+            /* No thumbnail — show the file input so they can upload one. */
+            <Input
+              {...field}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={isDisabled}
+              aria-label="Upload card thumbnail"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.currentTarget.value = "";
+                if (file) void handleFile(file);
+              }}
+            />
           )}
-          <Input
-            {...field}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            disabled={isDisabled}
-            aria-label={previewUrl ? "Replace card thumbnail" : "Upload card thumbnail"}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              // Reset so the same file can be re-selected after removal.
-              e.currentTarget.value = "";
-              if (file) void handleFile(file);
-            }}
-          />
           {uploading && (
             <small className="thumbnail-field-uploading" aria-live="polite">
               Uploading thumbnail…
@@ -131,10 +136,7 @@ export function ThumbnailField({
             aria-label="Thumbnail preview"
             onClick={(e) => {
               // Close when clicking the backdrop (outside the image).
-              if (e.target === e.currentTarget) closeLightbox();
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") closeLightbox();
+              if (e.target === e.currentTarget) closeLightbox(e);
             }}
           >
             {previewUrl && (

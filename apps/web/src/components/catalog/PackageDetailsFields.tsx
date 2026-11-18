@@ -11,7 +11,6 @@ export function PackageDetailsFields({
   content,
   onChange,
   privateProposal = false,
-  thumbnailMediaId,
   thumbnailPreviewUrl,
   onThumbnailChange,
   onThumbnailError,
@@ -20,7 +19,6 @@ export function PackageDetailsFields({
   privateProposal?: boolean;
   content: PackageContent;
   onChange: (content: PackageContent) => void;
-  thumbnailMediaId: string | null;
   thumbnailPreviewUrl: string | null;
   onThumbnailChange: (mediaId: string | null, previewUrl: string | null) => void;
   onThumbnailError: (message: string) => void;
@@ -94,7 +92,6 @@ export function PackageDetailsFields({
         )}
       </FormField>
       <ThumbnailField
-        mediaId={thumbnailMediaId}
         previewUrl={thumbnailPreviewUrl}
         onChange={onThumbnailChange}
         onError={onThumbnailError}

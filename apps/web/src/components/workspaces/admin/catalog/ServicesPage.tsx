@@ -13,7 +13,6 @@ import {
 } from "@event-management/ui";
 import { ApiError } from "../../../../lib/http/request";
 import { catalogMediaSrc } from "../../../../lib/data/catalog/media";
-import { deleteCatalogMedia } from "../../../../lib/data/catalog/media";
 import {
   archiveService,
   createService,
@@ -29,6 +28,7 @@ import { servicePricingLabels } from "../../../../lib/utils/formatting/money";
 import { CatalogDetailPreview } from "../../../catalog/CatalogDetailPreview";
 import { CatalogEditor } from "../../../catalog/CatalogEditor";
 import { CatalogCreateDialog } from "../../../catalog/CatalogCreateDialog";
+import { useThumbnail } from "../../../../lib/utils/catalog/use-thumbnail";
 import { ServiceDetailsFields } from "../../../catalog/ServiceDetailsFields";
 import { validateServiceDetails } from "../../../../lib/utils/catalog/details-validation";
 
@@ -98,17 +98,10 @@ export function ServicesPage() {
   const [creating, setCreating] = useState<ServiceContent | null>(null);
   const [editing, setEditing] = useState<ServiceContent | null>(null);
 
-  // Thumbnail state for the create modal — reset each time create opens.
-  const [thumbnailMediaId, setThumbnailMediaId] = useState<string | null | undefined>(undefined);
-  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<string | null>(null);
-  const [thumbnailUploading, setThumbnailUploading] = useState(false);
-  // Thumbnail for the edit modal — `undefined` means untouched (preserve DB value).
-  // Ref mirrors state to avoid stale closures in onSave.
-  const [editThumbnailMediaId, setEditThumbnailMediaId] = useState<string | null | undefined>(undefined);
-  const [editThumbnailPreviewUrl, setEditThumbnailPreviewUrl] = useState<string | null>(null);
-  const [editThumbnailUploading, setEditThumbnailUploading] = useState(false);
-  const editThumbnailMediaIdRef = useRef<string | null | undefined>(undefined);
-  const thumbnailMediaIdRef = useRef<string | null | undefined>(undefined);
+  // Thumbnail for the create dialog. Reset each time "+ Create service" is clicked.
+  const createThumbnail = useThumbnail();
+  // Thumbnail for the edit editor. Seeded from imageUrl when opening an existing service.
+  const editThumbnail = useThumbnail();
   const savedRef = useRef<{ id: string | null; updatedAt: string | null }>({
     id: null,
     updatedAt: null,
@@ -156,12 +149,8 @@ export function ServicesPage() {
       if (!mounted.current) return;
       savedDuringEditRef.current = false;
       savedRef.current = { id, updatedAt: item.updatedAt };
-      // Reset thumbnail state to undefined — "untouched" — so an edit that
-      // doesn't touch the thumbnail field preserves the existing DB value.
-      editThumbnailMediaIdRef.current = undefined;
-      setEditThumbnailMediaId(undefined);
-      // Seed previewUrl from imageUrl so the existing thumbnail shows in the field.
-      setEditThumbnailPreviewUrl(item.imageUrl ? catalogMediaSrc(item.imageUrl) : null);
+      // Reset to untouched, seed preview from the existing imageUrl.
+      editThumbnail.reset(item.imageUrl ? catalogMediaSrc(item.imageUrl) : null);
       setEditing(content(item));
     } catch (err) {
       if (!mounted.current) return;
@@ -236,10 +225,7 @@ export function ServicesPage() {
               onClick={() => {
                 savedDuringEditRef.current = false;
                 savedRef.current = { id: null, updatedAt: null };
-                thumbnailMediaIdRef.current = undefined;
-                setThumbnailMediaId(undefined);
-                setThumbnailPreviewUrl(null);
-                setThumbnailUploading(false);
+                createThumbnail.reset();
                 setCreating(empty());
               }}
             >
@@ -355,18 +341,16 @@ export function ServicesPage() {
         <CatalogCreateDialog
           entity="service"
           initial={creating}
-          uploading={thumbnailUploading}
+          uploading={createThumbnail.uploading}
           onClose={() => {
-            // Clean up any uploaded-but-unsaved thumbnail asset (AC-07).
-            if (thumbnailMediaIdRef.current) void deleteCatalogMedia(thumbnailMediaIdRef.current);
+            createThumbnail.cancelAndCleanup();
             setCreating(null);
           }}
           onContinue={(form) => {
             setCreating(null);
-            editThumbnailMediaIdRef.current = thumbnailMediaIdRef.current;
-            setEditThumbnailMediaId(thumbnailMediaIdRef.current);
-            setEditThumbnailPreviewUrl(thumbnailPreviewUrl);
-            setEditThumbnailUploading(false);
+            // Transfer the create thumbnail into the edit slot before opening the editor.
+            editThumbnail.reset(createThumbnail.previewUrl);
+            editThumbnail.mediaIdRef.current = createThumbnail.mediaIdRef.current;
             setEditing(form);
           }}
           validate={validateServiceDetails}
@@ -374,15 +358,10 @@ export function ServicesPage() {
             <ServiceDetailsFields
               content={form}
               onChange={setForm}
-              thumbnailMediaId={thumbnailMediaId ?? null}
-              thumbnailPreviewUrl={thumbnailPreviewUrl}
-              onThumbnailChange={(id, url) => {
-                thumbnailMediaIdRef.current = id;
-                setThumbnailMediaId(id);
-                setThumbnailPreviewUrl(url);
-              }}
+              thumbnailPreviewUrl={createThumbnail.previewUrl}
+              onThumbnailChange={createThumbnail.handleChange}
               onThumbnailError={(msg) => notifyError(msg)}
-              onThumbnailBusyChange={setThumbnailUploading}
+              onThumbnailBusyChange={createThumbnail.setUploading}
             />
           )}
         />
@@ -395,7 +374,7 @@ export function ServicesPage() {
             setEditing(null);
             if (savedDuringEditRef.current) void load();
           }}
-          onSave={(form) => save(form, editThumbnailMediaIdRef.current)}
+          onSave={(form) => save(form, editThumbnail.mediaIdRef.current)}
           onSaved={() => {
             setEditing(null);
             void load();
@@ -416,15 +395,10 @@ export function ServicesPage() {
             <ServiceDetailsFields
               content={form}
               onChange={setForm}
-              thumbnailMediaId={editThumbnailMediaId ?? null}
-              thumbnailPreviewUrl={editThumbnailPreviewUrl}
-              onThumbnailChange={(id, url) => {
-                editThumbnailMediaIdRef.current = id;
-                setEditThumbnailMediaId(id);
-                setEditThumbnailPreviewUrl(url);
-              }}
+              thumbnailPreviewUrl={editThumbnail.previewUrl}
+              onThumbnailChange={editThumbnail.handleChange}
               onThumbnailError={(msg) => notifyError(msg)}
-              onThumbnailBusyChange={setEditThumbnailUploading}
+              onThumbnailBusyChange={editThumbnail.setUploading}
             />
           )}
           renderPreview={(form, mode) =>

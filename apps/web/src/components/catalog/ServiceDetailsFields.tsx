@@ -6,7 +6,6 @@ import { ThumbnailField } from "./ThumbnailField";
 export function ServiceDetailsFields({
   content,
   onChange,
-  thumbnailMediaId,
   thumbnailPreviewUrl,
   onThumbnailChange,
   onThumbnailError,
@@ -14,7 +13,6 @@ export function ServiceDetailsFields({
 }: {
   content: ServiceContent;
   onChange: (content: ServiceContent) => void;
-  thumbnailMediaId: string | null;
   thumbnailPreviewUrl: string | null;
   onThumbnailChange: (mediaId: string | null, previewUrl: string | null) => void;
   onThumbnailError: (message: string) => void;
@@ -122,7 +120,6 @@ export function ServiceDetailsFields({
         )}
       </FormField>
       <ThumbnailField
-        mediaId={thumbnailMediaId}
         previewUrl={thumbnailPreviewUrl}
         onChange={onThumbnailChange}
         onError={onThumbnailError}
