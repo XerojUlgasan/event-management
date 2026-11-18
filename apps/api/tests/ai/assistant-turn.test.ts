@@ -1403,7 +1403,9 @@ test("prompt evaluation: prompt instructs language matching and non-English mess
 // turn must still reflect the original saved value, not the discussed value.
 // The system prompt must instruct the assistant to distinguish the two.
 test("prompt evaluation: discussed change does not appear as saved in next turn context", async () => {
-  useReply("Got it, I've noted you'd like to change the guest count to 100.");
+  // Neutral fixture — same reply for both turns; assertions only check
+  // context snapshot values and system prompt content, not reply body.
+  useReply("I can help with that.");
   const reference = `DISCUSSED-${randomUUID()}`;
   const bookingId = await booking(customer.id, reference); // created with guestCount 75
   const id = (
