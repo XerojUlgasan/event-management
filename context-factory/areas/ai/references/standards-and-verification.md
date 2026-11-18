@@ -23,7 +23,7 @@ Use [structure and naming](structure-and-naming.md) for ownership and the [code 
 - Link completed rows for the turn and trigger atomically with assistant-message creation using [linkToolCallsToReplyData](../../../../apps/api/src/data/ai/link-tool-calls-to-reply.ts). Keep model/provider calls outside database transactions.
 - Allow an absent reply after provider failure, cancellation, or takeover. A terminated process can leave a `started` row. These records are audit evidence, not durable jobs, automatic retries, or proof that a customer received an answer.
 
-For pagination context, reuse only validated inputs and a cursor from a successful call linked to an earlier saved assistant reply in the same owned conversation. Never replay saved prices as fresh results. See [assistant-context.ts](../../../../apps/api/src/services/ai/assistant-context.ts) and [get-last-catalog-search.ts](../../../../apps/api/src/data/ai/get-last-catalog-search.ts).
+For pagination context, reuse only validated inputs and a cursor from a successful call linked to an earlier saved assistant reply in the same owned conversation. Never replay saved prices or Markdown as fresh results. See [assistant-context.ts](../../../../apps/api/src/services/ai/assistant-context.ts) and [get-last-catalog-tool-call.ts](../../../../apps/api/src/data/ai/get-last-catalog-tool-call.ts).
 
 ## Execution and model configuration
 

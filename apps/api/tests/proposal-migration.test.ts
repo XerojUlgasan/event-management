@@ -5,6 +5,8 @@ import { readdir, readFile } from "node:fs/promises";
 import { after, before, test } from "node:test";
 import pg from "pg";
 
+// Verify this historical migration in isolation, before later migrations remove
+// package_services. Current-schema removal has its own migration regression.
 const migration = "20261111130000_private_packages_quotations";
 const database = `proposal_migration_${randomUUID().replaceAll("-", "")}`;
 const connection = {

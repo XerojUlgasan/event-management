@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { after, before, test } from "node:test";
 import { Pool } from "pg";
+import { sql } from "kysely";
 import { MockLanguageModelV4, MockProviderV4 } from "ai/test";
 import {
   customerMessageResultSchema,
@@ -51,6 +52,19 @@ function useCatalogCalls(
   inputs: Record<string, unknown>[],
   beforeAnswer?: () => Promise<void>,
 ) {
+  useToolCalls(
+    inputs.map((input) => ({ toolName: "searchPublicCatalog", input })),
+    beforeAnswer,
+  );
+}
+
+function useToolCalls(
+  calls: {
+    toolName: "searchPublicCatalog" | "getPublicCatalogItem";
+    input: Record<string, unknown>;
+  }[],
+  beforeAnswer?: () => Promise<void>,
+) {
   useReply("Catalog results are ready");
   const generate = model.doGenerate.bind(model);
   model.doGenerate = async (...args) => {
@@ -58,10 +72,10 @@ function useCatalogCalls(
     if (model.doGenerateCalls.length === 1)
       return {
         ...result,
-        content: inputs.map((input, index) => ({
+        content: calls.map(({ toolName, input }, index) => ({
           type: "tool-call" as const,
           toolCallId: `catalog-call-${index}`,
-          toolName: "searchPublicCatalog",
+          toolName,
           input: JSON.stringify(input),
         })),
         finishReason: { unified: "tool-calls" as const, raw: undefined },
@@ -945,6 +959,177 @@ test("multiple searches belong to one customer turn and one resulting reply with
   );
 });
 
+async function detailPackage() {
+  const marker = randomUUID();
+  const row = await db
+    .insertInto("packages")
+    .values({
+      name: `Detail fixture ${marker}`,
+      slug: `detail-${marker}`,
+      description: "detail-source-marker",
+      price: 1250,
+      max_guests: 80,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  return row.id;
+}
+
+test("catalog detail reaches the model as Markdown and links its audit record to the reply", async () => {
+  const id = await detailPackage();
+  useToolCalls([
+    { toolName: "getPublicCatalogItem", input: { catalogType: "package", id } },
+  ]);
+  const result = await send(await conversation(), "Describe this package");
+  assert.equal(result.assistantError, null);
+  assert.ok(result.assistantMessage);
+  const toolMessage = model.doGenerateCalls[1].prompt.find(
+    (message) => message.role === "tool",
+  );
+  assert.ok(toolMessage);
+  const part = toolMessage.content.find(
+    (item) =>
+      item.type === "tool-result" && item.toolName === "getPublicCatalogItem",
+  );
+  assert.ok(part && part.type === "tool-result");
+  assert.equal(part.output.type, "text");
+  if (part.output.type !== "text")
+    throw new Error("Expected Markdown tool output");
+  assert.match(part.output.value, /^# Detail fixture/);
+  assert.match(part.output.value, /detail-source-marker/);
+  assert.match(part.output.value, /PHP 1250 per package/);
+  const record = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", result.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(record.tool_name, "getPublicCatalogItem");
+  assert.equal(record.status, "succeeded");
+  assert.equal(record.assistant_message_id, result.assistantMessage.id);
+  assert.deepEqual(record.output, {
+    markdown: part.output.value,
+    nextCursor: null,
+  });
+});
+
+test("catalog detail failures hide private records and sanitize errors", async () => {
+  useToolCalls([
+    {
+      toolName: "getPublicCatalogItem",
+      input: { catalogType: "package", id: randomUUID() },
+    },
+    {
+      toolName: "getPublicCatalogItem",
+      input: { catalogType: "package", id: packageId, cursor: "invalid" },
+    },
+  ]);
+  const result = await send(await conversation(), "Read unavailable details");
+  assert.ok(result.assistantMessage);
+  const calls = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", result.message.id)
+    .orderBy("tool_call_id")
+    .execute();
+  assert.deepEqual(
+    calls.map((item) => item.error_code),
+    ["item_not_found", "invalid_cursor"],
+  );
+  assert.ok(
+    calls.every((item) => item.status === "failed" && item.output === null),
+  );
+  const prompt = JSON.stringify(model.doGenerateCalls[1].prompt);
+  assert.match(prompt, /unavailable or no longer public/);
+  assert.match(prompt, /without a cursor/);
+  assert.doesNotMatch(prompt, /HTTPException|postgres|password|stack/i);
+});
+
+test("search and detail share the existing six-operation turn budget", async () => {
+  const id = await detailPackage();
+  useToolCalls(
+    Array.from({ length: 7 }, (_, index) =>
+      index % 2
+        ? {
+            toolName: "getPublicCatalogItem",
+            input: { catalogType: "package", id },
+          }
+        : {
+            toolName: "searchPublicCatalog",
+            input: { catalogType: "package" },
+          },
+    ),
+  );
+  const result = await send(
+    await conversation(),
+    "Find packages and read details",
+  );
+  assert.ok(result.assistantMessage);
+  const calls = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", result.message.id)
+    .execute();
+  assert.equal(calls.filter((item) => item.status === "succeeded").length, 6);
+  assert.equal(
+    calls.filter((item) => item.error_code === "call_limit").length,
+    1,
+  );
+  assert.equal(new Set(calls.map((item) => item.tool_name)).size, 2);
+});
+
+test("takeover after catalog detail keeps its record and suppresses the reply", async () => {
+  const id = await conversation();
+  useToolCalls(
+    [
+      {
+        toolName: "getPublicCatalogItem",
+        input: { catalogType: "package", id: await detailPackage() },
+      },
+    ],
+    async () => {
+      const response = await call(
+        `/admin/conversations/${id}/messages`,
+        team.cookie,
+        { body: "Taking over detail discussion" },
+      );
+      assert.equal(response.status, 201);
+    },
+  );
+  const result = await send(id, "Explain this package");
+  assert.equal(result.assistantMessage, null);
+  assert.equal(result.assistantError, null);
+  const record = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", result.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(record.status, "succeeded");
+  assert.equal(record.assistant_message_id, null);
+});
+
+test("catalog detail cannot receive model-selected conversation scope", async () => {
+  useToolCalls([
+    {
+      toolName: "getPublicCatalogItem",
+      input: {
+        catalogType: "package",
+        id: packageId,
+        conversationId: randomUUID(),
+      },
+    },
+  ]);
+  const result = await send(
+    await conversation(),
+    "Read details in another conversation",
+  );
+  const calls = await db
+    .selectFrom("ai_tool_calls")
+    .select("id")
+    .where("customer_message_id", "=", result.message.id)
+    .execute();
+  assert.equal(calls.length, 0);
+});
+
 test("failed searches record sanitized errors and distinguish unavailable from empty results", async () => {
   useCatalogCalls([{ catalogType: "package", cursor: "invalid" }]);
   const id = await conversation();
@@ -1140,6 +1325,82 @@ test("later turns receive only their conversation's delivered search pagination,
   useReply("A different conversation");
   await send(await conversation(), "Show more");
   assert.equal("previousCatalogSearch" in turnContext(0).context, false);
+});
+
+test("later detail turns retain only delivered same-conversation selectors and continuation", async () => {
+  const packageId = await detailPackage();
+  const originalText = "original-canvas-marker ".repeat(300);
+  await db
+    .updateTable("packages")
+    .set({
+      canvas: sql`${JSON.stringify([
+        {
+          id: randomUUID(),
+          title: "Details",
+          widgets: [
+            {
+              id: randomUUID(),
+              type: "markdown",
+              x: 0,
+              y: 0,
+              w: 12,
+              h: 4,
+              markdown: originalText,
+              mediaId: null,
+              alt: "",
+              caption: "",
+              autoplay: false,
+            },
+          ],
+        },
+      ])}::jsonb`,
+    })
+    .where("id", "=", packageId)
+    .execute();
+  const conversationId = await conversation();
+  const input = { catalogType: "package", id: packageId };
+  useToolCalls([{ toolName: "getPublicCatalogItem", input }]);
+  const first = await send(conversationId, "Read the details");
+  assert.ok(first.assistantMessage);
+  const saved = await db
+    .selectFrom("ai_tool_calls")
+    .select("output")
+    .where("customer_message_id", "=", first.message.id)
+    .executeTakeFirstOrThrow();
+  assert.ok(
+    saved.output &&
+      typeof saved.output === "object" &&
+      "nextCursor" in saved.output,
+  );
+  assert.equal(typeof saved.output.nextCursor, "string");
+  useReply("Follow-up");
+  await send(conversationId, "Continue reading");
+  const context = turnContext(0).context;
+  assert.ok("previousCatalogItem" in context);
+  assert.deepEqual(context.previousCatalogItem, {
+    input,
+    nextCursor: saved.output.nextCursor,
+  });
+  assert.doesNotMatch(
+    JSON.stringify(context.previousCatalogItem),
+    /original-canvas-marker|1250|markdown/,
+  );
+  useReply("Separate conversation");
+  await send(await conversation(), "Continue reading");
+  assert.equal("previousCatalogItem" in turnContext(0).context, false);
+
+  const undelivered = await conversation();
+  useToolCalls([{ toolName: "getPublicCatalogItem", input }], async () => {
+    throw new Error("fixture provider failure");
+  });
+  const failed = await send(
+    undelivered,
+    "Read details before provider failure",
+  );
+  assert.equal(failed.assistantMessage, null);
+  useReply("Retry later");
+  await send(undelivered, "Continue reading");
+  assert.equal("previousCatalogItem" in turnContext(0).context, false);
 });
 
 test("tracking failure preserves the customer message and never publishes an untracked result", async () => {

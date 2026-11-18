@@ -1,6 +1,5 @@
 import { tool } from "ai";
-import type { Kysely } from "kysely";
-import type { DB } from "../../../db/types.js";
+import type { AssistantToolContext } from "./assistant-tool-context.js";
 import { startToolCallData } from "../../../data/ai/start-tool-call.js";
 import { finishToolCallData } from "../../../data/ai/finish-tool-call.js";
 import {
@@ -15,14 +14,8 @@ export function createSearchPublicCatalogTool({
   assertActive,
   onPersistenceFailure,
   canRecord = () => true,
-}: {
-  db: Kysely<DB>;
-  customerMessageId: string;
-  turnId: string;
-  assertActive: () => Promise<void>;
-  onPersistenceFailure: () => void;
-  canRecord?: () => boolean;
-}) {
+  canExecute = () => true,
+}: AssistantToolContext) {
   let calls = 0;
   async function persist<T>(operation: Promise<T>): Promise<T> {
     try {
@@ -60,7 +53,7 @@ export function createSearchPublicCatalogTool({
       );
       let errorCode = "search_unavailable";
       try {
-        if (++calls > 6) {
+        if (++calls > 6 || !canExecute()) {
           errorCode = "call_limit";
           throw new Error("Search call limit reached");
         }

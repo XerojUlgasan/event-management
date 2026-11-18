@@ -50,9 +50,10 @@ const linkToolCallsSchema = z.object({
   assistantMessageId: z.string().uuid(),
 });
 
-const lastCatalogSearchSchema = z.object({
+const lastCatalogToolCallSchema = z.object({
   conversationId: z.string().uuid(),
   customerMessageId: z.string().uuid(),
+  toolName: z.enum(["searchPublicCatalog", "getPublicCatalogItem"]),
 });
 
 export type StartToolCallInput = {
@@ -76,9 +77,10 @@ export type LinkToolCallsInput = {
   assistantMessageId: string;
 };
 
-export type LastCatalogSearchInput = {
+export type LastCatalogToolCallInput = {
   conversationId: string;
   customerMessageId: string;
+  toolName: "searchPublicCatalog" | "getPublicCatalogItem";
 };
 
 function parse<T>(schema: z.ZodType<T>, value: unknown, message: string): T {
@@ -135,10 +137,10 @@ export function validateLinkToolCalls(value: unknown) {
   );
 }
 
-export function validateLastCatalogSearch(value: unknown) {
+export function validateLastCatalogToolCall(value: unknown) {
   return parse(
-    lastCatalogSearchSchema,
+    lastCatalogToolCallSchema,
     value,
-    "AI catalog search lookup is invalid",
+    "AI catalog tool lookup is invalid",
   );
 }

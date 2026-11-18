@@ -1,6 +1,5 @@
 import type { CatalogSection } from "@event-management/contracts/catalog";
 import type { Selectable } from "kysely";
-import type { PackageServiceRow } from "../../../data/packages/package-services.js";
 import type { Packages, Services } from "../../../db/types.js";
 
 const MAX_MARKDOWN_CHUNK_CHARACTERS = 6_000;
@@ -32,7 +31,6 @@ export type PrepareCatalogKnowledgeInput =
       kind: "package";
       record: PackageRecord;
       sections: CatalogSection[];
-      services: PackageServiceRow[];
     }
   | {
       kind: "service";
@@ -54,7 +52,7 @@ function nonemptyLine(label: string, value: string) {
   return value ? [`${label}: ${value}`] : [];
 }
 
-function packageOverview(record: PackageRecord, services: PackageServiceRow[]) {
+function packageOverview(record: PackageRecord) {
   const lines = [
     "Catalog package",
     `Name: ${record.name}`,
@@ -63,19 +61,6 @@ function packageOverview(record: PackageRecord, services: PackageServiceRow[]) {
     `Capacity: up to ${record.max_guests} guests.`,
   ];
 
-  const activeServices = services
-    .filter((service) => service.archived_at === null)
-    .slice()
-    .sort((left, right) => left.sort_order - right.sort_order);
-  for (const role of ["included", "optional"] as const) {
-    const names = activeServices
-      .filter((service) => service.role === role)
-      .map((service) => service.name);
-    if (names.length)
-      lines.push(
-        `${role === "included" ? "Included" : "Optional"} services: ${names.join(", ")}.`,
-      );
-  }
   return lines.join("\n");
 }
 
@@ -181,7 +166,7 @@ export function prepareCatalogKnowledge(
 
   const overview =
     input.kind === "package"
-      ? packageOverview(input.record, input.services)
+      ? packageOverview(input.record)
       : serviceOverview(input.record);
 
   return [

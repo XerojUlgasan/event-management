@@ -8,7 +8,6 @@ import type {
   CatalogSection,
   CatalogWidget,
   PackageContent,
-  PackageServiceInput,
 } from "@event-management/contracts/catalog";
 import type { ReactNode } from "react";
 import type { ServiceContent } from "../../lib/data/catalog/services";
@@ -69,13 +68,9 @@ export function WidgetContent({
 
 export function PackageCanvas({
   item,
-  hideServices = false,
   bookingAction,
 }: {
-  item: Omit<PackageContent, "services"> & {
-    services: (PackageServiceInput & { name?: string })[];
-  };
-  hideServices?: boolean;
+  item: PackageContent;
   bookingAction?: ReactNode;
 }) {
   const openCatalog = useCatalogNavigation();
@@ -93,19 +88,6 @@ export function PackageCanvas({
           <div className="catalog-detail-action">{bookingAction}</div>
         )}
       </div>
-      {!hideServices && item.services.length > 0 && (
-        <section className="ui-catalog-section">
-          <h2>Package services</h2>
-          <ul>
-            {item.services.map((service) => (
-              <li key={service.serviceId}>
-                {service.name ?? "Service"} ·{" "}
-                {service.role === "included" ? "Included" : "Optional"}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
       <CatalogSections
         sections={resolveSections(item.sections)}
         onOpenService={

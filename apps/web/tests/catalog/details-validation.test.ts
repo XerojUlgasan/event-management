@@ -15,7 +15,6 @@ const packageContent: PackageContent = {
   maxGuests: 100,
   price: { kind: "fixed", currency: "PHP", amountMinor: 2500000 },
   sections: [],
-  services: [],
 };
 const serviceContent: ServiceContent = {
   name: "Event host",

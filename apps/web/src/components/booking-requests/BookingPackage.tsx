@@ -204,7 +204,7 @@ export function BookingPackage({
             </div>
           )}
           {loaded.package && (
-            <PackageCanvas item={loaded.package} hideServices />
+            <PackageCanvas item={loaded.package} />
           )}
         </>
       )}
@@ -241,13 +241,13 @@ export function BookingPackage({
                   <details>
                     <summary>Previous content</summary>
                     <p>{entry.before.description}</p>
-                    <PackageCanvas item={entry.before} hideServices />
+                    <PackageCanvas item={entry.before} />
                   </details>
                 )}
                 <details>
                   <summary>Saved content</summary>
                   <p>{entry.after.description}</p>
-                  <PackageCanvas item={entry.after} hideServices />
+                  <PackageCanvas item={entry.after} />
                 </details>
               </details>
             ))}

@@ -18,7 +18,6 @@ export function PackagePreview({
   onClose,
   allowBooking = true,
   showBookingAction = true,
-  hideServices = false,
   onRetry,
 }: {
   item: PublicPackage | null;
@@ -26,7 +25,6 @@ export function PackagePreview({
   error?: string;
   allowBooking?: boolean;
   showBookingAction?: boolean;
-  hideServices?: boolean;
   onRetry?: () => void;
   onClose: () => void;
 }) {
@@ -101,7 +99,6 @@ export function PackagePreview({
           {item && (
             <PackageCanvas
               item={item}
-              hideServices={hideServices}
               bookingAction={
                 showBookingAction ? (
                   <Button onClick={book}>Book now</Button>

@@ -8,10 +8,6 @@ import {
   replaceCatalogSectionsService,
 } from "../catalog-canvas/replace-catalog-sections.js";
 import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
-import {
-  validatePackageServicesData,
-  replacePackageServicesData,
-} from "../../data/packages/package-services.js";
 import { packageDto } from "./package-response.js";
 import { syncCatalogKnowledge } from "../ai/workflows/sync-catalog-knowledge.js";
 import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
@@ -34,12 +30,6 @@ export async function updatePackageService(
         return error("Archived packages cannot be edited", 409);
       if (current.updated_at.toISOString() !== content.expectedUpdatedAt)
         return error("Package changed. Refresh and try again", 409);
-      const invalid = await validatePackageServicesData(
-        trx,
-        id,
-        content.services,
-      );
-      if (invalid) return invalid;
       const title = catalogTitle(content.name);
       if (await findCatalogTitleData(trx, "packages", title, id))
         return error("A package with this title already exists", 409);
@@ -53,9 +43,8 @@ export async function updatePackageService(
       );
       if (current.thumbnail_media_id)
         previousMediaIds.push(current.thumbnail_media_id);
-      await replacePackageServicesData(trx, id, content.services);
       await syncCatalogKnowledge(trx, { kind: "package", id });
-      return packageDto(trx, row, { includeArchivedServices: true });
+      return packageDto(trx, row);
     });
     if (!("status" in outcome)) {
       await promoteOwnerCatalogMediaService(db, { kind: "package", id });

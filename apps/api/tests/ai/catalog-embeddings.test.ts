@@ -285,23 +285,7 @@ async function setCanvas(owner: CatalogKnowledgeOwner, sections: unknown[]) {
     .executeTakeFirstOrThrow();
 }
 
-function serviceLink(packageId: string, serviceId: string, sortOrder: number) {
-  return getDb()
-    .insertInto("package_services")
-    .values({
-      package_id: packageId,
-      service_id: serviceId,
-      role: "included",
-      sort_order: sortOrder,
-    })
-    .execute();
-}
-
-function packageContent(
-  name: string,
-  serviceId?: string,
-  markdown = "Package details",
-) {
+function packageContent(name: string, markdown = "Package details") {
   return {
     name,
     description: `${name} description`,
@@ -341,7 +325,6 @@ function packageContent(
         ],
       },
     ],
-    services: serviceId ? [{ serviceId, role: "included" as const }] : [],
   } satisfies Content;
 }
 
@@ -493,8 +476,6 @@ test("embeds only eligible catalog owners with text and actual sample/upload ima
     name: "Archived package",
     archived: true,
   });
-  await serviceLink(packageId, activeServiceId, 0);
-  await serviceLink(packageId, archivedServiceId, 1);
 
   const sampleMediaId = await createMediaAsset("sample");
   const uploadedMediaId = await createMediaAsset("upload");
@@ -596,7 +577,7 @@ test("embeds only eligible catalog owners with text and actual sample/upload ima
     ].sort(),
   );
   const overview = packageRows.find((row) => row.chunk_key === "overview");
-  assert.match(overview?.content_markdown ?? "", /Active service/);
+  assert.doesNotMatch(overview?.content_markdown ?? "", /Active service/);
   assert.doesNotMatch(
     overview?.content_markdown ?? "",
     /Archived linked service/,
@@ -707,10 +688,6 @@ test("re-saving the same sample photo retains its embedding after media replacem
       maxGuests: listing.maxGuests,
       price: listing.price,
       sections: originalSections,
-      services: listing.services.map(({ serviceId, role }) => ({
-        serviceId,
-        role,
-      })),
       expectedUpdatedAt: listing.updatedAt,
     },
     actorId,
@@ -826,7 +803,7 @@ test("content, photo context, embedding model, removal, and archive changes refr
   assert.deepEqual(await knowledgeRows(owner), []);
 });
 
-test("catalog create, update, and archive mutations refresh owners and dependent package summaries", async () => {
+test("catalog create, update, and archive mutations refresh their owners", async () => {
   setGatewayHandler();
   const actorId = await createAdminId();
 
@@ -842,7 +819,7 @@ test("catalog create, update, and archive mutations refresh owners and dependent
 
   const packageListing = await createPackageService(
     getDb(),
-    packageContent("Garden package", service.id),
+    packageContent("Garden package"),
     actorId,
   );
   assert.ok(!("status" in packageListing));
@@ -861,11 +838,7 @@ test("catalog create, update, and archive mutations refresh owners and dependent
     getDb(),
     packageListing.id,
     {
-      ...packageContent(
-        "Garden package revised",
-        service.id,
-        "Revised package details",
-      ),
+      ...packageContent("Garden package revised", "Revised package details"),
       expectedUpdatedAt: packageListing.updatedAt,
     },
     actorId,
@@ -901,24 +874,12 @@ test("catalog create, update, and archive mutations refresh owners and dependent
     )?.content_markdown ?? "",
     /Catering service renamed/,
   );
-  const dependentOverview = (await knowledgeRows(packageOwner)).find(
-    (row) => row.chunk_key === "overview",
-  );
-  assert.match(
-    dependentOverview?.content_markdown ?? "",
-    /Catering service renamed/,
-  );
+  assert.deepEqual(await knowledgeRows(packageOwner), revisedPackageRows);
 
   await archiveServiceService(getDb(), service.id);
   await waitForCatalogEmbeddingRefresh(getDb());
   assert.deepEqual(await knowledgeRows(serviceOwner), []);
-  const afterServiceArchive = (await knowledgeRows(packageOwner)).find(
-    (row) => row.chunk_key === "overview",
-  );
-  assert.doesNotMatch(
-    afterServiceArchive?.content_markdown ?? "",
-    /Catering service renamed/,
-  );
+  assert.deepEqual(await knowledgeRows(packageOwner), revisedPackageRows);
 
   await archivePackageService(getDb(), packageListing.id);
   await waitForCatalogEmbeddingRefresh(getDb());

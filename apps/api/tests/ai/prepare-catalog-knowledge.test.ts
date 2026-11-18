@@ -4,7 +4,6 @@ import type {
   CatalogSection,
   CatalogWidget,
 } from "@event-management/contracts/catalog";
-import type { PackageServiceRow } from "../../src/data/packages/package-services.js";
 import type { PrepareCatalogKnowledgeInput } from "../../src/services/ai/workflows/prepare-catalog-knowledge.js";
 import { prepareCatalogKnowledge } from "../../src/services/ai/workflows/prepare-catalog-knowledge.js";
 
@@ -72,38 +71,11 @@ function markdownSource(chunk: { contentMarkdown: string }) {
   return chunk.contentMarkdown.slice(markerIndex + marker.length);
 }
 
-test("package overview uses peso units and ordered active service roles", () => {
-  const services: PackageServiceRow[] = [
-    {
-      package_id: packageRecord.id,
-      service_id: "optional-id",
-      role: "optional",
-      sort_order: 2,
-      name: "Dessert table",
-      archived_at: null,
-    },
-    {
-      package_id: packageRecord.id,
-      service_id: "archived-id",
-      role: "included",
-      sort_order: 0,
-      name: "Archived service marker",
-      archived_at: new Date("2026-01-01T00:00:00.000Z"),
-    },
-    {
-      package_id: packageRecord.id,
-      service_id: "included-id",
-      role: "included",
-      sort_order: 1,
-      name: "Table styling",
-      archived_at: null,
-    },
-  ];
+test("package overview uses peso units and capacity", () => {
   const [overview] = prepareCatalogKnowledge({
     kind: "package",
     record: packageRecord,
     sections: [],
-    services,
   });
 
   assert.equal(overview?.chunkKey, "overview");
@@ -112,18 +84,6 @@ test("package overview uses peso units and ordered active service roles", () => 
     /Price: PHP 12500 per package\./,
   );
   assert.match(overview?.contentMarkdown ?? "", /Capacity: up to 80 guests\./);
-  assert.match(
-    overview?.contentMarkdown ?? "",
-    /Included services: Table styling\./,
-  );
-  assert.match(
-    overview?.contentMarkdown ?? "",
-    /Optional services: Dessert table\./,
-  );
-  assert.doesNotMatch(
-    overview?.contentMarkdown ?? "",
-    /Archived service marker/,
-  );
 });
 
 test("service overview distinguishes hourly pricing from included hours and extra time", () => {
@@ -163,7 +123,6 @@ test("Markdown widgets follow section and y/x reading order with exact bounded U
   const input: PrepareCatalogKnowledgeInput = {
     kind: "package",
     record: packageRecord,
-    services: [],
     sections: [
       section("Reception", [
         widget("markdown", "later-row", 0, 4, { markdown: "Later row." }),
@@ -291,7 +250,6 @@ test("custom packages and archived catalog listings produce no chunks", () => {
         widget("markdown", "details", 0, 0, { markdown: "Text" }),
       ]),
     ],
-    services: [],
   };
   assert.deepEqual(
     prepareCatalogKnowledge({
@@ -321,7 +279,6 @@ test("preparation leaves the source input unchanged", () => {
   const input: PrepareCatalogKnowledgeInput = {
     kind: "package",
     record: packageRecord,
-    services: [],
     sections: [
       section("Details", [
         widget("markdown", "later", 0, 2, { markdown: "Later." }),
@@ -347,7 +304,6 @@ test("linked catalog widgets index captions without copying target details or ph
   const chunks = prepareCatalogKnowledge({
     kind: "package",
     record: packageRecord,
-    services: [],
     sections: [
       section("Explore", [
         widget("package", "linked-package", 0, 0, {

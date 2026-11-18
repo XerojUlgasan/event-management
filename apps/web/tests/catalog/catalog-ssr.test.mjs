@@ -109,10 +109,6 @@ const packageItem = {
   description: "Package summary",
   maxGuests: 120,
   price: { kind: "fixed", currency: "PHP", amountMinor: 125000 },
-  services: [
-    { serviceId: "s1", name: "Catering", role: "included" },
-    { serviceId: "s2", name: "Music", role: "optional" },
-  ],
   sections,
   slug: "celebration",
 };
@@ -142,12 +138,11 @@ test("public package renders the canonical canvas with the booking action", () =
     "Celebration",
     "Package summary",
     "Up to 120 guests",
-    "Catering · Included",
-    "Music · Optional",
     "Book now",
   ])
     assert.ok(actual.includes(value), value);
   assert.match(actual, /1,250/);
+  assert.doesNotMatch(actual, /Package services|Included|Optional/);
 });
 test("public service renders its canonical canvas and metadata", () => {
   const serviceHtml = render(publicDetails.PublicServiceDetail, {
@@ -206,10 +201,9 @@ test("editing media retains caption and suppresses autoplay without suppressing 
   assert.match(image, /Photo caption/);
 });
 
-test("private package canvas retains description while hiding services and booking action", () => {
+test("private package canvas retains description without a booking action", () => {
   const html = render(canvas.PackageCanvas, {
     item: packageItem,
-    hideServices: true,
   });
   assert.match(html, /Package summary/);
   assert.doesNotMatch(
@@ -293,14 +287,13 @@ const serviceWidget = {
 test("linked service cards render on public and private canvases without prices or inclusion claims", () => {
   const item = {
     ...packageItem,
-    services: [],
     sections: [
       { id: "linked-services", title: "Explore", widgets: [serviceWidget] },
     ],
   };
   for (const html of [
     render(publicPackage.PublicPackageDetail, { item }),
-    render(canvas.PackageCanvas, { item, hideServices: true }),
+    render(canvas.PackageCanvas, { item }),
     render(canvas.ServiceCanvas, {
       item: { ...service, sections: item.sections },
     }),
@@ -404,11 +397,10 @@ test("linked package cards share public and private canvases without prices or i
   ];
   for (const html of [
     render(publicPackage.PublicPackageDetail, {
-      item: { ...packageItem, services: [], sections },
+      item: { ...packageItem, sections },
     }),
     render(canvas.PackageCanvas, {
-      item: { ...packageItem, services: [], sections },
-      hideServices: true,
+      item: { ...packageItem, sections },
     }),
     render(canvas.ServiceCanvas, { item: { ...service, sections } }),
   ]) {

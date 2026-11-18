@@ -24,7 +24,7 @@
     "catalog:embed": "tsx src/db/embed-catalog.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:seed-admin": "tsx src/db/seed-admin.ts",
-    "test:packages": "tsx --test tests/packages.test.ts tests/canvas-jsonb-migration.test.ts tests/service-pricing-migration.test.ts tests/catalog-canvas-validation.test.ts tests/canvas-validation-migration.test.ts tests/thumbnail-migration.test.ts",
+    "test:packages": "tsx --test tests/packages.test.ts tests/canvas-jsonb-migration.test.ts tests/service-pricing-migration.test.ts tests/catalog-canvas-validation.test.ts tests/canvas-validation-migration.test.ts tests/thumbnail-migration.test.ts tests/package-services-removal-migration.test.ts",
     "test:quotations": "tsx --test tests/quotations.test.ts",
     "test:proposal-migration": "tsx --test tests/proposal-migration.test.ts",
     "test:catalog-knowledge": "tsx --test tests/catalog-knowledge-migration.test.ts tests/ai/prepare-catalog-knowledge.test.ts tests/ai/embed-catalog-content.test.ts tests/ai/catalog-embedding-images.test.ts tests/ai/catalog-embeddings.test.ts tests/ai/catalog-knowledge-dashboard.test.ts tests/ai/catalog-knowledge-search.test.ts tests/ai/catalog-media-relocation.test.ts",

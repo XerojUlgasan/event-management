@@ -121,7 +121,6 @@ model Package {
   customForBookingRequestId String? @unique @map("custom_for_booking_request_id") @db.Uuid
   customForBookingRequest BookingRequest? @relation("CustomBookingPackage", fields: [customForBookingRequestId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   bookingRequests BookingRequest[] @relation("InquiryPackage")
-  services PackageService[]
   knowledge CatalogKnowledge[]
   canvas          Json              @default("[]") @db.JsonB
   thumbnailMediaId String?          @map("thumbnail_media_id") @db.Uuid
@@ -147,7 +146,6 @@ model Service {
   canvas Json @default("[]") @db.JsonB
   thumbnailMediaId String? @map("thumbnail_media_id") @db.Uuid
   thumbnailMedia MediaAsset? @relation("ServiceThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  packages PackageService[]
   knowledge CatalogKnowledge[]
   @@index([canvas(ops: JsonbPathOps)], type: Gin, map: "services_canvas_idx")
   @@map("services")
@@ -189,22 +187,6 @@ model CatalogKnowledge {
   @@unique([serviceId, chunkKey])
   @@index([mediaId])
   @@map("catalog_knowledge")
-}
-
-model PackageService {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  packageId String @map("package_id") @db.Uuid
-  serviceId String @map("service_id") @db.Uuid
-  role String
-  sortOrder Int @map("sort_order")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  service Service @relation(fields: [serviceId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-
-  @@unique([packageId, serviceId])
-  @@unique([packageId, sortOrder])
-  @@index([serviceId])
-  @@map("package_services")
 }
 
 model Quotation {

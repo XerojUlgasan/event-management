@@ -5,13 +5,9 @@ import { lockServiceData } from "../../data/services/lock-service.js";
 import { error } from "../packages/package-rules.js";
 import { listCatalogMediaIdsService } from "../catalog-canvas/read-catalog-sections.js";
 import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
-import { invalidateDependentPackageKnowledgeData } from "../../data/ai/invalidate-dependent-package-knowledge.js";
-import type { CatalogKnowledgeOwner } from "../../data/ai/catalog-knowledge-types.js";
-import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
 import { hasCatalogListingReferenceData } from "../../data/catalog/has-catalog-listing-reference.js";
 export async function deleteServiceService(db: Kysely<DB>, id: string) {
   let media: string[] = [];
-  let dependents: CatalogKnowledgeOwner[] = [];
   try {
     const outcome = await db.transaction().execute(async (trx) => {
       const row = await lockServiceData(trx, id);
@@ -28,12 +24,10 @@ export async function deleteServiceService(db: Kysely<DB>, id: string) {
         );
       media = await listCatalogMediaIdsService(trx, { kind: "service", id });
       if (row.thumbnail_media_id) media.push(row.thumbnail_media_id);
-      dependents = await invalidateDependentPackageKnowledgeData(trx, id);
       await deleteServiceData(trx, id);
       return null;
     });
     if (!outcome) {
-      await scheduleCatalogEmbeddingRefresh(db, dependents);
       await cleanupCatalogMediaService(db, media);
     }
     return outcome;

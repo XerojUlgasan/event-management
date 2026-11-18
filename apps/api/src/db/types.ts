@@ -178,15 +178,6 @@ export interface Packages {
   updated_at: Generated<Timestamp>;
 }
 
-export interface PackageServices {
-  created_at: Generated<Timestamp>;
-  id: Generated<string>;
-  package_id: string;
-  role: string;
-  service_id: string;
-  sort_order: number;
-}
-
 export interface Quotations {
   accepted_at: Timestamp | null;
   adjustments_reviewed: Generated<boolean>;
@@ -255,7 +246,6 @@ export interface DB {
   guest_message_requests: GuestMessageRequests;
   media_assets: MediaAssets;
   messages: Messages;
-  package_services: PackageServices;
   packages: Packages;
   quotations: Quotations;
   services: Services;

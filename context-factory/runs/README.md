@@ -14,6 +14,8 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Public catalog item tool](2026-11-18_20-29-13_public-catalog-item-tool.md) | Current catalog/canvas detail as Markdown / main | complete | Review scoped diff; 59 synthetic API/database checks, types and Edge build passed; live provider/hosted rollout separate |
+| [Remove package service assignments](2026-11-18_20-23-00_remove-package-service-assignments.md) | Relational assignment removal; canvas widgets preserved / main | complete | Review diff; migration applied locally, focused checks pass; hosted rollout separate |
 | [AI architecture guidance](2026-11-18_19-40-01_ai-architecture-guidance.md) | Current tool architecture and extension instructions / main | complete | Use the AI area for extensions; source audit, routing walkthrough, and documentation checks passed |
 | [Catalog media folders](2026-11-18_18-44-03_catalog-media-folders.md) | New upload ownership paths / main | complete | Review scoped diff; 71 focused tests and local Storage passed; no existing-file migration or new table |
 | [Public catalog search tool](2026-11-18_00-28-54_catalog-search-tool.md) | Public assistant search and execution audit / main | complete | Review uncommitted diff; local additive migration and focused checks passed, hosted rollout separate |

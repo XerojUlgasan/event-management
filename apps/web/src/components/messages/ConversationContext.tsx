@@ -200,7 +200,6 @@ export function ConversationContext({
         onRetry={retry}
         onClose={onClose}
         showBookingAction={false}
-        hideServices
       />
     );
   const body = (

@@ -4,7 +4,6 @@ import {
 } from "@event-management/contracts/catalog-canvas";
 import { sql, type Kysely, type Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
-import { listPackageServicesData } from "../packages/package-services.js";
 
 type Database = Kysely<DB> | Transaction<DB>;
 type Owner = { kind: "package" | "service"; id: string };
@@ -77,16 +76,6 @@ export async function loadKnowledgeSourcesData(db: Database, owner?: Owner) {
         .where("id", "in", mediaIds)
         .execute()
     : [];
-  const packageServices = await listPackageServicesData(
-    db,
-    packages.map((p) => p.id),
-  );
-  const servicesByPackage = new Map<string, typeof packageServices>();
-  for (const service of packageServices) {
-    const list = servicesByPackage.get(service.package_id) ?? [];
-    list.push(service);
-    servicesByPackage.set(service.package_id, list);
-  }
   const assetMap = new Map(assets.map((asset) => [asset.id, asset]));
   const rowsByOwner = new Map<string, typeof rows>();
   for (const row of rows) {
@@ -125,7 +114,6 @@ export async function loadKnowledgeSourcesData(db: Database, owner?: Owner) {
   return {
     packages,
     services,
-    servicesByPackage,
     assetMap,
     rowsByOwner,
     sections,

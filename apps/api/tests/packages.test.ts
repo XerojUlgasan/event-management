@@ -688,6 +688,7 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
     { maxGuests: 0 },
     { eventTypes: ["Birthday"] },
     { guestMax: 100 },
+    { services: [] },
   ])
     await read(
       await call("/admin/packages", "POST", { ...data, ...patch }, adminCookie),
@@ -721,11 +722,22 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
     "versionId",
     "eventTypes",
     "guestMax",
+    "services",
   ])
     assert.equal(key in created, false);
   const detail = await read(await call(`/packages/${created.id}`), 200);
+  assert.equal("services" in detail, false);
   assert.equal(detail.sections[0].widgets.length, 2);
   assert.deepEqual(geometry(detail), expectedGeometry);
+  await read(
+    await call(
+      `/admin/packages/${created.id}`,
+      "PATCH",
+      { ...gridContent, services: [], expectedUpdatedAt: created.updatedAt },
+      adminCookie,
+    ),
+    400,
+  );
   const edits = await Promise.all(
     ["First edit", "Second edit"].map((name) =>
       call(
@@ -2494,7 +2506,6 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
     ...data,
     name: `Original ${randomUUID()}`,
     thumbnailMediaId: thumbnail.id,
-    services: [{ serviceId: includedService.id, role: "included" }],
     sections: [
       {
         id: randomUUID(),
@@ -2588,6 +2599,15 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
     expectedUpdatedAt: before.package.updatedAt,
     expectedBookingUpdatedAt: before.bookingUpdatedAt,
   };
+  await read(
+    await call(
+      `/admin/booking-requests/${booking.id}/custom-package`,
+      "POST",
+      { ...save, services: [] },
+      adminCookie,
+    ),
+    400,
+  );
   const saved = await read(
     await call(
       `/admin/booking-requests/${booking.id}/custom-package`,
@@ -2646,15 +2666,14 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
         ...data,
         name: `Private link ${randomUUID()}`,
         sections: [{ id: randomUUID(), title: "", widgets: [privateWidget] }],
-        services: [],
       },
       adminCookie,
     ),
     400,
   );
 
-  assert.equal(custom.services[0].serviceId, includedService.id);
-  assert.equal(custom.services[0].role, "included");
+  assert.equal("services" in custom, false);
+  assert.equal("services" in original, false);
   assert.equal(custom.sections[0].widgets[1].service.id, includedService.id);
   assert.equal(custom.sections[0].widgets[1].caption, "Included service");
   assert.equal(custom.customForBookingRequestId, booking.id);
@@ -2849,7 +2868,6 @@ test("quotations do not retain removed package media or grant historical media a
   const content = {
     ...data,
     name: `Quotation media ${randomUUID()}`,
-    services: [],
     sections: [
       {
         id: randomUUID(),
@@ -2996,7 +3014,7 @@ test("linked service widgets are validated, hydrated, and protect references", a
     },
   };
   const sections = [{ id: randomUUID(), title: "Services", widgets: [widget] }];
-  const content = { ...data, name: "Linked package", sections, services: [] };
+  const content = { ...data, name: "Linked package", sections };
   await read(
     await call("/admin/packages", "POST", content, customerCookie),
     403,
@@ -3158,7 +3176,7 @@ test("linked package widgets hydrate public records and protect both owner types
     await call(
       "/admin/packages",
       "POST",
-      { ...data, name: `Target ${randomUUID()}`, services: [] },
+      { ...data, name: `Target ${randomUUID()}` },
       adminCookie,
     ),
     201,
@@ -3189,7 +3207,6 @@ test("linked package widgets hydrate public records and protect both owner types
     ...data,
     name: `Owner ${randomUUID()}`,
     sections,
-    services: [],
   };
   await read(
     await call(

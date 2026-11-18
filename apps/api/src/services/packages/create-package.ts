@@ -6,10 +6,6 @@ import {
   InvalidCatalogMedia,
   replaceCatalogSectionsService,
 } from "../catalog-canvas/replace-catalog-sections.js";
-import {
-  validatePackageServicesData,
-  replacePackageServicesData,
-} from "../../data/packages/package-services.js";
 import { packageDto } from "./package-response.js";
 import { syncCatalogKnowledge } from "../ai/workflows/sync-catalog-knowledge.js";
 import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
@@ -27,12 +23,6 @@ export async function createPackageService(
       const title = catalogTitle(content.name);
       if (await findCatalogTitleData(trx, "packages", title))
         return error("A package with this title already exists", 409);
-      const invalid = await validatePackageServicesData(
-        trx,
-        null,
-        content.services,
-      );
-      if (invalid) return invalid;
       const now = new Date();
       const row = await createPackageData(trx, content, title.slug, now);
       await replaceCatalogSectionsService(
@@ -41,9 +31,8 @@ export async function createPackageService(
         content,
         actorId,
       );
-      await replacePackageServicesData(trx, row.id, content.services);
       await syncCatalogKnowledge(trx, { kind: "package", id: row.id });
-      return packageDto(trx, row, { includeArchivedServices: true });
+      return packageDto(trx, row);
     });
     if (!("status" in outcome)) {
       await promoteOwnerCatalogMediaService(db, {

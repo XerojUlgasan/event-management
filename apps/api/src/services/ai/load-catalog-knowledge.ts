@@ -11,14 +11,8 @@ export async function loadCatalogKnowledge(
   db: Database,
   owner?: { kind: "package" | "service"; id: string },
 ) {
-  const {
-    packages,
-    services,
-    servicesByPackage,
-    assetMap,
-    rowsByOwner,
-    sections,
-  } = await loadKnowledgeSourcesData(db, owner);
+  const { packages, services, assetMap, rowsByOwner, sections } =
+    await loadKnowledgeSourcesData(db, owner);
   const entries = [
     ...packages.map((record) => {
       const owner = {
@@ -32,7 +26,6 @@ export async function loadCatalogKnowledge(
           kind: "package",
           record,
           sections: sections(record.canvas),
-          services: servicesByPackage.get(record.id) ?? [],
         }),
         rowsByOwner.get(`package:${record.id}`) ?? [],
         assetMap,

@@ -4,16 +4,14 @@ import type { CatalogPackage } from "@event-management/contracts/catalog";
 import type { Packages } from "../../db/types.js";
 import { readCatalogSectionsService } from "../catalog-canvas/read-catalog-sections.js";
 import type { Database } from "../../data/catalog-canvas/catalog-canvas-types.js";
-import { listPackageServicesData } from "../../data/packages/package-services.js";
 export async function packageDto(
   db: Database,
   row: Selectable<Packages>,
-  options?: { includeArchivedServices?: boolean },
 ): Promise<CatalogPackage> {
-  const [sections, services] = await Promise.all([
-    readCatalogSectionsService(db, { kind: "package", id: row.id }),
-    listPackageServicesData(db, [row.id]),
-  ]);
+  const sections = await readCatalogSectionsService(db, {
+    kind: "package",
+    id: row.id,
+  });
   const widgets = sections.flatMap((section) => section.widgets);
   const thumbnailUrl = row.thumbnail_media_id
     ? `/v1/catalog-media/${row.thumbnail_media_id}`
@@ -26,17 +24,6 @@ export async function packageDto(
     slug: row.slug,
     packageType: row.package_type as "catalog" | "custom",
     customForBookingRequestId: row.custom_for_booking_request_id,
-    services: services
-      .filter(
-        (service) => options?.includeArchivedServices || !service.archived_at,
-      )
-      .map((service) => ({
-        serviceId: service.service_id,
-        name: service.name,
-        role: service.role as "included" | "optional",
-        sortOrder: service.sort_order,
-        archivedAt: service.archived_at?.toISOString() ?? null,
-      })),
     name: row.name,
     maxGuests: row.max_guests,
     price: {

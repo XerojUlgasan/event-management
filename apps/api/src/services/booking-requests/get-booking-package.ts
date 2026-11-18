@@ -17,12 +17,7 @@ export async function getBookingPackageService(
       if (!booking) return null;
       const pkg = await resolveBookingPackageData(trx, booking);
       return {
-        package: pkg
-          ? await packageDto(trx, pkg, {
-              includeArchivedServices:
-                !customerId || pkg.package_type === "custom",
-            })
-          : null,
+        package: pkg ? await packageDto(trx, pkg) : null,
         bookingUpdatedAt: booking.revision,
       };
     });

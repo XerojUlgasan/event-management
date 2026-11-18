@@ -7,7 +7,7 @@ import { Kysely, PostgresDialect } from "kysely";
 import { Pool, type QueryResult } from "pg";
 import type { DB } from "../../src/db/types.js";
 import { finishToolCallData } from "../../src/data/ai/finish-tool-call.js";
-import { getLastCatalogSearchData } from "../../src/data/ai/get-last-catalog-search.js";
+import { getLastCatalogToolCallData } from "../../src/data/ai/get-last-catalog-tool-call.js";
 import { linkToolCallsToReplyData } from "../../src/data/ai/link-tool-calls-to-reply.js";
 import { startToolCallData } from "../../src/data/ai/start-tool-call.js";
 
@@ -412,7 +412,8 @@ test("returns only the last earlier replied catalog search in this conversation"
     output: { items: [{ id: "current" }], nextCursor: "cursor-current" },
   });
 
-  const beforeCurrentReply = await getLastCatalogSearchData(db, {
+  const beforeCurrentReply = await getLastCatalogToolCallData(db, {
+    toolName: "searchPublicCatalog",
     conversationId: conversation.id,
     customerMessageId: currentCustomer.id,
   });
@@ -447,21 +448,24 @@ test("returns only the last earlier replied catalog search in this conversation"
   });
 
   assert.deepEqual(
-    await getLastCatalogSearchData(db, {
+    await getLastCatalogToolCallData(db, {
+      toolName: "searchPublicCatalog",
       conversationId: conversation.id,
       customerMessageId: currentCustomer.id,
     }),
     beforeCurrentReply,
   );
   assert.equal(
-    await getLastCatalogSearchData(db, {
+    await getLastCatalogToolCallData(db, {
+      toolName: "searchPublicCatalog",
       conversationId: conversation.id,
       customerMessageId: otherCustomer.id,
     }),
     undefined,
   );
   assert.equal(
-    await getLastCatalogSearchData(db, {
+    await getLastCatalogToolCallData(db, {
+      toolName: "searchPublicCatalog",
       conversationId: conversation.id,
       customerMessageId: currentReply.id,
     }),

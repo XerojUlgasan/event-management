@@ -2,7 +2,6 @@ export const MAX_CATALOG_SECTIONS = 20;
 export const MAX_CATALOG_WIDGETS = 100;
 export const MAX_WIDGET_MARKDOWN_LENGTH = 20000;
 export const CATALOG_COLUMNS = 12;
-export const MAX_PACKAGE_SERVICES = 100;
 
 export type CatalogMedia = {
   id?: string;
@@ -56,26 +55,14 @@ export type PackagePrice = {
   currency: "PHP";
   amountMinor: number;
 };
-export type PackageServiceRole = "included" | "optional";
-export type PackageServiceInput = {
-  serviceId: string;
-  role: PackageServiceRole;
-};
-export type PackageService = PackageServiceInput & {
-  name: string;
-  sortOrder: number;
-  archivedAt: string | null;
-};
 export type PackageContent = {
   name: string;
   description: string;
   maxGuests: number;
   price: PackagePrice;
   sections: CatalogSection[];
-  services: PackageServiceInput[];
 };
-export type CatalogPackage = Omit<PackageContent, "services"> & {
-  services: PackageService[];
+export type CatalogPackage = PackageContent & {
   packageType: "catalog" | "custom";
   customForBookingRequestId: string | null;
   id: string;

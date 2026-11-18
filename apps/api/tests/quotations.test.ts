@@ -790,15 +790,6 @@ test("package and service changes preserve quoted amounts; revisions use the cur
     })
     .returning("id")
     .executeTakeFirstOrThrow();
-  await db
-    .insertInto("package_services")
-    .values({
-      package_id: pkg.id,
-      service_id: service.id,
-      role: "included",
-      sort_order: 0,
-    })
-    .execute();
   const b = await booking(pkg.id);
   let q = await create(b);
   const items = [
@@ -991,7 +982,6 @@ test("private package edits remain visible separately while quotations retain th
     description: "Current description",
     maxGuests: 100,
     price: { kind: "fixed", currency: "PHP", amountMinor: 120000 },
-    services: [],
     sections: [],
   };
   const custom = await read(
@@ -1212,7 +1202,6 @@ test("package-less inquiries require a proposal and support private custom packa
       maxGuests: 50,
       price: { kind: "fixed", currency: "PHP", amountMinor: 100000 },
       sections: [],
-      services: [],
       expectedBookingUpdatedAt: b.updatedAt,
     }),
     200,
@@ -1270,7 +1259,6 @@ test("catalog attachment and scratch proposal serialize on the same inquiry", as
       maxGuests: 50,
       price: { kind: "fixed", currency: "PHP", amountMinor: 100000 },
       sections: [],
-      services: [],
       expectedBookingUpdatedAt: b.updatedAt,
     }),
   ]);

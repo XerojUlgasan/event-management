@@ -15,9 +15,7 @@ export const getBookingPackage = (id: string, admin: boolean) =>
   );
 export const saveBookingPackage = (
   id: string,
-  content: PackageContent & {
-    services: { serviceId: string; role: "included" | "optional" }[];
-  },
+  content: PackageContent,
   revisions: {
     expectedBookingUpdatedAt: string;
     expectedUpdatedAt?: string;

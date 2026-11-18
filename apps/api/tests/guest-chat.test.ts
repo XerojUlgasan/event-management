@@ -242,6 +242,53 @@ test("guest catalog calls are persisted under the guest message and replay does 
   );
 });
 
+test("guests receive public catalog details as Markdown with owned audit records", async () => {
+  useReply("Here are the package details");
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+    if (model.doGenerateCalls.length !== 1) return result;
+    return {
+      ...result,
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "guest-detail-call",
+          toolName: "getPublicCatalogItem",
+          input: JSON.stringify({ catalogType: "package", id: packageId }),
+        },
+      ],
+      finishReason: { unified: "tool-calls", raw: undefined },
+    };
+  };
+  const thread = await guest();
+  const requestId = randomUUID();
+  const result = await read(
+    await send(thread, "Read package details", requestId),
+    201,
+  );
+  assert.ok(result.assistantMessage);
+  const toolMessage = model.doGenerateCalls[1].prompt.find(
+    (message) => message.role === "tool",
+  );
+  assert.ok(toolMessage);
+  const part = toolMessage.content.find((item) => item.type === "tool-result");
+  assert.ok(part && part.type === "tool-result");
+  assert.equal(part.output.type, "text");
+  if (part.output.type !== "text") throw new Error("Expected Markdown detail");
+  assert.match(part.output.value, /PHP 1000 per package/);
+  const record = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", result.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(record.tool_name, "getPublicCatalogItem");
+  assert.equal(record.status, "succeeded");
+  assert.equal(record.assistant_message_id, result.assistantMessage.id);
+  await read(await send(thread, "Read package details", requestId), 201);
+  assert.equal(model.doGenerateCalls.length, 2);
+});
+
 test("five customer writes and five AI replies are allowed; sixth is readable login_required; replay never calls provider again", async () => {
   useReply("Guest reply");
   const thread = await guest();

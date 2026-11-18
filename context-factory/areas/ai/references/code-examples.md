@@ -9,6 +9,7 @@ The [customer-service agent factory](../../../../apps/api/src/services/ai/agents
 ```ts
 tools: {
   searchPublicCatalog: createSearchPublicCatalogTool(options),
+  getPublicCatalogItem: createGetPublicCatalogItemTool(options),
 }
 ```
 
@@ -28,10 +29,12 @@ For example, a request for a package within a budget can supply `catalogType: "p
 
 The factory closes over the database, triggering message ID, turn ID, and activity/persistence guards. Customer identity and conversation scope come from the application entry's server-side checks. They are not fields the model fills in.
 
+[getPublicCatalogItem](../../../../apps/api/src/services/ai/tools/get-public-catalog-item.ts) uses `catalogType`, a public catalog UUID, and optional continuation cursor. Its [service](../../../../apps/api/src/services/ai/get-public-catalog-item.ts) reads current facts and ordered canvas content without embeddings. The execution record stores `{ markdown, nextCursor }`; `toModelOutput` sends the Markdown as text to the model. Pages are bounded and cursors bind the rendered source, including visible linked references. The tool does not generate legacy service-role lists or recursively expand linked canvases. Both catalog tools share the turn's execution budget.
+
 ## One turn, from message to reply
 
 1. The existing Messages flow calls [runAssistantTurnService](../../../../apps/api/src/services/ai/run-assistant-turn.ts) with server-resolved identity and conversation/message IDs. The entry verifies ownership, active conversation state, and AI version, then loads ordered history through the triggering customer message.
-2. [assistant-context.ts](../../../../apps/api/src/services/ai/assistant-context.ts) builds current server context. Guests receive no private booking projection. Eligible previous search inputs/cursors can support continuation; stored search prices do not become current evidence.
+2. [assistant-context.ts](../../../../apps/api/src/services/ai/assistant-context.ts) builds current server context. Guests receive no private booking projection. Eligible previous search/detail inputs and cursors can support continuation; saved prices and Markdown do not become current evidence.
 3. The entry creates a turn ID and an agent with scoped dependencies. The [agent factory](../../../../apps/api/src/services/ai/agents/create-customer-service-agent.ts) selects the configured model and [prompt](../../../../apps/api/src/services/ai/prompts/customer-service-prompt.ts), registers tools, and sets loop/call budgets.
 4. When the model selects search, the tool records its start and calls [searchPublicCatalogService](../../../../apps/api/src/services/ai/search-public-catalog.ts). That service composes the current public catalog query and optional compatible, fresh indexed evidence. [data/ai/search-public-catalog.ts](../../../../apps/api/src/data/ai/search-public-catalog.ts) owns listing/filter SQL, while [data/ai/search-catalog-knowledge.ts](../../../../apps/api/src/data/ai/search-catalog-knowledge.ts) owns semantic vector search. The service returns a bounded listing projection.
 5. The tool checks activity again and records success or failure. The model can use successful evidence to answer. After generation, the entry checks fatal tracking errors and validates the reply; [createAssistantMessageData](../../../../apps/api/src/data/messages/create-assistant-message.ts) rechecks AI state and saves the reply with completed-call links in one transaction.

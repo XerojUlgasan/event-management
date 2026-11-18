@@ -28,9 +28,7 @@ export async function listAdminPackagesPageService(
       const page = createPage(rows, options.limit, cursorFor);
       return {
         packages: await Promise.all(
-          page.items.map((row) =>
-            packageDto(trx, row, { includeArchivedServices: true }),
-          ),
+          page.items.map((row) => packageDto(trx, row)),
         ),
         nextCursor: page.nextCursor,
         counts,

@@ -10,6 +10,7 @@ import { messageDto } from "../messages/message-response.js";
 import {
   buildAssistantContext,
   buildPreviousCatalogSearchContext,
+  buildPreviousCatalogItemContext,
 } from "./assistant-context.js";
 import { createCustomerServiceAgent } from "./agents/create-customer-service-agent.js";
 
@@ -57,6 +58,11 @@ export async function runAssistantTurnService({
     conversationId,
     customerMessageId,
   });
+  const previousCatalogItem = await buildPreviousCatalogItemContext({
+    db,
+    conversationId,
+    customerMessageId,
+  });
   const context = JSON.stringify({
     ...(guestIdentityId
       ? {
@@ -70,6 +76,7 @@ export async function runAssistantTurnService({
           bookingRequestId: conversation.booking_request_id,
         })),
     ...(previousCatalogSearch ? { previousCatalogSearch } : {}),
+    ...(previousCatalogItem ? { previousCatalogItem } : {}),
   });
   // Never silently discard older history. Reject an oversized context explicitly.
   if (

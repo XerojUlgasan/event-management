@@ -5519,7 +5519,7 @@ html:has(.public-site) {
   overflow-wrap: anywhere;
 }
 
-/* Service catalog and package assignments */
+/* Service catalog */
 .service-panel {
   display: grid;
   gap: 18px;
@@ -5530,14 +5530,12 @@ html:has(.public-site) {
   justify-content: space-between;
   gap: 16px;
 }
-.service-panel-heading h1,
-.service-assignments h3 {
+.service-panel-heading h1 {
   margin: 0 0 5px;
   font-family: var(--font-serif);
   font-size: 23px;
 }
-.service-panel-heading p,
-.service-assignments > p {
+.service-panel-heading p {
   margin: 0;
   color: var(--muted);
   font-size: 13px;
@@ -5588,61 +5586,6 @@ html:has(.public-site) {
 .service-card-actions .button {
   min-height: 38px;
 }
-.service-assignments {
-  display: grid;
-  gap: 12px;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--surface-subtle);
-}
-.service-assignment {
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface-base);
-}
-.service-assignment-heading {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-  font-size: 13px;
-}
-.service-assignment-heading strong {
-  overflow-wrap: anywhere;
-}
-.service-assignment-heading button {
-  border: 0;
-  background: none;
-  color: var(--wine);
-  text-decoration: underline;
-  min-height: 40px;
-}
-.service-assignment-fields {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
-  gap: 10px;
-}
-.service-assignment-fields label,
-.service-select {
-  display: grid;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.service-assignment-fields input,
-.service-assignment-fields select,
-.service-select select {
-  width: 100%;
-  min-height: 42px;
-  padding: 8px;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  color: var(--ink);
-  background: var(--surface-base);
-  font: inherit;
-}
 @media (max-width: 600px) {
   .service-panel-heading {
     align-items: stretch;
@@ -5673,21 +5616,6 @@ html:has(.public-site) {
 .service-card-body > small {
   color: var(--muted);
 }
-.service-assignment-preview {
-  display: flex;
-  gap: 12px;
-  margin: 8px 0;
-}
-.service-assignment-preview img {
-  width: 88px;
-  height: 66px;
-  object-fit: cover;
-  border-radius: 6px;
-}
-.service-assignment-preview p {
-  margin: 4px 0;
-}
-
 /* Shared guest and customer conversation states */
 .chat-messages {
   min-height: 0;

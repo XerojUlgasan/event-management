@@ -14,10 +14,6 @@ import {
   InvalidCatalogMedia,
   replaceCatalogSectionsService,
 } from "../catalog-canvas/replace-catalog-sections.js";
-import {
-  validatePackageServicesData,
-  replacePackageServicesData,
-} from "../../data/packages/package-services.js";
 import { findCatalogMediaData } from "../../data/catalog-media/find-catalog-media.js";
 import { createCatalogMediaData } from "../../data/catalog-media/create-catalog-media.js";
 import { createAuditEventData } from "../../data/audit/create-audit-event.js";
@@ -192,17 +188,7 @@ export async function saveCustomPackageService(
           "Custom package state changed. Refresh and try again",
           409,
         );
-      const invalid = await validatePackageServicesData(
-        trx,
-        current?.id ?? null,
-        content.services,
-      );
-      if (invalid) return invalid;
-      const before = current
-        ? await packageDto(trx, current, {
-            includeArchivedServices: true,
-          })
-        : null;
+      const before = current ? await packageDto(trx, current) : null;
       const now = current ? nextUpdate(current.updated_at) : new Date();
       if (!create && !current)
         return error(
@@ -229,14 +215,11 @@ export async function saveCustomPackageService(
       );
       if (!create && current?.thumbnail_media_id)
         previousMediaIds.push(current.thumbnail_media_id);
-      await replacePackageServicesData(trx, saved.id, content.services);
       await touchBookingRevisionData(trx, id);
       const updatedBooking = await findBookingRequestData(trx, id);
       if (!updatedBooking)
         throw new Error("Saved booking request is unavailable");
-      const pkg = await packageDto(trx, saved, {
-        includeArchivedServices: true,
-      });
+      const pkg = await packageDto(trx, saved);
       await createAuditEventData(trx, {
         actor_id: actorId,
         action: create

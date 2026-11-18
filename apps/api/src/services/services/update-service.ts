@@ -7,8 +7,6 @@ import { error, nextUpdate } from "../packages/package-rules.js";
 import { serviceAdminDto } from "./service-response.js";
 import { syncCatalogKnowledge } from "../ai/workflows/sync-catalog-knowledge.js";
 import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
-import { invalidateDependentPackageKnowledgeData } from "../../data/ai/invalidate-dependent-package-knowledge.js";
-import type { CatalogKnowledgeOwner } from "../../data/ai/catalog-knowledge-types.js";
 import { readCatalogSectionsService } from "../catalog-canvas/read-catalog-sections.js";
 import {
   InvalidCatalogMedia,
@@ -25,7 +23,6 @@ export async function updateServiceService(
   actorId: string,
 ) {
   let previousMedia: string[] = [];
-  let dependents: CatalogKnowledgeOwner[] = [];
   try {
     const outcome = await db.transaction().execute(async (trx) => {
       const current = await lockServiceData(trx, id);
@@ -58,16 +55,11 @@ export async function updateServiceService(
       if (current.thumbnail_media_id)
         previousMedia.push(current.thumbnail_media_id);
       await syncCatalogKnowledge(trx, { kind: "service", id });
-      if (current.name !== row.name)
-        dependents = await invalidateDependentPackageKnowledgeData(trx, id);
       return serviceAdminDto(trx, row);
     });
     if (!("status" in outcome)) {
       await promoteOwnerCatalogMediaService(db, { kind: "service", id });
-      await scheduleCatalogEmbeddingRefresh(db, [
-        { kind: "service", id },
-        ...dependents,
-      ]);
+      await scheduleCatalogEmbeddingRefresh(db, [{ kind: "service", id }]);
       await cleanupCatalogMediaService(db, previousMedia);
     }
     return outcome;
