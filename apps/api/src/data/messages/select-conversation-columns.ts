@@ -19,6 +19,7 @@ export function selectConversationColumnsData(db: Database) {
       "c.status",
       "c.ai_enabled",
       "c.ai_version",
+      "c.ai_handoff",
       "c.closed_at",
       "c.booking_request_id",
       "c.created_at",

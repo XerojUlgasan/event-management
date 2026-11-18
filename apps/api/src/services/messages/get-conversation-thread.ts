@@ -46,6 +46,7 @@ export async function getConversationThreadService(
       conversation,
       latest ? messageDto(latest) : null,
       0,
+      viewer,
     ),
     messages: page.items.map(messageDto).reverse(),
     nextCursor: page.nextCursor,

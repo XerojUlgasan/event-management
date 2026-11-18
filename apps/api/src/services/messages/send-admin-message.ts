@@ -1,3 +1,4 @@
+import type { AiHandoff } from "@event-management/contracts/ai-handoff";
 import type { Kysely } from "kysely";
 import { GuestChatError } from "../../data/guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
@@ -7,7 +8,13 @@ import { findConversationData } from "../../data/messages/find-conversation.js";
 import { messageDto, type MessageDto } from "./message-response.js";
 
 export type SendAdminMessageResult =
-  | { kind: "ok"; message: MessageDto; aiEnabled: boolean; aiVersion: number }
+  | {
+      kind: "ok";
+      message: MessageDto;
+      aiEnabled: boolean;
+      aiVersion: number;
+      aiHandoff: AiHandoff | null;
+    }
   | { kind: "not-found" }
   | { kind: "closed" };
 
@@ -33,6 +40,7 @@ export async function sendAdminMessageService(
       message: messageDto(saved.message),
       aiEnabled: saved.aiEnabled,
       aiVersion: saved.aiVersion,
+      aiHandoff: saved.aiHandoff,
     };
   } catch (error) {
     if (

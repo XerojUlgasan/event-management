@@ -4,14 +4,22 @@ import type {
   ChatThread,
 } from "../../data/messages/conversations";
 
-type ConversationAiState = Pick<ChatConversation, "aiEnabled" | "aiVersion">;
+type ConversationAiState = Pick<
+  ChatConversation,
+  "aiEnabled" | "aiVersion" | "aiHandoff"
+>;
 
 export function mergeAiStateByVersion<T extends ConversationAiState>(
   current: ConversationAiState | null,
   next: T,
 ): T {
   return current && current.aiVersion > next.aiVersion
-    ? { ...next, aiEnabled: current.aiEnabled, aiVersion: current.aiVersion }
+    ? {
+        ...next,
+        aiEnabled: current.aiEnabled,
+        aiVersion: current.aiVersion,
+        aiHandoff: current.aiHandoff,
+      }
     : next;
 }
 

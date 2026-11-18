@@ -1,3 +1,7 @@
+import {
+  clearPendingAiHandoff,
+  parseAiHandoff,
+} from "../../utils/ai-handoff.js";
 import type { Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 
@@ -32,7 +36,13 @@ export async function createQuotationMessageData(
     .set({
       updated_at: message.created_at,
       ai_enabled: false,
-      ai_version: conversation.ai_version + (conversation.ai_enabled ? 1 : 0),
+      ai_version:
+        conversation.ai_version +
+        (conversation.ai_enabled ||
+        parseAiHandoff(conversation.ai_handoff)?.pending
+          ? 1
+          : 0),
+      ai_handoff: clearPendingAiHandoff(conversation.ai_handoff),
     })
     .where("id", "=", conversation.id)
     .execute();

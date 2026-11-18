@@ -78,6 +78,27 @@ test("refresh moves recent rows to the head and preserves the loaded tail", () =
   assert.equal(result[2], loaded[1]);
 });
 
+test("a stale inbox page cannot restore handoff pending after a reply", () => {
+  const old = {
+    ...conversation("a"),
+    aiVersion: 2,
+    aiHandoff: {
+      reason: "customer_requested" as const,
+      summary: "Help",
+      pending: true,
+    },
+  };
+  const confirmed = {
+    ...old,
+    aiVersion: 3,
+    aiEnabled: false,
+    aiHandoff: { ...old.aiHandoff, pending: false },
+  };
+  const result = refreshConversations([confirmed], [old]);
+  assert.equal(result[0]?.aiVersion, 3);
+  assert.equal(result[0]?.aiHandoff?.pending, false);
+});
+
 test("recent read bridges new rows across pages until it reaches a known row", async () => {
   const known = conversation("known", "latest known row");
   const calls: (string | undefined)[] = [];

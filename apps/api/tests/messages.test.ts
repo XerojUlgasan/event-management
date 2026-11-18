@@ -170,7 +170,7 @@ after(async () => {
   await db?.destroy();
   await pool?.end();
   if (admin) {
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
     await admin.end();
   }
 });

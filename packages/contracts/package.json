@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./ai-handoff": "./src/ai-handoff.ts",
     "./guest-chat": "./src/guest-chat.ts",
     "./pagination": "./src/pagination.ts",
     "./catalog": "./src/catalog.ts",

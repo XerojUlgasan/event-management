@@ -1,3 +1,7 @@
+import {
+  clearPendingAiHandoff,
+  parseAiHandoff,
+} from "../../utils/ai-handoff.js";
 import { sql, type Kysely } from "kysely";
 import {
   assertGuestActive,
@@ -49,6 +53,7 @@ export async function createMessageData(
         return {
           aiEnabled: conversation.ai_enabled,
           aiVersion: conversation.ai_version,
+          aiHandoff: parseAiHandoff(conversation.ai_handoff),
           replayed: true,
           message: {
             ...previous,
@@ -64,10 +69,18 @@ export async function createMessageData(
     )
       throw new Error("Conversation is closed");
     if (conversation.guest_identity_id) assertGuestActive(conversation);
+    const previousHandoff = parseAiHandoff(conversation.ai_handoff);
+    const aiHandoff =
+      senderRole === "admin"
+        ? clearPendingAiHandoff(conversation.ai_handoff)
+        : previousHandoff;
     const aiEnabled = senderRole === "admin" ? false : conversation.ai_enabled;
     const aiVersion =
       conversation.ai_version +
-      (conversation.ai_enabled && senderRole === "admin" ? 1 : 0);
+      (senderRole === "admin" &&
+      (conversation.ai_enabled || previousHandoff?.pending)
+        ? 1
+        : 0);
     const row = await trx
       .insertInto("messages")
       .values({
@@ -96,6 +109,7 @@ export async function createMessageData(
         closed_at: null,
         ai_enabled: aiEnabled,
         ai_version: aiVersion,
+        ai_handoff: aiHandoff,
       })
       .where("id", "=", conversation.id)
       .execute();
@@ -107,6 +121,7 @@ export async function createMessageData(
     return {
       aiEnabled,
       aiVersion,
+      aiHandoff,
       replayed: false,
       message: {
         ...row,

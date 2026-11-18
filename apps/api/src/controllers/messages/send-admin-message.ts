@@ -34,6 +34,7 @@ export const sendAdminMessageRouteHandler: AppRouteHandler<
         message: result.message,
         aiEnabled: result.aiEnabled,
         aiVersion: result.aiVersion,
+        aiHandoff: result.aiHandoff,
       },
       201,
     );

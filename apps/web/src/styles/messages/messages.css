@@ -55,9 +55,23 @@
   font-weight: 600;
 }
 .messages-workspace .message-thread-head {
+  position: relative;
   min-height: 82px;
   padding: 16px 24px;
   flex-wrap: wrap;
+}
+.messages-workspace .ui-info-disclosure-hint,
+.messages-workspace .ui-info-disclosure-panel {
+  width: min(360px, calc(100vw - 32px));
+}
+.message-handoff-details p {
+  margin: 2px 0 10px;
+  white-space: pre-wrap;
+}
+.message-handoff-summary-label {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-weight: 600;
 }
 .messages-workspace .message-thread-name strong {
   font-size: 16px;
@@ -66,7 +80,7 @@
   font-size: 12px;
 }
 .messages-workspace .message-head-actions {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .messages-workspace .message-head-actions .button {

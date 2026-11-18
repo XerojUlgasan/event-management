@@ -39,7 +39,7 @@ before(async () => {
 after(async () => {
   await db?.destroy();
   if (admin) {
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
     await admin.end();
   }
 });

@@ -49,6 +49,7 @@ export async function listAdminConversationsService(
         row,
         latest ? messageDto(latest) : null,
         unread.get(row.id) ?? 0,
+        customerId ? "customer" : "admin",
       );
     }),
     nextCursor: page.nextCursor,

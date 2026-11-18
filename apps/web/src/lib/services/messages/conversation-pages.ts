@@ -1,4 +1,5 @@
 import type { ChatConversation } from "../../data/messages/conversations";
+import { mergeAiStateByVersion } from "./merge-thread";
 
 /** Preserve server order (including sub-millisecond ties), with one row per ID. */
 export function appendConversations(
@@ -20,7 +21,13 @@ export function refreshConversations(
   current: ChatConversation[],
   recent: ChatConversation[],
 ) {
-  return appendConversations(recent, current);
+  const known = new Map(current.map((item) => [item.id, item]));
+  return appendConversations(
+    recent.map((item) =>
+      mergeAiStateByVersion(known.get(item.id) ?? null, item),
+    ),
+    current,
+  );
 }
 
 type ConversationPage = {

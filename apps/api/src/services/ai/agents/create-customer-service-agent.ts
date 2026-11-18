@@ -1,4 +1,5 @@
 import { isStepCount, ToolLoopAgent } from "ai";
+import { createRequestHumanHandoffTool } from "../tools/request-human-handoff.js";
 import { getTextModel } from "../models.js";
 import { customerServicePrompt } from "../prompts/customer-service-prompt.js";
 import { createSearchPublicCatalogTool } from "../tools/search-public-catalog.js";
@@ -9,11 +10,19 @@ import type { AssistantToolContext } from "../tools/assistant-tool-context.js";
 export function createCustomerServiceAgent(options: AssistantToolContext) {
   let proposedCalls = 0;
   let executedCalls = 0;
+  let trackingUnavailable = false;
   let resultCharactersRemaining = options.resultCharacterBudget ?? 200_000;
   const toolContext = {
     ...options,
+    onPersistenceFailure: () => {
+      trackingUnavailable = true;
+      options.onPersistenceFailure();
+    },
     canRecord: () => proposedCalls <= 12,
-    canExecute: () => ++executedCalls <= 6,
+    canExecute: () =>
+      !trackingUnavailable &&
+      !options.isHandoffCommitted?.() &&
+      ++executedCalls <= 6,
     consumeResultCharacters: (characters: number) => {
       if (characters > resultCharactersRemaining) return false;
       resultCharactersRemaining -= characters;
@@ -24,6 +33,14 @@ export function createCustomerServiceAgent(options: AssistantToolContext) {
     model: getTextModel(),
     instructions: customerServicePrompt,
     tools: {
+      ...(options.handoffScope
+        ? {
+            requestHumanHandoff: createRequestHumanHandoffTool({
+              ...toolContext,
+              handoffScope: options.handoffScope,
+            }),
+          }
+        : {}),
       searchPublicCatalog: createSearchPublicCatalogTool(toolContext),
       getPublicCatalogItem: createGetPublicCatalogItemTool(toolContext),
       ...(options.proposalScope
@@ -35,7 +52,7 @@ export function createCustomerServiceAgent(options: AssistantToolContext) {
           }
         : {}),
     },
-    stopWhen: isStepCount(4),
+    stopWhen: [isStepCount(4), () => options.isHandoffCommitted?.() ?? false],
     // Reserve the fourth generation for an answer using the available evidence.
     prepareStep: ({ stepNumber }) =>
       stepNumber >= 3 ? { toolChoice: "none" } : {},

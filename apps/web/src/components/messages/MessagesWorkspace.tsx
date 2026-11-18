@@ -14,6 +14,7 @@ import {
   Button,
   Dialog,
   Icon,
+  InfoDisclosure,
   Textarea,
   useNotifications,
 } from "@event-management/ui";
@@ -55,6 +56,12 @@ function preview(conversation: ChatConversation) {
   if (!message) return "No messages yet";
   return message.body;
 }
+
+const handoffReason = {
+  customer_requested: "Customer requested a person",
+  needs_admin_review: "Requires an admin decision",
+  cannot_answer: "AI could not answer with available information",
+} as const;
 
 export function MessagesWorkspace({
   title,
@@ -446,6 +453,9 @@ export function MessagesWorkspace({
                       : conversation.unreadCount}
                   </Badge>
                 )}
+                {viewerRole === "admin" && conversation.aiHandoff?.pending && (
+                  <Badge tone="warning">Needs attention</Badge>
+                )}
               </span>
             </Button>
           );
@@ -536,6 +546,31 @@ export function MessagesWorkspace({
               >
                 {active.aiEnabled ? "AI on" : "AI off (Human)"}
               </Button>
+              {active.aiHandoff?.pending && (
+                <Badge tone="warning">Needs attention</Badge>
+              )}
+              {active.aiHandoff && (
+                <InfoDisclosure
+                  key={active.id}
+                  label="View AI handoff details"
+                  hint={handoffReason[active.aiHandoff.reason]}
+                >
+                  <div className="message-handoff-details">
+                    <strong>{handoffReason[active.aiHandoff.reason]}</strong>
+                    <div className="message-handoff-summary-label">
+                      AI summary
+                    </div>
+                    <p>{active.aiHandoff.summary}</p>
+                    <Badge
+                      tone={active.aiHandoff.pending ? "warning" : "neutral"}
+                    >
+                      {active.aiHandoff.pending
+                        ? "Needs attention"
+                        : "Taken over"}
+                    </Badge>
+                  </div>
+                </InfoDisclosure>
+              )}
             </div>
           )}
           {viewerRole === "customer" &&
@@ -589,7 +624,8 @@ export function MessagesWorkspace({
             <span>{active.bookingRequestReference}</span>
             {active.eventStartsAt && (
               <span>
-                Requested {enPhDayFormatter.format(new Date(active.eventStartsAt))}
+                Requested{" "}
+                {enPhDayFormatter.format(new Date(active.eventStartsAt))}
               </span>
             )}
           </div>

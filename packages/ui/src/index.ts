@@ -26,6 +26,7 @@ export type { TabItem } from "./molecules/Tabs";
 export { FormField } from "./molecules/FormField";
 export type { FormFieldControlProps } from "./molecules/FormField";
 export { InputGroup } from "./molecules/InputGroup";
+export { InfoDisclosure } from "./molecules/InfoDisclosure";
 export { ActivityList } from "./molecules/ActivityList";
 export type { ActivityItem } from "./molecules/ActivityList";
 export { Toast } from "./molecules/Toast";

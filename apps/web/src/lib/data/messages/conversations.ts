@@ -1,3 +1,4 @@
+import type { AiHandoff } from "@event-management/contracts/ai-handoff";
 import { request } from "../../http/request";
 
 export type ConversationStatus = "active" | "closed";
@@ -30,6 +31,7 @@ export type ChatConversation = {
   closedAt: string | null;
   aiEnabled: boolean;
   aiVersion: number;
+  aiHandoff?: AiHandoff | null;
   lastMessage: ChatMessage | null;
   unreadCount: number;
   updatedAt: string;
@@ -87,13 +89,18 @@ export const sendAdminMessage = (id: string, body: string) =>
     message: ChatMessage;
     aiEnabled: boolean;
     aiVersion: number;
+    aiHandoff: AiHandoff | null;
   }>(`/admin/conversations/${encodeURIComponent(id)}/messages`, { body });
 export const updateAdminConversationAi = (
   id: string,
   aiEnabled: boolean,
   expectedAiVersion: number,
 ) =>
-  request<{ aiEnabled: boolean; aiVersion: number }>(
+  request<{
+    aiEnabled: boolean;
+    aiVersion: number;
+    aiHandoff: AiHandoff | null;
+  }>(
     `/admin/conversations/${encodeURIComponent(id)}/ai`,
     { aiEnabled, expectedAiVersion },
     undefined,

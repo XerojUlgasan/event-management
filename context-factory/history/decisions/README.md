@@ -8,6 +8,7 @@ Preserve historical reasoning. When a decision changes, link a successor and mar
 
 | Record | Status / purpose |
 | --- | --- |
+| [Conversation AI handoff](2026-11-19_conversation-ai-handoff.md) | Accepted latest JSONB reason/summary/pending, atomic acknowledgement, and admin attention indicator |
 | [Model-selected tool use](2026-11-19_model-selected-tool-use.md) | Accepted removal of mandatory evidence selection; the model chooses direct answers or tools |
 | [Assistant evidence grounding](2026-11-18_assistant-evidence-grounding.md) | Superseded by model-selected tool use; historical mandatory-selector rationale |
 | [Remove package service assignments](2026-11-18_remove-package-service-assignments.md) | Accepted removal of relational included/optional assignments; linked canvas widgets remain |

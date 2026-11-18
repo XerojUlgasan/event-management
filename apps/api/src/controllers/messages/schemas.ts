@@ -1,3 +1,4 @@
+import { aiHandoffSchema } from "@event-management/contracts/ai-handoff";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import { z } from "@hono/zod-openapi";
 
@@ -46,6 +47,7 @@ export const conversationSchema = z.object({
   status: conversationStatusSchema,
   aiEnabled: z.boolean(),
   aiVersion: z.number().int().nonnegative(),
+  aiHandoff: aiHandoffSchema.nullable().optional(),
   closedAt: z.string().nullable(),
   lastMessage: messageSchema.nullable(),
   unreadCount: z.number().int().nonnegative(),
@@ -72,6 +74,7 @@ export const messageResultSchema = z.object({
 });
 
 export const conversationAiSchema = z.object({
+  aiHandoff: aiHandoffSchema.nullable(),
   aiEnabled: z.boolean(),
   aiVersion: z.number().int().nonnegative(),
 });

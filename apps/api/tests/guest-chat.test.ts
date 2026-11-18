@@ -5,6 +5,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { after, before, test } from "node:test";
 import { Pool } from "pg";
 import { MockLanguageModelV4, MockProviderV4 } from "ai/test";
+import { humanHandoffAcknowledgement } from "../src/data/messages/request-human-handoff.js";
 import { threadSchema } from "../src/controllers/messages/schemas.js";
 import { hashSessionToken } from "../src/utils/session.js";
 
@@ -111,7 +112,8 @@ after(async () => {
   await db?.destroy();
   await pool?.end();
   if (admin) {
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    // Let closing pool sockets finish instead of force-terminating them after end().
+    await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
     await admin.end();
   }
 });
@@ -289,7 +291,7 @@ test("guests receive public catalog details as Markdown with owned audit records
   assert.equal(model.doGenerateCalls.length, 2);
 });
 
-test("guests can answer directly and receive only public catalog tools", async () => {
+test("guests can answer directly and receive public catalog and handoff tools", async () => {
   useReply("Hello from AMAC AI");
   const thread = await guest();
   const response = await read(await send(thread, "Hello"), 201);
@@ -299,7 +301,7 @@ test("guests can answer directly and receive only public catalog tools", async (
   assert.deepEqual(model.doGenerateCalls[0].toolChoice, { type: "auto" });
   assert.deepEqual(
     model.doGenerateCalls[0].tools?.map((entry) => entry.name).sort(),
-    ["getPublicCatalogItem", "searchPublicCatalog"],
+    ["getPublicCatalogItem", "requestHumanHandoff", "searchPublicCatalog"],
   );
   const calls = await db
     .selectFrom("ai_tool_calls")
@@ -987,6 +989,110 @@ test("claimed guest conversation retains its history when a catalog request bind
     ).length,
     1,
   );
+});
+
+function useHandoff(beforeTool?: () => Promise<void>) {
+  useReply("No answer should be generated after handoff");
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+    if (model.doGenerateCalls.length !== 1)
+      throw new Error("Generation continued after handoff");
+    await beforeTool?.();
+    return {
+      ...result,
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "guest-handoff",
+          toolName: "requestHumanHandoff",
+          input: JSON.stringify({
+            reason: "customer_requested",
+            summary: "Guest requests an AMAC team reply.",
+          }),
+        },
+      ],
+      finishReason: { unified: "tool-calls", raw: undefined },
+    };
+  };
+}
+
+test("guest handoff persists one acknowledgement, audit and private admin state and replays it safely", async () => {
+  const thread = await guest();
+  useHandoff();
+  const requestId = randomUUID();
+  const sent = await read(
+    await send(thread, "Please get a person", requestId),
+    201,
+  );
+  assert.equal(sent.assistantMessage?.body, humanHandoffAcknowledgement);
+  assert.equal(sent.assistantError, null);
+  assert.equal(model.doGenerateCalls.length, 1);
+  const state = await db
+    .selectFrom("conversations")
+    .select(["ai_handoff", "ai_enabled", "ai_version"])
+    .where("id", "=", thread.conversation.id)
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(state, {
+    ai_enabled: false,
+    ai_version: 1,
+    ai_handoff: {
+      reason: "customer_requested",
+      summary: "Guest requests an AMAC team reply.",
+      pending: true,
+    },
+  });
+  const audit = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", sent.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(audit.status, "succeeded");
+  assert.equal(audit.assistant_message_id, sent.assistantMessage.id);
+  const replay = await read(
+    await send(thread, "Please get a person", requestId),
+    201,
+  );
+  assert.equal(replay.assistantMessage.id, sent.assistantMessage.id);
+  assert.equal(model.doGenerateCalls.length, 1);
+  const visible = await read(
+    await call(`/guest/conversations/${thread.conversation.id}`, thread.cookie),
+    200,
+  );
+  assert.equal("aiHandoff" in visible.conversation, false);
+  assert.doesNotMatch(
+    JSON.stringify(visible),
+    /Guest requests an AMAC team reply/,
+  );
+  const adminView = await read(
+    await call(`/admin/conversations/${thread.conversation.id}`, team.cookie),
+    200,
+  );
+  assert.deepEqual(adminView.conversation.aiHandoff, state.ai_handoff);
+});
+
+test("a guest conversation expiring before handoff commits receives no handoff mutation or acknowledgement", async () => {
+  const thread = await guest();
+  useHandoff(() => expired(thread));
+  const sent = await read(await send(thread, "Please get a person"), 201);
+  assert.equal(sent.assistantMessage, null);
+  const state = await db
+    .selectFrom("conversations")
+    .select(["ai_handoff", "ai_enabled", "ai_version"])
+    .where("id", "=", thread.conversation.id)
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(state, {
+    ai_handoff: null,
+    ai_enabled: true,
+    ai_version: 0,
+  });
+  const audit = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", sent.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(audit.status, "failed");
+  assert.equal(audit.assistant_message_id, null);
 });
 
 test("validation, foreign cookie isolation, body caps, OpenAPI and Edge route registration match", async () => {

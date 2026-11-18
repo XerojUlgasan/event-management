@@ -14,6 +14,7 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [AI human handoff](2026-11-19_00-57-12_ai-human-handoff.md) | Latest JSONB, safe mutation and admin indicator / main | complete | Locally verified; live-model evaluation and hosted rollout separate |
 | [Remove mandatory evidence selection](2026-11-19_00-19-05_remove-mandatory-evidence-selection.md) | Optional tool use from the first step / main | complete | Review scoped diff; 62 focused tests, API types, Edge bundle and guidance checks pass; live-model quality remains unverified |
 | [Assistant evidence grounding](2026-11-18_23-41-18_assistant-evidence-grounding.md) | Historical mandatory evidence selection / main | complete | Superseded by removal of the mandatory selector; original test results apply to that earlier implementation |
 | [Conversation-scoped proposal tool](2026-11-18_22-53-38_get-my-proposal-tool.md) | Empty-input private proposal read / main | complete | Review scoped diff; full-widget JSON, ownership, audit, takeover, types and Edge checks pass; live provider/hosted rollout separate |

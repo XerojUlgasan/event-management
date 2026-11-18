@@ -6,6 +6,7 @@ import type { DB } from "../../db/types.js";
 import { findConversationData } from "../../data/messages/find-conversation.js";
 import { listConversationHistoryData } from "../../data/messages/list-conversation-history.js";
 import { createAssistantMessageData } from "../../data/messages/create-assistant-message.js";
+import type { MessageWithSender } from "../../data/messages/types.js";
 import { messageDto } from "../messages/message-response.js";
 import {
   buildAssistantContext,
@@ -103,10 +104,24 @@ export async function runAssistantTurnService({
     throw new Error("Conversation is too long for an AI reply");
   const turnId = randomUUID();
   let persistenceFailed = false;
+  const handoff: { message: MessageWithSender | null } = { message: null };
+  const handoffStop = new AbortController();
   const agent = createCustomerServiceAgent({
     db,
     customerMessageId,
     turnId,
+    handoffScope: {
+      conversationId,
+      customerId,
+      customerMessageId,
+      aiVersion,
+      guestIdentityId,
+    },
+    isHandoffCommitted: () => handoff.message !== null,
+    onHandoffCommitted: (message) => {
+      handoff.message = message;
+      handoffStop.abort();
+    },
     resultCharacterBudget: 200_000 - inputCharacters,
     ...(!guestIdentityId && customerId
       ? { proposalScope: { customerId, conversationId } }
@@ -115,6 +130,7 @@ export async function runAssistantTurnService({
       persistenceFailed = true;
     },
     assertActive: async () => {
+      if (handoff.message) throw new Error("Conversation handed off");
       const current = await findConversationData(db, conversationId);
       const stillOwned =
         current &&
@@ -133,13 +149,22 @@ export async function runAssistantTurnService({
     },
   });
   const deadline = AbortSignal.timeout(30_000);
-  const signal = abortSignal
-    ? AbortSignal.any([abortSignal, deadline])
-    : deadline;
-  const { text, usage, steps } = await agent.generate({
-    messages,
-    abortSignal: signal,
-  });
+  const signal = AbortSignal.any([
+    deadline,
+    handoffStop.signal,
+    ...(abortSignal ? [abortSignal] : []),
+  ]);
+  const generated = await agent
+    .generate({ messages, abortSignal: signal })
+    .catch((error: unknown) => {
+      // The transaction has already delivered the acknowledgement. Provider/SDK
+      // cancellation after that commit cannot turn the saved handoff into failure.
+      if (handoff.message) return null;
+      throw error;
+    });
+  if (handoff.message) return messageDto(handoff.message);
+  if (!generated) return null;
+  const { text, usage, steps } = generated;
   if (persistenceFailed) throw new Error("Tool-call tracking is unavailable");
   const reply = text.trim();
   if (!reply) throw new Error("AI returned an empty reply");

@@ -32,7 +32,11 @@ export const updateConversationAiRouteHandler: AppRouteHandler<
   );
   if (result.kind === "ok")
     return c.json(
-      { aiEnabled: result.aiEnabled, aiVersion: result.aiVersion },
+      {
+        aiEnabled: result.aiEnabled,
+        aiVersion: result.aiVersion,
+        aiHandoff: result.aiHandoff,
+      },
       200,
     );
   return jsonError(c, result.error, result.status);

@@ -42,3 +42,11 @@ The customer and admin use the conversation to communicate and create transactio
 - A successfully sent admin message or quotation switches that conversation to human handling. AI stays off until an admin explicitly re-enables it; failed sends do not change the preference.
 - Customers can continue messaging while AI is off. Re-enabling AI applies to future customer messages, without generating replies to the backlog.
 - Takeover suppresses any unfinished AI reply. Conversation history stays intact, and closing or reopening a conversation does not reset its AI preference. Closed conversations cannot be toggled.
+
+## AI-requested human review
+
+- An active guest or customer conversation can be handed to the team when the customer requests a person, an administrator must make a decision, or AI cannot answer with available information.
+- The latest handoff stores only its reason, short AI summary, and whether it is pending in `conversations.ai_handoff`. It does not create a separate history table or record takeover times or identities.
+- A successful handoff pauses AI and saves a customer acknowledgement. The admin inbox and header show **Needs attention**; the information control explains why. The metadata is admin-only.
+- The first successfully saved admin reply, including a sent quotation, clears the pending indicator while retaining the reason. Viewing the conversation, failed replies, and re-enabling AI do not clear it. AI remains controlled by the existing administrator toggle.
+- Handoff success means the conversation is available for admin review. It does not establish assignment, an external notification, a response deadline, or resolution of the customer's request.

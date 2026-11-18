@@ -22,7 +22,10 @@ import {
   prependOlder,
 } from "../../../../lib/services/messages/merge-thread";
 
-type ConversationAiState = Pick<ChatConversation, "aiEnabled" | "aiVersion">;
+type ConversationAiState = Pick<
+  ChatConversation,
+  "aiEnabled" | "aiVersion" | "aiHandoff"
+>;
 
 export function MessagesPage() {
   const { notifyError } = useNotifications();
@@ -42,7 +45,11 @@ export function MessagesPage() {
     (id: string, incoming: ConversationAiState) => {
       const next = mergeAiStateByVersion(
         aiStateByConversation.current.get(id) ?? null,
-        { aiEnabled: incoming.aiEnabled, aiVersion: incoming.aiVersion },
+        {
+          aiEnabled: incoming.aiEnabled,
+          aiVersion: incoming.aiVersion,
+          aiHandoff: incoming.aiHandoff,
+        },
       );
       aiStateByConversation.current.set(id, next);
       return next;

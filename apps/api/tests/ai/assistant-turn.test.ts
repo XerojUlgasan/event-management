@@ -12,6 +12,9 @@ import {
   conversationsSchema,
 } from "../../src/controllers/messages/schemas.js";
 import { hashSessionToken } from "../../src/utils/session.js";
+import { startToolCallData } from "../../src/data/ai/start-tool-call.js";
+import { requestHumanHandoffService } from "../../src/services/ai/request-human-handoff.js";
+import { humanHandoffAcknowledgement } from "../../src/data/messages/request-human-handoff.js";
 import { runAssistantTurnService } from "../../src/services/ai/run-assistant-turn.js";
 
 const database = `em_ai_test_${randomUUID().replaceAll("-", "")}`;
@@ -60,7 +63,11 @@ function useCatalogCalls(
 
 function useToolCalls(
   calls: {
-    toolName: "searchPublicCatalog" | "getPublicCatalogItem" | "getMyProposal";
+    toolName:
+      | "searchPublicCatalog"
+      | "getPublicCatalogItem"
+      | "getMyProposal"
+      | "requestHumanHandoff";
     input: Record<string, unknown>;
   }[],
   beforeAnswer?: () => Promise<void>,
@@ -154,7 +161,10 @@ after(async () => {
   await db?.destroy();
   await pool?.end();
   if (admin) {
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    // pg-pool's end promise can settle before its clients' socket-end callbacks.
+    // A normal drop lets those disconnects finish and exposes a genuine leak;
+    // FORCE can terminate a closing client and emit a late unhandled error.
+    await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
     await admin.end();
   }
 });
@@ -270,10 +280,18 @@ test("AI control is per conversation, authorized, versioned, and skips generatio
 
   const off = await setAi(id, false, 0);
   assert.equal(off.status, 200);
-  assert.deepEqual(await off.json(), { aiEnabled: false, aiVersion: 1 });
+  assert.deepEqual(await off.json(), {
+    aiEnabled: false,
+    aiVersion: 1,
+    aiHandoff: null,
+  });
   const noop = await setAi(id, false, 1);
   assert.equal(noop.status, 200);
-  assert.deepEqual(await noop.json(), { aiEnabled: false, aiVersion: 1 });
+  assert.deepEqual(await noop.json(), {
+    aiEnabled: false,
+    aiVersion: 1,
+    aiHandoff: null,
+  });
   assert.equal((await setAi(id, true, 0)).status, 409);
 
   const held = await send(id, "A human can answer this");
@@ -308,7 +326,11 @@ test("AI control is per conversation, authorized, versioned, and skips generatio
 
   const on = await setAi(id, true, 1);
   assert.equal(on.status, 200);
-  assert.deepEqual(await on.json(), { aiEnabled: true, aiVersion: 2 });
+  assert.deepEqual(await on.json(), {
+    aiEnabled: true,
+    aiVersion: 2,
+    aiHandoff: null,
+  });
   assert.equal(model.doGenerateCalls.length, 0);
   const answered = await send(id, "Now please answer");
   assert.equal(answered.assistantMessage?.body, "AI is back");
@@ -378,7 +400,11 @@ test("admin takeover discards an in-flight AI reply even after AI is re-enabled"
     assert.equal(takeover.aiVersion, 1);
     const on = await setAi(id, true, 1);
     assert.equal(on.status, 200);
-    assert.deepEqual(await on.json(), { aiEnabled: true, aiVersion: 2 });
+    assert.deepEqual(await on.json(), {
+      aiEnabled: true,
+      aiVersion: 2,
+      aiHandoff: null,
+    });
   } finally {
     release();
   }
@@ -1754,7 +1780,12 @@ test("the assistant can answer directly without calling a tool", async () => {
   assert.deepEqual(model.doGenerateCalls[0].toolChoice, { type: "auto" });
   assert.deepEqual(
     model.doGenerateCalls[0].tools?.map((entry) => entry.name).sort(),
-    ["getMyProposal", "getPublicCatalogItem", "searchPublicCatalog"],
+    [
+      "getMyProposal",
+      "getPublicCatalogItem",
+      "requestHumanHandoff",
+      "searchPublicCatalog",
+    ],
   );
   const calls = await db
     .selectFrom("ai_tool_calls")
@@ -1762,4 +1793,284 @@ test("the assistant can answer directly without calling a tool", async () => {
     .where("customer_message_id", "=", result.message.id)
     .execute();
   assert.equal(calls.length, 0);
+});
+
+const handoffInput = {
+  reason: "customer_requested",
+  summary: "  Customer wants a human to discuss their event.  ",
+};
+
+async function handoffFixture() {
+  const id = await conversation();
+  const message = await db
+    .insertInto("messages")
+    .values({
+      conversation_id: id,
+      sender_id: customer.id,
+      sender_role: "customer",
+      body: "Please get a person",
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  return {
+    conversationId: id,
+    customerId: customer.id,
+    customerMessageId: message.id,
+    aiVersion: 0,
+  };
+}
+
+async function invokeHandoff(
+  scope: Awaited<ReturnType<typeof handoffFixture>>,
+  input = handoffInput,
+) {
+  const turnId = randomUUID();
+  const call = await startToolCallData(db, {
+    turnId,
+    toolCallId: randomUUID(),
+    toolName: "requestHumanHandoff",
+    customerMessageId: scope.customerMessageId,
+    input,
+  });
+  return requestHumanHandoffService({
+    db,
+    scope,
+    input,
+    callId: call.id,
+    turnId,
+  });
+}
+
+test("handoff commits its acknowledgement and audit, stops the loop and keeps admin metadata private", async () => {
+  useToolCalls(
+    [
+      { toolName: "requestHumanHandoff", input: handoffInput },
+      { toolName: "getMyProposal", input: {} },
+    ],
+    async () => {
+      throw new Error("No generation is allowed after the committed handoff");
+    },
+  );
+  const id = await conversation();
+  const result = await send(id, "Please let me talk to someone");
+  assert.equal(result.assistantError, null);
+  assert.equal(result.assistantMessage?.body, humanHandoffAcknowledgement);
+  assert.equal(model.doGenerateCalls.length, 1);
+  const state = await db
+    .selectFrom("conversations")
+    .select(["ai_handoff", "ai_enabled", "ai_version"])
+    .where("id", "=", id)
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(state, {
+    ai_handoff: {
+      reason: "customer_requested",
+      summary: handoffInput.summary.trim(),
+      pending: true,
+    },
+    ai_enabled: false,
+    ai_version: 1,
+  });
+  const audit = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", result.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(audit.status, "succeeded");
+  assert.equal(audit.assistant_message_id, result.assistantMessage?.id);
+  const adminThread = await (
+    await call(`/admin/conversations/${id}`, team.cookie)
+  ).json();
+  assert.deepEqual(adminThread.conversation.aiHandoff, state.ai_handoff);
+  const adminList = await (
+    await call("/admin/conversations", team.cookie)
+  ).json();
+  assert.deepEqual(
+    adminList.conversations.find((item: { id: string }) => item.id === id)
+      .aiHandoff,
+    state.ai_handoff,
+  );
+  const customerThread = await (
+    await call(`/messages/conversations/${id}`, customer.cookie)
+  ).json();
+  assert.equal("aiHandoff" in customerThread.conversation, false);
+  const customerList = await (
+    await call("/messages/conversations", customer.cookie)
+  ).json();
+  assert.ok(
+    customerList.conversations.every((item: object) => !("aiHandoff" in item)),
+  );
+});
+
+test("concurrent and repeated handoff calls reuse one acknowledgement and preserve the first reason", async () => {
+  const scope = await handoffFixture();
+  const messages = await Promise.all([
+    invokeHandoff(scope),
+    invokeHandoff(scope),
+  ]);
+  const retry = await invokeHandoff(scope, {
+    reason: "cannot_answer",
+    summary: "A later summary must not overwrite the first",
+  });
+  assert.equal(messages[0].id, messages[1].id);
+  assert.equal(retry.id, messages[0].id);
+  const replies = await db
+    .selectFrom("messages")
+    .select("id")
+    .where("conversation_id", "=", scope.conversationId)
+    .where("sender_role", "=", "assistant")
+    .execute();
+  assert.equal(replies.length, 1);
+  const state = await db
+    .selectFrom("conversations")
+    .select(["ai_handoff", "ai_version"])
+    .where("id", "=", scope.conversationId)
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(state.ai_handoff, {
+    reason: "customer_requested",
+    summary: handoffInput.summary.trim(),
+    pending: true,
+  });
+  assert.equal(state.ai_version, 1);
+});
+
+test("a handoff tracking-completion failure rolls back its state and acknowledgement", async () => {
+  const scope = await handoffFixture();
+  await pool.query(
+    "CREATE FUNCTION reject_handoff_completion_test() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.tool_name = 'requestHumanHandoff' AND NEW.status = 'succeeded' THEN RAISE EXCEPTION 'fixture audit completion failure'; END IF; RETURN NEW; END $$",
+  );
+  await pool.query(
+    "CREATE TRIGGER reject_handoff_completion_test BEFORE UPDATE ON ai_tool_calls FOR EACH ROW EXECUTE FUNCTION reject_handoff_completion_test()",
+  );
+  try {
+    await assert.rejects(invokeHandoff(scope));
+  } finally {
+    await pool.query(
+      "DROP TRIGGER reject_handoff_completion_test ON ai_tool_calls",
+    );
+    await pool.query("DROP FUNCTION reject_handoff_completion_test()");
+  }
+  const state = await db
+    .selectFrom("conversations")
+    .select(["ai_handoff", "ai_enabled", "ai_version"])
+    .where("id", "=", scope.conversationId)
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(state, {
+    ai_handoff: null,
+    ai_enabled: true,
+    ai_version: 0,
+  });
+  assert.equal(
+    (
+      await db
+        .selectFrom("messages")
+        .select("id")
+        .where("conversation_id", "=", scope.conversationId)
+        .where("sender_role", "=", "assistant")
+        .execute()
+    ).length,
+    0,
+  );
+});
+
+test("handoff rejects stale takeover, off/on cycles and mismatched triggering message scope", async () => {
+  for (const resume of [false, true]) {
+    const scope = await handoffFixture();
+    assert.equal((await setAi(scope.conversationId, false, 0)).status, 200);
+    if (resume)
+      assert.equal((await setAi(scope.conversationId, true, 1)).status, 200);
+    await assert.rejects(invokeHandoff(scope));
+    const state = await db
+      .selectFrom("conversations")
+      .select("ai_handoff")
+      .where("id", "=", scope.conversationId)
+      .executeTakeFirstOrThrow();
+    assert.equal(state.ai_handoff, null);
+  }
+  const own = await handoffFixture();
+  const another = await handoffFixture();
+  await assert.rejects(
+    invokeHandoff({ ...own, customerMessageId: another.customerMessageId }),
+  );
+  await assert.rejects(invokeHandoff({ ...own, customerId: other.id }));
+});
+
+test("failed admin replies retain pending, first successful reply clears it, and AI resume preserves pending", async () => {
+  const scope = await handoffFixture();
+  await invokeHandoff(scope);
+  assert.equal(
+    (
+      await call(
+        `/admin/conversations/${scope.conversationId}/messages`,
+        team.cookie,
+        { body: "" },
+      )
+    ).status,
+    400,
+  );
+  let state = await db
+    .selectFrom("conversations")
+    .selectAll()
+    .where("id", "=", scope.conversationId)
+    .executeTakeFirstOrThrow();
+  assert.equal(state.ai_version, 1);
+  assert.deepEqual(state.ai_handoff, {
+    reason: "customer_requested",
+    summary: handoffInput.summary.trim(),
+    pending: true,
+  });
+  const replied = await (
+    await call(
+      `/admin/conversations/${scope.conversationId}/messages`,
+      team.cookie,
+      { body: "I can help" },
+    )
+  ).json();
+  assert.equal(replied.aiVersion, 2);
+  assert.equal(replied.aiHandoff.pending, false);
+  assert.equal(replied.aiEnabled, false);
+  const secondReply = await (
+    await call(
+      `/admin/conversations/${scope.conversationId}/messages`,
+      team.cookie,
+      { body: "One more detail" },
+    )
+  ).json();
+  assert.equal(secondReply.aiVersion, 2);
+  const resumedScope = await handoffFixture();
+  await invokeHandoff(resumedScope);
+  const resumed = await (
+    await setAi(resumedScope.conversationId, true, 1)
+  ).json();
+  assert.deepEqual(resumed, {
+    aiEnabled: true,
+    aiVersion: 2,
+    aiHandoff: {
+      reason: "customer_requested",
+      summary: handoffInput.summary.trim(),
+      pending: true,
+    },
+  });
+  useReply("Future messages use AI again");
+  const future = await send(resumedScope.conversationId, "Hello again");
+  assert.equal(future.assistantMessage?.body, "Future messages use AI again");
+});
+
+test("handoff model input cannot supply identifiers or omit a meaningful bounded summary", async () => {
+  for (const input of [
+    { ...handoffInput, conversationId: randomUUID() },
+    { ...handoffInput, customerId: other.id },
+    { ...handoffInput, summary: " " },
+    { ...handoffInput, summary: "x".repeat(1001) },
+    { ...handoffInput, reason: "arbitrary_reason" },
+  ]) {
+    useToolCalls([{ toolName: "requestHumanHandoff", input }]);
+    const id = await conversation();
+    await send(id, "I need help");
+    const state = await db
+      .selectFrom("conversations")
+      .select("ai_handoff")
+      .where("id", "=", id)
+      .executeTakeFirstOrThrow();
+    assert.equal(state.ai_handoff, null);
+  }
 });

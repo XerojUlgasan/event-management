@@ -1,3 +1,4 @@
+import { parseAiHandoff } from "../../utils/ai-handoff.js";
 import type {
   ConversationWithCustomer,
   MessageWithSender,
@@ -34,6 +35,7 @@ export type ConversationDto = {
   lastMessage: MessageDto | null;
   unreadCount: number;
   updatedAt: string;
+  aiHandoff?: ReturnType<typeof parseAiHandoff>;
 };
 
 export function messageDto(row: MessageWithSender): MessageDto {
@@ -64,6 +66,7 @@ export function conversationDto(
   row: ConversationWithCustomer,
   lastMessage: MessageDto | null,
   unreadCount: number,
+  viewer: "admin" | "customer" = "customer",
 ): ConversationDto {
   return {
     id: row.id,
@@ -85,6 +88,9 @@ export function conversationDto(
     status: row.status as ConversationDto["status"],
     aiEnabled: row.ai_enabled,
     aiVersion: row.ai_version,
+    ...(viewer === "admin"
+      ? { aiHandoff: parseAiHandoff(row.ai_handoff) }
+      : {}),
     closedAt: row.closed_at ? new Date(row.closed_at).toISOString() : null,
     lastMessage,
     unreadCount,

@@ -96,6 +96,7 @@ export interface CatalogKnowledge {
 
 export interface Conversations {
   ai_enabled: Generated<boolean>;
+  ai_handoff: Json | null;
   ai_version: Generated<number>;
   booking_request_id: string | null;
   claimed_guest_identity_id: string | null;

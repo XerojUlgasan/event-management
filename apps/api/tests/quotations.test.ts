@@ -91,9 +91,7 @@ after(async () => {
   await pool?.end();
   if (adminPool) {
     try {
-      await adminPool.query(
-        `DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`,
-      );
+      await adminPool.query(`DROP DATABASE IF EXISTS "${database}"`);
     } finally {
       await adminPool.end();
     }
@@ -1283,4 +1281,62 @@ test("catalog attachment and scratch proposal serialize on the same inquiry", as
     current.package.id,
     catalog.status === 200 ? packageId : privatePackages[0].id,
   );
+});
+
+test("quotation delivery clears pending handoff only on a successful committed admin response", async () => {
+  const b = await booking();
+  const q = await create(b);
+  const pending = {
+    reason: "needs_admin_review",
+    summary: "The customer needs a quotation.",
+    pending: true,
+  };
+  await db
+    .updateTable("conversations")
+    .set({ ai_handoff: pending, ai_enabled: false, ai_version: 1 })
+    .where("booking_request_id", "=", b.id)
+    .execute();
+  await pool.query(
+    "CREATE FUNCTION reject_handoff_quote_test() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.quotation_id IS NOT NULL THEN RAISE EXCEPTION 'fixture delivery failure'; END IF; RETURN NEW; END $$",
+  );
+  await pool.query(
+    "CREATE TRIGGER reject_handoff_quote_test BEFORE INSERT ON messages FOR EACH ROW EXECUTE FUNCTION reject_handoff_quote_test()",
+  );
+  try {
+    assert.equal(
+      (
+        await call(`/admin/quotations/${q.id}/send`, "POST", {
+          expectedUpdatedAt: q.updatedAt,
+        })
+      ).status,
+      500,
+    );
+    const failed = await db
+      .selectFrom("conversations")
+      .select(["ai_handoff", "ai_version"])
+      .where("booking_request_id", "=", b.id)
+      .executeTakeFirstOrThrow();
+    assert.deepEqual(failed, { ai_handoff: pending, ai_version: 1 });
+  } finally {
+    await pool.query("DROP TRIGGER reject_handoff_quote_test ON messages");
+    await pool.query("DROP FUNCTION reject_handoff_quote_test()");
+  }
+  assert.equal(
+    (
+      await call(`/admin/quotations/${q.id}/send`, "POST", {
+        expectedUpdatedAt: q.updatedAt,
+      })
+    ).status,
+    200,
+  );
+  const sent = await db
+    .selectFrom("conversations")
+    .select(["ai_handoff", "ai_enabled", "ai_version"])
+    .where("booking_request_id", "=", b.id)
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(sent, {
+    ai_handoff: { ...pending, pending: false },
+    ai_enabled: false,
+    ai_version: 2,
+  });
 });
