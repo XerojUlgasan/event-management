@@ -125,6 +125,7 @@ model Package {
   knowledge CatalogKnowledge[]
   canvas          Json              @default("[]") @db.JsonB
   thumbnailMediaId String?          @map("thumbnail_media_id") @db.Uuid
+  thumbnailMedia MediaAsset? @relation("PackageThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@index([canvas(ops: JsonbPathOps)], type: Gin, map: "packages_canvas_idx")
   @@map("packages")
@@ -145,6 +146,7 @@ model Service {
   publishedAt DateTime @default(now()) @map("published_at") @db.Timestamptz(6)
   canvas Json @default("[]") @db.JsonB
   thumbnailMediaId String? @map("thumbnail_media_id") @db.Uuid
+  thumbnailMedia MediaAsset? @relation("ServiceThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   packages PackageService[]
   knowledge CatalogKnowledge[]
   @@index([canvas(ops: JsonbPathOps)], type: Gin, map: "services_canvas_idx")
@@ -162,6 +164,8 @@ model MediaAsset {
   createdBy String? @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   creator User? @relation(fields: [createdBy], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  thumbnailPackages Package[] @relation("PackageThumbnail")
+  thumbnailServices Service[] @relation("ServiceThumbnail")
   knowledge CatalogKnowledge[]
   @@map("media_assets")
 }
