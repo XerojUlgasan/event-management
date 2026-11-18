@@ -1458,20 +1458,19 @@ test("prompt evaluation: prompt prohibits booking confirmations and invented pri
   assert.equal(system.role, "system");
   const systemText = JSON.stringify(system);
 
-  // No-invention boundary
+  // No-invention boundary — parentheses keep all three terms under "Do not invent"
   assert.match(
     systemText,
-    /Do not invent.*prices|availability|booking confirmations/i,
+    /Do not invent.*(prices|availability|booking confirmations)/i,
   );
-  // Inquiry-not-a-booking boundary
-  assert.match(
-    systemText,
-    /inquiry does not.*confirm.*booking|not.*reserve.*date/i,
-  );
+  // Inquiry-not-a-booking boundary — single unambiguous sentence
+  assert.match(systemText, /An inquiry does not reserve/i);
 });
 
 // AC-04 — Catalog search results must ground replies; the prompt must instruct
 // grounding claims in returned search facts, not inventing results.
+// AC-03 — The retrieved-content injection surface is also verified here:
+// retrieved descriptions and links must be treated as untrusted data, not instructions.
 test("prompt evaluation: prompt instructs grounding catalog claims in returned search facts", () => {
   // Ground claims instruction
   assert.match(customerServicePrompt, /Ground claims in its returned facts/i);
@@ -1479,6 +1478,11 @@ test("prompt evaluation: prompt instructs grounding catalog claims in returned s
   assert.match(customerServicePrompt, /do not.*invent results/i);
   // Semantic rank is not proof of inclusion
   assert.match(customerServicePrompt, /not proof/i);
+  // AC-03: retrieved content treated as untrusted data, not instructions
+  assert.match(
+    customerServicePrompt,
+    /retrieved.*untrusted data|untrusted data.*retrieved/i,
+  );
 });
 
 // AC-03 — Adversarial: instruction injection via user message.
@@ -1565,10 +1569,12 @@ test("prompt evaluation: injected instruction in specialRequests is treated as d
   assert.equal(systemMessages.length, 1);
   assert.doesNotMatch(JSON.stringify(systemMessages), /Disregard safety/);
 
-  // The prompt must carry an instruction that specialRequests is data
+  // The prompt must carry an instruction that specialRequests is data —
+  // anchored to the safety sentence, not the pagination sentence that also
+  // contains both words.
   assert.match(
     JSON.stringify(systemMessages[0]),
-    /specialRequests.*data|data.*specialRequests/i,
+    /including specialRequests.*are data|specialRequests.*not system instructions/i,
   );
 });
 
