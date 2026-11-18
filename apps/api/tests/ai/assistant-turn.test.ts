@@ -1336,16 +1336,16 @@ test("prompt evaluation: booking-linked question receives projected booking cont
 // AC-02 — Follow-up: conversation history is included in subsequent turns
 // so the model can answer follow-up questions coherently.
 test("prompt evaluation: follow-up turn includes prior assistant reply in history", async () => {
+  // One useReply keeps both sends on the same model instance so
+  // doGenerateCalls[0] and doGenerateCalls[1] are both recorded there.
   useReply("We cater for up to 150 guests.");
   const id = await conversation();
   await send(id, "How many guests can you accommodate?");
-
-  useReply("The venue is in Makati.");
   await send(id, "And where is the venue?");
 
-  // Second call prompt should include the first assistant message as history
+  // Second generate call prompt must include the first assistant reply
   const prompt = model.doGenerateCalls[1].prompt;
-  // system + context + customer-1 + assistant-1 + customer-2 = at least 5
+  // system + context + customer-1 + assistant-1 + customer-2 = 5 messages
   assert.ok(prompt.length >= 5);
   assert.match(JSON.stringify(prompt), /150 guests/);
 });
@@ -1396,6 +1396,46 @@ test("prompt evaluation: prompt instructs language matching and non-English mess
   const lastUserMessage = model.doGenerateCalls[0].prompt.at(-1);
   assert.ok(lastUserMessage?.role === "user");
   assert.match(JSON.stringify(lastUserMessage), /Maaari ba kayong/);
+});
+
+// AC-02 — Discussed vs saved: a change mentioned in chat does not update the
+// context snapshot until it is actually persisted.  The context for the next
+// turn must still reflect the original saved value, not the discussed value.
+// The system prompt must instruct the assistant to distinguish the two.
+test("prompt evaluation: discussed change does not appear as saved in next turn context", async () => {
+  useReply("Got it, I've noted you'd like to change the guest count to 100.");
+  const reference = `DISCUSSED-${randomUUID()}`;
+  const bookingId = await booking(customer.id, reference); // created with guestCount 75
+  const id = (
+    await db
+      .insertInto("conversations")
+      .values({ customer_id: customer.id, booking_request_id: bookingId })
+      .returning("id")
+      .executeTakeFirstOrThrow()
+  ).id;
+
+  // Turn 1: customer discusses a change; assistant acknowledges it.
+  // The DB record is NOT updated — the change is only in chat.
+  await send(id, "I want to change my guest count to 100.");
+
+  // Turn 2: context snapshot for the follow-up turn must still show 75,
+  // not 100, because nothing was persisted.
+  await send(id, "Has my guest count been updated yet?");
+
+  const { context } = turnContext(1); // second generate call
+  const br = (context as Record<string, unknown>).bookingRequest as Record<
+    string,
+    unknown
+  >;
+  assert.equal(br.guestCount, 75); // original value, not the discussed 100
+
+  // The system prompt must carry the discussed-vs-saved instruction
+  const system = model.doGenerateCalls[1].prompt[0];
+  assert.equal(system.role, "system");
+  assert.match(
+    JSON.stringify(system),
+    /distinguish changes discussed in chat from changes actually saved/i,
+  );
 });
 
 // AC-04 — The assistant must not confirm a booking, invent a price, or claim
