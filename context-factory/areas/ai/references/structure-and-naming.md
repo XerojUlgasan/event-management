@@ -24,9 +24,11 @@ The assistant stays in `apps/api/src/services/ai/`, alongside its API consumers 
 
 ## Extending the assistant
 
+Customer-only [getMyProposal](../../../../apps/api/src/services/ai/tools/get-my-proposal.ts) uses an empty input schema and server-bound conversation/customer scope. Its [service](../../../../apps/api/src/services/ai/get-my-proposal.ts) reuses the owned booking-package read and returns complete sections/widgets as JSON. The SDK adapter preserves full Markdown while auditing bounded result identity/count metadata; the agent shares call and remaining proposal-result character budgets. Guest turns never receive this tool.
+
 1. Define the capability's audience, allowed inputs, result, and failure behavior using the relevant business rules. Determine which values are model choices and which must come from the authorized turn.
 2. Put domain behavior in the existing domain service. Use `services/ai/` for AI-specific orchestration/search policy and `data/<domain>/` for SQL. Reuse these owners rather than copying business rules into an SDK callback.
-3. Add a purpose-named tool factory under `tools/` when the model must choose that capability. Bind trusted dependencies when constructing it, then register its camelCase key explicitly in the agent's `tools` map. Update prompt instructions only when selection or interpretation needs explanation.
+3. Add a purpose-named tool factory under `tools/` when the model must choose that capability. Bind trusted dependencies when constructing it, then register its camelCase key explicitly in the agent's `tools` map. Keep tool use model-selected from the first step. Update descriptions and prompt instructions for source selection and interpretation.
 4. Extend the existing turn entry and audit path as needed. A new tool does not require another HTTP endpoint, agent, or generic registry. Add public contracts or UI only when the authorized consumer needs them.
 
 Route middleware does not execute when a tool calls a service directly. Pass trusted owner scope to domain services and inspect their checks; for example, a customer tool calling [getBookingRequestService](../../../../apps/api/src/services/booking-requests/get-booking-request.ts) must supply its customer argument.

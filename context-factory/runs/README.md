@@ -14,6 +14,9 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Remove mandatory evidence selection](2026-11-19_00-19-05_remove-mandatory-evidence-selection.md) | Optional tool use from the first step / main | complete | Review scoped diff; 62 focused tests, API types, Edge bundle and guidance checks pass; live-model quality remains unverified |
+| [Assistant evidence grounding](2026-11-18_23-41-18_assistant-evidence-grounding.md) | Historical mandatory evidence selection / main | complete | Superseded by removal of the mandatory selector; original test results apply to that earlier implementation |
+| [Conversation-scoped proposal tool](2026-11-18_22-53-38_get-my-proposal-tool.md) | Empty-input private proposal read / main | complete | Review scoped diff; full-widget JSON, ownership, audit, takeover, types and Edge checks pass; live provider/hosted rollout separate |
 | [Catalog editorial depth](2026-11-18_21-12-00_catalog-editorial-depth.md) | Detailed package/service copy / main | complete | Supersedes the initial short copy; 43 authored canvases, independent review, focused tests and 129 preview cases pass; existing databases unchanged |
 | [Index pending knowledge](2026-11-18_21-10-22_knowledge-index-pending.md) | Dashboard embedding recovery / main | complete | Review scoped diff; API/browser checks pass, live provider and hosted rollout separate |
 | [Curated catalog seeds](2026-11-18_20-49-00_curated-catalog-seeds.md) | Diverse demo canvases and real photographs / main | complete | Review scoped diff; 50 tests and 80 preview cases pass; existing databases and live embedding backfill remain separate |

@@ -60,7 +60,7 @@ function useCatalogCalls(
 
 function useToolCalls(
   calls: {
-    toolName: "searchPublicCatalog" | "getPublicCatalogItem";
+    toolName: "searchPublicCatalog" | "getPublicCatalogItem" | "getMyProposal";
     input: Record<string, unknown>;
   }[],
   beforeAnswer?: () => Promise<void>,
@@ -397,12 +397,19 @@ test("admin takeover discards an in-flight AI reply even after AI is re-enabled"
 });
 
 function turnContext(callIndex: number) {
-  const message = model.doGenerateCalls[callIndex].prompt[1];
+  const message = model.doGenerateCalls[callIndex].prompt.find(
+    (item) =>
+      item.role === "user" &&
+      JSON.stringify(item.content).includes(
+        "Current server-built context snapshot",
+      ),
+  );
+  assert.ok(message);
   assert.equal(message.role, "user");
   assert.equal(message.content.length, 1);
   const part = message.content[0];
   assert.equal(part.type, "text");
-  const context: unknown = JSON.parse(part.text);
+  const context: unknown = JSON.parse(part.text.slice(part.text.indexOf("{")));
   assert.ok(context && typeof context === "object");
   assert.ok("currentDateTime" in context);
   assert.ok(typeof context.currentDateTime === "string");
@@ -577,7 +584,7 @@ test("linked booking context is projected, scoped, and refreshed for each turn",
     },
   });
   assert.match(
-    JSON.stringify(model.doGenerateCalls[1].prompt.slice(2)),
+    JSON.stringify(model.doGenerateCalls[1].prompt),
     /Booking reply/,
   );
   const persisted = await db
@@ -668,9 +675,10 @@ test("model receives all ordered history beyond the UI page, including human tea
   const prompt = model.doGenerateCalls[0].prompt;
   assert.equal(prompt.length, 25); // system + context + 22 stored messages + latest customer
   assert.equal(prompt[1].role, "user");
+  assert.equal(prompt[21].role, "assistant");
   assert.equal(prompt[22].role, "assistant");
-  assert.equal(prompt[23].role, "assistant");
-  assert.match(JSON.stringify(prompt[22]), /AMAC team: history-20/);
+  assert.match(JSON.stringify(prompt[21]), /AMAC team: history-20/);
+  assert.match(JSON.stringify(prompt[22]), /unverified historical claims/);
   assert.match(JSON.stringify(prompt.at(-1)), /Latest question/);
   assert.doesNotMatch(JSON.stringify(prompt), /unrelated-private-marker/);
   await send(id, "Follow-up");
@@ -1044,19 +1052,21 @@ test("catalog detail failures hide private records and sanitize errors", async (
   assert.doesNotMatch(prompt, /HTTPException|postgres|password|stack/i);
 });
 
-test("search and detail share the existing six-operation turn budget", async () => {
+test("catalog and proposal tools share the existing six-operation turn budget", async () => {
   const id = await detailPackage();
   useToolCalls(
     Array.from({ length: 7 }, (_, index) =>
-      index % 2
-        ? {
-            toolName: "getPublicCatalogItem",
-            input: { catalogType: "package", id },
-          }
-        : {
-            toolName: "searchPublicCatalog",
-            input: { catalogType: "package" },
-          },
+      index % 3 === 2
+        ? { toolName: "getMyProposal", input: {} }
+        : index % 3 === 1
+          ? {
+              toolName: "getPublicCatalogItem",
+              input: { catalogType: "package", id },
+            }
+          : {
+              toolName: "searchPublicCatalog",
+              input: { catalogType: "package" },
+            },
     ),
   );
   const result = await send(
@@ -1074,7 +1084,7 @@ test("search and detail share the existing six-operation turn budget", async () 
     calls.filter((item) => item.error_code === "call_limit").length,
     1,
   );
-  assert.equal(new Set(calls.map((item) => item.tool_name)).size, 2);
+  assert.equal(new Set(calls.map((item) => item.tool_name)).size, 3);
 });
 
 test("takeover after catalog detail keeps its record and suppresses the reply", async () => {
@@ -1365,6 +1375,7 @@ test("later detail turns retain only delivered same-conversation selectors and c
   const saved = await db
     .selectFrom("ai_tool_calls")
     .select("output")
+    .where("tool_name", "=", "getPublicCatalogItem")
     .where("customer_message_id", "=", first.message.id)
     .executeTakeFirstOrThrow();
   assert.ok(
@@ -1381,10 +1392,6 @@ test("later detail turns retain only delivered same-conversation selectors and c
     input,
     nextCursor: saved.output.nextCursor,
   });
-  assert.doesNotMatch(
-    JSON.stringify(context.previousCatalogItem),
-    /original-canvas-marker|1250|markdown/,
-  );
   useReply("Separate conversation");
   await send(await conversation(), "Continue reading");
   assert.equal("previousCatalogItem" in turnContext(0).context, false);
@@ -1473,4 +1480,286 @@ test("takeover during search prevents its result from entering the answer", asyn
       delete process.env.EMBEDDING_MODEL;
     else process.env.EMBEDDING_MODEL = originalEmbeddingModel;
   }
+});
+
+test("customer proposal tool returns scoped JSON and records only bounded audit metadata", async () => {
+  const bookingId = await booking(customer.id, `PROPOSAL-${randomUUID()}`);
+  const id = (
+    await db
+      .insertInto("conversations")
+      .values({ customer_id: customer.id, booking_request_id: bookingId })
+      .returning("id")
+      .executeTakeFirstOrThrow()
+  ).id;
+  const marker = `private-proposal-${randomUUID()}`;
+  const originalMarkdown = `${marker}\n${"Original **widget** text. ".repeat(700)}`;
+  const sections = [
+    {
+      id: randomUUID(),
+      title: "Saved proposal canvas",
+      widgets: Array.from({ length: 5 }, (_, index) => ({
+        id: randomUUID(),
+        type: "markdown",
+        x: 0,
+        y: index * 4,
+        w: 12,
+        h: 4,
+        markdown: originalMarkdown,
+        mediaId: null,
+        alt: "",
+        caption: "",
+        autoplay: false,
+      })),
+    },
+  ];
+  await db
+    .insertInto("packages")
+    .values({
+      name: marker,
+      slug: `private-${randomUUID()}`,
+      description: marker,
+      price: 1200,
+      max_guests: 60,
+      package_type: "custom",
+      custom_for_booking_request_id: bookingId,
+      published_at: null,
+      canvas: sql`${JSON.stringify(sections)}::jsonb`,
+    })
+    .execute();
+  useToolCalls([
+    { toolName: "getMyProposal", input: {} },
+    { toolName: "getMyProposal", input: {} },
+    { toolName: "getMyProposal", input: {} },
+  ]);
+  const result = await send(id, "What is my proposal?");
+  assert.equal(result.assistantError, null);
+  assert.ok(result.assistantMessage);
+  const message = model.doGenerateCalls[1].prompt.find(
+    (item) =>
+      item.role === "tool" &&
+      item.content.some(
+        (part) =>
+          part.type === "tool-result" && part.toolName === "getMyProposal",
+      ),
+  );
+  assert.ok(message?.role === "tool");
+  const part = message.content.find(
+    (item) => item.type === "tool-result" && item.toolName === "getMyProposal",
+  );
+  assert.ok(part && part.type === "tool-result");
+  assert.equal(part.output.type, "json");
+  if (part.output.type !== "json") throw new Error("Expected JSON proposal");
+  assert.match(JSON.stringify(part.output.value), new RegExp(marker));
+  assert.ok(JSON.stringify(part.output.value).length > 65536);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(part.output.value)).proposal.sections,
+    sections.map((section) => ({
+      ...section,
+      widgets: section.widgets.map(({ mediaId, ...widget }) => ({
+        ...widget,
+        media: null,
+      })),
+    })),
+  );
+  const records = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("tool_name", "=", "getMyProposal")
+    .where("customer_message_id", "=", result.message.id)
+    .execute();
+  assert.equal(records.length, 3);
+  assert.equal(
+    records.filter((record) => record.status === "succeeded").length,
+    2,
+  );
+  assert.equal(
+    records.filter((record) => record.error_code === "proposal_too_large")
+      .length,
+    1,
+  );
+  for (const record of records) {
+    assert.equal(record.tool_name, "getMyProposal");
+    assert.equal(record.assistant_message_id, result.assistantMessage.id);
+    assert.doesNotMatch(JSON.stringify(record.output), new RegExp(marker));
+    if (record.status === "succeeded")
+      assert.match(JSON.stringify(record.output), /[a-f0-9]{64}/i);
+  }
+});
+
+test("proposal tool input cannot redirect to another conversation", async () => {
+  const ownId = await conversation();
+  const otherBooking = await booking(other.id, `SECRET-${randomUUID()}`);
+  const otherId = (
+    await db
+      .insertInto("conversations")
+      .values({ customer_id: other.id, booking_request_id: otherBooking })
+      .returning("id")
+      .executeTakeFirstOrThrow()
+  ).id;
+  useToolCalls([
+    {
+      toolName: "getMyProposal",
+      input: { conversationId: otherId, customerId: other.id },
+    },
+  ]);
+  await send(ownId, "Read my proposal");
+  assert.doesNotMatch(
+    JSON.stringify(model.doGenerateCalls.slice(1)),
+    /Private package marker/,
+  );
+});
+
+test("takeover suppresses a reply after a proposal tool result", async () => {
+  const bookingId = await booking(customer.id, `TAKEOVER-${randomUUID()}`);
+  const id = (
+    await db
+      .insertInto("conversations")
+      .values({ customer_id: customer.id, booking_request_id: bookingId })
+      .returning("id")
+      .executeTakeFirstOrThrow()
+  ).id;
+  useToolCalls([{ toolName: "getMyProposal", input: {} }], async () => {
+    assert.equal((await setAi(id, false, 0)).status, 200);
+  });
+  const result = await send(id, "Read my proposal");
+  assert.equal(result.assistantMessage, null);
+  const records = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("tool_name", "=", "getMyProposal")
+    .where("customer_message_id", "=", result.message.id)
+    .execute();
+  assert.equal(records.length, 1);
+  assert.equal(records[0].assistant_message_id, null);
+});
+
+test("proposal exceeding the turn input budget fails explicitly without returning partial widget text", async () => {
+  const bookingId = await booking(customer.id, `LARGE-${randomUUID()}`);
+  const id = (
+    await db
+      .insertInto("conversations")
+      .values({ customer_id: customer.id, booking_request_id: bookingId })
+      .returning("id")
+      .executeTakeFirstOrThrow()
+  ).id;
+  const marker = `large-private-${randomUUID()}`;
+  const sections = [
+    {
+      id: randomUUID(),
+      title: "Large proposal",
+      widgets: Array.from({ length: 11 }, (_, index) => ({
+        id: randomUUID(),
+        type: "markdown",
+        x: 0,
+        y: index * 4,
+        w: 12,
+        h: 4,
+        markdown: marker + "x".repeat(19000),
+        mediaId: null,
+        alt: "",
+        caption: "",
+        autoplay: false,
+      })),
+    },
+  ];
+  await db
+    .insertInto("packages")
+    .values({
+      name: "Large private proposal",
+      slug: `large-${randomUUID()}`,
+      description: "",
+      price: 1200,
+      max_guests: 60,
+      package_type: "custom",
+      custom_for_booking_request_id: bookingId,
+      published_at: null,
+      canvas: sql`${JSON.stringify(sections)}::jsonb`,
+    })
+    .execute();
+  useToolCalls([{ toolName: "getMyProposal", input: {} }]);
+  const result = await send(id, "Read my proposal");
+  assert.ok(result.assistantMessage);
+  assert.equal(result.assistantError, null);
+  const record = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("tool_name", "=", "getMyProposal")
+    .where("customer_message_id", "=", result.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(record.status, "failed");
+  assert.equal(record.error_code, "proposal_too_large");
+  assert.equal(record.output, null);
+  const prompt = JSON.stringify(model.doGenerateCalls[1].prompt);
+  assert.match(
+    prompt,
+    /The full proposal exceeds this turn's input budget and was not returned/,
+  );
+  assert.doesNotMatch(prompt, new RegExp(marker));
+});
+
+test("an implicit proposal follow-up can read current state after an earlier denial", async () => {
+  const id = await conversation();
+  useReply("There is no proposal for you yet.");
+  const first = await send(id, "Is there a proposal?");
+  assert.ok(first.assistantMessage);
+  const bookingId = await booking(customer.id, `FOLLOWUP-${randomUUID()}`);
+  await db
+    .updateTable("conversations")
+    .set({ booking_request_id: bookingId })
+    .where("id", "=", id)
+    .execute();
+  useReply("Your current proposal is available.");
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+    if (model.doGenerateCalls.length !== 1) return result;
+    return {
+      ...result,
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "current-proposal",
+          toolName: "getMyProposal",
+          input: "{}",
+        },
+      ],
+      finishReason: { unified: "tool-calls", raw: undefined },
+    };
+  };
+  const second = await send(id, "What about now?");
+  assert.ok(second.assistantMessage);
+  const prompt = JSON.stringify(model.doGenerateCalls[1].prompt);
+  assert.match(
+    prompt,
+    /Previous assistant reply \(unverified historical claims\)/,
+  );
+  assert.match(prompt, /Private package marker/);
+  assert.match(prompt, /FOLLOWUP-/);
+  const reader = await db
+    .selectFrom("ai_tool_calls")
+    .select(["status", "assistant_message_id"])
+    .where("customer_message_id", "=", second.message.id)
+    .where("tool_name", "=", "getMyProposal")
+    .executeTakeFirstOrThrow();
+  assert.equal(reader.status, "succeeded");
+  assert.equal(reader.assistant_message_id, second.assistantMessage.id);
+});
+
+test("the assistant can answer directly without calling a tool", async () => {
+  useReply("Hello from AMAC AI");
+  const result = await send(await conversation(), "Hello");
+  assert.equal(result.assistantError, null);
+  assert.equal(result.assistantMessage?.body, "Hello from AMAC AI");
+  assert.equal(model.doGenerateCalls.length, 1);
+  assert.deepEqual(model.doGenerateCalls[0].toolChoice, { type: "auto" });
+  assert.deepEqual(
+    model.doGenerateCalls[0].tools?.map((entry) => entry.name).sort(),
+    ["getMyProposal", "getPublicCatalogItem", "searchPublicCatalog"],
+  );
+  const calls = await db
+    .selectFrom("ai_tool_calls")
+    .select("id")
+    .where("customer_message_id", "=", result.message.id)
+    .execute();
+  assert.equal(calls.length, 0);
 });

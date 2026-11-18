@@ -8,12 +8,23 @@ The [customer-service agent factory](../../../../apps/api/src/services/ai/agents
 
 ```ts
 tools: {
-  searchPublicCatalog: createSearchPublicCatalogTool(options),
-  getPublicCatalogItem: createGetPublicCatalogItemTool(options),
+  searchPublicCatalog: createSearchPublicCatalogTool(toolContext),
+  getPublicCatalogItem: createGetPublicCatalogItemTool(toolContext),
+  // Registered only when the turn has trusted customer/conversation scope:
+  ...(options.proposalScope
+    ? {
+        getMyProposal: createGetMyProposalTool({
+          ...toolContext,
+          proposalScope: options.proposalScope,
+        }),
+      }
+    : {}),
 }
 ```
 
-The map key is the tool name the model can request. The SDK sends that name, its description, and its input schema with the model request. The model chooses a tool and generates arguments. The SDK validates those arguments, runs the server's `execute` callback, and supplies its result to the next model step so the agent can answer. The model receives the callable interface; the database handle and executable server code stay on the server.
+The map key is the tool name the model can request. The SDK sends tools' names, descriptions, and input schemas with the model request. From the first step, the model can answer directly or choose public catalog tools and, for customers, the private proposal tool. The SDK validates arguments, runs the server's `execute` callback, and supplies results to the next model step. The database handle and executable server code stay on the server.
+
+A direct answer does not require a tool call or create an execution record. Actual calls retain their SDK invocation IDs and pass through the existing audited adapters. Source choice and interpretation remain model decisions, which synthetic dispatch tests cannot prove correct.
 
 ## A tool's three parts
 
@@ -33,10 +44,12 @@ The factory closes over the database, triggering message ID, turn ID, and activi
 
 ## One turn, from message to reply
 
+The customer-only [getMyProposal adapter](../../../../apps/api/src/services/ai/tools/get-my-proposal.ts) takes no model arguments. Its server-bound scope identifies the conversation; the [service](../../../../apps/api/src/services/ai/get-my-proposal.ts) verifies ownership and reads the current domain proposal. The model receives structured JSON containing full original `sections[].widgets[]`, without a Markdown text conversion. Normal missing-request/unprepared results are distinct from access/read failures. Audit output contains status, result hash/size, and package/section/widget metadata rather than copied private text. Proposal results share the remaining context/history character budget and fail explicitly if they cannot fit. An in-flight guest claim does not add customer capabilities to the original guest turn.
+
 1. The existing Messages flow calls [runAssistantTurnService](../../../../apps/api/src/services/ai/run-assistant-turn.ts) with server-resolved identity and conversation/message IDs. The entry verifies ownership, active conversation state, and AI version, then loads ordered history through the triggering customer message.
-2. [assistant-context.ts](../../../../apps/api/src/services/ai/assistant-context.ts) builds current server context. Guests receive no private booking projection. Eligible previous search/detail inputs and cursors can support continuation; saved prices and Markdown do not become current evidence.
+2. [assistant-context.ts](../../../../apps/api/src/services/ai/assistant-context.ts) builds current server context. Guests receive no private booking projection. Eligible previous search/detail inputs and cursors can support continuation; saved prices and Markdown do not become current evidence. The entry labels previous assistant messages as historical claims and places current context beside the latest customer message, preserving the full history and its provenance.
 3. The entry creates a turn ID and an agent with scoped dependencies. The [agent factory](../../../../apps/api/src/services/ai/agents/create-customer-service-agent.ts) selects the configured model and [prompt](../../../../apps/api/src/services/ai/prompts/customer-service-prompt.ts), registers tools, and sets loop/call budgets.
-4. When the model selects search, the tool records its start and calls [searchPublicCatalogService](../../../../apps/api/src/services/ai/search-public-catalog.ts). That service composes the current public catalog query and optional compatible, fresh indexed evidence. [data/ai/search-public-catalog.ts](../../../../apps/api/src/data/ai/search-public-catalog.ts) owns listing/filter SQL, while [data/ai/search-catalog-knowledge.ts](../../../../apps/api/src/data/ai/search-catalog-knowledge.ts) owns semantic vector search. The service returns a bounded listing projection.
-5. The tool checks activity again and records success or failure. The model can use successful evidence to answer. After generation, the entry checks fatal tracking errors and validates the reply; [createAssistantMessageData](../../../../apps/api/src/data/messages/create-assistant-message.ts) rechecks AI state and saves the reply with completed-call links in one transaction.
+4. The model can answer directly or select a tool. For search, the adapter records its start and calls [searchPublicCatalogService](../../../../apps/api/src/services/ai/search-public-catalog.ts). That service composes the current public catalog query and optional compatible, fresh indexed evidence. [data/ai/search-public-catalog.ts](../../../../apps/api/src/data/ai/search-public-catalog.ts) owns listing/filter SQL, while [data/ai/search-catalog-knowledge.ts](../../../../apps/api/src/data/ai/search-catalog-knowledge.ts) owns semantic vector search. The service returns a bounded listing projection.
+5. Each called tool checks activity again and records success or failure. The model can use successful evidence or explain a sanitized read failure. After generation, the entry checks fatal tracking errors and validates the reply; [createAssistantMessageData](../../../../apps/api/src/data/messages/create-assistant-message.ts) rechecks AI state and saves the reply with any completed-call links in one transaction.
 
 Read [execution-record rules](standards-and-verification.md#tool-call-persistence) before adding another tool. The [accepted search decision](../../../history/decisions/2026-11-18_catalog-search-and-tool-calls.md) records why pagination, public visibility, and execution tracking have these boundaries.

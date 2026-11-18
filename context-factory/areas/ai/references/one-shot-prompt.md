@@ -24,8 +24,9 @@ Capability contract:
 - Persistence: [existing execution records; any new state and replay requirements].
 
 Follow the existing explicit tool registration and execution-record lifecycle when
-adding a callable tool. Keep domain behavior in services and SQL in data. Resolve
-missing business decisions before enabling dependent behavior.
+adding a callable tool. Let the model choose whether it needs tools for the message.
+Keep domain behavior in services and SQL in data. Resolve missing business decisions
+before enabling dependent behavior.
 
 Acceptance: [representative success, access, invalid input, failure, cancellation,
 takeover, and multiple-call cases relevant to this change]. Run the closest checks

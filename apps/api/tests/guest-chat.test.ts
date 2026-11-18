@@ -289,6 +289,26 @@ test("guests receive public catalog details as Markdown with owned audit records
   assert.equal(model.doGenerateCalls.length, 2);
 });
 
+test("guests can answer directly and receive only public catalog tools", async () => {
+  useReply("Hello from AMAC AI");
+  const thread = await guest();
+  const response = await read(await send(thread, "Hello"), 201);
+  assert.equal(response.assistantError, null);
+  assert.equal(response.assistantMessage?.body, "Hello from AMAC AI");
+  assert.equal(model.doGenerateCalls.length, 1);
+  assert.deepEqual(model.doGenerateCalls[0].toolChoice, { type: "auto" });
+  assert.deepEqual(
+    model.doGenerateCalls[0].tools?.map((entry) => entry.name).sort(),
+    ["getPublicCatalogItem", "searchPublicCatalog"],
+  );
+  const calls = await db
+    .selectFrom("ai_tool_calls")
+    .select("id")
+    .where("customer_message_id", "=", response.message.id)
+    .execute();
+  assert.equal(calls.length, 0);
+});
+
 test("five customer writes and five AI replies are allowed; sixth is readable login_required; replay never calls provider again", async () => {
   useReply("Guest reply");
   const thread = await guest();
@@ -712,9 +732,11 @@ test("in-flight guest AI remains guest-scoped after claim; takeover suppresses i
   useReply("unused");
   let calls = 0;
   let capturedPrompt: unknown;
+  let capturedTools: unknown;
   model.doGenerate = async (options) => {
     calls++;
     capturedPrompt = options.prompt;
+    capturedTools = options.tools;
     entered();
     await held;
     return {
@@ -755,6 +777,7 @@ test("in-flight guest AI remains guest-scoped after claim; takeover suppresses i
   assert.equal(completed.assistantMessage.body, "Delayed guest reply");
   const prompt = JSON.stringify(capturedPrompt);
   assert.ok(!prompt.includes("Private package marker"));
+  assert.doesNotMatch(JSON.stringify(capturedTools), /getMyProposal/);
   const owned = await read(
     await call(`/messages/conversations/${id}`, customer.cookie),
     200,

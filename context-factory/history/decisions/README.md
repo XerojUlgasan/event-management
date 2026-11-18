@@ -8,6 +8,8 @@ Preserve historical reasoning. When a decision changes, link a successor and mar
 
 | Record | Status / purpose |
 | --- | --- |
+| [Model-selected tool use](2026-11-19_model-selected-tool-use.md) | Accepted removal of mandatory evidence selection; the model chooses direct answers or tools |
+| [Assistant evidence grounding](2026-11-18_assistant-evidence-grounding.md) | Superseded by model-selected tool use; historical mandatory-selector rationale |
 | [Remove package service assignments](2026-11-18_remove-package-service-assignments.md) | Accepted removal of relational included/optional assignments; linked canvas widgets remain |
 | [Shared peso conversion and civil dates](2026-11-18_shared-money-and-dates.md) | Accepted shared money and calendar helpers; display, SQL, and request guards stay in their apps |
 | [Catalog media owner folders](2026-11-18_catalog-media-folders.md) | Accepted owner paths for new uploads; development scope excludes existing-file migration and a move journal |
