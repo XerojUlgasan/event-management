@@ -1,5 +1,9 @@
 import type { PublicPackage } from "../../data/catalog/packages";
 import type { PublicService } from "../../data/catalog/services";
+import type {
+  CatalogFilters,
+  ServicePricingType,
+} from "@event-management/contracts/catalog-filters";
 import { env } from "../config/env";
 
 async function serverGet<T>(path: string): Promise<T | null> {
@@ -10,50 +14,74 @@ async function serverGet<T>(path: string): Promise<T | null> {
   return response.json() as Promise<T>;
 }
 
-type Page<T> = { items: T[]; nextCursor: string | null };
-async function loadPage<T>(
-  kind: "packages" | "services",
+function buildParams(
+  filters: CatalogFilters,
   limit?: number,
   cursor?: string,
-): Promise<Page<T>> {
+) {
   const params = new URLSearchParams();
   if (limit !== undefined) params.set("limit", String(limit));
   if (cursor) params.set("cursor", cursor);
-  const result = await serverGet<
-    Record<string, T[]> & { nextCursor: string | null }
-  >(`/${kind}?${params}`);
-  return {
-    items: result?.[kind] ?? [],
-    nextCursor: result?.nextCursor ?? null,
-  };
+  if (filters.eventType) params.set("eventType", filters.eventType);
+  if (filters.minPricePesos !== undefined)
+    params.set("minPricePesos", String(filters.minPricePesos));
+  if (filters.maxPricePesos !== undefined)
+    params.set("maxPricePesos", String(filters.maxPricePesos));
+  if (filters.guests !== undefined)
+    params.set("guests", String(filters.guests));
+  if (filters.pricingType !== undefined)
+    params.set("pricingType", filters.pricingType);
+  return params;
 }
-export const loadPackagesPage = (limit?: number, cursor?: string) =>
-  loadPage<PublicPackage>("packages", limit, cursor);
-export const loadServicesPage = (limit?: number, cursor?: string) =>
-  loadPage<PublicService>("services", limit, cursor);
+
+type Page<T> = { items: T[]; nextCursor: string | null };
+
+export const loadPackagesPage = (
+  filters: CatalogFilters = {},
+  limit?: number,
+  cursor?: string,
+): Promise<Page<PublicPackage>> =>
+  serverGet<{ packages: PublicPackage[]; nextCursor: string | null }>(
+    `/packages?${buildParams(filters, limit, cursor)}`,
+  ).then((r) => ({ items: r?.packages ?? [], nextCursor: r?.nextCursor ?? null }));
+
+export const loadServicesPage = (
+  filters: CatalogFilters = {},
+  limit?: number,
+  cursor?: string,
+): Promise<Page<PublicService>> =>
+  serverGet<{ services: PublicService[]; nextCursor: string | null }>(
+    `/services?${buildParams(filters, limit, cursor)}`,
+  ).then((r) => ({ items: r?.services ?? [], nextCursor: r?.nextCursor ?? null }));
+
 export const loadPackages = async (limit: number) =>
-  (await loadPackagesPage(limit)).items;
+  (await loadPackagesPage({}, limit)).items;
 export const loadServices = async (limit: number) =>
-  (await loadServicesPage(limit)).items;
+  (await loadServicesPage({}, limit)).items;
 
 export async function loadAllCatalog<T>(
-  load: (limit?: number, cursor?: string) => Promise<Page<T>>,
+  load: (filters?: CatalogFilters, limit?: number, cursor?: string) => Promise<Page<T>>,
 ) {
   const items: T[] = [];
   let cursor: string | undefined;
   do {
-    const page = await load(undefined, cursor);
+    const page = await load({}, undefined, cursor);
     items.push(...page.items);
     cursor = page.nextCursor ?? undefined;
   } while (cursor);
   return items;
 }
 
-export function catalogPageLinks(url: URL, nextCursor: string | null) {
+export function catalogPageLinks(
+  url: URL,
+  nextCursor: string | null,
+  filters: CatalogFilters = {},
+) {
   const cursor = url.searchParams.get("cursor") ?? undefined;
   const history = url.searchParams.getAll("previous");
   const link = (current: string | undefined, previous: string[]) => {
-    const params = new URLSearchParams();
+    // Preserve active filter params across page navigation.
+    const params = buildParams(filters);
     if (current) params.set("cursor", current);
     for (const item of previous) params.append("previous", item);
     const query = params.toString();
