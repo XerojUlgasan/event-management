@@ -523,34 +523,34 @@
 /* Pending (new) adjustment form */
 .quotation-adj-pending {
   display: grid;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 8px;
+  padding: 10px 12px;
   background: var(--surface-base);
   border-top: 1px solid var(--line);
 }
-.quotation-adj-pending-row {
+.quotation-adj-pending-fields {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  grid-template-columns: 2fr 1.5fr 100px 90px;
+  gap: 6px;
   align-items: center;
-  gap: 8px;
 }
-.quotation-adj-desc {
-  min-width: 0;
+.quotation-adj-pending-field--wide {
+  grid-column: unset;
 }
-.quotation-adj-service {
-  min-width: 0;
+.quotation-adj-pending-field {
+  display: contents;
 }
-.quotation-adj-dir {
-  width: auto;
-  min-width: 110px;
-}
-.quotation-adj-amount {
-  width: 100px;
+.quotation-adj-pending-label {
+  display: none;
 }
 .quotation-pending-actions {
   display: flex;
   gap: 6px;
   justify-content: flex-end;
+  align-items: center;
+}
+.quotation-pending-refresh {
+  margin-right: auto;
 }
 
 .quotation-negative-warn {
@@ -633,21 +633,11 @@
 }
 
 @media (max-width: 800px) {
-  .quotation-adj-pending-row {
-    grid-template-columns: 1fr 1fr;
-  }
-  .quotation-adj-list .quotation-adjustment-fields {
+  .quotation-adj-pending-fields {
     grid-template-columns: 1fr;
   }
-  .quotation-adj-desc {
-    grid-column: 1 / -1;
-  }
-  .quotation-adj-amount {
-    width: 100%;
-  }
-  .quotation-adj-dir {
-    min-width: 0;
-    width: 100%;
+  .quotation-adj-pending-field--wide {
+    grid-column: 1;
   }
   .quotation-adj-card {
     flex-wrap: wrap;
