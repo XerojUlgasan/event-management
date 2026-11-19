@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-let server, cacheDir, ui, MessagesWorkspace;
+let server, cacheDir, ui, MessagesWorkspace, MessageProcessing, MessageImages;
 
 before(async () => {
   cacheDir = await mkdtemp(join(tmpdir(), "clemora-message-markdown-"));
@@ -28,6 +28,12 @@ before(async () => {
   ui = await server.ssrLoadModule("@event-management/ui");
   ({ MessagesWorkspace } = await server.ssrLoadModule(
     "/src/components/messages/MessagesWorkspace.tsx",
+  ));
+  ({ MessageProcessing } = await server.ssrLoadModule(
+    "/src/components/messages/MessageProcessing.tsx",
+  ));
+  ({ MessageImages } = await server.ssrLoadModule(
+    "/src/components/messages/MessageImages.tsx",
   ));
 });
 after(async () => {
@@ -125,6 +131,63 @@ const message = (id, senderRole, body, quotationId = null) => ({
   readAt: null,
 });
 
+test("pending processing phases stay hidden while authorized failure retry remains", () => {
+  const render = (status, canRetry = false) =>
+    renderToStaticMarkup(
+      createElement(MessageProcessing, {
+        message: {
+          ...message("image", "customer", ""),
+          processing: { status, canRetry, errorCode: null },
+        },
+        onRetry: async () => {},
+      }),
+    );
+
+  for (const status of ["queued", "interpreting", "replying"])
+    assert.equal(render(status), "");
+
+  assert.match(render("failed", true), /message was saved.*Retry processing/);
+  assert.doesNotMatch(render("failed"), /Retry processing/);
+  assert.equal(render("completed"), "");
+  assert.equal(render("suppressed"), "");
+});
+
+test("images load only after interpretation; pending and failed originals remain hidden", () => {
+  const render = (status) =>
+    renderToStaticMarkup(
+      createElement(MessageImages, {
+        message: {
+          ...message("image", "customer", ""),
+          processing: {
+            status,
+            canRetry: status === "failed",
+            errorCode: null,
+          },
+          images: [
+            { id: "pending", interpretation: null, url: "/secret-pending" },
+            {
+              id: "ready",
+              interpretation: { summary: "A photo" },
+              url: "/safe-image",
+            },
+          ],
+        },
+      }),
+    );
+
+  for (const status of ["queued", "interpreting", "replying"]) {
+    const html = render(status);
+    assert.match(html, /Image attachment/);
+    assert.doesNotMatch(html, /secret-pending/);
+    assert.match(html, /safe-image/);
+  }
+
+  const failed = render("failed");
+  assert.match(failed, /Image unavailable/);
+  assert.doesNotMatch(failed, /secret-pending/);
+  assert.match(failed, /safe-image/);
+});
+
 const messages = [
   message("customer", "customer", "**Customer text**"),
   message("assistant", "assistant", "*Assistant text*"),
@@ -145,6 +208,50 @@ const conversation = {
   unreadCount: 0,
   updatedAt: "2026-11-19T08:00:00.000Z",
 };
+
+for (const viewerRole of ["customer", "admin"]) {
+  test(`${viewerRole} sees processing retry only for permitted message sources`, () => {
+    const failed = (id, role) => ({
+      ...message(id, role, `${role} image`),
+      processing: {
+        status: "failed",
+        canRetry: true,
+        errorCode: "vision_unavailable",
+      },
+    });
+
+    const html = renderToStaticMarkup(
+      createElement(
+        ui.NotificationProvider,
+        null,
+        createElement(MessagesWorkspace, {
+          title: "Messages",
+          viewerRole,
+          conversations: [conversation],
+          activeId: conversation.id,
+          onSelect() {},
+          messages: [
+            failed("customer-image", "customer"),
+            failed("admin-image", "admin"),
+          ],
+          loading: false,
+          error: null,
+          async onSend() {},
+          async onRetryProcessing() {},
+          conversationOpen: true,
+          listEmpty: { title: "Empty", body: "No conversations" },
+          threadEmpty: { title: "Empty", body: "No messages" },
+        }),
+      ),
+    );
+
+    assert.equal(
+      (html.match(/Retry processing/g) ?? []).length,
+      viewerRole === "admin" ? 2 : 1,
+    );
+    assert.equal((html.match(/Your message was saved/g) ?? []).length, 2);
+  });
+}
 
 for (const viewerRole of ["customer", "admin"]) {
   test(`${viewerRole} workspace formats all senders and preserves quotation and retry controls`, () => {
@@ -181,5 +288,57 @@ for (const viewerRole of ["customer", "admin"]) {
     assert.match(html, /Delivery could not be confirmed/);
     assert.match(html, />Retry<\/button>/);
     assert.equal(messages[0].body, "**Customer text**");
+  });
+}
+
+test("assistant typing status is accessible and decorative dots are hidden", () => {
+  const html = renderToStaticMarkup(createElement(ui.AssistantTyping));
+  assert.match(html, /role="status"/);
+  assert.match(html, /aria-label="AI is preparing a reply"/);
+  assert.match(html, /aria-hidden="true"/);
+  assert.equal((html.match(/<i>/g) ?? []).length, 3);
+});
+
+for (const viewerRole of ["customer", "admin"]) {
+  test(`${viewerRole} sees one typing indicator only when AI reply is pending`, () => {
+    const render = (active) =>
+      renderToStaticMarkup(
+        createElement(
+          ui.NotificationProvider,
+          null,
+          createElement(MessagesWorkspace, {
+            title: "Messages",
+            viewerRole,
+            conversations: [active],
+            activeConversation: active,
+            activeId: active.id,
+            onSelect() {},
+            messages,
+            loading: false,
+            error: null,
+            async onSend() {},
+            conversationOpen: true,
+            listEmpty: { title: "Empty", body: "Empty" },
+            threadEmpty: { title: "Empty", body: "Empty" },
+          }),
+        ),
+      );
+
+    assert.equal(
+      (
+        render({ ...conversation, aiReplyPending: true }).match(
+          /AI is preparing a reply/g,
+        ) ?? []
+      ).length,
+      1,
+    );
+    assert.doesNotMatch(
+      render({ ...conversation, aiReplyPending: true, aiEnabled: false }),
+      /AI is preparing a reply/,
+    );
+    assert.doesNotMatch(
+      render({ ...conversation, aiReplyPending: true, status: "closed" }),
+      /AI is preparing a reply/,
+    );
   });
 }

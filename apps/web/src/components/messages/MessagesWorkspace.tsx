@@ -9,6 +9,7 @@ import {
   type SubmitEvent,
 } from "react";
 import {
+  AssistantTyping,
   Avatar,
   Badge,
   Button,
@@ -31,6 +32,8 @@ import {
   type ConversationContextView,
 } from "./ConversationContext";
 import "../../styles/messages/messages.css";
+import { MessageAttachments, MessageImages } from "./MessageImages";
+import { MessageProcessing } from "./MessageProcessing";
 import { initialsFromName } from "../../lib/utils/formatting/name";
 import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
 import {
@@ -60,7 +63,10 @@ function preview(conversation: ChatConversation) {
 
   if (!message) return "No messages yet";
 
-  return message.body;
+  return (
+    message.body ||
+    (message.images?.length || message.pendingFiles?.length ? "Image" : "")
+  );
 }
 
 const handoffReason = {
@@ -83,7 +89,9 @@ export function MessagesWorkspace({
   onRetry,
   onSend,
   failedMessageIds = [],
+  failedMessageErrors = {},
   onRetryMessage,
+  onRetryProcessing,
   onToggleAi,
   pendingAiToggle = false,
   onBack,
@@ -99,6 +107,8 @@ export function MessagesWorkspace({
   olderError = "",
   onLoadOlder,
   historyNotice = "",
+  localAiReplyPending = false,
+  localImageFiles,
   resumeBooking = false,
   onBookingSubmitted,
   onBookingClosed,
@@ -122,9 +132,11 @@ export function MessagesWorkspace({
   loading: boolean;
   error: string | null;
   onRetry?: () => void;
-  onSend: (body: string) => Promise<void>;
+  onSend: (body: string, files: File[], requestId: string) => Promise<void>;
   failedMessageIds?: string[];
+  failedMessageErrors?: Record<string, string>;
   onRetryMessage?: (id: string) => void;
+  onRetryProcessing?: (id: string) => Promise<void>;
   onToggleAi?: (
     conversationId: string,
     aiEnabled: boolean,
@@ -144,6 +156,8 @@ export function MessagesWorkspace({
   olderError?: string;
   onLoadOlder?: () => void;
   historyNotice?: string;
+  localAiReplyPending?: boolean;
+  localImageFiles?: ReadonlyMap<string, File[]>;
 }) {
   const { notify, notifyError } = useNotifications();
   const [quotationId, setQuotationId] = useState<string | null>(null);
@@ -154,6 +168,11 @@ export function MessagesWorkspace({
     if (activeId) setDrafts((previous) => ({ ...previous, [activeId]: value }));
   };
 
+  const [fileDrafts, setFileDrafts] = useState<Record<string, File[]>>({});
+  const files = activeId ? (fileDrafts[activeId] ?? []) : [];
+  const sendKeys = useRef<
+    Record<string, { body: string; files: File[]; requestId: string }>
+  >({});
   const [pendingSends, setPendingSends] = useState<Record<string, boolean>>({});
   const sending = !!activeId && !!pendingSends[activeId];
   const pendingSendIds = useRef(new Set<string>());
@@ -171,10 +190,15 @@ export function MessagesWorkspace({
   const nearBottom = useRef(true);
 
   const active =
+    (activeConversation?.id === activeId ? activeConversation : null) ??
     conversations.find((item) => item.id === activeId) ??
-    activeConversation ??
     null;
 
+  const aiReplyPending =
+    !!activeId &&
+    active?.status === "active" &&
+    !!active.aiEnabled &&
+    (localAiReplyPending || !!active.aiReplyPending);
   const isTeam = viewerRole === "customer";
   const singleConversation =
     isTeam &&
@@ -268,7 +292,7 @@ export function MessagesWorkspace({
 
     previousFirst.current = first;
     previousActive.current = activeId;
-  }, [messages, activeId]);
+  }, [messages, activeId, aiReplyPending]);
 
   useEffect(() => {
     if (!loadingOlder) olderScroll.current = null;
@@ -365,7 +389,7 @@ export function MessagesWorkspace({
     const body = draft.trim();
 
     if (
-      !body ||
+      (!body && !files.length) ||
       (!isTeam && sending) ||
       readOnly ||
       sendDisabled ||
@@ -377,10 +401,24 @@ export function MessagesWorkspace({
     const request = generation.current();
     const conversationId = activeId;
     const sentDraft = draft;
+    const sentFiles = files;
+    const previous = sendKeys.current[conversationId];
+
+    const requestId =
+      previous &&
+      previous.body === body &&
+      previous.files.length === files.length &&
+      previous.files.every((file, i) => file === files[i])
+        ? previous.requestId
+        : crypto.randomUUID();
+
+    sendKeys.current[conversationId] = { body, files, requestId };
 
     if (isTeam) {
       setDrafts((previous) => ({ ...previous, [conversationId]: "" }));
-      void onSend(body);
+      setFileDrafts((previous) => ({ ...previous, [conversationId]: [] }));
+      delete sendKeys.current[conversationId];
+      void onSend(body, sentFiles, requestId);
       composer.current?.focus();
 
       return;
@@ -391,7 +429,13 @@ export function MessagesWorkspace({
     setSendError("");
 
     try {
-      await onSend(body);
+      await onSend(body, sentFiles, requestId);
+      delete sendKeys.current[conversationId];
+      setFileDrafts((previous) =>
+        previous[conversationId] === sentFiles
+          ? { ...previous, [conversationId]: [] }
+          : previous,
+      );
       setDrafts((previous) =>
         previous[conversationId] === sentDraft
           ? { ...previous, [conversationId]: "" }
@@ -469,7 +513,8 @@ export function MessagesWorkspace({
                   </small>
                 )}
                 <small>{preview(conversation)}</small>
-                {drafts[conversation.id] && (
+                {(drafts[conversation.id] ||
+                  fileDrafts[conversation.id]?.length) && (
                   <small className="conversation-draft">Draft</small>
                 )}
               </span>
@@ -789,9 +834,27 @@ export function MessagesWorkspace({
                   ) : (
                     <Markdown source={message.body} variant="message" />
                   )}
+                  <MessageImages
+                    message={{
+                      ...message,
+                      pendingFiles:
+                        message.pendingFiles ??
+                        localImageFiles?.get(message.id),
+                    }}
+                  />
+                  <MessageProcessing
+                    message={message}
+                    onRetry={
+                      viewerRole === "admin" ||
+                      message.senderRole === "customer"
+                        ? onRetryProcessing
+                        : undefined
+                    }
+                  />
                   {failedMessageIds.includes(message.id) && (
                     <div className="message-delivery-error" role="alert">
-                      Delivery could not be confirmed.{" "}
+                      {failedMessageErrors[message.id] ||
+                        "Delivery could not be confirmed."}{" "}
                       {!readOnly &&
                         !closedBookingForCustomer &&
                         onRetryMessage && (
@@ -812,6 +875,11 @@ export function MessagesWorkspace({
               </Fragment>
             );
           })}
+          {aiReplyPending && (
+            <div className="message bot message-typing">
+              <AssistantTyping />
+            </div>
+          )}
         </div>
 
         {sendError && (
@@ -846,6 +914,14 @@ export function MessagesWorkspace({
             <label htmlFor="conversation-message">
               {isTeam ? "Message the Styled by AMAC team" : "Reply to customer"}
             </label>
+            <MessageAttachments
+              files={files}
+              onChange={(next) =>
+                activeId &&
+                setFileDrafts((previous) => ({ ...previous, [activeId]: next }))
+              }
+              disabled={!activeId || (!isTeam && sending) || sendDisabled}
+            />
             <Textarea
               variant="plain"
               ref={composer}
@@ -880,7 +956,7 @@ export function MessagesWorkspace({
                 pending={!isTeam && sending}
                 aria-label={isTeam ? "Send message" : undefined}
                 disabled={
-                  !draft.trim() ||
+                  (!draft.trim() && !files.length) ||
                   !activeId ||
                   (!isTeam && sending) ||
                   sendDisabled

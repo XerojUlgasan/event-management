@@ -387,7 +387,7 @@ enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
 # `per_worker` enables hot reload. This bundle is large, and reloading it killed the
 # runtime container with exit 137, so local serving uses the oneshot fallback.
-policy = "oneshot"
+policy = "per_worker"
 # Port to attach the Chrome inspector for debugging edge functions.
 inspector_port = 8083
 # The Deno major version to use.

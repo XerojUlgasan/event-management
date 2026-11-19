@@ -1,3 +1,5 @@
+import { MessageProcessingError } from "../messages/message-processing-error.js";
+import type { ImageMessageJobLease } from "../../data/messages/message-processing.js";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
@@ -23,6 +25,7 @@ type WorkerOptions = {
     payload: unknown,
     db: Kysely<DB>,
     signal: AbortSignal,
+    lease?: ImageMessageJobLease,
   ) => Promise<void>;
   pollIntervalMs?: number;
   concurrency?: number;
@@ -87,7 +90,8 @@ export async function runOneBackgroundJob(
     }
   })();
 
-  let outcome: "success" | "retry" | "invalid" = "retry";
+  let outcome: "success" | "retry" | "invalid" | "permanent" = "retry";
+  let errorCode: string | undefined;
 
   try {
     // Validate persisted JSON even when tests inject a handler.
@@ -117,6 +121,7 @@ export async function runOneBackgroundJob(
               parsed.data,
               db,
               controller.signal,
+              { jobId: job.id, leaseToken: job.lease_token },
             );
           }),
           aborted,
@@ -129,7 +134,13 @@ export async function runOneBackgroundJob(
       outcome = "success";
     }
   } catch (error) {
-    // Handler failures are retryable; provider details are deliberately discarded.
+    // Persist only bounded application-owned codes; never provider details.
+    if (error instanceof MessageProcessingError) {
+      errorCode = error.code;
+
+      if (error.code === "invalid_image" || error.code === "invalid_payload")
+        outcome = "permanent";
+    }
   } finally {
     clearTimeout(timeout);
     heartbeatStop.abort();
@@ -138,7 +149,7 @@ export async function runOneBackgroundJob(
   }
 
   if (!ownershipLost)
-    await finishJobData(db, job, outcome, backgroundJobPolicies);
+    await finishJobData(db, job, outcome, backgroundJobPolicies, errorCode);
 
   return true;
 }

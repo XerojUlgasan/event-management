@@ -1,13 +1,12 @@
+import { hasObservedReply } from "../../../../lib/services/messages/pending-replies";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  notificationErrorMessage,
-  useNotifications,
-} from "@event-management/ui";
+import { useNotifications } from "@event-management/ui";
 
 import {
   getAdminConversation,
   getAdminConversations,
   sendAdminMessage,
+  retryAdminMessageProcessing,
   updateAdminConversationAi,
   type ChatConversation,
   type ChatThread,
@@ -15,8 +14,10 @@ import {
 import { ApiError } from "../../../../lib/http/request";
 import { useConversationList } from "../../../../lib/services/messages/use-conversation-list";
 import { assertCursorMoved } from "../../../../lib/services/messages/older-page";
+import { conversationLoadError } from "../../../../lib/services/messages/load-error";
 import { MessagesWorkspace } from "../../../messages/MessagesWorkspace";
 import {
+  addSentMessages,
   mergeAiStateByVersion,
   mergePolledThread,
   prependOlder,
@@ -39,7 +40,11 @@ export function MessagesPage() {
   }, []);
   const threadFailure = useRef("");
   const activeIdRef = useRef<string | null>(null);
-  const loadingThreadId = useRef<string | null>(null);
+  const loadingThreadRequest = useRef<{
+    id: string;
+    generation: number;
+  } | null>(null);
+  const threadGeneration = useRef(0);
   const localMessages = useRef(new Set<string>());
   const aiStateByConversation = useRef(new Map<string, ConversationAiState>());
 
@@ -95,18 +100,36 @@ export function MessagesPage() {
   const aiPendingRef = useRef(new Set<string>());
   const olderRequest = useRef(0);
   const olderPending = useRef(false);
+  const replyRevision = useRef(0);
+  const successfulPolls = useRef(0);
 
   const loadThread = useCallback(
     async (id: string) => {
-      if (loadingThreadId.current === id) return;
+      const generation = threadGeneration.current;
 
-      loadingThreadId.current = id;
+      if (
+        loadingThreadRequest.current?.id === id &&
+        loadingThreadRequest.current.generation === generation
+      )
+        return;
+
+      const request = { id, generation };
+      loadingThreadRequest.current = request;
+      const revision = replyRevision.current;
       setLoadingThread(true);
 
       try {
         const response = await getAdminConversation(id);
 
-        if (!mounted.current || activeIdRef.current !== id) return;
+        if (
+          !mounted.current ||
+          activeIdRef.current !== id ||
+          generation !== threadGeneration.current ||
+          revision !== replyRevision.current
+        )
+          return;
+
+        successfulPolls.current++;
 
         const result = {
           ...response,
@@ -139,11 +162,16 @@ export function MessagesPage() {
         setThreadError("");
         threadFailure.current = "";
       } catch (cause) {
-        if (!mounted.current || activeIdRef.current !== id) return;
+        if (
+          !mounted.current ||
+          activeIdRef.current !== id ||
+          generation !== threadGeneration.current
+        )
+          return;
 
-        const message = notificationErrorMessage(
+        const message = conversationLoadError(
           cause,
-          "Unable to load this conversation.",
+          "Unable to load or refresh this conversation. Please try again.",
         );
         setThreadError(message);
         const key = `${id}:${message}`;
@@ -153,9 +181,14 @@ export function MessagesPage() {
           notifyError(message);
         }
       } finally {
-        if (loadingThreadId.current === id) loadingThreadId.current = null;
+        if (loadingThreadRequest.current === request)
+          loadingThreadRequest.current = null;
 
-        if (mounted.current && activeIdRef.current === id)
+        if (
+          mounted.current &&
+          activeIdRef.current === id &&
+          generation === threadGeneration.current
+        )
           setLoadingThread(false);
       }
     },
@@ -182,6 +215,7 @@ export function MessagesPage() {
     const timer = window.setInterval(() => void loadThread(activeId), 5000);
 
     return () => {
+      threadGeneration.current++;
       olderRequest.current++;
       window.clearInterval(timer);
     };
@@ -234,28 +268,32 @@ export function MessagesPage() {
     }
   };
 
-  const send = async (body: string) => {
+  const send = async (body: string, files: File[], requestId: string) => {
     if (!activeId) return;
 
     const conversationId = activeId;
-    const result = await sendAdminMessage(conversationId, body);
+    const result = await sendAdminMessage(
+      conversationId,
+      body,
+      requestId,
+      files,
+    );
     const aiState = rememberAiState(conversationId, result);
     localMessages.current.add(result.message.id);
-    setThread((current) =>
-      current && current.conversation.id === conversationId
-        ? {
-            ...current,
-            conversation: {
-              ...current.conversation,
-              ...aiState,
-              status: "active",
-              lastMessage: result.message,
-              updatedAt: result.message.createdAt,
-            },
-            messages: [...current.messages, result.message],
-          }
-        : current,
-    );
+    setThread((current) => {
+      if (!current || current.conversation.id !== conversationId)
+        return current;
+
+      const merged = addSentMessages(current, [result.message]);
+
+      return {
+        ...merged,
+        conversation: {
+          ...merged.conversation,
+          ...mergeAiStateByVersion(current.conversation, aiState),
+        },
+      };
+    });
     setConversations((current) =>
       current.map((item) =>
         item.id === conversationId ? { ...item, ...aiState } : item,
@@ -306,6 +344,7 @@ export function MessagesPage() {
           result.messages.forEach((message) =>
             localMessages.current.delete(message.id),
           );
+          replyRevision.current++;
           setThread((current) =>
             current?.conversation.id === id
               ? mergePolledThread(current, result, unacknowledged).thread
@@ -351,6 +390,53 @@ export function MessagesPage() {
       <MessagesWorkspace
         title="Messages"
         viewerRole="admin"
+        onRetryProcessing={async (messageId) => {
+          if (!activeId) return;
+
+          const id = activeId;
+          const aiVersion = thread?.conversation.aiVersion;
+          const pollAtStart = successfulPolls.current;
+          const { message } = await retryAdminMessageProcessing(id, messageId);
+          replyRevision.current++;
+          setThread((current) =>
+            current?.conversation.id === id
+              ? {
+                  ...current,
+                  conversation: {
+                    ...current.conversation,
+                    aiReplyPending:
+                      current.conversation.aiReplyPending ||
+                      (current.conversation.aiEnabled &&
+                        current.conversation.aiVersion === aiVersion &&
+                        !!message.processing?.replyPending &&
+                        !hasObservedReply(current.messages, messageId) &&
+                        !(
+                          successfulPolls.current > pollAtStart &&
+                          current.messages.some(
+                            (item) =>
+                              item.id === messageId &&
+                              ["completed", "failed", "suppressed"].includes(
+                                item.processing?.status ?? "",
+                              ),
+                          )
+                        )),
+                  },
+                  messages: current.messages.map((item) =>
+                    item.id === message.id &&
+                    !hasObservedReply(current.messages, messageId) &&
+                    !(
+                      successfulPolls.current > pollAtStart &&
+                      ["completed", "failed", "suppressed"].includes(
+                        item.processing?.status ?? "",
+                      )
+                    )
+                      ? message
+                      : item,
+                  ),
+                }
+              : current,
+          );
+        }}
         conversations={conversations}
         activeConversation={thread?.conversation}
         conversationFeed={{

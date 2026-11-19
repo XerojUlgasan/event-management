@@ -1,3 +1,9 @@
+import { serializeMessageRequest } from "../messages/serialize-message-request.js";
+import {
+  prepareMessageImages,
+  cleanupMessageImages,
+  type CheckedMessageImage,
+} from "../messages/prepare-message-images.js";
 import type { GuestDatabase } from "../../data/guest-chat/guest-conversation.js";
 import { guestStatus } from "../../data/guest-chat/guest-conversation.js";
 import {
@@ -7,6 +13,7 @@ import {
 import { findConversationData } from "../../data/messages/find-conversation.js";
 import { messageDto } from "../messages/message-response.js";
 import { runAssistantTurnService } from "../ai/run-assistant-turn.js";
+import { waitForEarlierImages } from "../messages/wait-for-earlier-images.js";
 
 export async function sendGuestMessageService(
   db: GuestDatabase,
@@ -15,16 +22,50 @@ export async function sendGuestMessageService(
   body: string,
   requestId: string,
   abortSignal?: AbortSignal,
+  imageFiles: CheckedMessageImage[] = [],
 ) {
-  const saved = await saveGuestMessageData(db, id, token, body, requestId);
+  const saved = await serializeMessageRequest(`guest:${id}`, async () => {
+    const replay = await saveGuestMessageData(
+      db,
+      id,
+      token,
+      body,
+      requestId,
+      [],
+      imageFiles.map((image) => image.contentHash),
+      true,
+    );
+
+    const images = replay
+      ? []
+      : await prepareMessageImages(id, imageFiles, abortSignal);
+    let saved;
+
+    try {
+      saved =
+        replay ??
+        (await saveGuestMessageData(db, id, token, body, requestId, images));
+
+      if (!saved) throw new Error("Message persistence failed");
+    } catch (error) {
+      await cleanupMessageImages(images);
+      throw error;
+    }
+
+    if (saved.replay && images.length) await cleanupMessageImages(images);
+
+    return saved;
+  });
+
   const message = messageDto(saved.message);
   let assistantMessage = saved.assistantMessage
     ? messageDto(saved.assistantMessage)
     : null;
   let assistantError = saved.assistantError;
 
-  if (!saved.replay && saved.conversation.ai_enabled) {
+  if (!saved.replay && saved.conversation.ai_enabled && !imageFiles.length) {
     try {
+      await waitForEarlierImages(db, id, message.id, abortSignal);
       assistantMessage = await runAssistantTurnService({
         db,
         customerId: null,
@@ -62,8 +103,7 @@ export async function sendGuestMessageService(
 
   const current = await findConversationData(db, id);
 
-  // A concurrent authenticated claim can finish while the provider runs. The
-  // response contains only this already-authorized guest turn, never new account data.
+  // Claim may race this response; expose only the already-authorized saved turn.
   return {
     message,
     assistantMessage,

@@ -119,6 +119,15 @@ export function createEnv(source: EnvSource) {
 
       return { apiKey, model };
     },
+    get AI_VISION() {
+      const apiKey = configured("AI_GATEWAY_API_KEY");
+      const model = configured("VISION_MODEL");
+
+      if (!apiKey || !model)
+        throw new Error("AI vision model is not configured");
+
+      return { apiKey, model };
+    },
     get AI_EMBEDDING() {
       const apiKey = configured("AI_GATEWAY_API_KEY");
       const model = configured("EMBEDDING_MODEL");

@@ -1,6 +1,10 @@
 import type { GuestChatStatus } from "@event-management/contracts/guest-chat";
 import { request } from "../../http/request";
-import type { ChatConversation, ChatMessage } from "./conversations";
+import {
+  messagePayload,
+  type ChatConversation,
+  type ChatMessage,
+} from "./conversations";
 
 export type GuestState = GuestChatStatus;
 
@@ -19,19 +23,30 @@ export const getGuestChat = (id: string, cursor?: string) =>
     `/guest/conversations/${encodeURIComponent(id)}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
   );
 
-export const sendGuestMessage = (id: string, body: string, requestId: string) =>
+export const sendGuestMessage = (
+  id: string,
+  body: string,
+  requestId: string,
+  images: File[] = [],
+) =>
   request<{
     message: ChatMessage;
     assistantMessage: ChatMessage | null;
     assistantError: string | null;
     guest: GuestState;
-  }>(`/guest/conversations/${encodeURIComponent(id)}/messages`, {
-    body,
-    requestId,
-  });
+  }>(
+    `/guest/conversations/${encodeURIComponent(id)}/messages`,
+    messagePayload(body, images, { requestId }),
+  );
 
 export const claimGuestChat = (id: string) =>
   request<{ conversationId: string }>(
     `/guest/conversations/${encodeURIComponent(id)}/claim`,
+    {},
+  );
+
+export const retryGuestMessageProcessing = (id: string, messageId: string) =>
+  request<{ message: ChatMessage }>(
+    `/guest/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/retry`,
     {},
   );

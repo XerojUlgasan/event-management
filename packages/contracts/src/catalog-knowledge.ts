@@ -63,9 +63,8 @@ export type KnowledgeSearchResponse = {
 };
 
 export type KnowledgeIndexResponse = {
-  embedded: number;
-  unchanged: number;
-  superseded: number;
-  failed: number;
-  nextCursor: string | null;
+  pendingListings: number;
+  submittedListings: number;
+  skippedListings: number;
+  failedListings: number;
 };

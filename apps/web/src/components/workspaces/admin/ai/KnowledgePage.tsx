@@ -30,7 +30,7 @@ import { KnowledgeSearch } from "./KnowledgeSearch";
 import "../../../../styles/ai/knowledge.css";
 
 export function KnowledgePage() {
-  const { notify, notifyError } = useNotifications();
+  const { notify } = useNotifications();
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState("");
   const [status, setStatus] = useState("");
@@ -61,52 +61,43 @@ export function KnowledgePage() {
     indexRun.current = run;
     setIndexing(true);
     setIndexError(false);
-    setIndexMessage("Indexing pending knowledge across the catalog…");
+    setIndexMessage("Submitting pending indexing…");
     setDetail(null);
-    let embedded = 0;
-    let failed = 0;
-    let cursor: string | undefined;
 
     try {
-      do {
-        const result = await indexPendingKnowledge(cursor);
+      const result = await indexPendingKnowledge();
 
-        if (run.stopped) return;
+      if (run.stopped) return;
 
-        embedded += result.embedded;
-        failed += result.failed;
-        setIndexMessage(
-          `Indexing… ${embedded} chunks indexed; ${failed} failed.`,
-        );
-        load();
-        cursor = result.nextCursor ?? undefined;
-      } while (cursor);
-
-      const message = failed
-        ? `${embedded} chunks indexed; ${failed} failed. Select Index pending to retry. Failed chunks remain unavailable to semantic search.`
-        : embedded
-          ? `${embedded} chunks indexed for semantic search.`
-          : "Indexing pass finished. Any listings still needing attention can be retried.";
+      const counts = [
+        `${result.submittedListings} listings queued`,
+        ...(result.skippedListings
+          ? [
+              `${result.skippedListings} already queued or no longer need indexing`,
+            ]
+          : []),
+      ].join("; ");
+      const message = result.failedListings
+        ? `${counts}; ${result.failedListings} could not be queued. Select Index pending to retry remaining work.`
+        : result.pendingListings
+          ? `${counts}. You can leave this page. Use Refresh to check coverage.`
+          : "No pending listings to submit.";
       setIndexMessage(message);
-      setIndexError(failed > 0);
-      notify(message, failed ? "info" : "success");
-    } catch (cause) {
+      setIndexError(result.failedListings > 0);
+      notify(message, result.failedListings ? "info" : "success");
+    } catch {
       if (!run.stopped) {
         setIndexError(true);
-        const message = notifyError(
-          cause,
-          "Unable to index pending knowledge. Select Index pending to retry; completed chunks are saved.",
-        );
-        setIndexMessage(
-          `${embedded} chunks indexed before stopping. Select Index pending to retry. ${message}`,
-        );
+        const message =
+          "Could not finish submitting pending indexing. Some listings may already be queued. Select Index pending to retry.";
+        setIndexMessage(message);
+        notify(message, "danger");
       }
     } finally {
       if (indexRun.current === run) indexRun.current = null;
 
       if (!run.stopped) {
         setIndexing(false);
-        pages.reset();
         load();
       }
     }
@@ -138,21 +129,27 @@ export function KnowledgePage() {
         actions={
           <div className="knowledge-header-actions">
             <Button
+              size="icon"
+              icon="spark"
+              aria-label={
+                indexing ? "Submitting pending indexing…" : "Index pending"
+              }
+              title="Index pending"
               onClick={() => void indexPending()}
               pending={indexing}
               disabled={loading || !data || data.summary.attention === 0}
-            >
-              {indexing ? "Indexing pending…" : "Index pending"}
-            </Button>
-            <KnowledgeHelp text="Index pending and outdated text and photos across all eligible catalog listings using the configured embedding model. Keep this page open until finished; completed chunks are saved and failures can be retried." />
+            />
+            <KnowledgeHelp text="Queue pending and outdated text and photos across all eligible catalog listings. Listings already queued or being indexed keep their existing jobs and retry timing. Use Refresh to check coverage." />
             <Button
               variant="secondary"
+              size="icon"
+              icon="refresh"
+              aria-label="Refresh"
+              title="Refresh"
               onClick={load}
               pending={loading}
               disabled={indexing}
-            >
-              Refresh
-            </Button>
+            />
           </div>
         }
       />

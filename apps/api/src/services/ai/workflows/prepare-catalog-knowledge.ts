@@ -2,8 +2,6 @@ import type { CatalogSection } from "@event-management/contracts/catalog";
 import type { Selectable } from "kysely";
 import type { Packages, Services } from "../../../db/types.js";
 
-const MAX_MARKDOWN_CHUNK_CHARACTERS = 6_000;
-
 type PackageRecord = Pick<
   Selectable<Packages>,
   | "id"
@@ -87,27 +85,9 @@ function serviceOverview(record: ServiceRecord) {
   return lines.join("\n");
 }
 
-function splitMarkdown(markdown: string) {
-  const characters = Array.from(markdown);
-  const chunks: string[] = [];
-
-  for (
-    let start = 0;
-    start < characters.length;
-    start += MAX_MARKDOWN_CHUNK_CHARACTERS
-  ) {
-    chunks.push(
-      characters.slice(start, start + MAX_MARKDOWN_CHUNK_CHARACTERS).join(""),
-    );
-  }
-
-  return chunks;
-}
-
-function prepareSections(
-  input: PrepareCatalogKnowledgeInput,
-): PreparedCatalogKnowledgeChunk[] {
-  const chunks: PreparedCatalogKnowledgeChunk[] = [];
+function prepareSections(input: PrepareCatalogKnowledgeInput) {
+  const text: string[] = [];
+  const photos: PreparedCatalogKnowledgeChunk[] = [];
 
   for (const section of input.sections) {
     const widgets = section.widgets
@@ -125,30 +105,17 @@ function prepareSections(
       const context = `${listingLabel(input)}\nSection: ${section.title}`;
 
       if (widget.type === "service" || widget.type === "package") {
-        if (widget.caption)
-          chunks.push({
-            chunkKey: `${widget.type}:${widget.id}`,
-            contentMarkdown: `${context}\nCaption: ${widget.caption}`,
-            mediaId: null,
-          });
+        if (widget.caption) text.push(`${context}\nCaption: ${widget.caption}`);
 
         continue;
       }
 
       if (widget.type === "markdown") {
-        for (const [index, markdown] of splitMarkdown(
-          widget.markdown,
-        ).entries())
-          chunks.push({
-            chunkKey: `markdown:${widget.id}:${index}`,
-            contentMarkdown: `${context}\nMarkdown:\n${markdown}`,
-            mediaId: null,
-          });
-
+        text.push(`${context}\nMarkdown:\n${widget.markdown}`);
         continue;
       }
 
-      chunks.push({
+      photos.push({
         chunkKey: `photo:${widget.id}`,
         contentMarkdown: [
           context,
@@ -160,7 +127,7 @@ function prepareSections(
     }
   }
 
-  return chunks;
+  return { text, photos };
 }
 
 export function prepareCatalogKnowledge(
@@ -179,13 +146,14 @@ export function prepareCatalogKnowledge(
       ? packageOverview(input.record)
       : serviceOverview(input.record);
 
+  const { text, photos } = prepareSections(input);
+
   return [
-    ...splitMarkdown(overview).map((content, index) => ({
-      chunkKey: index === 0 ? "overview" : `overview:${index}`,
-      contentMarkdown:
-        index === 0 ? content : `${listingLabel(input)}\n\n${content}`,
+    {
+      chunkKey: "text",
+      contentMarkdown: [overview, ...text].join("\n\n"),
       mediaId: null,
-    })),
-    ...prepareSections(input),
+    },
+    ...photos,
   ];
 }

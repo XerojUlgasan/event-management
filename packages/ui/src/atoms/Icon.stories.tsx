@@ -10,6 +10,7 @@ const names = [
   "chart",
   "settings",
   "spinner",
+  "refresh",
   "search",
   "filter",
   "bell",

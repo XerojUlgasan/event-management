@@ -64,14 +64,6 @@ function section(
   return { id, title, widgets };
 }
 
-function markdownSource(chunk: { contentMarkdown: string }) {
-  const marker = "\nMarkdown:\n";
-  const markerIndex = chunk.contentMarkdown.indexOf(marker);
-  assert.notEqual(markerIndex, -1);
-
-  return chunk.contentMarkdown.slice(markerIndex + marker.length);
-}
-
 test("package overview uses peso units and capacity", () => {
   const [overview] = prepareCatalogKnowledge({
     kind: "package",
@@ -79,7 +71,7 @@ test("package overview uses peso units and capacity", () => {
     sections: [],
   });
 
-  assert.equal(overview?.chunkKey, "overview");
+  assert.equal(overview?.chunkKey, "text");
   assert.match(
     overview?.contentMarkdown ?? "",
     /Price: PHP 12500 per package\./,
@@ -119,58 +111,48 @@ test("service overview distinguishes hourly pricing from included hours and extr
   );
 });
 
-test("Markdown widgets follow section and y/x reading order with exact bounded Unicode slices", () => {
-  const markdown = `🎉`.repeat(6_001) + "\n# Ending";
+test("all sections combine exact Unicode Markdown and linked captions in reading order", () => {
+  const markdown = `🎉`.repeat(6_001) + "\n# Ending  ";
   const input: PrepareCatalogKnowledgeInput = {
     kind: "package",
     record: packageRecord,
     sections: [
       section("Reception", [
-        widget("markdown", "later-row", 0, 4, { markdown: "Later row." }),
-        widget("markdown", "right-column", 8, 0, { markdown: "Right column." }),
-        widget("markdown", "long-copy", 0, 2, { markdown }),
+        widget("markdown", "later", 0, 4, { markdown: "Later row." }),
+        widget("markdown", "right", 8, 0, { markdown: "Right column." }),
+        widget("service", "linked", 0, 0, { caption: "Ask about music." }),
+        widget("markdown", "long", 0, 2, { markdown }),
+        widget("markdown", "tie", 0, 2, { markdown: "Same position." }),
       ]),
       section("Dinner", [
-        widget("markdown", "next-section", 0, 0, { markdown: "Dinner copy." }),
+        widget("markdown", "next", 0, 0, { markdown: "Dinner copy." }),
       ]),
     ],
   };
-
+  const before = structuredClone(input);
   const chunks = prepareCatalogKnowledge(input);
+  assert.deepEqual(input, before);
+  assert.equal(chunks.length, 1);
+  assert.equal(chunks[0]?.chunkKey, "text");
+  assert.equal(chunks[0]?.mediaId, null);
+  const text = chunks[0]?.contentMarkdown ?? "";
+  const parts = [
+    "Section: Reception",
+    "Ask about music.",
+    "Right column.",
+    markdown,
+    "Same position.",
+    "Later row.",
+    "Section: Dinner",
+    "Dinner copy.",
+  ];
+  let position = -1;
 
-  const markdownChunks = chunks.filter((chunk) =>
-    chunk.chunkKey.startsWith("markdown:"),
-  );
-
-  assert.deepEqual(
-    markdownChunks.map((chunk) => chunk.chunkKey),
-    [
-      "markdown:right-column:0",
-      "markdown:long-copy:0",
-      "markdown:long-copy:1",
-      "markdown:later-row:0",
-      "markdown:next-section:0",
-    ],
-  );
-
-  const longChunks = markdownChunks.filter((chunk) =>
-    chunk.chunkKey.startsWith("markdown:long-copy:"),
-  );
-
-  const sourceSlices = longChunks.map(markdownSource);
-  assert.ok(sourceSlices.every((slice) => Array.from(slice).length <= 6_000));
-  assert.equal(sourceSlices.join(""), markdown);
-  assert.match(
-    longChunks[0]?.contentMarkdown ?? "",
-    /Catalog package: Garden celebration/,
-  );
-  assert.match(longChunks[0]?.contentMarkdown ?? "", /Section: Reception/);
-  assert.match(
-    markdownChunks.find((chunk) => chunk.chunkKey === "markdown:next-section:0")
-      ?.contentMarkdown ?? "",
-    /Section: Dinner/,
-  );
-  assert.ok(markdownChunks.every((chunk) => chunk.mediaId === null));
+  for (const part of parts) {
+    const next = text.indexOf(part, position + 1);
+    assert.ok(next > position, `Missing or out of order: ${part.slice(0, 30)}`);
+    position = next;
+  }
 });
 
 test("each sample or uploaded photo keeps its context and media reference while videos are skipped", () => {
@@ -329,12 +311,13 @@ test("linked catalog widgets index captions without copying target details or ph
     ],
   });
 
-  const linked = chunks.filter((chunk) => chunk.chunkKey !== "overview");
-
-  assert.equal(linked.length, 2);
-  assert.match(linked[0].contentMarkdown, /Discuss this package with our team/);
-  assert.match(linked[1].contentMarkdown, /Ask about this service/);
-  assert.ok(linked.every((chunk) => chunk.mediaId === null));
+  assert.equal(chunks.length, 1);
+  assert.equal(chunks[0]?.chunkKey, "text");
+  assert.match(
+    chunks[0]?.contentMarkdown ?? "",
+    /Discuss this package with our team/,
+  );
+  assert.match(chunks[0]?.contentMarkdown ?? "", /Ask about this service/);
   assert.doesNotMatch(
     JSON.stringify(chunks),
     /TARGET NAME|TARGET DESCRIPTION|wedding\.jpg/,

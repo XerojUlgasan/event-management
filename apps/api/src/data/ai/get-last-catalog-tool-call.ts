@@ -44,10 +44,10 @@ export function getLastCatalogToolCallData(
       sql<boolean>`(trigger_message.created_at, trigger_message.id) < (reply.created_at, reply.id)`,
     )
     .where(
-      sql<boolean>`(reply.created_at, reply.id) < (current_message.created_at, current_message.id)`,
+      sql<boolean>`(trigger_message.created_at, trigger_message.id) < (current_message.created_at, current_message.id)`,
     )
-    .orderBy("reply.created_at", "desc")
-    .orderBy("reply.id", "desc")
+    .orderBy("trigger_message.created_at", "desc")
+    .orderBy("trigger_message.id", "desc")
     .orderBy("tool_call.started_at", "desc")
     .orderBy("tool_call.id", "desc")
     .limit(1)

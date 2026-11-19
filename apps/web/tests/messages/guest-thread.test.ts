@@ -4,7 +4,9 @@ import type { GuestThread } from "../../src/lib/data/messages/guest";
 import type { ChatMessage } from "../../src/lib/data/messages/conversations";
 import {
   addGuestSentMessages,
+  acknowledgeGuestSends,
   guestRemaining,
+  guestReservedSends,
   mergeGuestAllowance,
   mergeGuestMessages,
   mergeGuestThread,
@@ -20,6 +22,20 @@ const thread = (ids: string[], cursor: string | null, id = "guest") =>
     nextCursor: cursor,
     guest: { remainingMessages: 1 },
   }) as GuestThread;
+
+test("polling confirms a saved guest message even after its send response is lost", () => {
+  const outbox = {
+    saved: { failed: true, definitelyUnsent: false },
+    pending: { failed: false, definitelyUnsent: false },
+  };
+  assert.deepEqual(acknowledgeGuestSends(outbox, [message("saved")]), {
+    pending: { failed: false, definitelyUnsent: false },
+  });
+  assert.equal(
+    guestReservedSends(acknowledgeGuestSends(outbox, [message("saved")])),
+    1,
+  );
+});
 
 test("send and polling responses do not duplicate the same messages", () => {
   assert.deepEqual(
@@ -79,6 +95,24 @@ test("an uncertain send retries the original request even if the draft changes",
     prepareGuestSend(null, "   ", () => "unused"),
     null,
   );
+});
+
+test("confirmed image rejections release guest slots while uncertain sends remain reserved", () => {
+  const rejected = Object.fromEntries(
+    Array.from({ length: 5 }, (_, index) => [
+      String(index),
+      { definitelyUnsent: true },
+    ]),
+  );
+
+  assert.equal(guestRemaining(5, guestReservedSends(rejected)), 5);
+  const withUncertain = {
+    ...rejected,
+    pending: {},
+    uncertain: { definitelyUnsent: false },
+  };
+  assert.equal(guestRemaining(5, guestReservedSends(withUncertain)), 3);
+  assert.equal(guestRemaining(0, guestReservedSends(rejected)), 0);
 });
 
 test("overlapping guest sends reserve slots and stale responses cannot restore allowance", () => {

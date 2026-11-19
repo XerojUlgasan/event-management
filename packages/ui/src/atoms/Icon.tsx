@@ -44,6 +44,12 @@ const iconPaths = {
     </>
   ),
   spinner: <path d="M12 3a9 9 0 1 0 9 9" />,
+  refresh: (
+    <>
+      <path d="M21 7v5h-5" />
+      <path d="M21 12a9 9 0 1 0-2.64 6.36" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="7" />

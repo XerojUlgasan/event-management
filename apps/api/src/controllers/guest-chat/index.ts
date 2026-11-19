@@ -1,3 +1,7 @@
+import {
+  retryGuestMessageRoute,
+  retryGuestMessageRouteHandler,
+} from "../messages/retry-message-processing.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { jsonError } from "../../utils/service-result.js";
 import { HTTPException } from "hono/http-exception";
@@ -43,7 +47,8 @@ routes.onError((error, c) => {
       error.status,
     );
 
-  if (error instanceof HTTPException) return error.getResponse();
+  if (error instanceof HTTPException)
+    return c.json({ error: error.message }, error.status);
 
   console.error("guest-chat", { outcome: "failed" });
 
@@ -66,5 +71,7 @@ routes.openapi(
 routes.openapi(getGuestConversationRoute, getGuestConversationRouteHandler);
 routes.openapi(sendGuestMessageRoute, sendGuestMessageRouteHandler);
 routes.openapi(claimGuestConversationRoute, claimGuestConversationRouteHandler);
+
+routes.openapi(retryGuestMessageRoute, retryGuestMessageRouteHandler);
 
 export default routes;

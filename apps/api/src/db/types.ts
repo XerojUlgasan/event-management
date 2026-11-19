@@ -26,11 +26,12 @@ export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 export interface AiToolCalls {
   assistant_message_id: string | null;
   completed_at: Timestamp | null;
-  customer_message_id: string;
+  customer_message_id: string | null;
   error_code: string | null;
   id: Generated<string>;
   input: Json;
   output: Json | null;
+  source_message_id: string | null;
   started_at: Generated<Timestamp>;
   status: Generated<string>;
   tool_call_id: string;
@@ -166,6 +167,17 @@ export interface MediaAssets {
   url: string | null;
 }
 
+export interface MessageImages {
+  byte_size: number;
+  content_hash: string;
+  id: Generated<string>;
+  interpretation: Json | null;
+  message_id: string;
+  mime_type: string;
+  position: number;
+  storage_key: string;
+}
+
 export interface Messages {
   body: string;
   conversation_id: string;
@@ -174,6 +186,7 @@ export interface Messages {
   id: Generated<string>;
   quotation_id: string | null;
   read_at: Timestamp | null;
+  reply_to_message_id: string | null;
   sender_id: string | null;
   sender_role: Generated<string>;
 }
@@ -263,6 +276,7 @@ export interface DB {
   guest_chat_identities: GuestChatIdentities;
   guest_message_requests: GuestMessageRequests;
   media_assets: MediaAssets;
+  message_images: MessageImages;
   messages: Messages;
   packages: Packages;
   quotations: Quotations;

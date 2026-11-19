@@ -359,6 +359,17 @@ test("five customer writes and five AI replies are allowed; sixth is readable lo
 
   assert.equal(fifth.guest.loginRequired, true);
   assert.equal(fifth.message.id, requestId);
+  assert.equal(fifth.message.processing, null);
+  assert.equal(
+    (
+      await db
+        .selectFrom("background_jobs")
+        .select("id")
+        .where("dedupe_key", "=", requestId)
+        .execute()
+    ).length,
+    0,
+  );
   assert.equal(model.doGenerateCalls.length, 5);
   const replay = await read(await send(thread, "Question 4", requestId), 201);
   assert.equal(replay.message.id, fifth.message.id);

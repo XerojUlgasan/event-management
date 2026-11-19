@@ -1694,3 +1694,48 @@ textarea.ui-control {
 .ui-catalog-thumbnail > img[hidden] {
   display: none;
 }
+
+.ui-assistant-typing {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+.ui-assistant-typing > span {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.ui-assistant-typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: ui-assistant-dot 1.2s infinite ease-in-out;
+}
+.ui-assistant-typing i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.ui-assistant-typing i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes ui-assistant-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.4;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-assistant-typing i {
+    animation: none;
+  }
+}

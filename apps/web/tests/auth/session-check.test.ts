@@ -39,3 +39,31 @@ test("401 on a data request requests session confirmation, while credential and 
     globalThis.fetch = originalFetch;
   }
 });
+
+test("server failures do not imply a form error and validation details remain visible", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async () => new Response("Starting", { status: 503 });
+    await assert.rejects(
+      request("/messages/conversations"),
+      (error: unknown) =>
+        error instanceof ApiError &&
+        error.message === "Unable to complete the request. Please try again.",
+    );
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          error: { issues: [{ path: ["body"], message: "Required" }] },
+        }),
+        { status: 400 },
+      );
+    await assert.rejects(
+      request("/messages/conversations"),
+      (error: unknown) =>
+        error instanceof ApiError && error.message === "body: Required",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

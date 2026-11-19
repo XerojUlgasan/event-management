@@ -1,3 +1,5 @@
+import messageImageRoutes from "./controllers/message-images/index.js";
+import { messageBodyLimit } from "./constants/http.js";
 import { env } from "./utils/env.js";
 import {
   SMALL_JSON_BODY_LIMIT_BYTES,
@@ -64,11 +66,20 @@ app.use(
   "/v1/admin/ai/knowledge/index",
   bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
 );
-app.use("/v1/guest/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
-app.use("/v1/messages/*", bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }));
-app.use(
-  "/v1/admin/conversations/*",
-  bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
+app.use("/v1/guest/*", (c, next) =>
+  bodyLimit({
+    maxSize: messageBodyLimit(c.req.path, c.req.header("content-type")),
+  })(c, next),
+);
+app.use("/v1/messages/*", (c, next) =>
+  bodyLimit({
+    maxSize: messageBodyLimit(c.req.path, c.req.header("content-type")),
+  })(c, next),
+);
+app.use("/v1/admin/conversations/*", (c, next) =>
+  bodyLimit({
+    maxSize: messageBodyLimit(c.req.path, c.req.header("content-type")),
+  })(c, next),
 );
 
 app.use(
@@ -128,6 +139,7 @@ app.use(
 );
 app.route("/v1", eventDayRoutes);
 app.route("/v1", messageRoutes);
+app.route("/v1", messageImageRoutes);
 app.route("/v1", guestChatRoutes);
 app.route("/v1", authRoutes);
 app.route("/v1", userRoutes);

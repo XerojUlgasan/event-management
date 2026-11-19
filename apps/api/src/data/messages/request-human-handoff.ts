@@ -1,3 +1,7 @@
+import {
+  assertImageMessageJobLeaseData,
+  type ImageMessageJobLease,
+} from "./message-processing.js";
 import { sql, type Kysely } from "kysely";
 import type { AiHandoff } from "@event-management/contracts/ai-handoff";
 import type { DB } from "../../db/types.js";
@@ -14,6 +18,7 @@ export type HumanHandoffScope = {
   guestIdentityId?: string;
   customerMessageId: string;
   aiVersion: number;
+  jobLease?: ImageMessageJobLease;
 };
 
 export const humanHandoffAcknowledgement =
@@ -55,6 +60,9 @@ export function requestHumanHandoffData({
 
     if (conversation.guest_identity_id) assertGuestActive(conversation);
 
+    if (scope.jobLease)
+      await assertImageMessageJobLeaseData(trx, scope.jobLease, abortSignal);
+
     const execution = await trx
       .selectFrom("ai_tool_calls")
       .select("id")
@@ -88,13 +96,24 @@ export function requestHumanHandoffData({
     // A retried invocation of the same customer action reuses its committed reply.
     // The row lock serializes concurrent calls, including different turn IDs.
     const previous = await trx
-      .selectFrom("ai_tool_calls as call")
-      .innerJoin("messages as reply", "reply.id", "call.assistant_message_id")
-      .selectAll("reply")
-      .where("call.customer_message_id", "=", scope.customerMessageId)
-      .where("call.tool_name", "=", "requestHumanHandoff")
-      .where("call.status", "=", "succeeded")
+      .selectFrom("messages")
+      .selectAll()
+      .where("reply_to_message_id", "=", scope.customerMessageId)
       .executeTakeFirst();
+
+    if (previous) {
+      const committedHandoff = await trx
+        .selectFrom("ai_tool_calls")
+        .select("id")
+        .where("customer_message_id", "=", scope.customerMessageId)
+        .where("tool_name", "=", "requestHumanHandoff")
+        .where("status", "=", "succeeded")
+        .where("assistant_message_id", "=", previous.id)
+        .executeTakeFirst();
+
+      if (!committedHandoff)
+        throw new Error("This message already has a reply");
+    }
 
     if (
       !previous &&
@@ -112,6 +131,7 @@ export function requestHumanHandoffData({
           sender_id: null,
           sender_role: "assistant",
           body: humanHandoffAcknowledgement,
+          reply_to_message_id: scope.customerMessageId,
           created_at: sql<Date>`clock_timestamp()`,
         })
         .returningAll()
@@ -132,6 +152,15 @@ export function requestHumanHandoffData({
         .where("id", "=", scope.conversationId)
         .execute();
 
+    await trx
+      .updateTable("guest_message_requests")
+      .set({
+        assistant_message_id: message.id,
+        assistant_error: null,
+        completed: true,
+      })
+      .where("message_id", "=", scope.customerMessageId)
+      .execute();
     await finishToolCallData(trx, {
       id: callId,
       status: "succeeded",

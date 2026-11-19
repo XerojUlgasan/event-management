@@ -1,6 +1,4 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { MAX_CURSOR_LENGTH } from "@event-management/contracts/pagination";
-import { HTTPException } from "hono/http-exception";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { openapiJson } from "../../utils/openapi.js";
 import { jsonError } from "../../utils/service-result.js";
@@ -14,21 +12,16 @@ export const indexPendingRoute = createRoute({
   request: {
     body: {
       required: true,
-      content: openapiJson(
-        z.strictObject({
-          cursor: z.string().min(1).max(MAX_CURSOR_LENGTH).optional(),
-        }),
-      ),
+      content: openapiJson(z.strictObject({})),
     },
   },
   responses: {
-    200: response(
+    202: response(
       z.object({
-        embedded: z.number().int(),
-        unchanged: z.number().int(),
-        superseded: z.number().int(),
-        failed: z.number().int(),
-        nextCursor: z.string().nullable(),
+        pendingListings: z.number().int().nonnegative(),
+        submittedListings: z.number().int().nonnegative(),
+        skippedListings: z.number().int().nonnegative(),
+        failedListings: z.number().int().nonnegative(),
       }),
     ),
     503: { description: "Knowledge indexing is temporarily unavailable" },
@@ -46,16 +39,10 @@ export const indexPendingRouteHandler: AppRouteHandler<
     ]);
 
     return c.json(
-      await indexPendingCatalogKnowledgeService(
-        c.get("db"),
-        c.req.valid("json").cursor,
-        signal,
-      ),
-      200,
+      await indexPendingCatalogKnowledgeService(c.get("db"), signal),
+      202,
     );
-  } catch (error) {
-    if (error instanceof HTTPException && error.status === 400) throw error;
-
+  } catch {
     return jsonError(c, "Knowledge indexing is temporarily unavailable", 503);
   }
 };

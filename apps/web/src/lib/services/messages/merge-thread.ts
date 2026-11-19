@@ -19,6 +19,9 @@ export function mergeAiStateByVersion<T extends ConversationAiState>(
         aiEnabled: current.aiEnabled,
         aiVersion: current.aiVersion,
         aiHandoff: current.aiHandoff,
+        ...("aiReplyPending" in current
+          ? { aiReplyPending: current.aiReplyPending }
+          : {}),
       }
     : next;
 }

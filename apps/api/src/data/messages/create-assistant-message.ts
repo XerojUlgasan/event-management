@@ -1,3 +1,7 @@
+import {
+  assertImageMessageJobLeaseData,
+  type ImageMessageJobLease,
+} from "./message-processing.js";
 import { sql, type Kysely } from "kysely";
 import {
   assertGuestActive,
@@ -14,6 +18,8 @@ export function createAssistantMessageData(
   aiVersion: number,
   guestIdentityId?: string,
   toolTurn?: { turnId: string; customerMessageId: string },
+  jobLease?: ImageMessageJobLease,
+  abortSignal?: AbortSignal,
 ) {
   return db.transaction().execute(async (trx) => {
     const conversation = await trx
@@ -34,6 +40,23 @@ export function createAssistantMessageData(
 
     if (conversation.guest_identity_id) assertGuestActive(conversation);
 
+    if (jobLease)
+      await assertImageMessageJobLeaseData(trx, jobLease, abortSignal);
+
+    abortSignal?.throwIfAborted();
+
+    if (toolTurn) {
+      const previous = await trx
+        .selectFrom("messages")
+        .selectAll()
+        .where("reply_to_message_id", "=", toolTurn.customerMessageId)
+        .where("conversation_id", "=", conversationId)
+        .executeTakeFirst();
+
+      if (previous)
+        return { ...previous, sender_display_name: null, sender_email: null };
+    }
+
     if (!conversation.ai_enabled || conversation.ai_version !== aiVersion)
       return null;
 
@@ -45,9 +68,21 @@ export function createAssistantMessageData(
         sender_id: null,
         sender_role: "assistant",
         body,
+        reply_to_message_id: toolTurn?.customerMessageId ?? null,
       })
       .returningAll()
       .executeTakeFirstOrThrow();
+
+    if (toolTurn)
+      await trx
+        .updateTable("guest_message_requests")
+        .set({
+          assistant_message_id: message.id,
+          assistant_error: null,
+          completed: true,
+        })
+        .where("message_id", "=", toolTurn.customerMessageId)
+        .execute();
 
     if (toolTurn)
       await linkToolCallsToReplyData(trx, {

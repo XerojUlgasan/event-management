@@ -26,10 +26,8 @@ export function searchKnowledge(query: string) {
   });
 }
 
-export function indexPendingKnowledge(cursor?: string) {
-  return request<KnowledgeIndexResponse>("/admin/ai/knowledge/index", {
-    cursor,
-  });
+export function indexPendingKnowledge() {
+  return request<KnowledgeIndexResponse>("/admin/ai/knowledge/index", {});
 }
 
 export function getKnowledgeDetail(kind: string, id: string, cursor?: string) {

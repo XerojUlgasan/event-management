@@ -294,6 +294,25 @@ test("filters before ranking, deduplicates listings, excludes stale and private 
   for (const id of [p.id, low.id, stale.id])
     await index("package", id, vector(1, 0));
 
+  const legacy = await db
+    .insertInto("packages")
+    .values({
+      name: "Legacy",
+      slug: "legacy",
+      description: "garden",
+      max_guests: 60,
+      price: 200,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  await index("package", legacy.id, vector(1, 0));
+  await db
+    .updateTable("catalog_knowledge")
+    .set({ chunk_key: "overview" })
+    .where("package_id", "=", legacy.id)
+    .where("chunk_key", "=", "text")
+    .execute();
+
   await db
     .updateTable("packages")
     .set({ description: "changed" })

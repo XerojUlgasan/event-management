@@ -17,7 +17,7 @@ import {
 import { assessKnowledgeListing } from "../../src/services/ai/catalog-knowledge-status.js";
 
 const chunk = {
-  chunkKey: "overview",
+  chunkKey: "text",
   contentMarkdown: "fixture",
   mediaId: null,
 };
@@ -27,7 +27,7 @@ const owner = { id: "owner", name: "Fixture", kind: "service" as const };
 const hash = catalogKnowledgeSourceHash(chunk.contentMarkdown, undefined);
 
 const ready = {
-  chunk_key: "overview",
+  chunk_key: "text",
   content_markdown: "fixture",
   content_hash: `${hash}:${catalogKnowledgeDigest("fixture")}`,
   media_id: null,
@@ -292,7 +292,7 @@ test("admin endpoints enforce sessions, global summary, filters, scoped paging a
     adminCookie,
   );
   assert.equal(detail.status, 200);
-  assert.equal((await detail.json()).chunks[0].key, "overview");
+  assert.equal((await detail.json()).chunks[0].key, "text");
   assert.deepEqual(
     await db!.selectFrom("catalog_knowledge").selectAll().execute(),
     beforeCount,

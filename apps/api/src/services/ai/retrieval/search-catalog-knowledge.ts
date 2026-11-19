@@ -69,18 +69,29 @@ export async function searchCatalogKnowledgeService(
         vector.model,
       );
 
-      return ranked.rows
-        .flatMap((row) => {
-          const key = row.package_id
-            ? `package:${row.package_id}:${row.chunk_key}`
-            : `service:${row.service_id}:${row.chunk_key}`;
-          const result = eligible.get(key);
+      const results: KnowledgeSearchResult[] = [];
+      const matchedListings = new Set<string>();
 
-          return result && Number.isFinite(row.similarity)
-            ? [{ ...result, similarity: row.similarity }]
-            : [];
-        })
-        .slice(0, KNOWLEDGE_SEARCH_LIMIT);
+      for (const row of ranked.rows) {
+        const listingKey = row.package_id
+          ? `package:${row.package_id}`
+          : `service:${row.service_id}`;
+        const result = eligible.get(`${listingKey}:${row.chunk_key}`);
+
+        if (
+          !result ||
+          !Number.isFinite(row.similarity) ||
+          matchedListings.has(listingKey)
+        )
+          continue;
+
+        matchedListings.add(listingKey);
+        results.push({ ...result, similarity: row.similarity });
+
+        if (results.length === KNOWLEDGE_SEARCH_LIMIT) break;
+      }
+
+      return results;
     });
 
   return { query, model: vector.model, results };

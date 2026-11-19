@@ -1,4 +1,5 @@
 import {
+  AssistantTyping,
   ActionLink,
   Button,
   Icon,
@@ -15,6 +16,7 @@ import {
 import {
   getGuestChat,
   sendGuestMessage,
+  retryGuestMessageProcessing,
   startGuestChat,
   type GuestThread,
 } from "../../../lib/data/messages/guest";
@@ -22,10 +24,22 @@ import { ApiError } from "../../../lib/http/request";
 import {
   addGuestSentMessages,
   guestRemaining,
+  guestReservedSends,
   mergeGuestAllowance,
   mergeGuestThread,
+  acknowledgeGuestSends,
   prepareGuestSend,
 } from "../../../lib/services/messages/guest-thread";
+import {
+  MessageAttachments,
+  MessageImages,
+} from "../../messages/MessageImages";
+import { MessageProcessing } from "../../messages/MessageProcessing";
+import {
+  hasLocalReplyPending,
+  hasObservedReply,
+  reconcilePendingReplies,
+} from "../../../lib/services/messages/pending-replies";
 import { assertCursorMoved } from "../../../lib/services/messages/older-page";
 
 export default function PublicChat() {
@@ -37,14 +51,21 @@ export default function PublicChat() {
       string,
       {
         body: string;
+        files: File[];
         createdAt: string;
         failed: boolean;
+        error?: string;
+        definitelyUnsent?: boolean;
         loginRequired?: boolean;
         expired?: boolean;
       }
     >
   >({});
   const outboxRef = useRef(outbox);
+  const [pendingReplies, setPendingReplies] = useState<
+    Record<string, { conversationId: string; aiVersion: number }>
+  >({});
+  const localFiles = useRef(new Map<string, File[]>());
 
   const updateOutbox = (update: (current: typeof outbox) => typeof outbox) => {
     outboxRef.current = update(outboxRef.current);
@@ -57,6 +78,7 @@ export default function PublicChat() {
   const [expired, setExpired] = useState(false);
   const [admin, setAdmin] = useState(false);
   const [draft, setDraft] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const [newMessages, setNewMessages] = useState(false);
   const messageList = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
@@ -66,6 +88,7 @@ export default function PublicChat() {
   const threadRef = useRef(thread);
   threadRef.current = thread;
   const polling = useRef(false);
+  const successfulPolls = useRef(0);
   const opening = useRef(false);
   const revision = useRef(0);
 
@@ -124,6 +147,7 @@ export default function PublicChat() {
       ) {
         updateOutbox(() => ({}));
         setDraft("");
+        setFiles([]);
       }
 
       if (threadRef.current?.conversation.id === result.conversation.id) {
@@ -178,6 +202,14 @@ export default function PublicChat() {
         const result = await getGuestChat(id);
 
         if (active && started === revision.current) {
+          successfulPolls.current++;
+          setPendingReplies((current) =>
+            reconcilePendingReplies(
+              current,
+              result.conversation,
+              result.messages,
+            ),
+          );
           updateOutbox((current) => {
             const next = { ...current };
             result.messages.forEach((message) => delete next[message.id]);
@@ -202,6 +234,9 @@ export default function PublicChat() {
               },
             };
           });
+          updateOutbox((current) =>
+            acknowledgeGuestSends(current, result.messages),
+          );
           setError("");
         }
       } catch (cause) {
@@ -225,6 +260,13 @@ export default function PublicChat() {
       window.clearInterval(timer);
     };
   }, [open, loading, thread?.conversation.id, expired]);
+  const aiReplyPending =
+    !expired &&
+    thread?.conversation.status === "active" &&
+    !!thread.conversation.aiEnabled &&
+    (!!thread.conversation.aiReplyPending ||
+      hasLocalReplyPending(pendingReplies, thread.conversation));
+
   useLayoutEffect(() => {
     const element = messageList.current;
 
@@ -253,16 +295,27 @@ export default function PublicChat() {
 
     scrollOnOpen.current = false;
     lastMessageId.current = last;
-  }, [open, loading, admin, thread, outbox]);
+  }, [open, loading, admin, thread, outbox, aiReplyPending]);
 
   const deliver = async (
     conversationId: string,
-    item: { body: string; requestId: string; createdAt: string },
+    item: { body: string; files: File[]; requestId: string; createdAt: string },
   ) => {
+    const initial = threadRef.current?.conversation;
+
+    if (initial?.id === conversationId && initial.aiEnabled)
+      setPendingReplies((current) => ({
+        ...current,
+        [item.requestId]: { conversationId, aiVersion: initial.aiVersion },
+      }));
+
+    if (item.files.length) localFiles.current.set(item.requestId, item.files);
+
     updateOutbox((current) => ({
       ...current,
       [item.requestId]: {
         body: item.body,
+        files: item.files,
         createdAt: item.createdAt,
         failed: false,
       },
@@ -274,11 +327,29 @@ export default function PublicChat() {
         conversationId,
         item.body,
         item.requestId,
+        item.files,
       );
+      revision.current++;
       setThread((current) =>
         current && current.conversation.id === conversationId
           ? {
               ...current,
+              conversation: {
+                ...current.conversation,
+                aiReplyPending:
+                  current.conversation.aiReplyPending ||
+                  (current.conversation.aiEnabled &&
+                    current.conversation.aiVersion === initial?.aiVersion &&
+                    !!result.message.processing?.replyPending &&
+                    !hasObservedReply(current.messages, item.requestId) &&
+                    !current.messages.some(
+                      (message) =>
+                        message.id === item.requestId &&
+                        ["completed", "failed", "suppressed"].includes(
+                          message.processing?.status ?? "",
+                        ),
+                    )),
+              },
               guest: {
                 ...result.guest,
                 remainingMessages: mergeGuestAllowance(
@@ -319,8 +390,19 @@ export default function PublicChat() {
               ...current,
               [item.requestId]: {
                 body: item.body,
+                files: item.files,
                 createdAt: item.createdAt,
                 failed: true,
+                definitelyUnsent:
+                  item.files.length > 0 &&
+                  cause instanceof ApiError &&
+                  [400, 413].includes(cause.status),
+                error:
+                  item.files.length &&
+                  cause instanceof ApiError &&
+                  [400, 413].includes(cause.status)
+                    ? cause.message
+                    : undefined,
                 expired: cause instanceof ApiError && cause.status === 410,
                 loginRequired:
                   cause instanceof ApiError &&
@@ -355,13 +437,25 @@ export default function PublicChat() {
         );
         setError("Sign in to continue this conversation.");
       }
+    } finally {
+      setPendingReplies((current) => {
+        const next = { ...current };
+        delete next[item.requestId];
+
+        return next;
+      });
     }
   };
 
   const send = () => {
     const current = threadRef.current;
 
-    const item = prepareGuestSend(null, draft, () => crypto.randomUUID());
+    const item = prepareGuestSend(
+      null,
+      draft,
+      () => crypto.randomUUID(),
+      files,
+    );
 
     if (
       !current ||
@@ -370,15 +464,17 @@ export default function PublicChat() {
       current.guest.loginRequired ||
       guestRemaining(
         current.guest.remainingMessages,
-        Object.keys(outboxRef.current).length,
+        guestReservedSends(outboxRef.current),
       ) === 0
     )
       return;
 
     setDraft("");
+    setFiles([]);
     setError("");
     void deliver(current.conversation.id, {
       ...item,
+      files: item.files ?? [],
       createdAt: new Date().toISOString(),
     });
     draftInput.current?.focus();
@@ -507,6 +603,7 @@ export default function PublicChat() {
                   Object.entries(outbox).map(([id, item]): ChatMessage => ({
                     id,
                     body: item.body,
+                    pendingFiles: item.files,
                     createdAt: item.createdAt,
                     quotationId: null,
                     senderId: null,
@@ -531,6 +628,91 @@ export default function PublicChat() {
                       <div className="public-chat-message-body">
                         <Markdown source={message.body} variant="message" />
                       </div>
+                      <MessageImages
+                        message={{
+                          ...message,
+                          pendingFiles:
+                            message.pendingFiles ??
+                            localFiles.current.get(message.id),
+                        }}
+                      />
+                      <MessageProcessing
+                        message={message}
+                        onRetry={
+                          message.senderRole === "customer"
+                            ? async (messageId) => {
+                                const id = thread.conversation.id;
+                                const aiVersion = thread.conversation.aiVersion;
+                                const pollAtStart = successfulPolls.current;
+                                const result =
+                                  await retryGuestMessageProcessing(
+                                    id,
+                                    messageId,
+                                  );
+                                revision.current++;
+                                setThread((current) =>
+                                  current?.conversation.id === id
+                                    ? {
+                                        ...current,
+                                        conversation: {
+                                          ...current.conversation,
+                                          aiReplyPending:
+                                            current.conversation
+                                              .aiReplyPending ||
+                                            (current.conversation.aiEnabled &&
+                                              current.conversation.aiVersion ===
+                                                aiVersion &&
+                                              !!result.message.processing
+                                                ?.replyPending &&
+                                              !hasObservedReply(
+                                                current.messages,
+                                                messageId,
+                                              ) &&
+                                              !(
+                                                successfulPolls.current >
+                                                  pollAtStart &&
+                                                current.messages.some(
+                                                  (item) =>
+                                                    item.id === messageId &&
+                                                    [
+                                                      "completed",
+                                                      "failed",
+                                                      "suppressed",
+                                                    ].includes(
+                                                      item.processing?.status ??
+                                                        "",
+                                                    ),
+                                                )
+                                              )),
+                                        },
+                                        messages: current.messages.map(
+                                          (item) =>
+                                            item.id === result.message.id &&
+                                            !hasObservedReply(
+                                              current.messages,
+                                              messageId,
+                                            ) &&
+                                            !(
+                                              successfulPolls.current >
+                                                pollAtStart &&
+                                              [
+                                                "completed",
+                                                "failed",
+                                                "suppressed",
+                                              ].includes(
+                                                item.processing?.status ?? "",
+                                              )
+                                            )
+                                              ? result.message
+                                              : item,
+                                        ),
+                                      }
+                                    : current,
+                                );
+                              }
+                            : undefined
+                        }
+                      />
                       {item?.failed && (
                         <div className="message-delivery-error" role="alert">
                           {item.expired ? (
@@ -539,13 +721,14 @@ export default function PublicChat() {
                             "Not sent. Sign in to continue."
                           ) : (
                             <>
-                              Delivery could not be confirmed.{" "}
+                              {item.error || "Delivery could not be confirmed."}{" "}
                               {!expired && (
                                 <Button
                                   variant="link"
                                   onClick={() =>
                                     void deliver(thread.conversation.id, {
                                       body: item.body,
+                                      files: item.files,
                                       requestId: message.id,
                                       createdAt: item.createdAt,
                                     })
@@ -561,6 +744,11 @@ export default function PublicChat() {
                     </div>
                   );
                 })}
+                {aiReplyPending && (
+                  <div className="message bot message-typing">
+                    <AssistantTyping />
+                  </div>
+                )}
                 {thread.guest.loginRequired && !expired && (
                   <div className="chat-signin">
                     <strong>Continue your conversation</strong>
@@ -583,6 +771,7 @@ export default function PublicChat() {
                       updateOutbox(() => ({}));
                       setThread(null);
                       setDraft("");
+                      setFiles([]);
                       void openChat();
                     }}
                   >
@@ -624,6 +813,7 @@ export default function PublicChat() {
                   void send();
                 }}
               >
+                <MessageAttachments files={files} onChange={setFiles} />
                 <Textarea
                   variant="plain"
                   rows={1}
@@ -647,10 +837,10 @@ export default function PublicChat() {
                 <Button
                   type="submit"
                   disabled={
-                    !draft.trim() ||
+                    (!draft.trim() && !files.length) ||
                     guestRemaining(
                       thread.guest.remainingMessages,
-                      Object.keys(outbox).length,
+                      guestReservedSends(outbox),
                     ) === 0
                   }
                   aria-label="Send message"
@@ -666,7 +856,7 @@ export default function PublicChat() {
               <div className="handover">
                 {guestRemaining(
                   thread.guest.remainingMessages,
-                  Object.keys(outbox).length,
+                  guestReservedSends(outbox),
                 )}{" "}
                 guest messages remaining
               </div>

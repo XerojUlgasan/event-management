@@ -14,14 +14,20 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Catalog indexing scheduling](2026-11-19_21-52-00_catalog-index-scheduling.md) | Manual ensure-scheduled queue intent and no duplicate active work / main | complete | Review scoped diff; deploy matching API/frontend together; no schema migration required |
+| [Combined catalog text](2026-11-19_21-19-36_combined-catalog-text.md) | One text entry per listing; separate photos / main | complete | Review scoped diff; rebuild existing text through Index pending with matching worker code |
+| [Unique knowledge search results](2026-11-19_21-13-26_unique-knowledge-search-results.md) | Best eligible chunk per listing before top-five limit / main | complete | Review scoped API/test diff; browser, live provider, and hosted rollout remain separate |
+| [Knowledge background indexing](2026-11-19_20-48-44_knowledge-background-indexing.md) | Pending owner discovery and durable queue submission / main | complete | Review coordinated API/web/worker rollout; live provider and hosted verification remain separate |
+| [Knowledge background indexing spec](2026-11-19_20-43-57_knowledge-background-indexing-spec.md) | Pending owner discovery and queue submission / main | complete | Continued by the implementation run above; original specification evidence retained |
+| [AI typing bubble](2026-11-19_20-06-56_ai-typing-bubble.md) | AI-only conversation waiting / main | complete | Review uncommitted API/UI changes; real provider and rollout remain separate |
+| [Image-only conversation jobs](2026-11-19_19-32-50_image-message-jobs-only.md) | Image jobs and synchronous text replies / main | complete | Review uncommitted refactor; apply queue migration with matching API/worker during authorized rollout |
+| [Local message schema repair](2026-11-19_19-19-19_local-message-schema-repair.md) | Actual local Edge database / main | complete | Reload messages; real image/provider flow remains unverified |
+| [Durable message processing](2026-11-19_18-51-15_durable-message-processing.md) | Background image interpretation and scoped replies / main | complete | Review uncommitted diff; application migration, live provider and hosted rollout remain separate |
 | [Conversation Markdown](2026-11-19_16-31-50_conversation-markdown.md) | Shared catalog/message renderer / main | complete | Review scoped diff; synthetic browser and local checks pass; unrelated structure/design/guidance issues remain |
 | [Catalog background jobs](2026-11-19_15-53-34_catalog-background-jobs.md) | Durable automatic catalog embeddings / main | complete | Review diff; hosted rollout and live provider verification remain separate |
-<<<<<<< Updated upstream
-=======
 | [Automatic image tool tracking](2026-11-19_11-59-15_automatic-image-tool-tracking.md) | Mandatory vision tool execution records / main | complete | Locally verified and migrated; server-side traces, live provider and hosted rollout separate |
 | [Conversation image messages](2026-11-19_11-38-25_conversation-image-messages.md) | Private images and saved vision observations / main | complete | Locally verified; live-model quality and hosted rollout remain separate |
 | [Catalog default thumbnails](2026-11-19_11-18-16_catalog-default-thumbnails.md) | Dedicated thumbnail or shared branded default / main | complete | Review scoped diff; API/catalog/browser checks pass; unrelated workspace check failures and hosted rollout remain separate |
->>>>>>> Stashed changes
 | [AI human handoff](2026-11-19_00-57-12_ai-human-handoff.md) | Latest JSONB, safe mutation and admin indicator / main | complete | Locally verified; live-model evaluation and hosted rollout separate |
 | [Remove mandatory evidence selection](2026-11-19_00-19-05_remove-mandatory-evidence-selection.md) | Optional tool use from the first step / main | complete | Review scoped diff; 62 focused tests, API types, Edge bundle and guidance checks pass; live-model quality remains unverified |
 | [Assistant evidence grounding](2026-11-18_23-41-18_assistant-evidence-grounding.md) | Historical mandatory evidence selection / main | complete | Superseded by removal of the mandatory selector; original test results apply to that earlier implementation |

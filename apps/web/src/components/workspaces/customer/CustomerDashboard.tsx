@@ -1,3 +1,4 @@
+import { ApiError } from "../../../lib/http/request";
 import { navigateWorkspace } from "../../../lib/navigation/workspace-navigation";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import { useEffect, useRef, useState } from "react";
@@ -13,7 +14,6 @@ import {
   Textarea,
   FormField,
   useNotifications,
-  notificationErrorMessage,
 } from "@event-management/ui";
 
 import { photos } from "../../../demo/catalog/photos";
@@ -23,7 +23,13 @@ import { BookingRequestDialog } from "../../booking-requests/BookingRequestDialo
 import { initialsFromName } from "../../../lib/utils/formatting/name";
 import { SignInMethods } from "../../auth/SignInMethods";
 import { useConversationList } from "../../../lib/services/messages/use-conversation-list";
+import {
+  hasLocalReplyPending,
+  hasObservedReply,
+  reconcilePendingReplies,
+} from "../../../lib/services/messages/pending-replies";
 import { assertCursorMoved } from "../../../lib/services/messages/older-page";
+import { conversationLoadError } from "../../../lib/services/messages/load-error";
 import { MessagesWorkspace } from "../../messages/MessagesWorkspace";
 import {
   addSentMessages,
@@ -42,6 +48,7 @@ import {
   getMyConversation,
   getMyConversationById,
   sendMyMessage,
+  retryMyMessageProcessing,
   type ChatMessage,
   type ChatConversation,
   type ChatThread,
@@ -67,6 +74,12 @@ export function CustomerDashboard({
   const { notify, notifyError } = useNotifications();
   const mounted = useRef(true);
   const localMessages = useRef(new Set<string>());
+  const localFiles = useRef(new Map<string, File[]>());
+  const replyRevision = useRef(0);
+  const successfulPolls = useRef(0);
+  const [pendingReplies, setPendingReplies] = useState<
+    Record<string, { conversationId: string; aiVersion: number }>
+  >({});
   useEffect(() => {
     mounted.current = true;
 
@@ -101,7 +114,12 @@ export function CustomerDashboard({
   const [outbox, setOutbox] = useState<
     Record<
       string,
-      { conversationId: string; message: ChatMessage; failed: boolean }
+      {
+        conversationId: string;
+        message: ChatMessage;
+        failed: boolean;
+        error?: string;
+      }
     >
   >({});
   const [dialogError, setDialogError] = useState("");
@@ -244,6 +262,7 @@ export function CustomerDashboard({
     if (tab !== "Messages" || !selectedConversationId) return;
 
     let active = true;
+    let inFlight = false;
     const id = selectedConversationId;
     olderRequest.current++;
     olderPending.current = false;
@@ -255,11 +274,24 @@ export function CustomerDashboard({
     );
 
     const load = async () => {
+      if (inFlight) return;
+
+      inFlight = true;
+      const revision = replyRevision.current;
+
       try {
         const thread = await getMyConversationById(id);
 
-        if (!active) return;
+        if (!active || revision !== replyRevision.current) return;
 
+        successfulPolls.current++;
+        setPendingReplies((current) =>
+          reconcilePendingReplies(
+            current,
+            thread.conversation,
+            thread.messages,
+          ),
+        );
         const unacknowledged = new Set(localMessages.current);
         setOutbox((current) => {
           const next = { ...current };
@@ -287,12 +319,14 @@ export function CustomerDashboard({
       } catch (cause) {
         if (active)
           setThreadError(
-            notificationErrorMessage(
+            conversationLoadError(
               cause,
-              "Unable to load this conversation.",
+              "Unable to load or refresh this conversation. Please try again.",
             ),
           );
       } finally {
+        inFlight = false;
+
         if (active) setThreadLoading(false);
       }
     };
@@ -384,6 +418,18 @@ export function CustomerDashboard({
     conversation: ChatConversation,
     message: ChatMessage,
   ) => {
+    if (conversation.aiEnabled)
+      setPendingReplies((current) => ({
+        ...current,
+        [message.id]: {
+          conversationId: conversation.id,
+          aiVersion: conversation.aiVersion,
+        },
+      }));
+
+    if (message.pendingFiles?.length)
+      localFiles.current.set(message.id, message.pendingFiles);
+
     setOutbox((current) => ({
       ...current,
       [message.id]: { conversationId: conversation.id, message, failed: false },
@@ -395,7 +441,30 @@ export function CustomerDashboard({
         message.body,
         conversation.id,
         message.id,
+        message.pendingFiles ?? [],
       );
+      replyRevision.current++;
+
+      if (result.message.processing?.replyPending)
+        setMessageThread((current) =>
+          current?.conversation.id === conversation.id &&
+          current.conversation.aiEnabled &&
+          current.conversation.aiVersion === conversation.aiVersion &&
+          !hasObservedReply(current.messages, message.id) &&
+          !current.messages.some(
+            (item) =>
+              item.id === message.id &&
+              ["completed", "failed", "suppressed"].includes(
+                item.processing?.status ?? "",
+              ),
+          )
+            ? {
+                ...current,
+                conversation: { ...current.conversation, aiReplyPending: true },
+              }
+            : current,
+        );
+
       const sent = result.assistantMessage
         ? [result.message, result.assistantMessage]
         : [result.message];
@@ -437,26 +506,45 @@ export function CustomerDashboard({
             : current,
         );
       }
-    } catch {
+    } catch (cause) {
+      const error =
+        message.pendingFiles?.length &&
+        cause instanceof ApiError &&
+        [400, 413].includes(cause.status)
+          ? cause.message
+          : undefined;
       setOutbox((current) =>
         current[message.id]
           ? {
               ...current,
-              [message.id]: { ...current[message.id], failed: true },
+              [message.id]: { ...current[message.id], failed: true, error },
             }
           : current,
       );
+    } finally {
+      setPendingReplies((current) => {
+        const next = { ...current };
+        delete next[message.id];
+
+        return next;
+      });
     }
   };
 
-  const sendMessage = async (body: string, thread = messageThread) => {
+  const sendMessage = async (
+    body: string,
+    files: File[] = [],
+    requestId: string = crypto.randomUUID(),
+    thread = messageThread,
+  ) => {
     const conversation = thread?.conversation;
 
     if (!conversation) return;
 
     const message: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: requestId,
       body,
+      pendingFiles: files,
       quotationId: null,
       senderId: conversation.customerId,
       senderRole: "customer",
@@ -513,7 +601,7 @@ export function CustomerDashboard({
       setMessageOpen(false);
       setConversationOpen(true);
       go("Messages");
-      void sendMessage(body, thread);
+      void sendMessage(body, [], crypto.randomUUID(), thread);
     } catch (cause) {
       setDialogError(notifyError(cause, "Unable to open your conversation."));
     } finally {
@@ -723,6 +811,63 @@ export function CustomerDashboard({
             <MessagesWorkspace
               title="Messages"
               viewerRole="customer"
+              localAiReplyPending={
+                !!messageThread &&
+                hasLocalReplyPending(pendingReplies, messageThread.conversation)
+              }
+              localImageFiles={localFiles.current}
+              onRetryProcessing={async (messageId) => {
+                if (!selectedConversationId) return;
+
+                const id = selectedConversationId;
+                const aiVersion = messageThread?.conversation.aiVersion;
+                const pollAtStart = successfulPolls.current;
+                const { message } = await retryMyMessageProcessing(
+                  id,
+                  messageId,
+                );
+                replyRevision.current++;
+                setMessageThread((current) =>
+                  current?.conversation.id === id
+                    ? {
+                        ...current,
+                        conversation: {
+                          ...current.conversation,
+                          aiReplyPending:
+                            current.conversation.aiReplyPending ||
+                            (current.conversation.aiEnabled &&
+                              current.conversation.aiVersion === aiVersion &&
+                              !!message.processing?.replyPending &&
+                              !hasObservedReply(current.messages, messageId) &&
+                              !(
+                                successfulPolls.current > pollAtStart &&
+                                current.messages.some(
+                                  (item) =>
+                                    item.id === messageId &&
+                                    [
+                                      "completed",
+                                      "failed",
+                                      "suppressed",
+                                    ].includes(item.processing?.status ?? ""),
+                                )
+                              )),
+                        },
+                        messages: current.messages.map((item) =>
+                          item.id === message.id &&
+                          !hasObservedReply(current.messages, messageId) &&
+                          !(
+                            successfulPolls.current > pollAtStart &&
+                            ["completed", "failed", "suppressed"].includes(
+                              item.processing?.status ?? "",
+                            )
+                          )
+                            ? message
+                            : item,
+                        ),
+                      }
+                    : current,
+                );
+              }}
               resumeBooking={
                 new URLSearchParams(search).get("createRequest") === "1" &&
                 selectedConversationId === requestedConversation
@@ -801,6 +946,15 @@ export function CustomerDashboard({
                     ),
                 )
                 .map((item) => item.message.id)}
+              failedMessageErrors={Object.fromEntries(
+                Object.entries(outbox)
+                  .filter(
+                    ([, item]) =>
+                      item.conversationId === selectedConversationId &&
+                      item.error,
+                  )
+                  .map(([id, item]) => [id, item.error ?? ""]),
+              )}
               onRetryMessage={(id) => {
                 const item = outbox[id];
                 const conversation = messageThread?.conversation;

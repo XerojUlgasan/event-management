@@ -60,6 +60,37 @@ test("send response deduplicates both messages already received by polling", () 
   assert.equal(result.conversation.lastMessage?.id, "3");
 });
 
+test("an admin retry after polling keeps one image message and the newer latest message", () => {
+  const imageMessage: ChatMessage = {
+    ...datedMessage(2, 2),
+    senderRole: "admin",
+    body: "",
+    images: [
+      {
+        id: "image-1",
+        url: "/v1/message-images/image-1",
+        mimeType: "image/png",
+        byteSize: 1,
+        interpretation: {
+          summary: "Photo",
+          objects: [],
+          colors: [],
+          styles: [],
+          visibleText: null,
+          uncertainty: [],
+        },
+      },
+    ],
+  };
+  const newer = datedMessage(3, 3);
+  const current = datedThread([datedMessage(1, 1), imageMessage, newer]);
+  const result = addSentMessages(current, [imageMessage]);
+  assert.deepEqual(ids(result), [1, 2, 3]);
+  assert.equal(result.messages[1].images?.[0].id, "image-1");
+  assert.equal(result.conversation.lastMessage?.id, "3");
+  assert.equal(result.conversation.updatedAt, newer.createdAt);
+});
+
 test("an older polled thread cannot replace a newer confirmed AI setting", () => {
   const current = {
     ...thread([1, 2], null),

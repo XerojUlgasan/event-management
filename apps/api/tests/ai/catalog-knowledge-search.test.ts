@@ -140,7 +140,7 @@ test("rejects unauthorized and invalid requests before embedding", async () => {
   assert.equal(calls, 0);
 });
 
-test("returns ranked current text and photos while excluding stale, pending, incompatible, withdrawn and archived entries", async () => {
+test("returns the best current chunk while excluding stale, pending, incompatible, withdrawn and archived entries", async () => {
   const photoId = randomUUID(),
     photoWidget = randomUUID(),
     textWidget = randomUUID();
@@ -157,6 +157,7 @@ test("returns ranked current text and photos while excluding stale, pending, inc
       created_by: null,
     })
     .execute();
+
   const canvas = [
     {
       id: randomUUID(),
@@ -175,6 +176,19 @@ test("returns ranked current text and photos while excluding stale, pending, inc
           caption: "",
           autoplay: false,
         },
+        ...Array.from({ length: 5 }, (_, index) => ({
+          id: randomUUID(),
+          type: "photo",
+          x: 0,
+          y: 30 + index * 5,
+          w: 6,
+          h: 5,
+          markdown: "",
+          mediaId: photoId,
+          alt: `Extra flowers ${index}`,
+          caption: "",
+          autoplay: false,
+        })),
         {
           id: textWidget,
           type: "markdown",
@@ -188,9 +202,23 @@ test("returns ranked current text and photos while excluding stale, pending, inc
           caption: "",
           autoplay: false,
         },
+        ...Array.from({ length: 3 }, (_, index) => ({
+          id: randomUUID(),
+          type: "markdown",
+          x: 0,
+          y: 9 + index * 4,
+          w: 12,
+          h: 4,
+          markdown: `More garden text ${index}`,
+          mediaId: null,
+          alt: "",
+          caption: "",
+          autoplay: false,
+        })),
       ],
     },
   ];
+
   const service = await db!
     .insertInto("services")
     .values({
@@ -221,38 +249,51 @@ test("returns ranked current text and photos while excluding stale, pending, inc
       .execute();
     await saveCatalogKnowledgeEmbeddingData(db!, row.id, fullHash, {
       model,
-      embedding: row.chunk_key.startsWith("photo:")
-        ? vector(1, 0)
-        : vector(0.6, 0.8),
+      embedding:
+        row.chunk_key === "text"
+          ? vector(1, 0)
+          : row.chunk_key === `photo:${photoWidget}`
+            ? vector(0.8, 0.6)
+            : vector(0.7, 0.714142842),
     });
   }
 
-  const original = rows.find((r) => r.chunk_key === "overview")!;
+  const original = rows.find((r) => r.chunk_key === "text")!;
 
   await db!
     .updateTable("catalog_knowledge")
     .set({ content_hash: "stale" })
     .where("id", "=", original.id)
     .execute();
-  const withdrawn = await db!
-    .insertInto("catalog_knowledge")
-    .values({
-      service_id: service.id,
-      package_id: null,
-      chunk_key: "withdrawn",
-      content_markdown: "old",
-      content_hash: "old",
-      media_id: null,
-      embedding: null,
-      embedding_model: null,
-      embedded_at: null,
-    })
-    .returning("id")
-    .executeTakeFirstOrThrow();
-  await saveCatalogKnowledgeEmbeddingData(db!, withdrawn.id, "old", {
-    model,
-    embedding: vector(1, 0),
-  });
+
+  for (const chunkKey of [
+    "overview",
+    "overview:1",
+    "markdown:old:0",
+    "service:old",
+    "package:old",
+  ]) {
+    const withdrawn = await db!
+      .insertInto("catalog_knowledge")
+      .values({
+        service_id: service.id,
+        package_id: null,
+        chunk_key: chunkKey,
+        content_markdown: "old",
+        content_hash: "old",
+        media_id: null,
+        embedding: null,
+        embedding_model: null,
+        embedded_at: null,
+      })
+      .returning("id")
+      .executeTakeFirstOrThrow();
+    await saveCatalogKnowledgeEmbeddingData(db!, withdrawn.id, "old", {
+      model,
+      embedding: vector(1, 0),
+    });
+  }
+
   const source = await db!
     .insertInto("packages")
     .values({
@@ -374,10 +415,17 @@ test("returns ranked current text and photos while excluding stale, pending, inc
   assert.equal(result.model, model);
   assert.deepEqual(
     result.results.map((r: { kind: string }) => r.kind),
-    ["photo", "text"],
+    ["photo"],
   );
   assert.equal(result.results[0].mediaUrl, `/v1/catalog-media/${photoId}`);
-  assert.ok(result.results[0].similarity > result.results[1].similarity);
+  assert.equal(result.results[0].key, `photo:${photoWidget}`);
+  await db!
+    .updateTable("catalog_knowledge")
+    .set({
+      content_hash: `${original.content_hash}:${catalogKnowledgeDigest(original.content_markdown)}`,
+    })
+    .where("id", "=", original.id)
+    .execute();
   await db!
     .updateTable("catalog_knowledge")
     .set({ embedding_model: "other" })
@@ -406,13 +454,63 @@ test("maps provider failures to a sanitized 503", async () => {
   process.env.AI_GATEWAY_API_KEY = "fixture-key";
 });
 
-test("caps results after removing stale high-scoring candidates", async () => {
+test("caps unique listings after removing stale high-scoring candidates", async () => {
   providerFail = false;
+  const sharedId = randomUUID();
+  const garden = await db!
+    .selectFrom("services")
+    .select("id")
+    .where("slug", "=", "garden")
+    .executeTakeFirstOrThrow();
+  // The strongest text row is stale; six eligible photos for this owner still
+  // rank above the other listings and must consume only one result slot.
+  await db!
+    .updateTable("catalog_knowledge")
+    .set({ content_hash: "stale" })
+    .where("service_id", "=", garden.id)
+    .where("chunk_key", "=", "text")
+    .execute();
+
+  await db!
+    .updateTable("catalog_knowledge")
+    .set({ embedding_model: model })
+    .where("media_id", "is not", null)
+    .execute();
+  await db!
+    .insertInto("packages")
+    .values({
+      id: sharedId,
+      name: "Shared package",
+      slug: "shared-package",
+      description: "",
+      max_guests: 40,
+      price: 100,
+      package_type: "catalog",
+    })
+    .execute();
+
+  const [packageRow] = await db!
+    .transaction()
+    .execute((trx) =>
+      syncCatalogKnowledge(trx, { kind: "package", id: sharedId }),
+    );
+
+  const packageHash = `${packageRow!.content_hash}:${catalogKnowledgeDigest(packageRow!.content_markdown)}`;
+  await db!
+    .updateTable("catalog_knowledge")
+    .set({ content_hash: packageHash })
+    .where("id", "=", packageRow!.id)
+    .execute();
+  await saveCatalogKnowledgeEmbeddingData(db!, packageRow!.id, packageHash, {
+    model,
+    embedding: vector(0.5, 0.866),
+  });
 
   for (let i = 0; i < 23; i++) {
     const service = await db!
       .insertInto("services")
       .values({
+        ...(i === 0 ? { id: sharedId } : {}),
         name: `Rank ${i}`,
         slug: `rank-${i}`,
         description: "",
@@ -435,19 +533,43 @@ test("caps results after removing stale high-scoring candidates", async () => {
       .execute();
     await saveCatalogKnowledgeEmbeddingData(db!, row!.id, hash, {
       model,
-      embedding: vector(0.1, 0.995),
+      embedding: i === 0 ? vector(0.4, 0.9165) : vector(0.1, 0.995),
     });
   }
+
+  const countBefore = await db!
+    .selectFrom("catalog_knowledge")
+    .select((eb) => eb.fn.countAll().as("count"))
+    .executeTakeFirstOrThrow();
 
   const response = await request({ query: "garden" }, adminCookie);
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.results.length, 5);
-  assert.equal(body.results[0].kind, "text");
-  assert.ok(
-    body.results.every(
-      (item: { listing: { name: string } }) =>
-        item.listing.name === "Garden" || item.listing.name.startsWith("Rank "),
-    ),
+  assert.equal(body.results[0].kind, "photo");
+  assert.equal(body.results[0].listing.name, "Garden");
+  assert.equal(
+    new Set(
+      body.results.map(
+        (item: { listing: { kind: string; id: string } }) =>
+          `${item.listing.kind}:${item.listing.id}`,
+      ),
+    ).size,
+    5,
   );
+  assert.deepEqual(
+    body.results
+      .filter(
+        (item: { listing: { id: string } }) => item.listing.id === sharedId,
+      )
+      .map((item: { listing: { kind: string } }) => item.listing.kind),
+    ["package", "service"],
+  );
+
+  const countAfter = await db!
+    .selectFrom("catalog_knowledge")
+    .select((eb) => eb.fn.countAll().as("count"))
+    .executeTakeFirstOrThrow();
+
+  assert.equal(countAfter.count, countBefore.count);
 });

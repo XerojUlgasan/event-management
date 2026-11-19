@@ -449,39 +449,25 @@ test("seed creates demo users and conversations while preserving unrelated data 
 
     activeListingsWithPhotos++;
 
-    const markdown = knowledge.filter((chunk) =>
-      chunk.chunkKey.startsWith("markdown:"),
-    );
+    const text = knowledge.filter((chunk) => chunk.chunkKey === "text");
 
-    assert.ok(
-      markdown.length >= 5,
-      `${page.key} contributes its introduction and authored sections`,
-    );
+    assert.equal(text.length, 1, `${page.key} has one combined text entry`);
     assert.ok(
       knowledge.some(
         (chunk) => chunk.chunkKey.startsWith("photo:") && chunk.mediaId,
       ),
       `${page.key} contributes photo knowledge`,
     );
-    const widgetBodies = new Map<string, string>();
+    const combined = text[0]?.contentMarkdown ?? "";
 
-    for (const chunk of markdown) {
-      const widgetId = chunk.chunkKey.split(":")[1];
-      assert.ok(widgetId);
-      const marker = "\nMarkdown:\n";
-      const offset = chunk.contentMarkdown.indexOf(marker);
-      assert.ok(offset >= 0);
-      const body = chunk.contentMarkdown.slice(offset + marker.length);
-      widgetBodies.set(widgetId, (widgetBodies.get(widgetId) ?? "") + body);
-    }
+    for (const body of sourceMarkdown)
+      assert.ok(
+        combined.includes(body),
+        `${page.key} indexes complete authored Markdown`,
+      );
 
-    const bodies = [...widgetBodies.values()];
+    const bodies = sourceMarkdown;
     activeMarkdownBodies.push(...bodies);
-    assert.deepEqual(
-      bodies,
-      sourceMarkdown,
-      `${page.key} indexes the complete authored Markdown`,
-    );
     assert.ok(
       new Set(bodies).size >= 2,
       `${page.key} has distinct meaningful copy`,
@@ -848,16 +834,19 @@ test("seed creates demo users and conversations while preserving unrelated data 
       id: sample.id,
     });
     assertNoWidgetOverlaps(sections);
-    assertSubstantialEditorial(sections, sample.name);
+    const sourceMarkdown = assertSubstantialEditorial(sections, sample.name);
     const chunks = prepareCatalogKnowledge({
       kind: "package",
       record: sample,
       sections,
     });
-    assert.ok(
-      chunks.filter((chunk) => chunk.chunkKey.startsWith("markdown:")).length >=
-        5,
-    );
+
+    const text = chunks.filter((chunk) => chunk.chunkKey === "text");
+
+    assert.equal(text.length, 1);
+
+    for (const body of sourceMarkdown)
+      assert.ok(text[0]?.contentMarkdown.includes(body));
 
     const photo = sections
       .flatMap((section) => section.widgets)

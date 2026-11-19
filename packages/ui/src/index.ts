@@ -15,6 +15,7 @@ export { ActionLink } from "./atoms/ActionLink";
 export { SectionCounter } from "./atoms/SectionCounter";
 
 // Molecules
+export { AssistantTyping } from "./molecules/AssistantTyping";
 export { Markdown } from "./molecules/Markdown";
 export { Pagination } from "./molecules/Pagination";
 export type { PaginationProps } from "./molecules/Pagination";

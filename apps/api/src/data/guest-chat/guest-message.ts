@@ -1,3 +1,9 @@
+import { enqueueImageMessageProcessingData } from "../messages/message-processing.js";
+import {
+  insertMessageImagesData,
+  matchingMessageImagesData,
+  type SavedMessageImage,
+} from "../messages/message-images.js";
 import { sql } from "kysely";
 import type { GuestDatabase } from "./guest-conversation.js";
 import { GUEST_CUSTOMER_MESSAGE_LIMIT } from "@event-management/contracts/guest-chat";
@@ -14,6 +20,9 @@ export async function saveGuestMessageData(
   token: string | undefined,
   body: string,
   requestId: string,
+  images: SavedMessageImage[] = [],
+  imageHashes = images.map((image) => image.content_hash),
+  preflight = false,
 ) {
   return db.transaction().execute(async (trx) => {
     const conversation = await lockGuestConversation(trx, id, token);
@@ -29,7 +38,10 @@ export async function saveGuestMessageData(
         .where("m.id", "=", previous.message_id)
         .executeTakeFirstOrThrow();
 
-      if (message.body !== body)
+      if (
+        message.body !== body ||
+        !(await matchingMessageImagesData(trx, message.id, imageHashes))
+      )
         throw new GuestChatError(
           409,
           "Request ID was already used for a different message",
@@ -51,6 +63,19 @@ export async function saveGuestMessageData(
       };
     }
 
+    const foreignRequest = await trx
+      .selectFrom("messages")
+      .select("id")
+      .where("id", "=", requestId)
+      .executeTakeFirst();
+
+    if (foreignRequest)
+      throw new GuestChatError(
+        409,
+        "Request ID was already used for a different message",
+        "request_conflict",
+      );
+
     if (
       conversation.guest_customer_message_count >= GUEST_CUSTOMER_MESSAGE_LIMIT
     )
@@ -59,6 +84,8 @@ export async function saveGuestMessageData(
         "Sign in to continue this conversation",
         "login_required",
       );
+
+    if (preflight) return null;
 
     const message = await trx
       .insertInto("messages")
@@ -82,6 +109,14 @@ export async function saveGuestMessageData(
         "request_conflict",
       );
 
+    await insertMessageImagesData(trx, message.id, id, images);
+    const processing = await enqueueImageMessageProcessingData(
+      trx,
+      message.id,
+      conversation,
+      "customer",
+      images.length > 0,
+    );
     const updated = await trx
       .updateTable("conversations")
       .set({
@@ -107,7 +142,13 @@ export async function saveGuestMessageData(
 
     return {
       conversation: updated,
-      message: { ...message, sender_display_name: null, sender_email: null },
+      message: {
+        ...message,
+        images,
+        processing,
+        sender_display_name: null,
+        sender_email: null,
+      },
       assistantMessage: null,
       assistantError: null,
       replay: false as const,

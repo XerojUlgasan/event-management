@@ -75,7 +75,9 @@ export async function request<T>(
                   `${issue.path?.join(".") || "Field"}: ${issue.message || "invalid value"}`,
               )
               .join("; ")
-          : "Please check the form and try again.",
+          : response.status === 400 || response.status === 422
+            ? "Please check the form and try again."
+            : "Unable to complete the request. Please try again.",
       response.status,
       result.code,
     );

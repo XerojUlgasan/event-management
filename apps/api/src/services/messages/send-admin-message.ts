@@ -1,3 +1,9 @@
+import { serializeMessageRequest } from "./serialize-message-request.js";
+import {
+  prepareMessageImages,
+  cleanupMessageImages,
+  type CheckedMessageImage,
+} from "./prepare-message-images.js";
 import type { AiHandoff } from "@event-management/contracts/ai-handoff";
 import type { Kysely } from "kysely";
 import { GuestChatError } from "../../data/guest-chat/guest-conversation.js";
@@ -18,11 +24,14 @@ export type SendAdminMessageResult =
   | { kind: "not-found" }
   | { kind: "closed" };
 
-export async function sendAdminMessageService(
+async function performSend(
   db: Kysely<DB>,
   id: string,
   senderId: string,
   body: string,
+  requestId?: string,
+  imageFiles: CheckedMessageImage[] = [],
+  abortSignal?: AbortSignal,
 ): Promise<SendAdminMessageResult> {
   const conversation = await findConversationData(db, id);
 
@@ -30,14 +39,39 @@ export async function sendAdminMessageService(
 
   if (conversation.status === "closed") return { kind: "closed" };
 
+  let images: Awaited<ReturnType<typeof prepareMessageImages>> = [];
+
   try {
-    const saved = await createMessageData(
+    const replay = await createMessageData(
       db,
-      conversation.id,
+      id,
       senderId,
       "admin",
       body,
+      requestId,
+      [],
+      imageFiles.map((image) => image.contentHash),
+      true,
     );
+
+    images = replay
+      ? []
+      : await prepareMessageImages(id, imageFiles, abortSignal);
+    const saved =
+      replay ??
+      (await createMessageData(
+        db,
+        conversation.id,
+        senderId,
+        "admin",
+        body,
+        requestId,
+        images,
+      ));
+
+    if (!saved) throw new Error("Message persistence failed");
+
+    if (saved.replayed && images.length) await cleanupMessageImages(images);
 
     return {
       kind: "ok",
@@ -47,6 +81,8 @@ export async function sendAdminMessageService(
       aiHandoff: saved.aiHandoff,
     };
   } catch (error) {
+    await cleanupMessageImages(images);
+
     if (
       error instanceof GuestChatError ||
       (error instanceof Error && error.message === "Conversation is closed")
@@ -58,4 +94,10 @@ export async function sendAdminMessageService(
 
     throw error;
   }
+}
+
+export function sendAdminMessageService(
+  ...args: Parameters<typeof performSend>
+) {
+  return serializeMessageRequest(args[4], () => performSend(...args));
 }

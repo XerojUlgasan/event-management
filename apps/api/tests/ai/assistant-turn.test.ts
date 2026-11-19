@@ -259,6 +259,17 @@ test("concurrent customer retries start only one assistant turn", async () => {
     1,
   );
   assert.equal(model.doGenerateCalls.length, 1);
+  assert.equal(results[0].message.processing, null);
+  assert.equal(
+    (
+      await db
+        .selectFrom("background_jobs")
+        .select("id")
+        .where("dedupe_key", "=", requestId)
+        .execute()
+    ).length,
+    0,
+  );
   const messages = await db
     .selectFrom("messages")
     .select("sender_role")

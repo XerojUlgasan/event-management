@@ -1,3 +1,8 @@
+import {
+  messageImageInterpretationSchema,
+  type MessageProcessing,
+  type MessageImage,
+} from "@event-management/contracts/message-images";
 import { parseAiHandoff } from "../../utils/ai-handoff.js";
 import type {
   ConversationWithCustomer,
@@ -6,8 +11,11 @@ import type {
 
 export type MessageDto = {
   id: string;
+  images: MessageImage[];
+  processing: MessageProcessing | null;
   body: string;
   quotationId: string | null;
+  replyToMessageId: string | null;
   senderId: string | null;
   senderRole: "admin" | "customer" | "assistant";
   senderName: string;
@@ -31,6 +39,7 @@ export type ConversationDto = {
   status: "active" | "closed";
   aiEnabled: boolean;
   aiVersion: number;
+  aiReplyPending: boolean;
   closedAt: string | null;
   lastMessage: MessageDto | null;
   unreadCount: number;
@@ -48,8 +57,29 @@ export function messageDto(row: MessageWithSender): MessageDto {
 
   return {
     id: row.id,
+    processing: row.processing ?? null,
+    images: (row.images ?? []).map((value) => {
+      const image = value as {
+        id: string;
+        mime_type: MessageImage["mimeType"];
+        byte_size: number;
+        interpretation: unknown;
+      };
+
+      return {
+        id: image.id,
+        url: `/v1/message-images/${image.id}`,
+        mimeType: image.mime_type,
+        byteSize: image.byte_size,
+        interpretation:
+          image.interpretation == null
+            ? null
+            : messageImageInterpretationSchema.parse(image.interpretation),
+      };
+    }),
     body: row.body,
     quotationId: row.quotation_id,
+    replyToMessageId: row.reply_to_message_id,
     senderId: row.sender_id,
     senderRole: role,
     senderName:
@@ -89,6 +119,7 @@ export function conversationDto(
     status: row.status as ConversationDto["status"],
     aiEnabled: row.ai_enabled,
     aiVersion: row.ai_version,
+    aiReplyPending: row.ai_reply_pending,
     ...(viewer === "admin"
       ? { aiHandoff: parseAiHandoff(row.ai_handoff) }
       : {}),

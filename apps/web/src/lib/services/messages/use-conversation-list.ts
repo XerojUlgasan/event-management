@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  notificationErrorMessage,
-  useNotifications,
-} from "@event-management/ui";
+import { useNotifications } from "@event-management/ui";
 import type { ChatConversation } from "../../data/messages/conversations";
 import {
   appendConversations,
@@ -11,6 +8,7 @@ import {
   type ConversationLoader,
 } from "./conversation-pages";
 import { assertCursorMoved } from "./older-page";
+import { conversationLoadError } from "./load-error";
 
 type Inbox = {
   conversations: ChatConversation[];
@@ -73,9 +71,9 @@ export function useConversationList(load: ConversationLoader, enabled = true) {
     } catch (cause) {
       if (request !== epoch.current) return;
 
-      const error = notificationErrorMessage(
+      const error = conversationLoadError(
         cause,
-        "Unable to load conversations.",
+        "Unable to load or refresh conversations. Please try again.",
       );
       commit((value) => ({ ...value, error, loading: false }));
 

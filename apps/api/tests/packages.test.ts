@@ -3157,9 +3157,7 @@ test("linked service widgets are validated, hydrated, and protect references", a
     [pkg.id],
   );
 
-  const serviceChunk = chunks.rows.find(
-    (row) => row.chunk_key === `service:${widget.id}`,
-  );
+  const serviceChunk = chunks.rows.find((row) => row.chunk_key === "text");
 
   assert.match(serviceChunk.content_markdown, /Our recommendation/);
   assert.doesNotMatch(serviceChunk.content_markdown, /Forged|Linked service/);

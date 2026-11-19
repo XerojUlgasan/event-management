@@ -1,5 +1,6 @@
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
+import { conversationAiReplyPendingSelection } from "./message-processing.js";
 
 type Database = Kysely<DB>;
 
@@ -19,6 +20,7 @@ export function selectConversationColumnsData(db: Database) {
       "c.status",
       "c.ai_enabled",
       "c.ai_version",
+      conversationAiReplyPendingSelection(),
       "c.ai_handoff",
       "c.closed_at",
       "c.booking_request_id",

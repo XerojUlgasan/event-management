@@ -1,4 +1,5 @@
 import type { GuestThread } from "../../data/messages/guest";
+import { mergeAiStateByVersion } from "./merge-thread";
 import type { ChatMessage } from "../../data/messages/conversations";
 
 export function mergeGuestMessages(
@@ -60,11 +61,20 @@ export function mergeGuestThread(
       current.messages.some((old) => old.id === message.id),
     );
 
+  next = {
+    ...next,
+    conversation: mergeAiStateByVersion(
+      current.conversation,
+      next.conversation,
+    ),
+  };
+
   if (gap) return next;
 
   if (older)
     return {
       ...next,
+      conversation: current.conversation,
       messages: mergeGuestMessages(current.messages, next.messages, true),
       nextCursor: next.nextCursor,
     };
@@ -92,19 +102,45 @@ export function mergeGuestThread(
   };
 }
 
-export type PendingGuestSend = { body: string; requestId: string };
+export type PendingGuestSend = {
+  body: string;
+  requestId: string;
+  files?: File[];
+};
 
 /** An uncertain delivery is retried with the original key and payload. */
 export function prepareGuestSend(
   pending: PendingGuestSend | null,
   draft: string,
   createId: () => string,
+  files: File[] = [],
 ): PendingGuestSend | null {
   if (pending) return pending;
 
   const body = draft.trim();
 
-  return body ? { body, requestId: createId() } : null;
+  return body || files.length
+    ? { body, requestId: createId(), ...(files.length ? { files } : {}) }
+    : null;
+}
+
+/** Only requests that may have been saved reserve the guest allowance. */
+export function guestReservedSends(
+  outbox: Record<string, { definitelyUnsent?: boolean }>,
+) {
+  return Object.values(outbox).filter((item) => !item.definitelyUnsent).length;
+}
+
+/** A polled saved message confirms delivery even when the send response was lost. */
+export function acknowledgeGuestSends<T>(
+  outbox: Record<string, T>,
+  messages: ChatMessage[],
+) {
+  const next = { ...outbox };
+
+  for (const message of messages) delete next[message.id];
+
+  return next;
 }
 
 /** Reserve a slot for each unresolved request until its outcome is known. */

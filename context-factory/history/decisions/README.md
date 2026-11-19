@@ -8,6 +8,8 @@ Preserve historical reasoning. When a decision changes, link a successor and mar
 
 | Record | Status / purpose |
 | --- | --- |
+| [Catalog indexing scheduling](2026-11-19_catalog-index-scheduling.md) | Accepted manual ensure-scheduled no-ops for active jobs; catalog saves retain refresh successors |
+| [Combined catalog text](2026-11-19_combined-catalog-text.md) | Accepted one text entry per package/service across all sections, with only photo widgets indexed separately |
 | [Conversation AI handoff](2026-11-19_conversation-ai-handoff.md) | Accepted latest JSONB reason/summary/pending, atomic acknowledgement, and admin attention indicator |
 | [Model-selected tool use](2026-11-19_model-selected-tool-use.md) | Accepted removal of mandatory evidence selection; the model chooses direct answers or tools |
 | [Assistant evidence grounding](2026-11-18_assistant-evidence-grounding.md) | Superseded by model-selected tool use; historical mandatory-selector rationale |

@@ -11,7 +11,10 @@ import {
   finishJobData,
   heartbeatJobData,
 } from "../src/data/background-jobs/queue.js";
-import { enqueueBackgroundJobService } from "../src/services/background-jobs/enqueue-job.js";
+import {
+  enqueueBackgroundJobService,
+  ensureBackgroundJobScheduledService,
+} from "../src/services/background-jobs/enqueue-job.js";
 import {
   backgroundJobPolicies,
   backgroundJobSettings,
@@ -97,7 +100,7 @@ after(async () => {
 test("defaults, validation, deduplication, and transaction rollback", async () => {
   assert.deepEqual(backgroundJobSettings, {
     pollIntervalMs: 3000,
-    concurrency: 2,
+    concurrency: 3,
     leaseMs: 60000,
     heartbeatMs: 20000,
   });
@@ -124,6 +127,48 @@ test("defaults, validation, deduplication, and transaction rollback", async () =
     }),
   );
   assert.equal((await rows()).length, 1);
+  await clear();
+});
+
+test("ensure scheduling preserves active retries and expired leases, then permits terminal retry", async () => {
+  const payload = pkg();
+
+  const ensure = () =>
+    db
+      .transaction()
+      .execute((trx) =>
+        ensureBackgroundJobScheduledService(trx, "embed_package", payload),
+      );
+
+  assert.deepEqual((await Promise.all([ensure(), ensure()])).sort(), [
+    "already-active",
+    "inserted",
+  ]);
+  const job = await claimJobData(db, 60000, backgroundJobPolicies);
+  assert.ok(job);
+  await finishJobData(db, job, "retry", backgroundJobPolicies);
+  const before = await rows();
+  assert.equal(await ensure(), "already-active");
+  assert.deepEqual(await rows(), before);
+  await due();
+  const expired = await claimJobData(db, 60000, backgroundJobPolicies);
+  assert.ok(expired);
+  await sql`update background_jobs set lease_expires_at = clock_timestamp() - interval '1 second'`.execute(
+    db,
+  );
+  assert.equal(await ensure(), "already-active");
+  assert.equal((await rows()).length, 1);
+  assert.equal(await claimJobData(db, 60000, backgroundJobPolicies), undefined);
+  assert.equal((await rows())[0]?.status, "pending");
+  await due();
+  const final = await claimJobData(db, 60000, backgroundJobPolicies);
+  assert.ok(final);
+  await finishJobData(db, final, "permanent", backgroundJobPolicies);
+  assert.equal(await ensure(), "inserted");
+  assert.deepEqual(
+    (await rows()).map((row) => row.status),
+    ["failed", "pending"],
+  );
   await clear();
 });
 
