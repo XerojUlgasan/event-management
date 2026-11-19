@@ -1,7 +1,9 @@
 import type { Kysely, Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 import { keysetPredicate, utcTimestampSql } from "../../utils/sql-page.js";
+
 type Database = Kysely<DB> | Transaction<DB>;
+
 export function listStatusHistoryData(
   db: Database,
   bookingId: string,
@@ -14,6 +16,7 @@ export function listStatusHistoryData(
       utcTimestampSql("created_at").as("cursor_created_at"),
     )
     .where("booking_request_id", "=", bookingId);
+
   if (input.position)
     query = query.where(
       keysetPredicate(
@@ -24,6 +27,7 @@ export function listStatusHistoryData(
         ">",
       ),
     );
+
   return query
     .orderBy("created_at", "asc")
     .orderBy("id", "asc")

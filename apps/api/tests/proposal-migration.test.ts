@@ -8,14 +8,18 @@ import pg from "pg";
 // Verify this historical migration in isolation, before later migrations remove
 // package_services. Current-schema removal has its own migration regression.
 const migration = "20261111130000_private_packages_quotations";
+
 const database = `proposal_migration_${randomUUID().replaceAll("-", "")}`;
+
 const connection = {
   host: process.env.DB_HOST ?? "localhost",
   port: Number(process.env.DB_PORT ?? 5432),
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
 };
+
 const admin = new pg.Pool({ ...connection, database: process.env.DB_NAME });
+
 let pool: pg.Pool;
 let customer: string, catalog: string, booking: string, conversation: string;
 let quote: string;
@@ -33,6 +37,7 @@ async function snapshot() {
     "messages",
   ];
   const result: Record<string, unknown> = {};
+
   for (const table of tables) {
     const omit =
       table === "packages"
@@ -46,6 +51,7 @@ async function snapshot() {
       )
     ).rows[0].rows;
   }
+
   return result;
 }
 
@@ -53,14 +59,17 @@ before(async () => {
   await admin.query(`CREATE DATABASE "${database}"`);
   pool = new pg.Pool({ ...connection, database });
   const root = new URL("../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((e) => e.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name))) {
     if (entry.name >= migration) break;
+
     await pool.query(
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
   }
+
   customer = (
     await pool.query(
       "INSERT INTO users(email,role,password_hash) VALUES ('migration-customer@example.test','customer','unused-test-identity') RETURNING id",
@@ -360,6 +369,7 @@ test("new tables enable RLS and deny direct client privileges", async () => {
       "SELECT rolname FROM pg_roles WHERE rolname IN ('anon','authenticated')",
     )
   ).rows;
+
   for (const { rolname } of roles) {
     for (const table of tables) {
       assert.equal(

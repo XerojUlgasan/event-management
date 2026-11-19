@@ -32,24 +32,30 @@ import {
 } from "../../lib/services/booking-requests/booking-draft";
 
 const OTHER = "__other__";
+
 const COMMON_EVENT_TYPES: readonly string[] = [
   "Birthday",
   "Wedding",
   "Corporate",
 ];
+
 type Fields = BookingDraftFields;
+
 type Errors = Partial<Record<keyof Fields, string>>;
+
 function validate(fields: Fields, zone: string, requireName = true): Errors {
   const errors: Errors = {};
   const eventType =
     fields.eventType === OTHER
       ? fields.customEventType.trim()
       : fields.eventType.trim();
+
   if (!fields.eventType) errors.eventType = "Choose an event type.";
   else if (!eventType) errors.customEventType = "Enter your event type.";
   else if (eventType.length > MAX_EVENT_TYPE_LENGTH)
     errors[fields.eventType === OTHER ? "customEventType" : "eventType"] =
       `Use ${MAX_EVENT_TYPE_LENGTH} characters or fewer.`;
+
   if (
     fields.dates.length < (fields.durationMode === "multi_day" ? 2 : 1) ||
     (fields.durationMode === "one_day" && fields.dates.length !== 1)
@@ -61,9 +67,12 @@ function validate(fields: Fields, zone: string, requireName = true): Errors {
     )
   )
     errors.dates = "Check the dates below.";
+
   if (requireName && !fields.contactName.trim())
     errors.contactName = "Enter a contact person.";
+
   if (!fields.phoneNumber.trim()) errors.phoneNumber = "Enter a phone number.";
+
   for (const [key, limit] of [
     ["contactName", MAX_CONTACT_NAME_LENGTH],
     ["phoneNumber", MAX_PHONE_NUMBER_LENGTH],
@@ -71,8 +80,10 @@ function validate(fields: Fields, zone: string, requireName = true): Errors {
   ] as const)
     if (fields[key].trim().length > limit)
       errors[key] = `Use ${limit} characters or fewer.`;
+
   return errors;
 }
+
 export function BookingRequestDialog({
   item,
   resume = false,
@@ -88,6 +99,7 @@ export function BookingRequestDialog({
 }) {
   const { notify, notifyError } = useNotifications();
   const saved = resume ? readBookingDraft() : null;
+
   const [fields, setFields] = useState<Fields>(() => {
     const old = saved?.fields;
     const oldType = typeof old?.eventType === "string" ? old.eventType : "";
@@ -96,6 +108,7 @@ export function BookingRequestDialog({
       oldType === OTHER ||
       oldType === "Other" ||
       (!!oldType && !options.includes(oldType));
+
     return {
       eventType: oldType ? (custom ? OTHER : oldType) : "",
       customEventType: custom
@@ -120,6 +133,7 @@ export function BookingRequestDialog({
         typeof old?.specialRequests === "string" ? old.specialRequests : "",
     };
   });
+
   const timeZone =
     saved?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [review, setReview] = useState(!!saved);
@@ -131,7 +145,9 @@ export function BookingRequestDialog({
     "loading" | "customer" | "signed-out" | "admin" | "error"
   >("loading");
   const [busy, setBusy] = useState(false);
+
   const [noteOpen, setNoteOpen] = useState(() => !!fields.specialRequests);
+
   const [error, setError] = useState(
     saved && saved.timeZone !== Intl.DateTimeFormat().resolvedOptions().timeZone
       ? "Your browser time zone changed. Your request still uses the saved time zone; please review your dates."
@@ -148,11 +164,13 @@ export function BookingRequestDialog({
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
     dialog.current?.showModal();
+
     return () => {
       dialog.current?.close();
       trigger?.focus();
     };
   }, []);
+
   const checkAuth = () => {
     setAuth("loading");
     getMe()
@@ -162,8 +180,10 @@ export function BookingRequestDialog({
           currentFields.current.contactName.trim() ||
           (!nameEdited.current ? profile.displayName?.trim() : "") ||
           "";
+
         if (name && !currentFields.current.contactName.trim())
           setFields((current) => ({ ...current, contactName: name }));
+
         if (profile.role === "customer" && !name && resume) {
           setReview(false);
           setError(
@@ -180,24 +200,31 @@ export function BookingRequestDialog({
             ? "signed-out"
             : "error",
         );
+
         if (!(cause instanceof ApiError && cause.status === 401))
           notifyError("Unable to check your session. Try again.");
       });
   };
+
   useEffect(() => {
     checkAuth();
   }, []);
   const errors = validate(fields, timeZone, auth === "customer");
+
   const change = (key: keyof Fields, value: string) => {
     if (key === "contactName") nameEdited.current = true;
+
     setFields((current) => ({ ...current, [key]: value }));
   };
+
   const cancel = () => {
     clearBookingDraft();
     onClose();
   };
+
   const submit = async () => {
     const found = validate(fields, timeZone);
+
     if (Object.keys(found).length) {
       notifyError("Please check the highlighted fields before submitting.");
       setTouched(
@@ -205,10 +232,13 @@ export function BookingRequestDialog({
       );
       setReview(false);
       requestAnimationFrame(() => summary.current?.focus());
+
       return;
     }
+
     setBusy(true);
     setError("");
+
     try {
       const result = await createBookingRequest({
         packageId: item?.id ?? null,
@@ -227,6 +257,7 @@ export function BookingRequestDialog({
           ? { specialRequests: fields.specialRequests.trim() }
           : {}),
       });
+
       clearBookingDraft();
       setReference(result.bookingRequest.reference);
       onSubmitted?.();
@@ -245,8 +276,10 @@ export function BookingRequestDialog({
       setBusy(false);
     }
   };
+
   const next = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
+
     if (auth === "signed-out") {
       if (conversationId) {
         setError(
@@ -254,27 +287,36 @@ export function BookingRequestDialog({
             "Your session ended. Sign in again and reopen this conversation to submit your request.",
           ),
         );
+
         return;
       }
+
       if (!item) return;
+
       saveBookingDraft({ item, fields, timeZone });
       window.location.assign("/login?booking=resume");
+
       return;
     }
+
     const found = validate(fields, timeZone, auth === "customer");
+
     if (Object.keys(found).length) {
       notifyError("Please check the highlighted fields before submitting.");
       setTouched(
         Object.fromEntries(Object.keys(found).map((key) => [key, true])),
       );
       requestAnimationFrame(() => summary.current?.focus());
+
       return;
     }
+
     if (auth === "customer") {
       if (resume) setReview(true);
       else void submit();
     }
   };
+
   const field = (
     key: keyof Fields,
     label: string,
@@ -293,6 +335,7 @@ export function BookingRequestDialog({
       {control}
     </FormField>
   );
+
   const props = (key: Exclude<keyof Fields, "dates" | "durationMode">) => ({
     value: fields[key],
     onChange: (
@@ -302,6 +345,7 @@ export function BookingRequestDialog({
     ) => change(key, e.target.value),
     onBlur: () => setTouched((current) => ({ ...current, [key]: true })),
   });
+
   return createPortal(
     <NativeDialog
       ref={dialog}
@@ -473,10 +517,13 @@ export function BookingRequestDialog({
                         event.target.value === "multi_day"
                           ? "multi_day"
                           : "one_day";
+
                       if (mode === "one_day" && fields.dates.length > 1) {
                         setConfirmOneDay(true);
+
                         return;
                       }
+
                       setConfirmOneDay(false);
                       setFields((current) => ({
                         ...current,

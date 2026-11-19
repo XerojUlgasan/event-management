@@ -20,6 +20,7 @@ export async function bookingRequestDtos(
       ])
     ).map((pkg) => [pkg.id, pkg]),
   );
+
   const schedules = new Map(
     (
       await listRequestedDaySchedulesData(
@@ -28,14 +29,18 @@ export async function bookingRequestDtos(
       )
     ).map((day) => [day.id, day]),
   );
+
   return rows.map((r) => {
     const pkg = r.package_id ? packages.get(r.package_id) : undefined;
+
     if (r.package_id && !pkg)
       throw new Error("Booking request package not found");
+
     const days =
       r.requested_days === null
         ? null
         : requestedDaysSchema.parse(r.requested_days);
+
     return {
       id: r.id,
       reference: r.reference,
@@ -58,6 +63,7 @@ export async function bookingRequestDtos(
             ? schedules.get(day.eventDayId)
             : undefined;
           const visited = new Set<string>();
+
           while (
             schedule?.replacement_event_day_id &&
             !visited.has(schedule.id)
@@ -66,9 +72,12 @@ export async function bookingRequestDtos(
             const replacement = schedules.get(
               schedule.replacement_event_day_id,
             );
+
             if (!replacement || replacement.booking_request_id !== r.id) break;
+
             schedule = replacement;
           }
+
           return {
             ...day,
             operationalSchedule:

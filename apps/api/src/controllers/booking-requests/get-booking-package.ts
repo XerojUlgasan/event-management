@@ -21,6 +21,7 @@ const readResponses = {
   403: errors[403],
   404: errors[404],
 };
+
 export const getMyBookingPackageRoute = createRoute({
   method: "get",
   path: "/booking-requests/{id}/package",
@@ -28,6 +29,7 @@ export const getMyBookingPackageRoute = createRoute({
   request: { params: idParams },
   responses: readResponses,
 });
+
 export const getMyBookingPackageRouteHandler: AppRouteHandler<
   typeof getMyBookingPackageRoute
 > = async (c) => {
@@ -37,10 +39,12 @@ export const getMyBookingPackageRouteHandler: AppRouteHandler<
     c.get("session").user.id,
   );
   c.header("Cache-Control", "private, no-store");
+
   return result
     ? c.json(result, 200)
     : jsonError(c, "Booking request not found", 404);
 };
+
 export const getAdminBookingPackageRoute = createRoute({
   method: "get",
   path: "/admin/booking-requests/{id}/package",
@@ -48,17 +52,21 @@ export const getAdminBookingPackageRoute = createRoute({
   request: { params: idParams },
   responses: readResponses,
 });
+
 export const getAdminBookingPackageRouteHandler: AppRouteHandler<
   typeof getAdminBookingPackageRoute
 > = async (c) => {
   const user = c.get("session").user;
+
   if (user.role !== "admin")
     return jsonError(c, "Booking request not found", 404);
+
   const result = await getBookingPackageService(
     c.get("db"),
     c.req.valid("param").id,
   );
   c.header("Cache-Control", "private, no-store");
+
   return result
     ? c.json(result, 200)
     : jsonError(c, "Booking request not found", 404);

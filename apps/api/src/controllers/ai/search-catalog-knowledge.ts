@@ -48,6 +48,7 @@ export const searchRoute = createRoute({
     ...errors,
   },
 });
+
 export const searchRouteHandler: AppRouteHandler<typeof searchRoute> = async (
   c,
 ) => {
@@ -63,6 +64,7 @@ export const searchRouteHandler: AppRouteHandler<typeof searchRoute> = async (
   } catch (error) {
     if (error instanceof KnowledgeSearchUnavailable)
       return jsonError(c, "Knowledge search is temporarily unavailable", 503);
+
     throw error;
   }
 };

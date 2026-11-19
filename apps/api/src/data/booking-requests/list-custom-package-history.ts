@@ -1,7 +1,9 @@
 import type { Kysely, Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 import { keysetPredicate, utcTimestampSql } from "../../utils/sql-page.js";
+
 type Database = Kysely<DB> | Transaction<DB>;
+
 export const listCustomPackageHistoryData = (
   db: Database,
   bookingId: string,
@@ -19,6 +21,7 @@ export const listCustomPackageHistoryData = (
       "booking.custom_package_created",
       "booking.custom_package_updated",
     ]);
+
   if (input.position)
     query = query.where(
       keysetPredicate(
@@ -29,6 +32,7 @@ export const listCustomPackageHistoryData = (
         "<",
       ),
     );
+
   return query
     .orderBy("created_at", "desc")
     .orderBy("id", "desc")

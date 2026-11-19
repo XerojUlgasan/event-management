@@ -7,6 +7,7 @@ import type {
 } from "../../utils/catalog-pagination.js";
 
 type Database = Kysely<DB> | Transaction<DB>;
+
 export function listPublicPackagesPageData(
   db: Database,
   options: CatalogListOptions,
@@ -20,12 +21,16 @@ export function listPublicPackagesPageData(
       utcTimestampSql("published_at").as("page_sort"),
     );
   query = query.where("archived_at", "is", null);
+
   if (options.minPricePesos !== undefined)
     query = query.where("price", ">=", options.minPricePesos);
+
   if (options.maxPricePesos !== undefined)
     query = query.where("price", "<=", options.maxPricePesos);
+
   if (options.guests !== undefined)
     query = query.where("max_guests", ">=", options.guests);
+
   if (position)
     query = query.where(
       keysetPredicate(
@@ -36,6 +41,7 @@ export function listPublicPackagesPageData(
         "<",
       ),
     );
+
   return query
     .orderBy("published_at", "desc")
     .orderBy("id", "desc")

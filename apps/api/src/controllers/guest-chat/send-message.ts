@@ -36,10 +36,12 @@ export const sendGuestMessageRoute = createRoute({
     ...errors,
   },
 });
+
 export const sendGuestMessageRouteHandler: AppRouteHandler<
   typeof sendGuestMessageRoute
 > = async (c) => {
   const { body, requestId } = c.req.valid("json");
+
   return c.json(
     await sendGuestMessageService(
       c.get("db"),

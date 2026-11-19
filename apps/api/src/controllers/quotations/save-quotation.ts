@@ -5,6 +5,7 @@ import type { AppRouteHandler } from "../../types/hono.js";
 import { body, errors } from "../booking-requests/http.js";
 import { quoteResult } from "./responses.js";
 import { idParams, saveBody } from "./schemas.js";
+
 export const saveQuotationRoute = createRoute({
   method: "patch",
   path: "/admin/quotations/{id}",
@@ -12,6 +13,7 @@ export const saveQuotationRoute = createRoute({
   request: { params: idParams, body: body(saveBody) },
   responses: { 200: quoteResult, ...errors },
 });
+
 export const saveQuotationRouteHandler: AppRouteHandler<
   typeof saveQuotationRoute
 > = async (c) => {
@@ -23,6 +25,7 @@ export const saveQuotationRouteHandler: AppRouteHandler<
     input.expectedUpdatedAt,
     input.items,
   );
+
   return "message" in r
     ? jsonError(c, r.message, r.status)
     : c.json({ quotation: r }, 200);

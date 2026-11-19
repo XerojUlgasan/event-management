@@ -44,14 +44,18 @@ export const registerUserRouteHandler: AppRouteHandler<
     password,
     displayName,
   );
+
   if (result.kind === "rate-limited")
     return jsonError(c, "Too many attempts. Try again in 15 minutes.", 429);
+
   if (result.kind === "conflict")
     return jsonError(
       c,
       "An account already uses this email. Sign in with its existing method.",
       409,
     );
+
   await startSessionService(c, result.row.id);
+
   return c.json(toProfile(result.row), 201);
 };

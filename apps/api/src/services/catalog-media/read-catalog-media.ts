@@ -18,8 +18,11 @@ export async function readCatalogMediaService(
     return await getCatalogMedia(key, range, signal);
   } catch (cause) {
     if (!(cause instanceof CatalogMediaNotFound)) throw cause;
+
     const current = await findCatalogMediaData(db, id);
+
     if (!current?.storage_key || current.storage_key === key) throw cause;
+
     return getCatalogMedia(current.storage_key, range, signal);
   }
 }

@@ -8,8 +8,10 @@ import {
 
 export function OperationsPage() {
   const { notify } = useNotifications();
+
   const unavailable = () =>
     notify("Demo only: this action is unavailable.", "info");
+
   return (
     <div className="content-stack">
       <div className="breadcrumb">

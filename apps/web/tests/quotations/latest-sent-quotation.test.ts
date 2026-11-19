@@ -39,11 +39,13 @@ const page = (quotations: Quotation[], nextCursor: string | null = null) => ({
 test("admin lookup skips a newer unsent draft and returns the newest sent version", async () => {
   const sent = quotation(2, "sent", "2090-02-02T00:00:00.000Z");
   const calls: unknown[][] = [];
+
   const result = await findLatestSentQuotation(
     "booking-1",
     true,
     async (...args) => {
       calls.push(args);
+
       return page([
         quotation(3, "draft", null),
         sent,
@@ -58,6 +60,7 @@ test("admin lookup skips a newer unsent draft and returns the newest sent versio
 
 test("a superseded sent quotation remains eligible even when a newer draft exists", async () => {
   const sent = quotation(2, "superseded", "2090-02-02T00:00:00.000Z");
+
   const result = await findLatestSentQuotation("booking-1", false, async () =>
     page([quotation(3, "draft", null), sent]),
   );
@@ -73,14 +76,17 @@ test("lookup follows cursors, including after an empty page, with booking and ro
     page([], "cursor-sent"),
     page([sent]),
   ];
+
   const result = await findLatestSentQuotation(
     "booking-1",
     false,
     async (...args) => {
       calls.push(args);
       const nextPage = pages.shift();
+
       if (!nextPage)
         throw new Error("loader should only be called for available pages");
+
       return nextPage;
     },
   );
@@ -98,10 +104,13 @@ test("returns null when every page has no sent quotation", async () => {
     page([quotation(2, "draft", null)], "next"),
     page([quotation(1, "draft", null)]),
   ];
+
   const result = await findLatestSentQuotation("booking-1", true, async () => {
     const nextPage = pages.shift();
+
     if (!nextPage)
       throw new Error("loader should only be called for available pages");
+
     return nextPage;
   });
 
@@ -120,6 +129,7 @@ test("propagates page loading errors", async () => {
 
 test("skips superseded versions that were never sent", async () => {
   const accepted = quotation(1, "accepted", "2090-01-01T00:00:00.000Z");
+
   const result = await findLatestSentQuotation("booking-1", true, async () =>
     page([
       quotation(3, "draft", null),
@@ -127,6 +137,7 @@ test("skips superseded versions that were never sent", async () => {
       accepted,
     ]),
   );
+
   assert.equal(result, accepted);
 });
 

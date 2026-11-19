@@ -20,19 +20,23 @@ test("removal preserves account/history/task data, revokes obsolete access, and 
   };
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
+
   try {
     await admin.query(`CREATE DATABASE "${database}"`);
     pool = new Pool({ ...connection, database });
     const root = new URL("../prisma/migrations/", import.meta.url);
+
     const entries = (await readdir(root, { withFileTypes: true }))
       .filter((e) => e.isDirectory())
       .sort((a, b) => a.name.localeCompare(b.name));
+
     for (const entry of entries.filter(
       (e) => e.name < "20261114000000_drop_venues",
     ))
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );
+
     const users = await pool.query<{
       id: string;
       email: string;
@@ -43,16 +47,21 @@ test("removal preserves account/history/task data, revokes obsolete access, and 
       ('null-title@example.test','admin',NULL,'unused'),
       ('case-title@example.test','admin','system administrator','unused'),
       ('customer@example.test','customer',NULL,'unused') RETURNING id,email`);
+
     const id = (email: string) => {
       const user = users.rows.find((row) => row.email === email);
+
       assert.ok(user);
+
       return user.id;
     };
+
     for (const user of users.rows)
       await pool.query(
         "INSERT INTO sessions(user_id,token_hash,expires_at) VALUES($1,$2,now()+interval '1 day')",
         [user.id, randomUUID()],
       );
+
     const pkg = (
       await pool.query(
         "INSERT INTO packages(name,slug,max_guests,price) VALUES('Retained package','retained-package',100,1000) RETURNING id",
@@ -82,6 +91,7 @@ test("removal preserves account/history/task data, revokes obsolete access, and 
       "INSERT INTO catalog_pages(package_id,service_id,venue_id) VALUES($1,NULL,NULL),(NULL,$2,NULL),(NULL,NULL,$3) RETURNING id,venue_id",
       [pkg, service, venue],
     );
+
     for (const page of pages.rows) {
       const section = (
         await pool.query(
@@ -93,12 +103,14 @@ test("removal preserves account/history/task data, revokes obsolete access, and 
         "INSERT INTO catalog_widgets(section_id,type,sort_order,x,y,w,h,media_id) VALUES($1,'photo',0,0,0,6,6,$2)",
         [section, media],
       );
+
       if (page.venue_id)
         await pool.query(
           "INSERT INTO catalog_widgets(section_id,type,sort_order,x,y,w,h,media_id) VALUES($1,'photo',1,6,0,6,6,$2)",
           [section, exclusiveMedia],
         );
     }
+
     const booking = (
       await pool.query(
         `INSERT INTO booking_requests(reference,customer_id,package_id,package_name,package_price,package_max_guests,event_type,preferred_date,time_zone,contact_name,phone_number,out_of_range,status)
@@ -149,6 +161,7 @@ test("removal preserves account/history/task data, revokes obsolete access, and 
       "INSERT INTO booking_request_status_history(booking_request_id,status,changed_by) VALUES($1,'accepted',$2)",
       [booking, id("staff@example.test")],
     );
+
     for (const entry of entries.filter(
       (e) =>
         e.name >= "20261114000000_drop_venues" &&
@@ -157,15 +170,18 @@ test("removal preserves account/history/task data, revokes obsolete access, and 
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );
+
     const roles = await pool.query(
       "SELECT email,role FROM users ORDER BY email",
     );
     assert.equal(roles.rowCount, users.rowCount);
+
     for (const row of roles.rows)
       assert.equal(
         row.role,
         row.email === "designated@example.test" ? "admin" : "customer",
       );
+
     assert.deepEqual(
       (
         await pool.query(

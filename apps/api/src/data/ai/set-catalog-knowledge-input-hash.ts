@@ -17,5 +17,6 @@ export async function setCatalogKnowledgeInputHashData(
     .where("id", "=", id)
     .where("content_hash", "=", expectedHash)
     .executeTakeFirst();
+
   return result.numUpdatedRows === 1n;
 }

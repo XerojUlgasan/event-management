@@ -18,7 +18,9 @@ export async function createQuotationMessageData(
     .where("booking_request_id", "=", bookingId)
     .forUpdate()
     .executeTakeFirst();
+
   if (!conversation || conversation.status !== "active") return false;
+
   const message = await trx
     .insertInto("messages")
     .values({
@@ -46,5 +48,6 @@ export async function createQuotationMessageData(
     })
     .where("id", "=", conversation.id)
     .execute();
+
   return true;
 }

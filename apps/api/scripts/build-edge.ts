@@ -20,6 +20,7 @@ const apiRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
+
 const outdir = path.resolve(apiRoot, "../supabase/functions/api/_generated");
 
 const result = await build({
@@ -46,10 +47,12 @@ const result = await build({
           { filter: /sample-catalog-photos\.ts$/ },
           async () => {
             const photos: Record<string, string> = {};
+
             for (const url of sampleCatalogPhotoPaths)
               photos[url] = (
                 await readFile(path.resolve(apiRoot, `../web/public${url}`))
               ).toString("base64");
+
             return {
               contents: `const photos = ${JSON.stringify(photos)};
 export const sampleCatalogPhotoPaths = Object.keys(photos);
@@ -84,6 +87,7 @@ export async function readSampleCatalogPhoto(url) {
 });
 
 const metafile = result.metafile;
+
 if (!metafile) throw new Error("esbuild did not return a metafile");
 
 const expected = new Set(
@@ -109,12 +113,16 @@ async function removeStaleOutput(directory: string, keep: Set<string>) {
     withFileTypes: true,
   }).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return [];
+
     throw error;
   });
+
   const files = entries.filter((entry) => entry.isFile());
+
   await Promise.all(
     files.map(async (entry) => {
       const file = path.join(entry.parentPath, entry.name);
+
       if (!keep.has(path.normalize(file))) await rm(file);
     }),
   );
@@ -133,18 +141,21 @@ async function hideBundledPaths(directory: string) {
       .map(async (entry) => {
         const file = path.join(entry.parentPath, entry.name);
         const source = await readFile(file, "utf8");
+
         const next = source.replaceAll(
           /(?:\.\.\/)+node_modules\/[^\s"'`]+/g,
           (specifier) => {
             return `bundled_${createHash("sha256").update(specifier).digest("hex").slice(0, 12)}`;
           },
         );
+
         const withRequire = next.includes("Dynamic require of")
           ? `import { createRequire as __createEdgeRequire } from "node:module";\n${next.replace(
               /var __require = \/\* @__PURE__ \*\/ \(\(x\) => typeof require !== "undefined" \? require : typeof Proxy !== "undefined" \? new Proxy\(x, \{\n  get: \(a, b\) => \(typeof require !== "undefined" \? require : a\)\[b\]\n\}\) : x\)\(function\(x\) \{\n  if \(typeof require !== "undefined"\) return require\.apply\(this, arguments\);\n  throw Error\('Dynamic require of "' \+ x \+ '" is not supported'\);\n\}\);/,
               "var __require = __createEdgeRequire(import.meta.url);",
             )}`
           : next;
+
         if (withRequire !== source) await writeFile(file, withRequire);
       }),
   );
@@ -179,7 +190,9 @@ globalThis.process = process;
         const specifier = file.includes(`${path.sep}chunks${path.sep}`)
           ? "../node-globals.js"
           : "./node-globals.js";
+
         if (source.startsWith(`import "${specifier}";`)) return;
+
         await writeFile(file, `import "${specifier}";\n${source}`);
       }),
   );
@@ -187,14 +200,19 @@ globalThis.process = process;
 
 async function assertEntrySplits(entryFile: string, meta: Metafile) {
   const source = await readFile(entryFile, "utf8");
+
   if (/\bfrom\s+["'][^"']*controllers\//.test(source)) {
     throw new Error("Generated app.js statically imports a route controller");
   }
+
   if (!source.includes("import("))
     throw new Error("Generated app.js has no dynamic route import");
+
   const chunks = outputFiles(path.join(outdir, "chunks"), meta);
+
   if (chunks.length === 0)
     throw new Error("esbuild did not emit reusable chunks");
+
   console.log(
     `Edge bundle: ${path.relative(apiRoot, entryFile)} and ${chunks.length} chunks`,
   );

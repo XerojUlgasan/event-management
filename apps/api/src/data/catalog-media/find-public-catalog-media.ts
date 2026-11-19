@@ -2,6 +2,7 @@ import { sql } from "kysely";
 import { catalogOwnerContainsMedia } from "./canvas-reference.js";
 import type { Kysely, Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
+
 type Database = Kysely<DB> | Transaction<DB>;
 
 export const findPublicCatalogMediaData = (db: Database, id: string) =>

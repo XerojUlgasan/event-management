@@ -29,6 +29,7 @@ async function initialize() {
 
   if (env.FIREBASE_AUTH_EMULATOR_HOST && projectId) {
     initializeApp({ projectId });
+
     return;
   }
 
@@ -37,6 +38,7 @@ async function initialize() {
       credential: cert({ projectId, clientEmail, privateKey }),
       projectId,
     });
+
     return;
   }
 
@@ -63,6 +65,7 @@ async function initialize() {
       }),
       projectId: serviceAccount.project_id ?? projectId,
     });
+
     return;
   }
 
@@ -71,6 +74,7 @@ async function initialize() {
       credential: applicationDefault(),
       ...(projectId ? { projectId } : {}),
     });
+
     return;
   }
 

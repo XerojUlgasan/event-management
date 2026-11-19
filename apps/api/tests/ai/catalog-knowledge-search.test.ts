@@ -15,6 +15,7 @@ import { syncCatalogKnowledge } from "../../src/services/ai/workflows/sync-catal
 import { saveCatalogKnowledgeEmbeddingData } from "../../src/data/ai/save-catalog-knowledge-embedding.js";
 
 const database = `em_knowledge_search_${randomUUID().replaceAll("-", "")}`;
+
 const originalFetch = globalThis.fetch;
 const originalKey = process.env.AI_GATEWAY_API_KEY;
 const originalModel = process.env.EMBEDDING_MODEL;
@@ -26,7 +27,9 @@ let adminCookie: string;
 let customerCookie: string;
 let calls = 0;
 let providerFail = false;
+
 const vector = (x: number, y: number) => [x, y, ...Array(766).fill(0)];
+
 before(async () => {
   process.env.AI_GATEWAY_API_KEY = "fixture-key";
   process.env.EMBEDDING_MODEL = model;
@@ -36,6 +39,7 @@ before(async () => {
       "task: search result | query: garden",
     ]);
     assert.ok(init?.signal);
+
     return providerFail
       ? new Response("failure", { status: 503 })
       : new Response(
@@ -56,12 +60,14 @@ before(async () => {
   const pool = new Pool({ ...connection, database });
   db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
   const root = new URL("../../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name)))
     await pool.query(
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
+
   async function session(role: string) {
     const token = randomUUID();
     const user = await db!
@@ -81,6 +87,7 @@ before(async () => {
         expires_at: new Date(Date.now() + 3600000),
       })
       .execute();
+
     return `em_session=${token}`;
   }
   adminCookie = await session("admin");
@@ -94,16 +101,21 @@ before(async () => {
 });
 after(async () => {
   globalThis.fetch = originalFetch;
+
   if (originalKey === undefined) delete process.env.AI_GATEWAY_API_KEY;
   else process.env.AI_GATEWAY_API_KEY = originalKey;
+
   if (originalModel === undefined) delete process.env.EMBEDDING_MODEL;
   else process.env.EMBEDDING_MODEL = originalModel;
+
   await db?.destroy();
+
   if (admin) {
     await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await admin.end();
   }
 });
+
 const request = (body: unknown, cookie?: string) =>
   app.request("/v1/admin/ai/knowledge/search", {
     method: "POST",
@@ -190,11 +202,13 @@ test("returns ranked current text and photos while excluding stale, pending, inc
     })
     .returning("id")
     .executeTakeFirstOrThrow();
+
   const rows = await db!
     .transaction()
     .execute((trx) =>
       syncCatalogKnowledge(trx, { kind: "service", id: service.id }),
     );
+
   for (const row of rows) {
     const digest = row.media_id
       ? "a".repeat(64)
@@ -212,7 +226,9 @@ test("returns ranked current text and photos while excluding stale, pending, inc
         : vector(0.6, 0.8),
     });
   }
+
   const original = rows.find((r) => r.chunk_key === "overview")!;
+
   await db!
     .updateTable("catalog_knowledge")
     .set({ content_hash: "stale" })
@@ -328,11 +344,13 @@ test("returns ranked current text and photos while excluding stale, pending, inc
     })
     .returning("id")
     .executeTakeFirstOrThrow();
+
   const archivedRows = await db!
     .transaction()
     .execute((trx) =>
       syncCatalogKnowledge(trx, { kind: "service", id: archived.id }),
     );
+
   const a = archivedRows[0]!;
   const ah = `${a.content_hash}:${catalogKnowledgeDigest(a.content_markdown)}`;
   await db!
@@ -390,6 +408,7 @@ test("maps provider failures to a sanitized 503", async () => {
 
 test("caps results after removing stale high-scoring candidates", async () => {
   providerFail = false;
+
   for (let i = 0; i < 23; i++) {
     const service = await db!
       .insertInto("services")
@@ -401,11 +420,13 @@ test("caps results after removing stale high-scoring candidates", async () => {
       })
       .returning("id")
       .executeTakeFirstOrThrow();
+
     const [row] = await db!
       .transaction()
       .execute((trx) =>
         syncCatalogKnowledge(trx, { kind: "service", id: service.id }),
       );
+
     const hash = `${row!.content_hash}:${catalogKnowledgeDigest(row!.content_markdown)}`;
     await db!
       .updateTable("catalog_knowledge")
@@ -417,6 +438,7 @@ test("caps results after removing stale high-scoring candidates", async () => {
       embedding: vector(0.1, 0.995),
     });
   }
+
   const response = await request({ query: "garden" }, adminCookie);
   assert.equal(response.status, 200);
   const body = await response.json();

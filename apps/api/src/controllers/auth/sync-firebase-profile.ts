@@ -60,6 +60,7 @@ export const syncFirebaseProfileRouteHandler: AppRouteHandler<
     c.get("firebase"),
     c.req.valid("json").displayName,
   );
+
   if (result.kind === "missing-email") {
     return jsonError(
       c,
@@ -78,5 +79,6 @@ export const syncFirebaseProfileRouteHandler: AppRouteHandler<
 
   // The app profile and role belong to our database, including after linking.
   await startSessionService(c, result.row.id);
+
   return c.json(toProfile(result.row), 200);
 };

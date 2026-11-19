@@ -29,6 +29,7 @@ const responses = {
   403: errors[403],
   404: errors[404],
 };
+
 export const getMyStatusHistoryRoute = createRoute({
   method: "get",
   path: "/booking-requests/{id}/status-history",
@@ -36,6 +37,7 @@ export const getMyStatusHistoryRoute = createRoute({
   request: { params: idParams, query: paginationQuerySchema },
   responses,
 });
+
 export const getMyStatusHistoryRouteHandler: AppRouteHandler<
   typeof getMyStatusHistoryRoute
 > = async (c) => {
@@ -45,10 +47,14 @@ export const getMyStatusHistoryRouteHandler: AppRouteHandler<
     c.req.valid("query"),
     c.get("session").user.id,
   );
+
   if (!result) return jsonError(c, "Booking request not found", 404);
+
   c.header("Cache-Control", "private, no-store");
+
   return c.json(result, 200);
 };
+
 export const getAdminStatusHistoryRoute = createRoute({
   method: "get",
   path: "/admin/booking-requests/{id}/status-history",
@@ -56,6 +62,7 @@ export const getAdminStatusHistoryRoute = createRoute({
   request: { params: idParams, query: paginationQuerySchema },
   responses,
 });
+
 export const getAdminStatusHistoryRouteHandler: AppRouteHandler<
   typeof getAdminStatusHistoryRoute
 > = async (c) => {
@@ -64,7 +71,10 @@ export const getAdminStatusHistoryRouteHandler: AppRouteHandler<
     c.req.valid("param").id,
     c.req.valid("query"),
   );
+
   if (!result) return jsonError(c, "Booking request not found", 404);
+
   c.header("Cache-Control", "private, no-store");
+
   return c.json(result, 200);
 };

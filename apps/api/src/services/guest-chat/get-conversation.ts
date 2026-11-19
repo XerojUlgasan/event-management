@@ -16,6 +16,7 @@ export function getGuestChatService(
   return db.transaction().execute(async (trx) => {
     const conversation = await lockGuestConversation(trx, id, token);
     const row = await findConversationData(trx, id);
+
     return {
       ...(await getConversationThreadService(
         trx,

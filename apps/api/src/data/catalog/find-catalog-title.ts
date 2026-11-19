@@ -13,8 +13,11 @@ export function findCatalogTitleData(
     .where(
       sql<SqlBool>`(lower(name) = ${title.name.toLowerCase()} or slug = ${title.slug})`,
     );
+
   if (table === "packages")
     query = query.where(sql<SqlBool>`package_type = 'catalog'`);
+
   if (exceptId) query = query.where("id", "!=", exceptId);
+
   return query.executeTakeFirst();
 }

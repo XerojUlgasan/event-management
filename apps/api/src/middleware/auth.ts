@@ -14,6 +14,7 @@ export const requireFirebaseAuth = createMiddleware<HonoEnv>(
     }
 
     let auth;
+
     try {
       auth = await getFirebaseAuth();
     } catch (error) {
@@ -53,18 +54,22 @@ export const requireSession = createMiddleware<HonoEnv>(async (c, next) => {
   }
 
   const result = await resolveSessionService(c.get("db"), token);
+
   if (result.kind === "not-found") {
     clearSessionCookie(c);
+
     return c.json({ error: "Session not found" }, 401);
   }
 
   if (result.kind === "expired") {
     clearSessionCookie(c);
+
     return c.json({ error: "Session expired" }, 401);
   }
 
   if (result.kind === "user-not-found") {
     clearSessionCookie(c);
+
     return c.json({ error: "Session user not found" }, 401);
   }
 
@@ -76,7 +81,9 @@ export const requireSession = createMiddleware<HonoEnv>(async (c, next) => {
 // Administrative privileges come from the saved account role.
 export const requireSystemAdmin = createMiddleware<HonoEnv>(async (c, next) => {
   const user = c.get("session").user;
+
   if (user.role !== "admin")
     return c.json({ error: "Admin access required" }, 403);
+
   await next();
 });

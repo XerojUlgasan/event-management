@@ -68,6 +68,7 @@ function markdownSource(chunk: { contentMarkdown: string }) {
   const marker = "\nMarkdown:\n";
   const markerIndex = chunk.contentMarkdown.indexOf(marker);
   assert.notEqual(markerIndex, -1);
+
   return chunk.contentMarkdown.slice(markerIndex + marker.length);
 }
 
@@ -136,9 +137,11 @@ test("Markdown widgets follow section and y/x reading order with exact bounded U
   };
 
   const chunks = prepareCatalogKnowledge(input);
+
   const markdownChunks = chunks.filter((chunk) =>
     chunk.chunkKey.startsWith("markdown:"),
   );
+
   assert.deepEqual(
     markdownChunks.map((chunk) => chunk.chunkKey),
     [
@@ -153,6 +156,7 @@ test("Markdown widgets follow section and y/x reading order with exact bounded U
   const longChunks = markdownChunks.filter((chunk) =>
     chunk.chunkKey.startsWith("markdown:long-copy:"),
   );
+
   const sourceSlices = longChunks.map(markdownSource);
   assert.ok(sourceSlices.every((slice) => Array.from(slice).length <= 6_000));
   assert.equal(sourceSlices.join(""), markdown);
@@ -209,6 +213,7 @@ test("each sample or uploaded photo keeps its context and media reference while 
       ]),
     ],
   });
+
   const photos = chunks.filter((chunk) => chunk.chunkKey.startsWith("photo:"));
 
   assert.deepEqual(
@@ -323,7 +328,9 @@ test("linked catalog widgets index captions without copying target details or ph
       ]),
     ],
   });
+
   const linked = chunks.filter((chunk) => chunk.chunkKey !== "overview");
+
   assert.equal(linked.length, 2);
   assert.match(linked[0].contentMarkdown, /Discuss this package with our team/);
   assert.match(linked[1].contentMarkdown, /Ask about this service/);

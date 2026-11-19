@@ -5,10 +5,13 @@ import { lockPackageData } from "../../data/packages/lock-package.js";
 import { packageDto } from "./package-response.js";
 import { error, nextUpdate } from "./package-rules.js";
 import { deleteCatalogKnowledgeData } from "../../data/ai/delete-catalog-knowledge.js";
+
 export async function archivePackageService(db: Kysely<DB>, id: string) {
   return db.transaction().execute(async (trx) => {
     const current = await lockPackageData(trx, id);
+
     if (!current) return error("Package not found", 404);
+
     const row = await archivePackageData(
       trx,
       id,
@@ -16,6 +19,7 @@ export async function archivePackageService(db: Kysely<DB>, id: string) {
       nextUpdate(current.updated_at),
     );
     await deleteCatalogKnowledgeData(trx, { kind: "package", id });
+
     return packageDto(trx, row);
   });
 }

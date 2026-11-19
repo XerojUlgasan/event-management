@@ -22,11 +22,14 @@ export function createRequestHumanHandoffTool(
     execute: async (input, { toolCallId, abortSignal }) => {
       if (options.isHandoffCommitted?.())
         throw new Error("This conversation has already been handed off");
+
       if (options.canRecord && !options.canRecord()) {
         options.onPersistenceFailure();
         throw new Error("The handoff call budget was exceeded");
       }
+
       let call;
+
       try {
         call = await startToolCallData(options.db, {
           turnId: options.turnId,
@@ -39,9 +42,11 @@ export function createRequestHumanHandoffTool(
         options.onPersistenceFailure();
         throw new Error("Handoff tracking is unavailable");
       }
+
       try {
         if (options.canExecute && !options.canExecute())
           throw new Error("Handoff call limit reached");
+
         const message = await requestHumanHandoffService({
           db: options.db,
           scope: options.handoffScope,
@@ -51,6 +56,7 @@ export function createRequestHumanHandoffTool(
           abortSignal,
         });
         options.onHandoffCommitted?.(message);
+
         return { status: "handed_off" as const };
       } catch {
         try {
@@ -62,6 +68,7 @@ export function createRequestHumanHandoffTool(
         } catch {
           options.onPersistenceFailure();
         }
+
         throw new Error(
           "The handoff could not be completed. Do not claim it succeeded.",
         );

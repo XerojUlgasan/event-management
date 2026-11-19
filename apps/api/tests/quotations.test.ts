@@ -7,6 +7,7 @@ import { Pool } from "pg";
 import { hashSessionToken } from "../src/utils/session.js";
 
 const database = `em_quote_test_${randomUUID().replaceAll("-", "")}`;
+
 let app: typeof import("../src/app.js").app;
 let db: typeof import("../src/db/client.js").db;
 let adminPool: Pool;
@@ -36,12 +37,14 @@ before(async () => {
   await adminPool.query(`CREATE DATABASE "${database}"`);
   pool = new Pool({ ...connection, database });
   const root = new URL("../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((e) => e.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name)))
     await pool.query(
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
+
   process.env.DB_NAME = database;
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
@@ -65,6 +68,7 @@ before(async () => {
         expires_at: new Date(Date.now() + 3600000),
       })
       .execute();
+
     return { cookie: `em_session=${token}`, id: user.id };
   }
   adminCookie = (await session("admin")).cookie;
@@ -89,6 +93,7 @@ before(async () => {
 after(async () => {
   await db?.destroy();
   await pool?.end();
+
   if (adminPool) {
     try {
       await adminPool.query(`DROP DATABASE IF EXISTS "${database}"`);
@@ -97,6 +102,7 @@ after(async () => {
     }
   }
 });
+
 function call(
   path: string,
   method = "GET",
@@ -112,10 +118,13 @@ function call(
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 }
+
 async function read(response: Response, status: number): Promise<any> {
   assert.equal(response.status, status, await response.clone().text());
+
   return response.json();
 }
+
 async function booking(selectedPackageId: string | null = packageId) {
   const id = randomUUID();
   await db
@@ -141,6 +150,7 @@ async function booking(selectedPackageId: string | null = packageId) {
     .insertInto("conversations")
     .values({ booking_request_id: id, customer_id: customerId })
     .execute();
+
   return (
     await read(
       await call(`/booking-requests/${id}`, "GET", undefined, customerCookie),
@@ -148,6 +158,7 @@ async function booking(selectedPackageId: string | null = packageId) {
     )
   ).bookingRequest;
 }
+
 async function create(b: any) {
   return (
     await read(
@@ -288,6 +299,7 @@ test("quotation delivery, ownership, removed customer actions and admin revision
     .selectAll()
     .where("entity_type", "=", "quotation")
     .execute();
+
   for (const action of ["accept", "revision"]) {
     assert.equal(
       (
@@ -301,6 +313,7 @@ test("quotation delivery, ownership, removed customer actions and admin revision
       404,
     );
   }
+
   assert.equal(
     (
       await call(
@@ -429,6 +442,7 @@ test("old active booking conversations receive exact quotation versions", async 
       .set({ created_at: old })
       .where("id", "=", conversation.id)
       .execute();
+
     if (pastEnd) {
       await db
         .updateTable("booking_requests")
@@ -436,6 +450,7 @@ test("old active booking conversations receive exact quotation versions", async 
         .where("id", "=", b.id)
         .execute();
     }
+
     let q = await create(b);
     q = (
       await read(
@@ -716,6 +731,7 @@ test("message failure rolls back send status, message and audit", async () => {
   await pool.query(
     "CREATE TRIGGER reject_quote_test BEFORE INSERT ON messages FOR EACH ROW EXECUTE FUNCTION reject_quote_test()",
   );
+
   try {
     assert.equal(
       (
@@ -849,6 +865,7 @@ test("package and service changes preserve quoted amounts; revisions use the cur
   assert.equal(q.totalAmountMinor, 80000);
   assert.deepEqual(q.items, items);
   assert.equal(q.offeredPackageId, pkg.id);
+
   for (const field of [
     "offeredPackageUpdatedAt",
     "offeredPackageTerms",
@@ -1302,6 +1319,7 @@ test("quotation delivery clears pending handoff only on a successful committed a
   await pool.query(
     "CREATE TRIGGER reject_handoff_quote_test BEFORE INSERT ON messages FOR EACH ROW EXECUTE FUNCTION reject_handoff_quote_test()",
   );
+
   try {
     assert.equal(
       (
@@ -1321,6 +1339,7 @@ test("quotation delivery clears pending handoff only on a successful committed a
     await pool.query("DROP TRIGGER reject_handoff_quote_test ON messages");
     await pool.query("DROP FUNCTION reject_handoff_quote_test()");
   }
+
   assert.equal(
     (
       await call(`/admin/quotations/${q.id}/send`, "POST", {

@@ -12,6 +12,7 @@ export const bookingStatusLabels: Record<BookingStatus, string> = {
 
 export function bookingDateTime(value: string | null, timeZone: string) {
   if (!value) return "To be confirmed";
+
   try {
     return formatEnPhDateTime(new Date(value), timeZone);
   } catch {
@@ -21,7 +22,9 @@ export function bookingDateTime(value: string | null, timeZone: string) {
 
 export function bookingDate(value: string | null) {
   if (!value) return "To be confirmed";
+
   const date = new Date(`${value}T00:00:00Z`);
+
   return Number.isNaN(date.getTime())
     ? "To be confirmed"
     : formatEnPhDate(date, "UTC");

@@ -16,6 +16,7 @@ export const createBookingCustomPackageRoute = createRoute({
   },
   responses: saveResponses,
 });
+
 export const createBookingCustomPackageRouteHandler: AppRouteHandler<
   typeof createBookingCustomPackageRoute
 > = async (c) => {
@@ -26,6 +27,7 @@ export const createBookingCustomPackageRouteHandler: AppRouteHandler<
     c.req.valid("json"),
     true,
   );
+
   return "status" in result
     ? jsonError(c, result.message, result.status)
     : c.json(result, 200);

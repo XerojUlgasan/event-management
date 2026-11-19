@@ -10,6 +10,7 @@ import { threadSchema } from "../src/controllers/messages/schemas.js";
 import { hashSessionToken } from "../src/utils/session.js";
 
 const database = `em_guest_test_${randomUUID().replaceAll("-", "")}`;
+
 const modelId = "fixture/text-model";
 let admin: Pool;
 let pool: Pool;
@@ -56,6 +57,7 @@ before(async () => {
   await admin.query(`CREATE DATABASE "${database}"`);
   pool = new Pool({ ...connection, database });
   const root = new URL("../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name))) {
@@ -63,6 +65,7 @@ before(async () => {
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
   }
+
   process.env.DB_NAME = database;
   process.env.AI_GATEWAY_API_KEY = "fixture-key";
   process.env.TEXT_MODEL = modelId;
@@ -88,6 +91,7 @@ before(async () => {
         expires_at: new Date(Date.now() + 3600000),
       })
       .execute();
+
     return { id: user.id, cookie: `em_session=${token}` };
   }
   customer = await session("customer");
@@ -111,6 +115,7 @@ after(async () => {
   delete globalThis.AI_SDK_DEFAULT_PROVIDER;
   await db?.destroy();
   await pool?.end();
+
   if (admin) {
     // Let closing pool sockets finish instead of force-terminating them after end().
     await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
@@ -132,16 +137,20 @@ function call(path: string, cookie: string, body?: unknown) {
 async function read(response: Response, status: number) {
   const value: any = await response.json();
   assert.equal(response.status, status, JSON.stringify(value));
+
   return value;
 }
+
 async function guest(cookie = "") {
   const response = await call("/guest/conversation", cookie, {});
   const value = await read(response, 200);
+
   return {
     ...value,
     cookie: response.headers.get("set-cookie")!.split(";")[0],
   };
 }
+
 function send(
   thread: any,
   body = "Hello",
@@ -154,6 +163,7 @@ function send(
     { body, requestId },
   );
 }
+
 async function expired(thread: any) {
   await db
     .updateTable("conversations")
@@ -169,9 +179,11 @@ test("bootstrap issues opaque httponly cookies, rejects caller-chosen identities
   assert.equal(first.conversation.customerEmail, null);
   assert.equal(first.conversation.customerName, "Guest");
   threadSchema.parse(first);
+
   const results = await Promise.all(
     Array.from({ length: 8 }, () => guest(first.cookie)),
   );
+
   assert.ok(
     results.every((result) => result.conversation.id === first.conversation.id),
   );
@@ -195,7 +207,9 @@ test("guest catalog calls are persisted under the guest message and replay does 
   const generate = model.doGenerate.bind(model);
   model.doGenerate = async (...args) => {
     const result = await generate(...args);
+
     if (model.doGenerateCalls.length !== 1) return result;
+
     return {
       ...result,
       content: [
@@ -249,7 +263,9 @@ test("guests receive public catalog details as Markdown with owned audit records
   const generate = model.doGenerate.bind(model);
   model.doGenerate = async (...args) => {
     const result = await generate(...args);
+
     if (model.doGenerateCalls.length !== 1) return result;
+
     return {
       ...result,
       content: [
@@ -270,14 +286,20 @@ test("guests receive public catalog details as Markdown with owned audit records
     201,
   );
   assert.ok(result.assistantMessage);
+
   const toolMessage = model.doGenerateCalls[1].prompt.find(
     (message) => message.role === "tool",
   );
+
   assert.ok(toolMessage);
+
   const part = toolMessage.content.find((item) => item.type === "tool-result");
+
   assert.ok(part && part.type === "tool-result");
   assert.equal(part.output.type, "text");
+
   if (part.output.type !== "text") throw new Error("Expected Markdown detail");
+
   assert.match(part.output.value, /PHP 1000 per package/);
   const record = await db
     .selectFrom("ai_tool_calls")
@@ -316,6 +338,7 @@ test("five customer writes and five AI replies are allowed; sixth is readable lo
   const thread = await guest();
   let fifth: any;
   const requestId = randomUUID();
+
   for (let index = 0; index < 5; index++) {
     const result = await read(
       await send(
@@ -333,6 +356,7 @@ test("five customer writes and five AI replies are allowed; sixth is readable lo
     );
     fifth = result;
   }
+
   assert.equal(fifth.guest.loginRequired, true);
   assert.equal(fifth.message.id, requestId);
   assert.equal(model.doGenerateCalls.length, 5);
@@ -372,21 +396,26 @@ test("quota races serialize and concurrent request replays create one history en
   useReply("Race reply");
   const thread = await guest();
   const requestId = randomUUID();
+
   const duplicates = await Promise.all(
     Array.from({ length: 5 }, () => send(thread, "Same request", requestId)),
   );
+
   const values = await Promise.all(
     duplicates.map((response) => read(response, 201)),
   );
+
   assert.equal(new Set(values.map((value) => value.message.id)).size, 1);
   assert.equal(values[0].message.id, requestId);
   assert.ok(values.every((value) => value.guest.customerMessageCount === 1));
   assert.equal(model.doGenerateCalls.length, 1);
+
   const responses = await Promise.all(
     Array.from({ length: 8 }, (_, index) =>
       send(thread, `Concurrent ${index}`),
     ),
   );
+
   assert.equal(
     responses.filter((response) => response.status === 201).length,
     4,
@@ -617,9 +646,11 @@ test("reads and AI preferences do not extend inactivity; messages from customer,
   assert.notEqual(replacement.conversation.id, id);
   assert.equal(replacement.guest.remainingMessages, 5);
   assert.equal(replacement.cookie, thread.cookie);
+
   const replacements = await Promise.all(
     Array.from({ length: 6 }, () => guest(thread.cookie)),
   );
+
   assert.ok(
     replacements.every(
       (value) => value.conversation.id === replacement.conversation.id,
@@ -635,9 +666,11 @@ test("admin inbox includes guests without fabricated email and normal admin resp
     await call("/admin/conversations?limit=50", team.cookie),
     200,
   );
+
   const entry = list.conversations.find(
     (value: any) => value.id === thread.conversation.id,
   );
+
   assert.equal(entry.customerName, "Guest");
   assert.equal(entry.customerEmail, null);
   const result = await read(
@@ -664,13 +697,16 @@ test("claim requires both cookies, preserves IDs/history/provenance, revokes gue
   await read(await call(path, thread.cookie, {}), 401);
   await read(await call(path, customer.cookie, {}), 404);
   await read(await call(path, `${team.cookie}; ${thread.cookie}`, {}), 403);
+
   const claims = await Promise.all(
     Array.from({ length: 4 }, () =>
       call(path, `${customer.cookie}; ${thread.cookie}`, {}),
     ),
   );
+
   for (const response of claims)
     assert.equal((await read(response, 200)).conversationId, id);
+
   await read(await call(path, `${other.cookie}; ${thread.cookie}`, {}), 404);
   await read(await call(`/guest/conversations/${id}`, thread.cookie), 404);
   await read(await send(thread), 404);
@@ -696,11 +732,13 @@ test("claim requires both cookies, preserves IDs/history/provenance, revokes gue
 test("claim races choose one account; expired chats cannot be claimed", async () => {
   const thread = await guest();
   const path = `/guest/conversations/${thread.conversation.id}/claim`;
+
   const results = await Promise.all(
     [customer, other].map((account) =>
       call(path, `${account.cookie}; ${thread.cookie}`, {}),
     ),
   );
+
   assert.deepEqual(
     results.map((response) => response.status).sort(),
     [200, 404],
@@ -725,12 +763,15 @@ test("claim races choose one account; expired chats cannot be claimed", async ()
 test("in-flight guest AI remains guest-scoped after claim; takeover suppresses it and pending replay never duplicates calls", async () => {
   let release!: () => void;
   let entered!: () => void;
+
   const enteredPromise = new Promise<void>((resolve) => {
     entered = resolve;
   });
+
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
+
   useReply("unused");
   let calls = 0;
   let capturedPrompt: unknown;
@@ -741,6 +782,7 @@ test("in-flight guest AI remains guest-scoped after claim; takeover suppresses i
     capturedTools = options.tools;
     entered();
     await held;
+
     return {
       content: [{ type: "text", text: "Delayed guest reply" }],
       finishReason: { unified: "stop", raw: undefined },
@@ -792,17 +834,21 @@ test("guest takeover invalidates a delayed AI reply through an off/on cycle with
   let release!: () => void;
   let entered!: () => void;
   let calls = 0;
+
   const started = new Promise<void>((resolve) => {
     entered = resolve;
   });
+
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
+
   useReply("unused");
   model.doGenerate = async () => {
     calls++;
     entered();
     await held;
+
     return {
       content: [{ type: "text", text: "Must not appear" }],
       finishReason: { unified: "stop", raw: undefined },
@@ -908,6 +954,7 @@ test("guest database invariants reject ambiguous ownership, over-quota counts an
     ).rows[0].count,
     0,
   );
+
   for (const { rolname } of (
     await pool.query(
       "SELECT rolname FROM pg_roles WHERE rolname IN ('anon','authenticated')",
@@ -996,9 +1043,12 @@ function useHandoff(beforeTool?: () => Promise<void>) {
   const generate = model.doGenerate.bind(model);
   model.doGenerate = async (...args) => {
     const result = await generate(...args);
+
     if (model.doGenerateCalls.length !== 1)
       throw new Error("Generation continued after handoff");
+
     await beforeTool?.();
+
     return {
       ...result,
       content: [
@@ -1135,6 +1185,7 @@ test("validation, foreign cookie isolation, body caps, OpenAPI and Edge route re
     413,
   );
   const spec: any = await (await app.request("/openapi.json")).json();
+
   for (const [path, method] of [
     ["/v1/guest/conversation", "post"],
     ["/v1/guest/conversations/{id}", "get"],
@@ -1142,6 +1193,7 @@ test("validation, foreign cookie isolation, body caps, OpenAPI and Edge route re
     ["/v1/guest/conversations/{id}/claim", "post"],
   ])
     assert.ok(spec.paths[path][method]);
+
   const { matchRouteFamily } = await import("../src/edge/match-route.js");
   assert.equal(matchRouteFamily("/v1/guest/conversation"), "guest-chat");
   const edge = (await import("../src/edge/server.js")).app;

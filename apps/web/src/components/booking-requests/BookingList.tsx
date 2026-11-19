@@ -66,23 +66,27 @@ export function BookingList(props: {
 }) {
   return props.admin ? <AdminBookingList /> : <BookingCards {...props} />;
 }
+
 function requestedSummary(item: BookingRequest) {
   return item.requestedDays
     ? `${preferredDateLabel(item.requestedDays[0]?.date ?? null)}${item.requestedDays.length > 1 ? ` + ${item.requestedDays.length - 1} more` : ""}`
     : preferredDateLabel(item.preferredDate);
 }
+
 function OperationalSchedule({
   day,
 }: {
   day: NonNullable<BookingRequest["requestedDays"]>[number];
 }) {
   const schedule = day.operationalSchedule;
+
   if (!schedule)
     return (
       <span>
         {day.eventDayId ? "Operational schedule unavailable" : "Not scheduled"}
       </span>
     );
+
   const moved = schedule.id !== day.eventDayId;
   const status =
     schedule.status === "cancelled"
@@ -90,6 +94,7 @@ function OperationalSchedule({
       : schedule.status === "scheduled"
         ? "Scheduled"
         : schedule.status;
+
   return (
     <span>
       {moved ? `Moved · ${status}` : status}: {preferredDateLabel(schedule.day)}{" "}
@@ -98,6 +103,7 @@ function OperationalSchedule({
     </span>
   );
 }
+
 function BookingCards({
   onExplore,
   onOpenChat,
@@ -116,28 +122,40 @@ function BookingCards({
   const [cancelError, setCancelError] = useState("");
   const [busy, setBusy] = useState("");
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+
   const [now, setNow] = useState(() => new Date());
+
   useEffect(() => {
     mounted.current = true;
+
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
+
     return () => {
       mounted.current = false;
       generation.bump();
       window.clearInterval(timer);
     };
   }, []);
+
   const load = useCallback(
     async (cursor?: string) => {
       const current = generation.bump();
+
       if (cursor) setLoadingMore(true);
       else setLoading(true);
+
       setError("");
+
       try {
         const result = await getMyBookingRequests(cursor);
+
         if (!mounted.current || !generation.isCurrent(current)) return;
+
         setItems((rows) => {
           if (!cursor) return result.bookingRequests;
+
           const ids = new Set(rows.map((row) => row.id));
+
           return [
             ...rows,
             ...result.bookingRequests.filter((row) => !ids.has(row.id)),
@@ -156,9 +174,11 @@ function BookingCards({
     },
     [notifyError],
   );
+
   useEffect(() => {
     void load();
   }, [load]);
+
   const saveItem = (updated: BookingRequest) => {
     setSelected((current) =>
       current?.id === updated.id
@@ -171,12 +191,16 @@ function BookingCards({
       ),
     );
   };
+
   const cancel = async (id: string, reason: string) => {
     setBusy(id);
     setCancelError("");
+
     try {
       const result = await cancelMyBookingRequest(id, reason.trim());
+
       if (!mounted.current) return;
+
       saveItem(result.bookingRequest);
       notify("Booking request cancelled.");
     } catch (cause) {
@@ -186,6 +210,7 @@ function BookingCards({
       if (mounted.current) setBusy("");
     }
   };
+
   return (
     <div className="customer-events-page">
       <PageHeader
@@ -314,6 +339,7 @@ function BookingCards({
     </div>
   );
 }
+
 function CancelForm({
   item,
   busy,
@@ -325,6 +351,7 @@ function CancelForm({
 }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
+
   if (!open)
     return (
       <div className="booking-cancel">
@@ -333,11 +360,13 @@ function CancelForm({
         </Button>
       </div>
     );
+
   return (
     <form
       className="booking-cancel-confirm"
       onSubmit={(event) => {
         event.preventDefault();
+
         if (reason.trim()) void onCancel(item.id, reason);
       }}
     >
@@ -378,15 +407,19 @@ function CancelForm({
 
 const dateKey = (year: number, month: number, day: number) =>
   `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
 const shortDate = (value: string) => formatEnPhDate(new Date(value));
 
 function AdminBookingList() {
   const { notifyError } = useNotifications();
   const [status, setStatus] = useState<BookingStatus | "all">("all");
+
   const [month, setMonth] = useState(() => {
     const now = new Date();
+
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+
   const [day, setDay] = useState<string | undefined>();
   const [items, setItems] = useState<BookingRequest[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -432,6 +465,7 @@ function AdminBookingList() {
       .finally(() => {
         if (active && currentScope.current === requestKey) setLoading(false);
       });
+
     return () => {
       active = false;
     };
@@ -461,10 +495,12 @@ function AdminBookingList() {
       .finally(() => {
         if (active) setCalendarLoading(false);
       });
+
     return () => {
       active = false;
     };
   }, [monthKey, statusFilter, revision, notifyError]);
+
   return (
     <div className="booking-admin">
       <PageHeader
@@ -628,6 +664,7 @@ function AdminBookingList() {
     </div>
   );
 }
+
 export function BookingDetails({
   item,
   customerCanEditTimes = false,
@@ -649,11 +686,13 @@ export function BookingDetails({
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
     dialog.current?.showModal();
+
     return () => {
       dialog.current?.close();
       trigger?.focus();
     };
   }, []);
+
   return createPortal(
     <NativeDialog
       ref={dialog}
@@ -887,6 +926,7 @@ function RequestedDay({
     [error, setError] = useState("");
   const [stale, setStale] = useState(false);
   const dirty = useRef(false);
+
   const resetTimes = (saved: typeof day) => {
     const savedStart = localInput(saved.startsAt, item.timeZone),
       savedEnd = localInput(saved.endsAt, item.timeZone);
@@ -895,6 +935,7 @@ function RequestedDay({
     setNextDay(!!savedEnd && savedEnd.slice(0, 10) !== saved.date);
     dirty.current = false;
   };
+
   useEffect(() => {
     if (!dirty.current) resetTimes(day);
   }, [day.startsAt, day.endsAt, day.date, item.timeZone]);
@@ -903,19 +944,25 @@ function RequestedDay({
     setError("");
     setStale(false);
     setBusy(true);
+
     try {
       if (!start || !end) throw new Error("Enter both start and end times.");
+
       const date = new Date(`${day.date}T00:00:00Z`);
+
       if (nextDay) date.setUTCDate(date.getUTCDate() + 1);
+
       const startsAt = zonedInstant(`${day.date}T${start}`, item.timeZone),
         endsAt = zonedInstant(
           `${date.toISOString().slice(0, 10)}T${end}`,
           item.timeZone,
         );
+
       if (endsAt <= startsAt)
         throw new Error(
           "End time must be after start time. Select next day for an overnight event.",
         );
+
       const result = await updateRequestedDayTimes(item.id, day.date, {
         startsAt,
         endsAt,
@@ -931,6 +978,7 @@ function RequestedDay({
       setBusy(false);
     }
   }
+
   return (
     <Panel as="article" className="requested-day">
       <h4>{preferredDateLabel(day.date)}</h4>
@@ -997,11 +1045,14 @@ function RequestedDay({
                   onClick={async () => {
                     try {
                       const result = await getMyBookingRequest(item.id);
+
                       const refreshed =
                         result.bookingRequest.requestedDays?.find(
                           (entry) => entry.date === day.date,
                         );
+
                       if (refreshed) resetTimes(refreshed);
+
                       onSaved(result.bookingRequest);
                       setStale(false);
                       setError("");

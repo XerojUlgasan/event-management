@@ -18,6 +18,7 @@ export async function sendCustomerMessageService(
   const conversation = conversationId
     ? await findConversationData(db, conversationId)
     : await ensureConversationData(db, customerId);
+
   if (!conversation || conversation.customer_id !== customerId) {
     throw new Error("Conversation not found");
   }
@@ -33,9 +34,12 @@ export async function sendCustomerMessageService(
     requestId,
   );
   const message = messageDto(saved.message);
+
   if (saved.replayed || !saved.aiEnabled)
     return { message, assistantMessage: null, assistantError: null };
+
   const started = Date.now();
+
   try {
     const assistantMessage = await runAssistantTurnService({
       db,
@@ -45,16 +49,19 @@ export async function sendCustomerMessageService(
       aiVersion: saved.aiVersion,
       abortSignal,
     });
+
     return { message, assistantMessage, assistantError: null };
   } catch {
     const current = await findConversationData(db, conversation.id).catch(
       () => undefined,
     );
+
     if (
       current &&
       (!current.ai_enabled || current.ai_version !== saved.aiVersion)
     )
       return { message, assistantMessage: null, assistantError: null };
+
     // The customer write already committed. Do not invite a duplicate resend.
     console.warn("assistant-turn", {
       messageId: message.id,
@@ -62,6 +69,7 @@ export async function sendCustomerMessageService(
       outcome: "unavailable",
       durationMs: Date.now() - started,
     });
+
     return {
       message,
       assistantMessage: null,

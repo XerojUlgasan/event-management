@@ -4,6 +4,7 @@ import type { CatalogPackage } from "@event-management/contracts/catalog";
 import type { Packages } from "../../db/types.js";
 import { readCatalogSectionsService } from "../catalog-canvas/read-catalog-sections.js";
 import type { Database } from "../../data/catalog-canvas/catalog-canvas-types.js";
+
 export async function packageDto(
   db: Database,
   row: Selectable<Packages>,
@@ -15,6 +16,7 @@ export async function packageDto(
   const thumbnailUrl = row.thumbnail_media_id
     ? `/v1/catalog-media/${row.thumbnail_media_id}`
     : null;
+
   return {
     id: row.id,
     slug: row.slug,

@@ -64,6 +64,7 @@ import {
   getAdminBookingRequestRoute,
   getAdminBookingRequestRouteHandler,
 } from "./get-booking-request.js";
+
 const routes = new OpenAPIHono<HonoEnv>({
   defaultHook: (result, c) => {
     if (!result.success)
@@ -77,11 +78,14 @@ const routes = new OpenAPIHono<HonoEnv>({
       );
   },
 });
+
 const customer = createMiddleware<HonoEnv>(async (c, next) => {
   if (c.get("session").user.role !== "customer")
     return jsonError(c, "Customer access required", 403);
+
   await next();
 });
+
 routes.use("/booking-requests", requireSession, customer);
 routes.use("/booking-requests/*", requireSession, customer);
 routes.use("/admin/booking-requests", requireSession, requireSystemAdmin);
@@ -116,4 +120,5 @@ routes.openapi(
   updateBookingCustomPackageRouteHandler,
 );
 routes.route("/", quotationRoutes);
+
 export default routes;

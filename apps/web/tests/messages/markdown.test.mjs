@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 let server, cacheDir, ui, MessagesWorkspace;
+
 before(async () => {
   cacheDir = await mkdtemp(join(tmpdir(), "clemora-message-markdown-"));
   server = await createServer({
@@ -39,6 +40,7 @@ after(async () => {
 
 const renderMarkdown = (source, variant = "message") =>
   renderToStaticMarkup(createElement(ui.Markdown, { source, variant }));
+
 const source = `## Event details
 
 **Bold** and *italic*, with [details](https://example.com).
@@ -63,6 +65,7 @@ wide code content
 
 test("the shared renderer formats message Markdown without changing its source", () => {
   const html = renderMarkdown(source);
+
   for (const pattern of [
     /<h2[^>]*>/,
     /<strong>Bold<\/strong>/,
@@ -91,6 +94,7 @@ test("ordinary message line breaks and blank lines remain available to presentat
 
 test("both variants sanitize untrusted content and preserve safe links", () => {
   const unsafe = `**Safe**\n\n<script>alert(1)</script>\n\n<img src="/safe.png" onerror="alert(1)">\n\n[Bad](javascript:alert(1))\n\n[Good](https://example.com)\n\n![Image](/safe.png)`;
+
   for (const variant of ["message", "document"]) {
     const html = renderMarkdown(unsafe, variant);
     assert.match(html, /<strong>Safe<\/strong>/);
@@ -120,12 +124,14 @@ const message = (id, senderRole, body, quotationId = null) => ({
   createdAt: "2026-11-19T08:00:00.000Z",
   readAt: null,
 });
+
 const messages = [
   message("customer", "customer", "**Customer text**"),
   message("assistant", "assistant", "*Assistant text*"),
   message("admin", "admin", "[Admin text](https://example.com)"),
   message("quotation", "admin", "**Quotation notice**", "quotation-version"),
 ];
+
 const conversation = {
   id: "thread",
   customerId: "customer",
@@ -164,6 +170,7 @@ for (const viewerRole of ["customer", "admin"]) {
         }),
       ),
     );
+
     assert.match(html, /<strong>Customer text<\/strong>/);
     assert.match(html, /<em>Assistant text<\/em>/);
     assert.match(html, /<a href="https:\/\/example.com">Admin text<\/a>/);

@@ -36,12 +36,16 @@ import type { Selectable } from "kysely";
 import type { MediaAssets } from "../../src/db/types.js";
 
 const database = `em_catalog_embeddings_${randomUUID().replaceAll("-", "")}`;
+
 const embeddingModel = "google/gemini-embedding-2";
 const samplePhotoUrl = "/images/wedding.jpg";
+
 const uploadedPhotoBytes = new Uint8Array([
   137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3, 4,
 ]);
+
 const originalFetch = globalThis.fetch;
+
 const environmentNames = [
   "AI_GATEWAY_API_KEY",
   "EMBEDDING_MODEL",
@@ -51,6 +55,7 @@ const environmentNames = [
   "SUPABASE_SECRET_KEYS",
   "SUPABASE_STORAGE_BUCKET",
 ] as const;
+
 const originalEnvironment = new Map(
   environmentNames.map((name) => [name, process.env[name]]),
 );
@@ -66,6 +71,7 @@ type GatewayRequest = {
 };
 
 type GatewayCall = { url: URL; body: GatewayRequest };
+
 type GatewayHandler = (call: GatewayCall) => Response | Promise<Response>;
 
 let db: Kysely<DB> | undefined;
@@ -73,11 +79,14 @@ let adminPool: Pool | undefined;
 let testPool: Pool | undefined;
 let storageServer: Server | undefined;
 let storageRequests = 0;
+
 let gatewayCalls: GatewayCall[] = [];
+
 let gatewayHandler: GatewayHandler = () => gatewayResponse();
 
 function gatewayResponse() {
   const vector = [1, ...Array(767).fill(0)];
+
   return new Response(JSON.stringify({ embeddings: [vector], warnings: [] }), {
     headers: { "Content-Type": "application/json" },
   });
@@ -90,19 +99,24 @@ function setGatewayHandler(handler: GatewayHandler = () => gatewayResponse()) {
 
 function requestUrl(input: RequestInfo | URL) {
   if (input instanceof Request) return new URL(input.url);
+
   if (input instanceof URL) return input;
+
   return new URL(input);
 }
 
 async function installGatewayInterceptor() {
   globalThis.fetch = async (input, init) => {
     const url = requestUrl(input);
+
     if (url.hostname !== "ai-gateway.vercel.sh")
       return originalFetch(input, init);
+
     if (!url.pathname.toLowerCase().includes("embedding"))
       throw new Error(
         "Unexpected AI Gateway endpoint in catalog embedding test",
       );
+
     const rawBody =
       init?.body ??
       (input instanceof Request ? await input.clone().text() : undefined);
@@ -114,6 +128,7 @@ async function installGatewayInterceptor() {
     assert.equal(body.dimensions, 768);
     const call = { url, body };
     gatewayCalls.push(call);
+
     return gatewayHandler(call);
   };
 }
@@ -121,11 +136,13 @@ async function installGatewayInterceptor() {
 function getDb() {
   if (!db)
     throw new Error("Disposable catalog embedding database is not ready");
+
   return db;
 }
 
 async function drainCatalogJobs(database: Kysely<DB>) {
   const signal = AbortSignal.timeout(30_000);
+
   while (await runOneBackgroundJob(database, { signal })) {
     signal.throwIfAborted();
   }
@@ -210,6 +227,7 @@ async function createPackageRow(options: {
     })
     .returning("id")
     .executeTakeFirstOrThrow();
+
   return row.id;
 }
 
@@ -227,6 +245,7 @@ async function createServiceRow(options: { name: string; archived?: boolean }) {
     })
     .returning("id")
     .executeTakeFirstOrThrow();
+
   return row.id;
 }
 
@@ -273,6 +292,7 @@ async function createCustomPackageRow(name: string) {
     })
     .returning("id")
     .executeTakeFirstOrThrow();
+
   return row.id;
 }
 
@@ -291,6 +311,7 @@ async function createMediaAsset(source: "sample" | "upload") {
       created_by: null,
     })
     .execute();
+
   return id;
 }
 
@@ -404,6 +425,7 @@ async function createAdminId() {
     })
     .returning("id")
     .executeTakeFirstOrThrow();
+
   return row.id;
 }
 
@@ -421,6 +443,7 @@ before(async () => {
   testPool = new Pool({ ...connection, database });
   db = new Kysely<DB>({ dialect: new PostgresDialect({ pool: testPool }) });
   const migrationRoot = new URL("../../prisma/migrations/", import.meta.url);
+
   for (const migration of (
     await readdir(migrationRoot, { withFileTypes: true })
   )
@@ -442,8 +465,10 @@ before(async () => {
       )
     ) {
       response.writeHead(404).end();
+
       return;
     }
+
     storageRequests++;
     response
       .writeHead(200, { "Content-Type": "image/png" })
@@ -464,18 +489,23 @@ before(async () => {
 
 after(async () => {
   if (db) await drainCatalogJobs(db).catch(() => {});
+
   await db?.destroy();
   await new Promise<void>((resolve) => {
     if (storageServer?.listening) storageServer.close(() => resolve());
     else resolve();
   });
+
   if (adminPool) {
     await adminPool.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await adminPool.end();
   }
+
   globalThis.fetch = originalFetch;
+
   for (const name of environmentNames) {
     const value = originalEnvironment.get(name);
+
     if (value === undefined) delete process.env[name];
     else process.env[name] = value;
   }
@@ -507,10 +537,12 @@ test("admin indexing traverses pending chunks, advances failures and retries", a
         expires_at: new Date(Date.now() + 3600000),
       })
       .execute();
+
     return `em_session=${token}`;
   }
   const admin = await session("admin");
   const customer = await session("customer");
+
   const request = (body: object, cookie?: string) =>
     app.request("/v1/admin/ai/knowledge/index", {
       method: "POST",
@@ -520,10 +552,12 @@ test("admin indexing traverses pending chunks, advances failures and retries", a
       },
       body: JSON.stringify(body),
     });
+
   assert.equal((await request({})).status, 401);
   assert.equal((await request({}, customer)).status, 403);
   const apiKey = process.env.AI_GATEWAY_API_KEY;
   delete process.env.AI_GATEWAY_API_KEY;
+
   try {
     const empty = await request({}, admin);
     assert.equal(empty.status, 200);
@@ -544,14 +578,19 @@ test("admin indexing traverses pending chunks, advances failures and retries", a
     await setCanvas({ kind: "service", id: first }, [
       section("Photos", [mediaWidget(randomUUID(), media, { alt: "Fixture" })]),
     ]);
+
     let unlock = () => {};
+
     let locked = () => {};
+
     const ready = new Promise<void>((resolve) => {
       locked = resolve;
     });
+
     const release = new Promise<void>((resolve) => {
       unlock = resolve;
     });
+
     const holdingLock = getDb()
       .transaction()
       .execute(async (trx) => {
@@ -564,7 +603,9 @@ test("admin indexing traverses pending chunks, advances failures and retries", a
         locked();
         await release;
       });
+
     await ready;
+
     try {
       const started = Date.now();
       const blocked = await request({}, admin);
@@ -577,6 +618,7 @@ test("admin indexing traverses pending chunks, advances failures and retries", a
       unlock();
       await holdingLock;
     }
+
     assert.equal((await request({}, admin)).status, 503);
     assert.equal((await request({ cursor: "bad" }, admin)).status, 400);
     process.env.AI_GATEWAY_API_KEY = "fixture-gateway-key";
@@ -598,6 +640,7 @@ test("admin indexing traverses pending chunks, advances failures and retries", a
     setGatewayHandler();
     let cursor: string | null = failed.nextCursor;
     let embedded = 0;
+
     while (cursor) {
       const response = await request({ cursor }, admin);
       assert.equal(response.status, 200);
@@ -608,6 +651,7 @@ test("admin indexing traverses pending chunks, advances failures and retries", a
       embedded += result.embedded;
       cursor = result.nextCursor;
     }
+
     assert.equal(embedded, 2);
     assert.equal(gatewayCalls.length, 2);
     const retry = await request({}, admin);
@@ -651,6 +695,7 @@ test("admin indexing traverses pending chunks, advances failures and retries", a
   } finally {
     if (apiKey === undefined) delete process.env.AI_GATEWAY_API_KEY;
     else process.env.AI_GATEWAY_API_KEY = apiKey;
+
     setGatewayHandler();
     storageRequests = 0;
   }
@@ -662,6 +707,7 @@ test("bounded index scan resumes across already indexed owners", async () => {
     (_, index) =>
       `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
   );
+
   for (const [index, id] of ids.entries()) {
     await getDb()
       .insertInto("services")
@@ -673,12 +719,14 @@ test("bounded index scan resumes across already indexed owners", async () => {
         hourly_rate_pesos: 1,
       })
       .execute();
+
     if (index < 6)
       await refreshCatalogEmbeddingsService({
         db: getDb(),
         owner: { kind: "service", id },
       });
   }
+
   setGatewayHandler();
   const signal = new AbortController().signal;
   const first = await indexPendingCatalogKnowledgeService(
@@ -807,6 +855,7 @@ test("embeds only eligible catalog owners with text and actual sample/upload ima
     assert.equal(result.embedded, 0);
     assert.equal((await knowledgeRows(owner)).length, 0);
   }
+
   assert.equal(gatewayCalls.length, 6);
 
   const packageRows = await knowledgeRows(packageOwner);
@@ -819,13 +868,17 @@ test("embeds only eligible catalog owners with text and actual sample/upload ima
       `photo:${uploadedWidgetId}`,
     ].sort(),
   );
+
   const overview = packageRows.find((row) => row.chunk_key === "overview");
+
   assert.doesNotMatch(overview?.content_markdown ?? "", /Active service/);
   assert.doesNotMatch(
     overview?.content_markdown ?? "",
     /Archived linked service/,
   );
+
   const sampleRow = packageRows.find((row) => row.media_id === sampleMediaId);
+
   assert.match(sampleRow?.content_markdown ?? "", /Section: Reception/);
   assert.match(
     sampleRow?.content_markdown ?? "",
@@ -835,9 +888,11 @@ test("embeds only eligible catalog owners with text and actual sample/upload ima
     sampleRow?.content_markdown ?? "",
     /Caption: Sample photo caption/,
   );
+
   const uploadedRow = packageRows.find(
     (row) => row.media_id === uploadedMediaId,
   );
+
   assert.match(
     uploadedRow?.content_markdown ?? "",
     /Alt text: Uploaded table setting/,
@@ -851,9 +906,11 @@ test("embeds only eligible catalog owners with text and actual sample/upload ima
   const expectedSampleImage = await readCatalogEmbeddingImage(
     sampleAsset as Selectable<MediaAssets>,
   );
+
   const sampleCall = gatewayCalls.find((call) =>
     call.body.values[0]?.includes("Sample garden arch"),
   );
+
   assert.ok(sampleCall);
   assert.equal(sampleCall.body.values[0]?.includes("Reception"), true);
   assert.equal(
@@ -865,17 +922,21 @@ test("embeds only eligible catalog owners with text and actual sample/upload ima
     sampleCall.body.providerOptions?.google.content[0]?.[0]?.inlineData.data,
     Buffer.from(expectedSampleImage.bytes).toString("base64"),
   );
+
   const uploadedCall = gatewayCalls.find((call) =>
     call.body.values[0]?.includes("Uploaded table setting"),
   );
+
   assert.ok(uploadedCall);
   assert.equal(
     uploadedCall.body.providerOptions?.google.content[0]?.[0]?.inlineData.data,
     Buffer.from(uploadedPhotoBytes).toString("base64"),
   );
+
   const textCall = gatewayCalls.find((call) =>
     call.body.values[0]?.includes("Markdown from the reception section"),
   );
+
   assert.ok(textCall);
   assert.equal(textCall.body.providerOptions, undefined);
   assert.equal(storageRequests, 1);
@@ -906,18 +967,22 @@ test("re-saving the same sample photo retains its embedding after media replacem
   await drainCatalogJobs(getDb());
 
   const originalSections = sectionsSchema.parse(listing.sections);
+
   const originalPhoto = originalSections
     .flatMap((section) => section.widgets)
     .find((widget) => widget.type === "photo");
+
   assert.ok(originalPhoto?.media?.id);
   const originalMediaId = originalPhoto.media.id;
   const originalPhotoWidgetId = originalPhoto.id;
   const originalSectionId = originalSections[0]?.id;
   assert.ok(originalSectionId);
   const owner = { kind: "package", id: listing.id } as const;
+
   const originalKnowledge = (await knowledgeRows(owner)).find(
     (row) => row.chunk_key === `photo:${originalPhotoWidgetId}`,
   );
+
   assert.ok(originalKnowledge?.embedding);
   assert.equal(originalKnowledge.media_id, originalMediaId);
   const previousGatewayCalls = gatewayCalls.length;
@@ -945,9 +1010,11 @@ test("re-saving the same sample photo retains its embedding after media replacem
 
   const updatedSections = sectionsSchema.parse(updated.sections);
   assert.equal(updatedSections[0]?.id, originalSectionId);
+
   const updatedPhoto = updatedSections
     .flatMap((section) => section.widgets)
     .find((widget) => widget.id === originalPhotoWidgetId);
+
   assert.ok(updatedPhoto?.media?.id);
   assert.notEqual(updatedPhoto.media.id, originalMediaId);
   const updatedMedia = await getDb()
@@ -966,6 +1033,7 @@ test("re-saving the same sample photo retains its embedding after media replacem
   const updatedKnowledge = (await knowledgeRows(owner)).find(
     (row) => row.chunk_key === `photo:${originalPhotoWidgetId}`,
   );
+
   assert.ok(updatedKnowledge?.embedding);
   assert.equal(updatedKnowledge.id, originalKnowledge.id);
   assert.equal(updatedKnowledge.media_id, updatedPhoto.media.id);
@@ -981,12 +1049,14 @@ test("content, photo context, embedding model, removal, and archive changes refr
   const photoWidgetId = randomUUID();
   const markdownWidgetId = randomUUID();
   const owner = { kind: "package", id: packageId } as const;
+
   const canvas = (markdown: string, alt: string) => [
     section("Refresh section", [
       markdownWidget(markdownWidgetId, markdown),
       mediaWidget(photoWidgetId, mediaId, { alt }),
     ]),
   ];
+
   await setCanvas(owner, canvas("Original Markdown", "Original alt"));
 
   const first = await refreshCatalogEmbeddingsService({ db: getDb(), owner });
@@ -1000,18 +1070,22 @@ test("content, photo context, embedding model, removal, and archive changes refr
   assert.equal(changed.unchanged, 1);
   assert.equal(gatewayCalls.length, baselineCalls + 2);
   const rowsAfterChange = await knowledgeRows(owner);
+
   const markdown = rowsAfterChange.find(
     (row) => row.chunk_key === `markdown:${markdownWidgetId}:0`,
   );
+
   const photo = rowsAfterChange.find(
     (row) => row.chunk_key === `photo:${photoWidgetId}`,
   );
+
   assert.match(markdown?.content_markdown ?? "", /Edited Markdown/);
   assert.match(photo?.content_markdown ?? "", /Edited alt/);
   assert.ok(rowsBeforeChange.every((row) => row.embedding !== null));
   assert.ok(rowsAfterChange.every((row) => row.embedding !== null));
 
   const overview = rowsAfterChange.find((row) => row.chunk_key === "overview");
+
   assert.ok(overview);
   await getDb()
     .updateTable("catalog_knowledge")
@@ -1025,9 +1099,11 @@ test("content, photo context, embedding model, removal, and archive changes refr
   assert.equal(modelChanged.embedded, 1);
   assert.equal(modelChanged.unchanged, 2);
   assert.equal(gatewayCalls.length, baselineCalls + 3);
+
   const refreshedOverview = (await knowledgeRows(owner)).find(
     (row) => row.chunk_key === "overview",
   );
+
   assert.equal(refreshedOverview?.embedding_model, embeddingModel);
 
   await setCanvas(owner, [
@@ -1153,6 +1229,7 @@ test("service deletion removes its knowledge and an in-flight edit cannot save s
   setGatewayHandler();
   const packageId = await createPackageRow({ name: "Concurrent package" });
   const owner = { kind: "package", id: packageId } as const;
+
   const started = new Promise<void>((resolve) => {
     gatewayHandler = async () => {
       resolve();
@@ -1160,9 +1237,11 @@ test("service deletion removes its knowledge and an in-flight edit cannot save s
         gatewayHandler = () => gatewayResponse();
         releaseGate = release;
       });
+
       return gatewayResponse();
     };
   });
+
   let releaseGate: (() => void) | undefined;
   await getDb()
     .updateTable("packages")
@@ -1188,9 +1267,11 @@ test("service deletion removes its knowledge and an in-flight edit cannot save s
   releaseGate();
   const superseded = await originalRefresh;
   assert.equal(superseded.superseded, 1);
+
   const staleRow = (await knowledgeRows(owner)).find(
     (row) => row.chunk_key === "overview",
   );
+
   assert.ok(staleRow);
   assert.equal(staleRow.embedding, null);
   assert.match(staleRow.content_markdown, /After edit/);
@@ -1198,9 +1279,11 @@ test("service deletion removes its knowledge and an in-flight edit cannot save s
   setGatewayHandler();
   const retry = await refreshCatalogEmbeddingsService({ db: getDb(), owner });
   assert.equal(retry.embedded, 1);
+
   const savedRow = (await knowledgeRows(owner)).find(
     (row) => row.chunk_key === "overview",
   );
+
   assert.ok(savedRow?.embedding);
   assert.match(savedRow?.content_markdown ?? "", /After edit/);
 });
@@ -1208,6 +1291,7 @@ test("service deletion removes its knowledge and an in-flight edit cannot save s
 test("provider failures stay pending and a later refresh retries them", async () => {
   setGatewayHandler((call) => {
     assert.ok(call.body.values[0]?.includes("Retry package"));
+
     return new Response(
       JSON.stringify({ error: { message: "fixture failure" } }),
       {
@@ -1301,6 +1385,7 @@ test("package and service creates and updates roll back when enqueue fails", asy
   );
   assert.ok(!("status" in existingPackage));
   assert.ok(!("status" in existingService));
+
   const snapshot = () =>
     Promise.all([
       getDb().selectFrom("packages").selectAll().orderBy("id").execute(),
@@ -1313,6 +1398,7 @@ test("package and service creates and updates roll back when enqueue fails", asy
         .execute(),
       getDb().selectFrom("background_jobs").selectAll().orderBy("id").execute(),
     ]);
+
   const before = await snapshot();
   await sql`CREATE FUNCTION public.reject_fixture_background_job() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN RAISE EXCEPTION 'fixture enqueue unavailable'; END;
@@ -1321,6 +1407,7 @@ test("package and service creates and updates roll back when enqueue fails", asy
     FOR EACH ROW EXECUTE FUNCTION public.reject_fixture_background_job()`.execute(
     getDb(),
   );
+
   try {
     await assert.rejects(
       createPackageService(

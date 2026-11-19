@@ -8,15 +8,19 @@ import { loadPackage } from "../../lib/server/catalog/load-catalog";
 const slug = Astro.params.slug ?? "";
 let item: PublicPackage | null = null;
 let unavailable = false;
+
 try {
   item = await loadPackage(slug);
 } catch {
   unavailable = true;
 }
+
 if (!unavailable && !item) Astro.response.status = 404;
+
 const title = item
   ? `${item.name} | Styled by AMAC`
   : "Package not found | Styled by AMAC";
+
 const description = item?.description || "This package is not available.";
 ---
 

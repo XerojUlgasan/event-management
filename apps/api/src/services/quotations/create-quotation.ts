@@ -21,22 +21,32 @@ export async function createQuotationService(
 ) {
   return db.transaction().execute(async (trx) => {
     const booking = await lockBookingRequestData(trx, bookingId);
+
     if (!booking) return failure("Booking request not found", 404);
+
     if (booking.revision !== expected)
       return failure("Booking request changed. Refresh and try again", 409);
+
     if (closed(booking)) return failure("This request is closed", 409);
+
     const pkg = await proposalPackage(trx, booking);
+
     if (!pkg)
       return failure(
         "Choose or create a package before preparing a quotation",
         409,
       );
+
     const base = basePrice(pkg.price);
+
     if (base === null)
       return failure("Package price is outside the supported range", 400);
+
     const existing = await quotationWriteStateData(trx, booking.id);
+
     if (existing.has_active)
       return failure("Revise the active quotation instead", 409);
+
     const row = await createQuotationData(trx, {
       booking_request_id: booking.id,
       version: existing.max_version + 1,
@@ -54,6 +64,7 @@ export async function createQuotationService(
     await audit(trx, actor, "quotation.created", row.id, {
       bookingRequestId: booking.id,
     });
+
     return dto((await findQuoteData(trx, row.id))!);
   });
 }

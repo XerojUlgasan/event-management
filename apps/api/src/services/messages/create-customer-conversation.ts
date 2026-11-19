@@ -8,5 +8,6 @@ export async function createCustomerConversationService(
   customerId: string,
 ) {
   const conversation = await createConversationData(db, customerId);
+
   return getConversationThreadService(db, conversation, "customer");
 }

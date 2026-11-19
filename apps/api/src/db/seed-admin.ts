@@ -14,9 +14,11 @@ if (!email) {
 }
 
 const firebaseAuth = await getFirebaseAuth();
+
 const fallbackName = email.split("@")[0] ?? "Admin";
 
 let user;
+
 try {
   user = await firebaseAuth.getUserByEmail(email);
 } catch (error) {
@@ -25,6 +27,7 @@ try {
   }
 
   const password = env.ADMIN_PASSWORD;
+
   if (!password) {
     console.error(
       `No Firebase user exists for ${email}. Add ADMIN_PASSWORD to create one, or create it in the Firebase console first.`,

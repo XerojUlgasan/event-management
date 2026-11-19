@@ -53,12 +53,16 @@ const routes = new OpenAPIHono<HonoEnv>({
       );
   },
 });
+
 const customerOnly = createMiddleware<HonoEnv>(async (c, next) => {
   if (c.get("session").user.role !== "customer")
     return jsonError(c, "Customer access required", 403);
+
   await next();
 });
+
 const adminOnly = requireSystemAdmin;
+
 routes.use("/messages", requireSession, customerOnly);
 routes.use("/messages/*", requireSession, customerOnly);
 routes.use("/admin/conversations", requireSession, adminOnly);
@@ -85,4 +89,5 @@ routes.openapi(listAdminConversationsRoute, listAdminConversationsRouteHandler);
 routes.openapi(getAdminConversationRoute, getAdminConversationRouteHandler);
 routes.openapi(sendAdminMessageRoute, sendAdminMessageRouteHandler);
 routes.openapi(updateConversationAiRoute, updateConversationAiRouteHandler);
+
 export default routes;

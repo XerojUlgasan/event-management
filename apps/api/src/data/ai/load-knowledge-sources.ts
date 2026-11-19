@@ -6,7 +6,9 @@ import { sql, type Kysely, type Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 
 type Database = Kysely<DB> | Transaction<DB>;
+
 type Owner = { kind: "package" | "service"; id: string };
+
 export async function loadKnowledgeSourcesData(db: Database, owner?: Owner) {
   const [packages, services] = await Promise.all([
     owner?.kind === "service"
@@ -27,8 +29,11 @@ export async function loadKnowledgeSourcesData(db: Database, owner?: Owner) {
           .$if(!!owner, (q) => q.where("id", "=", owner!.id))
           .execute(),
   ]);
+
   const packageIds = packages.map((p) => p.id);
+
   const serviceIds = services.map((s) => s.id);
+
   const rows =
     packageIds.length || serviceIds.length
       ? await db
@@ -56,6 +61,7 @@ export async function loadKnowledgeSourcesData(db: Database, owner?: Owner) {
           )
           .execute()
       : [];
+
   const mediaIds = [
     ...new Set(
       [...packages, ...services].flatMap((record) =>
@@ -69,6 +75,7 @@ export async function loadKnowledgeSourcesData(db: Database, owner?: Owner) {
       ),
     ),
   ];
+
   const assets = mediaIds.length
     ? await db
         .selectFrom("media_assets")
@@ -76,8 +83,11 @@ export async function loadKnowledgeSourcesData(db: Database, owner?: Owner) {
         .where("id", "in", mediaIds)
         .execute()
     : [];
+
   const assetMap = new Map(assets.map((asset) => [asset.id, asset]));
+
   const rowsByOwner = new Map<string, typeof rows>();
+
   for (const row of rows) {
     const ownerKey = row.package_id
       ? `package:${row.package_id}`
@@ -86,12 +96,14 @@ export async function loadKnowledgeSourcesData(db: Database, owner?: Owner) {
     list.push(row);
     rowsByOwner.set(ownerKey, list);
   }
+
   function sections(canvas: unknown) {
     return sectionsSchema.parse(
       storedSectionsSchema.parse(canvas).map((section) => ({
         ...section,
         widgets: section.widgets.map(({ mediaId, ...widget }) => {
           const media = mediaId ? assetMap.get(mediaId) : undefined;
+
           return {
             ...widget,
             media: media
@@ -111,6 +123,7 @@ export async function loadKnowledgeSourcesData(db: Database, owner?: Owner) {
       })),
     );
   }
+
   return {
     packages,
     services,

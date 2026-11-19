@@ -16,7 +16,9 @@ export async function cleanupCatalogMediaService(
       .transaction()
       .execute(async (trx) => {
         const media = await lockCatalogMediaData(trx, id);
+
         if (!media || (await hasCatalogMediaReferenceData(trx, id))) return;
+
         await deleteCatalogMediaObjectsService(media);
         await deleteCatalogMediaData(trx, id);
       })

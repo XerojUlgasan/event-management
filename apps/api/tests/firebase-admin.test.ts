@@ -17,13 +17,16 @@ const variables = [
   "GOOGLE_CLOUD_PROJECT",
   "GCLOUD_PROJECT",
 ];
+
 const original = new Map(variables.map((name) => [name, process.env[name]]));
+
 let directory: string;
 let credentialsFile: string;
 let credentials: string;
 
 before(async () => {
   for (const name of variables) delete process.env[name];
+
   directory = await mkdtemp(join(tmpdir(), "clemora-firebase-test-"));
   credentialsFile = join(directory, "service-account.json");
   process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsFile;
@@ -45,6 +48,7 @@ afterEach(async () => {
 
 after(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
+
   for (const [name, value] of original) {
     if (value === undefined) delete process.env[name];
     else process.env[name] = value;
@@ -53,11 +57,15 @@ after(async () => {
 
 test("concurrent credential loads return the same Firebase Auth instance", async () => {
   await writeFile(credentialsFile, credentials);
+
   const instances = await Promise.all(
     Array.from({ length: 8 }, () => getFirebaseAuth()),
   );
+
   assert.equal(getApps().length, 1);
+
   for (const instance of instances) assert.equal(instance, instances[0]);
+
   assert.equal(instances[0].app.options.projectId, "demo-event-management");
   assert.equal(await getFirebaseAuth(), instances[0]);
 });

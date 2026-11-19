@@ -15,8 +15,11 @@ export function formatPesosFromMinor(amountMinor: number) {
 
 export function formatSignedPesosFromMinor(amountMinor: number) {
   const formatted = formatPesosFromMinor(Math.abs(amountMinor));
+
   if (amountMinor > 0) return `+${formatted}`;
+
   if (amountMinor < 0) return `−${formatted}`;
+
   return formatted;
 }
 
@@ -33,12 +36,14 @@ export function servicePricingLabels(service: ServicePricing) {
       currency: "PHP",
       maximumFractionDigits: 0,
     }).format(amount);
+
   if (service.fixedPricePesos != null && service.includedHours != null) {
     return {
       price: `${pesos(service.fixedPricePesos)} for ${service.includedHours} ${service.includedHours === 1 ? "hour" : "hours"}`,
       excess: `${service.hourlyRatePesos == null ? "Rate on request" : pesos(service.hourlyRatePesos)} / additional hour`,
     };
   }
+
   return {
     price:
       service.hourlyRatePesos == null

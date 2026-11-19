@@ -11,6 +11,7 @@ import type {
 } from "../../utils/catalog-pagination.js";
 
 type Database = Kysely<DB> | Transaction<DB>;
+
 export function listAdminServicesPageData(
   db: Database,
   options: CatalogListOptions,
@@ -22,12 +23,16 @@ export function listAdminServicesPageData(
     .select(
       utcTimestampSql("created_at").as("page_sort"),
     );
+
   if (options.archived === "active")
     query = query.where("archived_at", "is", null);
+
   if (options.archived === "archived")
     query = query.where("archived_at", "is not", null);
+
   if (options.search)
     query = query.where(catalogTextMatch(options.search));
+
   if (position)
     query = query.where(
       keysetPredicate(
@@ -38,6 +43,7 @@ export function listAdminServicesPageData(
         "<",
       ),
     );
+
   return query
     .orderBy("created_at", "desc")
     .orderBy("id", "desc")
@@ -61,15 +67,20 @@ export async function countAdminServicesData(
     )
     .executeTakeFirstOrThrow();
   let matching = db.selectFrom("services");
+
   if (options.archived === "active")
     matching = matching.where("archived_at", "is", null);
+
   if (options.archived === "archived")
     matching = matching.where("archived_at", "is not", null);
+
   if (options.search)
     matching = matching.where(catalogTextMatch(options.search));
+
   const filtered = await matching
     .select(sql<string>`count(*)`.as("count"))
     .executeTakeFirstOrThrow();
+
   return {
     active: Number(result.active),
     archived: Number(result.archived),

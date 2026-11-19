@@ -6,7 +6,9 @@ const normalizeMessageBreaks: NonNullable<
   ComponentProps<typeof MarkdownPreview>["rehypeRewrite"]
 > = (node, index, parent) => {
   if (node.type !== "text" || index === undefined) return;
+
   const previous = parent?.children[index - 1];
+
   if (
     previous?.type === "element" &&
     previous.tagName === "br" &&

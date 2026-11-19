@@ -29,6 +29,7 @@ export const attachBookingPackageRoute = createRoute({
     ...errors,
   },
 });
+
 export const attachBookingPackageRouteHandler: AppRouteHandler<
   typeof attachBookingPackageRoute
 > = async (c) => {
@@ -38,6 +39,7 @@ export const attachBookingPackageRouteHandler: AppRouteHandler<
     c.get("session").user.id,
     c.req.valid("json"),
   );
+
   return "message" in result
     ? jsonError(c, result.message, result.status)
     : c.json(result, 200);

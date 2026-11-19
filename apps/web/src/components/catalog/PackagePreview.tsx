@@ -37,6 +37,7 @@ export function PackagePreview({
     const dialog = dialogRef.current;
     const unlockScroll = lockCatalogScroll();
     dialog?.showModal();
+
     return () => {
       dialog?.close();
       unlockScroll();
@@ -47,14 +48,18 @@ export function PackagePreview({
     if (!booking && dialogRef.current && !dialogRef.current.open)
       dialogRef.current.showModal();
   }, [booking]);
+
   const book = () => {
     if (!allowBooking) {
       notify("Customers can book this package from its public page.", "info");
+
       return;
     }
+
     dialogRef.current?.close();
     setBooking(true);
   };
+
   return createPortal(
     <>
       <NativeDialog

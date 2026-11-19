@@ -7,7 +7,9 @@ import type { z } from "zod";
 import type { MediaAssets } from "../db/types.js";
 
 type StoredSections = z.infer<typeof storedSectionsSchema>;
+
 type Asset = Selectable<MediaAssets>;
+
 type CatalogReference = {
   id: string;
   slug: string;

@@ -21,6 +21,7 @@ const routes = new OpenAPIHono<HonoEnv>({
     if (!result.success) return jsonError(c, "Media not found.", 404);
   },
 });
+
 routes.use("/admin/catalog-media", requireSession, requireSystemAdmin);
 routes.use("/admin/catalog-media/*", requireSession, requireSystemAdmin);
 
@@ -30,4 +31,5 @@ routes.openapi(
   removePendingCatalogMediaRouteHandler,
 );
 routes.openapi(getCatalogMediaRoute, getCatalogMediaRouteHandler);
+
 export default routes;

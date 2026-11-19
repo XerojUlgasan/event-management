@@ -8,7 +8,9 @@ const extensions: Record<string, string> = {
 
 function mediaFilename(id: string, mimeType: string) {
   const extension = extensions[mimeType];
+
   if (!extension) throw new Error("Unsupported catalog media type");
+
   return `${id}.${extension}`;
 }
 
@@ -33,5 +35,6 @@ export function ownedCatalogMediaKey(
       ? `bookings/${owner.id}/custom-package`
       : `${owner.kind === "package" ? "packages" : "services"}/${owner.id}`;
   const folder = media.kind === "image" ? "images" : "videos";
+
   return `${prefix}/${folder}/${mediaFilename(media.id, media.mime_type)}`;
 }

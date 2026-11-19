@@ -1,6 +1,8 @@
 import { catalogSlug } from "@event-management/contracts/catalog-slug";
+
 export function catalogTitle(name: string) {
   const trimmed = name.trim();
+
   return { name: trimmed, slug: catalogSlug(trimmed) };
 }
 
@@ -13,5 +15,6 @@ export function duplicateTitle(cause: unknown, message: string) {
   ) {
     return { message, status: 409 as const };
   }
+
   return null;
 }

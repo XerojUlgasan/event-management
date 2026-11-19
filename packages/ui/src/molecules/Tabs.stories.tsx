@@ -17,10 +17,12 @@ const meta = {
 } satisfies Meta<typeof Tabs>;
 
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 function InteractiveTabs() {
   const [active, setActive] = useState("all");
+
   return (
     <Tabs
       active={active}
@@ -35,6 +37,7 @@ function InteractiveTabs() {
 }
 
 export const Default: Story = { args: { active: "all" } };
+
 export const Segmented: Story = {
   args: {
     active: "all",
@@ -43,6 +46,7 @@ export const Segmented: Story = {
     "aria-label": "Booking filters",
   },
 };
+
 function TabPanels() {
   const [active, setActive] = useState("details");
   const items = [
@@ -66,6 +70,7 @@ function TabPanels() {
       panelId: "example-notes-panel",
     },
   ];
+
   return (
     <div style={{ width: "min(100%, 480px)" }}>
       <Tabs
@@ -95,10 +100,12 @@ function TabPanels() {
     </div>
   );
 }
+
 export const TabList: Story = {
   args: { active: "all" },
   render: () => <TabPanels />,
 };
+
 export const DisabledItem: Story = {
   args: {
     active: "all",
@@ -110,6 +117,7 @@ export const DisabledItem: Story = {
     ],
   },
 };
+
 export const Interactive: Story = {
   args: { active: "all" },
   render: () => <InteractiveTabs />,

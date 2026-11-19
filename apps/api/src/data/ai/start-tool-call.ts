@@ -23,5 +23,6 @@ export async function startToolCallData(
     })
     .returning("id")
     .executeTakeFirstOrThrow();
+
   return { id: row.id };
 }

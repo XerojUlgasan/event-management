@@ -6,13 +6,16 @@ type CatalogEditorial = {
   intro: string;
   sections: Array<{ title: string; markdown: string }>;
 };
+
 export type CatalogCopy = CatalogEditorial & {
   name: string;
   description: string;
   photo: string;
   alt: string;
 };
+
 type PackageCopy = CatalogCopy & { price: number; guests: number };
+
 type ServiceCopy = CatalogCopy & {
   rate: number;
   fixed: number | null;
@@ -60,6 +63,7 @@ const photos = {
     alt: "Illustrative wedding event setting",
   },
 };
+
 type PhotoName = keyof typeof photos;
 
 const packages: Array<
@@ -212,6 +216,7 @@ const packages: Array<
     "A family reunion inspired by Filipino heritage. Fictional demo concept.",
   ],
 ];
+
 const services: Array<
   [
     name: string,
@@ -389,7 +394,9 @@ export function requireCatalogEditorial(
   name: string,
 ): CatalogEditorial {
   const editorial = entries[name];
+
   if (!editorial) throw new Error(`Missing catalog editorial: ${name}`);
+
   return editorial;
 }
 
@@ -403,6 +410,7 @@ export const curatedPackages: PackageCopy[] = packages.map(
     ...requireCatalogEditorial(packageEditorial, name),
   }),
 );
+
 export const curatedServices: ServiceCopy[] = services.map(
   ([name, rate, fixed, hours, photo, description]) => ({
     name,
@@ -420,13 +428,16 @@ export const curatedServices: ServiceCopy[] = services.map(
 function markdownRows(markdown: string, width: number) {
   const charactersPerLine = width === 12 ? 30 : 26;
   let pixels = 24;
+
   for (const line of markdown.split("\n")) {
     if (!line.trim()) {
       pixels += 12;
       continue;
     }
+
     if (/^\s*\|/.test(line)) {
       if (/^[\s|:-]+$/.test(line)) continue;
+
       const cells = line.split("|").slice(1, -1);
       const cellWidth = Math.max(
         8,
@@ -441,10 +452,13 @@ function markdownRows(markdown: string, width: number) {
         24;
     } else {
       pixels += Math.ceil(line.length / charactersPerLine) * 24;
+
       if (/^#{1,3} /.test(line)) pixels += 24;
+
       if (/^[-*] /.test(line)) pixels += 18;
     }
   }
+
   return Math.max(3, Math.ceil((pixels + 12) / 64));
 }
 
@@ -462,6 +476,7 @@ export function buildCatalogCanvas(
   const introWidth = stacked ? 12 : 6;
   const introHeight = markdownRows(copy.intro, introWidth);
   const photoHeight = stacked ? 5 : Math.max(6, introHeight);
+
   const widget = (part: string, markdown: string, width: number) => ({
     id: id(part),
     type: "markdown",
@@ -475,6 +490,7 @@ export function buildCatalogCanvas(
     caption: "",
     autoplay: false,
   });
+
   const intro = {
     ...widget("intro", copy.intro, introWidth),
     x: stacked || !photoFirst ? 0 : 6,
@@ -494,6 +510,7 @@ export function buildCatalogCanvas(
       "Illustrative sample photo; not a record of this event or service.",
     autoplay: false,
   };
+
   const sections = [
     {
       id: id("section-vision"),
@@ -506,6 +523,7 @@ export function buildCatalogCanvas(
       widgets: [widget(`editorial-${position}`, section.markdown, 12)],
     })),
   ];
+
   if (link)
     sections.push({
       id: id("section-related"),
@@ -529,5 +547,6 @@ export function buildCatalogCanvas(
         },
       ],
     });
+
   return storedSectionsSchema.parse(sections);
 }

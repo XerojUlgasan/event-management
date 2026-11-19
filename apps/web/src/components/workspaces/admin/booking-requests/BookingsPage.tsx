@@ -1,5 +1,6 @@
 import { BookingList } from "../../../booking-requests/BookingList";
 import { BookingRequestPage } from "./BookingRequestPage";
+
 export function BookingsPage({
   bookingRequestId,
 }: {

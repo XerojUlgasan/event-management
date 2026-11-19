@@ -45,6 +45,7 @@ export function messageDto(row: MessageWithSender): MessageDto {
       : row.sender_role === "admin"
         ? "admin"
         : "customer";
+
   return {
     id: row.id,
     body: row.body,

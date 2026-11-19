@@ -14,8 +14,10 @@ import {
 import { encodePageCursor } from "../../src/utils/pagination.js";
 
 const database = `em_catalog_detail_${randomUUID().replaceAll("-", "")}`;
+
 let admin: Pool | undefined;
 let db: Kysely<DB>;
+
 before(async () => {
   const host = process.env.DB_HOST ?? "localhost";
   assert.ok(["localhost", "127.0.0.1", "::1"].includes(host));
@@ -30,6 +32,7 @@ before(async () => {
   const pool = new Pool({ ...connection, database });
   db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
   const root = new URL("../../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((e) => e.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name)))
@@ -39,11 +42,13 @@ before(async () => {
 });
 after(async () => {
   await db?.destroy();
+
   if (admin) {
     await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await admin.end();
   }
 });
+
 const widget = (
   type: "markdown" | "package" | "service" | "photo" | "video",
   extra: object,
@@ -61,6 +66,7 @@ const widget = (
   autoplay: false,
   ...extra,
 });
+
 const canvas = (widgets: object[]) => [
   { id: randomUUID(), title: "Details", widgets },
 ];
@@ -293,11 +299,13 @@ test("continuations retain Unicode text, stay bounded, and reject stale or forge
     throw new Error("Unexpected provider call");
   };
   let result;
+
   try {
     result = await getPublicCatalogItemService({ db, input });
   } finally {
     globalThis.fetch = originalFetch;
   }
+
   assert.match(result.markdown, /Price: PHP 50 per hour/);
   const initialCursor = result.nextCursor;
   assert.ok(initialCursor);
@@ -305,6 +313,7 @@ test("continuations retain Unicode text, stay bounded, and reject stale or forge
     /\n\n---\nComplete: false\nNext cursor: [^\n]+$/,
     "",
   );
+
   while (result.nextCursor) {
     result = await getPublicCatalogItemService({
       db,
@@ -320,10 +329,12 @@ test("continuations retain Unicode text, stay bounded, and reject stale or forge
         "",
       );
   }
+
   assert.ok(document.includes(content));
   const parsedCursor = JSON.parse(
     Buffer.from(initialCursor, "base64url").toString("utf8"),
   );
+
   for (const offset of [1, 1000000]) {
     const cursor = encodePageCursor(parsedCursor.scope, { offset });
     await assert.rejects(
@@ -332,6 +343,7 @@ test("continuations retain Unicode text, stay bounded, and reject stale or forge
         error instanceof Error && "status" in error && error.status === 400,
     );
   }
+
   await assert.rejects(
     getPublicCatalogItemService({ db, input: { ...input, cursor: "invalid" } }),
   );

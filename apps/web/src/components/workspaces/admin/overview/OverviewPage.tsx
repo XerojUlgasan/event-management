@@ -21,8 +21,10 @@ export function OverviewPage({
   onNavigate: (key: NavKey) => void;
 }) {
   const { notify } = useNotifications();
+
   const unavailable = () =>
     notify("Demo only: this action is unavailable.", "info");
+
   return (
     <div className="content-stack">
       <PageHeader

@@ -43,13 +43,17 @@ export function KnowledgeSearch() {
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmed = query.trim();
+
     if (!trimmed) return;
+
     const current = ++sequence.current;
     setResult(null);
     setError("");
     setLoading(true);
+
     try {
       const response = await searchKnowledge(trimmed);
+
       if (sequence.current === current) setResult(response);
     } catch (cause) {
       if (sequence.current === current) {

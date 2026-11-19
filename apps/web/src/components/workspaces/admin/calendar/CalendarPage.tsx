@@ -12,8 +12,10 @@ import {
 
 export function CalendarPage() {
   const { notify } = useNotifications();
+
   const unavailable = () =>
     notify("Demo only: this action is unavailable.", "info");
+
   const [mode, setMode] = useState<"Month" | "Week" | "Day">("Month");
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [conflictOpen, setConflictOpen] = useState(false);

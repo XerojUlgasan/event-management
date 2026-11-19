@@ -27,20 +27,28 @@ export function mergeAiStateByVersion<T extends ConversationAiState>(
 // equal timestamps unless a known following sent message anchors the position.
 export function addSentMessages(thread: ChatThread, sent: ChatMessage[]) {
   const messages = [...thread.messages];
+
   for (const [index, message] of sent.entries()) {
     if (messages.some((item) => item.id === message.id)) continue;
+
     const followingIds = new Set(sent.slice(index + 1).map((item) => item.id));
+
     const insertAt = messages.findIndex(
       (item) => followingIds.has(item.id) || item.createdAt > message.createdAt,
     );
+
     messages.splice(insertAt < 0 ? messages.length : insertAt, 0, message);
   }
+
   const lastMessage = messages[messages.length - 1];
   const previousLast = thread.conversation.lastMessage;
+
   const previousSentIndex = sent.findIndex(
     (item) => item.id === previousLast?.id,
   );
+
   const lastSentIndex = sent.findIndex((item) => item.id === lastMessage?.id);
+
   const latest =
     previousLast &&
     (!lastMessage ||
@@ -50,6 +58,7 @@ export function addSentMessages(thread: ChatThread, sent: ChatMessage[]) {
         !(previousSentIndex >= 0 && lastSentIndex > previousSentIndex)))
       ? previousLast
       : lastMessage;
+
   return {
     ...thread,
     conversation: {
@@ -82,10 +91,12 @@ export function mergeThread(
   next: ChatThread,
 ): ChatThread {
   if (!current || current.conversation.id !== next.conversation.id) return next;
+
   const conversation = mergeAiStateByVersion(
     current.conversation,
     next.conversation,
   );
+
   if (!next.messages.length)
     return {
       ...next,
@@ -93,23 +104,29 @@ export function mergeThread(
       messages: current.messages,
       nextCursor: current.nextCursor,
     };
+
   const nextIds = new Set(next.messages.map((message) => message.id));
+
   const firstOverlap = current.messages.findIndex((message) =>
     nextIds.has(message.id),
   );
+
   const lastOverlap = current.messages.findLastIndex((message) =>
     nextIds.has(message.id),
   );
+
   const prefix =
     firstOverlap < 0
       ? current.messages
       : current.messages.slice(0, firstOverlap);
+
   const suffix =
     lastOverlap < 0
       ? []
       : current.messages
           .slice(lastOverlap + 1)
           .filter((message) => !nextIds.has(message.id));
+
   return {
     ...next,
     conversation,
@@ -123,6 +140,7 @@ export function prependOlder(
   older: ChatThread,
 ): ChatThread {
   const known = new Set(current.messages.map((message) => message.id));
+
   return {
     ...current,
     messages: [
@@ -162,9 +180,12 @@ export function mergePolledThread(
   localOnlyIds: ReadonlySet<string>,
 ) {
   const gap = threadHasGap(current, next, localOnlyIds);
+
   if (!gap || !current)
     return { thread: mergeThread(current, next), gap: false };
+
   const nextIds = new Set(next.messages.map((message) => message.id));
+
   return {
     thread: {
       ...next,

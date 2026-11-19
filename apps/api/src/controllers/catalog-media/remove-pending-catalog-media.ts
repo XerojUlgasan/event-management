@@ -26,6 +26,7 @@ export const removePendingCatalogMediaRouteHandler: AppRouteHandler<
     id,
     c.get("session").user.id,
   );
+
   return result
     ? jsonError(c, result.message, result.status)
     : c.body(null, 204);

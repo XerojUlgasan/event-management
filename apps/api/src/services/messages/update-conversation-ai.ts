@@ -14,7 +14,9 @@ export async function updateConversationAiService(
     aiEnabled,
     expectedAiVersion,
   );
+
   if (result.kind === "ok") return result;
+
   return {
     kind: "error" as const,
     status: result.kind === "not-found" ? (404 as const) : (409 as const),

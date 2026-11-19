@@ -4,6 +4,7 @@ import type { AppRouteHandler } from "../../types/hono.js";
 import { json, errors, body, idParams } from "../packages/http.js";
 import { serviceInputSchema, adminSchema } from "./schemas.js";
 import { createServiceService } from "../../services/services/create-service.js";
+
 export const createServiceRoute = createRoute({
   method: "post",
   path: "/admin/services",
@@ -14,6 +15,7 @@ export const createServiceRoute = createRoute({
     ...errors,
   },
 });
+
 export const createServiceRouteHandler: AppRouteHandler<
   typeof createServiceRoute
 > = async (c) => {
@@ -22,6 +24,8 @@ export const createServiceRouteHandler: AppRouteHandler<
     c.req.valid("json"),
     c.get("session").user.id,
   );
+
   if ("status" in value) return jsonError(c, value.message, value.status);
+
   return c.json(value, 201);
 };

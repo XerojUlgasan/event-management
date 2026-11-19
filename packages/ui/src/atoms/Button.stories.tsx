@@ -26,19 +26,25 @@ const meta = {
 } satisfies Meta<typeof Button>;
 
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 export const Primary: Story = {};
+
 export const Secondary: Story = { args: { variant: "secondary" } };
+
 export const Link: Story = {
   args: { variant: "link", children: "View details" },
 };
+
 export const WithIcon: Story = {
   args: { icon: "arrow", children: "Start planning" },
 };
+
 export const Small: Story = {
   args: { variant: "secondary", size: "small", children: "Edit" },
 };
+
 export const IconOnly: Story = {
   args: {
     variant: "secondary",
@@ -48,19 +54,25 @@ export const IconOnly: Story = {
     "aria-label": "Close",
   },
 };
+
 export const PlainComposite: Story = {
   args: { variant: "plain", children: "Custom navigation" },
 };
+
 export const Disabled: Story = {
   args: { disabled: true, children: "Saving…" },
 };
+
 export const Pending: Story = { args: { pending: true, children: "Saving…" } };
+
 export const Danger: Story = {
   args: { variant: "danger", children: "Delete venue" },
 };
+
 export const Toggle: Story = {
   args: { variant: "secondary", "aria-pressed": true, children: "Available" },
 };
+
 export const OnDark: Story = {
   render: () => (
     <div

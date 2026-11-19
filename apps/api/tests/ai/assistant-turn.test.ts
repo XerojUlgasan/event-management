@@ -18,6 +18,7 @@ import { humanHandoffAcknowledgement } from "../../src/data/messages/request-hum
 import { runAssistantTurnService } from "../../src/services/ai/run-assistant-turn.js";
 
 const database = `em_ai_test_${randomUUID().replaceAll("-", "")}`;
+
 const modelId = "fixture/text-model";
 let admin: Pool;
 let pool: Pool;
@@ -76,6 +77,7 @@ function useToolCalls(
   const generate = model.doGenerate.bind(model);
   model.doGenerate = async (...args) => {
     const result = await generate(...args);
+
     if (model.doGenerateCalls.length === 1)
       return {
         ...result,
@@ -87,7 +89,9 @@ function useToolCalls(
         })),
         finishReason: { unified: "tool-calls" as const, raw: undefined },
       };
+
     await beforeAnswer?.();
+
     return result;
   };
 }
@@ -105,6 +109,7 @@ before(async () => {
   await admin.query(`CREATE DATABASE "${database}"`);
   pool = new Pool({ ...connection, database });
   const root = new URL("../../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name))) {
@@ -112,6 +117,7 @@ before(async () => {
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
   }
+
   process.env.DB_NAME = database;
   process.env.AI_GATEWAY_API_KEY = "fixture-key";
   process.env.TEXT_MODEL = modelId;
@@ -137,6 +143,7 @@ before(async () => {
         expires_at: new Date(Date.now() + 3600000),
       })
       .execute();
+
     return { id: user.id, cookie: `em_session=${token}` };
   }
   customer = await session("customer");
@@ -160,6 +167,7 @@ after(async () => {
   delete globalThis.AI_SDK_DEFAULT_PROVIDER;
   await db?.destroy();
   await pool?.end();
+
   if (admin) {
     // pg-pool's end promise can settle before its clients' socket-end callbacks.
     // A normal drop lets those disconnects finish and exposes a genuine leak;
@@ -197,6 +205,7 @@ async function send(conversationId: string, body: string) {
     { conversationId, body },
   );
   assert.equal(response.status, 201);
+
   return customerMessageResultSchema.parse(await response.json());
 }
 
@@ -226,11 +235,13 @@ test("concurrent customer retries start only one assistant turn", async () => {
     responses.map((response) => response.status),
     [201, 201],
   );
+
   const results = await Promise.all(
     responses.map(async (response) =>
       customerMessageResultSchema.parse(await response.json()),
     ),
   );
+
   assert.deepEqual(
     results.map((result) => result.message.id),
     [requestId, requestId],
@@ -366,16 +377,20 @@ test("admin takeover discards an in-flight AI reply even after AI is re-enabled"
   useReply("Old reply must not be saved");
   let started!: () => void;
   let release!: () => void;
+
   const generating = new Promise<void>((resolve) => {
     started = resolve;
   });
+
   const resume = new Promise<void>((resolve) => {
     release = resolve;
   });
+
   const originalGenerate = model.doGenerate.bind(model);
   model.doGenerate = async (...args) => {
     started();
     await resume;
+
     return originalGenerate(...args);
   };
   const id = await conversation();
@@ -386,6 +401,7 @@ test("admin takeover discards an in-flight AI reply even after AI is re-enabled"
       throw new Error("Customer send completed before generation began");
     }),
   ]);
+
   try {
     const response = await call(
       `/admin/conversations/${id}/messages`,
@@ -408,6 +424,7 @@ test("admin takeover discards an in-flight AI reply even after AI is re-enabled"
   } finally {
     release();
   }
+
   const result = await pending;
   assert.equal(result.assistantMessage, null);
   assert.equal(result.assistantError, null);
@@ -430,6 +447,7 @@ function turnContext(callIndex: number) {
         "Current server-built context snapshot",
       ),
   );
+
   assert.ok(message);
   assert.equal(message.role, "user");
   assert.equal(message.content.length, 1);
@@ -441,6 +459,7 @@ function turnContext(callIndex: number) {
   assert.ok(typeof context.currentDateTime === "string");
   const now = Date.parse(context.currentDateTime);
   assert.equal(new Date(now).toISOString(), context.currentDateTime);
+
   return { context, now };
 }
 
@@ -650,7 +669,9 @@ test("customer sends generate persisted AI replies, visible after refresh with c
   const list = conversationsSchema.parse(
     await (await call("/messages/conversations", customer.cookie)).json(),
   );
+
   const item = list.conversations.find((item) => item.id === id);
+
   assert.equal(item?.unreadCount, 1);
   assert.equal(item?.lastMessage?.id, result.assistantMessage?.id);
   const adminList = conversationsSchema.parse(
@@ -684,6 +705,7 @@ test("model receives all ordered history beyond the UI page, including human tea
       body: "unrelated-private-marker",
     })
     .execute();
+
   for (let i = 0; i < 22; i++) {
     await db
       .insertInto("messages")
@@ -696,6 +718,7 @@ test("model receives all ordered history beyond the UI page, including human tea
       })
       .execute();
   }
+
   const result = await send(id, "Latest question");
   assert.equal(result.assistantError, null);
   const prompt = model.doGenerateCalls[0].prompt;
@@ -714,11 +737,14 @@ test("model receives all ordered history beyond the UI page, including human tea
 test("provider failure, missing configuration, and empty output preserve the customer write without leaking errors", async () => {
   for (const failure of ["provider", "config", "empty"]) {
     useReply(failure === "empty" ? "   " : "unused");
+
     if (failure === "provider")
       model.doGenerate = async () => {
         throw new Error("private-provider-payload");
       };
+
     if (failure === "config") delete process.env.AI_GATEWAY_API_KEY;
+
     const id = await conversation();
     const result = await send(id, "Save this message");
     process.env.AI_GATEWAY_API_KEY = "fixture-key";
@@ -1006,6 +1032,7 @@ async function detailPackage() {
     })
     .returning("id")
     .executeTakeFirstOrThrow();
+
   return row.id;
 }
 
@@ -1017,18 +1044,24 @@ test("catalog detail reaches the model as Markdown and links its audit record to
   const result = await send(await conversation(), "Describe this package");
   assert.equal(result.assistantError, null);
   assert.ok(result.assistantMessage);
+
   const toolMessage = model.doGenerateCalls[1].prompt.find(
     (message) => message.role === "tool",
   );
+
   assert.ok(toolMessage);
+
   const part = toolMessage.content.find(
     (item) =>
       item.type === "tool-result" && item.toolName === "getPublicCatalogItem",
   );
+
   assert.ok(part && part.type === "tool-result");
   assert.equal(part.output.type, "text");
+
   if (part.output.type !== "text")
     throw new Error("Expected Markdown tool output");
+
   assert.match(part.output.value, /^# Detail fixture/);
   assert.match(part.output.value, /detail-source-marker/);
   assert.match(part.output.value, /PHP 1250 per package/);
@@ -1258,7 +1291,9 @@ test("the agent reserves a final answer step after repeated searches", async () 
   const generate = model.doGenerate.bind(model);
   model.doGenerate = async (...args) => {
     const result = await generate(...args);
+
     if (args[0].toolChoice?.type === "none") return result;
+
     return {
       ...result,
       content: [
@@ -1326,6 +1361,7 @@ test("later turns receive only their conversation's delivered search pagination,
         price: 3333,
       })
       .execute();
+
   const id = await conversation();
   const input = {
     catalogType: "package",
@@ -1441,6 +1477,7 @@ test("tracking failure preserves the customer message and never publishes an unt
     LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'private-tracking-payload'; END $$;
     CREATE TRIGGER reject_fixture_tool_tracking BEFORE INSERT ON ai_tool_calls
     FOR EACH ROW EXECUTE FUNCTION reject_fixture_tool_tracking()`);
+
   try {
     useCatalogCalls([{ catalogType: "package" }]);
     const result = await send(await conversation(), "Show catalog packages");
@@ -1478,6 +1515,7 @@ test("takeover during search prevents its result from entering the answer", asyn
       ).status,
       201,
     );
+
     return new Response(
       JSON.stringify({
         embeddings: [[1, ...Array(767).fill(0)]],
@@ -1486,6 +1524,7 @@ test("takeover during search prevents its result from entering the answer", asyn
       { headers: { "content-type": "application/json" } },
     );
   };
+
   try {
     useCatalogCalls([{ catalogType: "package", query: "garden" }]);
     const result = await send(id, "Find a garden package");
@@ -1502,6 +1541,7 @@ test("takeover during search prevents its result from entering the answer", asyn
     assert.equal(record.assistant_message_id, null);
   } finally {
     globalThis.fetch = originalFetch;
+
     if (originalEmbeddingModel === undefined)
       delete process.env.EMBEDDING_MODEL;
     else process.env.EMBEDDING_MODEL = originalEmbeddingModel;
@@ -1519,6 +1559,7 @@ test("customer proposal tool returns scoped JSON and records only bounded audit 
   ).id;
   const marker = `private-proposal-${randomUUID()}`;
   const originalMarkdown = `${marker}\n${"Original **widget** text. ".repeat(700)}`;
+
   const sections = [
     {
       id: randomUUID(),
@@ -1538,6 +1579,7 @@ test("customer proposal tool returns scoped JSON and records only bounded audit 
       })),
     },
   ];
+
   await db
     .insertInto("packages")
     .values({
@@ -1560,6 +1602,7 @@ test("customer proposal tool returns scoped JSON and records only bounded audit 
   const result = await send(id, "What is my proposal?");
   assert.equal(result.assistantError, null);
   assert.ok(result.assistantMessage);
+
   const message = model.doGenerateCalls[1].prompt.find(
     (item) =>
       item.role === "tool" &&
@@ -1568,13 +1611,18 @@ test("customer proposal tool returns scoped JSON and records only bounded audit 
           part.type === "tool-result" && part.toolName === "getMyProposal",
       ),
   );
+
   assert.ok(message?.role === "tool");
+
   const part = message.content.find(
     (item) => item.type === "tool-result" && item.toolName === "getMyProposal",
   );
+
   assert.ok(part && part.type === "tool-result");
   assert.equal(part.output.type, "json");
+
   if (part.output.type !== "json") throw new Error("Expected JSON proposal");
+
   assert.match(JSON.stringify(part.output.value), new RegExp(marker));
   assert.ok(JSON.stringify(part.output.value).length > 65536);
   assert.deepEqual(
@@ -1603,10 +1651,12 @@ test("customer proposal tool returns scoped JSON and records only bounded audit 
       .length,
     1,
   );
+
   for (const record of records) {
     assert.equal(record.tool_name, "getMyProposal");
     assert.equal(record.assistant_message_id, result.assistantMessage.id);
     assert.doesNotMatch(JSON.stringify(record.output), new RegExp(marker));
+
     if (record.status === "succeeded")
       assert.match(JSON.stringify(record.output), /[a-f0-9]{64}/i);
   }
@@ -1669,6 +1719,7 @@ test("proposal exceeding the turn input budget fails explicitly without returnin
       .executeTakeFirstOrThrow()
   ).id;
   const marker = `large-private-${randomUUID()}`;
+
   const sections = [
     {
       id: randomUUID(),
@@ -1688,6 +1739,7 @@ test("proposal exceeding the turn input budget fails explicitly without returnin
       })),
     },
   ];
+
   await db
     .insertInto("packages")
     .values({
@@ -1738,7 +1790,9 @@ test("an implicit proposal follow-up can read current state after an earlier den
   const generate = model.doGenerate.bind(model);
   model.doGenerate = async (...args) => {
     const result = await generate(...args);
+
     if (model.doGenerateCalls.length !== 1) return result;
+
     return {
       ...result,
       content: [
@@ -1812,6 +1866,7 @@ async function handoffFixture() {
     })
     .returning("id")
     .executeTakeFirstOrThrow();
+
   return {
     conversationId: id,
     customerId: customer.id,
@@ -1832,6 +1887,7 @@ async function invokeHandoff(
     customerMessageId: scope.customerMessageId,
     input,
   });
+
   return requestHumanHandoffService({
     db,
     scope,
@@ -1941,6 +1997,7 @@ test("a handoff tracking-completion failure rolls back its state and acknowledge
   await pool.query(
     "CREATE TRIGGER reject_handoff_completion_test BEFORE UPDATE ON ai_tool_calls FOR EACH ROW EXECUTE FUNCTION reject_handoff_completion_test()",
   );
+
   try {
     await assert.rejects(invokeHandoff(scope));
   } finally {
@@ -1949,6 +2006,7 @@ test("a handoff tracking-completion failure rolls back its state and acknowledge
     );
     await pool.query("DROP FUNCTION reject_handoff_completion_test()");
   }
+
   const state = await db
     .selectFrom("conversations")
     .select(["ai_handoff", "ai_enabled", "ai_version"])
@@ -1976,8 +2034,10 @@ test("handoff rejects stale takeover, off/on cycles and mismatched triggering me
   for (const resume of [false, true]) {
     const scope = await handoffFixture();
     assert.equal((await setAi(scope.conversationId, false, 0)).status, 200);
+
     if (resume)
       assert.equal((await setAi(scope.conversationId, true, 1)).status, 200);
+
     await assert.rejects(invokeHandoff(scope));
     const state = await db
       .selectFrom("conversations")
@@ -1986,6 +2046,7 @@ test("handoff rejects stale takeover, off/on cycles and mismatched triggering me
       .executeTakeFirstOrThrow();
     assert.equal(state.ai_handoff, null);
   }
+
   const own = await handoffFixture();
   const another = await handoffFixture();
   await assert.rejects(

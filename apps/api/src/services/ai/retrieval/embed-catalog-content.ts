@@ -16,8 +16,11 @@ export async function embedCatalogContent({
   purpose?: "document" | "search";
 }): Promise<{ embedding: number[]; model: string }> {
   const { apiKey, model } = env.AI_EMBEDDING;
+
   if (model !== supportedModel) throw new Error("Unsupported embedding model");
+
   if (!contentMarkdown.trim()) throw new Error("Embedding content is empty");
+
   if (
     image &&
     (!image.bytes.length ||
@@ -53,11 +56,15 @@ export async function embedCatalogContent({
       },
     }),
   });
+
   if (embedding.length !== dimensions || !embedding.every(Number.isFinite)) {
     throw new Error("Invalid embedding vector");
   }
+
   const norm = Math.hypot(...embedding);
+
   if (!Number.isFinite(norm) || norm === 0)
     throw new Error("Invalid embedding vector");
+
   return { embedding: embedding.map((value) => value / norm), model };
 }

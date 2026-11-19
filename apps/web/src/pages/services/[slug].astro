@@ -8,15 +8,19 @@ import { loadService } from "../../lib/server/catalog/load-catalog";
 const slug = Astro.params.slug ?? "";
 let item: PublicService | null = null;
 let unavailable = false;
+
 try {
   item = await loadService(slug);
 } catch {
   unavailable = true;
 }
+
 if (!unavailable && !item) Astro.response.status = 404;
+
 const title = item
   ? `${item.name} | Styled by AMAC`
   : "Service not found | Styled by AMAC";
+
 const description = item?.description || "This service is not available.";
 ---
 

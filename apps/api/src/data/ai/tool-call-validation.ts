@@ -9,6 +9,7 @@ const toolCallIdSchema = z
   .refine((value) => value.trim().length > 0);
 
 const toolNameSchema = z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,127}$/);
+
 const inputSchema = z.record(z.string(), z.json());
 
 const startToolCallSchema = z.object({
@@ -36,6 +37,7 @@ const finishToolCallSchema = z
         message: "Failed tool calls cannot persist output",
         path: ["output"],
       });
+
     if (status === "succeeded" && errorCode !== undefined)
       context.addIssue({
         code: "custom",
@@ -93,11 +95,13 @@ function parse<T>(schema: z.ZodType<T>, value: unknown, message: string): T {
 
 function assertBoundedJson(value: unknown, message: string) {
   let encoded: string | undefined;
+
   try {
     encoded = JSON.stringify(value, null, 2);
   } catch {
     throw new Error(message);
   }
+
   if (
     encoded === undefined ||
     new TextEncoder().encode(encoded).byteLength > maxJsonBytes
@@ -112,6 +116,7 @@ export function validateStartToolCall(value: unknown) {
     "AI tool call input is invalid or too large",
   );
   assertBoundedJson(parsed.input, "AI tool call input is invalid or too large");
+
   return parsed;
 }
 
@@ -121,11 +126,13 @@ export function validateFinishToolCall(value: unknown) {
     value,
     "AI tool call completion is invalid",
   );
+
   if (parsed.output !== undefined && parsed.output !== null)
     assertBoundedJson(
       parsed.output,
       "AI tool call output is invalid or too large",
     );
+
   return parsed;
 }
 

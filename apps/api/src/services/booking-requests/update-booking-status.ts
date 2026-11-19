@@ -17,16 +17,21 @@ export async function updateBookingStatusService(
 ) {
   return db.transaction().execute(async (trx) => {
     const row = await lockBookingRequestData(trx, id);
+
     if (!row) return error("Booking request not found", 404);
+
     if (
       ["declined", "cancelled"].includes(row.status) ||
       row.status === status ||
       status === "under_review"
     )
       return error("Invalid status transition", 409);
+
     if (status === "cancelled") await cancelScheduledEventDaysService(trx, id);
+
     const updated = await updateBookingStatusData(trx, id, status);
     await addStatusHistoryData(trx, id, status, actorId, reason || null);
+
     return (await bookingRequestDtos(trx, [updated]))[0]!;
   });
 }

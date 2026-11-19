@@ -6,6 +6,7 @@ export function listBookingPackagesData(
   packageIds: string[],
 ) {
   if (!packageIds.length) return Promise.resolve([]);
+
   return db
     .selectFrom("packages")
     .select(["id", "name", "price", "max_guests"])

@@ -37,6 +37,7 @@ import { ServiceCanvas } from "./CatalogContent";
 import { CatalogFiltersForm } from "./CatalogFiltersForm";
 
 type Kind = CatalogKind;
+
 type Preview = { kind: Kind; id: string } | null;
 
 function PackageCard({
@@ -80,6 +81,7 @@ function ServiceCard({
   onPreview: () => void;
 }) {
   const pricing = servicePricingLabels(item);
+
   return (
     <article className="catalog-card">
       <div className="catalog-card-image">
@@ -125,10 +127,12 @@ function ServicePreview({ id, onClose }: { id: string; onClose: () => void }) {
       .finally(() => {
         if (active) setLoading(false);
       });
+
     return () => {
       active = false;
     };
   }, [id, notifyError]);
+
   return (
     <CatalogDetailPreview entity="service" onClose={onClose}>
       {loading && (
@@ -163,6 +167,7 @@ function CatalogPreview({
   const [error, setError] = useState("");
   useEffect(() => {
     if (selected?.kind !== "packages") return;
+
     let active = true;
     setPackageDetail(null);
     setLoading(true);
@@ -179,12 +184,15 @@ function CatalogPreview({
       .finally(() => {
         if (active) setLoading(false);
       });
+
     return () => {
       active = false;
     };
   }, [selected, notifyError]);
+
   if (selected?.kind === "services")
     return <ServicePreview id={selected.id} onClose={onClose} />;
+
   if (selected?.kind === "packages")
     return (
       <PackagePreview
@@ -195,6 +203,7 @@ function CatalogPreview({
         onClose={onClose}
       />
     );
+
   return null;
 }
 
@@ -232,21 +241,27 @@ export function PublicCatalog({
   const load = useCallback(
     async (cursor: string | undefined) => {
       if (busy.current) return;
+
       const current = generation.current();
       busy.current = true;
       setLoading(true);
       setError("");
       setItems([]);
       setNextCursor(null);
+
       try {
         if (kind === "packages") {
           const result = await getPackages({ limit, cursor, ...filters });
+
           if (!generation.isCurrent(current)) return;
+
           setItems(result.packages);
           setNextCursor(result.nextCursor);
         } else {
           const result = await getServices({ limit, cursor, ...filters });
+
           if (!generation.isCurrent(current)) return;
+
           setItems(result.services);
           setNextCursor(result.nextCursor);
         }
@@ -266,6 +281,7 @@ export function PublicCatalog({
 
   useEffect(() => {
     void load(pagination.cursor);
+
     return () => {
       generation.bump();
       busy.current = false;
@@ -274,18 +290,22 @@ export function PublicCatalog({
 
   const showPackage = (id: string) => {
     if (selected?.kind === "services") setParentService(selected.id);
+
     setSelected({ kind: "packages", id });
   };
+
   const closePreview = () => {
     if (selected?.kind === "packages" && parentService) {
       setSelected({ kind: "services", id: parentService });
       setParentService(null);
     } else setSelected(null);
   };
+
   const scrollToTop = () => {
     topRef.current?.focus({ preventScroll: true });
     topRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
   };
+
   const hasFilters = Object.keys(filters).length > 0;
 
   return (
@@ -432,6 +452,7 @@ export function CatalogOverlay({
     const unlockScroll = lockCatalogScroll();
     dialog?.showModal();
     dialog?.querySelector<HTMLButtonElement>(".package-preview-close")?.focus();
+
     return () => {
       dialog?.close();
       unlockScroll();

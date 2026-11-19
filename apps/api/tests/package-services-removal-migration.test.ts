@@ -19,13 +19,16 @@ test("removing service assignments preserves source records and canvas reference
   const database = `em_remove_service_links_${randomUUID().replaceAll("-", "")}`;
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
+
   try {
     await admin.query(`CREATE DATABASE "${database}"`);
     pool = new Pool({ ...connection, database });
     const root = new URL("../prisma/migrations/", import.meta.url);
+
     const entries = (await readdir(root, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory())
       .sort((a, b) => a.name.localeCompare(b.name));
+
     for (const entry of entries.filter((entry) => entry.name < migration))
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
@@ -55,6 +58,7 @@ test("removing service assignments preserves source records and canvas reference
       "INSERT INTO package_services(package_id,service_id,role,sort_order) VALUES($1,$2,'included',0)",
       [pkg, service],
     );
+
     const widget = (type: string, reference: object) => ({
       id: randomUUID(),
       type,
@@ -69,6 +73,7 @@ test("removing service assignments preserves source records and canvas reference
       mediaId: null,
       ...reference,
     });
+
     await pool.query("UPDATE packages SET canvas=$2::jsonb WHERE id=$1", [
       pkg,
       JSON.stringify([
@@ -106,6 +111,7 @@ test("removing service assignments preserves source records and canvas reference
        VALUES($1,'fixture','package',$2,'{"historical":true}')`,
       [customer, pkg],
     );
+
     for (const [owner, key, content] of [
       [pkg, "overview", "Old included service text"],
       [pkg, "overview:1", "Old split overview text"],
@@ -117,8 +123,10 @@ test("removing service assignments preserves source records and canvas reference
          VALUES($1,$2,$3,'fixture-hash')`,
         [owner, key, content],
       );
+
     const snapshot = async () => {
       const result: Record<string, unknown> = {};
+
       for (const table of [
         "packages",
         "services",
@@ -133,8 +141,10 @@ test("removing service assignments preserves source records and canvas reference
             `SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) AS rows FROM ${table} t`,
           )
         ).rows[0].rows;
+
       return result;
     };
+
     const before = await snapshot();
     const retainedKnowledge = (
       await pool.query(

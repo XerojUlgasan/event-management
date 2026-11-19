@@ -13,8 +13,10 @@ import type { NavKey } from "../../../app/navigation-types";
 
 export function GenericPage({ page }: { page: NavKey }) {
   const { notify } = useNotifications();
+
   const unavailable = () =>
     notify("Demo only: this action is unavailable.", "info");
+
   const content: Record<
     string,
     {
@@ -91,6 +93,7 @@ export function GenericPage({ page }: { page: NavKey }) {
             "Harlow Garden Birthday",
             "Arc & Co. Product Launch",
           ];
+
   return (
     <div className="content-stack">
       <PageHeader

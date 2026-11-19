@@ -41,6 +41,7 @@ const resolveWidget = (widget: CatalogWidget): CatalogWidget => ({
       }
     : widget.service,
 });
+
 const resolveSections = (sections: CatalogSection[]): CatalogSection[] =>
   sections.map((section) => ({
     ...section,
@@ -74,6 +75,7 @@ export function PackageCanvas({
   bookingAction?: ReactNode;
 }) {
   const openCatalog = useCatalogNavigation();
+
   return (
     <CatalogCanvas>
       <div className="catalog-detail-intro">
@@ -108,6 +110,7 @@ export function PackageCanvas({
 export function ServiceCanvas({ item }: { item: ServiceContent }) {
   const pricing = servicePricingLabels(item);
   const openCatalog = useCatalogNavigation();
+
   return (
     <CatalogCanvas>
       <div className="catalog-detail-intro">

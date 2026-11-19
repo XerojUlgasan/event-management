@@ -41,6 +41,7 @@ export function MonthCalendar({
     month: "long",
     year: "numeric",
   }).format(current);
+
   const moveMonth = (offset: number) =>
     onMonthChange(
       keyForDate(new Date(year, monthNumber - 1 + offset, 1)).slice(0, 7),
@@ -112,6 +113,7 @@ export function MonthCalendar({
             dateStyle: "full",
           }).format(new Date(year, monthNumber - 1, index + 1));
           const showCount = !loading && !error;
+
           return (
             <Button
               variant="plain"

@@ -11,13 +11,17 @@ import type { PublicPackage } from "../lib/data/catalog/packages";
 import type { PublicService } from "../lib/data/catalog/services";
 
 let packages: PublicPackage[] = [];
+
 let services: PublicService[] = [];
+
 let unavailable = false;
+
 try {
   [packages, services] = await Promise.all([loadPackages(3), loadServices(3)]);
 } catch {
   unavailable = true;
 }
+
 const description =
   "Styled by AMAC connects event planning, customer bookings, and catering operations in one workspace.";
 ---

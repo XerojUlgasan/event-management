@@ -1,7 +1,9 @@
 import type { Kysely, Selectable, Transaction } from "kysely";
 import type { DB, Services } from "../../db/types.js";
 import { readCatalogSectionsService } from "../catalog-canvas/read-catalog-sections.js";
+
 type Database = Kysely<DB> | Transaction<DB>;
+
 export async function serviceAdminDto(db: Database, s: Selectable<Services>) {
   const sections = await readCatalogSectionsService(db, {
     kind: "service",
@@ -10,6 +12,7 @@ export async function serviceAdminDto(db: Database, s: Selectable<Services>) {
   const thumbnailUrl = s.thumbnail_media_id
     ? `/v1/catalog-media/${s.thumbnail_media_id}`
     : null;
+
   return {
     id: s.id,
     slug: s.slug,
@@ -26,4 +29,5 @@ export async function serviceAdminDto(db: Database, s: Selectable<Services>) {
     publishedAt: s.published_at.toISOString(),
   };
 }
+
 export const publicDto = serviceAdminDto;

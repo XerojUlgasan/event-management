@@ -40,6 +40,7 @@ export function ServiceCards({ items }: { items: PublicService[] }) {
     <div className="catalog-grid">
       {items.map((item) => {
         const pricing = servicePricingLabels(item);
+
         return (
           <article className="catalog-card" key={item.id}>
             <a href={`/services/${item.slug}`}>

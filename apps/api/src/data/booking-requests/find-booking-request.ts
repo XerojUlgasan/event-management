@@ -1,6 +1,7 @@
 import { bookingRevision } from "./booking-revision.js";
 import type { Kysely, Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
+
 type Database = Kysely<DB> | Transaction<DB>;
 
 export const findBookingRequestData = (
@@ -13,6 +14,8 @@ export const findBookingRequestData = (
     .selectAll()
     .select(bookingRevision.as("revision"))
     .where("id", "=", id);
+
   if (customerId) query = query.where("customer_id", "=", customerId);
+
   return query.executeTakeFirst();
 };

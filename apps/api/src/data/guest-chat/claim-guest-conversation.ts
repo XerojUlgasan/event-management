@@ -13,13 +13,16 @@ export function claimGuestConversationData(
 ) {
   return db.transaction().execute(async (trx) => {
     if (!token) throw new GuestChatError(404, "Conversation not found");
+
     const conversation = await trx
       .selectFrom("conversations")
       .selectAll()
       .where("id", "=", id)
       .forUpdate()
       .executeTakeFirst();
+
     if (!conversation) throw new GuestChatError(404, "Conversation not found");
+
     const identityId =
       conversation.guest_identity_id ?? conversation.claimed_guest_identity_id;
     const identity = identityId
@@ -30,15 +33,19 @@ export function claimGuestConversationData(
           .where("token_hash", "=", hashSessionToken(token))
           .executeTakeFirst()
       : null;
+
     if (!identity) throw new GuestChatError(404, "Conversation not found");
+
     if (conversation.customer_id) {
       if (
         conversation.customer_id !== customerId ||
         !conversation.claimed_guest_identity_id
       )
         throw new GuestChatError(404, "Conversation not found");
+
       return { conversationId: id };
     }
+
     assertGuestActive(conversation);
     await trx
       .updateTable("conversations")
@@ -50,6 +57,7 @@ export function claimGuestConversationData(
       })
       .where("id", "=", id)
       .execute();
+
     // Guest human messages retain their original provenance and NULL sender IDs.
     return { conversationId: id };
   });

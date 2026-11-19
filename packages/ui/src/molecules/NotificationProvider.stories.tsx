@@ -13,13 +13,16 @@ const meta = {
   component: NotificationProvider,
   args: { children: null },
 } satisfies Meta<typeof NotificationProvider>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 function Example({ modal = false }: { modal?: boolean }) {
   const { notify, notifyError } = useNotifications();
   const [open, setOpen] = useState(false);
   const [nested, setNested] = useState(false);
+
   const actions = (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
       <Button onClick={() => notify("Changes saved successfully.")}>
@@ -56,6 +59,7 @@ function Example({ modal = false }: { modal?: boolean }) {
       </Button>
     </div>
   );
+
   return (
     <>
       {modal ? (
@@ -92,6 +96,7 @@ export const StackAndErrors: Story = {
     </NotificationProvider>
   ),
 };
+
 export const NativeModal: Story = {
   render: () => (
     <NotificationProvider>

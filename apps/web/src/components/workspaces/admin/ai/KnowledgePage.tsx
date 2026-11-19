@@ -45,7 +45,9 @@ export function KnowledgePage() {
   const indexRun = useRef<{ stopped: boolean } | null>(null);
   const seq = useRef(0);
   const pages = usePagination(`${search}:${kind}:${status}`);
+
   const load = useCallback(() => setRetry((n) => n + 1), []);
+
   useEffect(
     () => () => {
       if (indexRun.current) indexRun.current.stopped = true;
@@ -54,6 +56,7 @@ export function KnowledgePage() {
   );
   async function indexPending() {
     if (indexRun.current) return;
+
     const run = { stopped: false };
     indexRun.current = run;
     setIndexing(true);
@@ -63,10 +66,13 @@ export function KnowledgePage() {
     let embedded = 0;
     let failed = 0;
     let cursor: string | undefined;
+
     try {
       do {
         const result = await indexPendingKnowledge(cursor);
+
         if (run.stopped) return;
+
         embedded += result.embedded;
         failed += result.failed;
         setIndexMessage(
@@ -75,6 +81,7 @@ export function KnowledgePage() {
         load();
         cursor = result.nextCursor ?? undefined;
       } while (cursor);
+
       const message = failed
         ? `${embedded} chunks indexed; ${failed} failed. Select Index pending to retry. Failed chunks remain unavailable to semantic search.`
         : embedded
@@ -96,6 +103,7 @@ export function KnowledgePage() {
       }
     } finally {
       if (indexRun.current === run) indexRun.current = null;
+
       if (!run.stopped) {
         setIndexing(false);
         pages.reset();
@@ -117,10 +125,12 @@ export function KnowledgePage() {
       .finally(() => {
         if (seq.current === current) setLoading(false);
       });
+
     return () => {
       seq.current++;
     };
   }, [search, kind, status, pages.cursor, retry]);
+
   return (
     <div className="knowledge-page">
       <PageHeader

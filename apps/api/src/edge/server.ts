@@ -82,6 +82,7 @@ const bodyLimits: Partial<
 };
 
 const familyApps = new Map<RouteFamilyId, Promise<OpenAPIHono<HonoEnv>>>();
+
 let documentationApp: Promise<OpenAPIHono<HonoEnv>> | undefined;
 
 function remember<T>(load: () => Promise<T>, drop: () => void) {
@@ -89,6 +90,7 @@ function remember<T>(load: () => Promise<T>, drop: () => void) {
     drop();
     throw error;
   });
+
   return pending;
 }
 
@@ -103,52 +105,66 @@ async function createFamilyApp(id: RouteFamilyId) {
     c.set("db", db);
     await next();
   });
+
   for (const limit of bodyLimits[id] ?? [])
     family.use(limit.path, bodyLimit({ maxSize: limit.maxSize }));
+
   if (id === "booking-requests")
     family.use("/admin/booking-requests/*", (c, next) =>
       bodyLimit({ maxSize: bookingBodyLimit(c.req.path) })(c, next),
     );
+
   family.route("/", routes);
+
   return family;
 }
 
 function loadFamily(id: RouteFamilyId) {
   const cached = familyApps.get(id);
+
   if (cached) return cached;
+
   const pending = remember(
     () => createFamilyApp(id),
     () => familyApps.delete(id),
   );
+
   familyApps.set(id, pending);
+
   return pending;
 }
 
 function loadDocumentation() {
   if (documentationApp) return documentationApp;
+
   documentationApp = remember(
     async () => {
       const docs = new OpenAPIHono<HonoEnv>();
+
       for (const family of routeFamilies) {
         const { default: routes } = await loaders[family.id]();
         docs.route("/v1", routes);
       }
+
       docs.doc("/openapi.json", {
         openapi: "3.0.0",
         info: { title: "Event Management API", version: "0.1.0" },
       });
+
       return docs;
     },
     () => {
       documentationApp = undefined;
     },
   );
+
   return documentationApp;
 }
 
 function stripMountPrefix(request: Request) {
   const url = new URL(request.url);
   url.pathname = url.pathname.replace(/^\/v1(?=\/|$)/, "") || "/";
+
   return new Request(url, request);
 }
 
@@ -167,6 +183,7 @@ app.use(
 
 app.use("/v1/*", async (c, next) => {
   const origin = c.req.header("origin");
+
   if (
     ["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method) &&
     origin &&
@@ -174,6 +191,7 @@ app.use("/v1/*", async (c, next) => {
   ) {
     return c.json({ error: "Origin is not allowed" }, 403);
   }
+
   await next();
 });
 
@@ -183,7 +201,10 @@ app.all("/openapi.json", (c) =>
 
 app.all("/v1/*", async (c) => {
   const family = matchRouteFamily(c.req.path);
+
   if (!family) return c.notFound();
+
   const familyApp = await loadFamily(family);
+
   return familyApp.fetch(stripMountPrefix(c.req.raw));
 });

@@ -6,6 +6,7 @@ import { publicSchema } from "../../controllers/packages/schemas.js";
 import { findBookingRequestData } from "../../data/booking-requests/find-booking-request.js";
 import { listCustomPackageHistoryData } from "../../data/booking-requests/list-custom-package-history.js";
 import { encodePageCursor, parsePageCursor } from "../../utils/pagination.js";
+
 const positionSchema = z.object({
   createdAt: z.iso
     .datetime()
@@ -16,26 +17,31 @@ const positionSchema = z.object({
     ),
   id: z.string().uuid(),
 });
+
 export async function getBookingPackageHistoryService(
   db: Kysely<DB>,
   id: string,
   input: { limit: number; cursor?: string },
 ) {
   if (!(await findBookingRequestData(db, id))) return null;
+
   const scope = JSON.stringify(["private-package-history", id]);
   const position = parsePageCursor(input.cursor, positionSchema, scope);
   const rows = await listCustomPackageHistoryData(db, id, {
     limit: input.limit,
     position,
   });
+
   const page = createPage(rows, input.limit, (row) =>
     encodePageCursor(scope, { createdAt: row.cursor_created_at, id: row.id }),
   );
+
   return {
     history: page.items.map((row) => {
       const metadata = z
         .object({ before: publicSchema.nullable(), after: publicSchema })
         .parse(row.metadata);
+
       return {
         id: row.id,
         actorId: row.actor_id,

@@ -17,6 +17,7 @@ const positionSchema = z.object({
     ),
   id: z.string().uuid(),
 });
+
 export async function listAdminBookingRequestsPageService(
   db: Kysely<DB>,
   input: {
@@ -38,9 +39,11 @@ export async function listAdminBookingRequestsPageService(
     ...input,
     position,
   });
+
   const page = createPage(rows, input.limit, (row) =>
     encodePageCursor(scope, { createdAt: row.cursor_created_at, id: row.id }),
   );
+
   return {
     bookingRequests: await bookingRequestDtos(db, page.items),
     nextCursor: page.nextCursor,

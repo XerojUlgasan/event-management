@@ -45,10 +45,12 @@ export default function PublicChat() {
     >
   >({});
   const outboxRef = useRef(outbox);
+
   const updateOutbox = (update: (current: typeof outbox) => typeof outbox) => {
     outboxRef.current = update(outboxRef.current);
     setOutbox(outboxRef.current);
   };
+
   const draftInput = useRef<HTMLTextAreaElement>(null);
   const [olderBusy, setOlderBusy] = useState(false);
   const [error, setError] = useState("");
@@ -66,27 +68,35 @@ export default function PublicChat() {
   const polling = useRef(false);
   const opening = useRef(false);
   const revision = useRef(0);
+
   const openChat = async () => {
     setOpen(true);
     scrollOnOpen.current = true;
+
     if (opening.current) return;
+
     opening.current = true;
     setLoading(true);
     setError("");
     setExpired(false);
+
     try {
       let profile;
+
       try {
         profile = await getMe();
       } catch (cause) {
         if (!(cause instanceof ApiError && cause.status === 401)) throw cause;
       }
+
       if (profile?.role === "admin") {
         setThread(null);
         updateOutbox(() => ({}));
         setAdmin(true);
+
         return;
       }
+
       if (profile?.role === "customer") {
         setThread(null);
         updateOutbox(() => ({}));
@@ -94,8 +104,10 @@ export default function PublicChat() {
         window.location.assign(
           `/app/messages?conversation=${encodeURIComponent(result.conversation.id)}`,
         );
+
         return;
       }
+
       setAdmin(false);
       // Tabs on this origin serialize the first bootstrap, allowing the next
       // request to use the HttpOnly cookie set by the first response.
@@ -105,6 +117,7 @@ export default function PublicChat() {
             startGuestChat,
           )
         : await startGuestChat();
+
       if (
         threadRef.current &&
         threadRef.current.conversation.id !== result.conversation.id
@@ -112,17 +125,22 @@ export default function PublicChat() {
         updateOutbox(() => ({}));
         setDraft("");
       }
+
       if (threadRef.current?.conversation.id === result.conversation.id) {
         updateOutbox((current) => {
           const next = { ...current };
           result.messages.forEach((message) => delete next[message.id]);
+
           return next;
         });
       }
+
       setThread((current) => {
         const merged = mergeGuestThread(current, result);
+
         if (!current || current.conversation.id !== result.conversation.id)
           return merged;
+
         return {
           ...merged,
           guest: {
@@ -143,25 +161,34 @@ export default function PublicChat() {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     if (!open || loading || !thread || expired) return;
+
     const id = thread.conversation.id;
     let active = true;
+
     const poll = async () => {
       if (polling.current) return;
+
       polling.current = true;
       const started = revision.current;
+
       try {
         const result = await getGuestChat(id);
+
         if (active && started === revision.current) {
           updateOutbox((current) => {
             const next = { ...current };
             result.messages.forEach((message) => delete next[message.id]);
+
             return next;
           });
           setThread((current) => {
             const merged = mergeGuestThread(current, result);
+
             if (!current || current.conversation.id !== id) return merged;
+
             return {
               ...merged,
               guest: {
@@ -190,7 +217,9 @@ export default function PublicChat() {
         polling.current = false;
       }
     };
+
     const timer = window.setInterval(() => void poll(), 5000);
+
     return () => {
       active = false;
       window.clearInterval(timer);
@@ -198,16 +227,21 @@ export default function PublicChat() {
   }, [open, loading, thread?.conversation.id, expired]);
   useLayoutEffect(() => {
     const element = messageList.current;
+
     if (!open || loading || admin || !thread || !element) return;
+
     const last =
       Object.keys(outbox).at(-1) ?? thread.messages.at(-1)?.id ?? null;
     const anchor = olderAnchor.current;
+
     if (anchor) {
       const row = [
         ...element.querySelectorAll<HTMLElement>("[data-message-id]"),
       ].find((item) => item.dataset.messageId === anchor.id);
+
       if (row)
         element.scrollTop += row.getBoundingClientRect().top - anchor.top;
+
       olderAnchor.current = null;
     } else if (scrollOnOpen.current || nearBottom.current) {
       element.scrollTop = element.scrollHeight;
@@ -216,9 +250,11 @@ export default function PublicChat() {
     } else if (last && last !== lastMessageId.current) {
       setNewMessages(true);
     }
+
     scrollOnOpen.current = false;
     lastMessageId.current = last;
   }, [open, loading, admin, thread, outbox]);
+
   const deliver = async (
     conversationId: string,
     item: { body: string; requestId: string; createdAt: string },
@@ -232,6 +268,7 @@ export default function PublicChat() {
       },
     }));
     revision.current++;
+
     try {
       const result = await sendGuestMessage(
         conversationId,
@@ -263,15 +300,19 @@ export default function PublicChat() {
       updateOutbox((current) => {
         const next = { ...current };
         delete next[item.requestId];
+
         return next;
       });
+
       if (threadRef.current?.conversation.id !== conversationId) return;
+
       if (result.assistantError)
         setError(
           "Your message was sent, but an automatic reply is unavailable. Our team can still respond.",
         );
     } catch (cause) {
       if (threadRef.current?.conversation.id !== conversationId) return;
+
       updateOutbox((current) =>
         current[item.requestId]
           ? {
@@ -289,6 +330,7 @@ export default function PublicChat() {
             }
           : current,
       );
+
       if (cause instanceof ApiError && cause.status === 410) {
         setExpired(true);
         setError(
@@ -315,9 +357,12 @@ export default function PublicChat() {
       }
     }
   };
+
   const send = () => {
     const current = threadRef.current;
+
     const item = prepareGuestSend(null, draft, () => crypto.randomUUID());
+
     if (
       !current ||
       !item ||
@@ -329,6 +374,7 @@ export default function PublicChat() {
       ) === 0
     )
       return;
+
     setDraft("");
     setError("");
     void deliver(current.conversation.id, {
@@ -337,30 +383,38 @@ export default function PublicChat() {
     });
     draftInput.current?.focus();
   };
+
   const loadOlder = async () => {
     const current = threadRef.current;
+
     if (!current?.nextCursor || olderBusy) return;
+
     setOlderBusy(true);
     const started = ++revision.current;
+
     try {
       const older = await getGuestChat(
         current.conversation.id,
         current.nextCursor,
       );
       assertCursorMoved(older.nextCursor, current.nextCursor);
+
       if (started === revision.current) {
         updateOutbox((items) => {
           const next = { ...items };
           older.messages.forEach((message) => delete next[message.id]);
+
           return next;
         });
         const row =
           messageList.current?.querySelector<HTMLElement>("[data-message-id]");
+
         if (row?.dataset.messageId)
           olderAnchor.current = {
             id: row.dataset.messageId,
             top: row.getBoundingClientRect().top,
           };
+
         setThread((value) => mergeGuestThread(value, older, true));
       }
     } catch {
@@ -369,6 +423,7 @@ export default function PublicChat() {
       setOlderBusy(false);
     }
   };
+
   return (
     <>
       <Button
@@ -405,6 +460,7 @@ export default function PublicChat() {
               const el = event.currentTarget;
               nearBottom.current =
                 el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+
               if (nearBottom.current) setNewMessages(false);
             }}
           >
@@ -460,6 +516,7 @@ export default function PublicChat() {
                   })),
                 ).map((message) => {
                   const item = outbox[message.id];
+
                   return (
                     <div
                       key={message.id}
@@ -547,6 +604,7 @@ export default function PublicChat() {
                 if (messageList.current)
                   messageList.current.scrollTop =
                     messageList.current.scrollHeight;
+
                 nearBottom.current = true;
                 setNewMessages(false);
               }}

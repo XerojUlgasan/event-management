@@ -11,6 +11,7 @@ export const deletePackageRoute = createRoute({
   request: { params: idParams },
   responses: { 204: { description: "Deleted" }, ...errors },
 });
+
 export const deletePackageRouteHandler: AppRouteHandler<
   typeof deletePackageRoute
 > = async (c) => {
@@ -18,6 +19,8 @@ export const deletePackageRouteHandler: AppRouteHandler<
     c.get("db"),
     c.req.valid("param").id,
   );
+
   if (outcome) return jsonError(c, outcome.message, outcome.status);
+
   return c.body(null, 204);
 };

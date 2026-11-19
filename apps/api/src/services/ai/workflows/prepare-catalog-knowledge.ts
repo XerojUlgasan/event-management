@@ -75,6 +75,7 @@ function serviceOverview(record: ServiceRecord) {
     lines.push(
       `Fixed price: PHP ${record.fixed_price_pesos} for ${record.included_hours} included hours.`,
     );
+
     if (record.hourly_rate_pesos !== null)
       lines.push(`Additional time: PHP ${record.hourly_rate_pesos} per hour.`);
   } else if (record.hourly_rate_pesos !== null) {
@@ -82,12 +83,14 @@ function serviceOverview(record: ServiceRecord) {
   } else if (record.fixed_price_pesos !== null) {
     lines.push(`Fixed price: PHP ${record.fixed_price_pesos}.`);
   }
+
   return lines.join("\n");
 }
 
 function splitMarkdown(markdown: string) {
   const characters = Array.from(markdown);
   const chunks: string[] = [];
+
   for (
     let start = 0;
     start < characters.length;
@@ -97,6 +100,7 @@ function splitMarkdown(markdown: string) {
       characters.slice(start, start + MAX_MARKDOWN_CHUNK_CHARACTERS).join(""),
     );
   }
+
   return chunks;
 }
 
@@ -104,6 +108,7 @@ function prepareSections(
   input: PrepareCatalogKnowledgeInput,
 ): PreparedCatalogKnowledgeChunk[] {
   const chunks: PreparedCatalogKnowledgeChunk[] = [];
+
   for (const section of input.sections) {
     const widgets = section.widgets
       .map((widget, index) => ({ widget, index }))
@@ -118,6 +123,7 @@ function prepareSections(
       if (widget.type === "video") continue;
 
       const context = `${listingLabel(input)}\nSection: ${section.title}`;
+
       if (widget.type === "service" || widget.type === "package") {
         if (widget.caption)
           chunks.push({
@@ -125,8 +131,10 @@ function prepareSections(
             contentMarkdown: `${context}\nCaption: ${widget.caption}`,
             mediaId: null,
           });
+
         continue;
       }
+
       if (widget.type === "markdown") {
         for (const [index, markdown] of splitMarkdown(
           widget.markdown,
@@ -136,6 +144,7 @@ function prepareSections(
             contentMarkdown: `${context}\nMarkdown:\n${markdown}`,
             mediaId: null,
           });
+
         continue;
       }
 
@@ -150,6 +159,7 @@ function prepareSections(
       });
     }
   }
+
   return chunks;
 }
 

@@ -7,6 +7,7 @@ import { Pool } from "pg";
 import { hashSessionToken } from "../src/utils/session.js";
 
 const database = `em_booking_test_${randomUUID().replaceAll("-", "")}`;
+
 let app: typeof import("../src/app.js").app;
 let db: typeof import("../src/db/client.js").db;
 let admin: Pool;
@@ -39,6 +40,7 @@ before(async () => {
   await admin.query(`CREATE DATABASE "${database}"`);
   pool = new Pool({ ...connection, database });
   const root = new URL("../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((item) => item.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name))) {
@@ -47,6 +49,7 @@ before(async () => {
         "INSERT INTO users (email, role, staff_role, password_hash) VALUES ('old-admin@example.test', 'admin', NULL, 'unused'), ('old-staff@example.test', 'admin', 'Waiter', 'unused')",
       );
     }
+
     if (entry.name === "20261101100000_short_booking_intake") {
       const user = await pool.query(
         "INSERT INTO users (email, role, password_hash) VALUES ('legacy-booker@example.test', 'customer', 'unused') RETURNING id",
@@ -65,6 +68,7 @@ before(async () => {
         [user.rows[0].id, pkg.rows[0].id, version.rows[0].id],
       );
     }
+
     if (entry.name === "20261102130000_package_canvas") {
       const legacy = await pool.query(
         "SELECT id, customer_id FROM booking_requests WHERE reference = 'LEGACY'",
@@ -91,6 +95,7 @@ before(async () => {
         [preservedGeneralConversationId, legacy.rows[0].customer_id],
       );
     }
+
     if (entry.name === "20261111120000_booking_requested_days") {
       const user = (
         await pool.query(
@@ -134,6 +139,7 @@ before(async () => {
         )
       ).rows[0];
     }
+
     if (entry.name === "20261116063852_derive_booking_package_details") {
       packageMigrationSnapshot = (
         await pool.query(
@@ -142,9 +148,11 @@ before(async () => {
         )
       ).rows[0];
     }
+
     await pool.query(
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
+
     if (entry.name === "20261116063852_derive_booking_package_details") {
       const after = (
         await pool.query(
@@ -154,6 +162,7 @@ before(async () => {
       ).rows[0];
       assert.deepEqual(after, packageMigrationSnapshot);
     }
+
     if (entry.name === "20261111120000_booking_requested_days") {
       const after = (
         await pool.query(
@@ -172,6 +181,7 @@ before(async () => {
         null,
       );
     }
+
     if (entry.name === "20261101100000_short_booking_intake") {
       const legacy = await pool.query(
         "SELECT preferred_date, estimated_duration, starts_at, ends_at, preferred_venue_location FROM booking_requests WHERE reference = 'LEGACY'",
@@ -188,6 +198,7 @@ before(async () => {
       );
       assert.equal(legacy.rows[0].preferred_venue_location, "Manila");
     }
+
     if (entry.name === "20261030100000_designate_existing_admins") {
       const migrated = await pool.query(
         "SELECT email, role, staff_role FROM users WHERE email IN ('old-admin@example.test', 'old-staff@example.test') ORDER BY email",
@@ -205,6 +216,7 @@ before(async () => {
         },
       ]);
     }
+
     if (entry.name === "20261102130000_package_canvas") {
       assert.equal(
         (
@@ -250,6 +262,7 @@ before(async () => {
       );
     }
   }
+
   const finalRoles = await pool.query(
     "SELECT email, role FROM users WHERE email IN ('old-admin@example.test', 'old-staff@example.test') ORDER BY email",
   );
@@ -289,6 +302,7 @@ before(async () => {
         expires_at: new Date(Date.now() + 3600000),
       })
       .execute();
+
     return { cookie: `em_session=${token}`, id: user.id };
   }
 
@@ -304,6 +318,7 @@ before(async () => {
 after(async () => {
   await db?.destroy();
   await pool?.end();
+
   if (admin) {
     await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await admin.end();
@@ -323,6 +338,7 @@ function call(path: string, method = "GET", body?: unknown, cookie?: string) {
 
 async function read(response: Response, status: number): Promise<any> {
   assert.equal(response.status, status, await response.clone().text());
+
   return response.status === 204 ? null : response.json();
 }
 
@@ -355,6 +371,7 @@ test("requests enforce roles, published package availability, current package de
     await call("/admin/booking-requests", "GET", undefined, customerCookie),
     403,
   );
+
   for (const preferredDate of [
     "2020-01-01",
     "2027-02-29",
@@ -371,6 +388,7 @@ test("requests enforce roles, published package availability, current package de
       ),
       400,
     );
+
   await read(
     await call(
       "/booking-requests",
@@ -442,6 +460,7 @@ test("requests enforce roles, published package availability, current package de
   );
   assert.equal(customerProfile.role, "customer");
   assert.equal("staffRole" in customerProfile, false);
+
   for (const path of [
     "/admin/users",
     "/admin/conversations",
@@ -449,12 +468,14 @@ test("requests enforce roles, published package availability, current package de
     "/admin/services",
   ])
     await read(await call(path, "GET", undefined, otherCustomerCookie), 403);
+
   for (const path of [
     "/admin/packages",
     "/admin/services",
     "/admin/conversations",
   ])
     await read(await call(path, "POST", {}, otherCustomerCookie), 403);
+
   await read(
     await call(
       `/admin/packages/${pkg.id}`,
@@ -540,6 +561,7 @@ test("requests enforce roles, published package availability, current package de
   assert.equal(atMaximum.outOfRange, false);
   assert.equal(belowPreviousMinimum.outOfRange, false);
   const { guestCount: _guestCount, ...withoutGuestCount } = input;
+
   for (const requestedDays of [
     [],
     [{ date: "2099-01-02" }, { date: "2099-01-02" }],
@@ -554,6 +576,7 @@ test("requests enforce roles, published package availability, current package de
       400,
     );
   }
+
   await read(
     await call(
       "/booking-requests",
@@ -563,6 +586,7 @@ test("requests enforce roles, published package availability, current package de
     ),
     400,
   );
+
   for (const forbidden of [
     { startsAt: "2099-01-02T00:00:00Z" },
     { eventDayId: randomUUID() },
@@ -577,6 +601,7 @@ test("requests enforce roles, published package availability, current package de
       400,
     );
   }
+
   const detail = (
     await read(
       await call(
@@ -694,6 +719,7 @@ test("requests enforce roles, published package availability, current package de
   assert.equal("event_starts_at" in linkedConversation, false);
   assert.equal("event_ends_at" in linkedConversation, false);
   assert.equal("guest_count" in linkedConversation, false);
+
   const linkedAdminConversation = (
     await read(
       await call("/admin/conversations", "GET", undefined, adminCookie),
@@ -702,6 +728,7 @@ test("requests enforce roles, published package availability, current package de
   ).conversations.find(
     (conversation: any) => conversation.bookingRequestId === created.id,
   );
+
   assert.ok(linkedAdminConversation);
   assert.equal(linkedAdminConversation.packageId, pkg.id);
   assert.equal(linkedAdminConversation.packageName, "Garden");
@@ -813,6 +840,7 @@ test("requests enforce roles, published package availability, current package de
   );
   assert.equal(updated.status, "needs_details");
   assert.equal(customerHistory[1].reason, "Please clarify");
+
   for (const status of ["needs_details", "declined", "cancelled"])
     await read(
       await call(
@@ -823,6 +851,7 @@ test("requests enforce roles, published package availability, current package de
       ),
       400,
     );
+
   await read(
     await call(
       `/admin/booking-requests/${created.id}/status`,
@@ -1026,7 +1055,9 @@ test("requests enforce roles, published package availability, current package de
       200,
     )
   ).bookingRequests;
+
   const original = list.find((item: any) => item.id === created.id);
+
   assert.equal(original.packageName, "Updated Garden");
   assert.deepEqual(original.packagePrice, {
     kind: "fixed",
@@ -1094,6 +1125,7 @@ test("admin request filters, cursor pages and calendar counts use preferred date
     [ids[3], "2098-02-02", "accepted"],
     [ids[4], "2098-03-01", "under_review"],
   ];
+
   for (const [id, date, status] of rows) {
     await pool.query(
       `INSERT INTO booking_requests (id, reference, customer_id, package_id, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, created_at)
@@ -1101,6 +1133,7 @@ test("admin request filters, cursor pages and calendar counts use preferred date
       [id, `TEST-${id}`, customerId, packageId, date, status],
     );
   }
+
   const base =
     "/admin/booking-requests?status=under_review&preferredDate=2098-02-02&limit=1";
   const first = await read(
@@ -1147,6 +1180,7 @@ test("admin request filters, cursor pages and calendar counts use preferred date
     { preferredDate: "2098-02-02", count: 3 },
     { preferredDate: "2098-02-03", count: 1 },
   ]);
+
   for (const path of [
     "/admin/booking-requests?limit=51",
     "/admin/booking-requests?status=unknown",
@@ -1155,6 +1189,7 @@ test("admin request filters, cursor pages and calendar counts use preferred date
     "/admin/booking-requests/calendar?month=2098-13",
   ])
     await read(await call(path, "GET", undefined, adminCookie), 400);
+
   await read(
     await call(
       "/admin/booking-requests/calendar?month=2098-02",
@@ -1181,11 +1216,13 @@ test("booking request pagination crosses the 50-item boundary without duplicates
     FROM generate_series(1, 53) AS n`,
     [customerId, packageId],
   );
+
   const expected = (
     await pool.query(
       "SELECT id FROM booking_requests WHERE preferred_date = '2097-05-10' AND status = 'under_review' ORDER BY created_at DESC, id DESC",
     )
   ).rows.map((row) => row.id);
+
   await pool.query(
     `UPDATE booking_requests SET requested_days='[{"date":"2097-05-11","startsAt":null,"endsAt":null},{"date":"2097-05-12","startsAt":null,"endsAt":null},{"date":"2097-05-12","startsAt":null,"endsAt":null}]'::jsonb WHERE preferred_date='2097-05-10'`,
   );
@@ -1245,9 +1282,11 @@ test("booking request pagination crosses the 50-item boundary without duplicates
     ),
     400,
   );
+
   const actual = [...first.bookingRequests, ...second.bookingRequests].map(
     (row: any) => row.id,
   );
+
   assert.equal(new Set(actual).size, 53);
   assert.deepEqual(actual, expected);
   await pool.query("DELETE FROM booking_requests WHERE id = $1", [
@@ -1305,6 +1344,7 @@ async function createDatesBooking(
     })
     .returning("id")
     .executeTakeFirstOrThrow();
+
   return (
     await read(
       await call(
@@ -1325,6 +1365,7 @@ async function createDatesBooking(
     )
   ).bookingRequest;
 }
+
 test("status history is bounded, ordered, scoped, and authorized", async () => {
   const booking = await createDatesBooking(["2099-12-05"]);
   const other = await createDatesBooking(["2099-12-06"]);
@@ -1333,12 +1374,14 @@ test("status history is bounded, ordered, scoped, and authorized", async () => {
     SELECT $1, 'needs_details', $2, 'History ' || n, '2050-01-01T00:00:00Z'::timestamptz + (n / 2) * interval '1 microsecond' FROM generate_series(1, 52) n`,
     [booking.id, customerId],
   );
+
   const expected = (
     await pool.query(
       "SELECT id FROM booking_request_status_history WHERE booking_request_id=$1 ORDER BY created_at, id",
       [booking.id],
     )
   ).rows.map((row) => row.id);
+
   const path = `/booking-requests/${booking.id}/status-history`;
   await read(await call(path), 401);
   await read(await call(path, "GET", undefined, otherCustomerCookie), 404);
@@ -1459,6 +1502,7 @@ test("status history is bounded, ordered, scoped, and authorized", async () => {
 
 const timesPath = (id: string, date: string) =>
   `/booking-requests/${id}/requested-days/${date}/times`;
+
 const sampleTimes = {
   startsAt: "2099-12-05T23:00:00+08:00",
   endsAt: "2099-12-06T02:00:00+08:00",
@@ -1505,6 +1549,7 @@ test("nonconsecutive dates create atomically in order, appear on every calendar 
     ),
     200,
   );
+
   for (const date of ["2099-12-05", "2099-12-07", "2099-12-08"]) {
     assert.ok(
       calendar.dailyCounts.some(
@@ -1523,6 +1568,7 @@ test("nonconsecutive dates create atomically in order, appear on every calendar 
     );
     assert.equal(page.bookingRequests[0].id, booking.id);
   }
+
   const absent = await read(
     await call(
       "/admin/booking-requests?preferredDate=2099-12-06",
@@ -1599,6 +1645,7 @@ test("owner saves independent per-day times with exact revisions; roles, state a
   await read(await call(path, "PATCH", input), 401);
   await read(await call(path, "PATCH", input, adminCookie), 403);
   await read(await call(path, "PATCH", input, otherCustomerCookie), 404);
+
   for (const invalid of [
     { endsAt: undefined },
     { endsAt: sampleTimes.startsAt },
@@ -1610,6 +1657,7 @@ test("owner saves independent per-day times with exact revisions; roles, state a
       await call(path, "PATCH", { ...input, ...invalid }, customerCookie),
       400,
     );
+
   await read(
     await call(
       timesPath(booking.id, "2099-12-06"),
@@ -1736,6 +1784,7 @@ test("owner saves independent per-day times with exact revisions; roles, state a
     )
   ).bookingRequest;
   assert.equal(editable.status, "needs_details");
+
   for (const status of ["declined", "cancelled"]) {
     const terminal = await createDatesBooking();
     const result = (
@@ -1764,6 +1813,7 @@ test("owner saves independent per-day times with exact revisions; roles, state a
 test("repeated DST local times are rejected while unambiguous offset and overnight times persist", async () => {
   const booking = await createDatesBooking(["2027-11-07"], "America/New_York");
   const path = timesPath(booking.id, "2027-11-07");
+
   for (const startsAt of [
     "2027-11-07T01:30:00-04:00",
     "2027-11-07T01:30:00-05:00",
@@ -1781,6 +1831,7 @@ test("repeated DST local times are rejected while unambiguous offset and overnig
       ),
       400,
     );
+
   const saved = (
     await read(
       await call(
@@ -1801,6 +1852,7 @@ test("repeated DST local times are rejected while unambiguous offset and overnig
 
 test("concurrent per-day saves reject one stale writer and retain every other entry", async () => {
   const booking = await createDatesBooking();
+
   const results = await Promise.all(
     ["2099-12-05", "2099-12-07"].map((date) =>
       call(
@@ -1815,6 +1867,7 @@ test("concurrent per-day saves reject one stale writer and retain every other en
       ),
     ),
   );
+
   assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
   const saved = (
     await read(
@@ -1965,6 +2018,7 @@ test("general conversation can become one package-less request atomically", asyn
     ).status,
     409,
   );
+
   const attempts = await Promise.all(
     [1, 2].map(() =>
       call(
@@ -1975,13 +2029,16 @@ test("general conversation can become one package-less request atomically", asyn
       ),
     ),
   );
+
   assert.deepEqual(attempts.map((x) => x.status).sort(), [201, 409]);
+
   const created = (
     await read(
       attempts.find((x) => x.status === 201)!,
       201,
     )
   ).bookingRequest;
+
   assert.equal(created.packageId, null);
   assert.equal(created.packageName, null);
   assert.equal(created.packagePrice, null);
@@ -2119,6 +2176,7 @@ test("general conversation can become one package-less request atomically", asyn
   await pool.query(
     "CREATE TRIGGER reject_booking_link_test BEFORE UPDATE OF booking_request_id ON conversations FOR EACH ROW EXECUTE FUNCTION reject_booking_link_test()",
   );
+
   try {
     assert.equal(
       (
@@ -2152,6 +2210,7 @@ test("general conversation can become one package-less request atomically", asyn
     await pool.query("DROP TRIGGER reject_booking_link_test ON conversations");
     await pool.query("DROP FUNCTION reject_booking_link_test()");
   }
+
   const plain = (
     await read(
       await call("/booking-requests", "POST", input, customerCookie),

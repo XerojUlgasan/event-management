@@ -14,16 +14,23 @@ export function scheduleRequestedDaysService(
 ) {
   return db.transaction().execute(async (trx) => {
     const booking = await lockBookingRequestData(trx, input.bookingRequestId);
+
     if (!booking) return fail("Booking request not found", 404);
+
     if (booking.status !== "accepted")
       return fail("Booking request must be accepted", 409);
+
     if (booking.revision !== input.expectedUpdatedAt)
       return fail("Booking request changed. Refresh and try again", 409);
+
     if (booking.requested_days === null)
       return fail("This booking uses manual event-day scheduling", 409);
+
     const requested = requestedDaysSchema.parse(booking.requested_days);
+
     const ready = requested.flatMap((day) => {
       if (day.eventDayId || !day.startsAt || !day.endsAt) return [];
+
       return [
         validateSchedule(
           { day: day.date, startsAt: day.startsAt, endsAt: day.endsAt },
@@ -31,21 +38,26 @@ export function scheduleRequestedDaysService(
         ),
       ];
     });
+
     const links = new Map<string, string>();
+
     for (const schedule of ready)
       links.set(
         schedule.day,
         await createEventDayData(trx, booking.id, schedule),
       );
+
     if (links.size)
       await updateRequestedDaysData(
         trx,
         booking.id,
         requested.map((day) => {
           const eventDayId = links.get(day.date);
+
           return eventDayId ? { ...day, eventDayId } : day;
         }),
       );
+
     return responses(trx, await listEventDaysData(trx, booking.id));
   });
 }

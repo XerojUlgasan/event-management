@@ -16,11 +16,14 @@ export async function createBookingRequestService(
   input: CreateInput,
 ) {
   const today = calendarDateInTimeZone(new Date(), input.timeZone);
+
   if (input.requestedDays.some((day) => day.date < today))
     return error("Choose today or a future date", 400);
+
   const requestedDays = input.requestedDays
     .map(({ date }) => ({ date, startsAt: null, endsAt: null }))
     .sort((a, b) => a.date.localeCompare(b.date));
+
   return db.transaction().execute(async (trx) => {
     if (input.conversationId) {
       const conversation = await trx
@@ -29,6 +32,7 @@ export async function createBookingRequestService(
         .where("id", "=", input.conversationId)
         .forUpdate()
         .executeTakeFirst();
+
       if (
         !conversation ||
         conversation.customer_id !== customerId ||
@@ -38,19 +42,23 @@ export async function createBookingRequestService(
       )
         return error("Conversation is unavailable", 409);
     }
+
     const pkg = input.packageId
       ? await findAvailablePackageData(trx, input.packageId)
       : undefined;
+
     if (input.packageId && !pkg)
       return error(
         "Package is no longer available. Refresh and try again",
         409,
       );
+
     if (
       input.packageUpdatedAt &&
       (!pkg || input.packageUpdatedAt !== pkg.updated_at.toISOString())
     )
       return error("Package changed. Refresh and try again", 409);
+
     const row = await createBookingRequestData(trx, {
       reference: `BR-${randomUUID().toUpperCase()}`,
       customer_id: customerId,
@@ -75,6 +83,7 @@ export async function createBookingRequestService(
         input.guestCount > pkg.max_guests,
     });
     await addStatusHistoryData(trx, row.id, "under_review", customerId, null);
+
     if (input.conversationId) {
       await trx
         .updateTable("conversations")
@@ -87,6 +96,7 @@ export async function createBookingRequestService(
         booking_request_id: row.id,
       });
     }
+
     return (await bookingRequestDtos(trx, [row]))[0]!;
   });
 }

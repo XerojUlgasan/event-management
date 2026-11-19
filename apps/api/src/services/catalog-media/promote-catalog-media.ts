@@ -25,16 +25,20 @@ export async function promoteOwnerCatalogMediaService(
 ) {
   const stats = { promoted: 0, skipped: 0, failed: 0 };
   let ids: string[];
+
   try {
     ids = await listOwnerMediaIdsData(db, owner);
   } catch {
     console.warn("Catalog media promotion could not be started.");
+
     return { ...stats, failed: 1 };
   }
+
   for (const id of ids) {
     try {
       const result = await db.transaction().execute(async (trx) => {
         const media = await lockCatalogMediaData(trx, id);
+
         if (
           !media ||
           media.source !== "upload" ||
@@ -45,12 +49,16 @@ export async function promoteOwnerCatalogMediaService(
           (media.kind !== "image" && media.kind !== "video")
         )
           return null;
+
         const owners = await findMediaOwnersData(trx, id);
+
         if (owners.packages.length + owners.services.length !== 1) return null;
+
         const pkg = owners.packages[0];
         const service = owners.services[0];
         const keyMedia = { id, kind: media.kind, mime_type: media.mime_type };
         let target: string;
+
         if (
           pkg &&
           owner.kind === "package" &&
@@ -80,13 +88,16 @@ export async function promoteOwnerCatalogMediaService(
             keyMedia,
           );
         } else return null;
+
         const pendingKey = pendingCatalogMediaKey(
           media.created_by,
           id,
           media.mime_type,
         );
+
         if (media.storage_key !== pendingKey && media.storage_key !== target)
           return null;
+
         if (media.storage_key === pendingKey) {
           const stream = await getCatalogMedia(
             pendingKey,
@@ -101,14 +112,18 @@ export async function promoteOwnerCatalogMediaService(
           );
           await updateMediaStorageKeyData(trx, id, target);
         }
+
         return { pendingKey, currentKey: target };
       });
+
       if (!result) {
         stats.skipped++;
         continue;
       }
+
       await db.transaction().execute(async (trx) => {
         const media = await lockCatalogMediaData(trx, id);
+
         if (media?.storage_key === result.currentKey)
           await deleteCatalogMedia(result.pendingKey);
       });
@@ -120,5 +135,6 @@ export async function promoteOwnerCatalogMediaService(
       );
     }
   }
+
   return stats;
 }

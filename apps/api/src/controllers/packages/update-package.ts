@@ -4,6 +4,7 @@ import type { AppRouteHandler } from "../../types/hono.js";
 import { contentSchema } from "./schemas.js";
 import { body, errors, idParams, result } from "./http.js";
 import { updatePackageService } from "../../services/packages/update-package.js";
+
 export const updatePackageRoute = createRoute({
   method: "patch",
   path: "/admin/packages/{id}",
@@ -16,6 +17,7 @@ export const updatePackageRoute = createRoute({
   },
   responses: { 200: result, ...errors },
 });
+
 export const updatePackageRouteHandler: AppRouteHandler<
   typeof updatePackageRoute
 > = async (c) => {
@@ -25,6 +27,8 @@ export const updatePackageRouteHandler: AppRouteHandler<
     c.req.valid("json"),
     c.get("session").user.id,
   );
+
   if ("status" in value) return jsonError(c, value.message, value.status);
+
   return c.json(value, 200);
 };

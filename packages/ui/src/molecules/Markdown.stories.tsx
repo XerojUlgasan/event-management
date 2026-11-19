@@ -20,10 +20,13 @@ const meta = {
   component: Markdown,
   args: { source },
 } satisfies Meta<typeof Markdown>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 export const Document: Story = {};
+
 export const Message: Story = {
   args: { variant: "message" },
   decorators: [
@@ -43,6 +46,7 @@ export const Message: Story = {
     ),
   ],
 };
+
 export const OwnMessage: Story = {
   ...Message,
   decorators: [
@@ -62,6 +66,7 @@ export const OwnMessage: Story = {
     ),
   ],
 };
+
 export const PlainMultiline: Story = {
   ...Message,
   args: {
@@ -70,6 +75,7 @@ export const PlainMultiline: Story = {
       "Hello!\nOur event is in June.\n\nFirst line with a Markdown hard break.  \nSecond line.\n\nThank you.",
   },
 };
+
 export const NarrowOverflow: Story = {
   ...OwnMessage,
   args: {
@@ -77,6 +83,7 @@ export const NarrowOverflow: Story = {
     source: `${source}\n\n| Package | Details |\n| --- | --- |\n| Celebration | ${"Long details ".repeat(20)} |\n\n\`\`\`text\n${"wide content ".repeat(30)}\n\`\`\`\n\nhttps://example.com/${"long-path-".repeat(25)}`,
   },
 };
+
 export const Sanitized: Story = {
   ...Message,
   args: {

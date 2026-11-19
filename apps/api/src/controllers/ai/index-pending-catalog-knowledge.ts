@@ -35,6 +35,7 @@ export const indexPendingRoute = createRoute({
     ...errors,
   },
 });
+
 export const indexPendingRouteHandler: AppRouteHandler<
   typeof indexPendingRoute
 > = async (c) => {
@@ -43,6 +44,7 @@ export const indexPendingRouteHandler: AppRouteHandler<
       c.req.raw.signal,
       AbortSignal.timeout(75_000),
     ]);
+
     return c.json(
       await indexPendingCatalogKnowledgeService(
         c.get("db"),
@@ -53,6 +55,7 @@ export const indexPendingRouteHandler: AppRouteHandler<
     );
   } catch (error) {
     if (error instanceof HTTPException && error.status === 400) throw error;
+
     return jsonError(c, "Knowledge indexing is temporarily unavailable", 503);
   }
 };

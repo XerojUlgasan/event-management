@@ -5,6 +5,7 @@ import {
 
 type QuotationsLoader =
   typeof import("../../data/quotations/quotations").getQuotations;
+
 type QuotationsPage = Awaited<ReturnType<QuotationsLoader>>;
 
 /**
@@ -25,14 +26,18 @@ export async function findLatestSentQuotation(
       admin,
       cursor ? { cursor } : {},
     );
+
     const quotation = page.quotations.find(
       (item) => item.sentAt !== null && item.status !== "draft",
     );
+
     if (quotation) return quotation;
 
     if (!page.nextCursor) return null;
+
     if (requestedCursors.has(page.nextCursor))
       throw new Error("Unable to load quotation history. Please try again.");
+
     requestedCursors.add(page.nextCursor);
     cursor = page.nextCursor;
   }

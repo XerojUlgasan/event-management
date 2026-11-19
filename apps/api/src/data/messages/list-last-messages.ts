@@ -9,6 +9,7 @@ export async function listLastMessagesData(
   conversationIds: string[],
 ) {
   if (!conversationIds.length) return new Map<string, MessageWithSender>();
+
   const rows = await db
     .selectFrom("messages as m")
     .leftJoin("users as sender", "sender.id", "m.sender_id")
@@ -31,5 +32,6 @@ export async function listLastMessagesData(
     .orderBy("m.created_at", "desc")
     .orderBy("m.id", "desc")
     .execute();
+
   return new Map(rows.map((row) => [row.conversation_id, row]));
 }

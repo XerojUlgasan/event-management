@@ -14,9 +14,13 @@ export async function reconcileCatalogKnowledgeData(
   }>,
 ) {
   const current = await listCatalogKnowledgeData(trx, owner);
+
   const byKey = new Map(current.map((row) => [row.chunk_key, row]));
+
   const desiredKeys = new Set(chunks.map((chunk) => chunk.chunkKey));
+
   const removed = current.filter((row) => !desiredKeys.has(row.chunk_key));
+
   if (removed.length)
     await trx
       .deleteFrom("catalog_knowledge")
@@ -26,8 +30,10 @@ export async function reconcileCatalogKnowledgeData(
         removed.map((row) => row.id),
       )
       .execute();
+
   for (const chunk of chunks) {
     const previous = byKey.get(chunk.chunkKey);
+
     if (
       previous &&
       (previous.content_hash === chunk.sourceHash ||
@@ -39,14 +45,17 @@ export async function reconcileCatalogKnowledgeData(
           .set({ media_id: chunk.mediaId })
           .where("id", "=", previous.id)
           .execute();
+
       continue;
     }
+
     // Replacing the row also invalidates unfinished workers after A -> B -> A edits.
     if (previous)
       await trx
         .deleteFrom("catalog_knowledge")
         .where("id", "=", previous.id)
         .execute();
+
     await trx
       .insertInto("catalog_knowledge")
       .values({
@@ -62,5 +71,6 @@ export async function reconcileCatalogKnowledgeData(
       })
       .execute();
   }
+
   return listCatalogKnowledgeData(trx, owner);
 }

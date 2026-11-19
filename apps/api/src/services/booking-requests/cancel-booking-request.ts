@@ -15,10 +15,13 @@ export async function cancelBookingRequestService(
 ) {
   return db.transaction().execute(async (trx) => {
     const row = await lockBookingRequestData(trx, id);
+
     if (!row || row.customer_id !== customerId)
       return error("Booking request not found", 404);
+
     if (!["under_review", "needs_details", "accepted"].includes(row.status))
       return error("Invalid status transition", 409);
+
     await cancelScheduledEventDaysService(trx, id);
     const updated = await updateBookingStatusData(trx, id, "cancelled");
     await addStatusHistoryData(
@@ -28,6 +31,7 @@ export async function cancelBookingRequestService(
       customerId,
       reason || null,
     );
+
     return (await bookingRequestDtos(trx, [updated]))[0]!;
   });
 }

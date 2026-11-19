@@ -12,7 +12,9 @@ import { linkToolCallsToReplyData } from "../../src/data/ai/link-tool-calls-to-r
 import { startToolCallData } from "../../src/data/ai/start-tool-call.js";
 
 const database = `em_ai_tool_calls_${randomUUID().replaceAll("-", "")}`;
+
 const messageEpoch = Date.UTC(2026, 0, 1);
+
 let messageSequence = 0;
 let admin: Pool | undefined;
 let pool: Pool | undefined;
@@ -34,6 +36,7 @@ before(async () => {
   db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
 
   const root = new URL("../../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name)))
@@ -56,6 +59,7 @@ before(async () => {
 
 after(async () => {
   await db?.destroy();
+
   if (admin) {
     await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
     await admin.end();
@@ -77,6 +81,7 @@ async function createMessage(
   const id = randomUUID();
   const senderId = senderRole === "customer" ? customerId : null;
   const createdAt = new Date(messageEpoch + messageSequence++ * 1_000);
+
   return db
     .insertInto("messages")
     .values({
@@ -500,6 +505,7 @@ test("enables RLS and denies client-role table privileges", async () => {
     "SELECT rolname FROM pg_roles WHERE rolname = ANY($1::text[])",
     [["anon", "authenticated"]],
   );
+
   for (const { rolname } of roles.rows) {
     const roleAccess: QueryResult<{ has_privilege: boolean }> =
       await queryPool.query(

@@ -10,6 +10,7 @@ export function CustomerCatalogPage({ search }: { search: string }) {
   const value = new URLSearchParams(search).get("catalog");
   const kind: CatalogKind =
     value === "services" ? value : "packages";
+
   const items = [
     { value: "packages", label: "Packages" },
     { value: "services", label: "Services" },
@@ -18,6 +19,7 @@ export function CustomerCatalogPage({ search }: { search: string }) {
     id: `${id}-${item.value}-tab`,
     panelId: `${id}-${item.value}-panel`,
   }));
+
   return (
     <div className="customer-content customer-catalog">
       <PageHeader

@@ -11,12 +11,14 @@ const originalFetch = globalThis.fetch;
 const oldUrl = process.env.SUPABASE_URL;
 const oldKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const oldBucket = process.env.SUPABASE_STORAGE_BUCKET;
+
 process.env.SUPABASE_URL = "https://storage.invalid";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "fixture-key";
 process.env.SUPABASE_STORAGE_BUCKET = "fixture-bucket";
 
 after(() => {
   globalThis.fetch = originalFetch;
+
   for (const [key, value] of Object.entries({
     SUPABASE_URL: oldUrl,
     SUPABASE_SERVICE_ROLE_KEY: oldKey,
@@ -50,6 +52,7 @@ function serve(bytes: Uint8Array) {
       String(input),
       "https://storage.invalid/storage/v1/object/fixture-bucket/catalog-media/fixture-id",
     );
+
     return new Response(
       new ReadableStream({
         start(controller) {
@@ -75,6 +78,7 @@ test("reads only checked-in allowlisted sample images", async () => {
       new URL("../../../web/public/images/wedding.jpg", import.meta.url),
     ),
   );
+
   for (const url of [
     "/images/login.jpg",
     "/images/../images/wedding.jpg",
@@ -135,6 +139,7 @@ test("cancels an upload read and forwards the signal to Storage", async () => {
   const controller = new AbortController();
   globalThis.fetch = async (_input, init) => {
     assert.equal(init?.signal, controller.signal);
+
     return await new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener(
         "abort",

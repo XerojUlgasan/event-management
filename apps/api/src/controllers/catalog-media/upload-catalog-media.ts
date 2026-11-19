@@ -41,19 +41,25 @@ export const uploadCatalogMediaRouteHandler: AppRouteHandler<
   typeof uploadCatalogMediaRoute
 > = async (c) => {
   let form: FormData;
+
   try {
     form = await c.req.raw.formData();
   } catch {
     return jsonError(c, "Invalid multipart form.", 400);
   }
+
   const file = form.get("file");
+
   if (!(file instanceof File) || form.getAll("file").length !== 1)
     return jsonError(c, "Choose one media file.", 400);
+
   const result = await uploadCatalogMediaService(
     c.get("db"),
     c.get("session").user.id,
     file,
   );
+
   if ("status" in result) return jsonError(c, result.message, result.status);
+
   return c.json(result, 201);
 };

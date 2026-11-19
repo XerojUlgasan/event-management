@@ -12,6 +12,7 @@ export function createCustomerServiceAgent(options: AssistantToolContext) {
   let executedCalls = 0;
   let trackingUnavailable = false;
   let resultCharactersRemaining = options.resultCharacterBudget ?? 200_000;
+
   const toolContext = {
     ...options,
     onPersistenceFailure: () => {
@@ -25,10 +26,13 @@ export function createCustomerServiceAgent(options: AssistantToolContext) {
       ++executedCalls <= 6,
     consumeResultCharacters: (characters: number) => {
       if (characters > resultCharactersRemaining) return false;
+
       resultCharactersRemaining -= characters;
+
       return true;
     },
   };
+
   return new ToolLoopAgent({
     model: getTextModel(),
     instructions: customerServicePrompt,

@@ -21,20 +21,25 @@ test("expanded sample photo allowlist preserves media and rejects untrusted sour
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
   let created = false;
+
   try {
     await admin.query(`CREATE DATABASE "${database}"`);
     created = true;
     pool = new Pool({ ...connection, database });
     const root = new URL("../prisma/migrations/", import.meta.url);
     const migrationName = "20261118123813_expand_catalog_sample_photos";
+
     const entries = (await readdir(root, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory())
       .sort((a, b) => a.name.localeCompare(b.name));
+
     assert.ok(entries.some((entry) => entry.name === migrationName));
+
     for (const entry of entries.filter((entry) => entry.name < migrationName))
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );
+
     await pool.query(`INSERT INTO media_assets(kind,source,url)
       VALUES ('image','sample','/images/wedding.jpg')`);
     await pool.query(`INSERT INTO media_assets(kind,source,storage_key,mime_type,byte_size)
@@ -47,6 +52,7 @@ test("expanded sample photo allowlist preserves media and rejects untrusted sour
       (await pool.query("SELECT * FROM media_assets ORDER BY id")).rows,
       before.rows,
     );
+
     for (const url of sampleCatalogPhotoPaths) {
       await pool.query(
         "INSERT INTO media_assets(kind,source,url) VALUES ('image','sample',$1)",
@@ -55,6 +61,7 @@ test("expanded sample photo allowlist preserves media and rejects untrusted sour
       const photo = await Image.decode(await readSampleCatalogPhoto(url));
       assert.ok(photo.width > 0 && photo.height > 0);
     }
+
     for (const url of [
       "https://example.test/photo.jpg",
       "/images/unknown.jpg",
@@ -72,6 +79,7 @@ test("expanded sample photo allowlist preserves media and rejects untrusted sour
         /Unknown catalog sample/,
       );
     }
+
     await assert.rejects(
       pool.query(`INSERT INTO media_assets(kind,source,url)
         VALUES ('video','sample','/images/catalog-dj.jpg')`),
@@ -84,7 +92,9 @@ test("expanded sample photo allowlist preserves media and rejects untrusted sour
     );
   } finally {
     await pool?.end();
+
     if (created) await admin.query(`DROP DATABASE "${database}" WITH (FORCE)`);
+
     await admin.end();
   }
 });

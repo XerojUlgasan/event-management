@@ -4,6 +4,7 @@ import * as service from "../../services/event-days/move-event-day.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { body } from "../booking-requests/http.js";
 import { errorResponse, params, response, schedule, tags } from "./schemas.js";
+
 export const moveEventDayRoute = createRoute({
   method: "post",
   path: "/admin/event-days/{id}/move",
@@ -11,6 +12,7 @@ export const moveEventDayRoute = createRoute({
   request: { params, body: body(schedule) },
   responses: response,
 });
+
 export const moveEventDayRouteHandler: AppRouteHandler<
   typeof moveEventDayRoute
 > = async (c) => {
@@ -27,6 +29,7 @@ export const moveEventDayRouteHandler: AppRouteHandler<
     );
   } catch (e) {
     const error = errorResponse(e);
+
     return jsonError(c, error.message, error.status);
   }
 };

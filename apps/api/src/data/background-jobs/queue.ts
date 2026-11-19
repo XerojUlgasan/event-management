@@ -3,6 +3,7 @@ import { sql, type Kysely, type Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 
 export type JobRetryPolicies = Readonly<Record<string, readonly number[]>>;
+
 type QueueJob = {
   id: string;
   type: string;
@@ -11,6 +12,7 @@ type QueueJob = {
   attempts: number;
   lease_token: string;
 };
+
 const lock = async (trx: Transaction<DB>) => {
   // Restore the caller's setting: enqueue participates in a larger transaction.
   const previous = await sql<{
@@ -22,6 +24,7 @@ const lock = async (trx: Transaction<DB>) => {
     trx,
   );
 };
+
 const boundTransaction = async (trx: Transaction<DB>) => {
   await sql`set local statement_timeout = '10s'`.execute(trx);
   await lock(trx);
@@ -48,6 +51,7 @@ export async function enqueueJobData(
   await sql`select set_config('statement_timeout', ${previous.rows[0]?.value ?? "0"}, true)`.execute(
     trx,
   );
+
   return result.rows[0]?.id;
 }
 
@@ -60,16 +64,20 @@ export async function claimJobData(
   return db.transaction().execute(async (trx) => {
     await boundTransaction(trx);
     const types = Object.keys(policies);
+
     if (!types.length) return undefined;
+
     const expired =
       await sql<QueueJob>`select id, type, payload, dedupe_key, attempts, lease_token
       from background_jobs where status = 'running' and lease_expires_at <= clock_timestamp()
       and type in (${sql.join(types)}) order by lease_expires_at limit 32`.execute(
         trx,
       );
+
     for (const job of expired.rows) {
       await retryOrFail(trx, job, policies, "Job lease expired");
     }
+
     // A deployment may shorten retry policy for jobs already pending.
     // Bound cleanup per poll and never claim rows that have exhausted that policy.
     for (const [type, delays] of Object.entries(policies)) {
@@ -79,10 +87,12 @@ export async function claimJobData(
           and available_at <= clock_timestamp() and attempts >= ${delays.length + 1}
           order by available_at, created_at, id limit 32)`.execute(trx);
     }
+
     const eligiblePolicies = Object.entries(policies).map(
       ([type, delays]) =>
         sql`(p.type = ${type} and p.attempts < ${delays.length + 1})`,
     );
+
     const token = randomUUID();
     const result =
       await sql<QueueJob>`update background_jobs set status = 'running', attempts = attempts + 1,
@@ -96,6 +106,7 @@ export async function claimJobData(
       returning id, type, payload, dedupe_key, attempts, lease_token`.execute(
         trx,
       );
+
     return result.rows[0];
   });
 }
@@ -109,7 +120,9 @@ async function retryOrFail(
   requireFresh = false,
 ) {
   const delays = policies[job.type];
+
   if (!delays) return;
+
   const successor =
     job.dedupe_key !== null &&
     (
@@ -129,6 +142,7 @@ async function retryOrFail(
       and (${!requireFresh} or lease_expires_at > clock_timestamp()) returning id`.execute(
     trx,
   );
+
   return result.rows.length > 0;
 }
 
@@ -145,7 +159,9 @@ export async function finishJobData(
       where id = ${job.id}::uuid and status = 'running' and lease_token = ${job.lease_token}::uuid
       and lease_expires_at > clock_timestamp()`.execute(trx);
     const current = fresh.rows[0];
+
     if (!current) return false;
+
     if (outcome === "success") {
       const result = await sql<{
         id: string;
@@ -154,8 +170,10 @@ export async function finishJobData(
         and status = 'running' and lease_token = ${job.lease_token}::uuid and lease_expires_at > clock_timestamp() returning id`.execute(
         trx,
       );
+
       return result.rows.length > 0;
     }
+
     return (
       (await retryOrFail(
         trx,
@@ -183,6 +201,7 @@ export async function heartbeatJobData(
       and lease_token = ${job.lease_token}::uuid and lease_expires_at > clock_timestamp() returning id`.execute(
       trx,
     );
+
     return result.rows.length > 0;
   });
 }

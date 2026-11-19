@@ -4,6 +4,7 @@ import type { AppRouteHandler } from "../../types/hono.js";
 import { createBookingRequestService } from "../../services/booking-requests/create-booking-request.js";
 import { bookingSchema, createSchema } from "./schemas.js";
 import { body, errors, json } from "./http.js";
+
 export const createBookingRequestRoute = createRoute({
   method: "post",
   path: "/booking-requests",
@@ -17,6 +18,7 @@ export const createBookingRequestRoute = createRoute({
     ...errors,
   },
 });
+
 export const createBookingRequestRouteHandler: AppRouteHandler<
   typeof createBookingRequestRoute
 > = async (c) => {
@@ -25,7 +27,9 @@ export const createBookingRequestRouteHandler: AppRouteHandler<
     c.get("session").user.id,
     c.req.valid("json"),
   );
+
   if ("message" in result)
     return jsonError(c, result.message, result.status);
+
   return c.json({ bookingRequest: result }, 201);
 };

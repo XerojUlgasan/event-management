@@ -27,26 +27,36 @@ export async function refreshCatalogEmbeddingsService({
     action: (trx: Transaction<DB>) => Promise<T>,
   ): Promise<T> {
     abortSignal?.throwIfAborted();
+
     return db.transaction().execute(async (trx) => {
       await sql`SET LOCAL statement_timeout = '10s'`.execute(trx);
       await sql`SET LOCAL lock_timeout = '5s'`.execute(trx);
       abortSignal?.throwIfAborted();
+
       return action(trx);
     });
   }
+
   const synced = await refreshTransaction((trx) =>
     syncCatalogKnowledge(trx, owner),
   );
+
   const rows = chunkKeys
     ? synced.filter((row) => chunkKeys.includes(row.chunk_key))
     : synced;
+
   const result = { embedded: 0, unchanged: 0, superseded: 0, failed: 0 };
+
   if (!rows.length) return result;
+
   const { model } = env.AI_EMBEDDING;
+
   if (model !== "google/gemini-embedding-2")
     throw new Error("Unsupported embedding model");
+
   for (const row of rows) {
     abortSignal?.throwIfAborted();
+
     try {
       const sourceHash = row.content_hash.split(":").slice(0, 2).join(":");
       const photoSignal = AbortSignal.timeout(30_000);
@@ -56,26 +66,33 @@ export async function refreshCatalogEmbeddingsService({
       const media = row.media_id
         ? await findCatalogKnowledgeMediaData(db, row.media_id)
         : undefined;
+
       if (row.media_id && !media)
         throw new Error("Catalog photo is unavailable");
+
       const image = media
         ? await readCatalogEmbeddingImage(media, signal, (key, range, signal) =>
             readCatalogMediaService(db, media.id, key, range, signal),
           )
         : undefined;
+
       const inputHash = `${sourceHash}:${catalogKnowledgeDigest(image ? image.bytes : row.content_markdown)}`;
+
       const stage = await refreshTransaction(async (trx) => {
         const current = (await syncCatalogKnowledge(trx, owner)).find(
           (item) => item.id === row.id,
         );
+
         if (!current || !current.content_hash.startsWith(sourceHash))
           return "superseded";
+
         if (
           current.content_hash === inputHash &&
           current.embedding &&
           current.embedding_model === model
         )
           return "unchanged";
+
         return (await setCatalogKnowledgeInputHashData(
           trx,
           row.id,
@@ -85,21 +102,26 @@ export async function refreshCatalogEmbeddingsService({
           ? "pending"
           : "superseded";
       });
+
       if (stage !== "pending") {
         result[stage]++;
         continue;
       }
+
       const vector = await embedCatalogContent({
         contentMarkdown: row.content_markdown,
         image,
         abortSignal,
       });
       abortSignal?.throwIfAborted();
+
       const saved = await refreshTransaction(async (trx) => {
         const current = (await syncCatalogKnowledge(trx, owner)).find(
           (item) => item.id === row.id,
         );
+
         if (!current || current.content_hash !== inputHash) return false;
+
         return saveCatalogKnowledgeEmbeddingData(
           trx,
           row.id,
@@ -107,6 +129,7 @@ export async function refreshCatalogEmbeddingsService({
           vector,
         );
       });
+
       result[saved ? "embedded" : "superseded"]++;
     } catch (cause) {
       abortSignal?.throwIfAborted();
@@ -123,5 +146,6 @@ export async function refreshCatalogEmbeddingsService({
       });
     }
   }
+
   return result;
 }

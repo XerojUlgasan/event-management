@@ -26,10 +26,12 @@ export const sendCustomerMessageRoute = createRoute({
     409: errors[409],
   },
 });
+
 export const sendCustomerMessageRouteHandler: AppRouteHandler<
   typeof sendCustomerMessageRoute
 > = async (c) => {
   const input = c.req.valid("json");
+
   try {
     const result = await sendCustomerMessageService(
       c.get("db"),
@@ -39,20 +41,24 @@ export const sendCustomerMessageRouteHandler: AppRouteHandler<
       c.req.raw.signal,
       input.requestId,
     );
+
     return c.json(result, 201);
   } catch (error) {
     if (error instanceof Error && error.message === "Conversation not found") {
       return jsonError(c, error.message, 404);
     }
+
     if (error instanceof Error && error.message === "Conversation is closed") {
       return jsonError(c, error.message, 409);
     }
+
     if (
       error instanceof Error &&
       error.message === "Message request conflict"
     ) {
       return jsonError(c, error.message, 409);
     }
+
     throw error;
   }
 };

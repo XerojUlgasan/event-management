@@ -17,10 +17,12 @@ test("thumbnail migrations replay in order and retain media foreign keys", async
   const database = `em_thumbnail_${randomUUID().replaceAll("-", "")}`;
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
+
   try {
     await admin.query(`CREATE DATABASE "${database}"`);
     pool = new Pool({ ...connection, database });
     const root = new URL("../prisma/migrations/", import.meta.url);
+
     for (const entry of (await readdir(root, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory())
       .sort((a, b) => a.name.localeCompare(b.name))) {
@@ -28,6 +30,7 @@ test("thumbnail migrations replay in order and retain media foreign keys", async
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );
     }
+
     for (const table of ["packages", "services"]) {
       const foreignKey: QueryResult<{ target: string; confdeltype: string }> =
         await pool.query(
@@ -46,6 +49,7 @@ test("thumbnail migrations replay in order and retain media foreign keys", async
         `${table}_thumbnail_media_id_idx`,
       );
     }
+
     await pool.query(
       "INSERT INTO packages(name,slug,max_guests,price) VALUES ('Package','package',100,1000)",
     );
@@ -57,6 +61,7 @@ test("thumbnail migrations replay in order and retain media foreign keys", async
         "INSERT INTO media_assets(kind,source,url) VALUES('image','sample','/images/wedding.jpg') RETURNING id",
       )
     ).rows[0].id;
+
     for (const table of ["packages", "services"]) {
       await assert.rejects(
         pool.query(`UPDATE ${table} SET thumbnail_media_id=$1`, [randomUUID()]),
@@ -64,7 +69,9 @@ test("thumbnail migrations replay in order and retain media foreign keys", async
       );
       await pool.query(`UPDATE ${table} SET thumbnail_media_id=$1`, [mediaId]);
     }
+
     await pool.query("DELETE FROM media_assets WHERE id=$1", [mediaId]);
+
     for (const table of ["packages", "services"]) {
       assert.equal(
         (await pool.query(`SELECT thumbnail_media_id FROM ${table}`)).rows[0]

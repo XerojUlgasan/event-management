@@ -78,9 +78,11 @@ function lineTotals(items: QuotationItem[]) {
   const additions = items
     .filter((line) => line.direction === "add")
     .reduce((sum, line) => sum + line.amountMinor, 0);
+
   const deductions = items
     .filter((line) => line.direction === "deduct")
     .reduce((sum, line) => sum + line.amountMinor, 0);
+
   return { additions, deductions };
 }
 
@@ -88,12 +90,15 @@ function readingIntro(quotation: Quotation) {
   if (quotation.status === "accepted" && quotation.acceptedAt) {
     return `Version ${quotation.version} was accepted on ${formatWhen(quotation.acceptedAt)}.`;
   }
+
   if (quotation.status === "sent" && quotation.sentAt) {
     return `Version ${quotation.version} was sent on ${formatWhen(quotation.sentAt)}.`;
   }
+
   if (quotation.status === "superseded" && quotation.supersededAt) {
     return `Version ${quotation.version} was sent on ${quotation.sentAt ? formatWhen(quotation.sentAt) : "an earlier date"}. Replaced by a newer version.`;
   }
+
   return `Version ${quotation.version}.`;
 }
 
@@ -168,6 +173,7 @@ function QuotationMathBox({
   totalMinor: number;
 }) {
   const { additions, deductions } = lineTotals(items);
+
   return (
     <>
       <div className="quotation-math" aria-live="polite">
@@ -259,6 +265,7 @@ function QuotationAdjustmentCard({
               value={line.kind}
               onChange={(event) => {
                 const kind = event.target.value;
+
                 if (
                   kind === "addition" ||
                   kind === "deduction" ||
@@ -344,9 +351,12 @@ export function Quotations({
   async function loadServices(cursor?: string) {
     const current = generation.current();
     setServiceLoading(true);
+
     try {
       const result = await getAdminServices({ cursor });
+
       if (!generation.isCurrent(current)) return;
+
       setServices((previous) =>
         cursor ? [...previous, ...result.services] : result.services,
       );
@@ -354,6 +364,7 @@ export function Quotations({
       setServiceError("");
     } catch (cause) {
       if (!generation.isCurrent(current)) return;
+
       setServiceError(notifyError(cause, "Unable to load services."));
     } finally {
       if (generation.isCurrent(current)) setServiceLoading(false);
@@ -406,6 +417,7 @@ export function Quotations({
     ]);
     setLoading(true);
     setError("");
+
     try {
       const result =
         quotationId && !admin
@@ -429,24 +441,29 @@ export function Quotations({
                 currentOffer: null,
                 previousDraftVersion: null,
               };
+
       const resolved = await result;
+
       if (
         !generation.isCurrent(currentGeneration) ||
         sequence !== pageRequest.current ||
         pageKeyRef.current !== key
       )
         return;
+
       setRows(resolved.quotations);
       setLoadedPageKey(key);
       setLoadedScope(identity);
       setNextCursor(resolved.nextCursor);
       setOffer(resolved.currentOffer);
       setPreviousDraftVersion(resolved.previousDraftVersion);
+
       if (
         draftRef.current?.id !== resolved.currentDraft?.id ||
         draftRef.current?.updatedAt !== resolved.currentDraft?.updatedAt
       )
         setItems(resolved.currentDraft?.items ?? []);
+
       setDraft(resolved.currentDraft);
     } catch (cause) {
       if (
@@ -455,6 +472,7 @@ export function Quotations({
         pageKeyRef.current !== key
       )
         return;
+
       setError(notifyError(cause, "Unable to load quotations."));
     } finally {
       if (
@@ -467,12 +485,14 @@ export function Quotations({
   }
   useEffect(() => {
     void load();
+
     return () => {
       pageRequest.current++;
     };
   }, [bookingId, admin, quotationId, pagination.cursor]);
   useEffect(() => {
     if (admin) void loadServices();
+
     return () => {
       generation.bump();
     };
@@ -481,9 +501,11 @@ export function Quotations({
   async function action(successMessage: string, fn: () => Promise<unknown>) {
     setBusy(true);
     setError("");
+
     try {
       await fn();
       notify(successMessage);
+
       if (pagination.page !== 1) pagination.reset();
       else await load();
     } catch (cause) {
@@ -510,7 +532,9 @@ export function Quotations({
     () => [...rows].sort((a, b) => b.version - a.version),
     [rows],
   );
+
   const currentOffer = offer;
+
   const earlierVersions =
     loadedPageKey === currentPageKey
       ? sorted.filter((q) => q.status === "superseded")
@@ -849,6 +873,7 @@ export function Quotations({
           <h2 id="quotation-history-title">Earlier versions</h2>
           {earlierVersions.map((quotation) => {
             const expanded = expandedHistoryId === quotation.id;
+
             return (
               <div key={quotation.id}>
                 <Button

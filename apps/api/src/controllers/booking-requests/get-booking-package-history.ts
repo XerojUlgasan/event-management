@@ -37,18 +37,24 @@ export const getAdminBookingPackageHistoryRoute = createRoute({
     404: errors[404],
   },
 });
+
 export const getAdminBookingPackageHistoryRouteHandler: AppRouteHandler<
   typeof getAdminBookingPackageHistoryRoute
 > = async (c) => {
   const user = c.get("session").user;
+
   if (user.role !== "admin")
     return jsonError(c, "Booking request not found", 404);
+
   const history = await getBookingPackageHistoryService(
     c.get("db"),
     c.req.valid("param").id,
     c.req.valid("query"),
   );
+
   if (!history) return jsonError(c, "Booking request not found", 404);
+
   c.header("Cache-Control", "private, no-store");
+
   return c.json(history, 200);
 };

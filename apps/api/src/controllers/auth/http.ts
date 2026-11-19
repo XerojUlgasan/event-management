@@ -13,14 +13,17 @@ export const emailSchema = z
   .toLowerCase()
   .email()
   .max(MAX_EMAIL_LENGTH);
+
 export const newPasswordSchema = z
   .string()
   .min(MIN_PASSWORD_LENGTH, "Use a password with at least 8 characters.")
   .max(MAX_PASSWORD_LENGTH);
+
 export const credentialsSchema = z.object({
   email: emailSchema,
   password: z.string().min(1).max(MAX_PASSWORD_LENGTH),
 });
+
 export const errors = {
   400: {
     content: openapiJson(errorSchema),

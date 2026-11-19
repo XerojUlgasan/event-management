@@ -1,5 +1,6 @@
 export type KnowledgeStatus =
   "indexed" | "partial" | "pending" | "needs-refresh";
+
 export type KnowledgeListing = {
   id: string;
   kind: "package" | "service";
@@ -11,12 +12,14 @@ export type KnowledgeListing = {
   photoChunks: number;
   lastIndexedAt: string | null;
 };
+
 export type KnowledgeSummary = {
   packages: { total: number; indexed: number };
   services: { total: number; indexed: number };
   attention: number;
   total: number;
 };
+
 export type KnowledgePage = {
   summary: KnowledgeSummary;
   listings: KnowledgeListing[];
@@ -24,6 +27,7 @@ export type KnowledgePage = {
   nextCursor: string | null;
   checkedAt: string;
 };
+
 export type KnowledgeChunk = {
   key: string;
   kind: "text" | "photo";
@@ -33,6 +37,7 @@ export type KnowledgeChunk = {
   mediaUrl: string | null;
   embeddedAt: string | null;
 };
+
 export type KnowledgeDetail = {
   listing: KnowledgeListing;
   chunks: KnowledgeChunk[];
@@ -41,6 +46,7 @@ export type KnowledgeDetail = {
 
 export const KNOWLEDGE_SEARCH_MAX_LENGTH = 500;
 export const KNOWLEDGE_SEARCH_LIMIT = 5;
+
 export type KnowledgeSearchResult = {
   listing: Pick<KnowledgeListing, "id" | "kind" | "name">;
   key: string;
@@ -49,6 +55,7 @@ export type KnowledgeSearchResult = {
   mediaUrl: string | null;
   similarity: number;
 };
+
 export type KnowledgeSearchResponse = {
   query: string;
   model: string;

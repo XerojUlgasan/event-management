@@ -7,9 +7,12 @@ import { formatEnPh } from "../../lib/utils/formatting/dates";
 
 function requestedTime(item: BookingRequest, date: string | null) {
   const day = item.requestedDays?.find((day) => day.date === date);
+
   const startsAt = day ? day.startsAt : item.startsAt;
   const endsAt = day ? day.endsAt : item.endsAt;
+
   if (!startsAt || !endsAt) return "Time to be arranged";
+
   const overnight =
     localInput(startsAt, item.timeZone).slice(0, 10) !==
     localInput(endsAt, item.timeZone).slice(0, 10);
@@ -22,6 +25,7 @@ function requestedTime(item: BookingRequest, date: string | null) {
     timeStyle: "short",
     timeZone: item.timeZone,
   });
+
   return `${start} – ${end}`;
 }
 
@@ -42,6 +46,7 @@ export function CustomerEventTimeline({
     <div className="customer-event-timeline">
       {groupCustomerEvents(items, now).map((group) => {
         if (!group.events.length && group.key !== "upcoming") return null;
+
         return (
           <section
             className={`event-timeline-group event-timeline-${group.key}`}

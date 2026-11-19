@@ -46,17 +46,21 @@ function AccountMenu({
 
   useEffect(() => {
     if (!open) return;
+
     const dismiss = (event: PointerEvent) => {
       if (!container.current?.contains(event.target as Node)) setOpen(false);
     };
+
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpen(false);
         trigger.current?.focus();
       }
     };
+
     document.addEventListener("pointerdown", dismiss);
     document.addEventListener("keydown", escape);
+
     return () => {
       document.removeEventListener("pointerdown", dismiss);
       document.removeEventListener("keydown", escape);
@@ -121,24 +125,36 @@ export function AdminShell({
 }) {
   const name = profile.displayName ?? profile.email;
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const go = (key: NavKey) => {
     navigateWorkspace(adminPaths[key]);
   };
 
   const body = useMemo(() => {
     if (active === "AI") return <KnowledgePage />;
+
     if (active === "Overview")
       return <OverviewPage firstName={firstName(name)} onNavigate={go} />;
+
     if (active === "Bookings")
       return <BookingsPage bookingRequestId={bookingRequestId} />;
+
     if (active === "Messages") return <MessagesPage />;
+
     if (active === "Customers") return <CustomersPage />;
+
     if (active === "Calendar") return <CalendarPage />;
+
     if (active === "Packages") return <PackagesPage />;
+
     if (active === "Services") return <ServicesPage />;
+
     if (active === "Inventory") return <InventoryPage />;
+
     if (active === "Operations") return <OperationsPage />;
+
     if (active === "Reports") return <ReportsPage />;
+
     if (active === "Administration")
       return (
         <section className="account-settings">
@@ -159,6 +175,7 @@ export function AdminShell({
           <SignInMethods />
         </section>
       );
+
     return <GenericPage page={active} />;
   }, [active, name, profile.email, bookingRequestId]);
 

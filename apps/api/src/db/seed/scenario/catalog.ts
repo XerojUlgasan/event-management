@@ -25,16 +25,19 @@ export type ScenarioPackage = {
   maxGuests: number;
   archived: boolean;
 };
+
 export type ScenarioService = {
   id: string;
   name: string;
   hourlyRatePesos: number | null;
   archived: boolean;
 };
+
 export type ScenarioCatalog = {
   packages: ScenarioPackage[];
   services: ScenarioService[];
 };
+
 type CanvasPlan = {
   key: string;
   kind: "package" | "service";
@@ -54,12 +57,14 @@ export function planScenarioCatalog(): ScenarioCatalog & {
     maxGuests: copy.guests,
     archived: index >= 18,
   }));
+
   const services = curatedServices.map((copy, index) => ({
     id: scenarioId(`service:${index}`),
     name: copy.name,
     hourlyRatePesos: copy.rate,
     archived: index >= 18,
   }));
+
   const canvases: CanvasPlan[] = [
     ...packages.map((owner, index) => ({
       key: `package:${index}`,
@@ -76,6 +81,7 @@ export function planScenarioCatalog(): ScenarioCatalog & {
       index,
     })),
   ];
+
   return { packages, services, canvases };
 }
 
@@ -88,14 +94,18 @@ export async function seedScenarioCatalog(
   },
 ) {
   const admin = input.users.find((user) => user.role === "admin");
+
   if (!admin) throw new Error("Scenario catalog requires an administrator");
+
   let packages = 0,
     services = 0,
     media = 0,
     canvases = 0;
   const insertedOwners = new Set<string>();
+
   for (const [index, pkg] of input.catalog.packages.entries()) {
     const copy = curatedPackages[index];
+
     if (
       await insertIfNew(db, "packages", {
         id: pkg.id,
@@ -114,8 +124,10 @@ export async function seedScenarioCatalog(
       insertedOwners.add(pkg.id);
     }
   }
+
   for (const [index, service] of input.catalog.services.entries()) {
     const copy = curatedServices[index];
+
     if (
       await insertIfNew(db, "services", {
         id: service.id,
@@ -135,9 +147,12 @@ export async function seedScenarioCatalog(
       insertedOwners.add(service.id);
     }
   }
+
   for (const page of input.catalog.canvases) {
     if (!insertedOwners.has(page.ownerId)) continue;
+
     const mediaId = scenarioId(`media:curated-catalog-v2:${page.key}`);
+
     if (
       await insertIfNew(db, "media_assets", {
         id: mediaId,
@@ -152,6 +167,7 @@ export async function seedScenarioCatalog(
       })
     )
       media++;
+
     const link =
       page.kind === "package" && page.index < 3
         ? {
@@ -168,6 +184,7 @@ export async function seedScenarioCatalog(
                 "Explore this related package; this link does not include the service or establish availability.",
             }
           : undefined;
+
     const content = buildCatalogCanvas(
       page.copy,
       mediaId,
@@ -175,6 +192,7 @@ export async function seedScenarioCatalog(
       page.index,
       link,
     );
+
     await db
       .updateTable(page.kind === "package" ? "packages" : "services")
       .set({
@@ -185,6 +203,7 @@ export async function seedScenarioCatalog(
       .execute();
     canvases++;
   }
+
   for (let index = 0; index < 20; index++) {
     if (
       await insertIfNew(db, "media_assets", {
@@ -201,6 +220,7 @@ export async function seedScenarioCatalog(
     )
       media++;
   }
+
   // Existing scenario rows are intentionally left untouched. Plan dependent
   // bookings from their stored state, in the same stable order as the plan.
   const packageRows = await db
@@ -221,6 +241,7 @@ export async function seedScenarioCatalog(
       input.catalog.packages.map((item) => item.id),
     )
     .execute();
+
   const serviceRows = await db
     .selectFrom("services")
     .select(["id", "name", "hourly_rate_pesos", "archived_at"])
@@ -230,13 +251,19 @@ export async function seedScenarioCatalog(
       input.catalog.services.map((item) => item.id),
     )
     .execute();
+
   const packageById = new Map(packageRows.map((row) => [row.id, row]));
+
   const serviceById = new Map(serviceRows.map((row) => [row.id, row]));
+
   const persistedPackages: ScenarioPackage[] = [];
+
   for (const item of input.catalog.packages) {
     const row = packageById.get(item.id);
+
     if (!row || row.package_type !== "catalog" || row.published_at === null)
       continue;
+
     persistedPackages.push({
       id: row.id,
       name: row.name,
@@ -246,10 +273,14 @@ export async function seedScenarioCatalog(
       archived: row.archived_at !== null,
     });
   }
+
   const persistedServices: ScenarioService[] = [];
+
   for (const item of input.catalog.services) {
     const row = serviceById.get(item.id);
+
     if (!row) continue;
+
     persistedServices.push({
       id: row.id,
       name: row.name,
@@ -257,6 +288,7 @@ export async function seedScenarioCatalog(
       archived: row.archived_at !== null,
     });
   }
+
   return {
     packages: persistedPackages,
     services: persistedServices,

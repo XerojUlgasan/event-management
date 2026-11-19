@@ -10,7 +10,10 @@ export async function loadCatalogKnowledgeSource(
   owner: CatalogKnowledgeOwner,
 ) {
   const source = await findCatalogKnowledgeSourceData(db, owner);
+
   if (!source) return null;
+
   const sections = await readCatalogSectionsService(db, owner);
+
   return { ...source, sections };
 }

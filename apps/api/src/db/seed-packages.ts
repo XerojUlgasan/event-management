@@ -42,6 +42,7 @@ export async function seedSamplePackages(db: Transaction<DB>) {
     },
   ];
   let count = 0;
+
   for (const [index, sample] of samples.entries()) {
     const row = await db
       .insertInto("packages")
@@ -56,7 +57,9 @@ export async function seedSamplePackages(db: Transaction<DB>) {
       .onConflict((c) => c.column("id").doNothing())
       .returning("id")
       .executeTakeFirst();
+
     if (!row) continue;
+
     const mediaId = randomUUID();
     await db
       .insertInto("media_assets")
@@ -67,12 +70,14 @@ export async function seedSamplePackages(db: Transaction<DB>) {
         url: sample.photo,
       })
       .execute();
+
     const canvas = buildCatalogCanvas(
       { ...sample, ...requireCatalogEditorial(packageEditorial, sample.name) },
       mediaId,
       () => randomUUID(),
       index,
     );
+
     await db
       .updateTable("packages")
       .set({
@@ -83,5 +88,6 @@ export async function seedSamplePackages(db: Transaction<DB>) {
       .execute();
     count++;
   }
+
   return count;
 }

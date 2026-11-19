@@ -11,6 +11,7 @@ export const getAdminPackageRoute = createRoute({
   request: { params: idParams },
   responses: { 200: result, ...errors },
 });
+
 export const getAdminPackageRouteHandler: AppRouteHandler<
   typeof getAdminPackageRoute
 > = async (c) => {
@@ -18,5 +19,6 @@ export const getAdminPackageRouteHandler: AppRouteHandler<
     c.get("db"),
     c.req.valid("param").id,
   );
+
   return row ? c.json(row, 200) : jsonError(c, "Package not found", 404);
 };

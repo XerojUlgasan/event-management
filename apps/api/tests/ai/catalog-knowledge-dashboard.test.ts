@@ -21,8 +21,11 @@ const chunk = {
   contentMarkdown: "fixture",
   mediaId: null,
 };
+
 const owner = { id: "owner", name: "Fixture", kind: "service" as const };
+
 const hash = catalogKnowledgeSourceHash(chunk.contentMarkdown, undefined);
+
 const ready = {
   chunk_key: "overview",
   content_markdown: "fixture",
@@ -32,6 +35,7 @@ const ready = {
   embedded_at: new Date("2026-01-01T00:00:00Z"),
   has_embedding: true,
 };
+
 test("coverage requires expected content, input hash and model and detects withdrawn rows", () => {
   assert.equal(
     assessKnowledgeListing(owner, [chunk], [], new Map()).listing.status,
@@ -170,11 +174,13 @@ test("photo coverage checks metadata and stored digest without fetching bytes", 
 });
 
 const database = `em_knowledge_dashboard_${randomUUID().replaceAll("-", "")}`;
+
 let admin: Pool | undefined;
 let db: Kysely<DB> | undefined;
 let app: OpenAPIHono<HonoEnv>;
 let adminCookie: string;
 let customerCookie: string;
+
 before(async () => {
   const host = process.env.DB_HOST ?? "localhost";
   assert.ok(["localhost", "127.0.0.1", "::1"].includes(host));
@@ -189,12 +195,14 @@ before(async () => {
   const pool = new Pool({ ...connection, database });
   db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
   const root = new URL("../../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name)))
     await pool.query(
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
+
   async function session(role: string) {
     const token = randomUUID();
     const user = await db!
@@ -214,6 +222,7 @@ before(async () => {
         expires_at: new Date(Date.now() + 3600000),
       })
       .execute();
+
     return `em_session=${token}`;
   }
   adminCookie = await session("admin");
@@ -234,6 +243,7 @@ before(async () => {
 });
 after(async () => {
   await db?.destroy();
+
   if (admin) {
     await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await admin.end();
@@ -242,6 +252,7 @@ after(async () => {
 test("admin endpoints enforce sessions, global summary, filters, scoped paging and do not mutate knowledge", async () => {
   const request = (path: string, cookie?: string) =>
     app.request(path, { headers: cookie ? { cookie } : {} });
+
   assert.equal((await request("/v1/admin/ai/knowledge")).status, 401);
   assert.equal(
     (await request("/v1/admin/ai/knowledge", customerCookie)).status,
@@ -322,9 +333,11 @@ test("detail exposes withdrawn chunks without counting or serving removed media"
   assert.equal(detail.listing.expectedChunks, 1);
   assert.equal(detail.listing.indexedChunks, 0);
   assert.equal(detail.listing.photoChunks, 0);
+
   const removed = detail.chunks.find(
     (chunk: { key: string }) => chunk.key === "photo:removed",
   );
+
   assert.equal(removed.withdrawn, true);
   assert.equal(removed.contentMarkdown, "Old photo context");
   assert.equal(removed.mediaUrl, null);

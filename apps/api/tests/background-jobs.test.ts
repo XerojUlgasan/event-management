@@ -23,16 +23,21 @@ import {
 } from "../src/services/background-jobs/run-worker.js";
 
 const database = `em_jobs_${randomUUID().replaceAll("-", "")}`;
+
 let admin: Pool;
 let db: Kysely<DB>;
+
 const signal = new AbortController().signal;
+
 const pkg = () => ({ packageId: randomUUID() });
+
 const enqueue = (payload: { packageId: string }) =>
   db
     .transaction()
     .execute((trx) =>
       enqueueBackgroundJobService(trx, "embed_package", payload),
     );
+
 async function rows() {
   return (
     await sql<{
@@ -46,9 +51,11 @@ async function rows() {
     )
   ).rows;
 }
+
 async function clear() {
   await sql`delete from background_jobs`.execute(db);
 }
+
 async function due() {
   await sql`update background_jobs set available_at = clock_timestamp() - interval '1 second' where status = 'pending'`.execute(
     db,
@@ -69,6 +76,7 @@ before(async () => {
   const pool = new Pool({ ...connection, database });
   db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
   const root = new URL("../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((e) => e.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name))) {
@@ -79,6 +87,7 @@ before(async () => {
 });
 after(async () => {
   await db?.destroy();
+
   if (admin) {
     await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await admin.end();
@@ -167,6 +176,7 @@ test("claims are due, fenced, and serialized per owner with a follow-up", async 
 
 test("retry delays, exhausted attempts, and expired final lease", async () => {
   await enqueue(pkg());
+
   for (const delay of [10000, 60000, 300000]) {
     const before = Date.now();
     assert.equal(
@@ -188,6 +198,7 @@ test("retry delays, exhausted attempts, and expired final lease", async () => {
     );
     await due();
   }
+
   const final = await claimJobData(db, 60000, backgroundJobPolicies);
   assert.ok(final);
   assert.equal(final.attempts, 4);
@@ -252,6 +263,7 @@ test("invalid payload is permanent, unknown jobs stay untouched, and timeouts ab
 test("worker polls while occupied and shuts down active handlers", async () => {
   const controller = new AbortController();
   let runs = 0;
+
   const running = runBackgroundJobsWorker(db, {
     signal: controller.signal,
     concurrency: 2,
@@ -265,6 +277,7 @@ test("worker polls while occupied and shuts down active handlers", async () => {
       );
     },
   });
+
   await enqueue(pkg());
   await new Promise((resolve) => setTimeout(resolve, 100));
   await enqueue(pkg());
@@ -288,7 +301,9 @@ test("expired work yields to a pending successor and a new save resets pending r
   const next = await claimJobData(db, 60000, backgroundJobPolicies);
   assert.ok(next);
   assert.equal(next.id, nextId);
+
   const previous = (await rows()).find((r) => r.id === old.id);
+
   assert.equal(previous?.status, "failed");
   assert.equal(previous?.last_error, "Superseded by a newer job");
   assert.equal(await heartbeatJobData(db, old, 60000), false);
@@ -299,7 +314,9 @@ test("expired work yields to a pending successor and a new save resets pending r
   await finishJobData(db, next, "retry", backgroundJobPolicies);
   assert.equal((await rows()).find((r) => r.id === next.id)?.attempts, 1);
   assert.equal(await enqueue(payload), next.id);
+
   const pending = (await rows()).find((r) => r.id === next.id);
+
   assert.equal(pending?.attempts, 0);
   assert.equal(pending?.last_error, null);
   assert.ok(pending && pending.available_at.getTime() <= Date.now());
@@ -317,6 +334,7 @@ test("independent owners can run concurrently and four failures exhaust retries"
   assert.notEqual(first.id, second.id);
   await finishJobData(db, first, "success", backgroundJobPolicies);
   await finishJobData(db, second, "retry", backgroundJobPolicies);
+
   for (let attempt = 2; attempt <= 4; attempt++) {
     await due();
     assert.equal(
@@ -329,7 +347,9 @@ test("independent owners can run concurrently and four failures exhaust retries"
       true,
     );
   }
+
   const failed = (await rows()).find((row) => row.id === second.id);
+
   assert.equal(failed?.status, "failed");
   assert.equal(failed?.attempts, 4);
   await clear();
@@ -358,8 +378,10 @@ test("a shortened retry policy exhausts due pending work without another claim",
 
 test("timeout and shutdown stop waiting for an uncooperative handler", async () => {
   const never = () => new Promise<void>(() => {});
+
   const bounded = async <T>(promise: Promise<T>) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
+
     try {
       return await Promise.race([
         promise,
@@ -374,6 +396,7 @@ test("timeout and shutdown stop waiting for an uncooperative handler", async () 
       if (timer) clearTimeout(timer);
     }
   };
+
   await enqueue(pkg());
   await bounded(
     runOneBackgroundJob(db, { signal, timeoutMs: 10, execute: never }),
@@ -382,18 +405,23 @@ test("timeout and shutdown stop waiting for an uncooperative handler", async () 
   await clear();
   await enqueue(pkg());
   const controller = new AbortController();
+
   let started = () => {};
+
   const began = new Promise<void>((resolve) => {
     started = resolve;
   });
+
   const worker = runBackgroundJobsWorker(db, {
     signal: controller.signal,
     pollIntervalMs: 10,
     execute: () => {
       started();
+
       return never();
     },
   });
+
   await bounded(began);
   controller.abort();
   await bounded(worker);

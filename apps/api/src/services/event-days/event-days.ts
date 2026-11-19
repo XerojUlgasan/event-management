@@ -13,6 +13,7 @@ export type Schedule = {
   startsAt: string;
   endsAt: string;
 };
+
 export class EventDayError extends Error {
   constructor(
     message: string,
@@ -21,17 +22,23 @@ export class EventDayError extends Error {
     super(message);
   }
 }
+
 export const fail = (message: string, status: 400 | 404 | 409): never => {
   throw new EventDayError(message, status);
 };
+
 export function validateSchedule(input: Schedule, timeZone: string) {
   const start = new Date(input.startsAt),
     end = new Date(input.endsAt);
+
   if (calendarDateInTimeZone(start, timeZone) !== input.day)
     fail("Day must match the start date in the booking time zone", 400);
+
   if (end <= start) fail("End must be after start", 400);
+
   return input;
 }
+
 export function responses(db: Database, days: DayRow[]) {
   return days.map((day) => ({
     id: day.id,
@@ -47,26 +54,39 @@ export function responses(db: Database, days: DayRow[]) {
     replacementEventDayId: day.replacement_event_day_id,
   }));
 }
+
 export async function one(db: Database, id: string) {
   const day = await getEventDayData(db, id);
+
   if (!day) return fail("Event day not found", 404);
+
   const result = responses(db, [day])[0];
+
   if (!result) throw new Error("Event day response missing");
+
   return result;
 }
+
 export async function lockExisting(
   trx: Transaction<DB>,
   id: string,
   requireAccepted = true,
 ) {
   const ref = await findEventDayBookingData(trx, id);
+
   if (!ref) return fail("Event day not found", 404);
+
   const booking = await lockBookingRequestData(trx, ref.booking_request_id);
+
   if (!booking || (requireAccepted && booking.status !== "accepted"))
     return fail("Booking request must be accepted", 409);
+
   const day = await lockEventDayData(trx, id);
+
   if (!day) return fail("Event day not found", 404);
+
   if (day.status !== "scheduled")
     return fail("Event day is no longer scheduled", 409);
+
   return day;
 }

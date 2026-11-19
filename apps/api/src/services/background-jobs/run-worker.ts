@@ -44,25 +44,35 @@ export async function runOneBackgroundJob(
   options: WorkerOptions,
 ): Promise<boolean> {
   if (options.signal.aborted) return false;
+
   const leaseMs = options.leaseMs ?? backgroundJobSettings.leaseMs;
   const heartbeatMs = options.heartbeatMs ?? backgroundJobSettings.heartbeatMs;
   const job = await claimJobData(db, leaseMs, backgroundJobPolicies);
+
   if (!job || !isBackgroundJobType(job.type)) return false;
+
   const type = job.type;
   const controller = new AbortController();
+
   const abort = () => controller.abort();
+
   options.signal.addEventListener("abort", abort, { once: true });
+
   if (options.signal.aborted) abort();
+
   const timeout = setTimeout(
     abort,
     options.timeoutMs ?? jobDefinitions[type].timeoutMs,
   );
   const heartbeatStop = new AbortController();
   let ownershipLost = false;
+
   const heartbeat = (async () => {
     while (!heartbeatStop.signal.aborted) {
       await wait(heartbeatMs, heartbeatStop.signal);
+
       if (heartbeatStop.signal.aborted) break;
+
       try {
         if (!(await heartbeatJobData(db, job, leaseMs))) {
           ownershipLost = true;
@@ -76,25 +86,32 @@ export async function runOneBackgroundJob(
       }
     }
   })();
+
   let outcome: "success" | "retry" | "invalid" = "retry";
+
   try {
     // Validate persisted JSON even when tests inject a handler.
     const parsed = jobDefinitions[type].payloadSchema.safeParse(job.payload);
+
     if (!parsed.success) outcome = "invalid";
     else {
       controller.signal.throwIfAborted();
       // Abort bounds worker ownership even when a buggy handler ignores the signal.
       // Handlers must still honor the signal before making external writes.
       let onAbort: (() => void) | undefined;
+
       const aborted = new Promise<never>((_, reject) => {
         onAbort = () => reject(new Error("Job aborted"));
         controller.signal.addEventListener("abort", onAbort, { once: true });
+
         if (controller.signal.aborted) onAbort();
       });
+
       try {
         await Promise.race([
           Promise.resolve().then(() => {
             controller.signal.throwIfAborted();
+
             return (options.execute ?? executeJob)(
               type,
               parsed.data,
@@ -107,6 +124,7 @@ export async function runOneBackgroundJob(
       } finally {
         if (onAbort) controller.signal.removeEventListener("abort", onAbort);
       }
+
       controller.signal.throwIfAborted();
       outcome = "success";
     }
@@ -118,8 +136,10 @@ export async function runOneBackgroundJob(
     await heartbeat;
     options.signal.removeEventListener("abort", abort);
   }
+
   if (!ownershipLost)
     await finishJobData(db, job, outcome, backgroundJobPolicies);
+
   return true;
 }
 
@@ -130,6 +150,7 @@ export async function runBackgroundJobsWorker(
   const concurrency = options.concurrency ?? backgroundJobSettings.concurrency;
   const pollIntervalMs =
     options.pollIntervalMs ?? backgroundJobSettings.pollIntervalMs;
+
   if (
     !Number.isInteger(concurrency) ||
     concurrency < 1 ||
@@ -139,7 +160,9 @@ export async function runBackgroundJobsWorker(
     (options.heartbeatMs ?? backgroundJobSettings.heartbeatMs) < 1
   )
     throw new Error("Invalid worker settings");
+
   const active = new Set<Promise<void>>();
+
   while (!options.signal.aborted) {
     while (active.size < concurrency && !options.signal.aborted) {
       // Claim one at a time so no more than the available slots are leased.
@@ -157,7 +180,9 @@ export async function runBackgroundJobsWorker(
       active.add(task);
       // Avoid spinning on an empty queue: each slot is checked at most once per poll.
     }
+
     await wait(pollIntervalMs, options.signal);
   }
+
   await Promise.all(active);
 }

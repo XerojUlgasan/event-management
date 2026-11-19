@@ -46,6 +46,7 @@ export function useThumbnail(initialPreviewUrl: string | null = null) {
    */
   const cancelAndCleanup = () => {
     if (mediaIdRef.current) void deleteCatalogMedia(mediaIdRef.current);
+
     reset();
   };
 

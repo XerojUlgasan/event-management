@@ -25,7 +25,9 @@ export async function verifyPassword(
     /^\$argon2id\$v=19\$m=(\d+),t=(\d+),p=(\d+)\$([A-Za-z0-9+/]+)\$([A-Za-z0-9+/]+)$/.exec(
       encoded,
     );
+
   if (!parameters) throw new Error("Invalid Argon2id password hash");
+
   const [, memorySize, iterations, parallelism, salt, digest] = parameters;
   const expected = Buffer.from(digest, "base64");
   const actual = await argon2id({
@@ -39,5 +41,6 @@ export async function verifyPassword(
   });
   // hash-wasm's verifier compares strings; retain a timing-safe digest comparison.
   const matches = timingSafeEqual(actual, expected);
+
   return passwordHash !== null && matches;
 }

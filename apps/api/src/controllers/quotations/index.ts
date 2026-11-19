@@ -43,11 +43,14 @@ const routes = new OpenAPIHono<HonoEnv>({
           400,
         ),
 });
+
 const customer = createMiddleware<HonoEnv>(async (c, next) => {
   if (c.get("session").user.role !== "customer")
     return jsonError(c, "Customer access required", 403);
+
   await next();
 });
+
 routes.use(
   "/admin/booking-requests/:id/quotations",
   requireSession,
@@ -64,4 +67,5 @@ routes.openapi(getQuotationRoute, getQuotationRouteHandler);
 routes.openapi(saveQuotationRoute, saveQuotationRouteHandler);
 routes.openapi(sendQuotationRoute, sendQuotationRouteHandler);
 routes.openapi(reviseAdminQuotationRoute, reviseAdminQuotationRouteHandler);
+
 export default routes;

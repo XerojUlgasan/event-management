@@ -26,5 +26,6 @@ export function zonedPartValues(formatter: Intl.DateTimeFormat, instant: Date) {
 
 export function calendarDateInTimeZone(instant: Date, timeZone: string) {
   const parts = zonedPartValues(zonedFormat(timeZone), instant);
+
   return `${parts.year}-${parts.month}-${parts.day}`;
 }

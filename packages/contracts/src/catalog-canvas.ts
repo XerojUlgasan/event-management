@@ -12,6 +12,7 @@ import {
 } from "@event-management/contracts/limits/catalog";
 
 const text = z.string().trim().max(MAX_CATALOG_TEXT_LENGTH);
+
 export const sampleCatalogPhotoPaths: readonly string[] = [
   "/images/wedding.jpg",
   "/images/dinner.jpg",
@@ -24,7 +25,9 @@ export const sampleCatalogPhotoPaths: readonly string[] = [
   "/images/catalog-coastal.jpg",
   "/images/catalog-ballroom.jpg",
 ];
+
 const sampleImages = new Set(sampleCatalogPhotoPaths);
+
 function createMediaSchema(allowMissingUploadId: boolean) {
   return z
     .object({
@@ -42,6 +45,7 @@ function createMediaSchema(allowMissingUploadId: boolean) {
           message: "Choose an uploaded file",
           path: ["id"],
         });
+
       if (
         media.source === "sample" &&
         (media.kind !== "image" || !sampleImages.has(media.url))
@@ -53,7 +57,9 @@ function createMediaSchema(allowMissingUploadId: boolean) {
         });
     });
 }
+
 export const mediaSchema = createMediaSchema(false);
+
 function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
   return z
     .object({
@@ -110,18 +116,21 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
           message: "Choose an uploaded file",
           path: ["media", "id"],
         });
+
       if (widget.autoplay && widget.type !== "video")
         ctx.addIssue({
           code: "custom",
           message: "Autoplay is only available for video widgets",
           path: ["autoplay"],
         });
+
       if (widget.x + widget.w > CATALOG_COLUMNS)
         ctx.addIssue({
           code: "custom",
           message: "Widget exceeds the page width",
           path: ["w"],
         });
+
       if (
         widget.type !== "service" &&
         (widget.serviceId != null || widget.service != null)
@@ -130,6 +139,7 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
           code: "custom",
           message: "Only service widgets can reference a service",
         });
+
       if (
         widget.type !== "package" &&
         (widget.packageId != null || widget.package != null)
@@ -138,6 +148,7 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
           code: "custom",
           message: "Only package widgets can reference a package",
         });
+
       if (widget.type === "package") {
         if (!widget.packageId)
           ctx.addIssue({
@@ -145,6 +156,7 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
             message: "Choose a package for this widget before saving.",
             path: ["packageId"],
           });
+
         if (widget.media !== null || widget.markdown !== "")
           ctx.addIssue({
             code: "custom",
@@ -157,6 +169,7 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
             message: "Choose a service for this widget before saving.",
             path: ["serviceId"],
           });
+
         if (widget.media !== null || widget.markdown !== "")
           ctx.addIssue({
             code: "custom",
@@ -183,7 +196,9 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
         });
     });
 }
+
 export const widgetSchema = createWidgetSchema();
+
 function createSectionSchema(pendingWidgetIds?: ReadonlySet<string>) {
   return z
     .object({
@@ -195,16 +210,20 @@ function createSectionSchema(pendingWidgetIds?: ReadonlySet<string>) {
     })
     .strict();
 }
+
 export const sectionSchema = createSectionSchema();
+
 function createSectionsSchema(pendingWidgetIds?: ReadonlySet<string>) {
   return z
     .array(createSectionSchema(pendingWidgetIds))
     .max(MAX_CATALOG_SECTIONS)
     .superRefine((sections, ctx) => {
       const sectionIds = sections.map((section) => section.id);
+
       const widgetIds = sections.flatMap((section) =>
         section.widgets.map((widget) => widget.id),
       );
+
       if (
         new Set(sectionIds).size !== sectionIds.length ||
         new Set(widgetIds).size !== widgetIds.length
@@ -213,6 +232,7 @@ function createSectionsSchema(pendingWidgetIds?: ReadonlySet<string>) {
           code: "custom",
           message: "Section and widget IDs must be unique",
         });
+
       if (widgetIds.length > MAX_CATALOG_WIDGETS)
         ctx.addIssue({
           code: "custom",
@@ -220,7 +240,9 @@ function createSectionsSchema(pendingWidgetIds?: ReadonlySet<string>) {
         });
     });
 }
+
 export const sectionsSchema = createSectionsSchema();
+
 export const draftSectionsSchema = (pendingWidgetIds: ReadonlySet<string>) =>
   createSectionsSchema(pendingWidgetIds);
 
@@ -283,6 +305,7 @@ export const storedSectionsSchema = z
         })),
       })),
     );
+
     if (!result.success) {
       for (const issue of result.error.issues)
         ctx.addIssue({

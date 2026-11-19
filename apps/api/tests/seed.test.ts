@@ -27,15 +27,21 @@ import { searchPublicCatalogService } from "../src/services/ai/search-public-cat
 import { getPublicCatalogItemService } from "../src/services/ai/get-public-catalog-item.js";
 
 const database = `em_seed_test_${randomUUID().replaceAll("-", "")}`;
+
 const workspaceDirectory = fileURLToPath(new URL("../../../", import.meta.url));
+
 let admin: Pool;
 let pool: Pool;
 let created = false;
 let app: typeof import("../src/app.js").app;
 let db: typeof import("../src/db/client.js").db;
+
 const catalogPlan = planScenarioCatalog();
+
 const packageIds = catalogPlan.packages.map((item) => item.id);
+
 const serviceIds = catalogPlan.services.map((item) => item.id);
+
 const catalogMediaIds = [
   ...catalogPlan.canvases.map((page) =>
     scenarioId(`media:curated-catalog-v2:${page.key}`),
@@ -47,6 +53,7 @@ const catalogMediaIds = [
 
 async function applyMigrations(target: Pool) {
   const migrations = new URL("../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(migrations, { withFileTypes: true }))
     .filter((item) => item.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name))) {
@@ -85,6 +92,7 @@ before(async () => {
 after(async () => {
   await db?.destroy();
   await pool?.end();
+
   if (admin) {
     // Pool shutdown can resolve before PostgreSQL has finished disconnecting.
     // Wait for those connections to leave before forcibly dropping the test DB.
@@ -94,11 +102,15 @@ after(async () => {
           "SELECT 1 FROM pg_stat_activity WHERE datname = $1",
           [database],
         );
+
         if (remaining.rowCount === 0) break;
+
         await new Promise((resolve) => setTimeout(resolve, 25));
       }
     }
+
     if (created) await admin.query(`DROP DATABASE "${database}" WITH (FORCE)`);
+
     await admin.end();
   }
 });
@@ -134,14 +146,17 @@ const tables = [
   "quotations",
   "audit_events",
 ] as const;
+
 async function ids() {
   const snapshot: Record<string, string[]> = {};
+
   for (const table of tables) {
     const result = await pool.query<{ id: string }>(
       `SELECT id FROM ${table} ORDER BY id`,
     );
     snapshot[table] = result.rows.map((row) => row.id);
   }
+
   for (const table of ["packages", "services"]) {
     const result = await pool.query<{ id: string; canvas: unknown }>(
       `SELECT id, canvas FROM ${table} ORDER BY id`,
@@ -150,6 +165,7 @@ async function ids() {
       JSON.stringify([row.id, row.canvas]),
     );
   }
+
   return snapshot;
 }
 
@@ -162,12 +178,14 @@ async function read(path: string, cookie?: string) {
     200,
     `GET ${path}: ${await response.clone().text()}`,
   );
+
   return response.json() as Promise<any>;
 }
 
 async function readAll(path: string, collection: string, cookie?: string) {
   const rows: Record<string, unknown>[] = [];
   let cursor: string | undefined;
+
   do {
     const query = new URLSearchParams({
       limit: "50",
@@ -175,12 +193,15 @@ async function readAll(path: string, collection: string, cookie?: string) {
     });
     const page = await read(`${path}?${query}`, cookie);
     assert.ok(Array.isArray(page[collection]));
+
     for (const row of page[collection]) {
       assert.ok(typeof row === "object" && row !== null && !Array.isArray(row));
       rows.push(row);
     }
+
     cursor = typeof page.nextCursor === "string" ? page.nextCursor : undefined;
   } while (cursor);
+
   return rows;
 }
 
@@ -193,6 +214,7 @@ async function login(email: string) {
   assert.equal(response.status, 200, `Login failed for ${email}`);
   const cookie = response.headers.get("set-cookie")?.split(";")[0];
   assert.ok(cookie);
+
   return cookie;
 }
 
@@ -227,6 +249,7 @@ function assertSubstantialEditorial(sections: CatalogSection[], name: string) {
       .filter((widget) => widget.type === "markdown")
       .map((widget) => widget.markdown),
   );
+
   assert.ok(
     bodies.length >= 5,
     `${name} has an introduction and detailed sections`,
@@ -239,6 +262,7 @@ function assertSubstantialEditorial(sections: CatalogSection[], name: string) {
     .split(/\s+/)
     .filter(Boolean);
   assert.ok(words.length >= 220, `${name} has substantial source material`);
+
   return bodies;
 }
 
@@ -343,12 +367,16 @@ test("seed creates demo users and conversations while preserving unrelated data 
   );
   assert.equal(seededPackages.rowCount, 20);
   assert.equal(seededServices.rowCount, 20);
+
   const packageById = new Map(seededPackages.rows.map((row) => [row.id, row]));
+
   const serviceById = new Map(seededServices.rows.map((row) => [row.id, row]));
+
   const activeMarkdownBodies: string[] = [];
   const layoutSignatures = new Set<string>();
   let resolvedCatalogPhotos = 0;
   let activeListingsWithPhotos = 0;
+
   for (const page of catalogPlan.canvases) {
     const record =
       page.kind === "package"
@@ -379,9 +407,11 @@ test("seed creates demo users and conversations while preserving unrelated data 
         ),
       ),
     );
+
     const photos = sections.flatMap((section) =>
       section.widgets.filter((widget) => widget.type === "photo"),
     );
+
     assert.equal(photos.length, 1, `${page.key} has one canvas photo`);
     const photo = photos[0];
     assert.ok(photo?.media, `${page.key} photo resolves to local media`);
@@ -407,6 +437,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
             record: record as SeedService,
             sections,
           });
+
     if (archived) {
       assert.deepEqual(
         knowledge,
@@ -415,10 +446,13 @@ test("seed creates demo users and conversations while preserving unrelated data 
       );
       continue;
     }
+
     activeListingsWithPhotos++;
+
     const markdown = knowledge.filter((chunk) =>
       chunk.chunkKey.startsWith("markdown:"),
     );
+
     assert.ok(
       markdown.length >= 5,
       `${page.key} contributes its introduction and authored sections`,
@@ -430,6 +464,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
       `${page.key} contributes photo knowledge`,
     );
     const widgetBodies = new Map<string, string>();
+
     for (const chunk of markdown) {
       const widgetId = chunk.chunkKey.split(":")[1];
       assert.ok(widgetId);
@@ -439,6 +474,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
       const body = chunk.contentMarkdown.slice(offset + marker.length);
       widgetBodies.set(widgetId, (widgetBodies.get(widgetId) ?? "") + body);
     }
+
     const bodies = [...widgetBodies.values()];
     activeMarkdownBodies.push(...bodies);
     assert.deepEqual(
@@ -451,6 +487,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
       `${page.key} has distinct meaningful copy`,
     );
   }
+
   assert.equal(resolvedCatalogPhotos, 40);
   assert.equal(activeListingsWithPhotos, 36);
   assert.ok(layoutSignatures.size >= 5, "seed canvases exercise five layouts");
@@ -480,10 +517,12 @@ test("seed creates demo users and conversations while preserving unrelated data 
   assert.ok(fixedSearchTarget && fixedSearchTarget.fixed_price_pesos !== null);
   const fixedPrice = fixedSearchTarget.fixed_price_pesos;
   assert.ok(fixedPrice !== null);
+
   const hourlySearchTarget = seededServices.rows.find(
     (service) =>
       service.archived_at === null && service.fixed_price_pesos === null,
   );
+
   assert.ok(hourlySearchTarget);
   const hourlyRate = hourlySearchTarget.hourly_rate_pesos;
   assert.ok(hourlyRate !== null);
@@ -493,6 +532,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
     fetchAttempts++;
     throw new Error("Queryless catalog smoke must not call a provider");
   };
+
   try {
     const packageResults = await searchPublicCatalogService({
       db,
@@ -571,6 +611,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
   let detailCursor: string | null = firstDetailCursor;
   let detailDocument = firstDetailPage.markdown;
   let detailPages = 1;
+
   while (detailCursor) {
     const nextPage = await getPublicCatalogItemService({
       db,
@@ -580,6 +621,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
     detailCursor = nextPage.nextCursor;
     detailPages++;
   }
+
   assert.ok(detailPages > 1);
   assert.ok(detailDocument.includes("Pagination scope detail."));
   const otherPackage = catalogPlan.packages[1];
@@ -752,9 +794,11 @@ test("seed creates demo users and conversations while preserving unrelated data 
       },
     ],
   );
+
   const grandCelebration = packageRows.rows.find(
     (row) => row.name === "The Grand Celebration",
   );
+
   assert.ok(grandCelebration);
   const packagePageContent = await pool.query(`
     SELECT p.name,
@@ -783,9 +827,11 @@ test("seed creates demo users and conversations while preserving unrelated data 
     "The Intimate Gathering",
     "The Sweet Soirée",
   ];
+
   const samplePackages = publicPackages.filter((row: any) =>
     sampleNames.includes(row.name),
   );
+
   assert.deepEqual(
     samplePackages.map((row: any) => row.name).sort(),
     sampleNames,
@@ -795,6 +841,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
     [sampleNames],
   );
   assert.equal(seededSamplePackages.rowCount, 3);
+
   for (const sample of seededSamplePackages.rows) {
     const sections = await readCatalogSectionsService(db, {
       kind: "package",
@@ -811,9 +858,11 @@ test("seed creates demo users and conversations while preserving unrelated data 
       chunks.filter((chunk) => chunk.chunkKey.startsWith("markdown:")).length >=
         5,
     );
+
     const photo = sections
       .flatMap((section) => section.widgets)
       .find((widget) => widget.type === "photo");
+
     assert.ok(photo?.media);
     assert.ok(sampleCatalogPhotoPaths.includes(photo.media.url));
     assert.equal(sample.thumbnail_media_id, photo.media.id);
@@ -821,6 +870,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
       resolve(workspaceDirectory, "apps/web/public", photo.media.url.slice(1)),
     );
   }
+
   assert.equal(
     publicPackages.filter((row: any) => packageIds.includes(row.id)).length,
     18,
@@ -828,6 +878,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
   assert.ok(
     samplePackages.every((pkg: any) => {
       const widgets = pkg.sections.flatMap((section: any) => section.widgets);
+
       return (
         widgets.some((widget: any) => widget.type === "markdown") &&
         widgets.some(
@@ -1077,8 +1128,11 @@ test("seed creates demo users and conversations while preserving unrelated data 
     [changedActiveCandidate.id],
   );
   const scenarioUsers = planScenarioUsers();
+
   const scenarioAdminUser = scenarioUsers.find((user) => user.role === "admin");
+
   assert.ok(scenarioAdminUser);
+
   const persistedCatalog = await db.transaction().execute((trx) =>
     seedScenarioCatalog(trx, {
       catalog: catalogPlan,
@@ -1086,12 +1140,15 @@ test("seed creates demo users and conversations while preserving unrelated data 
       now: new Date("2026-10-31T00:00:00.000Z"),
     }),
   );
+
   const returnedArchived = persistedCatalog.packages.find(
     (item) => item.id === archivedCandidate.id,
   );
+
   const returnedActive = persistedCatalog.packages.find(
     (item) => item.id === changedActiveCandidate.id,
   );
+
   assert.deepEqual(
     returnedArchived && {
       price: returnedArchived.price,
@@ -1108,17 +1165,20 @@ test("seed creates demo users and conversations while preserving unrelated data 
     },
     { price: 23456, maxGuests: 44, archived: false },
   );
+
   const rerunActivity = planScenarioActivity({
     users: scenarioUsers,
     packages: persistedCatalog.packages,
     now: new Date("2026-10-31T00:00:00.000Z"),
     random: () => 0.5,
   });
+
   const returnedActiveIds = new Set(
     persistedCatalog.packages
       .filter((item) => !item.archived)
       .map((item) => item.id),
   );
+
   assert.ok(
     rerunActivity.bookings.every((booking) =>
       returnedActiveIds.has(booking.packageId),
@@ -1133,6 +1193,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
   const legacyServicePage = catalogPlan.canvases.find(
     (page) => page.kind === "service" && page.index === 19,
   );
+
   assert.ok(legacyServicePage);
   const legacyMediaId = scenarioId("media:service:19");
   const curatedMediaId = scenarioId(
@@ -1167,9 +1228,11 @@ test("seed creates demo users and conversations while preserving unrelated data 
     kind: "service",
     id: legacyServicePage.ownerId,
   });
+
   const rebuiltPhoto = rebuiltSections
     .flatMap((section) => section.widgets)
     .find((widget) => widget.type === "photo");
+
   assert.ok(rebuiltPhoto?.media);
   assert.equal(rebuiltPhoto.media.id, curatedMediaId);
   assert.equal(rebuiltPhoto.media.url, legacyServicePage.copy.photo);

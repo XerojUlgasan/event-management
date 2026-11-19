@@ -33,12 +33,14 @@ export function BookingStatusHistory({
   const pagination = usePagination(JSON.stringify([id, admin, revision]));
   useEffect(() => {
     if (!open) return;
+
     const current = generation.bump();
     setLoading(true);
     setError("");
     getBookingStatusHistory(id, admin, pagination.cursor)
       .then((result) => {
         if (!generation.isCurrent(current)) return;
+
         setEntries(result.history);
         setNextCursor(result.nextCursor);
       })
@@ -49,10 +51,12 @@ export function BookingStatusHistory({
       .finally(() => {
         if (generation.isCurrent(current)) setLoading(false);
       });
+
     return () => {
       generation.bump();
     };
   }, [open, id, admin, revision, pagination.cursor, retry]);
+
   return (
     <details
       className={className}

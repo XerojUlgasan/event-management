@@ -13,6 +13,7 @@ type Navigation =
       onPrevious?: never;
       onNext?: never;
     };
+
 export type PaginationProps = Navigation & {
   page: number;
   hasNextPage: boolean;
@@ -20,6 +21,7 @@ export type PaginationProps = Navigation & {
   disabled?: boolean;
   label?: string;
 };
+
 /** Controlled navigation for tables, cards, and server-rendered collection pages. */
 export function Pagination({
   page,
@@ -32,6 +34,7 @@ export function Pagination({
   const previousDisabled = disabled || pending || page <= 1;
   const nextDisabled = disabled || pending || !hasNextPage;
   const linkClass = "button button-secondary button-size-small";
+
   return (
     <nav className="ui-pagination" aria-label={label} aria-busy={pending}>
       {navigation.onPrevious ? (

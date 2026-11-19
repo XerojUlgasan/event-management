@@ -45,15 +45,21 @@ export function CatalogReferencePickerDialog({
   onClose: () => void;
 }) {
   const plural = kind === "package" ? "packages" : "services";
+
   const loadPage = async (search: string, cursor?: string) => {
     const query = { archived: "active" as const, search, cursor };
+
     if (kind === "package") {
       const page = await getAdminPackages(query);
+
       return { items: page.packages.map(preview), nextCursor: page.nextCursor };
     }
+
     const page = await getAdminServices(query);
+
     return { items: page.services.map(preview), nextCursor: page.nextCursor };
   };
+
   const searchRef = useRef<HTMLInputElement>(null);
   const requestId = useRef(0);
   const [search, setSearch] = useState("");
@@ -69,17 +75,20 @@ export function CatalogReferencePickerDialog({
     setError(false);
     setItems([]);
     setCursor(null);
+
     const timer = window.setTimeout(
       () => {
         void loadPage(search.trim()).then(
           (page) => {
             if (id !== requestId.current) return;
+
             setItems(page.items);
             setCursor(page.nextCursor);
             setLoading(false);
           },
           () => {
             if (id !== requestId.current) return;
+
             setError(true);
             setLoading(false);
           },
@@ -87,6 +96,7 @@ export function CatalogReferencePickerDialog({
       },
       search ? 250 : 0,
     );
+
     return () => {
       window.clearTimeout(timer);
       requestId.current++;
@@ -95,12 +105,16 @@ export function CatalogReferencePickerDialog({
 
   const loadMore = async () => {
     if (!cursor || loading) return;
+
     const id = ++requestId.current;
     setLoading(true);
     setError(false);
+
     try {
       const page = await loadPage(search.trim(), cursor);
+
       if (id !== requestId.current) return;
+
       setItems((previous) => [...previous, ...page.items]);
       setCursor(page.nextCursor);
     } catch {

@@ -42,8 +42,10 @@ export const addPasswordRouteHandler: AppRouteHandler<
     firebase,
     c.req.valid("json").password,
   );
+
   if (result.kind === "rate-limited")
     return jsonError(c, "Too many attempts. Try again in 15 minutes.", 429);
+
   if (result.kind === "invalid") {
     return jsonError(
       c,
@@ -51,8 +53,11 @@ export const addPasswordRouteHandler: AppRouteHandler<
       401,
     );
   }
+
   if (result.kind === "conflict")
     return jsonError(c, "This account already has a local password.", 409);
+
   await startSessionService(c, result.row.id);
+
   return c.json(toProfile(result.row), 200);
 };

@@ -28,6 +28,7 @@ const rows: RequestRow[] = [
     status: "under_review",
   },
 ];
+
 const columns: DataTableColumn<RequestRow>[] = [
   {
     key: "customer",
@@ -79,11 +80,15 @@ const meta = {
     minWidth: 850,
   },
 } satisfies Meta<typeof DataTable<RequestRow>>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
 export const Empty: Story = { args: { rows: [] } };
+
 export const Narrow: Story = {
   render: (args) => (
     <div style={{ maxWidth: 360 }}>
@@ -91,6 +96,7 @@ export const Narrow: Story = {
     </div>
   ),
 };
+
 export const LongNames: Story = {
   args: {
     rows: [

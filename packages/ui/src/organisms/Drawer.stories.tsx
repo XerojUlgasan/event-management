@@ -35,10 +35,12 @@ const meta = {
 } satisfies Meta<typeof Drawer>;
 
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 function Example(args: ComponentProps<typeof Drawer>) {
   const [open, setOpen] = useState(false);
+
   return (
     <>
       <Button onClick={() => setOpen(true)}>Open details</Button>
@@ -46,7 +48,9 @@ function Example(args: ComponentProps<typeof Drawer>) {
     </>
   );
 }
+
 export const Default: Story = { render: (args) => <Example {...args} /> };
+
 export const LongContent: Story = {
   args: {
     title:
@@ -67,6 +71,7 @@ export const LongContent: Story = {
 
 function Handoff() {
   const [stage, setStage] = useState<"closed" | "drawer" | "dialog">("closed");
+
   return (
     <>
       <Button onClick={() => setStage("drawer")}>Open item details</Button>
@@ -87,4 +92,5 @@ function Handoff() {
     </>
   );
 }
+
 export const DialogHandoff: Story = { render: () => <Handoff /> };

@@ -19,6 +19,7 @@ test("filing preserves uploaded photo freshness across folders", () => {
     mime_type: "image/png",
   };
   const legacy = catalogKnowledgeSourceHash("photo context", media);
+
   for (const storage_key of [
     pendingCatalogMediaKey("admin-id", media.id, media.mime_type),
     ownedCatalogMediaKey(
@@ -34,6 +35,7 @@ test("filing preserves uploaded photo freshness across folders", () => {
       catalogKnowledgeSourceHash("photo context", { ...media, storage_key }),
       legacy,
     );
+
   assert.notEqual(catalogKnowledgeSourceHash("changed caption", media), legacy);
   assert.notEqual(
     catalogKnowledgeSourceHash("photo context", {
@@ -52,6 +54,7 @@ test("Storage missing-key detection accepts both response formats without hiding
   };
   process.env.SUPABASE_URL = "http://storage.invalid";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "synthetic-fixture";
+
   try {
     for (const response of [
       new Response(null, { status: 404 }),
@@ -60,6 +63,7 @@ test("Storage missing-key detection accepts both response formats without hiding
       globalThis.fetch = async () => response;
       await assert.rejects(getCatalogMedia("old-key"), CatalogMediaNotFound);
     }
+
     globalThis.fetch = async () =>
       Response.json({ code: "InvalidJWT" }, { status: 400 });
     await assert.rejects(
@@ -69,6 +73,7 @@ test("Storage missing-key detection accepts both response formats without hiding
     );
   } finally {
     globalThis.fetch = oldFetch;
+
     for (const [key, value] of Object.entries(oldEnv)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;

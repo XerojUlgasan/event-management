@@ -8,6 +8,7 @@ export function requestHumanHandoffService({
   input: unknown;
 }) {
   const parsed = requestHumanHandoffInputSchema.parse(input);
+
   return requestHumanHandoffData({
     ...options,
     handoff: { ...parsed, pending: true },

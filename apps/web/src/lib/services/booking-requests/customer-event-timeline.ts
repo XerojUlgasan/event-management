@@ -42,11 +42,14 @@ type CustomerEventGroup = (typeof customerEventGroups)[number]["key"];
 // Requested dates stay separate from operational schedules, which can move.
 export function customerEventPosition(item: BookingRequest, now = new Date()) {
   const today = calendarDateInTimeZone(now, item.timeZone);
+
   const dates = (
     item.requestedDays?.map((day) => day.date) ??
     (item.preferredDate ? [item.preferredDate] : [])
   ).toSorted();
+
   const nextDate = dates.find((date) => date >= today);
+
   const date = nextDate ?? dates.at(-1) ?? null;
   const group: CustomerEventGroup =
     item.status === "declined" || item.status === "cancelled"
@@ -58,6 +61,7 @@ export function customerEventPosition(item: BookingRequest, now = new Date()) {
           : date > today
             ? "upcoming"
             : "past";
+
   return { group, date, dayCount: dates.length };
 }
 
@@ -66,6 +70,7 @@ export function groupCustomerEvents(items: BookingRequest[], now = new Date()) {
     item,
     ...customerEventPosition(item, now),
   }));
+
   return customerEventGroups.map((group) => ({
     ...group,
     events: positioned
@@ -73,7 +78,9 @@ export function groupCustomerEvents(items: BookingRequest[], now = new Date()) {
       .sort((a, b) => {
         if (group.key === "closed" || group.key === "undated")
           return b.item.createdAt.localeCompare(a.item.createdAt);
+
         const order = (a.date ?? "").localeCompare(b.date ?? "");
+
         return (
           (group.key === "past" ? -order : order) ||
           b.item.createdAt.localeCompare(a.item.createdAt)

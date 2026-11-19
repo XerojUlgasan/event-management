@@ -9,5 +9,6 @@ export async function lockEventDayData(db: Transaction<DB>, id: string) {
     .where("id", "=", id)
     .forUpdate()
     .executeTakeFirst();
+
   return getEventDayData(db, id);
 }

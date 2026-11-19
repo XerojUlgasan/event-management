@@ -2,6 +2,7 @@ import type { Kysely, Selectable, Transaction } from "kysely";
 import type { BookingRequests, DB, EventsDay } from "../../db/types.js";
 
 export type Database = Kysely<DB> | Transaction<DB>;
+
 export type DayRow = Pick<
   Selectable<EventsDay>,
   | "id"

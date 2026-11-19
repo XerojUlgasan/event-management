@@ -8,12 +8,14 @@ import { CatalogThumbnail } from "../atoms/CatalogThumbnail";
 import { Markdown } from "../molecules/Markdown";
 
 type WidgetStyle = CSSProperties & { "--catalog-widget-h": number };
+
 export const CATALOG_GRID = {
   columns: CATALOG_COLUMNS,
   rowHeight: 52,
   gap: 12,
   padding: 12,
 } as const;
+
 export const catalogGridStyle = {
   "--catalog-columns": CATALOG_GRID.columns,
   "--catalog-row-height": `${CATALOG_GRID.rowHeight}px`,
@@ -35,14 +37,17 @@ export function CatalogGridGuides({
     "--catalog-guide-columns": columns,
     "--catalog-guide-rows": rows,
   } as CSSProperties;
+
   return <div className="ui-catalog-guides" style={style} aria-hidden="true" />;
 }
+
 export function CatalogGridRuler({ stacked = false }: { stacked?: boolean }) {
   const columns = stacked ? 1 : CATALOG_GRID.columns;
   const style = {
     ...catalogGridStyle,
     "--catalog-guide-columns": columns,
   } as CSSProperties;
+
   return (
     <div className="ui-catalog-ruler" style={style} aria-hidden="true">
       {Array.from({ length: columns }, (_, i) => (
@@ -90,6 +95,7 @@ export function CatalogWidgetContent({
   const reference = widget.type === "package" ? widget.package : widget.service;
   const entity = widget.type === "package" ? "package" : "service";
   const onOpen = entity === "package" ? onOpenPackage : onOpenService;
+
   if ((widget.type === "service" || widget.type === "package") && reference) {
     const content = (
       <>
@@ -110,6 +116,7 @@ export function CatalogWidgetContent({
         )}
       </>
     );
+
     return (
       <div className="ui-catalog-widget-content ui-catalog-reference">
         {editor ? (
@@ -135,6 +142,7 @@ export function CatalogWidgetContent({
       </div>
     );
   }
+
   return (
     <div
       className={`ui-catalog-widget-content ui-catalog-${widget.type === "service" || widget.type === "package" ? "reference" : widget.type}`}
@@ -207,6 +215,7 @@ export function CatalogSections({
                   gridRow: `${widget.y + 1} / span ${widget.h}`,
                   "--catalog-widget-h": widget.h,
                 };
+
                 return (
                   <div
                     key={widget.id}

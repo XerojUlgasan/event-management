@@ -51,6 +51,7 @@ export function createGetMyProposalTool({
         onPersistenceFailure();
         throw new Error("The proposal call budget was exceeded");
       }
+
       const call = await persist(
         startToolCallData(db, {
           turnId,
@@ -61,11 +62,13 @@ export function createGetMyProposalTool({
         }),
       );
       let errorCode = "proposal_unavailable";
+
       try {
         if (!canExecute()) {
           errorCode = "call_limit";
           throw new Error("Proposal call limit reached");
         }
+
         errorCode = "turn_inactive";
         await assertActive();
         abortSignal?.throwIfAborted();
@@ -76,13 +79,16 @@ export function createGetMyProposalTool({
           abortSignal,
         });
         const encoded = JSON.stringify(result);
+
         if (!consumeResultCharacters(encoded.length)) {
           errorCode = "proposal_too_large";
           throw new Error("Proposal exceeds the remaining turn input budget");
         }
+
         errorCode = "turn_inactive";
         await assertActive();
         abortSignal?.throwIfAborted();
+
         // Full widget text goes to the model. The audit record remains bounded
         // independently of canvas size, retaining result identity without copies
         // of potentially large private Markdown in the execution table.
@@ -102,21 +108,27 @@ export function createGetMyProposalTool({
               }
             : {}),
         };
+
         await persist(
           finishToolCallData(db, { id: call.id, status: "succeeded", output }),
         );
+
         return result;
       } catch (error) {
         if (error instanceof ProposalAccessDenied) errorCode = "access_denied";
+
         if (abortSignal?.aborted) errorCode = "cancelled";
+
         await persist(
           finishToolCallData(db, { id: call.id, status: "failed", errorCode }),
         );
+
         if (errorCode === "proposal_too_large")
           throw new Error(
             "The full proposal exceeds this turn's input budget and was not returned. " +
               "Do not infer missing details or claim to have read it. The customer can view the package in their booking details.",
           );
+
         throw new Error(
           "The current conversation's proposal is unavailable for this call. " +
             "Do not invent details, treat this as an absent proposal, or use old history as current evidence.",

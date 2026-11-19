@@ -12,5 +12,6 @@ export async function embedPackageJob(
     owner: { kind: "package", id: payload.packageId },
     abortSignal: signal,
   });
+
   if (result.failed > 0) throw new Error("Embedding refresh failed");
 }

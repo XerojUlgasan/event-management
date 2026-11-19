@@ -18,6 +18,7 @@ export async function deleteCatalogMediaObjectsService(
       ? pendingCatalogMediaKey(media.created_by, media.id, media.mime_type)
       : null;
   const keys = [media.storage_key, pendingKey];
+
   for (const key of new Set(keys)) {
     if (key) await deleteCatalogMedia(key);
   }

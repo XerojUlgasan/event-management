@@ -17,6 +17,7 @@ export async function listPublicServicesPageService(
   const { position, cursorFor } = catalogCursor(options.cursor, scope);
   const rows = await listPublicServicesPageData(db, options, position);
   const page = createPage(rows, options.limit, cursorFor);
+
   return {
     services: await Promise.all(page.items.map((row) => publicDto(db, row))),
     nextCursor: page.nextCursor,

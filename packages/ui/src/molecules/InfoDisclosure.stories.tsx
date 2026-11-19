@@ -17,9 +17,13 @@ const meta = {
     ),
   ],
 } satisfies Meta<typeof InfoDisclosure>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
+
 export const Default: Story = {};
+
 export const LongContent: Story = {
   args: {
     hint: "Longer details",

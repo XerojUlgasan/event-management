@@ -4,7 +4,9 @@ import { dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
 const ts = createRequire(join(root, "apps/web/package.json"))("typescript");
+
 const nativeControls = new Set([
   "button",
   "input",
@@ -12,19 +14,25 @@ const nativeControls = new Set([
   "textarea",
   "dialog",
 ]);
+
 const color =
   /#[\da-f]{3,8}\b|\b(?:rgba?|hsla?)\s*\(|(?<![-\w])(?:white|black|transparent)(?![-\w])/i;
+
 const failures = [];
+
 let filesChecked = 0;
 
 async function files(directory) {
   const found = [];
+
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
+
     if (entry.isDirectory()) found.push(...(await files(path)));
     else if ([".tsx", ".css", ".astro"].includes(extname(path)))
       found.push(path);
   }
+
   return found;
 }
 
@@ -34,6 +42,7 @@ function report(path, source, position, message) {
 }
 
 const scopes = process.argv.slice(2).map((path) => resolve(path));
+
 for (const path of await filesInScopes(
   scopes.length
     ? scopes
@@ -41,11 +50,13 @@ for (const path of await filesInScopes(
 )) {
   filesChecked++;
   const source = await readFile(path, "utf8");
+
   if (extname(path) === ".css") {
     const cleaned = source.replace(
       /\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g,
       (text) => " ".repeat(text.length),
     );
+
     for (const match of cleaned.matchAll(
       /(?:^|[;{])\s*(?:--[\w-]+|[-\w]+)\s*:\s*([^;{}]+)/gm,
     )) {
@@ -57,12 +68,15 @@ for (const path of await filesInScopes(
           "Use packages/theme color tokens in authored styles.",
         );
     }
+
     continue;
   }
+
   if (extname(path) === ".astro") {
     const markup = source
       .replace(/^---[\s\S]*?---/, (text) => " ".repeat(text.length))
       .replace(/<!--[\s\S]*?-->/g, (text) => " ".repeat(text.length));
+
     for (const match of markup.matchAll(
       /<\s*(button|input|select|textarea|dialog)\b/g,
     ))
@@ -72,8 +86,10 @@ for (const path of await filesInScopes(
         match.index,
         `Use the shared UI component for <${match[1]}>.`,
       );
+
     continue;
   }
+
   const ast = ts.createSourceFile(
     path,
     source,
@@ -96,6 +112,7 @@ for (const path of await filesInScopes(
         `Use the shared UI component for <${node.tagName.getText(ast)}>.`,
       );
     }
+
     if (
       ts.isImportDeclaration(node) &&
       /packages\/ui\/src|packages\/theme\/src/.test(node.moduleSpecifier.text)
@@ -107,6 +124,7 @@ for (const path of await filesInScopes(
         "Import through the public workspace package exports.",
       );
     }
+
     if (ts.isStringLiteral(node) && color.test(node.text)) {
       const parent = node.parent;
       const styleProperty =
@@ -115,6 +133,7 @@ for (const path of await filesInScopes(
       const colorAttribute =
         ts.isJsxAttribute(parent) &&
         /^(?:fill|stroke|color|stopColor)$/.test(parent.name.getText(ast));
+
       if (styleProperty || colorAttribute)
         report(
           path,
@@ -123,6 +142,7 @@ for (const path of await filesInScopes(
           "Use a theme token for the color value.",
         );
     }
+
     ts.forEachChild(node, visit);
   }
   visit(ast);

@@ -47,14 +47,19 @@ function dayLabel(value: string) {
   const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
+
   if (dayKey(value) === dayKey(today.toISOString())) return "Today";
+
   if (dayKey(value) === dayKey(yesterday.toISOString())) return "Yesterday";
+
   return enPhDayFormatter.format(date);
 }
 
 function preview(conversation: ChatConversation) {
   const message = conversation.lastMessage;
+
   if (!message) return "No messages yet";
+
   return message.body;
 }
 
@@ -144,9 +149,11 @@ export function MessagesWorkspace({
   const [quotationId, setQuotationId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draft = activeId ? (drafts[activeId] ?? "") : "";
+
   const setDraft = (value: string) => {
     if (activeId) setDrafts((previous) => ({ ...previous, [activeId]: value }));
   };
+
   const [pendingSends, setPendingSends] = useState<Record<string, boolean>>({});
   const sending = !!activeId && !!pendingSends[activeId];
   const pendingSendIds = useRef(new Set<string>());
@@ -162,10 +169,12 @@ export function MessagesWorkspace({
   const inboxBoundary = useRef<HTMLDivElement>(null);
   const historyBoundary = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
+
   const active =
     conversations.find((item) => item.id === activeId) ??
     activeConversation ??
     null;
+
   const isTeam = viewerRole === "customer";
   const singleConversation =
     isTeam &&
@@ -207,6 +216,7 @@ export function MessagesWorkspace({
     setContext(null);
     setQuotationId(null);
     generation.bump();
+
     return () => {
       generation.bump();
     };
@@ -223,13 +233,18 @@ export function MessagesWorkspace({
   useLayoutEffect(() => {
     const element = thread.current;
     const changedConversation = previousActive.current !== activeId;
+
     if (changedConversation) olderScroll.current = null;
+
     const first = messages[0]?.id;
+
     if (element && olderScroll.current && first !== previousFirst.current) {
       const anchor = olderScroll.current;
+
       const row = [
         ...element.querySelectorAll<HTMLElement>("[data-message-id]"),
       ].find((item) => item.dataset.messageId === anchor.id);
+
       element.scrollTop = row
         ? element.scrollTop +
           row.getBoundingClientRect().top -
@@ -246,9 +261,11 @@ export function MessagesWorkspace({
     ) {
       element.scrollTop = element.scrollHeight;
     }
+
     if (element)
       nearBottom.current =
         element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+
     previousFirst.current = first;
     previousActive.current = activeId;
   }, [messages, activeId]);
@@ -259,12 +276,16 @@ export function MessagesWorkspace({
 
   const requestOlder = useCallback(() => {
     if (!onLoadOlder || loadingOlder || !hasOlder) return;
+
     const element = thread.current;
+
     if (element) {
       const top = element.getBoundingClientRect().top;
+
       const row = [
         ...element.querySelectorAll<HTMLElement>("[data-message-id]"),
       ].find((item) => item.getBoundingClientRect().bottom > top);
+
       olderScroll.current = {
         id: row?.dataset.messageId,
         offset: row ? row.getBoundingClientRect().top - top : 0,
@@ -272,12 +293,14 @@ export function MessagesWorkspace({
         top: element.scrollTop,
       };
     }
+
     onLoadOlder();
   }, [onLoadOlder, loadingOlder, hasOlder]);
 
   useEffect(() => {
     const root = inbox.current;
     const boundary = inboxBoundary.current;
+
     if (
       !root ||
       !boundary ||
@@ -287,6 +310,7 @@ export function MessagesWorkspace({
       loading
     )
       return;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && root.clientHeight > 0)
@@ -294,13 +318,16 @@ export function MessagesWorkspace({
       },
       { root, rootMargin: "120px 0px" },
     );
+
     observer.observe(boundary);
+
     return () => observer.disconnect();
   }, [conversationFeed, loading, conversationOpen]);
 
   useEffect(() => {
     const root = thread.current;
     const boundary = historyBoundary.current;
+
     if (
       !root ||
       !boundary ||
@@ -311,13 +338,16 @@ export function MessagesWorkspace({
       !messages.length
     )
       return;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && root.clientHeight > 0) requestOlder();
       },
       { root, rootMargin: "120px 0px" },
     );
+
     observer.observe(boundary);
+
     return () => observer.disconnect();
   }, [
     requestOlder,
@@ -333,6 +363,7 @@ export function MessagesWorkspace({
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const body = draft.trim();
+
     if (
       !body ||
       (!isTeam && sending) ||
@@ -342,18 +373,23 @@ export function MessagesWorkspace({
       (!isTeam && pendingSendIds.current.has(activeId))
     )
       return;
+
     const request = generation.current();
     const conversationId = activeId;
     const sentDraft = draft;
+
     if (isTeam) {
       setDrafts((previous) => ({ ...previous, [conversationId]: "" }));
       void onSend(body);
       composer.current?.focus();
+
       return;
     }
+
     pendingSendIds.current.add(conversationId);
     setPendingSends((previous) => ({ ...previous, [conversationId]: true }));
     setSendError("");
+
     try {
       await onSend(body);
       setDrafts((previous) =>
@@ -361,10 +397,13 @@ export function MessagesWorkspace({
           ? { ...previous, [conversationId]: "" }
           : previous,
       );
+
       if (!generation.isCurrent(request)) return;
+
       notify("Message sent.");
     } catch (cause) {
       if (!generation.isCurrent(request)) return;
+
       setSendError(
         notifyError(cause, "Unable to send your message. Please try again."),
       );
@@ -400,6 +439,7 @@ export function MessagesWorkspace({
           const conversationAvatar = isTeam
             ? "C"
             : initialsFromName(conversation.customerName);
+
           return (
             <Button
               variant="plain"
@@ -651,6 +691,7 @@ export function MessagesWorkspace({
           aria-live="polite"
           onScroll={() => {
             const element = thread.current;
+
             if (element)
               nearBottom.current =
                 element.scrollHeight -
@@ -716,6 +757,7 @@ export function MessagesWorkspace({
               index === 0 ||
               dayKey(message.createdAt) !==
                 dayKey(messages[index - 1].createdAt);
+
             return (
               <Fragment key={message.id}>
                 {showDay && (

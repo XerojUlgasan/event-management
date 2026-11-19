@@ -3,6 +3,7 @@ import test from "node:test";
 import { ApiError, request } from "../../src/lib/http/request";
 
 const browser = new EventTarget();
+
 Object.assign(globalThis, { window: browser });
 
 test("401 on a data request requests session confirmation, while credential and /me failures do not", async () => {
@@ -11,6 +12,7 @@ test("401 on a data request requests session confirmation, while credential and 
   browser.addEventListener("clemora:session-check", () => checks++);
   globalThis.fetch = async () =>
     new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+
   try {
     for (const path of [
       "/auth/login",
@@ -24,6 +26,7 @@ test("401 on a data request requests session confirmation, while credential and 
       );
       assert.equal(checks, 0);
     }
+
     await assert.rejects(
       request("/admin/packages"),
       (error: unknown) => error instanceof ApiError && error.status === 401,

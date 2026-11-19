@@ -30,6 +30,7 @@ export const updateConversationAiRouteHandler: AppRouteHandler<
     aiEnabled,
     expectedAiVersion,
   );
+
   if (result.kind === "ok")
     return c.json(
       {
@@ -39,5 +40,6 @@ export const updateConversationAiRouteHandler: AppRouteHandler<
       },
       200,
     );
+
   return jsonError(c, result.error, result.status);
 };

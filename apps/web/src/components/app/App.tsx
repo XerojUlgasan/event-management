@@ -33,11 +33,14 @@ export default function App({
   const previousPath = useRef(location.path);
   useEffect(() => {
     document.addEventListener("click", interceptWorkspaceLink);
+
     return () => document.removeEventListener("click", interceptWorkspaceLink);
   }, []);
   useEffect(() => {
     if (previousPath.current === location.path) return;
+
     previousPath.current = location.path;
+
     if (location.hash) {
       try {
         document
@@ -46,20 +49,25 @@ export default function App({
       } catch {
         /* Invalid fragments retain their URL. */
       }
+
       return;
     }
+
     window.scrollTo(0, 0);
     const heading =
       document.querySelector<HTMLElement>("main h1, main [role='heading']") ??
       document.querySelector<HTMLElement>("main");
+
     if (heading) {
       const previous = heading.getAttribute("tabindex");
       heading.setAttribute("tabindex", "-1");
       heading.focus({ preventScroll: true });
+
       if (previous === null) heading.removeAttribute("tabindex");
       else heading.setAttribute("tabindex", previous);
     }
   }, [location.path, location.hash]);
+
   return (
     <NotificationProvider>
       <AuthProvider>
@@ -94,13 +102,16 @@ function Workspace({
 
   useEffect(() => {
     if (status !== "signed-in" || !profile) return;
+
     if (path === "/login" && guestId) {
       if (profile.role !== "customer") {
         setClaimError(
           "This conversation can only be continued with a customer account. You are signed in as an administrator.",
         );
+
         return;
       }
+
       let active = true;
       setClaimError("");
       void claimGuestChat(guestId)
@@ -116,26 +127,34 @@ function Workspace({
               "You are signed in, but we could not attach this conversation. Retry, or continue to your workspace.",
             );
         });
+
       return () => {
         active = false;
       };
     }
+
     const home = appHome(profile);
     const params = new URLSearchParams(search);
     const book = params.get("book");
     const resume = params.get("booking") === "resume";
+
     if (path === "/login") {
       if (profile.role === "customer" && (book || resume)) {
         const next = new URLSearchParams();
+
         if (book) next.set("book", book);
+
         if (resume) next.set("booking", "resume");
+
         window.location.replace(`/app/home?${next}`);
       } else
         window.location.replace(
           workspaceReturnPath(profile, params.get("next")) ?? home,
         );
+
       return;
     }
+
     if (path === "/app") navigateWorkspace(`${home}${search}${hash}`, true);
     else if (!allowedWorkspacePath(profile, path))
       navigateWorkspace(home, true);
@@ -163,6 +182,7 @@ function Workspace({
     if (path !== "/login") {
       const next = `${path}${search}${hash}`;
       window.location.replace(`/login?next=${encodeURIComponent(next)}`);
+
       return (
         <div className="auth-splash">
           <Brand />
@@ -170,6 +190,7 @@ function Workspace({
         </div>
       );
     }
+
     return (
       <AuthPage
         initialMode={mode}
@@ -231,6 +252,7 @@ function Workspace({
 
   if (isSystemAdmin(profile)) {
     const active = adminKey(path);
+
     return active ? (
       <CatalogNavigationProvider
         key={`${profile.id}:${profile.role}`}
@@ -245,6 +267,7 @@ function Workspace({
       </CatalogNavigationProvider>
     ) : null;
   }
+
   return (
     <CatalogNavigationProvider
       key={`${profile.id}:${profile.role}`}

@@ -35,21 +35,28 @@ const routes = new OpenAPIHono<HonoEnv>({
       );
   },
 });
+
 routes.onError((error, c) => {
   if (error instanceof GuestChatError)
     return c.json(
       { error: error.message, ...(error.code ? { code: error.code } : {}) },
       error.status,
     );
+
   if (error instanceof HTTPException) return error.getResponse();
+
   console.error("guest-chat", { outcome: "failed" });
+
   return jsonError(c, "Unable to complete guest chat request", 500);
 });
+
 const customerOnly = createMiddleware<HonoEnv>(async (c, next) => {
   if (c.get("session").user.role !== "customer")
     return jsonError(c, "Customer access required", 403);
+
   await next();
 });
+
 routes.use("/guest/conversations/:id/claim", requireSession, customerOnly);
 
 routes.openapi(
@@ -59,4 +66,5 @@ routes.openapi(
 routes.openapi(getGuestConversationRoute, getGuestConversationRouteHandler);
 routes.openapi(sendGuestMessageRoute, sendGuestMessageRouteHandler);
 routes.openapi(claimGuestConversationRoute, claimGuestConversationRouteHandler);
+
 export default routes;

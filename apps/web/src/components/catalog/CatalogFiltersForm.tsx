@@ -31,12 +31,16 @@ export function CatalogFiltersForm({
   const [error, setError] = useState("");
   const hasPrice = kind === "packages" || pricingType !== "";
   const hasGuests = kind !== "services";
+
   const apply = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
+
     if (minPrice && maxPrice && Number(minPrice) > Number(maxPrice)) {
       setError("Maximum price must be at least the minimum price.");
+
       return;
     }
+
     setError("");
     onApply({
       ...(kind === "services" && pricingType !== "" ? { pricingType } : {}),
@@ -49,6 +53,7 @@ export function CatalogFiltersForm({
       ...(hasGuests && guests !== "" ? { guests: Number(guests) } : {}),
     });
   };
+
   return (
     <form
       className="catalog-filters"
@@ -75,6 +80,7 @@ export function CatalogFiltersForm({
                 value={pricingType}
                 onChange={(event) => {
                   const value = event.target.value;
+
                   if (value === "" || value === "fixed" || value === "hourly") {
                     setPricingType(value);
                     setMinPrice("");

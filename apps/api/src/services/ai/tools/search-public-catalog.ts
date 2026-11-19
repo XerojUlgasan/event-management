@@ -42,6 +42,7 @@ export function createSearchPublicCatalogTool({
         onPersistenceFailure();
         throw new Error("The catalog search call budget was exceeded");
       }
+
       const call = await persist(
         startToolCallData(db, {
           turnId,
@@ -52,11 +53,13 @@ export function createSearchPublicCatalogTool({
         }),
       );
       let errorCode = "search_unavailable";
+
       try {
         if (++calls > 6 || !canExecute()) {
           errorCode = "call_limit";
           throw new Error("Search call limit reached");
         }
+
         errorCode = "turn_inactive";
         await assertActive();
         abortSignal?.throwIfAborted();
@@ -72,9 +75,11 @@ export function createSearchPublicCatalogTool({
         await persist(
           finishToolCallData(db, { id: call.id, status: "succeeded", output }),
         );
+
         return output;
       } catch {
         if (abortSignal?.aborted) errorCode = "cancelled";
+
         await persist(
           finishToolCallData(db, {
             id: call.id,

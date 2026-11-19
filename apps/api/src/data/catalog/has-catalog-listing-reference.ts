@@ -11,5 +11,6 @@ export async function hasCatalogListingReferenceData(
     db.selectFrom("packages").select("id").where(ref).executeTakeFirst(),
     db.selectFrom("services").select("id").where(ref).executeTakeFirst(),
   ]);
+
   return Boolean(packageRef || serviceRef);
 }

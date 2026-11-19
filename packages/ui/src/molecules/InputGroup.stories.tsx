@@ -11,7 +11,9 @@ const meta = {
   title: "Molecules/InputGroup",
   component: InputGroup,
 } satisfies Meta<typeof InputGroup>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 export const WithIcon: Story = {
@@ -26,6 +28,7 @@ export const WithIcon: Story = {
     </InputGroup>
   ),
 };
+
 export const WithAction: Story = {
   render: () => (
     <InputGroup
@@ -57,6 +60,7 @@ export const Invalid: Story = {
     </FormField>
   ),
 };
+
 export const Disabled: Story = {
   render: () => (
     <InputGroup leading={<Icon name="search" />}>

@@ -25,8 +25,11 @@ export async function sendAdminMessageService(
   body: string,
 ): Promise<SendAdminMessageResult> {
   const conversation = await findConversationData(db, id);
+
   if (!conversation) return { kind: "not-found" };
+
   if (conversation.status === "closed") return { kind: "closed" };
+
   try {
     const saved = await createMessageData(
       db,
@@ -35,6 +38,7 @@ export async function sendAdminMessageService(
       "admin",
       body,
     );
+
     return {
       kind: "ok",
       message: messageDto(saved.message),
@@ -48,8 +52,10 @@ export async function sendAdminMessageService(
       (error instanceof Error && error.message === "Conversation is closed")
     )
       return { kind: "closed" };
+
     if (error instanceof Error && error.message === "Conversation not found")
       return { kind: "not-found" };
+
     throw error;
   }
 }

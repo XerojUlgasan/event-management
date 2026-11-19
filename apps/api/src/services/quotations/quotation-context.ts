@@ -20,34 +20,47 @@ import { serviceError } from "../../utils/service-result.js";
 
 export const failure = (message: string, status: 400 | 404 | 409) =>
   serviceError(message, status);
+
 type Booking = Selectable<BookingRequests> & { revision: string };
+
 type Quote = Selectable<Quotations> & { revision: string };
+
 const iso = (v: Date | null) => v?.toISOString() ?? null;
+
 export async function proposalPackage(trx: Transaction<DB>, booking: Booking) {
   const resolved = await resolveBookingPackageData(trx, booking);
+
   if (!resolved) return null;
+
   const pkg = await lockAnyPackageData(trx, resolved.id);
+
   if (!pkg) throw new Error("Linked package not found");
+
   return pkg;
 }
+
 export function amount(base: number, items: QuotationItem[]) {
   const value = items.reduce(
     (sum, item) =>
       sum + (item.direction === "add" ? item.amountMinor : -item.amountMinor),
     base,
   );
+
   return Number.isSafeInteger(value) &&
     value >= -2147483648 &&
     value <= 2147483647
     ? value
     : null;
 }
+
 export function basePrice(price: number) {
   const value = pesosToCentavos(price);
+
   return Number.isSafeInteger(value) && value > 0 && value <= 2147483647
     ? value
     : null;
 }
+
 export function dto(row: Quote): Quotation {
   return {
     id: row.id,
@@ -70,14 +83,21 @@ export function dto(row: Quote): Quotation {
     items: z.array(itemSchema).parse(row.items),
   };
 }
+
 export async function locked(trx: Transaction<DB>, id: string) {
   const found = await findQuoteData(trx, id);
+
   if (!found) return null;
+
   const booking = await lockBookingRequestData(trx, found.booking_request_id);
+
   if (!booking) return null;
+
   const row = await lockQuoteData(trx, id);
+
   return row ? { booking, row } : null;
 }
+
 export async function audit(
   trx: Transaction<DB>,
   actor: string,
@@ -93,5 +113,6 @@ export async function audit(
     metadata: JSON.stringify(meta),
   });
 }
+
 export const closed = (booking: Booking) =>
   ["declined", "cancelled"].includes(booking.status);

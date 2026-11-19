@@ -6,6 +6,7 @@ import type { RequestedDay } from "../../controllers/booking-requests/schemas.js
 
 function localParts(instant: Date, timeZone: string) {
   const parts = zonedPartValues(zonedFormat(timeZone, "second"), instant);
+
   return {
     date: `${parts.year}-${parts.month}-${parts.day}`,
     clock: `${parts.hour}:${parts.minute}:${parts.second}`,
@@ -18,6 +19,7 @@ function isAmbiguous(instant: Date, timeZone: string) {
   const local = localParts(instant, timeZone);
   const wall = Date.parse(`${local.date}T${local.clock}Z`);
   const offsets = new Set<number>();
+
   for (let hours = -48; hours <= 48; hours += 6) {
     const sample = new Date(instant.getTime() + hours * 3_600_000);
     const parts = localParts(sample, timeZone);
@@ -26,12 +28,16 @@ function isAmbiguous(instant: Date, timeZone: string) {
         Math.floor(sample.getTime() / 1000) * 1000,
     );
   }
+
   let matches = 0;
+
   for (const offset of offsets) {
     const candidate = localParts(new Date(wall - offset), timeZone);
+
     if (candidate.date === local.date && candidate.clock === local.clock)
       matches++;
   }
+
   return matches > 1;
 }
 
@@ -43,18 +49,25 @@ export function requestedDayTimesError(
 ) {
   const start = new Date(startsAt),
     end = new Date(endsAt);
+
   if (!(end > start)) return "End must be after start";
+
   const startLocal = localParts(start, timeZone),
     endLocal = localParts(end, timeZone);
+
   if (startLocal.date !== date)
     return "Start must match the requested date in the booking time zone";
+
   const next = new Date(`${date}T12:00:00Z`);
   next.setUTCDate(next.getUTCDate() + 1);
   const nextDate = next.toISOString().slice(0, 10);
+
   if (endLocal.date !== date && endLocal.date !== nextDate)
     return "End must be on the requested date or the following day";
+
   if (isAmbiguous(start, timeZone) || isAmbiguous(end, timeZone))
     return "Choose an unambiguous local time outside the daylight-saving transition";
+
   return null;
 }
 

@@ -43,6 +43,7 @@ export function createGetPublicCatalogItemTool({
         onPersistenceFailure();
         throw new Error("The catalog detail call budget was exceeded");
       }
+
       const call = await persist(
         startToolCallData(db, {
           turnId,
@@ -53,11 +54,13 @@ export function createGetPublicCatalogItemTool({
         }),
       );
       let errorCode = "detail_unavailable";
+
       try {
         if (++calls > 6 || !canExecute()) {
           errorCode = "call_limit";
           throw new Error("Catalog detail call limit reached");
         }
+
         errorCode = "turn_inactive";
         await assertActive();
         abortSignal?.throwIfAborted();
@@ -73,24 +76,30 @@ export function createGetPublicCatalogItemTool({
         await persist(
           finishToolCallData(db, { id: call.id, status: "succeeded", output }),
         );
+
         return output;
       } catch (error) {
         if (error instanceof PublicCatalogItemNotFound)
           errorCode = "item_not_found";
         else if (error instanceof HTTPException && error.status === 400)
           errorCode = "invalid_cursor";
+
         if (abortSignal?.aborted) errorCode = "cancelled";
+
         await persist(
           finishToolCallData(db, { id: call.id, status: "failed", errorCode }),
         );
+
         if (errorCode === "item_not_found")
           throw new Error(
             "This catalog item is unavailable or no longer public. Search again for current listings; do not invent its details.",
           );
+
         if (errorCode === "invalid_cursor")
           throw new Error(
             "Catalog detail continuation is invalid or the content changed. Read this item again without a cursor.",
           );
+
         throw new Error(
           "Catalog details are unavailable for this call. Do not invent details or use old history as current catalog evidence.",
         );

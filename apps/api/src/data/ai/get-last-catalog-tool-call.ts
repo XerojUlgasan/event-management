@@ -10,6 +10,7 @@ export function getLastCatalogToolCallData(
   value: LastCatalogToolCallInput,
 ) {
   const input = validateLastCatalogToolCall(value);
+
   return db
     .selectFrom("ai_tool_calls as tool_call")
     .innerJoin(

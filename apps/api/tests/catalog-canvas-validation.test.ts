@@ -22,12 +22,14 @@ const markdown = () => ({
   caption: "",
   autoplay: false,
 });
+
 const photo = () => ({
   ...markdown(),
   type: "photo",
   markdown: "",
   media: { id: randomUUID(), kind: "image", source: "upload", url: "/file" },
 });
+
 const section = (widgets: unknown[] = [markdown()]) => ({
   id: randomUUID(),
   title: "  Title  ",
@@ -42,6 +44,7 @@ test("canvas request rules and defaults", () => {
   assert.equal(parsed[0].title, "Title");
   assert.equal(parsed[0].widgets[0].autoplay, false);
   assert.equal(sectionsSchema.safeParse([section([photo()])]).success, true);
+
   const invalid = [
     [section([{ ...widget, x: 11, w: 2 }])],
     [section([{ ...widget, y: 100001 }])],
@@ -80,8 +83,10 @@ test("canvas request rules and defaults", () => {
     ],
     [section([{ ...widget, id: "invalid" }])],
   ];
+
   for (const value of invalid)
     assert.equal(sectionsSchema.safeParse(value).success, false);
+
   assert.equal(
     sectionsSchema.safeParse([
       section([
@@ -121,6 +126,7 @@ test("service widgets require a service and persist only the reference", () => {
     serviceId: randomUUID(),
   };
   assert.equal(sectionsSchema.safeParse([section([widget])]).success, true);
+
   for (const bad of [
     { ...widget, serviceId: null },
     { ...widget, media: photo().media },
@@ -139,6 +145,7 @@ test("service widgets require a service and persist only the reference", () => {
     },
   ])
     assert.equal(sectionsSchema.safeParse([section([bad])]).success, false);
+
   const { media: _media, ...rest } = widget;
   assert.equal(
     storedSectionsSchema.safeParse([section([{ ...rest, mediaId: null }])])
@@ -169,6 +176,7 @@ test("package widgets validate references and canonical storage", () => {
     packageId: randomUUID(),
   };
   assert.equal(sectionsSchema.safeParse([section([widget])]).success, true);
+
   for (const bad of [
     { ...widget, packageId: null },
     { ...widget, media: photo().media },
@@ -178,6 +186,7 @@ test("package widgets validate references and canonical storage", () => {
     { ...markdown(), packageId: widget.packageId },
   ])
     assert.equal(sectionsSchema.safeParse([section([bad])]).success, false);
+
   const { media: _media, ...stored } = widget;
   assert.equal(
     storedSectionsSchema.safeParse([section([{ ...stored, mediaId: null }])])
@@ -258,6 +267,7 @@ test("stored canvases enforce the shared rules and canonical media IDs", () => {
       .success,
     true,
   );
+
   for (const bad of [
     { ...storedPhoto, mediaId: mediaId.toUpperCase() },
     { ...storedPhoto, mediaId: null },
@@ -272,6 +282,7 @@ test("stored canvases enforce the shared rules and canonical media IDs", () => {
       storedSectionsSchema.safeParse([section([bad])]).success,
       false,
     );
+
   assert.equal(
     storedSectionsSchema.safeParse([
       section([storedWidget]),

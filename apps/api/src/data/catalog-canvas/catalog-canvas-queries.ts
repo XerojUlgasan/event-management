@@ -11,6 +11,7 @@ export async function readStoredCanvasData(db: Database, owner: CanvasOwner) {
     .select("canvas")
     .where("id", "=", owner.id)
     .executeTakeFirst();
+
   return row ? storedSectionsSchema.parse(row.canvas) : [];
 }
 
@@ -24,6 +25,7 @@ export const listCanvasPackagesData = (db: Database, ids: string[]) =>
         .where("archived_at", "is", null)
         .execute()
     : Promise.resolve([]);
+
 export const listCanvasServicesData = (db: Database, ids: string[]) =>
   ids.length
     ? db
@@ -33,10 +35,12 @@ export const listCanvasServicesData = (db: Database, ids: string[]) =>
         .where("archived_at", "is", null)
         .execute()
     : Promise.resolve([]);
+
 export const listCanvasAssetsData = (db: Database, ids: string[]) =>
   ids.length
     ? db.selectFrom("media_assets").selectAll().where("id", "in", ids).execute()
     : Promise.resolve([]);
+
 export const lockCanvasServiceData = (db: Transaction<DB>, id: string) =>
   db
     .selectFrom("services")
@@ -44,6 +48,7 @@ export const lockCanvasServiceData = (db: Transaction<DB>, id: string) =>
     .where("id", "=", id)
     .forUpdate()
     .executeTakeFirst();
+
 export const lockCanvasPackageData = (db: Transaction<DB>, id: string) =>
   db
     .selectFrom("packages")
@@ -51,6 +56,7 @@ export const lockCanvasPackageData = (db: Transaction<DB>, id: string) =>
     .where("id", "=", id)
     .forUpdate()
     .executeTakeFirst();
+
 export async function findCanvasMediaOwnersData(
   db: Transaction<DB>,
   id: string,
@@ -66,8 +72,10 @@ export async function findCanvasMediaOwnersData(
     .select("s.id")
     .where(canvasContainsMedia(sql.ref("s.canvas"), ref))
     .execute();
+
   return { packageRefs, serviceRefs };
 }
+
 export async function updateStoredCanvasData(
   db: Transaction<DB>,
   owner: CanvasOwner,

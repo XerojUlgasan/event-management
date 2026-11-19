@@ -8,13 +8,16 @@ export const statusSchema = z.object({
   expiresAt: z.string(),
   loginRequired: z.boolean(),
 });
+
 export const guestThreadSchema = threadSchema.extend({ guest: statusSchema });
+
 const guestErrorSchema = z.object({
   error: z.string(),
   code: z
     .enum(["login_required", "guest_expired", "request_conflict"])
     .optional(),
 });
+
 export const errors = {
   400: { content: json(guestErrorSchema), description: "Invalid request" },
   401: { content: json(guestErrorSchema), description: "Not signed in" },

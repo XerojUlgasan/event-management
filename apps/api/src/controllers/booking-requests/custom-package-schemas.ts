@@ -8,9 +8,11 @@ export const saveSchema = contentSchema.extend({
   expectedUpdatedAt: z.string().datetime().optional(),
   sourcePackageId: z.string().uuid().optional(),
 });
+
 export const updateSchema = saveSchema.extend({
   expectedUpdatedAt: z.string().datetime(),
 });
+
 export const saveResponses = {
   200: {
     content: json(

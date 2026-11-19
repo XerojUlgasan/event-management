@@ -14,6 +14,7 @@ export const durationLabels: Record<BookingEstimatedDuration, string> = {
   more_than_1_week: "More than 1 week",
   undecided: "Not sure yet",
 };
+
 export function durationLabel(
   duration: BookingEstimatedDuration | null,
   days: number | null,

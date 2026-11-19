@@ -2,6 +2,7 @@ import { useRef } from "react";
 
 export function createRequestGeneration() {
   let generation = 0;
+
   return {
     current: () => generation,
     bump: () => ++generation,
@@ -14,6 +15,8 @@ export function useRequestGeneration() {
   const generation = useRef<ReturnType<typeof createRequestGeneration> | null>(
     null,
   );
+
   if (!generation.current) generation.current = createRequestGeneration();
+
   return generation.current;
 }

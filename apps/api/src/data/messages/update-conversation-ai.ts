@@ -16,7 +16,9 @@ export function updateConversationAiData(
       .where("id", "=", id)
       .forUpdate()
       .executeTakeFirst();
+
     if (!conversation) return { kind: "not-found" as const };
+
     if (conversation.guest_identity_id) {
       try {
         assertGuestActive(conversation);
@@ -24,12 +26,16 @@ export function updateConversationAiData(
         return { kind: "closed" as const };
       }
     }
+
     if (conversation.status !== "active") return { kind: "closed" as const };
+
     if (conversation.ai_version !== expectedAiVersion)
       return { kind: "stale" as const };
+
     const aiHandoff = parseAiHandoff(conversation.ai_handoff);
     const changed = conversation.ai_enabled !== aiEnabled;
     const aiVersion = conversation.ai_version + (changed ? 1 : 0);
+
     if (changed)
       await trx
         .updateTable("conversations")
@@ -40,6 +46,7 @@ export function updateConversationAiData(
         })
         .where("id", "=", id)
         .execute();
+
     // Preferences do not bump the inbox's last-message ordering.
     return { kind: "ok" as const, aiEnabled, aiVersion, aiHandoff };
   });

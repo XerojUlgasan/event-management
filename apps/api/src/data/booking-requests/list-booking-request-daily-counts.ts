@@ -1,5 +1,6 @@
 import { sql, type Kysely, type Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
+
 type Database = Kysely<DB> | Transaction<DB>;
 
 export async function listBookingRequestDailyCountsData(
@@ -20,5 +21,6 @@ export async function listBookingRequestDailyCountsData(
       ${status ? sql`AND br.status = ${status}` : sql``}
     GROUP BY dates.preferred_date ORDER BY dates.preferred_date ASC
   `.execute(db);
+
   return result.rows;
 }

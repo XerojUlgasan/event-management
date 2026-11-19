@@ -4,7 +4,9 @@ import { backgroundJobSettings } from "../services/background-jobs/job-definitio
 import { runBackgroundJobsWorker } from "../services/background-jobs/run-worker.js";
 
 const controller = new AbortController();
+
 const stop = () => controller.abort();
+
 process.once("SIGINT", stop);
 process.once("SIGTERM", stop);
 

@@ -29,6 +29,7 @@ export async function replaceCatalogSectionsService(
   actorId: string,
 ) {
   const previous = await readStoredCanvasData(db, owner);
+
   const existing = new Set(
     previous.flatMap((s) =>
       s.widgets.flatMap((w) =>
@@ -36,16 +37,20 @@ export async function replaceCatalogSectionsService(
       ),
     ),
   );
+
   const refs = content.sections.flatMap((s) =>
     s.widgets.filter((w) => w.type === "service" && w.serviceId),
   );
+
   const serviceIds = [
     ...new Set(
       refs.flatMap((w) => (w.serviceId ? [w.serviceId.toLowerCase()] : [])),
     ),
   ].sort();
+
   for (const id of serviceIds) {
     const service = await lockCanvasServiceData(db, id);
+
     if (
       (!service || service.archived_at) &&
       refs.some(
@@ -55,6 +60,7 @@ export async function replaceCatalogSectionsService(
     )
       throw new InvalidCatalogMedia("Selected service is unavailable");
   }
+
   const existingPackages = new Set(
     previous.flatMap((section) =>
       section.widgets.flatMap((widget) =>
@@ -64,11 +70,13 @@ export async function replaceCatalogSectionsService(
       ),
     ),
   );
+
   const packageRefs = content.sections.flatMap((section) =>
     section.widgets.filter(
       (widget) => widget.type === "package" && widget.packageId,
     ),
   );
+
   const packageIds = [
     ...new Set(
       packageRefs.flatMap((widget) =>
@@ -76,8 +84,10 @@ export async function replaceCatalogSectionsService(
       ),
     ),
   ].sort();
+
   for (const id of packageIds) {
     const item = await lockCanvasPackageData(db, id);
+
     if (
       (!item || item.archived_at || item.package_type !== "catalog") &&
       packageRefs.some(
@@ -88,7 +98,9 @@ export async function replaceCatalogSectionsService(
     )
       throw new InvalidCatalogMedia("Selected package is unavailable");
   }
+
   const previousMediaIds = await listCatalogMediaIdsService(db, owner);
+
   const uploadIds = [
     ...new Set(
       content.sections.flatMap((section) =>
@@ -100,19 +112,25 @@ export async function replaceCatalogSectionsService(
       ),
     ),
   ].sort();
+
   // Include the existing canvas and dedicated thumbnail before taking any
   // media lock, so attachment, relocation and cleanup acquire them in ID order.
   const ownerMediaIds = await listOwnerMediaIdsData(db, owner);
+
   for (const id of [...new Set([...uploadIds, ...ownerMediaIds])].sort())
     await lockCatalogMediaData(db, id);
+
   for (const id of uploadIds) {
     const media = await lockCatalogMediaData(db, id);
+
     if (!media || media.source !== "upload")
       throw new InvalidCatalogMedia("Uploaded media is unavailable");
+
     const { packageRefs, serviceRefs } = await findCanvasMediaOwnersData(
       db,
       id,
     );
+
     if (
       !packageRefs.length &&
       !serviceRefs.length &&
@@ -121,6 +139,7 @@ export async function replaceCatalogSectionsService(
       throw new InvalidCatalogMedia(
         "Uploaded media belongs to another administrator",
       );
+
     if (
       packageRefs.some((r) => owner.kind !== "package" || r.id !== owner.id) ||
       serviceRefs.some((r) => owner.kind !== "service" || r.id !== owner.id)
@@ -128,6 +147,7 @@ export async function replaceCatalogSectionsService(
       throw new InvalidCatalogMedia(
         "Uploaded media already belongs to another catalog canvas",
       );
+
     if (
       content.sections
         .flatMap((s) => s.widgets)
@@ -142,15 +162,20 @@ export async function replaceCatalogSectionsService(
         "Uploaded media kind does not match the widget",
       );
   }
+
   const sections = [];
+
   for (const section of content.sections) {
     const widgets = [];
+
     for (const inputWidget of section.widgets) {
       const { media } = inputWidget;
       let mediaId: string | null = null;
+
       if (media?.source === "upload") {
         if (!media.id)
           throw new InvalidCatalogMedia("Uploaded media is unavailable");
+
         mediaId = media.id.toLowerCase();
       } else if (media) {
         mediaId = randomUUID();
@@ -162,11 +187,15 @@ export async function replaceCatalogSectionsService(
           created_by: actorId,
         });
       }
+
       widgets.push(storedCanvasWidget(inputWidget, mediaId));
     }
+
     sections.push({ id: section.id, title: section.title, widgets });
   }
+
   const validatedSections = storedSectionsSchema.parse(sections);
   await updateStoredCanvasData(db, owner, validatedSections);
+
   return previousMediaIds;
 }

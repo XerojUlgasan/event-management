@@ -21,7 +21,9 @@ export async function attachBookingPackageService(
 ) {
   return db.transaction().execute(async (trx) => {
     const booking = await lockBookingRequestData(trx, id);
+
     if (!booking) return error("Booking request not found", 404);
+
     if (
       booking.revision !== input.expectedBookingUpdatedAt ||
       booking.package_id ||
@@ -29,13 +31,16 @@ export async function attachBookingPackageService(
       ["declined", "cancelled"].includes(booking.status)
     )
       return error("Booking request changed or already has a package", 409);
+
     const pkg = await findAvailablePackageData(trx, input.packageId);
+
     if (
       !pkg ||
       (input.packageUpdatedAt &&
         input.packageUpdatedAt !== pkg.updated_at.toISOString())
     )
       return error("Package is unavailable or changed", 409);
+
     await attachBookingPackageData(
       trx,
       id,
@@ -50,7 +55,9 @@ export async function attachBookingPackageService(
       metadata: JSON.stringify({ packageId: pkg.id }),
     });
     const updated = await findBookingRequestData(trx, id);
+
     if (!updated) throw new Error("Booking request unavailable");
+
     return { bookingRequest: (await bookingRequestDtos(trx, [updated]))[0]! };
   });
 }

@@ -14,11 +14,13 @@ const position = z.object({
   id: z.string().uuid(),
   at: z.iso.datetime({ offset: true }),
 });
+
 const boundary = {
   name: "José",
   id: "12345678-1234-4234-8234-123456789abc",
   at: "2026-11-13T01:02:03.123456Z",
 };
+
 test("pagination preserves complete cursor positions and binds them to the query scope", () => {
   const cursor = encodePageCursor("staff:day-1:available", boundary);
   assert.deepEqual(
@@ -44,8 +46,10 @@ test("invalid and overlong cursors produce a usable HTTP 400 response", async ()
   const app = new Hono();
   app.get("/", (c) => {
     parsePageCursor(c.req.query("cursor"), position, "staff");
+
     return c.json({ ok: true });
   });
+
   for (const cursor of [
     "!",
     "e30",
@@ -61,8 +65,10 @@ test("invalid and overlong cursors produce a usable HTTP 400 response", async ()
 });
 test("omitted options are bounded and invalid page sizes are rejected", () => {
   assert.deepEqual(paginationQuerySchema.parse({}), { limit: 15 });
+
   for (const limit of ["0", "-1", "51", "1.5", "Infinity", "", "abc"])
     assert.equal(paginationQuerySchema.safeParse({ limit }).success, false);
+
   assert.equal(paginationQuerySchema.parse({ limit: "50" }).limit, 50);
 });
 test("page continuation comes from the last included row and ends without a phantom page", () => {

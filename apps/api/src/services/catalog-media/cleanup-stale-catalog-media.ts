@@ -16,5 +16,6 @@ export async function cleanupStaleCatalogMediaService(
     db,
     rows.map((row) => row.id),
   );
+
   return rows.length;
 }

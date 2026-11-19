@@ -15,6 +15,7 @@ import { catalogKnowledgeDigest } from "../../src/services/ai/catalog-knowledge-
 import { saveCatalogKnowledgeEmbeddingData } from "../../src/data/ai/save-catalog-knowledge-embedding.js";
 
 const database = `em_public_search_${randomUUID().replaceAll("-", "")}`;
+
 const originalFetch = globalThis.fetch;
 const originalKey = process.env.AI_GATEWAY_API_KEY;
 const originalModel = process.env.EMBEDDING_MODEL;
@@ -23,6 +24,7 @@ let admin: Pool | undefined;
 let db: Kysely<DB>;
 let calls = 0;
 let fail = false;
+
 const vector = (x: number, y: number) => [x, y, ...Array(766).fill(0)];
 
 before(async () => {
@@ -30,6 +32,7 @@ before(async () => {
   process.env.EMBEDDING_MODEL = model;
   globalThis.fetch = async () => {
     calls++;
+
     return fail
       ? new Response("failed", { status: 503 })
       : new Response(
@@ -50,6 +53,7 @@ before(async () => {
   const pool = new Pool({ ...connection, database });
   db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
   const root = new URL("../../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name)))
@@ -59,11 +63,15 @@ before(async () => {
 });
 after(async () => {
   globalThis.fetch = originalFetch;
+
   if (originalKey === undefined) delete process.env.AI_GATEWAY_API_KEY;
   else process.env.AI_GATEWAY_API_KEY = originalKey;
+
   if (originalModel === undefined) delete process.env.EMBEDDING_MODEL;
   else process.env.EMBEDDING_MODEL = originalModel;
+
   await db?.destroy();
+
   if (admin) {
     await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await admin.end();
@@ -78,6 +86,7 @@ async function index(
   const rows = await db
     .transaction()
     .execute((trx) => syncCatalogKnowledge(trx, { kind, id }));
+
   for (const row of rows) {
     const hash = `${row.content_hash}:${catalogKnowledgeDigest(row.content_markdown)}`;
     await db
@@ -120,6 +129,7 @@ test("validates filters and never embeds queryless searches", async () => {
     }).success,
     false,
   );
+
   for (let i = 0; i < 7; i++)
     await db
       .insertInto("packages")
@@ -131,6 +141,7 @@ test("validates filters and never embeds queryless searches", async () => {
         price: 100,
       })
       .execute();
+
   await assert.rejects(
     db
       .insertInto("packages")
@@ -279,8 +290,10 @@ test("filters before ranking, deduplicates listings, excludes stale and private 
     model,
     embedding: vector(1, 0),
   });
+
   for (const id of [p.id, low.id, stale.id])
     await index("package", id, vector(1, 0));
+
   await db
     .updateTable("packages")
     .set({ description: "changed" })
@@ -335,6 +348,7 @@ test("semantic cursor paginates equal scores and is bound to the normalized quer
       .executeTakeFirstOrThrow();
     await index("service", service.id, vector(1, 0));
   }
+
   const archived = await db
     .insertInto("services")
     .values({

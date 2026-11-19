@@ -21,13 +21,16 @@ const message = (id: number): ChatMessage => ({
   createdAt: "2090-01-01T00:00:00.000Z",
   readAt: null,
 });
+
 const thread = (ids: number[], nextCursor: string | null): ChatThread => ({
   conversation: { id: "thread" } as ChatThread["conversation"],
   messages: ids.map(message),
   nextCursor,
 });
+
 const range = (start: number, end: number) =>
   Array.from({ length: end - start + 1 }, (_, index) => start + index);
+
 const ids = (value: ChatThread) =>
   value.messages.map((item) => Number(item.id));
 
@@ -35,6 +38,7 @@ const datedMessage = (id: number, second: number): ChatMessage => ({
   ...message(id),
   createdAt: `2090-01-01T00:00:${String(second).padStart(2, "0")}.000Z`,
 });
+
 const datedThread = (messages: ChatMessage[]): ChatThread => ({
   ...thread([], "older"),
   conversation: {

@@ -9,10 +9,12 @@ export type BookingPackageResult = {
   package: CatalogPackage | null;
   bookingUpdatedAt: string;
 };
+
 export const getBookingPackage = (id: string, admin: boolean) =>
   request<BookingPackageResult>(
     `${admin ? "/admin" : ""}/booking-requests/${encodeURIComponent(id)}/package`,
   );
+
 export const saveBookingPackage = (
   id: string,
   content: PackageContent,
@@ -38,6 +40,7 @@ export type PackageHistoryEntry = {
   after: CatalogPackage;
   createdAt: string;
 };
+
 export const getBookingPackageHistory = (id: string, cursor?: string) =>
   request<{ history: PackageHistoryEntry[]; nextCursor: string | null }>(
     `/admin/booking-requests/${encodeURIComponent(id)}/package-history${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,

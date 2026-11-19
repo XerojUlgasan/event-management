@@ -16,6 +16,7 @@ const cursorSchema = z.object({
   updatedAt: postgresTimestampSchema.and(z.iso.datetime({ precision: 6 })),
   id: z.string().uuid(),
 });
+
 export async function listAdminConversationsService(
   db: Kysely<DB>,
   limit: number,
@@ -34,17 +35,22 @@ export async function listAdminConversationsService(
     customerId,
     reference,
   );
+
   const page = createPage(fetched, limit, (row) =>
     encodePageCursor(scope, { updatedAt: row.cursor_updated_at, id: row.id }),
   );
+
   const ids = page.items.map((row) => row.id);
+
   const [last, unread] = await Promise.all([
     listLastMessagesData(db, ids),
     countUnreadMessagesData(db, ids, customerId ? "customer" : "admin"),
   ]);
+
   return {
     conversations: page.items.map((row) => {
       const latest = last.get(row.id);
+
       return conversationDto(
         row,
         latest ? messageDto(latest) : null,

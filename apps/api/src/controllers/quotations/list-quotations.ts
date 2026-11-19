@@ -6,9 +6,11 @@ import { errors } from "../booking-requests/http.js";
 import { paginationQuerySchema } from "../../utils/pagination.js";
 import { listResult } from "./responses.js";
 import { idParams } from "./schemas.js";
+
 const querySchema = paginationQuerySchema.extend({
   quotationId: z.string().uuid().optional(),
 });
+
 export const listAdminQuotationsRoute = createRoute({
   method: "get",
   path: "/admin/booking-requests/{id}/quotations",
@@ -16,6 +18,7 @@ export const listAdminQuotationsRoute = createRoute({
   request: { params: idParams, query: querySchema },
   responses: { 200: listResult, ...errors },
 });
+
 export const listAdminQuotationsRouteHandler: AppRouteHandler<
   typeof listAdminQuotationsRoute
 > = async (c) => {
@@ -26,6 +29,7 @@ export const listAdminQuotationsRouteHandler: AppRouteHandler<
     false,
     c.req.valid("query"),
   );
+
   return "message" in r
     ? jsonError(c, r.message, r.status)
     : c.json(r, 200);
@@ -38,6 +42,7 @@ export const listCustomerQuotationsRoute = createRoute({
   request: { params: idParams, query: querySchema },
   responses: { 200: listResult, ...errors },
 });
+
 export const listCustomerQuotationsRouteHandler: AppRouteHandler<
   typeof listCustomerQuotationsRoute
 > = async (c) => {
@@ -48,6 +53,7 @@ export const listCustomerQuotationsRouteHandler: AppRouteHandler<
     true,
     c.req.valid("query"),
   );
+
   return "message" in r
     ? jsonError(c, r.message, r.status)
     : c.json(r, 200);

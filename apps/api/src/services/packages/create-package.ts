@@ -13,6 +13,7 @@ import { error } from "./package-rules.js";
 import { duplicateTitle, catalogTitle } from "../../utils/catalog-title.js";
 import { findCatalogTitleData } from "../../data/catalog/find-catalog-title.js";
 import { promoteOwnerCatalogMediaService } from "../catalog-media/promote-catalog-media.js";
+
 export async function createPackageService(
   db: Kysely<DB>,
   content: Content,
@@ -21,8 +22,10 @@ export async function createPackageService(
   try {
     const outcome = await db.transaction().execute(async (trx) => {
       const title = catalogTitle(content.name);
+
       if (await findCatalogTitleData(trx, "packages", title))
         return error("A package with this title already exists", 409);
+
       const now = new Date();
       const row = await createPackageData(trx, content, title.slug, now);
       await replaceCatalogSectionsService(
@@ -35,26 +38,33 @@ export async function createPackageService(
         kind: "package",
         id: row.id,
       });
+
       if (chunks.length)
         await enqueueBackgroundJobService(trx, "embed_package", {
           packageId: row.id,
         });
+
       return packageDto(trx, row);
     });
+
     if (!("status" in outcome)) {
       await promoteOwnerCatalogMediaService(db, {
         kind: "package",
         id: outcome.id,
       });
     }
+
     return outcome;
   } catch (cause) {
     const duplicate = duplicateTitle(
       cause,
       "A package with this title already exists",
     );
+
     if (duplicate) return duplicate;
+
     if (cause instanceof InvalidCatalogMedia) return error(cause.message, 400);
+
     throw cause;
   }
 }

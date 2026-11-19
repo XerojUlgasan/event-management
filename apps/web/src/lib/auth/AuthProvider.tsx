@@ -22,7 +22,9 @@ import {
 import type { Profile } from "../data/auth/session";
 
 type Status = "loading" | "signed-out" | "signed-in";
+
 type FirebaseMethod = "google" | "password";
+
 export const firebaseConfigured = env.firebaseConfigured;
 
 type AuthContextValue = {
@@ -85,11 +87,13 @@ async function withFirebase<T>(
 ) {
   if (!firebaseConfigured)
     throw new Error("Firebase sign-in is currently unavailable.");
+
   const [client, sdk] = await Promise.all([
     import("./firebase"),
     import("firebase/auth"),
   ]);
   await client.firebaseReady;
+
   try {
     const credential =
       method === "google"
@@ -99,6 +103,7 @@ async function withFirebase<T>(
             email ?? "",
             password ?? "",
           );
+
     return await task(await credential.user.getIdToken(true));
   } finally {
     // Firebase proves identity; only the API cookie keeps the app signed in.
@@ -122,9 +127,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const notice = sessionStorage.getItem("clemora-auth-notice");
       sessionStorage.removeItem("clemora-auth-notice");
+
       if (notice === "signin") notify("Signed in successfully.");
+
       if (notice === "register")
         notify("Account created. You are now signed in.");
+
       if (notice === "signout") notify("Signed out successfully.");
     } catch {
       /* Authentication still works when browser storage is unavailable. */
@@ -137,16 +145,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void getMe()
       .then((nextProfile) => {
         if (!active || current !== operation.current) return;
+
         setProfile(nextProfile);
         setStatus("signed-in");
       })
       .catch((cause) => {
         if (!active || current !== operation.current) return;
+
         if (!(cause instanceof ApiError && cause.status === 401)) {
           setError(notifyError(messageFor(cause)));
         }
+
         setStatus("signed-out");
       });
+
     return () => {
       active = false;
     };
@@ -154,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+
     const revalidate = () => {
       if (
         statusRef.current !== "signed-in" ||
@@ -161,15 +174,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         authBusy.current
       )
         return;
+
       const current = operation.current;
+
       const pending = getMe()
         .then((nextProfile) => {
           if (!active || current !== operation.current) return;
+
           setProfile(nextProfile);
           probeFailure.current = false;
         })
         .catch((cause) => {
           if (!active || current !== operation.current) return;
+
           if (cause instanceof ApiError && cause.status === 401) {
             ++operation.current;
             setProfile(null);
@@ -185,14 +202,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .finally(() => {
           if (probe.current === pending) probe.current = null;
         });
+
       probe.current = pending;
     };
+
     const onVisible = () => {
       if (document.visibilityState === "visible") revalidate();
     };
+
     window.addEventListener("clemora:session-check", revalidate);
     window.addEventListener("focus", onVisible);
     document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       active = false;
       window.removeEventListener("clemora:session-check", revalidate);
@@ -211,9 +232,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       probe.current = null;
       setError("");
       let checkSession = false;
+
       try {
         const nextProfile = await task();
+
         if (current !== operation.current) return;
+
         if (notice) {
           try {
             sessionStorage.setItem("clemora-auth-notice", notice);
@@ -221,6 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             /* The destination page itself still confirms the new session. */
           }
         }
+
         setProfile(nextProfile);
         setStatus(nextProfile ? "signed-in" : "signed-out");
       } catch (cause) {
@@ -231,10 +256,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             statusRef.current === "signed-in";
           setError(notifyError(messageFor(cause)));
         }
+
         throw cause;
       } finally {
         if (current === operation.current) {
           authBusy.current = false;
+
           if (checkSession)
             window.dispatchEvent(new Event("clemora:session-check"));
         }
@@ -245,12 +272,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = (email: string, password: string) =>
     run(() => login(email, password), "signin");
+
   const signUp = (name: string, email: string, password: string) =>
     run(() => register(name, email, password), "register");
+
   const signInWithGoogle = () =>
     run(() => withFirebase("google", syncSession), "signin");
+
   const signInWithFirebase = (email: string, password: string) =>
     run(() => withFirebase("password", syncSession, email, password), "signin");
+
   const connectFirebase: AuthContextValue["connectFirebase"] = (
     currentPassword,
     method,
@@ -265,6 +296,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       ),
     );
+
   const createPassword: AuthContextValue["createPassword"] = (
     password,
     method,
@@ -279,11 +311,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         firebasePassword,
       ),
     );
+
   const signOut = () =>
     run(async () => {
       await endSession();
+
       return null;
     }, "signout");
+
   const clearError = useCallback(() => setError(""), []);
 
   return (
@@ -317,6 +352,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
+
   if (!context) throw new Error("useAuth must be used inside AuthProvider");
+
   return context;
 }

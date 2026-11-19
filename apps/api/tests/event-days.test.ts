@@ -7,6 +7,7 @@ import { Pool } from "pg";
 import { hashSessionToken } from "../src/utils/session.js";
 
 const database = `em_days_test_${randomUUID().replaceAll("-", "")}`;
+
 let admin: Pool, pool: Pool;
 let app: typeof import("../src/app.js").app;
 let db: typeof import("../src/db/client.js").db;
@@ -29,12 +30,14 @@ before(async () => {
   await admin.query(`CREATE DATABASE "${database}"`);
   pool = new Pool({ ...connection, database });
   const root = new URL("../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((e) => e.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name)))
     await pool.query(
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
+
   process.env.DB_NAME = database;
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
@@ -57,6 +60,7 @@ before(async () => {
         expires_at: new Date(Date.now() + 3600000),
       })
       .execute();
+
     return `em_session=${token}`;
   }
   adminCookie = await session("admin");
@@ -77,19 +81,24 @@ before(async () => {
 after(async () => {
   await db?.destroy();
   await pool?.end();
+
   if (admin) {
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const remaining = await admin.query(
         "SELECT 1 FROM pg_stat_activity WHERE datname = $1",
         [database],
       );
+
       if (remaining.rowCount === 0) break;
+
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
+
     await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await admin.end();
   }
 });
+
 function call(
   path: string,
   method = "GET",
@@ -105,10 +114,13 @@ function call(
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 }
+
 async function read(response: Response, status = 200) {
   assert.equal(response.status, status, await response.clone().text());
+
   return response.json();
 }
+
 async function booking(dates = ["2027-01-01", "2027-01-02"]) {
   return (
     await read(
@@ -131,12 +143,15 @@ async function booking(dates = ["2027-01-01", "2027-01-02"]) {
     )
   ).bookingRequest;
 }
+
 async function current(id: string) {
   return (await read(await call(`/admin/booking-requests/${id}`)))
     .bookingRequest;
 }
+
 async function saveTime(id: string, date: string) {
   const row = await current(id);
+
   return (
     await read(
       await call(
@@ -152,6 +167,7 @@ async function saveTime(id: string, date: string) {
     )
   ).bookingRequest;
 }
+
 async function accept(id: string) {
   return (
     await read(
@@ -161,8 +177,10 @@ async function accept(id: string) {
     )
   ).bookingRequest;
 }
+
 async function schedule(id: string) {
   const row = await current(id);
+
   return read(
     await call(schedulePath, "POST", {
       bookingRequestId: id,
@@ -278,6 +296,7 @@ test("scheduling validates the complete batch and serializes concurrent attempts
   );
   await saveTime(inquiry.id, "2027-02-02");
   const ready = await current(inquiry.id);
+
   const attempts = await Promise.all(
     [1, 2].map(() =>
       call(schedulePath, "POST", {
@@ -286,6 +305,7 @@ test("scheduling validates the complete batch and serializes concurrent attempts
       }),
     ),
   );
+
   assert.deepEqual(
     attempts.map((response) => response.status).sort(),
     [200, 409],
@@ -320,7 +340,9 @@ test("moving a requested-day schedule preserves history and cancellation follows
   const movedDays = (
     await read(await call(`/admin/event-days?bookingRequestId=${inquiry.id}`))
   ).eventDays;
+
   const oldDay = movedDays.find((item: { id: string }) => item.id === day.id);
+
   assert.equal(oldDay.status, "moved");
   assert.equal(oldDay.replacementEventDayId, replacement.id);
   const reloaded = await current(inquiry.id);
@@ -359,8 +381,10 @@ test("moving a requested-day schedule preserves history and cancellation follows
 
 test("removed venue, staff, and checklist operations are absent from Node and Edge API contracts", async () => {
   const { app: edgeApp } = await import("../src/edge/server.js");
+
   for (const runtime of [app, edgeApp]) {
     const document = await read(await runtime.request("/openapi.json"));
+
     for (const path of Object.keys(document.paths))
       assert.equal(
         /\/venues(?:\/|$)|\/staff(?:\/|$)|\/checklist(?:\/|$)|apply-response-deadlines/.test(
@@ -369,7 +393,9 @@ test("removed venue, staff, and checklist operations are absent from Node and Ed
         false,
         path,
       );
+
     assert.ok(document.paths[`/v1${schedulePath}`]);
+
     for (const method of ["GET", "POST", "PATCH"]) {
       for (const path of [
         "/admin/event-days/00000000-0000-4000-8000-000000000001/checklist",
@@ -387,6 +413,7 @@ test("removed venue, staff, and checklist operations are absent from Node and Ed
       }
     }
   }
+
   for (const path of [
     "/venues",
     "/admin/venues",

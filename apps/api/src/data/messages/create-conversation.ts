@@ -12,6 +12,7 @@ export async function createConversationData(
     .values({ customer_id: customerId })
     .returning("id")
     .executeTakeFirstOrThrow();
+
   return selectConversationColumnsData(db)
     .where("c.id", "=", row.id)
     .executeTakeFirstOrThrow();

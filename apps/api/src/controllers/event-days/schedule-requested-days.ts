@@ -9,7 +9,9 @@ const input = z.strictObject({
   bookingRequestId: id,
   expectedUpdatedAt: instant,
 });
+
 export type ScheduleRequestedDaysInput = z.infer<typeof input>;
+
 export const scheduleRequestedDaysRoute = createRoute({
   method: "post",
   path: "/admin/event-days/schedule-requested-days",
@@ -17,6 +19,7 @@ export const scheduleRequestedDaysRoute = createRoute({
   request: { body: body(input) },
   responses: listResponse,
 });
+
 export const scheduleRequestedDaysRouteHandler: AppRouteHandler<
   typeof scheduleRequestedDaysRoute
 > = async (c) => {
@@ -32,6 +35,7 @@ export const scheduleRequestedDaysRouteHandler: AppRouteHandler<
     );
   } catch (e) {
     const error = errorResponse(e);
+
     return jsonError(c, error.message, error.status);
   }
 };

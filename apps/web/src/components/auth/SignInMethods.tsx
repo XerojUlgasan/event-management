@@ -19,17 +19,22 @@ export function SignInMethods() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
+
   if (!profile) return null;
 
   const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     clearError();
     setFormError("");
+
     if (!profile.hasPassword && newPassword !== confirmPassword) {
       setFormError(notifyError("Passwords do not match."));
+
       return;
     }
+
     setBusy(true);
+
     try {
       if (profile.hasPassword) {
         await connectFirebase(
@@ -50,6 +55,7 @@ export function SignInMethods() {
           "Password added. You can now sign in with your email and password.",
         );
       }
+
       setCurrentPassword("");
       setFirebasePassword("");
       setNewPassword("");

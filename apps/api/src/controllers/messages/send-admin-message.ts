@@ -19,6 +19,7 @@ export const sendAdminMessageRoute = createRoute({
     ...errors,
   },
 });
+
 export const sendAdminMessageRouteHandler: AppRouteHandler<
   typeof sendAdminMessageRoute
 > = async (c) => {
@@ -28,6 +29,7 @@ export const sendAdminMessageRouteHandler: AppRouteHandler<
     c.get("session").user.id,
     c.req.valid("json").body,
   );
+
   if (result.kind === "ok")
     return c.json(
       {
@@ -38,6 +40,7 @@ export const sendAdminMessageRouteHandler: AppRouteHandler<
       },
       201,
     );
+
   return result.kind === "closed"
     ? jsonError(c, "Conversation is closed", 409)
     : jsonError(c, "Conversation not found", 404);

@@ -12,8 +12,11 @@ export async function searchCatalogKnowledgeData(
     where e.extname = 'vector'
   `.execute(db);
   const schema = extension.rows[0]?.schema;
+
   if (!schema) throw new Error("Catalog knowledge requires pgvector");
+
   const vector = sql`cast(${JSON.stringify(embedding)} as ${sql.id(schema, "vector")})`;
+
   // Return all eligible candidates: source freshness is assessed in the same
   // snapshot before selecting the top results, so stale rows cannot consume slots.
   return sql<{

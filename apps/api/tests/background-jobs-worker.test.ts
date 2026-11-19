@@ -21,11 +21,13 @@ test("standalone worker repeatedly consumes its database and exits on SIGTERM", 
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
   let worker: ReturnType<typeof spawn> | undefined;
+
   try {
     await admin.query(`CREATE DATABASE "${database}"`);
     const databasePool = new Pool({ ...connection, database });
     pool = databasePool;
     const migrations = new URL("../prisma/migrations/", import.meta.url);
+
     for (const entry of (await readdir(migrations, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory())
       .sort((a, b) => a.name.localeCompare(b.name))) {
@@ -36,12 +38,14 @@ test("standalone worker repeatedly consumes its database and exits on SIGTERM", 
         ),
       );
     }
+
     const insert = async () =>
       (
         await databasePool.query<{ id: string }>(
           "INSERT INTO background_jobs(type,payload) VALUES('embed_package','{}') RETURNING id",
         )
       ).rows[0].id;
+
     const first = await insert();
     const child = spawn(
       process.execPath,
@@ -67,6 +71,7 @@ test("standalone worker repeatedly consumes its database and exits on SIGTERM", 
     child.stderr.on("data", () => {});
     async function waitForFailure(id: string) {
       const deadline = Date.now() + 15_000;
+
       while (Date.now() < deadline) {
         const row = (
           await databasePool.query<{
@@ -78,14 +83,18 @@ test("standalone worker repeatedly consumes its database and exits on SIGTERM", 
             [id],
           )
         ).rows[0];
+
         if (row.status === "failed") {
           assert.equal(row.attempts, 1);
           assert.equal(row.last_error, "Invalid job payload");
+
           return;
         }
+
         assert.equal(child.exitCode, null, "worker must remain running");
         await sleep(50);
       }
+
       assert.fail("Worker did not consume the queued job");
     }
     await waitForFailure(first);
@@ -101,6 +110,7 @@ test("standalone worker repeatedly consumes its database and exits on SIGTERM", 
       worker.kill("SIGKILL");
       await exited;
     }
+
     await pool?.end();
     await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await admin.end();

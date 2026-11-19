@@ -32,6 +32,7 @@ const widget = (
   autoplay: false,
   ...overrides,
 });
+
 const sections: CatalogSection[] = [
   {
     id: "story",
@@ -65,6 +66,7 @@ const sections: CatalogSection[] = [
     ],
   },
 ];
+
 const meta = {
   title: "Organisms/CatalogCanvas",
   component: CatalogSections,
@@ -75,9 +77,13 @@ const meta = {
     </CatalogCanvas>
   ),
 } satisfies Meta<typeof CatalogSections>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
+
 export const AllWidgets: Story = {};
+
 export const Narrow: Story = {
   render: (args) => (
     <div style={{ width: 380 }}>
@@ -87,6 +93,7 @@ export const Narrow: Story = {
     </div>
   ),
 };
+
 export const LongMarkdown: Story = {
   args: {
     sections: [
@@ -108,6 +115,7 @@ export const LongMarkdown: Story = {
     ],
   },
 };
+
 export const EmptyMedia: Story = {
   args: {
     sections: [
@@ -122,6 +130,7 @@ export const EmptyMedia: Story = {
     ],
   },
 };
+
 export const ServiceWidgets: Story = {
   args: {
     sections: [
@@ -152,6 +161,7 @@ export const ServiceWidgets: Story = {
     ],
   },
 };
+
 export const PackageWidgets: Story = {
   args: {
     sections: [
@@ -192,8 +202,10 @@ export const PackageWidgets: Story = {
     ],
   },
 };
+
 function WorkspacePackageExample() {
   const [selected, setSelected] = useState<string | null>(null);
+
   return (
     <>
       <CatalogCanvas>
@@ -210,9 +222,11 @@ function WorkspacePackageExample() {
     </>
   );
 }
+
 export const WorkspacePackageAction: Story = {
   render: () => <WorkspacePackageExample />,
 };
+
 export const PackageEditor: Story = {
   render: () => (
     <div style={{ width: 320, height: 244 }}>
@@ -225,6 +239,7 @@ export const PackageEditor: Story = {
     </div>
   ),
 };
+
 export const NarrowPackages: Story = {
   args: PackageWidgets.args,
   render: (args) => (
@@ -235,8 +250,10 @@ export const NarrowPackages: Story = {
     </div>
   ),
 };
+
 function WorkspaceServiceExample() {
   const [selected, setSelected] = useState<string | null>(null);
+
   return (
     <>
       <CatalogCanvas>
@@ -253,9 +270,11 @@ function WorkspaceServiceExample() {
     </>
   );
 }
+
 export const WorkspaceServiceAction: Story = {
   render: () => <WorkspaceServiceExample />,
 };
+
 export const ServiceEditor: Story = {
   render: () => (
     <div style={{ width: 320, height: 244 }}>
@@ -273,6 +292,7 @@ export const ServiceEditor: Story = {
     </div>
   ),
 };
+
 export const EmptyMediaWithCaption: Story = {
   render: () => (
     <div style={{ width: 320, height: 244 }}>
@@ -332,6 +352,7 @@ export const GridGuides: Story = {
     </div>
   ),
 };
+
 export const StackedGuides: Story = {
   render: () => (
     <div style={{ width: 380 }}>
@@ -343,6 +364,7 @@ export const StackedGuides: Story = {
     </div>
   ),
 };
+
 export const EmptyGuides: Story = {
   render: () => (
     <div>

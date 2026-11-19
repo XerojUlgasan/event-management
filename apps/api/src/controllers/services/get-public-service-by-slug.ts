@@ -23,6 +23,7 @@ export const getPublicServiceBySlugRouteHandler: AppRouteHandler<
     c.get("db"),
     c.req.valid("param").slug,
   );
+
   return value
     ? c.json(value, 200)
     : jsonError(c, "Service not found", 404);

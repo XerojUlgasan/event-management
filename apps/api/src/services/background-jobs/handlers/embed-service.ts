@@ -12,5 +12,6 @@ export async function embedServiceJob(
     owner: { kind: "service", id: payload.serviceId },
     abortSignal: signal,
   });
+
   if (result.failed > 0) throw new Error("Embedding refresh failed");
 }

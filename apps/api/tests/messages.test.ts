@@ -9,6 +9,7 @@ import { hashSessionToken } from "../src/utils/session.js";
 import { encodePageCursor } from "../src/utils/pagination.js";
 
 const database = `em_messages_test_${randomUUID().replaceAll("-", "")}`;
+
 let app: typeof import("../src/app.js").app;
 let db: typeof import("../src/db/client.js").db;
 let admin: Pool;
@@ -39,11 +40,13 @@ before(async () => {
   await admin.query(`CREATE DATABASE "${database}"`);
   pool = new Pool({ ...connection, database });
   const root = new URL("../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((item) => item.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name))) {
     let legacyCustomerId: string | undefined;
     let legacyConversationIds: string[] = [];
+
     if (entry.name === "20261101130000_remove_deferred_ai_conversation_state") {
       legacyCustomerId = (
         await pool.query(
@@ -61,9 +64,11 @@ before(async () => {
         [legacyConversationIds[0], legacyCustomerId],
       );
     }
+
     await pool.query(
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
+
     if (legacyCustomerId) {
       const conversations = await pool.query(
         "SELECT status FROM conversations WHERE id = ANY($1::uuid[])",
@@ -113,6 +118,7 @@ before(async () => {
       );
     }
   }
+
   // This human-messaging suite must never make live provider requests.
   delete process.env.AI_GATEWAY_API_KEY;
   process.env.DB_NAME = database;
@@ -139,6 +145,7 @@ before(async () => {
         expires_at: new Date(Date.now() + 3600000),
       })
       .execute();
+
     return { cookie: `em_session=${token}`, id: user.id };
   }
 
@@ -169,6 +176,7 @@ before(async () => {
 after(async () => {
   await db?.destroy();
   await pool?.end();
+
   if (admin) {
     await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
     await admin.end();
@@ -188,11 +196,13 @@ function call(path: string, method = "GET", body?: unknown, cookie?: string) {
 
 async function read(response: Response, status: number): Promise<any> {
   assert.equal(response.status, status, await response.clone().text());
+
   return response.status === 204 ? null : response.json();
 }
 
 test("customer request IDs replay safely and reject collisions", async () => {
   const ids = Array.from({ length: 3 }, () => randomUUID());
+
   await db
     .insertInto("conversations")
     .values([
@@ -207,9 +217,11 @@ test("customer request IDs replay safely and reject collisions", async () => {
     call("/messages/conversation/messages", "POST", payload, customerCookie),
     call("/messages/conversation/messages", "POST", payload, customerCookie),
   ]);
+
   const results = await Promise.all(
     responses.map((response) => read(response, 201)),
   );
+
   assert.deepEqual(results[0].message, results[1].message);
   assert.equal(results[0].message.id, requestId);
   assert.equal(
@@ -635,6 +647,7 @@ test("old general threads stay open and explicitly closed threads can reopen", a
     await call("/messages/conversation", "GET", undefined, chatCustomerCookie),
     200,
   );
+
   for (const field of [
     "packageId",
     "packageName",
@@ -646,6 +659,7 @@ test("old general threads stay open and explicitly closed threads can reopen", a
   ]) {
     assert.equal(thread.conversation[field], null);
   }
+
   const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
   await db
     .updateTable("conversations")
@@ -735,6 +749,7 @@ test("old booking conversations remain active and explicitly closed history stay
         201,
       )
     ).bookingRequest;
+
     const linked = (
       await read(
         await call(
@@ -746,6 +761,7 @@ test("old booking conversations remain active and explicitly closed history stay
         200,
       )
     ).conversations.find((item: any) => item.bookingRequestId === booking.id);
+
     assert.ok(linked);
     const byReference = await read(
       await call(
@@ -773,6 +789,7 @@ test("old booking conversations remain active and explicitly closed history stay
       .set({ created_at: old })
       .where("id", "=", linked.id)
       .execute();
+
     if (pastEnd) {
       await db
         .updateTable("booking_requests")
@@ -780,15 +797,19 @@ test("old booking conversations remain active and explicitly closed history stay
         .where("id", "=", booking.id)
         .execute();
     }
+
     for (const [path, cookie] of [
       ["/messages/conversations", chatCustomerCookie],
       ["/admin/conversations", adminCookie],
     ] as const) {
       const list = await read(await call(path, "GET", undefined, cookie), 200);
+
       const row = list.conversations.find((item: any) => item.id === linked.id);
+
       assert.equal(row?.status, "active");
       assert.equal("expiresAt" in row, false);
     }
+
     for (const [path, cookie] of [
       [`/messages/conversations/${linked.id}`, chatCustomerCookie],
       [`/admin/conversations/${linked.id}`, adminCookie],
@@ -803,6 +824,7 @@ test("old booking conversations remain active and explicitly closed history stay
         pastEnd ? old.toISOString() : null,
       );
     }
+
     await read(
       await call(
         "/messages/conversation/messages",
@@ -886,6 +908,7 @@ test("admin conversation pages include empty threads and order by precise update
   const ids = Array.from({ length: 31 }, () => randomUUID())
     .sort()
     .reverse();
+
   await db
     .insertInto("conversations")
     .values(
@@ -925,6 +948,7 @@ test("admin conversation pages include empty threads and order by precise update
   );
   const pages: any[] = [];
   let cursor: string | null = null;
+
   do {
     const page = await read(
       await call(
@@ -936,7 +960,9 @@ test("admin conversation pages include empty threads and order by precise update
       200,
     );
     assert.ok(page.conversations.length <= 15);
+
     if (pages.length === 0) assert.equal(page.conversations.length, 15);
+
     pages.push(...page.conversations);
     cursor = page.nextCursor;
   } while (cursor);
@@ -946,10 +972,14 @@ test("admin conversation pages include empty threads and order by precise update
     ids,
   );
   assert.equal(new Set(pages.map((item: any) => item.id)).size, pages.length);
+
   const preview = pages.find((item: any) => item.id === ids[0]);
+
   assert.equal(preview.lastMessage.body, "Page preview");
   assert.equal(preview.unreadCount, 1);
+
   const empty = pages.find((item: any) => item.id === ids[1]);
+
   assert.equal(empty.lastMessage, null);
   assert.equal(empty.unreadCount, 0);
   await db.deleteFrom("conversations").where("id", "in", ids).execute();
@@ -961,6 +991,7 @@ test("legacy AI routes remain absent and unconfigured generation creates no assi
     await call("/messages/conversation", "GET", undefined, customerCookie),
     200,
   );
+
   for (const path of [
     "/chatbot/guest-reply",
     "/messages/conversation/claim",
@@ -985,6 +1016,7 @@ test("legacy AI routes remain absent and unconfigured generation creates no assi
       undefined,
     );
   }
+
   assert.equal(
     (
       await db
@@ -1001,6 +1033,7 @@ test("customer conversation and thread pages are bounded, scoped, and keep preci
   const conversations = Array.from({ length: 7 }, () => randomUUID())
     .sort()
     .reverse();
+
   await db
     .insertInto("conversations")
     .values(
@@ -1020,6 +1053,7 @@ test("customer conversation and thread pages are bounded, scoped, and keep preci
   );
   const ids: string[] = [];
   let cursor: string | null = null;
+
   do {
     const page = await read(
       await call(
@@ -1034,6 +1068,7 @@ test("customer conversation and thread pages are bounded, scoped, and keep preci
     ids.push(...page.conversations.map((item: any) => item.id));
     cursor = page.nextCursor;
   } while (cursor);
+
   assert.deepEqual(ids.slice(0, 7), conversations);
   assert.equal(new Set(ids).size, ids.length);
   const firstPage = await read(
@@ -1094,6 +1129,7 @@ test("customer conversation and thread pages are bounded, scoped, and keep preci
   const messageIds = Array.from({ length: 7 }, () => randomUUID())
     .sort()
     .reverse();
+
   await db
     .insertInto("messages")
     .values(

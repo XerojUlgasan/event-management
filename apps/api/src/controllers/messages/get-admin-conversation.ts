@@ -20,6 +20,7 @@ export const getAdminConversationRoute = createRoute({
     ...errors,
   },
 });
+
 export const getAdminConversationRouteHandler: AppRouteHandler<
   typeof getAdminConversationRoute
 > = async (c) => {
@@ -29,6 +30,7 @@ export const getAdminConversationRouteHandler: AppRouteHandler<
     c.req.valid("query").limit,
     c.req.valid("query").cursor,
   );
+
   return result
     ? c.json(result, 200)
     : jsonError(c, "Conversation not found", 404);

@@ -26,6 +26,7 @@ import { QuotationSummaryRead } from "../quotations/Quotations";
 import { adminBookingRequestPath, customerPaths } from "../app/routes";
 
 export type ConversationContextView = "details" | "package" | "quotation";
+
 type Content =
   | { kind: "details"; booking: BookingRequest }
   | { kind: "package"; package: CatalogPackage | null }
@@ -152,6 +153,7 @@ export function ConversationContext({
     async function load() {
       try {
         let result: Content;
+
         if (view === "details") {
           const response = await (admin
             ? getAdminBookingRequest(bookingId)
@@ -166,6 +168,7 @@ export function ConversationContext({
             quotation: await getLatestSentQuotation(bookingId, admin),
           };
         }
+
         if (active) setContent(result);
       } catch (cause) {
         if (active)
@@ -180,17 +183,21 @@ export function ConversationContext({
       }
     }
     void load();
+
     return () => {
       active = false;
     };
   }, [bookingId, admin, view, attempt, notifyError]);
+
   const retry = () => setAttempt((value) => value + 1);
+
   if (view === "package" && content?.kind === "package" && !content.package)
     return (
       <Dialog title="Current package" onClose={onClose}>
         <p>Package to be prepared. Amount to be discussed.</p>
       </Dialog>
     );
+
   if (view === "package")
     return (
       <PackagePreview
@@ -202,6 +209,7 @@ export function ConversationContext({
         showBookingAction={false}
       />
     );
+
   const body = (
     <>
       {pending && (
@@ -242,6 +250,7 @@ export function ConversationContext({
         ))}
     </>
   );
+
   return view === "details" ? (
     <Drawer
       title="Event details"

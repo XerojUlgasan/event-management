@@ -44,12 +44,14 @@ export async function getMyProposalService({
 }): Promise<MyProposalResult> {
   abortSignal?.throwIfAborted();
   const conversation = await findConversationData(db, conversationId);
+
   if (
     !conversation ||
     conversation.customer_id !== customerId ||
     conversation.guest_identity_id
   )
     throw new ProposalAccessDenied();
+
   if (!conversation.booking_request_id)
     return { status: "no_linked_request", proposal: null };
 
@@ -61,10 +63,14 @@ export async function getMyProposalService({
     customerId,
   );
   abortSignal?.throwIfAborted();
+
   if (!result) throw new ProposalAccessDenied();
+
   if (!result.package)
     return { status: "proposal_not_prepared", proposal: null };
+
   const pkg = result.package;
+
   return {
     status: "found",
     proposal: {

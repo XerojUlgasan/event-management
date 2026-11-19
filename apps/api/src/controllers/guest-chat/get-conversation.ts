@@ -21,10 +21,12 @@ export const getGuestConversationRoute = createRoute({
     ...errors,
   },
 });
+
 export const getGuestConversationRouteHandler: AppRouteHandler<
   typeof getGuestConversationRoute
 > = async (c) => {
   const { limit, cursor } = c.req.valid("query");
+
   return c.json(
     await getGuestChatService(
       c.get("db"),

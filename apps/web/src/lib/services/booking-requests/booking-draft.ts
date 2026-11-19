@@ -21,6 +21,7 @@ export type BookingDraft = {
 export function readBookingDraft(): BookingDraft | null {
   try {
     const draft = JSON.parse(sessionStorage.getItem(KEY) || "null");
+
     return draft &&
       typeof draft.item?.id === "string" &&
       typeof draft.item?.updatedAt === "string" &&

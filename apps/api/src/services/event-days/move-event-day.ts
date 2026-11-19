@@ -9,6 +9,7 @@ import {
   validateSchedule,
   type Schedule,
 } from "./event-days.js";
+
 export async function moveEventDayService(
   db: Kysely<DB>,
   id: string,
@@ -24,6 +25,7 @@ export async function moveEventDayService(
     );
     await endEventDayData(trx, id, "moved", replacement);
     await touchBookingRevisionData(trx, day.booking_request_id);
+
     return one(trx, replacement);
   });
 }

@@ -5,9 +5,11 @@ import type { HonoEnv } from "../types/hono.js";
 import { env } from "./env.js";
 
 export const GUEST_COOKIE = "em_guest";
+
 export function createGuestToken() {
   return randomBytes(32).toString("base64url");
 }
+
 export function setGuestCookie(c: Context<HonoEnv>, token: string) {
   setCookie(c, GUEST_COOKIE, token, {
     httpOnly: true,

@@ -3,6 +3,7 @@ import { Button, NativeDialog } from "@event-management/ui";
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
+
 export function CatalogDetailPreview({
   entity,
   children,
@@ -20,12 +21,14 @@ export function CatalogDetailPreview({
     const unlockScroll = lockCatalogScroll();
     dialog?.showModal();
     dialog?.querySelector<HTMLButtonElement>("button")?.focus();
+
     return () => {
       dialog?.close();
       unlockScroll();
       trigger?.focus();
     };
   }, []);
+
   return createPortal(
     <NativeDialog
       ref={dialogRef}

@@ -41,6 +41,7 @@ app.use(
 
 app.use("/v1/*", async (c, next) => {
   const origin = c.req.header("origin");
+
   if (
     ["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method) &&
     origin &&
@@ -48,6 +49,7 @@ app.use("/v1/*", async (c, next) => {
   ) {
     return c.json({ error: "Origin is not allowed" }, 403);
   }
+
   c.header("Cache-Control", "no-store");
   c.set("db", db);
   await next();

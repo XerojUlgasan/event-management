@@ -5,6 +5,7 @@ const IDENTIFIER = /^[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)?$/;
 function columnRef(column: string) {
   if (!IDENTIFIER.test(column))
     throw new Error(`Invalid SQL column reference: ${column}`);
+
   return sql.raw(
     column
       .split(".")

@@ -14,6 +14,7 @@ import { dto, failure } from "./quotation-context.js";
 const positionSchema = z.object({
   version: z.number().int().positive().max(2147483647),
 });
+
 export async function listQuotationService(
   db: Kysely<DB>,
   bookingId: string,
@@ -22,8 +23,10 @@ export async function listQuotationService(
   input: { limit: number; cursor?: string; quotationId?: string },
 ) {
   const booking = await findQuotationBookingData(db, bookingId);
+
   if (!booking || (customer && booking.customer_id !== actor))
     return failure("Booking request not found", 404);
+
   const scope = JSON.stringify([
     "quotation-history",
     bookingId,
@@ -51,9 +54,11 @@ export async function listQuotationService(
   const previous = draft?.previous_quotation_id
     ? await findQuoteData(db, draft.previous_quotation_id)
     : undefined;
+
   const page = createPage(rows, input.limit, (row) =>
     encodePageCursor(scope, { version: row.version }),
   );
+
   return {
     quotations: page.items.map(dto),
     nextCursor: page.nextCursor,

@@ -23,21 +23,25 @@ export async function saveGuestMessageData(
       .where("conversation_id", "=", id)
       .where("request_id", "=", requestId)
       .executeTakeFirst();
+
     if (previous) {
       const message = await selectMessageColumnsData(trx, id)
         .where("m.id", "=", previous.message_id)
         .executeTakeFirstOrThrow();
+
       if (message.body !== body)
         throw new GuestChatError(
           409,
           "Request ID was already used for a different message",
           "request_conflict",
         );
+
       const assistantMessage = previous.assistant_message_id
         ? await selectMessageColumnsData(trx, id)
             .where("m.id", "=", previous.assistant_message_id)
             .executeTakeFirstOrThrow()
         : null;
+
       return {
         conversation,
         message,
@@ -46,6 +50,7 @@ export async function saveGuestMessageData(
         replay: true as const,
       };
     }
+
     if (
       conversation.guest_customer_message_count >= GUEST_CUSTOMER_MESSAGE_LIMIT
     )
@@ -54,6 +59,7 @@ export async function saveGuestMessageData(
         "Sign in to continue this conversation",
         "login_required",
       );
+
     const message = await trx
       .insertInto("messages")
       .values({
@@ -68,12 +74,14 @@ export async function saveGuestMessageData(
       .onConflict((conflict) => conflict.column("id").doNothing())
       .returningAll()
       .executeTakeFirst();
+
     if (!message)
       throw new GuestChatError(
         409,
         "Request ID was already used for a different message",
         "request_conflict",
       );
+
     const updated = await trx
       .updateTable("conversations")
       .set({
@@ -96,6 +104,7 @@ export async function saveGuestMessageData(
         completed: !conversation.ai_enabled,
       })
       .execute();
+
     return {
       conversation: updated,
       message: { ...message, sender_display_name: null, sender_email: null },

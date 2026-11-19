@@ -59,8 +59,10 @@ export const linkFirebaseRouteHandler: AppRouteHandler<
     c.get("firebase"),
     c.req.valid("json").currentPassword,
   );
+
   if (result.kind === "rate-limited")
     return jsonError(c, "Too many attempts. Try again in 15 minutes.", 429);
+
   if (result.kind === "invalid") {
     return jsonError(
       c,
@@ -75,6 +77,8 @@ export const linkFirebaseRouteHandler: AppRouteHandler<
       "This Firebase identity or account is already connected. Accounts were not merged.",
       409,
     );
+
   await startSessionService(c, result.row.id);
+
   return c.json(toProfile(result.row), 200);
 };

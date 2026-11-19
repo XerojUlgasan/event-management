@@ -339,17 +339,25 @@ Back up affected records before deployment. Apply coordinated API/frontend contr
 
 ## Source formatting
 
-Run `pnpm format` to format source and configuration files across the workspace,
-or `pnpm format:check` to check them without writing changes. The root Prettier
-configuration covers JavaScript, TypeScript, React JSX/TSX, CSS, JSON, and YAML;
-`prettier-plugin-astro` adds Astro files. It uses two-space indentation and an
-80-character wrapping target.
+Run `pnpm format` to format source and configuration files with Prettier, then fix
+blank-line spacing with ESLint. Run `pnpm format:check` to check both without
+writing changes. Prettier covers JavaScript, TypeScript, React JSX/TSX, CSS, JSON,
+and YAML; `prettier-plugin-astro` adds Astro files. It uses two-space indentation
+and an 80-character wrapping target.
 
-In VS Code or Cursor, install the recommended Prettier extension to use the
-checked-in format-on-save settings. The Astro extension is also recommended.
+The [ESLint configuration](eslint.config.mjs) adds blank lines after import groups,
+between top-level declarations, around callback declarations and control flow,
+and before returns in JavaScript, TypeScript, TSX, and Astro scripts. Consecutive
+simple scalar declarations stay together. Existing intentional blank lines
+are preserved; logical grouping still needs judgment. Run `pnpm lint` to check
+spacing alone or `pnpm lint:fix` to fix it. `pnpm check` also runs the spacing check.
+
+In VS Code or Cursor, install the recommended Prettier and ESLint extensions to
+format and fix spacing on an explicit save. The Astro extension is also recommended.
 Generated files, lockfiles, migrations, assets, local data, imported agent tooling,
-and historical documentation are excluded through `.prettierignore`. The root
-README remains included so these instructions can be checked with the source.
+and historical documentation are excluded through `.prettierignore` and the matching
+ESLint ignores. The root README remains included so these instructions can be
+checked with the source.
 
 ## Verification
 
@@ -357,7 +365,8 @@ Run the checks matching the changed area:
 
 | Command                                                          | Checks                                                                                                                                                                |
 | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm check`                                                     | Workspace types                                                                                                                                                       |
+| `pnpm check`                                                     | Source spacing, environment boundaries, web structure, and workspace types                                                                                            |
+| `pnpm lint`                                                      | JavaScript, TypeScript, TSX, and Astro script blank-line spacing                                                                                                      |
 | `pnpm format:check`                                              | Source formatting without changing files                                                                                                                              |
 | `pnpm check:design`                                              | Web controls use shared UI exports; authored web/UI colors use theme tokens. Source checks do not establish visual or behavioral correctness.                         |
 | `pnpm build`                                                     | Web production bundle and API types                                                                                                                                   |

@@ -13,6 +13,8 @@ export async function lockCatalogKnowledgeOwnerData(
     .where("id", "=", owner.id)
     .forUpdate()
     .executeTakeFirst();
+
   if (!row) return false;
+
   return true;
 }

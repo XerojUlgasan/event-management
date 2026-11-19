@@ -11,6 +11,7 @@ export const archivePackageRoute = createRoute({
   request: { params: idParams },
   responses: { 200: result, ...errors },
 });
+
 export const archivePackageRouteHandler: AppRouteHandler<
   typeof archivePackageRoute
 > = async (c) => {
@@ -18,7 +19,9 @@ export const archivePackageRouteHandler: AppRouteHandler<
     c.get("db"),
     c.req.valid("param").id,
   );
+
   if ("status" in outcome)
     return jsonError(c, outcome.message, outcome.status);
+
   return c.json(outcome, 200);
 };

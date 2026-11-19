@@ -32,6 +32,7 @@ export function MessagesPage() {
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
+
     return () => {
       mounted.current = false;
     };
@@ -41,6 +42,7 @@ export function MessagesPage() {
   const loadingThreadId = useRef<string | null>(null);
   const localMessages = useRef(new Set<string>());
   const aiStateByConversation = useRef(new Map<string, ConversationAiState>());
+
   const rememberAiState = useCallback(
     (id: string, incoming: ConversationAiState) => {
       const next = mergeAiStateByVersion(
@@ -52,10 +54,12 @@ export function MessagesPage() {
         },
       );
       aiStateByConversation.current.set(id, next);
+
       return next;
     },
     [],
   );
+
   const normalizeConversation = useCallback(
     (conversation: ChatConversation) => ({
       ...conversation,
@@ -63,9 +67,11 @@ export function MessagesPage() {
     }),
     [rememberAiState],
   );
+
   const loadConversations = useCallback(
     async (cursor?: string) => {
       const page = await getAdminConversations(cursor);
+
       return {
         ...page,
         conversations: page.conversations.map(normalizeConversation),
@@ -73,6 +79,7 @@ export function MessagesPage() {
     },
     [normalizeConversation],
   );
+
   const inbox = useConversationList(loadConversations);
   const { conversations, setConversations } = inbox;
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -92,11 +99,15 @@ export function MessagesPage() {
   const loadThread = useCallback(
     async (id: string) => {
       if (loadingThreadId.current === id) return;
+
       loadingThreadId.current = id;
       setLoadingThread(true);
+
       try {
         const response = await getAdminConversation(id);
+
         if (!mounted.current || activeIdRef.current !== id) return;
+
         const result = {
           ...response,
           conversation: normalizeConversation(response.conversation),
@@ -107,10 +118,12 @@ export function MessagesPage() {
         );
         setThread((current) => {
           const merged = mergePolledThread(current, result, unacknowledged);
+
           if (merged.gap)
             setHistoryNotice(
               "New messages arrived while you were away. Earlier history was reset; scroll up to see it.",
             );
+
           return merged.thread;
         });
         setConversations((current) =>
@@ -127,18 +140,21 @@ export function MessagesPage() {
         threadFailure.current = "";
       } catch (cause) {
         if (!mounted.current || activeIdRef.current !== id) return;
+
         const message = notificationErrorMessage(
           cause,
           "Unable to load this conversation.",
         );
         setThreadError(message);
         const key = `${id}:${message}`;
+
         if (threadFailure.current !== key) {
           threadFailure.current = key;
           notifyError(message);
         }
       } finally {
         if (loadingThreadId.current === id) loadingThreadId.current = null;
+
         if (mounted.current && activeIdRef.current === id)
           setLoadingThread(false);
       }
@@ -151,15 +167,20 @@ export function MessagesPage() {
     olderPending.current = false;
     setLoadingOlder(false);
     setOlderError("");
+
     if (!activeId) {
       setThread(null);
+
       return;
     }
+
     setThread((current) =>
       current?.conversation.id === activeId ? current : null,
     );
     void loadThread(activeId);
+
     const timer = window.setInterval(() => void loadThread(activeId), 5000);
+
     return () => {
       olderRequest.current++;
       window.clearInterval(timer);
@@ -168,26 +189,31 @@ export function MessagesPage() {
 
   useEffect(() => {
     if (activeId || conversations.length === 0) return;
+
     if (window.matchMedia("(min-width: 761px)").matches)
       setActiveId(conversations[0].id);
   }, [activeId, conversations]);
 
   const loadOlder = async () => {
     if (!activeId || !thread?.nextCursor || olderPending.current) return;
+
     const id = activeId;
     const cursor = thread.nextCursor;
     const request = ++olderRequest.current;
     olderPending.current = true;
     setLoadingOlder(true);
     setOlderError("");
+
     try {
       const older = await getAdminConversation(id, cursor);
+
       if (
         !mounted.current ||
         request !== olderRequest.current ||
         activeIdRef.current !== id
       )
         return;
+
       assertCursorMoved(older.nextCursor, cursor);
       older.messages.forEach((message) =>
         localMessages.current.delete(message.id),
@@ -210,6 +236,7 @@ export function MessagesPage() {
 
   const send = async (body: string) => {
     if (!activeId) return;
+
     const conversationId = activeId;
     const result = await sendAdminMessage(conversationId, body);
     const aiState = rememberAiState(conversationId, result);
@@ -243,8 +270,10 @@ export function MessagesPage() {
     expectedAiVersion: number,
   ) => {
     if (aiPendingRef.current.has(id)) return;
+
     aiPendingRef.current.add(id);
     setAiPending((current) => ({ ...current, [id]: true }));
+
     try {
       const result = await updateAdminConversationAi(
         id,
@@ -311,6 +340,7 @@ export function MessagesPage() {
       setAiPending((current) => {
         const next = { ...current };
         delete next[id];
+
         return next;
       });
     }
@@ -349,6 +379,7 @@ export function MessagesPage() {
         error={inbox.error || threadError}
         onRetry={() => {
           void inbox.refresh();
+
           if (activeId) void loadThread(activeId);
         }}
         sendDisabled={thread?.conversation.id !== activeId || !!threadError}

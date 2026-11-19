@@ -42,6 +42,7 @@ test("Edge OpenAPI loads every router including auth", async () => {
 
 test("Edge loads nested and top-level quotation/private package routes with authentication", async () => {
   const id = randomUUID();
+
   for (const path of [
     `/admin/booking-requests/${id}/quotations`,
     `/booking-requests/${id}/quotations`,

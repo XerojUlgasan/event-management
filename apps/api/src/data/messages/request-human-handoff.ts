@@ -49,9 +49,12 @@ export function requestHumanHandoffData({
           conversation.claimed_guest_identity_id === scope.guestIdentityId
         : scope.customerId !== null &&
           conversation.customer_id === scope.customerId);
+
     if (!owned || conversation.status !== "active")
       throw new Error("Assistant turn is no longer active");
+
     if (conversation.guest_identity_id) assertGuestActive(conversation);
+
     const execution = await trx
       .selectFrom("ai_tool_calls")
       .select("id")
@@ -63,7 +66,9 @@ export function requestHumanHandoffData({
       .where("assistant_message_id", "is", null)
       .forUpdate()
       .executeTakeFirst();
+
     if (!execution) throw new Error("Handoff execution is unavailable");
+
     const trigger = await trx
       .selectFrom("messages")
       .select(["id", "sender_id"])
@@ -71,6 +76,7 @@ export function requestHumanHandoffData({
       .where("conversation_id", "=", scope.conversationId)
       .where("sender_role", "=", "customer")
       .executeTakeFirst();
+
     if (
       !trigger ||
       (scope.guestIdentityId
@@ -78,6 +84,7 @@ export function requestHumanHandoffData({
         : trigger.sender_id !== scope.customerId)
     )
       throw new Error("Customer message not found");
+
     // A retried invocation of the same customer action reuses its committed reply.
     // The row lock serializes concurrent calls, including different turn IDs.
     const previous = await trx
@@ -88,11 +95,13 @@ export function requestHumanHandoffData({
       .where("call.tool_name", "=", "requestHumanHandoff")
       .where("call.status", "=", "succeeded")
       .executeTakeFirst();
+
     if (
       !previous &&
       (!conversation.ai_enabled || conversation.ai_version !== scope.aiVersion)
     )
       throw new Error("Assistant turn is no longer active");
+
     abortSignal?.throwIfAborted();
     const message =
       previous ??
@@ -107,6 +116,7 @@ export function requestHumanHandoffData({
         })
         .returningAll()
         .executeTakeFirstOrThrow());
+
     if (!previous)
       await trx
         .updateTable("conversations")
@@ -121,6 +131,7 @@ export function requestHumanHandoffData({
         })
         .where("id", "=", scope.conversationId)
         .execute();
+
     await finishToolCallData(trx, {
       id: callId,
       status: "succeeded",
@@ -131,6 +142,7 @@ export function requestHumanHandoffData({
       customerMessageId: scope.customerMessageId,
       assistantMessageId: message.id,
     });
+
     return { ...message, sender_display_name: null, sender_email: null };
   });
 }

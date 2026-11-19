@@ -4,7 +4,9 @@ type EnvSource = Record<string, string | undefined>;
 export function createEnv(source: EnvSource) {
   function required(name: "DB_NAME" | "DB_USER" | "DB_PASSWORD") {
     const value = source[name];
+
     if (!value) throw new Error(`${name} is required`);
+
     return value;
   }
 
@@ -16,18 +18,25 @@ export function createEnv(source: EnvSource) {
     const direct =
       configured("SUPABASE_SERVICE_ROLE_KEY") ??
       configured("SUPABASE_SECRET_KEY");
+
     if (direct) return direct;
+
     const raw = configured("SUPABASE_SECRET_KEYS");
+
     if (!raw) return undefined;
+
     try {
       const parsed: unknown = JSON.parse(raw);
+
       // Object.values also accepts arrays and primitive JSON values, as before.
       if (parsed === null || parsed === undefined) return undefined;
+
       const entries = Object.values(parsed);
       const candidate =
         (typeof parsed === "object" && "default" in parsed
           ? parsed.default
           : undefined) ?? entries[0];
+
       return typeof candidate === "string" && candidate.trim()
         ? candidate.trim()
         : undefined;
@@ -63,6 +72,7 @@ export function createEnv(source: EnvSource) {
     },
     get SESSION_TTL_MS() {
       const days = Number(source.SESSION_TTL_DAYS ?? 7);
+
       return (
         (Number.isFinite(days) && days > 0 ? days : 7) * 24 * 60 * 60 * 1000
       );
@@ -96,20 +106,26 @@ export function createEnv(source: EnvSource) {
       const apiKey = storageKey();
       const bucket =
         configured("SUPABASE_STORAGE_BUCKET") ?? "event-management";
+
       if (!url || !apiKey) throw new Error("Media storage is not configured");
+
       return { url, apiKey, bucket };
     },
     get AI_TEXT() {
       const apiKey = configured("AI_GATEWAY_API_KEY");
       const model = configured("TEXT_MODEL");
+
       if (!apiKey || !model) throw new Error("AI text model is not configured");
+
       return { apiKey, model };
     },
     get AI_EMBEDDING() {
       const apiKey = configured("AI_GATEWAY_API_KEY");
       const model = configured("EMBEDDING_MODEL");
+
       if (!apiKey || !model)
         throw new Error("AI embedding model is not configured");
+
       return { apiKey, model };
     },
     get SEED_CLOCK() {

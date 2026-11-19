@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { Pool } from "pg";
 
 const migration = "20261116103220_add_catalog_knowledge";
+
 const vector = `[${[1, ...Array<number>(767).fill(0)].join(",")}]`;
 
 for (const extensionSchema of ["public", "extensions"]) {
@@ -21,11 +22,13 @@ for (const extensionSchema of ["public", "extensions"]) {
     const database = `em_catalog_knowledge_${randomUUID().replaceAll("-", "")}`;
     const admin = new Pool({ ...connection, database: process.env.DB_NAME });
     let pool: Pool | undefined;
+
     try {
       await admin.query(`CREATE DATABASE "${database}"`);
       const db = new Pool({ ...connection, database });
       pool = db;
       const root = new URL("../prisma/migrations/", import.meta.url);
+
       for (const entry of (await readdir(root, { withFileTypes: true }))
         .filter((entry) => entry.isDirectory() && entry.name < migration)
         .sort((a, b) => a.name.localeCompare(b.name)))
@@ -39,6 +42,7 @@ for (const extensionSchema of ["public", "extensions"]) {
         await db.query("CREATE SCHEMA extensions");
         await db.query("CREATE EXTENSION vector WITH SCHEMA extensions");
       }
+
       const packageId = (
         await db.query<{ id: string }>(
           "INSERT INTO packages(name,slug,max_guests,price) VALUES('Fixture package','fixture-package',50,1000) RETURNING id",
@@ -54,14 +58,18 @@ for (const extensionSchema of ["public", "extensions"]) {
           "INSERT INTO media_assets(kind,source,url) VALUES('image','sample','/images/wedding.jpg') RETURNING id",
         )
       ).rows[0].id;
+
       const sourceSnapshot = async () => {
         const sources = [];
+
         for (const table of ["packages", "services", "media_assets"])
           sources.push(
             (await db.query(`SELECT * FROM ${table} ORDER BY id`)).rows,
           );
+
         return sources;
       };
+
       const before = await sourceSnapshot();
       const clientRoles = (
         await db.query<{ rolname: string }>(
@@ -72,10 +80,12 @@ for (const extensionSchema of ["public", "extensions"]) {
       await db.query(
         "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO PUBLIC",
       );
+
       for (const { rolname } of clientRoles)
         await db.query(
           `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${rolname}"`,
         );
+
       await db.query(
         await readFile(new URL(`${migration}/migration.sql`, root), "utf8"),
       );
@@ -112,6 +122,7 @@ for (const extensionSchema of ["public", "extensions"]) {
           "INSERT INTO catalog_knowledge(package_id,service_id,chunk_key,content_markdown,media_id,content_hash) VALUES($1,$2,$3,'Fixture content',$4,$5) RETURNING *",
           [packageOwner, serviceOwner, key, media, hash],
         );
+
       await assert.rejects(insert(null, null), { code: "23514" });
       await assert.rejects(insert(packageId, serviceId), { code: "23514" });
       await assert.rejects(insert(randomUUID(), null), { code: "23503" });
@@ -156,6 +167,7 @@ for (const extensionSchema of ["public", "extensions"]) {
           ),
           { code: "23514" },
         );
+
       for (const dimensions of [767, 1536])
         await assert.rejects(
           db.query(
@@ -164,6 +176,7 @@ for (const extensionSchema of ["public", "extensions"]) {
           ),
           { code: "22000" },
         );
+
       await db.query(
         "UPDATE catalog_knowledge SET embedding=$1,embedding_model='fixture/embedding',embedded_at=now() WHERE id=$2",
         [vector, packageRow.id],
@@ -227,6 +240,7 @@ for (const extensionSchema of ["public", "extensions"]) {
         0,
       );
       const databasePool = db;
+
       for (const role of ["anon", "authenticated"])
         await t.test(
           `${role} cannot access knowledge`,
@@ -246,6 +260,7 @@ for (const extensionSchema of ["public", "extensions"]) {
               false,
             );
             const client = await databasePool.connect();
+
             try {
               await client.query("BEGIN");
               await client.query(`SET LOCAL ROLE "${role}"`);

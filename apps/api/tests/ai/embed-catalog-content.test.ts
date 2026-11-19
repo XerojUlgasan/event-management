@@ -6,13 +6,16 @@ const originalFetch = globalThis.fetch;
 const originalKey = process.env.AI_GATEWAY_API_KEY;
 const originalModel = process.env.EMBEDDING_MODEL;
 const model = "google/gemini-embedding-2";
+
 process.env.AI_GATEWAY_API_KEY = "fixture-key";
 process.env.EMBEDDING_MODEL = model;
 
 after(() => {
   globalThis.fetch = originalFetch;
+
   if (originalKey === undefined) delete process.env.AI_GATEWAY_API_KEY;
   else process.env.AI_GATEWAY_API_KEY = originalKey;
+
   if (originalModel === undefined) delete process.env.EMBEDDING_MODEL;
   else process.env.EMBEDDING_MODEL = originalModel;
 });
@@ -37,6 +40,7 @@ test("sends a photo and its context in one 768-dimensional request", async () =>
       },
     });
     assert.ok(init?.signal);
+
     return gatewayResponse([3, 4, ...Array(766).fill(0)]);
   };
   const result = await embedCatalogContent({
@@ -56,6 +60,7 @@ test("text uses the same document format without image content", async () => {
     assert.deepEqual(body.values, ["title: none | text: A package"]);
     assert.equal(body.dimensions, 768);
     assert.equal(body.providerOptions, undefined);
+
     return gatewayResponse([1, ...Array(767).fill(0)]);
   };
   assert.equal(
@@ -68,6 +73,7 @@ test("rejects invalid vectors, unsupported models and image formats", async () =
   let calls = 0;
   globalThis.fetch = async () => {
     calls++;
+
     return gatewayResponse(Array(768).fill(0));
   };
   await assert.rejects(
@@ -99,6 +105,7 @@ test("forwards cancellation and does not retry a failed call", async () => {
   let calls = 0;
   globalThis.fetch = async (_input, init) => {
     calls++;
+
     return await new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener(
         "abort",
@@ -121,6 +128,7 @@ test("does not retry a provider failure", async () => {
   let calls = 0;
   globalThis.fetch = async () => {
     calls++;
+
     return new Response(
       JSON.stringify({ error: { message: "fixture failure" } }),
       {

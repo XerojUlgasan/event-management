@@ -3,6 +3,7 @@ import { calendarDateInTimeZone } from "@event-management/contracts/calendar-dat
 export function todayInZone(zone: string) {
   return calendarDateInTimeZone(new Date(), zone);
 }
+
 export function dateError(
   date: string,
   index: number,
@@ -17,7 +18,9 @@ export function dateError(
     date < todayInZone(zone)
   )
     return "Choose a valid date today or in the future.";
+
   if (dates.indexOf(date) !== index)
     return "Choose a different date for each day.";
+
   return "";
 }

@@ -10,6 +10,7 @@ import {
   errors,
   response,
 } from "./schemas.js";
+
 export const listRoute = createRoute({
   method: "get",
   path: "/admin/ai/knowledge",
@@ -34,6 +35,7 @@ export const listRoute = createRoute({
     ...errors,
   },
 });
+
 export const listRouteHandler: AppRouteHandler<typeof listRoute> = async (c) =>
   c.json(
     await listCatalogKnowledgeService(c.get("db"), c.req.valid("query")),

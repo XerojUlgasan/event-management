@@ -22,6 +22,7 @@ export async function sendGuestMessageService(
     ? messageDto(saved.assistantMessage)
     : null;
   let assistantError = saved.assistantError;
+
   if (!saved.replay && saved.conversation.ai_enabled) {
     try {
       assistantMessage = await runAssistantTurnService({
@@ -35,6 +36,7 @@ export async function sendGuestMessageService(
       });
     } catch {
       const current = await findConversationData(db, id);
+
       if (
         current?.ai_enabled &&
         current.ai_version === saved.conversation.ai_version
@@ -48,6 +50,7 @@ export async function sendGuestMessageService(
         });
       }
     }
+
     await completeGuestMessageData(
       db,
       id,
@@ -56,7 +59,9 @@ export async function sendGuestMessageService(
       assistantError,
     );
   }
+
   const current = await findConversationData(db, id);
+
   // A concurrent authenticated claim can finish while the provider runs. The
   // response contains only this already-authorized guest turn, never new account data.
   return {

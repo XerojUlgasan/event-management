@@ -13,8 +13,10 @@ import {
 import { readCatalogSectionsService } from "../../src/services/catalog-canvas/read-catalog-sections.js";
 
 const database = `em_proposal_${randomUUID().replaceAll("-", "")}`;
+
 let admin: Pool;
 let db: Kysely<DB>;
+
 before(async () => {
   const host = process.env.DB_HOST ?? "localhost";
   assert.ok(["localhost", "127.0.0.1", "::1"].includes(host));
@@ -29,6 +31,7 @@ before(async () => {
   const pool = new Pool({ ...connection, database });
   db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
   const root = new URL("../../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((e) => e.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name)))
@@ -38,6 +41,7 @@ before(async () => {
 });
 after(async () => {
   await db?.destroy();
+
   if (admin) {
     await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
     await admin.end();
@@ -57,6 +61,7 @@ async function user() {
       .executeTakeFirstOrThrow()
   ).id;
 }
+
 async function booking(customerId: string, packageId: string | null) {
   return (
     await db
@@ -76,6 +81,7 @@ async function booking(customerId: string, packageId: string | null) {
       .executeTakeFirstOrThrow()
   ).id;
 }
+
 async function conversation(
   customerId: string,
   bookingRequestId: string | null = null,
@@ -88,6 +94,7 @@ async function conversation(
       .executeTakeFirstOrThrow()
   ).id;
 }
+
 const widget = (type: "markdown" | "photo" | "service", extra: object) => ({
   id: randomUUID(),
   type,
@@ -125,7 +132,9 @@ test("proposal is scoped to the authenticated conversation and reads current pri
     conversationId,
   });
   assert.equal(original.status, "found");
+
   if (original.status !== "found") throw new Error("Expected catalog proposal");
+
   assert.equal(original.proposal.packageType, "catalog");
   assert.equal(original.proposal.name, "Original catalog");
   const otherConversation = await conversation(customerId);
@@ -182,7 +191,9 @@ test("proposal is scoped to the authenticated conversation and reads current pri
     .executeTakeFirstOrThrow();
   const result = await getMyProposalService({ db, customerId, conversationId });
   assert.equal(result.status, "found");
+
   if (result.status !== "found") throw new Error("Expected proposal");
+
   assert.equal(result.proposal.packageType, "custom");
   assert.equal(result.proposal.name, "Private proposal");
   assert.equal(result.proposal.description, "Prepared details");
@@ -239,8 +250,10 @@ test("proposal is scoped to the authenticated conversation and reads current pri
     conversationId,
   });
   assert.equal(refreshed.status, "found");
+
   if (refreshed.status !== "found")
     throw new Error("Expected updated proposal");
+
   assert.equal(refreshed.proposal.name, "Saved edit");
   assert.equal(
     refreshed.proposal.sections[0].widgets[0].markdown,
@@ -257,6 +270,7 @@ test("unprepared inquiries and strict empty input are explicit", async () => {
     { status: "proposal_not_prepared", proposal: null },
   );
   assert.equal(getMyProposalInputSchema.safeParse({}).success, true);
+
   for (const input of [
     { conversationId },
     { customerId },
@@ -264,6 +278,7 @@ test("unprepared inquiries and strict empty input are explicit", async () => {
     { packageId: randomUUID() },
   ])
     assert.equal(getMyProposalInputSchema.safeParse(input).success, false);
+
   const controller = new AbortController();
   controller.abort();
   await assert.rejects(

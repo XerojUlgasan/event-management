@@ -26,31 +26,44 @@ export async function reviseQuotationService(
 ) {
   return db.transaction().execute(async (trx) => {
     const found = await locked(trx, id);
+
     if (!found) return failure("Quotation not found", 404);
+
     const { row, booking } = found;
+
     if (row.revision !== expected)
       return failure("Quotation changed. Refresh and try again", 409);
+
     if (closed(booking) || !["draft", "sent", "accepted"].includes(row.status))
       return failure("Only an active quotation can be revised", 409);
+
     const rows = await quotationWriteStateData(trx, booking.id, id);
+
     if (rows.has_other_draft)
       return failure("A quotation draft already exists", 409);
+
     const pkg = await proposalPackage(trx, booking);
+
     if (!pkg)
       return failure(
         "Choose or create a package before preparing a quotation",
         409,
       );
+
     const base = basePrice(pkg.price);
+
     if (base === null)
       return failure("Package price is outside the supported range", 400);
+
     const items = z.array(itemSchema).parse(row.items);
     const total = amount(base, items);
+
     if (total === null)
       return failure(
         "Revised quotation total is outside the supported range",
         409,
       );
+
     await updateQuotationData(trx, id, {
       status: "superseded",
       superseded_at: new Date(),
@@ -73,6 +86,7 @@ export async function reviseQuotationService(
       previousQuotationId: id,
       reason,
     });
+
     return dto((await findQuoteData(trx, draft.id))!);
   });
 }

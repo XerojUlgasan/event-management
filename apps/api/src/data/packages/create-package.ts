@@ -2,6 +2,7 @@ import { centavosToPesos } from "@event-management/contracts/money";
 import type { Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 import type { Content } from "../../controllers/packages/schemas.js";
+
 export const packageColumns = (content: Content, slug: string) => ({
   name: content.name.trim(),
   slug,
@@ -14,6 +15,7 @@ export const packageColumns = (content: Content, slug: string) => ({
     ? { thumbnail_media_id: content.thumbnailMediaId ?? null }
     : {}),
 });
+
 export function createPackageData(
   db: Transaction<DB>,
   content: Content,

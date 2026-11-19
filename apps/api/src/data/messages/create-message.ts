@@ -26,17 +26,20 @@ export async function createMessageData(
       .where("id", "=", conversationId)
       .forUpdate()
       .executeTakeFirst();
+
     if (
       !conversation ||
       (senderRole === "customer" && conversation.customer_id !== senderId)
     )
       throw new Error("Conversation not found");
+
     if (requestId) {
       const previous = await trx
         .selectFrom("messages")
         .selectAll()
         .where("id", "=", requestId)
         .executeTakeFirst();
+
       if (previous) {
         if (
           previous.conversation_id !== conversation.id ||
@@ -45,11 +48,13 @@ export async function createMessageData(
           previous.body !== body
         )
           throw new Error("Message request conflict");
+
         const sender = await trx
           .selectFrom("users")
           .select(["display_name", "email"])
           .where("id", "=", senderId)
           .executeTakeFirstOrThrow();
+
         return {
           aiEnabled: conversation.ai_enabled,
           aiVersion: conversation.ai_version,
@@ -63,12 +68,15 @@ export async function createMessageData(
         };
       }
     }
+
     if (
       conversation.status === "closed" &&
       (senderRole === "admin" || conversation.booking_request_id)
     )
       throw new Error("Conversation is closed");
+
     if (conversation.guest_identity_id) assertGuestActive(conversation);
+
     const previousHandoff = parseAiHandoff(conversation.ai_handoff);
     const aiHandoff =
       senderRole === "admin"
@@ -81,6 +89,7 @@ export async function createMessageData(
       (conversation.ai_enabled || previousHandoff?.pending)
         ? 1
         : 0);
+
     const row = await trx
       .insertInto("messages")
       .values({
@@ -95,9 +104,11 @@ export async function createMessageData(
       .onConflict((conflict) => conflict.column("id").doNothing())
       .returningAll()
       .executeTakeFirst();
+
     // Another conversation can insert the same globally unique ID while its
     // row lock is held. Do not expose that message to this customer.
     if (!row) throw new Error("Message request conflict");
+
     await trx
       .updateTable("conversations")
       .set({
@@ -118,6 +129,7 @@ export async function createMessageData(
       .select(["display_name", "email"])
       .where("id", "=", senderId)
       .executeTakeFirstOrThrow();
+
     return {
       aiEnabled,
       aiVersion,

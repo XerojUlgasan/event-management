@@ -13,5 +13,6 @@ export function enqueueBackgroundJobService<T extends BackgroundJobType>(
   payload: BackgroundJobPayload<T>,
 ) {
   const parsed = jobDefinitions[type].parse(payload);
+
   return enqueueJobData(trx, type, parsed.payload, parsed.key);
 }

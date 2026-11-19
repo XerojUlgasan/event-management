@@ -12,11 +12,14 @@ export type CatalogListOptions = CatalogFilters & {
   search?: string;
   archived?: "all" | "active" | "archived";
 };
+
 const positionSchema = z.object({
   sort: z.string().min(1).max(256),
   id: z.string().uuid(),
 });
+
 export type CatalogPosition = z.infer<typeof positionSchema>;
+
 export function catalogCursor(
   cursor: string | undefined,
   scope: string,

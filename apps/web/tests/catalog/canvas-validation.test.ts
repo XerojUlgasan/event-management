@@ -4,6 +4,7 @@ import type { CatalogSection } from "@event-management/contracts/catalog";
 import { validateCatalogCanvas } from "../../src/lib/utils/catalog/canvas-validation.ts";
 
 const widgetId = "ad075be9-5b36-48e1-a419-97f2f516358c";
+
 const sections: CatalogSection[] = [
   {
     id: "180eb8f2-2274-4b88-949f-2ade2fe76f31",

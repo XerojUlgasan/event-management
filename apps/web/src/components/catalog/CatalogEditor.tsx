@@ -47,12 +47,15 @@ import "react-grid-layout/css/styles.css";
 import "../../styles/catalog/package-editor.css";
 
 const uuid = () => crypto.randomUUID();
+
 export const newCatalogSection = (): CatalogSection => ({
   id: uuid(),
   title: "",
   widgets: [],
 });
+
 const newSection = newCatalogSection;
+
 const widget = (type: CatalogWidget["type"], y: number): CatalogWidget => ({
   id: uuid(),
   type,
@@ -67,16 +70,21 @@ const widget = (type: CatalogWidget["type"], y: number): CatalogWidget => ({
   caption: "",
   autoplay: false,
 });
+
 const sectionRows = (widgets: readonly { y: number; h: number }[]) =>
   Math.max(0, ...widgets.map((w) => w.y + w.h));
+
 type ActiveLayout = {
   sectionId: string;
   items: readonly { i: string; x: number; y: number; w: number; h: number }[];
 };
+
 const HISTORY_LIMIT = 50;
 const TEXT_BURST_MS = 700;
+
 const isTextField = (target: EventTarget | null) => {
   if (target instanceof HTMLTextAreaElement) return true;
+
   if (target instanceof HTMLInputElement)
     return ![
       "checkbox",
@@ -88,8 +96,10 @@ const isTextField = (target: EventTarget | null) => {
       "submit",
       "reset",
     ].includes(target.type);
+
   return target instanceof HTMLElement && target.isContentEditable;
 };
+
 function MediaWidget({
   widget,
   onSelectFile,
@@ -98,6 +108,7 @@ function MediaWidget({
   onSelectFile: (file?: File) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
+
   return (
     <div className="pe-media-preview">
       <WidgetContent
@@ -132,6 +143,7 @@ function MediaWidget({
     </div>
   );
 }
+
 function MarkdownSettings({
   widget,
   onChange,
@@ -146,11 +158,13 @@ function MarkdownSettings({
     const trigger = document.activeElement as HTMLElement | null;
     const node = dialog.current;
     node?.showModal();
+
     return () => {
       node?.close();
       trigger?.focus();
     };
   }, []);
+
   return createPortal(
     <NativeDialog
       ref={dialog}
@@ -192,7 +206,9 @@ function MarkdownSettings({
     document.body,
   );
 }
+
 type CanvasContent = { name: string; sections: CatalogSection[] };
+
 export function CatalogEditor<T extends CanvasContent>({
   initial,
   entity,
@@ -225,9 +241,11 @@ export function CatalogEditor<T extends CanvasContent>({
   const title = privateProposal
     ? "Private package"
     : entity[0].toUpperCase() + entity.slice(1);
+
   const [content, setContentState] = useState<T>(() =>
     structuredClone(initial),
   );
+
   const contentRef = useRef(content);
   const historyRef = useRef<{ past: T[]; future: T[] }>({
     past: [],
@@ -237,7 +255,9 @@ export function CatalogEditor<T extends CanvasContent>({
     at: 0,
     kind: "action",
   });
+
   const shortcuts = useRef({ undo: () => {}, redo: () => {}, busy: false });
+
   const [canUndo, setCanUndo] = useState(false),
     [canRedo, setCanRedo] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -263,6 +283,7 @@ export function CatalogEditor<T extends CanvasContent>({
     sectionId: string;
     widgetId: string;
   } | null>(null);
+
   // Content-only history. Publishing a snapshot is cheap because each change
   // replaces the section or widget objects it touches and reuses the rest.
   const applyContent = (next: T) => {
@@ -271,15 +292,19 @@ export function CatalogEditor<T extends CanvasContent>({
     setCanUndo(historyRef.current.past.length > 0);
     setCanRedo(historyRef.current.future.length > 0);
   };
+
   const setContent = (update: T | ((current: T) => T)) => {
     const previous = contentRef.current;
     const next =
       typeof update === "function"
         ? (update as (current: T) => T)(previous)
         : update;
+
     if (next === previous) return;
+
     const typing = isTextField(document.activeElement);
     const now = Date.now();
+
     // One burst of typing in a field becomes a single undo step.
     if (!(
       typing &&
@@ -291,12 +316,16 @@ export function CatalogEditor<T extends CanvasContent>({
       );
       historyRef.current.future = [];
     }
+
     lastEdit.current = { at: now, kind: typing ? "text" : "action" };
     applyContent(next);
   };
+
   const undo = () => {
     const past = historyRef.current.past;
+
     if (busy || !past.length) return;
+
     historyRef.current.past = past.slice(0, -1);
     historyRef.current.future = [
       contentRef.current,
@@ -305,9 +334,12 @@ export function CatalogEditor<T extends CanvasContent>({
     lastEdit.current = { at: 0, kind: "action" };
     applyContent(past[past.length - 1]);
   };
+
   const redo = () => {
     const [next, ...future] = historyRef.current.future;
+
     if (busy || !next) return;
+
     historyRef.current.future = future;
     historyRef.current.past = [
       ...historyRef.current.past,
@@ -316,6 +348,7 @@ export function CatalogEditor<T extends CanvasContent>({
     lastEdit.current = { at: 0, kind: "action" };
     applyContent(next);
   };
+
   useEffect(() => {
     shortcuts.current = { undo, redo, busy };
   });
@@ -327,25 +360,35 @@ export function CatalogEditor<T extends CanvasContent>({
         event.isComposing
       )
         return;
+
       const key = event.key.toLowerCase();
       const undoStep = key === "z" && !event.shiftKey;
       const redoStep = key === "y" || (key === "z" && event.shiftKey);
+
       if (!undoStep && !redoStep) return;
+
       const target = event.target instanceof HTMLElement ? event.target : null;
+
       // Text fields keep their native text undo; other dialogs keep their own shortcuts.
       if (
         isTextField(target) ||
         target?.closest("dialog") !== dialogRef.current
       )
         return;
+
       event.preventDefault();
+
       if (shortcuts.current.busy) return;
+
       if (redoStep) shortcuts.current.redo();
       else shortcuts.current.undo();
     };
+
     window.addEventListener("keydown", onShortcut);
+
     return () => window.removeEventListener("keydown", onShortcut);
   }, []);
+
   const displayContent = {
     ...content,
     sections: content.sections.map((s) => ({
@@ -357,33 +400,42 @@ export function CatalogEditor<T extends CanvasContent>({
       ),
     })),
   };
+
   const editingMedia =
     mediaEditing &&
     displayContent.sections
       .find((s) => s.id === mediaEditing.sectionId)
       ?.widgets.find((w) => w.id === mediaEditing.widgetId);
+
   const editingReference =
     referenceEditing &&
     displayContent.sections
       .find((s) => s.id === referenceEditing.sectionId)
       ?.widgets.find((w) => w.id === referenceEditing.widgetId);
+
   const editingMarkdown =
     markdownEditing &&
     displayContent.sections
       .find((s) => s.id === markdownEditing.sectionId)
       ?.widgets.find((w) => w.id === markdownEditing.widgetId);
+
   const pending = useRef<string[]>([]),
     objectUrls = useRef<string[]>([]);
   const [width, setWidth] = useState(800),
     gridContainer = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const node = gridContainer.current;
+
     if (!node) return;
+
     setWidth(node.clientWidth);
+
     const observer = new ResizeObserver((entries) =>
       setWidth(entries[0].contentRect.width),
     );
+
     observer.observe(node);
+
     return () => observer.disconnect();
   }, [preview]);
   useEffect(
@@ -392,11 +444,13 @@ export function CatalogEditor<T extends CanvasContent>({
     },
     [],
   );
+
   const setSection = (id: string, fn: (s: CatalogSection) => CatalogSection) =>
     setContent((c) => ({
       ...c,
       sections: c.sections.map((s) => (s.id === id ? fn(s) : s)),
     }));
+
   const changeWidget = (
     sid: string,
     id: string,
@@ -406,18 +460,21 @@ export function CatalogEditor<T extends CanvasContent>({
       ...s,
       widgets: s.widgets.map((w) => (w.id === id ? { ...w, ...patch } : w)),
     }));
+
   const keyboardLayout = (
     section: CatalogSection,
     current: CatalogWidget,
     event: React.KeyboardEvent,
   ) => {
     if (event.target !== event.currentTarget) return;
+
     if (
       busy ||
       width < 520 ||
       !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
     )
       return;
+
     event.preventDefault();
     const dx =
       event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
@@ -425,6 +482,7 @@ export function CatalogEditor<T extends CanvasContent>({
     const next = event.shiftKey
       ? { ...current, w: current.w + dx, h: current.h + dy }
       : { ...current, x: current.x + dx, y: current.y + dy };
+
     if (
       next.x < 0 ||
       next.y < 0 ||
@@ -435,6 +493,7 @@ export function CatalogEditor<T extends CanvasContent>({
       next.x + next.w > CATALOG_COLUMNS
     )
       return;
+
     if (
       section.widgets.some(
         (other) =>
@@ -446,6 +505,7 @@ export function CatalogEditor<T extends CanvasContent>({
       )
     )
       return;
+
     changeWidget(section.id, current.id, {
       x: next.x,
       y: next.y,
@@ -453,11 +513,13 @@ export function CatalogEditor<T extends CanvasContent>({
       h: next.h,
     });
   };
+
   const commitLayout = (
     section: CatalogSection,
     items: ActiveLayout["items"],
   ) => {
     setActiveLayout(null);
+
     if (
       items.some(
         (item) =>
@@ -472,8 +534,10 @@ export function CatalogEditor<T extends CanvasContent>({
         `A widget can start at row ${MAX_CATALOG_WIDGET_Y + 1} at most and span up to ${MAX_CATALOG_WIDGET_ROWS} rows.`,
         "danger",
       );
+
       return;
     }
+
     setSection(section.id, (s) => ({
       ...s,
       widgets: s.widgets.map((w) => ({
@@ -484,40 +548,53 @@ export function CatalogEditor<T extends CanvasContent>({
       })),
     }));
   };
+
   const reorderMobile = (
     section: CatalogSection,
     id: string,
     direction: number,
   ) => {
     const sorted = [...section.widgets].sort((a, b) => a.y - b.y || a.x - b.x);
+
     const index = sorted.findIndex((w) => w.id === id),
       target = index + direction;
+
     if (index < 0 || target < 0 || target >= sorted.length) return;
+
     [sorted[index], sorted[target]] = [sorted[target], sorted[index]];
     let y = 0;
+
     const widgets = sorted.map((w) => {
       const next = { ...w, x: 0, y };
       y += w.h;
+
       return next;
     });
+
     setSection(section.id, (s) => ({ ...s, widgets }));
   };
+
   const selectFile = (
     sid: string,
     w: CatalogWidget,
     file?: File,
   ): string | undefined => {
     if (!file) return;
+
     if (w.type === "photo") {
       const photoError = validateImageFile(file);
+
       if (photoError) return photoError;
     } else {
       const max = MAX_VIDEO_SIZE_BYTES;
       const types = ["video/mp4", "video/webm"];
+
       if (!types.includes(file.type)) return "Choose an MP4 or WebM video.";
+
       if (!file.size || file.size > max)
         return `File must be ${Math.floor(max / 1024 / 1024)} MiB or smaller.`;
     }
+
     const url = URL.createObjectURL(file);
     objectUrls.current.push(url);
     setLocalUrls((f) => ({ ...f, [w.id]: url }));
@@ -530,16 +607,20 @@ export function CatalogEditor<T extends CanvasContent>({
       },
     });
   };
+
   const cancel = () => {
     if (busy || !window.confirm("Discard unsaved changes?")) return;
+
     void Promise.allSettled(pending.current.map(deleteCatalogMedia));
     onClose();
   };
+
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
     const unlockScroll = lockCatalogScroll();
     dialogRef.current?.showModal();
     document.querySelector<HTMLInputElement>(".pe-name input")?.focus();
+
     return () => {
       dialogRef.current?.close();
       unlockScroll();
@@ -548,19 +629,25 @@ export function CatalogEditor<T extends CanvasContent>({
   }, []);
   useEffect(() => {
     const dialog = dialogRef.current;
+
     const trap = (event: KeyboardEvent) => {
       if (event.key !== "Tab" || !dialog) return;
+
       const controls = [
         ...dialog.querySelectorAll<HTMLElement>(
           'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
         ),
       ].filter((el) => el.getClientRects().length > 0);
+
       if (!controls.length) {
         event.preventDefault();
+
         return;
       }
+
       const first = controls[0],
         last = controls[controls.length - 1];
+
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
@@ -569,34 +656,45 @@ export function CatalogEditor<T extends CanvasContent>({
         first.focus();
       }
     };
+
     dialog?.addEventListener("keydown", trap);
+
     return () => dialog?.removeEventListener("keydown", trap);
   }, []);
+
   const save = async () => {
     const validationError = validate?.(content);
+
     if (validationError) {
       setError(notifyError(validationError));
       setSettings(true);
+
       return;
     }
+
     const canvasError = validateCatalogCanvas(
       content.sections,
       new Set(Object.keys(files)),
     );
+
     if (canvasError) {
       setError(notifyError(canvasError));
       setSettings(false);
       setPreview(false);
+
       return;
     }
+
     setBusy(true);
     setError("");
+
     try {
       const next = await uploadPendingCatalogMedia(
         content,
         files,
         (widgetId, uploaded) => {
           if (uploaded.id) pending.current.push(uploaded.id);
+
           setContent((c) => ({
             ...c,
             sections: c.sections.map((s) => ({
@@ -609,12 +707,16 @@ export function CatalogEditor<T extends CanvasContent>({
           setFiles((f) => {
             const copy = { ...f };
             delete copy[widgetId];
+
             return copy;
           });
         },
       );
+
       const uploadedCanvasError = validateCatalogCanvas(next.sections);
+
       if (uploadedCanvasError) throw new Error(uploadedCanvasError);
+
       await onSave(next);
       void Promise.allSettled(
         unreferencedUploadIds(next.sections, pending.current).map(
@@ -630,6 +732,7 @@ export function CatalogEditor<T extends CanvasContent>({
       setBusy(false);
     }
   };
+
   return createPortal(
     <NativeDialog
       ref={dialogRef}
@@ -637,6 +740,7 @@ export function CatalogEditor<T extends CanvasContent>({
       aria-label={`${title} editor`}
       onCancel={(event) => {
         event.preventDefault();
+
         if (settings) setSettings(false);
         else cancel();
       }}
@@ -785,6 +889,7 @@ export function CatalogEditor<T extends CanvasContent>({
                       content.sections[
                         Math.min(targetSection, content.sections.length - 1)
                       ]?.id;
+
                     if (sid)
                       setSection(sid, (s) => ({
                         ...s,
@@ -859,13 +964,17 @@ export function CatalogEditor<T extends CanvasContent>({
                   activeLayout?.sectionId === section.id
                     ? activeLayout.items
                     : null;
+
                 const rows = stacked
                   ? section.widgets.reduce((total, item) => total + item.h, 0)
                   : sectionRows(live ?? section.widgets);
+
                 const position = (w: CatalogWidget) => {
                   const p = live?.find((item) => item.i === w.id) ?? w;
+
                   return `Column ${p.x + 1}, Row ${p.y + 1} · ${p.w} × ${p.h}`;
                 };
+
                 return (
                   <section key={section.id} className="pe-editor-section">
                     <div className="pe-section-bar">
@@ -892,6 +1001,7 @@ export function CatalogEditor<T extends CanvasContent>({
                               sections[index],
                               sections[index - 1],
                             ];
+
                             return { ...c, sections };
                           })
                         }
@@ -908,6 +1018,7 @@ export function CatalogEditor<T extends CanvasContent>({
                               sections[index + 1],
                               sections[index],
                             ];
+
                             return { ...c, sections };
                           })
                         }
@@ -1149,6 +1260,7 @@ export function CatalogEditor<T extends CanvasContent>({
                                         file,
                                       );
                                       setError(error || "");
+
                                       if (error) notifyError(error);
                                     }
                                   }}

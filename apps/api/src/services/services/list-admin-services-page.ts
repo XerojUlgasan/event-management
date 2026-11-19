@@ -22,6 +22,7 @@ export async function listAdminServicesPageService(
     countAdminServicesData(db, options),
   ]);
   const page = createPage(rows, options.limit, cursorFor);
+
   return {
     services: await Promise.all(
       page.items.map((row) => serviceAdminDto(db, row)),

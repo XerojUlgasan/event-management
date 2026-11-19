@@ -9,6 +9,7 @@ export async function countUnreadMessagesData(
   viewer: "admin" | "customer",
 ) {
   if (!conversationIds.length) return new Map<string, number>();
+
   const rows = await db
     .selectFrom("messages as m")
     .select((eb) => ["m.conversation_id", eb.fn.count("m.id").as("count")])
@@ -21,5 +22,6 @@ export async function countUnreadMessagesData(
     .where("m.read_at", "is", null)
     .groupBy("m.conversation_id")
     .execute();
+
   return new Map(rows.map((row) => [row.conversation_id, Number(row.count)]));
 }

@@ -11,7 +11,9 @@ export function validateCatalogCanvas(
     ? draftSectionsSchema(pendingWidgetIds)
     : sectionsSchema;
   const result = schema.safeParse(sections);
+
   if (result.success) return;
+
   const issue = result.error.issues[0];
   const [section, field, widget] = issue.path;
   const location = [
@@ -20,5 +22,6 @@ export function validateCatalogCanvas(
       ? `widget ${widget + 1}`
       : null,
   ].filter(Boolean);
+
   return `${location.join(", ")}: ${issue.message}`;
 }

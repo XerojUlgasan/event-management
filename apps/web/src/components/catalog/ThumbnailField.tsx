@@ -28,8 +28,10 @@ export function ThumbnailField({
 
   const handleFile = async (file: File) => {
     const error = validateImageFile(file);
+
     if (error) {
       onError(error);
+
       return;
     }
 
@@ -37,11 +39,13 @@ export function ThumbnailField({
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
     }
+
     const preview = URL.createObjectURL(file);
     objectUrlRef.current = preview;
 
     setUploading(true);
     onBusyChange(true);
+
     try {
       const result = await uploadCatalogMedia(file);
       onChange(result.id ?? null, preview);
@@ -60,6 +64,7 @@ export function ThumbnailField({
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
     }
+
     onChange(null, null);
   };
 
@@ -68,6 +73,7 @@ export function ThumbnailField({
     e.stopPropagation();
     lightboxRef.current?.showModal();
   };
+
   const closeLightbox = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     lightboxRef.current?.close();
@@ -124,6 +130,7 @@ export function ThumbnailField({
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 e.currentTarget.value = "";
+
                 if (file) void handleFile(file);
               }}
             />

@@ -73,6 +73,7 @@ export function BookingPackage({
     const requestKey = key;
     setBusy(true);
     setError("");
+
     try {
       const [result, audit] = await Promise.all([
         getBookingPackage(id, admin),
@@ -80,12 +81,14 @@ export function BookingPackage({
           ? getBookingPackageHistory(id, pagination.cursor)
           : Promise.resolve(null),
       ]);
+
       if (
         !generation.isCurrent(current) ||
         sequence !== request.current ||
         keyRef.current !== requestKey
       )
         return;
+
       setLoaded(result);
       setHistory(audit?.history ?? []);
       setNextCursor(audit?.nextCursor ?? null);
@@ -98,6 +101,7 @@ export function BookingPackage({
         keyRef.current !== requestKey
       )
         return;
+
       setError(notifyError(cause, "Unable to load the proposed package."));
     } finally {
       if (
@@ -111,6 +115,7 @@ export function BookingPackage({
 
   useEffect(() => {
     void load();
+
     return () => {
       generation.bump();
     };
@@ -178,8 +183,11 @@ export function BookingPackage({
                 disabled={!selected || busy}
                 onClick={async () => {
                   const option = options.find((item) => item.id === selected);
+
                   if (!option) return;
+
                   setBusy(true);
+
                   try {
                     await assignBookingPackage(id, {
                       packageId: option.id,
@@ -270,8 +278,10 @@ export function BookingPackage({
           }}
           onSaved={() => {
             setEditing(false);
+
             if (pagination.page === 1) void load();
             else pagination.reset();
+
             onChanged?.();
           }}
           saveCustom={async (content) => {

@@ -47,11 +47,13 @@ export function KnowledgeDetailDrawer({
       .finally(() => {
         if (seq.current === current) setLoading(false);
       });
+
     return () => {
       seq.current++;
     };
   }, [item.id, item.kind, pages.cursor, retry]);
   const listing = data?.listing ?? item;
+
   return (
     <Drawer
       title={listing.name}

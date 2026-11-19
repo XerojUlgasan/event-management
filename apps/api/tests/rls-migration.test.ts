@@ -20,19 +20,23 @@ test("RLS migration preserves server access and closes direct client table acces
   const database = `em_rls_migration_${randomUUID().replaceAll("-", "")}`;
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
+
   try {
     await admin.query(`CREATE DATABASE "${database}"`);
     pool = new Pool({ ...connection, database });
     const root = new URL("../prisma/migrations/", import.meta.url);
     const migrationName = "20261109140000_enable_application_rls";
+
     const entries = (await readdir(root, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory() && entry.name < migrationName)
       .sort((a, b) => a.name.localeCompare(b.name));
+
     for (const entry of entries) {
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );
     }
+
     const migration = await readFile(
       new URL(`${migrationName}/migration.sql`, root),
       "utf8",
@@ -46,12 +50,14 @@ test("RLS migration preserves server access and closes direct client table acces
       "SELECT rolname FROM pg_roles WHERE rolname IN ('anon','authenticated') ORDER BY rolname",
     );
     await pool.query("GRANT ALL ON ALL TABLES IN SCHEMA public TO PUBLIC");
+
     for (const { rolname } of clientRoles.rows) {
       // Reproduce the grants present on Supabase-created public schemas.
       await pool.query(
         `GRANT ALL ON ALL TABLES IN SCHEMA public TO "${rolname}"`,
       );
     }
+
     await pool.query(migration);
     const tables = await pool.query<{
       relname: string;
@@ -61,6 +67,7 @@ test("RLS migration preserves server access and closes direct client table acces
       "SELECT relname,relrowsecurity,relforcerowsecurity FROM pg_class WHERE relnamespace='public'::regnamespace AND relkind='r' ORDER BY relname",
     );
     assert.equal(tables.rowCount, 13);
+
     for (const table of tables.rows) {
       assert.equal(table.relrowsecurity, true, `${table.relname} enables RLS`);
       assert.equal(
@@ -69,6 +76,7 @@ test("RLS migration preserves server access and closes direct client table acces
         `${table.relname} preserves owner access`,
       );
     }
+
     assert.equal(
       (
         await pool.query(
@@ -89,9 +97,11 @@ test("RLS migration preserves server access and closes direct client table acces
       "INSERT INTO _prisma_migrations VALUES('retained-history')",
     );
     await pool.query("GRANT ALL ON _prisma_migrations TO PUBLIC");
+
     for (const { rolname } of clientRoles.rows) {
       await pool.query(`GRANT ALL ON _prisma_migrations TO "${rolname}"`);
     }
+
     await pool.query(migration);
     assert.equal(
       (
@@ -116,6 +126,7 @@ test("RLS migration preserves server access and closes direct client table acces
     );
 
     const databasePool = pool;
+
     for (const rolname of ["anon", "authenticated"]) {
       await t.test(
         `${rolname} cannot read or truncate application tables`,
@@ -131,13 +142,16 @@ test("RLS migration preserves server access and closes direct client table acces
               [rolname],
             )
           ).rows;
+
           for (const grant of grants)
             assert.equal(
               grant.has_access,
               false,
               `${rolname} has no ${grant.relname} grants`,
             );
+
           const client = await databasePool.connect();
+
           try {
             await client.query("BEGIN");
             await client.query(`SET LOCAL ROLE "${rolname}"`);
@@ -157,6 +171,7 @@ test("RLS migration preserves server access and closes direct client table acces
         },
       );
     }
+
     assert.equal(
       (
         await pool.query("SELECT display_name FROM users WHERE id=$1", [

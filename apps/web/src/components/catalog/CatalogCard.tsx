@@ -2,6 +2,7 @@ import { Badge, Button, CatalogThumbnail } from "@event-management/ui";
 import type { ReactNode } from "react";
 
 type CardStatus = { label: string; tone: "neutral" | "warning" | "success" };
+
 type CardAction = { label: string; onSelect: () => void };
 
 export function CatalogCard({

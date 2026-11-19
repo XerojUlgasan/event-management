@@ -24,6 +24,7 @@ const blank = (): PackageContent => ({
   price: { kind: "fixed", currency: "PHP", amountMinor: 0 },
   sections: [newCatalogSection()],
 });
+
 export function PackageCard({
   item,
   action,
@@ -48,6 +49,7 @@ export function PackageCard({
     />
   );
 }
+
 export function PackageEditor({
   initial,
   onClose,
@@ -98,6 +100,7 @@ export function PackageEditor({
       />
     );
   }
+
   return (
     <CatalogEditor<PackageContent>
       initial={

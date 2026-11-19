@@ -6,5 +6,6 @@ export function parseAiHandoff(value: unknown) {
 
 export function clearPendingAiHandoff(value: unknown) {
   const handoff = parseAiHandoff(value);
+
   return handoff ? { ...handoff, pending: false } : null;
 }

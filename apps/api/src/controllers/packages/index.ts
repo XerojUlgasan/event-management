@@ -51,7 +51,9 @@ const routes = new OpenAPIHono<HonoEnv>({
       );
   },
 });
+
 const admin = requireSystemAdmin;
+
 routes.use("/admin/packages", requireSession, admin);
 routes.use("/admin/packages/*", requireSession, admin);
 
@@ -64,4 +66,5 @@ routes.openapi(createPackageRoute, createPackageRouteHandler);
 routes.openapi(updatePackageRoute, updatePackageRouteHandler);
 routes.openapi(archivePackageRoute, archivePackageRouteHandler);
 routes.openapi(deletePackageRoute, deletePackageRouteHandler);
+
 export default routes;

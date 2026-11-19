@@ -10,6 +10,7 @@ import { join } from "node:path";
 
 // Vite processes the real TSX and its CSS imports, as the Astro SSR build does.
 const root = fileURLToPath(new URL("../../", import.meta.url));
+
 let server,
   cacheDir,
   canvas,
@@ -19,6 +20,7 @@ let server,
   ui,
   markdownUi,
   scrollLock;
+
 before(async () => {
   cacheDir = await mkdtemp(join(tmpdir(), "clemora-catalog-ssr-"));
   server = await createServer({
@@ -75,8 +77,10 @@ after(async () => {
     if (cacheDir) await rm(cacheDir, { recursive: true, force: true });
   }
 });
+
 const render = (component, props) =>
   renderToStaticMarkup(createElement(component, props));
+
 const video = (id, autoplay) => ({
   id,
   type: "video",
@@ -90,6 +94,7 @@ const video = (id, autoplay) => ({
   caption: "Film caption",
   autoplay,
 });
+
 const photo = {
   id: "photo",
   type: "photo",
@@ -103,6 +108,7 @@ const photo = {
   caption: "Photo caption",
   autoplay: false,
 };
+
 const markdown = {
   id: "markdown",
   type: "markdown",
@@ -117,6 +123,7 @@ const markdown = {
   markdown:
     "# Heading\n\n*italic* and **bold**\n\n- First item\n- Second item\n\n[Safe link](https://example.com)\n\n| Name | Value |\n| --- | --- |\n| One | Two |\n\n<script>alert(1)</script>\n\n[bad](javascript:alert(1))",
 };
+
 const sections = [
   {
     id: "section",
@@ -124,6 +131,7 @@ const sections = [
     widgets: [photo, markdown, video("on", true), video("off", false)],
   },
 ];
+
 const packageItem = {
   name: "Celebration",
   description: "Package summary",
@@ -132,6 +140,7 @@ const packageItem = {
   sections,
   slug: "celebration",
 };
+
 const service = {
   name: "Catering",
   description: "Service **summary**",
@@ -154,6 +163,7 @@ test("public package renders the canonical canvas with the booking action", () =
     actual,
     render(canvas.PackageCanvas, { item: packageItem, bookingAction: action }),
   );
+
   for (const value of [
     "Celebration",
     "Package summary",
@@ -161,6 +171,7 @@ test("public package renders the canonical canvas with the booking action", () =
     "Book now",
   ])
     assert.ok(actual.includes(value), value);
+
   assert.match(actual, /1,250/);
   assert.doesNotMatch(actual, /Package services|Included|Optional/);
 });
@@ -178,6 +189,7 @@ test("SSR renders complete sanitized Markdown and media on every catalog", () =>
     [publicDetails.PublicServiceDetail, service],
   ]) {
     const html = render(component, { item });
+
     for (const pattern of [
       /<h1[^>]*>.*?Heading<\/h1>/,
       /<em>italic<\/em>/,
@@ -192,6 +204,7 @@ test("SSR renders complete sanitized Markdown and media on every catalog", () =>
       /Film caption/,
     ])
       assert.match(html, pattern);
+
     assert.doesNotMatch(html, /<script|javascript:|onerror=/i);
     const videos = html.match(/<video\b[^>]*>/g) ?? [];
     assert.equal(videos.length, 2);
@@ -269,6 +282,7 @@ test("empty media has meaningful fallback and Markdown requests light mode", () 
     assert.ok(html.includes(message));
     assert.doesNotMatch(html, /<img|<video/);
   }
+
   const html = render(markdownUi.Markdown, { source: "**Light content**" });
   assert.match(html, /data-color-mode="light"/);
   assert.match(html, /<strong>Light content<\/strong>/);
@@ -304,6 +318,7 @@ const serviceWidget = {
     imageUrl: "/images/wedding.jpg",
   },
 };
+
 test("linked service cards render on public and private canvases without prices or inclusion claims", () => {
   const item = {
     ...packageItem,
@@ -311,6 +326,7 @@ test("linked service cards render on public and private canvases without prices 
       { id: "linked-services", title: "Explore", widgets: [serviceWidget] },
     ],
   };
+
   for (const html of [
     render(publicPackage.PublicPackageDetail, { item }),
     render(canvas.PackageCanvas, { item }),
@@ -325,6 +341,7 @@ test("linked service cards render on public and private canvases without prices 
     assert.match(html, /src="\/images\/wedding.jpg"/);
     assert.doesNotMatch(html, /Included|Optional|additional charge/);
   }
+
   const card = render(ui.CatalogWidgetContent, { widget: serviceWidget });
   assert.doesNotMatch(card, /₱|PHP|hour|rate|price/i);
 });
@@ -336,10 +353,12 @@ test("service card uses one whole-card action for public and workspace contexts"
     /<a\b[^>]*href="\/services\/photo-booth"[^>]*>[\s\S]*<img[\s\S]*Photo booth[\s\S]*Portraits for your guests[\s\S]*Ask us about[\s\S]*<\/a>/,
   );
   assert.equal((publicCard.match(/<a\b/g) ?? []).length, 1);
+
   const workspaceCard = render(ui.CatalogWidgetContent, {
     widget: serviceWidget,
     onOpenService: () => {},
   });
+
   assert.match(
     workspaceCard,
     /<button\b[^>]*type="button"[^>]*>[\s\S]*<img[\s\S]*Photo booth[\s\S]*Ask us about[\s\S]*<\/button>/,
@@ -376,6 +395,7 @@ test("service editor content has no nested link and preserves captions and unava
 test("stacked catalog scroll locks restore the original overflow in either close order", () => {
   const originalDocument = globalThis.document;
   globalThis.document = { body: { style: { overflow: "auto" } } };
+
   try {
     const releaseParent = scrollLock.lockCatalogScroll();
     const releaseChild = scrollLock.lockCatalogScroll();
@@ -411,10 +431,12 @@ const packageWidget = {
     imageUrl: "/images/wedding.jpg",
   },
 };
+
 test("linked package cards share public and private canvases without prices or inclusion claims", () => {
   const sections = [
     { id: "linked-packages", title: "Explore", widgets: [packageWidget] },
   ];
+
   for (const html of [
     render(publicPackage.PublicPackageDetail, {
       item: { ...packageItem, sections },
@@ -431,6 +453,7 @@ test("linked package cards share public and private canvases without prices or i
     assert.match(html, /src="\/images\/wedding.jpg"/);
     assert.doesNotMatch(html, /Included|Optional|additional charge/);
   }
+
   assert.doesNotMatch(
     render(ui.CatalogWidgetContent, { widget: packageWidget }),
     /₱|PHP|hour|rate|price/i,
@@ -443,20 +466,24 @@ test("package cards use a single whole-card action and inert editor or unavailab
     /<a\b[^>]*href="\/packages\/celebration"[^>]*>[\s\S]*<img[\s\S]*Celebration package[\s\S]*Explore this arrangement[\s\S]*<\/a>/,
   );
   assert.equal((publicCard.match(/<a\b/g) ?? []).length, 1);
+
   const workspace = render(ui.CatalogWidgetContent, {
     widget: packageWidget,
     onOpenPackage: () => {},
   });
+
   assert.match(
     workspace,
     /<button\b[^>]*aria-label="View package: Celebration package"/,
   );
   assert.doesNotMatch(workspace, /<a\b/);
+
   const editor = render(ui.CatalogWidgetContent, {
     widget: packageWidget,
     editor: true,
     onOpenPackage: () => {},
   });
+
   assert.doesNotMatch(editor, /<a\b|<button\b/);
   const unavailable = render(ui.CatalogWidgetContent, {
     widget: { ...packageWidget, package: null },
@@ -499,6 +526,7 @@ test("public catalog thumbnails use the brand for absent images and retain dedic
     );
     assert.match(dedicated, /ui-catalog-thumbnail-brand/);
   }
+
   const reference = render(ui.CatalogWidgetContent, {
     widget: {
       ...serviceWidget,

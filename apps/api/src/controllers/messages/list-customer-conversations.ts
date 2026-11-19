@@ -31,6 +31,7 @@ export const listCustomerConversationsRouteHandler: AppRouteHandler<
   typeof listCustomerConversationsRoute
 > = async (c) => {
   const { limit, cursor, reference } = c.req.valid("query");
+
   return c.json(
     await listCustomerConversationsService(
       c.get("db"),

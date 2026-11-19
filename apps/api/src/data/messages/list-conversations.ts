@@ -13,8 +13,11 @@ export async function listConversationsData(
   let query = selectConversationColumnsData(db).select(
     utcTimestampSql("c.updated_at").as("cursor_updated_at"),
   );
+
   if (customerId) query = query.where("c.customer_id", "=", customerId);
+
   if (reference) query = query.where("br.reference", "=", reference);
+
   if (cursor)
     query = query.where(
       keysetPredicate(
@@ -25,6 +28,7 @@ export async function listConversationsData(
         "<",
       ),
     );
+
   return query
     .orderBy("c.updated_at", "desc")
     .orderBy("c.id", "desc")

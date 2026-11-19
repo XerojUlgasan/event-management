@@ -31,6 +31,7 @@ export const getCustomerConversationByIdRouteHandler: AppRouteHandler<
     c.req.valid("query").limit,
     c.req.valid("query").cursor,
   );
+
   return result
     ? c.json(result, 200)
     : jsonError(c, "Conversation not found", 404);

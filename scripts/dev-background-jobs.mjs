@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
 const functionEnvPath = join(root, "apps/supabase/.env.functions");
 
 // Supabase functions use container addresses; the separate Node worker uses
@@ -14,6 +15,7 @@ export function localWorkerEnvironment(functionEnv, status, parentEnv = {}) {
   const database = new URL(status.DB_URL);
   const api = new URL(status.API_URL);
   const localHosts = ["localhost", "127.0.0.1", "[::1]"];
+
   if (
     !["postgres:", "postgresql:"].includes(database.protocol) ||
     !localHosts.includes(database.hostname) ||
@@ -25,6 +27,7 @@ export function localWorkerEnvironment(functionEnv, status, parentEnv = {}) {
       "Background development worker requires local Supabase status.",
     );
   }
+
   return {
     ...parentEnv,
     ...functionEnv,
@@ -56,11 +59,13 @@ function start() {
     ],
     { cwd: root, encoding: "utf8", shell: isWindows },
   );
+
   if (status.status !== 0) {
     throw new Error(
       "Could not read local Supabase status. Start it with pnpm supabase:start.",
     );
   }
+
   const requireApi = createRequire(join(root, "apps/api/package.json"));
   const functionEnv = requireApi("dotenv").parse(readFileSync(functionEnvPath));
   const env = localWorkerEnvironment(
@@ -74,7 +79,9 @@ function start() {
     stdio: "inherit",
     shell: isWindows,
   });
+
   const stop = () => child.kill("SIGTERM");
+
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
   child.once("error", () => {

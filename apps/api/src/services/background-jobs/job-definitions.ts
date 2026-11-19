@@ -26,13 +26,16 @@ function defineJob<S extends z.ZodType>(definition: {
     ...definition,
     parse: (payload: unknown) => {
       const parsed = definition.payloadSchema.parse(payload);
+
       return { payload: parsed, key: definition.dedupeKey(parsed) };
     },
     run: (db: Kysely<DB>, payload: unknown, signal: AbortSignal) =>
       definition.handler(db, definition.payloadSchema.parse(payload), signal),
   };
 }
+
 const uuid = z.uuid().transform((id) => id.toLowerCase());
+
 export const jobDefinitions = {
   embed_package: defineJob({
     payloadSchema: z.object({ packageId: uuid }).strict(),
@@ -51,18 +54,22 @@ export const jobDefinitions = {
 } as const;
 
 export type BackgroundJobType = keyof typeof jobDefinitions;
+
 export type BackgroundJobPayload<T extends BackgroundJobType> = z.input<
   (typeof jobDefinitions)[T]["payloadSchema"]
 >;
+
 export const backgroundJobPolicies = Object.fromEntries(
   Object.entries(jobDefinitions).map(([type, definition]) => [
     type,
     definition.retryDelaysMs,
   ]),
 );
+
 export function isBackgroundJobType(type: string): type is BackgroundJobType {
   return Object.hasOwn(jobDefinitions, type);
 }
+
 export async function executeJob(
   type: BackgroundJobType,
   payload: unknown,

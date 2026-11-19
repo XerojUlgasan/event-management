@@ -19,6 +19,7 @@ export async function listCatalogKnowledgeOwnersData(
     .where("archived_at", "is", null)
     .orderBy("id")
     .execute();
+
   return [
     ...packages.map((row) => ({ kind: "package" as const, id: row.id })),
     ...services.map((row) => ({ kind: "service" as const, id: row.id })),

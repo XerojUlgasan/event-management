@@ -44,13 +44,16 @@ export const searchPublicCatalogInputSchema = z
         code: "custom",
         message: "Minimum price cannot exceed maximum price",
       });
+
     if (input.catalogType === "package" && input.pricingType !== undefined)
       ctx.addIssue({
         code: "custom",
         message: "Pricing type applies only to services",
       });
+
     if (input.catalogType === "service" && input.pax !== undefined)
       ctx.addIssue({ code: "custom", message: "Pax applies only to packages" });
+
     if (
       input.catalogType === "service" &&
       input.pricingType === undefined &&
@@ -61,13 +64,16 @@ export const searchPublicCatalogInputSchema = z
         message: "Service price filters require a pricing type",
       });
   });
+
 export type SearchPublicCatalogInput = z.infer<
   typeof searchPublicCatalogInputSchema
 >;
+
 const positionSchema = z.strictObject({
   id: z.string().uuid(),
   score: z.number().nullable(),
 });
+
 const short = (text: string, limit: number) =>
   Array.from(text).slice(0, limit).join("");
 
@@ -93,12 +99,15 @@ export async function searchPublicCatalogService({
     ]),
   )}`;
   const position = parsePageCursor(input.cursor, positionSchema, scope);
+
   if (
     position &&
     (input.query ? position.score === null : position.score !== null)
   )
     throw new Error("Invalid public catalog cursor");
+
   let vector: Awaited<ReturnType<typeof embedCatalogContent>> | undefined;
+
   if (input.query) {
     try {
       vector = await embedCatalogContent({
@@ -110,21 +119,27 @@ export async function searchPublicCatalogService({
       throw new KnowledgeSearchUnavailable();
     }
   }
+
   abortSignal?.throwIfAborted();
+
   return db
     .transaction()
     .setIsolationLevel("repeatable read")
     .execute(async (trx) => {
       const listings = await searchPublicCatalogData(trx, input);
+
       const eligible = new Map(
         listings.map((listing) => [listing.id, listing]),
       );
+
       const ranked = new Map<
         string,
         { score: number; evidence: { kind: "text" | "photo"; excerpt: string } }
       >();
+
       if (vector) {
         const knowledge = await loadCatalogKnowledge(trx);
+
         const chunks = new Map(
           knowledge.entries
             .filter(
@@ -139,17 +154,22 @@ export async function searchPublicCatalogService({
                 .map((chunk) => [`${listing.id}:${chunk.key}`, chunk] as const),
             ),
         );
+
         const rows = await searchCatalogKnowledgeData(
           trx,
           vector.embedding,
           vector.model,
         );
+
         for (const row of rows.rows) {
           const id =
             input.catalogType === "package" ? row.package_id : row.service_id;
+
           if (!id || ranked.has(id) || !Number.isFinite(row.similarity))
             continue;
+
           const chunk = chunks.get(`${id}:${row.chunk_key}`);
+
           if (chunk)
             ranked.set(id, {
               score: row.similarity,
@@ -160,10 +180,13 @@ export async function searchPublicCatalogService({
             });
         }
       }
+
       const ordered = listings
         .flatMap((listing) => {
           const match = ranked.get(listing.id);
+
           if (vector && !match) return [];
+
           return [
             {
               listing,
@@ -181,6 +204,7 @@ export async function searchPublicCatalogService({
                 ? 1
                 : 0),
         );
+
       const after = position
         ? ordered.filter((item) =>
             position.score !== null && item.score !== null
@@ -189,8 +213,10 @@ export async function searchPublicCatalogService({
               : item.listing.id > position.id,
           )
         : ordered;
+
       const page = after.slice(0, 5);
       const last = page.at(-1);
+
       return {
         results: page.map(({ listing, evidence }) => ({
           id: listing.id,

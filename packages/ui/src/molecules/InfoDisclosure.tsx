@@ -27,17 +27,21 @@ export function InfoDisclosure({
       )
         setOpen(false);
     };
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         if (open) {
           setOpen(false);
           trigger.current?.focus();
         }
+
         setHintDismissed(true);
       }
     };
+
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);

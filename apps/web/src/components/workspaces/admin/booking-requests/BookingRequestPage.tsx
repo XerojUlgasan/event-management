@@ -62,6 +62,7 @@ function RequestStatusForm({
 
   async function save(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
+
     if (
       savingRef.current ||
       stale ||
@@ -69,10 +70,12 @@ function RequestStatusForm({
       (reasonRequired && !reason.trim())
     )
       return;
+
     savingRef.current = true;
     setSaving(true);
     onBusyChange(true);
     setError("");
+
     try {
       const result = await updateBookingRequestStatus(
         item.id,
@@ -108,6 +111,7 @@ function RequestStatusForm({
               value={status}
               onChange={(event) => {
                 const value = event.target.value;
+
                 if (
                   value === "under_review" ||
                   value === "needs_details" ||
@@ -187,11 +191,14 @@ function BookingQuotations({ bookingId }: { bookingId: string }) {
       .catch(() => {
         if (active) setState("error");
       });
+
     return () => {
       active = false;
     };
   }, [bookingId, attempt]);
+
   if (state === "loading") return <p role="status">Checking package…</p>;
+
   if (state === "error")
     return (
       <p role="alert">
@@ -204,8 +211,10 @@ function BookingQuotations({ bookingId }: { bookingId: string }) {
         </Button>
       </p>
     );
+
   if (state === "missing")
     return <p>Prepare or choose a package before creating a quotation.</p>;
+
   return <Quotations bookingId={bookingId} admin />;
 }
 
@@ -236,12 +245,15 @@ export function BookingRequestPage({
     setRefreshing(true);
     setError("");
     setNeedsSignIn(false);
+
     try {
       const result = await getAdminBookingRequest(bookingRequestId);
+
       if (!generation.isCurrent(current))
         throw new Error(
           "The request changed while refreshing. Please try again.",
         );
+
       setItem(result.bookingRequest);
       setRefreshKey((value) => value + 1);
     } catch (cause) {
@@ -255,6 +267,7 @@ export function BookingRequestPage({
               : "Unable to load this booking request.",
         );
       }
+
       throw cause;
     } finally {
       if (generation.isCurrent(current)) setRefreshing(false);
@@ -279,6 +292,7 @@ export function BookingRequestPage({
       if (generation.isCurrent(current))
         notifyError(cause, "Unable to load this booking request.");
     });
+
     return () => {
       generation.bump();
     };

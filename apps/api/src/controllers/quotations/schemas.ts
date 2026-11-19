@@ -5,9 +5,13 @@ import {
   MAX_QUOTATION_REASON_LENGTH,
 } from "@event-management/contracts/quotations";
 import { z } from "@hono/zod-openapi";
+
 export const idParams = z.object({ id: z.string().uuid() });
+
 export const revision = z.string().min(1).max(100);
+
 export const expectedBody = z.strictObject({ expectedUpdatedAt: revision });
+
 export const itemSchema = z.strictObject({
   id: z.string().uuid(),
   direction: z.enum(["add", "deduct"]),
@@ -16,6 +20,7 @@ export const itemSchema = z.strictObject({
   amountMinor: z.number().int().positive().max(MAX_QUOTATION_AMOUNT_MINOR),
   serviceId: z.string().uuid().nullable(),
 });
+
 export const saveBody = z.strictObject({
   expectedUpdatedAt: revision,
   items: z
@@ -27,9 +32,11 @@ export const saveBody = z.strictObject({
       "Item IDs must be unique",
     ),
 });
+
 export const reviseBody = expectedBody.extend({
   reason: z.string().trim().min(1).max(MAX_QUOTATION_REASON_LENGTH),
 });
+
 export const quotationSchema = z.object({
   id: z.string().uuid(),
   bookingRequestId: z.string().uuid(),
@@ -50,4 +57,5 @@ export const quotationSchema = z.object({
   revisionReason: z.string().nullable(),
   items: z.array(itemSchema),
 });
+
 export type ItemInput = z.infer<typeof itemSchema>;

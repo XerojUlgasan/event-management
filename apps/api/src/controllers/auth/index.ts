@@ -19,6 +19,7 @@ import {
 } from "./link-firebase.js";
 
 const authRoutes = new OpenAPIHono<HonoEnv>();
+
 authRoutes.use("/auth/sync", requireFirebaseAuth);
 authRoutes.use("/me", requireSession);
 authRoutes.use("/auth/link/firebase", requireSession, requireFirebaseAuth);
@@ -31,4 +32,5 @@ authRoutes.openapi(registerUserRoute, registerUserRouteHandler);
 authRoutes.openapi(loginUserRoute, loginUserRouteHandler);
 authRoutes.openapi(linkFirebaseRoute, linkFirebaseRouteHandler);
 authRoutes.openapi(addPasswordRoute, addPasswordRouteHandler);
+
 export default authRoutes;

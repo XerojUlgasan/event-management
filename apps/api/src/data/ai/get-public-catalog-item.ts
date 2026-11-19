@@ -21,8 +21,10 @@ export async function getPublicCatalogItemData(
       .where("archived_at", "is", null)
       .where("published_at", "is not", null)
       .executeTakeFirst();
+
     return row ? { type: "package" as const, ...row } : null;
   }
+
   const row = await db
     .selectFrom("services")
     .select([
@@ -38,6 +40,7 @@ export async function getPublicCatalogItemData(
     .where("id", "=", input.id)
     .where("archived_at", "is", null)
     .executeTakeFirst();
+
   return row ? { type: "service" as const, ...row } : null;
 }
 
@@ -46,6 +49,7 @@ export async function listPublicLinkedPackageIdsData(
   ids: string[],
 ) {
   if (!ids.length) return new Set<string>();
+
   const rows = await db
     .selectFrom("packages")
     .select("id")
@@ -54,5 +58,6 @@ export async function listPublicLinkedPackageIdsData(
     .where("archived_at", "is", null)
     .where("published_at", "is not", null)
     .execute();
+
   return new Set(rows.map((row) => row.id));
 }

@@ -15,6 +15,7 @@ export const getPublicPackageRoute = createRoute({
     ...errors,
   },
 });
+
 export const getPublicPackageRouteHandler: AppRouteHandler<
   typeof getPublicPackageRoute
 > = async (c) => {
@@ -22,5 +23,6 @@ export const getPublicPackageRouteHandler: AppRouteHandler<
     c.get("db"),
     c.req.valid("param").id,
   );
+
   return row ? c.json(row, 200) : jsonError(c, "Package not found", 404);
 };

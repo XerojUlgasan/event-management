@@ -12,8 +12,10 @@ import { Select } from "../atoms/Select";
 function offsetDate(date: string, offset: number) {
   const instant = new Date(`${date}T12:00:00Z`);
   instant.setUTCDate(instant.getUTCDate() + offset);
+
   return instant.toISOString().slice(0, 10);
 }
+
 function longDate(date: string) {
   return new Intl.DateTimeFormat("en-US", {
     month: "long",
@@ -58,19 +60,24 @@ export function DateSelect({
   const scrollCenter = useRef(centerDate);
   const pendingScroll = useRef<number | null>(null);
   const listId = useId();
+
   const dates = Array.from(
     { length: range.before + range.after + 1 },
     (_, index) => offsetDate(centerDate, index - range.before),
   );
+
   function close(restore = false) {
     setOpen(false);
+
     if (restore) trigger.current?.focus({ preventScroll: true });
   }
   function show() {
     if (open) {
       close();
+
       return;
     }
+
     const rect = trigger.current?.getBoundingClientRect();
     setAbove(
       Boolean(rect && window.innerHeight - rect.bottom < 220 && rect.top > 220),
@@ -86,21 +93,28 @@ export function DateSelect({
   }
   useEffect(() => {
     if (!open || !list.current) return;
+
     const select = list.current;
+
     if (pendingScroll.current !== null) {
       select.scrollTop = pendingScroll.current;
       pendingScroll.current = null;
+
       return;
     }
+
     select.focus({ preventScroll: true });
+
     const target = Array.from(select.options).findIndex(
       (option) => option.value === scrollCenter.current,
     );
+
     const rowHeight = select.options[0]?.getBoundingClientRect().height || 40;
     select.scrollTop = Math.max(0, target - 2) * rowHeight;
   }, [open, range]);
   useEffect(() => {
     if (!open) return;
+
     function outside(event: PointerEvent) {
       if (
         event.target instanceof Node &&
@@ -109,8 +123,10 @@ export function DateSelect({
         close();
     }
     document.addEventListener("pointerdown", outside);
+
     return () => document.removeEventListener("pointerdown", outside);
   }, [open]);
+
   return (
     <div
       className="ui-date-select"
@@ -139,6 +155,7 @@ export function DateSelect({
         onKeyDown={(event) => {
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
+
             if (!open) show();
           }
         }}
@@ -171,9 +188,11 @@ export function DateSelect({
             }}
             onScroll={(event) => {
               if (pendingScroll.current !== null) return;
+
               const select = event.currentTarget;
               const rowHeight =
                 select.options[0]?.getBoundingClientRect().height || 40;
+
               if (select.scrollTop <= 1) {
                 pendingScroll.current = select.scrollTop + 30 * rowHeight;
                 setRange((previous) => ({

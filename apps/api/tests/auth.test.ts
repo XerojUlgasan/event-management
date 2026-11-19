@@ -10,14 +10,18 @@ import { Pool } from "pg";
 import type { Profile } from "../src/controllers/auth/profile.js";
 
 const projectId = "demo-event-management";
+
 const database = `em_auth_test_${randomUUID().replaceAll("-", "")}`;
+
 const password = "testpass";
 const firebasePassword = "firebase-test-password";
 let app: typeof import("../src/app.js").app;
 let db: typeof import("../src/db/client.js").db;
+
 let firebase: Awaited<
   ReturnType<typeof import("../src/utils/firebase-admin.js").getFirebaseAuth>
 >;
+
 let admin: Pool;
 let pool: Pool;
 
@@ -44,6 +48,7 @@ before(async () => {
   await admin.query(`CREATE DATABASE "${database}"`);
   pool = new Pool({ ...connection, database });
   const root = new URL("../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name))) {
@@ -51,6 +56,7 @@ before(async () => {
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
   }
+
   // Import configuration only after selecting the disposable database.
   process.env.DB_NAME = database;
   ({ app } = await import("../src/app.js"));
@@ -63,6 +69,7 @@ before(async () => {
 after(async () => {
   await db?.destroy();
   await pool?.end();
+
   if (admin) {
     await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await admin.end();
@@ -87,19 +94,24 @@ function call(
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 }
+
 function cookieOf(response: Response) {
   const cookie = response.headers.get("set-cookie")?.split(";")[0];
   assert.ok(cookie);
   assert.ok(cookie.startsWith("em_session="));
+
   return cookie;
 }
+
 async function profileOf(response: Response, expected = 200) {
   assert.equal(response.status, expected, await response.clone().text());
   const profile = (await response.json()) as Profile;
   assert.equal("password_hash" in profile, false);
   assert.equal("passwordHash" in profile, false);
+
   return profile;
 }
+
 async function register(email: string) {
   const response = await call("/auth/register", {
     email,
@@ -107,11 +119,13 @@ async function register(email: string) {
     displayName: "Test Customer",
     role: "admin",
   });
+
   return {
     cookie: cookieOf(response),
     profile: await profileOf(response, 201),
   };
 }
+
 async function emulatorRequest(operation: string, body: unknown) {
   const response = await fetch(
     `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:${operation}?key=fake-api-key`,
@@ -122,8 +136,10 @@ async function emulatorRequest(operation: string, body: unknown) {
     },
   );
   assert.equal(response.status, 200, await response.clone().text());
+
   return (await response.json()) as { idToken: string; localId: string };
 }
+
 async function google(email: string) {
   return emulatorRequest("signInWithIdp", {
     requestUri: "http://localhost",
@@ -139,6 +155,7 @@ async function google(email: string) {
     }).toString(),
   });
 }
+
 async function firebaseEmail(email: string, verified = false) {
   const user = await firebase.createUser({
     email,
@@ -150,11 +167,14 @@ async function firebaseEmail(email: string, verified = false) {
     password: firebasePassword,
     returnSecureToken: true,
   });
+
   return { ...result, uid: user.uid };
 }
+
 // Only the emulator accepts unsigned tokens, allowing old/malformed auth-time tests.
 function changeClaims(token: string, changes: Record<string, unknown>) {
   const [header, encoded] = token.split(".");
+
   return `${header}.${Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(encoded, "base64url").toString()), ...changes })).toString("base64url")}.`;
 }
 
@@ -591,6 +611,7 @@ test("simultaneous links cannot attach one Firebase identity to two local users"
   const first = await register("race-first@example.com");
   const second = await register("race-second@example.com");
   const identity = await google("race-identity@example.com");
+
   const responses = await Promise.all(
     [first, second].map((account) =>
       call(
@@ -601,6 +622,7 @@ test("simultaneous links cannot attach one Firebase identity to two local users"
       ),
     ),
   );
+
   assert.deepEqual(
     responses.map((response) => response.status).sort(),
     [200, 409],
@@ -659,6 +681,7 @@ test("a local password login session claims the existing anonymous conversation"
 test("a Firebase emulator sign-in session claims the existing anonymous conversation", async () => {
   await assertGuestClaimAfterAuthentication(async (guestCookie) => {
     const identity = await google("guest-firebase@example.com");
+
     return call("/auth/sync", {}, guestCookie, identity.idToken);
   }, 200);
 });
@@ -715,6 +738,7 @@ test("validation, origin checks, body size limits and throttling protect passwor
     ).status,
     413,
   );
+
   for (let attempt = 0; attempt < 10; attempt++) {
     assert.equal(
       (
@@ -726,6 +750,7 @@ test("validation, origin checks, body size limits and throttling protect passwor
       401,
     );
   }
+
   assert.equal(
     (
       await call("/auth/login", {
@@ -741,6 +766,7 @@ test("OpenAPI describes both account methods and never exposes the password hash
   const spec = (await (await app.request("/openapi.json")).json()) as {
     paths: Record<string, unknown>;
   };
+
   for (const path of [
     "/v1/auth/register",
     "/v1/auth/login",
@@ -752,6 +778,7 @@ test("OpenAPI describes both account methods and never exposes the password hash
   ]) {
     assert.ok(spec.paths[path], path);
   }
+
   assert.equal(JSON.stringify(spec).includes("password_hash"), false);
 });
 
@@ -787,6 +814,7 @@ test("db:seed inserts fixtures without changing existing accounts or sessions", 
     })
     .returningAll()
     .executeTakeFirstOrThrow();
+
   const runSeed = () =>
     promisify(execFile)(
       process.execPath,
@@ -803,7 +831,9 @@ test("db:seed inserts fixtures without changing existing accounts or sessions", 
         },
       },
     );
+
   await runSeed();
+
   for (const original of [collision, plausible, existingAdmin])
     assert.deepEqual(
       await db
@@ -813,6 +843,7 @@ test("db:seed inserts fixtures without changing existing accounts or sessions", 
         .executeTakeFirstOrThrow(),
       original,
     );
+
   for (const email of [
     "user1@gmail.com",
     "user2@gmail.com",
@@ -828,7 +859,9 @@ test("db:seed inserts fixtures without changing existing accounts or sessions", 
     const profile = await profileOf(response);
     assert.equal(profile.role, "customer");
   }
+
   await runSeed();
+
   for (const original of [collision, plausible, existingAdmin])
     assert.deepEqual(
       await db
@@ -838,5 +871,6 @@ test("db:seed inserts fixtures without changing existing accounts or sessions", 
         .executeTakeFirstOrThrow(),
       original,
     );
+
   assert.equal((await call("/me", undefined, unrelated.cookie)).status, 200);
 });

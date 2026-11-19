@@ -10,6 +10,7 @@ export type CatalogMedia = {
   url: string;
   mimeType?: string;
 };
+
 export type CatalogServicePreview = {
   id: string;
   slug: string;
@@ -18,7 +19,9 @@ export type CatalogServicePreview = {
   /** Dedicated card thumbnail. Null displays the shared default. */
   imageUrl: string | null;
 };
+
 export type CatalogPackagePreview = CatalogServicePreview;
+
 export type CatalogWidget = {
   id: string;
   type: "photo" | "markdown" | "video" | "service" | "package";
@@ -36,26 +39,31 @@ export type CatalogWidget = {
   packageId?: string | null;
   package?: CatalogPackagePreview | null;
 };
+
 export type CatalogSection = {
   id: string;
   title: string;
   widgets: CatalogWidget[];
 };
+
 export type ServicePricing = {
   hourlyRatePesos: number | null;
   fixedPricePesos: number | null;
   includedHours: number | null;
 };
+
 export type ServiceContent = ServicePricing & {
   name: string;
   description: string;
   sections: CatalogSection[];
 };
+
 export type PackagePrice = {
   kind: "fixed";
   currency: "PHP";
   amountMinor: number;
 };
+
 export type PackageContent = {
   name: string;
   description: string;
@@ -63,6 +71,7 @@ export type PackageContent = {
   price: PackagePrice;
   sections: CatalogSection[];
 };
+
 export type CatalogPackage = PackageContent & {
   packageType: "catalog" | "custom";
   customForBookingRequestId: string | null;

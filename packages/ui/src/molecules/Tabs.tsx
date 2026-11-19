@@ -35,6 +35,7 @@ export function Tabs({
   const focusValue =
     items.find((item) => item.value === active && !item.disabled)?.value ??
     items.find((item) => !item.disabled)?.value;
+
   return (
     <div
       {...props}
@@ -43,23 +44,29 @@ export function Tabs({
       className={`${variant === "segmented" ? "segmented-tabs" : "tab-row"}${className ? ` ${className}` : ""}`}
       onKeyDown={(event) => {
         onKeyDown?.(event);
+
         if (
           event.defaultPrevented ||
           role !== "tablist" ||
           !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
         )
           return;
+
         const buttons = Array.from(
           event.currentTarget.querySelectorAll<HTMLButtonElement>(
             'button[role="tab"]:not(:disabled)',
           ),
         );
+
         if (!buttons.length) return;
+
         event.preventDefault();
+
         const current = Math.max(
           0,
           buttons.findIndex((button) => button === event.target),
         );
+
         const index =
           event.key === "Home"
             ? 0
@@ -70,9 +77,12 @@ export function Tabs({
                   buttons.length) %
                 buttons.length;
         const next = buttons[index];
+
         if (!next) return;
+
         next.focus();
         const value = next.dataset.tabValue;
+
         if (value !== undefined) onChange?.(value);
       }}
     >

@@ -34,6 +34,7 @@ export function KnowledgeListingPreview({
     let current = true;
     setLoading(true);
     setError("");
+
     const request =
       listing.kind === "package"
         ? getAdminPackage(listing.id).then((item): Content => ({
@@ -44,6 +45,7 @@ export function KnowledgeListingPreview({
             kind: "service",
             item,
           }));
+
     void request
       .then((data) => {
         if (current) setContent(data);
@@ -54,6 +56,7 @@ export function KnowledgeListingPreview({
       .finally(() => {
         if (current) setLoading(false);
       });
+
     return () => {
       current = false;
     };
@@ -71,6 +74,7 @@ export function KnowledgeListingPreview({
       />
     );
   }
+
   return (
     <CatalogDetailPreview entity="service" onClose={onClose}>
       {loading && <p role="status">Loading service…</p>}

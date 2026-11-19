@@ -12,6 +12,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
 const isWindows = process.platform === "win32";
 
 function run(command, args, label) {
@@ -25,6 +26,7 @@ function run(command, args, label) {
     console.error(`\n[setup] Could not run ${label}: ${result.error.message}`);
     process.exit(1);
   }
+
   if (result.status !== 0) {
     console.error(`\n[setup] ${label} failed (exit ${result.status}).`);
     process.exit(result.status ?? 1);
@@ -32,6 +34,7 @@ function run(command, args, label) {
 }
 
 const envPath = join(root, "apps", "api", ".env");
+
 const envExamplePath = join(root, "apps", "api", ".env.example");
 
 if (!existsSync(envPath)) {
@@ -43,6 +46,7 @@ const docker = spawnSync("docker", ["--version"], {
   stdio: "ignore",
   shell: isWindows,
 });
+
 if (docker.status !== 0) {
   console.error(
     [

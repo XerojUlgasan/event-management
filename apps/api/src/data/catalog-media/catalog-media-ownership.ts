@@ -16,6 +16,7 @@ export async function findMediaOwnersData(db: Database, id: string) {
       ]),
     )
     .execute();
+
   const services = await db
     .selectFrom("services as s")
     .select("s.id")
@@ -26,6 +27,7 @@ export async function findMediaOwnersData(db: Database, id: string) {
       ]),
     )
     .execute();
+
   return { packages, services };
 }
 
@@ -39,6 +41,7 @@ export async function listOwnerMediaIdsData(db: Database, owner: CanvasOwner) {
       OR o.thumbnail_media_id = m.id
     ) ORDER BY m.id
   `.execute(db);
+
   return result.rows.map((row) => row.id);
 }
 

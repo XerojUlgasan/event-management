@@ -12,13 +12,18 @@ export async function createEventDayService(
 ) {
   return db.transaction().execute(async (trx) => {
     const booking = await lockBookingRequestData(trx, bookingId);
+
     if (!booking) return fail("Booking request not found", 404);
+
     if (booking.status !== "accepted")
       return fail("Booking request must be accepted", 409);
+
     if (booking.requested_days !== null)
       return fail("This booking uses requested days for scheduling", 409);
+
     const schedule = validateSchedule(input, booking.time_zone);
     await touchBookingRevisionData(trx, bookingId);
+
     return one(trx, await createEventDayData(trx, bookingId, schedule));
   });
 }

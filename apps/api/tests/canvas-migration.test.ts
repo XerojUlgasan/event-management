@@ -17,19 +17,23 @@ test("package reset removes booking chats before detaching requests and preserve
   const name = `em_canvas_migration_${randomUUID().replaceAll("-", "")}`;
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
+
   try {
     await admin.query(`CREATE DATABASE "${name}"`);
     pool = new Pool({ ...connection, database: name });
     const root = new URL("../prisma/migrations/", import.meta.url);
+
     const entries = (await readdir(root, { withFileTypes: true }))
       .filter((e) => e.isDirectory())
       .sort((a, b) => a.name.localeCompare(b.name));
+
     for (const entry of entries.filter(
       (e) => e.name < "20261102130000_package_canvas",
     ))
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );
+
     const user = (
       await pool.query(
         "INSERT INTO users(email,role,password_hash) VALUES ('migration@example.test','customer','unused') RETURNING id",
@@ -77,6 +81,7 @@ test("package reset removes booking chats before detaching requests and preserve
         "utf8",
       ),
     );
+
     for (const table of [
       "packages",
       "booking_requests",
@@ -88,6 +93,7 @@ test("package reset removes booking chats before detaching requests and preserve
         ),
         0,
       );
+
     assert.equal(
       (await pool.query("SELECT body FROM messages")).rows[0].body,
       "General message",
@@ -96,6 +102,7 @@ test("package reset removes booking chats before detaching requests and preserve
       (await pool.query("SELECT id FROM conversations")).rows.map((r) => r.id),
       [general],
     );
+
     for (const table of ["users", "services"])
       assert.equal(
         Number(
@@ -103,6 +110,7 @@ test("package reset removes booking chats before detaching requests and preserve
         ),
         1,
       );
+
     assert.equal(
       (await pool.query("SELECT to_regclass('package_versions') AS table_name"))
         .rows[0].table_name,
@@ -137,18 +145,22 @@ test("package description migration preserves existing card excerpts and indepen
   const database = `em_description_migration_${randomUUID().replaceAll("-", "")}`;
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
+
   try {
     await admin.query(`CREATE DATABASE "${database}"`);
     pool = new Pool({ ...connection, database });
     const root = new URL("../prisma/migrations/", import.meta.url);
     const migration = "20261102170000_package_description";
+
     const entries = (await readdir(root, { withFileTypes: true }))
       .filter((e) => e.isDirectory())
       .sort((a, b) => a.name.localeCompare(b.name));
+
     for (const entry of entries.filter((e) => e.name < migration))
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );
+
     const pkg = (
       await pool.query(
         "INSERT INTO packages(name,event_types,guest_max,price) VALUES('Existing',ARRAY['Wedding'],100,1000) RETURNING id",
@@ -203,6 +215,7 @@ test("package description migration preserves existing card excerpts and indepen
       (await pool.query("SELECT count(*) FROM catalog_widgets")).rows[0].count,
       "2",
     );
+
     for (const table of ["services", "venues"])
       assert.equal(
         (await pool.query(`SELECT count(*) FROM ${table}`)).rows[0].count,

@@ -69,6 +69,7 @@ export function CustomerDashboard({
   const localMessages = useRef(new Set<string>());
   useEffect(() => {
     mounted.current = true;
+
     return () => {
       mounted.current = false;
     };
@@ -84,9 +85,11 @@ export function CustomerDashboard({
     }
   }, [notify]);
   const tab = customerTab(path);
+
   const go = (next: CustomerTab) => {
     navigateWorkspace(customerPaths[next]);
   };
+
   const [messageOpen, setMessageOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
@@ -121,14 +124,17 @@ export function CustomerDashboard({
       setConversationOpen(true);
     }
   }, [tab, requestedConversation]);
+
   const [bookingItem, setBookingItem] = useState<PublicPackage | null>(() =>
     new URLSearchParams(search).get("booking") === "resume"
       ? (readBookingDraft()?.item ?? null)
       : null,
   );
+
   const [bookingResume, setBookingResume] = useState(
     () => new URLSearchParams(search).get("booking") === "resume",
   );
+
   const [threadLoading, setThreadLoading] = useState(false);
   const [threadError, setThreadError] = useState("");
   const [newChatBusy, setNewChatBusy] = useState(false);
@@ -145,14 +151,19 @@ export function CustomerDashboard({
     const params = new URLSearchParams(search);
     const slug = params.get("book");
     const resume = params.get("booking") === "resume";
+
     if (resume) {
       setBookingItem(readBookingDraft()?.item ?? null);
       setBookingResume(true);
+
       return;
     }
+
     setBookingItem(null);
     setBookingResume(false);
+
     if (!slug) return;
+
     let active = true;
     getPackageBySlug(slug)
       .then((item) => {
@@ -167,6 +178,7 @@ export function CustomerDashboard({
           notifyError(cause, "Unable to open the selected package.");
         }
       });
+
     return () => {
       active = false;
     };
@@ -174,11 +186,13 @@ export function CustomerDashboard({
 
   useEffect(() => {
     if (tab !== "Messages") return;
+
     if (
       pendingBookingReference &&
       handledReference.current !== pendingBookingReference
     )
       return;
+
     if (
       !requestedConversation &&
       !selectedConversationId &&
@@ -200,15 +214,18 @@ export function CustomerDashboard({
       handledReference.current === pendingBookingReference
     )
       return;
+
     let active = true;
     const selection = referenceSelection.current;
     getMyConversations(undefined, pendingBookingReference)
       .then((result) => {
         if (!active || selection !== referenceSelection.current) return;
+
         handledReference.current = pendingBookingReference;
         setSelectedConversationId(
           result.conversations[0]?.id ?? messageConversations[0]?.id ?? null,
         );
+
         if (result.conversations.length) setConversationOpen(true);
       })
       .catch((cause) => {
@@ -217,6 +234,7 @@ export function CustomerDashboard({
             notifyError(cause, "Unable to find this booking conversation."),
           );
       });
+
     return () => {
       active = false;
     };
@@ -224,6 +242,7 @@ export function CustomerDashboard({
 
   useEffect(() => {
     if (tab !== "Messages" || !selectedConversationId) return;
+
     let active = true;
     const id = selectedConversationId;
     olderRequest.current++;
@@ -234,14 +253,18 @@ export function CustomerDashboard({
     setMessageThread((current) =>
       current?.conversation.id === id ? current : null,
     );
+
     const load = async () => {
       try {
         const thread = await getMyConversationById(id);
+
         if (!active) return;
+
         const unacknowledged = new Set(localMessages.current);
         setOutbox((current) => {
           const next = { ...current };
           thread.messages.forEach((message) => delete next[message.id]);
+
           return next;
         });
         thread.messages.forEach((message) =>
@@ -249,10 +272,12 @@ export function CustomerDashboard({
         );
         setMessageThread((current) => {
           const merged = mergePolledThread(current, thread, unacknowledged);
+
           if (merged.gap)
             setHistoryNotice(
               "New messages arrived while you were away. Earlier history was reset; scroll up to see it.",
             );
+
           return merged.thread;
         });
         setThreadError("");
@@ -271,8 +296,11 @@ export function CustomerDashboard({
         if (active) setThreadLoading(false);
       }
     };
+
     void load();
+
     const timer = window.setInterval(() => void load(), 5000);
+
     return () => {
       active = false;
       olderRequest.current++;
@@ -319,15 +347,19 @@ export function CustomerDashboard({
 
   const loadOlder = async () => {
     if (!messageThread?.nextCursor || olderPending.current) return;
+
     const id = messageThread.conversation.id;
     const cursor = messageThread.nextCursor;
     const request = ++olderRequest.current;
     olderPending.current = true;
     setLoadingOlder(true);
     setOlderError("");
+
     try {
       const older = await getMyConversationById(id, cursor);
+
       if (!mounted.current || request !== olderRequest.current) return;
+
       assertCursorMoved(older.nextCursor, cursor);
       older.messages.forEach((message) =>
         localMessages.current.delete(message.id),
@@ -357,6 +389,7 @@ export function CustomerDashboard({
       [message.id]: { conversationId: conversation.id, message, failed: false },
     }));
     localMessages.current.add(message.id);
+
     try {
       const result = await sendMyMessage(
         message.body,
@@ -381,7 +414,9 @@ export function CustomerDashboard({
         result.assistantMessage ?? result.message,
         sent,
       );
+
       if (result.assistantError) notifyError(new Error(result.assistantError));
+
       if (conversation.status === "closed") {
         setMessageThread((current) =>
           current?.conversation.id === conversation.id
@@ -416,7 +451,9 @@ export function CustomerDashboard({
 
   const sendMessage = async (body: string, thread = messageThread) => {
     const conversation = thread?.conversation;
+
     if (!conversation) return;
+
     const message: ChatMessage = {
       id: crypto.randomUUID(),
       body,
@@ -432,9 +469,11 @@ export function CustomerDashboard({
 
   const startNewChat = async () => {
     if (newChatBusy) return;
+
     referenceSelection.current++;
     handledReference.current = pendingBookingReference;
     setNewChatBusy(true);
+
     try {
       const thread = await createMyConversation();
       setSelectedConversationId(thread.conversation.id);
@@ -460,9 +499,12 @@ export function CustomerDashboard({
 
   const sendFromDialog = async () => {
     const body = messageDraft.trim();
+
     if (!body || dialogSending) return;
+
     setDialogSending(true);
     setDialogError("");
+
     try {
       const thread = messageThread ?? (await getMyConversation());
       setSelectedConversationId(thread.conversation.id);
@@ -481,18 +523,22 @@ export function CustomerDashboard({
 
   useEffect(() => {
     if (!accountMenuOpen) return;
+
     const closeOnOutside = (event: MouseEvent) => {
       if (!accountMenuRef.current?.contains(event.target as Node))
         setAccountMenuOpen(false);
     };
+
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setAccountMenuOpen(false);
         accountTriggerRef.current?.focus();
       }
     };
+
     document.addEventListener("mousedown", closeOnOutside);
     document.addEventListener("keydown", closeOnEscape);
+
     return () => {
       document.removeEventListener("mousedown", closeOnOutside);
       document.removeEventListener("keydown", closeOnEscape);
@@ -684,6 +730,7 @@ export function CustomerDashboard({
               onBookingSubmitted={() => setThreadRevision((value) => value + 1)}
               onBookingClosed={() => {
                 const url = new URL(window.location.href);
+
                 if (url.searchParams.has("createRequest")) {
                   url.searchParams.delete("createRequest");
                   navigateWorkspace(
@@ -757,6 +804,7 @@ export function CustomerDashboard({
               onRetryMessage={(id) => {
                 const item = outbox[id];
                 const conversation = messageThread?.conversation;
+
                 if (item && conversation?.id === item.conversationId)
                   void deliverMessage(conversation, item.message);
               }}

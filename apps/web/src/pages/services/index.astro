@@ -9,8 +9,10 @@ import {
 import type { PublicService } from "../../lib/data/catalog/services";
 
 let services: PublicService[] = [];
+
 let unavailable = false;
 let nextCursor: string | null = null;
+
 try {
   const page = await loadServicesPage(
     undefined,
@@ -21,6 +23,7 @@ try {
 } catch {
   unavailable = true;
 }
+
 const links = catalogPageLinks(Astro.url, nextCursor);
 ---
 

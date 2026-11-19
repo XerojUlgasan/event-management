@@ -4,6 +4,7 @@ import { request } from "../../http/request";
 
 export type BookingStatus =
   "under_review" | "needs_details" | "accepted" | "declined" | "cancelled";
+
 export type BookingRequestInput = {
   packageId?: string | null;
   packageUpdatedAt?: string;
@@ -16,6 +17,7 @@ export type BookingRequestInput = {
   phoneNumber: string;
   specialRequests?: string;
 };
+
 export type BookingRequest = Omit<
   BookingRequestInput,
   | "packageId"
@@ -66,6 +68,7 @@ export type BookingRequest = Omit<
   createdAt: string;
   updatedAt: string;
 };
+
 export type BookingRequestFilters = {
   status?: BookingStatus;
   preferredDate?: string;
@@ -75,39 +78,52 @@ export type BookingRequestFilters = {
 
 export const createBookingRequest = (body: BookingRequestInput) =>
   request<{ bookingRequest: BookingRequest }>("/booking-requests", body);
+
 export const getMyBookingRequests = (cursor?: string) =>
   request<{ bookingRequests: BookingRequest[]; nextCursor: string | null }>(
     `/booking-requests/mine${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
   );
+
 export const getMyBookingRequest = (id: string) =>
   request<{ bookingRequest: BookingRequest }>(
     `/booking-requests/${encodeURIComponent(id)}`,
   );
+
 export const getAdminBookingRequest = (id: string) =>
   request<{ bookingRequest: BookingRequest }>(
     `/admin/booking-requests/${encodeURIComponent(id)}`,
   );
+
 export const getAdminBookingRequestsPage = (filters: BookingRequestFilters) => {
   const query = new URLSearchParams();
+
   if (filters.limit) query.set("limit", String(filters.limit));
+
   if (filters.status) query.set("status", filters.status);
+
   if (filters.preferredDate) query.set("preferredDate", filters.preferredDate);
+
   if (filters.cursor) query.set("cursor", filters.cursor);
+
   return request<{
     bookingRequests: BookingRequest[];
     nextCursor: string | null;
   }>(`/admin/booking-requests?${query}`);
 };
+
 export const getBookingRequestCalendar = (
   month: string,
   status?: BookingStatus,
 ) => {
   const query = new URLSearchParams({ month });
+
   if (status) query.set("status", status);
+
   return request<{ dailyCounts: { preferredDate: string; count: number }[] }>(
     `/admin/booking-requests/calendar?${query}`,
   );
 };
+
 export const updateBookingRequestStatus = (
   id: string,
   status: BookingStatus,
@@ -119,6 +135,7 @@ export const updateBookingRequestStatus = (
     undefined,
     "PATCH",
   );
+
 export const cancelMyBookingRequest = (id: string, reason: string) =>
   request<{ bookingRequest: BookingRequest }>(
     `/booking-requests/${encodeURIComponent(id)}/cancel`,
@@ -146,6 +163,7 @@ export type BookingStatusHistoryEntry = {
   changedBy: string;
   createdAt: string;
 };
+
 export const getBookingStatusHistory = (
   id: string,
   admin: boolean,

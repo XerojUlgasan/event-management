@@ -35,6 +35,7 @@ export async function seedScenarioQuotations(
     .where("role", "=", "admin")
     .orderBy("id")
     .executeTakeFirst();
+
   if (!admin)
     throw new Error("Scenario quotations require a System Administrator");
 
@@ -59,6 +60,7 @@ export async function seedScenarioQuotations(
     .where("customer.role", "=", "customer")
     .orderBy("b.id")
     .execute();
+
   const existing = await db
     .selectFrom("quotations")
     .select(["id", "booking_request_id"])
@@ -68,6 +70,7 @@ export async function seedScenarioQuotations(
       input.bookings.map((booking) => booking.id),
     )
     .execute();
+
   const seededBookings = new Set(
     existing
       .filter(
@@ -77,9 +80,11 @@ export async function seedScenarioQuotations(
       )
       .map((row) => row.booking_request_id),
   );
+
   const occupiedBookings = new Set(
     existing.map((row) => row.booking_request_id),
   );
+
   const eligible = parents.filter(
     (booking) =>
       seededBookings.has(booking.id) ||
@@ -87,6 +92,7 @@ export async function seedScenarioQuotations(
         !["declined", "cancelled"].includes(booking.status) &&
         booking.conversation_status === "active"),
   );
+
   // Keep previously selected parents even when a user later closes their request.
   const selected = eligible
     .sort(
@@ -96,6 +102,7 @@ export async function seedScenarioQuotations(
     )
     .slice(0, SCENARIO_COUNT / 2)
     .sort((a, b) => a.id.localeCompare(b.id));
+
   if (selected.length !== SCENARIO_COUNT / 2) {
     throw new Error(
       "Scenario quotations require 50 customer bookings with an open conversation (or existing scenario quotations)",
@@ -103,13 +110,16 @@ export async function seedScenarioQuotations(
   }
 
   const plan = [];
+
   for (const [index, booking] of selected.entries()) {
     const pkg = await resolveBookingPackageData(db, booking);
     const base = pkg ? basePrice(pkg.price) : null;
+
     if (!pkg || base === null)
       throw new Error(
         `Scenario quotation booking ${booking.id} needs a priced proposal`,
       );
+
     const items: QuotationItem[] =
       index % 4 === 0
         ? []
@@ -132,10 +142,12 @@ export async function seedScenarioQuotations(
             },
           ];
     const total = amount(base, items);
+
     if (total === null || total < 0)
       throw new Error(
         `Scenario quotation booking ${booking.id} has an invalid total`,
       );
+
     for (const version of [1, 2]) {
       const status: QuotationStatus =
         version === 1 ? "superseded" : index % 3 === 0 ? "draft" : "sent";
@@ -176,16 +188,21 @@ export async function seedScenarioQuotations(
       });
     }
   }
+
   expectCount("quotations", plan.length);
 
   let quotations = 0;
   let quotationMessages = 0;
   let quotationAuditEvents = 0;
+
   for (const { row, booking } of plan) {
     const inserted = await insertIfNew(db, "quotations", row);
+
     if (inserted) quotations += 1;
+
     // Existing quotations may have been revised by the API. Preserve their lifecycle too.
     if (!inserted) continue;
+
     if (
       row.sent_at &&
       (await insertIfNew(db, "messages", {
@@ -200,6 +217,7 @@ export async function seedScenarioQuotations(
       }))
     )
       quotationMessages += 1;
+
     const events = [
       {
         action: row.version === 1 ? "quotation.created" : "quotation.revised",
@@ -219,6 +237,7 @@ export async function seedScenarioQuotations(
         ? [{ action: "quotation.sent", actor: admin.id, at: row.sent_at }]
         : []),
     ];
+
     for (const event of events) {
       if (
         await insertIfNew(db, "audit_events", {
@@ -243,6 +262,7 @@ export async function seedScenarioQuotations(
         quotationAuditEvents += 1;
     }
   }
+
   return {
     quotations: plan.map(({ row }) => row),
     inserted: { quotations, quotationMessages, quotationAuditEvents },

@@ -14,25 +14,32 @@ export type {
   CatalogWidget,
   CatalogSection,
 } from "@event-management/contracts/catalog";
+
 export type PublicPackage = CatalogPackage;
+
 export type AdminPackage = CatalogPackage;
 
 export const getPackages = (page?: PublicCatalogPageQuery) =>
   request<{ packages: PublicPackage[]; nextCursor: string | null }>(
     `/packages${pageQuery(page)}`,
   );
+
 export const getPackage = (id: string) =>
   request<PublicPackage>(`/packages/${encodeURIComponent(id)}`);
+
 export const getPackageBySlug = (slug: string) =>
   request<PublicPackage>(`/packages/slug/${encodeURIComponent(slug)}`);
+
 export const getAdminPackages = (page?: CatalogPageQuery) =>
   request<{
     packages: AdminPackage[];
     nextCursor: string | null;
     counts: { active: number; archived: number; filtered: number };
   }>(`/admin/packages${pageQuery(page)}`);
+
 export const getAdminPackage = (id: string) =>
   request<AdminPackage>(`/admin/packages/${encodeURIComponent(id)}`);
+
 export const createPackage = (
   content: PackageContent,
   thumbnailMediaId?: string | null,
@@ -41,6 +48,7 @@ export const createPackage = (
     ...content,
     ...(thumbnailMediaId !== undefined ? { thumbnailMediaId } : {}),
   });
+
 export const updatePackage = (
   id: string,
   content: PackageContent,
@@ -59,11 +67,13 @@ export const updatePackage = (
     undefined,
     "PATCH",
   );
+
 export const archivePackage = (id: string) =>
   request<AdminPackage>(
     `/admin/packages/${encodeURIComponent(id)}/archive`,
     {},
   );
+
 export const deletePackage = (id: string) =>
   request<void>(
     `/admin/packages/${encodeURIComponent(id)}`,
@@ -71,5 +81,6 @@ export const deletePackage = (id: string) =>
     undefined,
     "DELETE",
   );
+
 export const packageImageSrc = (imageUrl: string | null): string | undefined =>
   imageUrl ? catalogMediaSrc(imageUrl) : undefined;

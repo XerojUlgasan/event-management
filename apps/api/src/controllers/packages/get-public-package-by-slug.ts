@@ -23,5 +23,6 @@ export const getPublicPackageBySlugRouteHandler: AppRouteHandler<
     c.get("db"),
     c.req.valid("param").slug,
   );
+
   return row ? c.json(row, 200) : jsonError(c, "Package not found", 404);
 };

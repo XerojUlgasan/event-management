@@ -14,20 +14,26 @@ function seedId(key: string) {
   bytes[6] = (bytes[6] & 0x0f) | 0x50;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = bytes.toString("hex");
+
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function seedClock() {
   const value = env.SEED_CLOCK;
+
   if (!value) return new Date();
+
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) {
     throw new Error(
       "SEED_CLOCK must be an ISO UTC timestamp, for example 2026-10-31T00:00:00Z",
     );
   }
+
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime()))
     throw new Error("SEED_CLOCK is not a valid date");
+
   return date;
 }
 
@@ -71,6 +77,7 @@ const users = [
 ] as const;
 
 type UserKey = (typeof users)[number]["key"];
+
 export async function seedDemo(db: SeedDb, passwordHash: string) {
   const now = seedClock();
   const count = {
@@ -89,6 +96,7 @@ export async function seedDemo(db: SeedDb, passwordHash: string) {
 
   for (const user of users) {
     const id = seedId(`user:${user.key}`);
+
     if (
       !(await db
         .selectFrom("users")
@@ -111,13 +119,16 @@ export async function seedDemo(db: SeedDb, passwordHash: string) {
         .onConflict((conflict) => conflict.doNothing())
         .returning("id")
         .executeTakeFirst();
+
       if (inserted) count.users++;
     }
+
     const row = await db
       .selectFrom("users")
       .select(["id", "role", "display_name"])
       .where("id", "=", id)
       .executeTakeFirst();
+
     if (row)
       persistedUsers.set(user.key, {
         id: row.id,
@@ -130,6 +141,7 @@ export async function seedDemo(db: SeedDb, passwordHash: string) {
   for (const user of users.filter((item) => item.role === "customer")) {
     const customer = persistedUsers.get(user.key);
     const admin = persistedUsers.get("admin");
+
     if (
       !customer ||
       customer.role !== "customer" ||
@@ -137,7 +149,9 @@ export async function seedDemo(db: SeedDb, passwordHash: string) {
       admin.role !== "admin"
     )
       continue;
+
     const id = seedId(`conversation:${user.key}`);
+
     const inserted = await db
       .insertInto("conversations")
       .values({
@@ -149,13 +163,17 @@ export async function seedDemo(db: SeedDb, passwordHash: string) {
       .onConflict((conflict) => conflict.doNothing())
       .returning("id")
       .executeTakeFirst();
+
     if (inserted) count.conversations++;
+
     const conversation = await db
       .selectFrom("conversations")
       .select(["id", "customer_id"])
       .where("id", "=", id)
       .executeTakeFirst();
+
     if (!conversation || conversation.customer_id !== customer.id) continue;
+
     const subject =
       {
         ana: "wedding",
@@ -164,6 +182,7 @@ export async function seedDemo(db: SeedDb, passwordHash: string) {
         daniel: "wedding",
         ella: "birthday",
       }[user.key] ?? "private";
+
     for (const [index, sender, body] of [
       [0, customer, `Hello, I would like to ask about a ${subject} event.`],
       [
@@ -186,6 +205,7 @@ export async function seedDemo(db: SeedDb, passwordHash: string) {
         .onConflict((conflict) => conflict.doNothing())
         .returning("id")
         .executeTakeFirst();
+
       if (message) count.messages++;
     }
   }

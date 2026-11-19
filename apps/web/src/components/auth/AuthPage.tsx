@@ -65,15 +65,19 @@ export function AuthPage({
             `Use a password with at least ${MIN_PASSWORD_LENGTH} characters.`,
           ),
         );
+
         return;
       }
+
       if (password !== confirmPassword) {
         setFormError(notifyError("Passwords do not match."));
+
         return;
       }
     }
 
     setSubmitting(true);
+
     try {
       if (mode === "register") {
         await signUp(name.trim(), email.trim(), password);
@@ -94,6 +98,7 @@ export function AuthPage({
     setFormError("");
     clearError();
     setSubmitting(true);
+
     try {
       await signInWithGoogle();
     } catch {

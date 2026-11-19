@@ -19,16 +19,19 @@ test("application canvas validation migration removes SQL validation without cha
   const database = `em_canvas_validation_${randomUUID().replaceAll("-", "")}`;
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
+
   try {
     await admin.query(`CREATE DATABASE "${database}"`);
     pool = new Pool({ ...connection, database });
     const root = new URL("../prisma/migrations/", import.meta.url);
+
     for (const entry of (await readdir(root, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory() && entry.name < migration)
       .sort((a, b) => a.name.localeCompare(b.name)))
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );
+
     const canvas = [
       {
         id: randomUUID(),
@@ -59,6 +62,7 @@ test("application canvas validation migration removes SQL validation without cha
       [JSON.stringify(canvas)],
     );
     const snapshots = new Map<string, unknown>();
+
     for (const table of ["packages", "services"])
       snapshots.set(
         table,
@@ -68,6 +72,7 @@ test("application canvas validation migration removes SQL validation without cha
           )
         ).rows,
       );
+
     await pool.query(
       await readFile(new URL(`${migration}/migration.sql`, root), "utf8"),
     );
@@ -87,6 +92,7 @@ test("application canvas validation migration removes SQL validation without cha
       ).rows[0].count,
       0,
     );
+
     for (const table of ["packages", "services"]) {
       assert.deepEqual(
         (

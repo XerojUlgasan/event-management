@@ -30,11 +30,13 @@ import { serviceError } from "../../utils/service-result.js";
 
 const error = (message: string, status: 400 | 404 | 409 | 502) =>
   serviceError(message, status);
+
 export type CustomPackageInput = Content & {
   expectedBookingUpdatedAt: string;
   expectedUpdatedAt?: string;
   sourcePackageId?: string;
 };
+
 async function stageSourceMedia(
   db: Kysely<DB>,
   sourceId: string,
@@ -46,6 +48,7 @@ async function stageSourceMedia(
     kind: "package",
     id: sourceId,
   });
+
   const requestedIds = [
     ...new Set([
       ...content.sections.flatMap((section) =>
@@ -58,13 +61,17 @@ async function stageSourceMedia(
       ...(content.thumbnailMediaId ? [content.thumbnailMediaId] : []),
     ]),
   ].filter((id) => sourceIds.includes(id));
+
   const replacements = new Map<string, string>();
+
   for (const sourceMediaId of requestedIds) {
     const source = await findCatalogMediaData(db, sourceMediaId);
+
     if (!source?.storage_key || !source.mime_type || source.source !== "upload")
       throw new InvalidCatalogMedia(
         "Source media is unavailable. Refresh and try again",
       );
+
     const id = randomUUID(),
       key = pendingCatalogMediaKey(actorId, id, source.mime_type);
     await createCatalogMediaData(db, {
@@ -91,6 +98,7 @@ async function stageSourceMedia(
     );
     replacements.set(sourceMediaId, id);
   }
+
   return {
     ...content,
     thumbnailMediaId: content.thumbnailMediaId
@@ -101,6 +109,7 @@ async function stageSourceMedia(
       widgets: section.widgets.map((widget) => {
         const media = widget.media;
         const id = media?.id && replacements.get(media.id);
+
         return media && id
           ? {
               ...widget,
@@ -111,6 +120,7 @@ async function stageSourceMedia(
     })),
   };
 }
+
 export async function saveCustomPackageService(
   db: Kysely<DB>,
   id: string,
@@ -120,9 +130,12 @@ export async function saveCustomPackageService(
 ) {
   const stagedIds: string[] = [];
   let previousMediaIds: string[] = [];
+
   try {
     const booking = await findBookingRequestData(db, id);
+
     if (!booking) return error("Booking request not found", 404);
+
     const custom = await findCustomPackageData(db, id);
     const sourceId = create
       ? (input.sourcePackageId ?? booking.package_id)
@@ -130,23 +143,31 @@ export async function saveCustomPackageService(
     const source = sourceId
       ? await findAnyPackageData(db, sourceId)
       : undefined;
+
     if (sourceId && !source) return error("Package not found", 404);
+
     if (!create && !source) return error("Package not found", 404);
+
     if (["declined", "cancelled"].includes(booking.status))
       return error("Closed booking requests cannot be customized", 409);
+
     if (
       booking.revision !== input.expectedBookingUpdatedAt ||
       (source && source.updated_at.toISOString() !== input.expectedUpdatedAt)
     )
       return error("Booking or package changed. Refresh and try again", 409);
+
     if (
       (create && (custom || (source && source.package_type !== "catalog"))) ||
       (!create && (!custom || source?.id !== custom.id))
     )
       return error("Custom package state changed. Refresh and try again", 409);
+
     if (source?.archived_at)
       return error("Archived packages cannot be customized", 409);
+
     let content: Content = input;
+
     if (create && source) {
       try {
         content = await stageSourceMedia(
@@ -158,17 +179,23 @@ export async function saveCustomPackageService(
         );
       } catch (cause) {
         if (cause instanceof InvalidCatalogMedia) throw cause;
+
         await cleanupCatalogMediaService(db, stagedIds);
+
         return error("Could not copy package media. Try again", 502);
       }
     }
+
     const outcome = await db.transaction().execute(async (trx) => {
       const currentBooking = await lockBookingRequestData(trx, id);
+
       if (!currentBooking) return error("Booking request not found", 404);
+
       const current = source
         ? await lockAnyPackageData(trx, source.id)
         : undefined;
       const currentCustom = await findCustomPackageData(trx, id);
+
       if (
         (source && !current) ||
         currentBooking.revision !== input.expectedBookingUpdatedAt ||
@@ -176,8 +203,10 @@ export async function saveCustomPackageService(
           current.updated_at.toISOString() !== input.expectedUpdatedAt)
       )
         return error("Booking or package changed. Refresh and try again", 409);
+
       if (["declined", "cancelled"].includes(currentBooking.status))
         return error("Closed booking requests cannot be customized", 409);
+
       if (
         current?.archived_at ||
         (create
@@ -188,13 +217,16 @@ export async function saveCustomPackageService(
           "Custom package state changed. Refresh and try again",
           409,
         );
+
       const before = current ? await packageDto(trx, current) : null;
       const now = current ? nextUpdate(current.updated_at) : new Date();
+
       if (!create && !current)
         return error(
           "Custom package state changed. Refresh and try again",
           409,
         );
+
       const saved = create
         ? await createCustomPackageData(
             trx,
@@ -206,19 +238,25 @@ export async function saveCustomPackageService(
         : current
           ? await updatePackageData(trx, current.id, content, current.slug, now)
           : undefined;
+
       if (!saved) throw new Error("Custom package state is unavailable");
+
       previousMediaIds = await replaceCatalogSectionsService(
         trx,
         { kind: "package", id: saved.id },
         content,
         actorId,
       );
+
       if (!create && current?.thumbnail_media_id)
         previousMediaIds.push(current.thumbnail_media_id);
+
       await touchBookingRevisionData(trx, id);
       const updatedBooking = await findBookingRequestData(trx, id);
+
       if (!updatedBooking)
         throw new Error("Saved booking request is unavailable");
+
       const pkg = await packageDto(trx, saved);
       await createAuditEventData(trx, {
         actor_id: actorId,
@@ -235,21 +273,27 @@ export async function saveCustomPackageService(
         }),
       });
       const [bookingRequest] = await bookingRequestDtos(trx, [updatedBooking]);
+
       return { package: pkg, bookingRequest };
     });
+
     if (!("status" in outcome))
       await promoteOwnerCatalogMediaService(db, {
         kind: "package",
         id: outcome.package.id,
       });
+
     await cleanupCatalogMediaService(
       db,
       "status" in outcome ? stagedIds : previousMediaIds,
     );
+
     return outcome;
   } catch (cause) {
     await cleanupCatalogMediaService(db, stagedIds);
+
     if (cause instanceof InvalidCatalogMedia) return error(cause.message, 400);
+
     if (
       typeof cause === "object" &&
       cause !== null &&
@@ -257,6 +301,7 @@ export async function saveCustomPackageService(
       cause.code === "23505"
     )
       return error("Custom package already exists. Refresh and try again", 409);
+
     throw cause;
   }
 }

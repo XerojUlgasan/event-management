@@ -34,6 +34,7 @@ export function AdminSidebar({
   const labelFor: Partial<Record<NavKey, string>> = {
     Customers: "Customers",
   };
+
   return (
     <aside className={`sidebar ${collapsed ? "" : "sidebar-open"}`}>
       <div className="sidebar-top">

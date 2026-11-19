@@ -8,7 +8,9 @@ import {
 import { hashSessionToken } from "../../utils/session.js";
 
 export type GuestDatabase = Kysely<DB>;
+
 export type GuestConversation = Selectable<Conversations>;
+
 export class GuestChatError extends Error {
   constructor(
     public status: 404 | 409 | 410,
@@ -18,6 +20,7 @@ export class GuestChatError extends Error {
     super(message);
   }
 }
+
 export function guestStatus(conversation: GuestConversation): GuestChatStatus {
   return {
     customerMessageCount: conversation.guest_customer_message_count,
@@ -30,9 +33,11 @@ export function guestStatus(conversation: GuestConversation): GuestChatStatus {
       conversation.guest_customer_message_count >= GUEST_CUSTOMER_MESSAGE_LIMIT,
   };
 }
+
 export function guestExpiry(now = new Date()) {
   return new Date(now.getTime() + GUEST_INACTIVITY_TTL_MS);
 }
+
 export function assertGuestActive(conversation: GuestConversation) {
   if (
     conversation.guest_expires_at &&
@@ -43,33 +48,42 @@ export function assertGuestActive(conversation: GuestConversation) {
       "This guest conversation expired. Start a new chat.",
       "guest_expired",
     );
+
   if (conversation.status !== "active")
     throw new GuestChatError(409, "Conversation is closed");
 }
+
 export async function lockGuestConversation(
   trx: Transaction<DB>,
   id: string,
   token: string | undefined,
 ) {
   if (!token) throw new GuestChatError(404, "Conversation not found");
+
   const conversation = await trx
     .selectFrom("conversations")
     .selectAll()
     .where("id", "=", id)
     .forUpdate()
     .executeTakeFirst();
+
   if (!conversation?.guest_identity_id || conversation.customer_id)
     throw new GuestChatError(404, "Conversation not found");
+
   const identity = await trx
     .selectFrom("guest_chat_identities")
     .select("id")
     .where("id", "=", conversation.guest_identity_id)
     .where("token_hash", "=", hashSessionToken(token))
     .executeTakeFirst();
+
   if (!identity) throw new GuestChatError(404, "Conversation not found");
+
   assertGuestActive(conversation);
+
   return conversation;
 }
+
 export async function bootstrapGuestConversationData(
   db: GuestDatabase,
   token: string,
@@ -94,14 +108,17 @@ export async function bootstrapGuestConversationData(
       .where("status", "=", "active")
       .forUpdate()
       .executeTakeFirst();
+
     if (current && current.guest_expires_at!.getTime() > Date.now())
       return current;
+
     if (current)
       await trx
         .updateTable("conversations")
         .set({ status: "closed", closed_at: sql`clock_timestamp()` })
         .where("id", "=", current.id)
         .execute();
+
     return trx
       .insertInto("conversations")
       .values({
@@ -120,6 +137,7 @@ export async function resolveGuestTokenData(
   token: string | undefined,
 ) {
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return false;
+
   return Boolean(
     await db
       .selectFrom("guest_chat_identities")

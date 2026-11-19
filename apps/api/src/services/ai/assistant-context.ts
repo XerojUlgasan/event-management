@@ -21,12 +21,16 @@ export async function buildPreviousCatalogSearchContext({
     customerMessageId,
     toolName: "searchPublicCatalog",
   });
+
   if (!previous) return undefined;
+
   const input = searchPublicCatalogInputSchema.safeParse(previous.input);
   const output = z
     .object({ nextCursor: z.string().min(1).max(MAX_CURSOR_LENGTH).nullable() })
     .safeParse(previous.output);
+
   if (!input.success || !output.success) return undefined;
+
   return { input: input.data, nextCursor: output.data.nextCursor };
 }
 
@@ -44,14 +48,18 @@ export async function buildPreviousCatalogItemContext({
     customerMessageId,
     toolName: "getPublicCatalogItem",
   });
+
   if (!previous) return undefined;
+
   const input = getPublicCatalogItemInputSchema.safeParse(previous.input);
   const output = z
     .object({
       nextCursor: z.string().min(1).max(MAX_CURSOR_LENGTH).nullable(),
     })
     .safeParse(previous.output);
+
   if (!input.success || !output.success) return undefined;
+
   return { input: input.data, nextCursor: output.data.nextCursor };
 }
 
@@ -67,6 +75,7 @@ export async function buildAssistantContext({
   const booking = bookingRequestId
     ? await getBookingRequestService(db, bookingRequestId, customerId)
     : null;
+
   if (bookingRequestId && !booking)
     throw new Error("Booking request not found");
 

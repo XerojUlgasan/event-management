@@ -28,11 +28,15 @@ export function createAssistantMessageData(
         ? conversation.guest_identity_id === guestIdentityId ||
           conversation.claimed_guest_identity_id === guestIdentityId
         : conversation.customer_id === customerId && customerId !== null);
+
     if (!owned || conversation.status !== "active")
       throw new Error("Conversation is unavailable");
+
     if (conversation.guest_identity_id) assertGuestActive(conversation);
+
     if (!conversation.ai_enabled || conversation.ai_version !== aiVersion)
       return null;
+
     const message = await trx
       .insertInto("messages")
       .values({
@@ -44,11 +48,13 @@ export function createAssistantMessageData(
       })
       .returningAll()
       .executeTakeFirstOrThrow();
+
     if (toolTurn)
       await linkToolCallsToReplyData(trx, {
         ...toolTurn,
         assistantMessageId: message.id,
       });
+
     await trx
       .updateTable("conversations")
       .set({
@@ -59,6 +65,7 @@ export function createAssistantMessageData(
       })
       .where("id", "=", conversationId)
       .execute();
+
     return { ...message, sender_display_name: null, sender_email: null };
   });
 }

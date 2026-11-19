@@ -17,6 +17,7 @@ export async function listAdminPackagesPageService(
 ) {
   const scope = `packages:admin:${options.archived ?? "all"}:${options.search ?? ""}`;
   const { position, cursorFor } = catalogCursor(options.cursor, scope);
+
   return db
     .transaction()
     .setIsolationLevel("repeatable read")
@@ -26,6 +27,7 @@ export async function listAdminPackagesPageService(
         countAdminPackagesData(trx, options),
       ]);
       const page = createPage(rows, options.limit, cursorFor);
+
       return {
         packages: await Promise.all(
           page.items.map((row) => packageDto(trx, row)),

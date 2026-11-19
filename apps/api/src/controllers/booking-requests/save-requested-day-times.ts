@@ -8,6 +8,7 @@ import {
   saveRequestedDayTimesSchema,
 } from "./schemas.js";
 import { body, errors, json } from "./http.js";
+
 export const saveRequestedDayTimesRoute = createRoute({
   method: "patch",
   path: "/booking-requests/{id}/requested-days/{date}/times",
@@ -24,6 +25,7 @@ export const saveRequestedDayTimesRoute = createRoute({
     ...errors,
   },
 });
+
 export const saveRequestedDayTimesRouteHandler: AppRouteHandler<
   typeof saveRequestedDayTimesRoute
 > = async (c) => {
@@ -35,7 +37,9 @@ export const saveRequestedDayTimesRouteHandler: AppRouteHandler<
     c.get("session").user.id,
     c.req.valid("json"),
   );
+
   if ("message" in result)
     return jsonError(c, result.message, result.status);
+
   return c.json({ bookingRequest: result }, 200);
 };

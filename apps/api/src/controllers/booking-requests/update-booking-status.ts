@@ -4,6 +4,7 @@ import type { AppRouteHandler } from "../../types/hono.js";
 import { updateBookingStatusService } from "../../services/booking-requests/update-booking-status.js";
 import { bookingSchema, idParams, updateStatusSchema } from "./schemas.js";
 import { body, errors, json } from "./http.js";
+
 export const updateBookingStatusRoute = createRoute({
   method: "patch",
   path: "/admin/booking-requests/{id}/status",
@@ -17,6 +18,7 @@ export const updateBookingStatusRoute = createRoute({
     ...errors,
   },
 });
+
 export const updateBookingStatusRouteHandler: AppRouteHandler<
   typeof updateBookingStatusRoute
 > = async (c) => {
@@ -28,7 +30,9 @@ export const updateBookingStatusRouteHandler: AppRouteHandler<
     input.status,
     input.reason,
   );
+
   if ("message" in result)
     return jsonError(c, result.message, result.status);
+
   return c.json({ bookingRequest: result }, 200);
 };

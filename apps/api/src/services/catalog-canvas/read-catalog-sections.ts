@@ -20,6 +20,7 @@ export async function readCatalogSectionsService(
   owner: CanvasOwner,
 ) {
   const sections = await readStoredCanvasData(db, owner);
+
   const serviceIds = [
     ...new Set(
       sections.flatMap((s) =>
@@ -29,6 +30,7 @@ export async function readCatalogSectionsService(
       ),
     ),
   ];
+
   const packageIds = [
     ...new Set(
       sections.flatMap((section) =>
@@ -40,17 +42,22 @@ export async function readCatalogSectionsService(
       ),
     ),
   ];
+
   const packages = await listCanvasPackagesData(db, packageIds);
   const services = await listCanvasServicesData(db, serviceIds);
   const ids = canvasMediaIds(sections);
   const assets = await listCanvasAssetsData(db, ids);
+
   const byId = new Map(assets.map((asset) => [asset.id, asset]));
+
   const serviceById = new Map(
     services.map((service) => [service.id, canvasReference(service)]),
   );
+
   const packageById = new Map(
     packages.map((item) => [item.id, canvasReference(item)]),
   );
+
   return sectionsSchema.parse(
     sections.map((section) => ({
       ...section,
@@ -61,15 +68,20 @@ export async function readCatalogSectionsService(
             media: null,
             package: packageById.get(widget.packageId ?? "") ?? null,
           };
+
         if (widget.type === "service")
           return {
             ...widget,
             media: null,
             service: serviceById.get(widget.serviceId ?? "") ?? null,
           };
+
         if (!mediaId) return { ...widget, media: null };
+
         const media = byId.get(mediaId);
+
         if (!media) throw new Error(`Catalog media ${mediaId} is unavailable`);
+
         return {
           ...widget,
           media: canvasMedia(media),
@@ -78,10 +90,12 @@ export async function readCatalogSectionsService(
     })),
   );
 }
+
 export async function listCatalogMediaIdsService(
   db: Database,
   owner: CanvasOwner,
 ) {
   const sections = await readStoredCanvasData(db, owner);
+
   return canvasMediaIds(sections);
 }
