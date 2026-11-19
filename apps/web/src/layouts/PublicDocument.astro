@@ -19,6 +19,27 @@ const { title, description } = Astro.props;
     <link rel="canonical" href={Astro.url.href} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>{title}</title>
+    <script>
+      // Public catalog cards are server-rendered, so React handlers do not run.
+      const hideFailedThumbnail = (image: HTMLImageElement) => {
+        if (image.matches("[data-catalog-thumbnail-image]"))
+          image.hidden = true;
+      };
+      document.addEventListener(
+        "error",
+        (event) => {
+          if (event.target instanceof HTMLImageElement)
+            hideFailedThumbnail(event.target);
+        },
+        true,
+      );
+      document
+        .querySelectorAll<HTMLImageElement>("[data-catalog-thumbnail-image]")
+        .forEach((image) => {
+          if (image.complete && image.naturalWidth === 0)
+            hideFailedThumbnail(image);
+        });
+    </script>
   </head>
   <body>
     <div class="public-site">

@@ -32,7 +32,7 @@ export const contentSchema = z
   })
   .strict();
 export type Content = z.infer<typeof contentSchema>;
-// Response schemas include the stored description and derived cover image.
+// imageUrl contains only the dedicated thumbnail; null uses the UI default.
 export const publicSchema = z.object({
   name: z.string(),
   maxGuests: z.number(),

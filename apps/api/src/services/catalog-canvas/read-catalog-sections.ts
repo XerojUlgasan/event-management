@@ -11,7 +11,6 @@ import {
 } from "../../data/catalog-canvas/catalog-canvas-queries.js";
 import {
   canvasMediaIds,
-  firstCanvasPhotoId,
   canvasReference,
   canvasMedia,
 } from "../../utils/catalog-canvas.js";
@@ -42,36 +41,15 @@ export async function readCatalogSectionsService(
     ),
   ];
   const packages = await listCanvasPackagesData(db, packageIds);
-  const packagePhotos = new Map(
-    packages.map((item) => [item.id, firstCanvasPhotoId(item.canvas)]),
-  );
   const services = await listCanvasServicesData(db, serviceIds);
-  const servicePhotos = new Map(
-    services.map((service) => [service.id, firstCanvasPhotoId(service.canvas)]),
-  );
-  const ids = [
-    ...new Set([
-      ...canvasMediaIds(sections),
-      ...[...servicePhotos.values(), ...packagePhotos.values()].filter(
-        (id): id is string => id !== null,
-      ),
-    ]),
-  ];
+  const ids = canvasMediaIds(sections);
   const assets = await listCanvasAssetsData(db, ids);
   const byId = new Map(assets.map((asset) => [asset.id, asset]));
   const serviceById = new Map(
-    services.map((service) => {
-      const photoId = servicePhotos.get(service.id);
-      const photo = photoId ? byId.get(photoId) : undefined;
-      return [service.id, canvasReference(service, photo)];
-    }),
+    services.map((service) => [service.id, canvasReference(service)]),
   );
   const packageById = new Map(
-    packages.map((item) => {
-      const photoId = packagePhotos.get(item.id);
-      const photo = photoId ? byId.get(photoId) : undefined;
-      return [item.id, canvasReference(item, photo)];
-    }),
+    packages.map((item) => [item.id, canvasReference(item)]),
   );
   return sectionsSchema.parse(
     sections.map((section) => ({

@@ -5,7 +5,7 @@ import {
   priceLabel,
   servicePricingLabels,
 } from "../../../lib/utils/formatting/money";
-import { photos } from "../../../demo/catalog/photos";
+import { CatalogThumbnail } from "@event-management/ui";
 
 export function PackageCards({ items }: { items: PublicPackage[] }) {
   return (
@@ -14,11 +14,7 @@ export function PackageCards({ items }: { items: PublicPackage[] }) {
         <article className="catalog-card" key={item.id}>
           <a href={`/packages/${item.slug}`}>
             <div className="catalog-card-image">
-              <img
-                src={packageImageSrc(item.imageUrl) || photos.dinner}
-                alt=""
-                loading="lazy"
-              />
+              <CatalogThumbnail src={packageImageSrc(item.imageUrl)} />
             </div>
             <div className="catalog-card-body">
               <span className="catalog-card-kicker">Event package</span>
@@ -48,13 +44,7 @@ export function ServiceCards({ items }: { items: PublicService[] }) {
           <article className="catalog-card" key={item.id}>
             <a href={`/services/${item.slug}`}>
               <div className="catalog-card-image">
-                {item.imageUrl && (
-                  <img
-                    src={packageImageSrc(item.imageUrl)}
-                    alt=""
-                    loading="lazy"
-                  />
-                )}
+                <CatalogThumbnail src={packageImageSrc(item.imageUrl)} />
               </div>
               <div className="catalog-card-body">
                 <span className="catalog-card-kicker">Event service</span>

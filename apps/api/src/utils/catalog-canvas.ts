@@ -13,6 +13,7 @@ type CatalogReference = {
   slug: string;
   name: string;
   description: string;
+  thumbnail_media_id: string | null;
 };
 
 export function canvasMediaIds(sections: StoredSections) {
@@ -27,32 +28,21 @@ export function canvasMediaIds(sections: StoredSections) {
   ];
 }
 
-export function firstCanvasPhotoId(canvas: unknown) {
-  return (
-    storedSectionsSchema
-      .parse(canvas)
-      .flatMap((section) => section.widgets)
-      .find((widget) => widget.type === "photo" && widget.mediaId)?.mediaId ??
-    null
-  );
-}
-
 export function catalogMediaUrl(media: Asset) {
   return media.source === "upload"
     ? `/v1/catalog-media/${media.id}`
     : media.url;
 }
 
-export function canvasReference(
-  record: CatalogReference,
-  photo: Asset | undefined,
-) {
+export function canvasReference(record: CatalogReference) {
   return {
     id: record.id,
     slug: record.slug,
     name: record.name,
     description: record.description,
-    imageUrl: photo ? catalogMediaUrl(photo) : null,
+    imageUrl: record.thumbnail_media_id
+      ? `/v1/catalog-media/${record.thumbnail_media_id}`
+      : null,
   };
 }
 

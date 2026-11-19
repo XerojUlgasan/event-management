@@ -319,7 +319,7 @@ test("services save directly, validate complete content, and enforce permissions
   assert.equal(created.name, content.name);
   assert.equal(created.hourlyRatePesos, 500);
   assert.equal("imageId" in created, false);
-  assert.equal(created.imageUrl, created.sections[0].widgets[0].media.url);
+  assert.equal(created.imageUrl, null);
   assert.ok(created.publishedAt);
   for (const key of ["draft", "published", "versions", "version", "state"])
     assert.equal(key in created, false);
@@ -611,7 +611,7 @@ test("service canvas photos replace legacy image uploads and clean up removed me
   );
   assert.equal(
     (await read(await call(`/services/${created.id}`), 200)).imageUrl,
-    newPhoto.url,
+    null,
   );
   assert.equal((await app.request(oldPhoto.url)).status, 404);
   await read(
@@ -714,7 +714,7 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
   );
   assert.equal(created.name, data.name);
   assert.equal(created.description, data.description);
-  assert.equal(created.imageUrl, "/images/wedding.jpg");
+  assert.equal(created.imageUrl, null);
   for (const key of [
     "draft",
     "published",
@@ -2396,7 +2396,7 @@ test("service canvases save rich content directly and enforce media ownership", 
     })),
   );
   const visible = await read(await call(`/services/${created.id}`), 200);
-  assert.equal(visible.imageUrl, photo.url);
+  assert.equal(visible.imageUrl, null);
   assert.deepEqual(
     visible.sections[0].widgets.map((w: any) => [w.type, w.x, w.y, w.w, w.h]),
     [
@@ -3069,10 +3069,7 @@ test("linked service widgets are validated, hydrated, and protect references", a
     publicPackage.sections[0].widgets[0].service.name,
     "Linked service",
   );
-  assert.equal(
-    publicPackage.sections[0].widgets[0].service.imageUrl,
-    "/images/wedding.jpg",
-  );
+  assert.equal(publicPackage.sections[0].widgets[0].service.imageUrl, null);
   await read(
     await call(
       `/admin/services/${service.id}`,
@@ -3242,10 +3239,7 @@ test("linked package widgets hydrate public records and protect both owner types
   assert.equal("package" in stored, false);
   const visible = await read(await call(`/packages/${owner.id}`), 200);
   assert.equal(visible.sections[0].widgets[0].package.name, target.name);
-  assert.equal(
-    visible.sections[0].widgets[0].package.imageUrl,
-    "/images/wedding.jpg",
-  );
+  assert.equal(visible.sections[0].widgets[0].package.imageUrl, null);
   await read(
     await call(
       `/admin/packages/${target.id}`,
@@ -3331,6 +3325,134 @@ test("linked package widgets hydrate public records and protect both owner types
     ),
     400,
   );
+});
+
+test("only dedicated thumbnails override defaults across catalog reads and linked cards", async () => {
+  for (const kind of ["packages", "services"] as const) {
+    const content = {
+      ...(kind === "packages"
+        ? data
+        : {
+            description: "A service with a canvas photo",
+            hourlyRatePesos: 500,
+            fixedPricePesos: null,
+            includedHours: null,
+            sections: data.sections,
+          }),
+      name: `Thumbnail policy ${kind} ${randomUUID()}`,
+    };
+    let saved = await read(
+      await call(`/admin/${kind}`, "POST", content, adminCookie),
+      201,
+    );
+    const linkedKind = kind === "packages" ? "package" : "service";
+    const owner = await read(
+      await call(
+        "/admin/packages",
+        "POST",
+        {
+          ...data,
+          name: `Thumbnail reference ${randomUUID()}`,
+          sections: [
+            {
+              id: randomUUID(),
+              title: "Recommended",
+              widgets: [
+                {
+                  id: randomUUID(),
+                  type: linkedKind,
+                  x: 0,
+                  y: 0,
+                  w: 6,
+                  h: 4,
+                  markdown: "",
+                  media: null,
+                  alt: "",
+                  caption: "",
+                  autoplay: false,
+                  [`${linkedKind}Id`]: saved.id,
+                },
+              ],
+            },
+          ],
+        },
+        adminCookie,
+      ),
+      201,
+    );
+    const verify = async (expected: string | null) => {
+      assert.equal(saved.imageUrl, expected);
+      assert.equal(
+        saved.sections[0].widgets[0].media.url,
+        "/images/wedding.jpg",
+      );
+      for (const cookie of [undefined, customerCookie, adminCookie]) {
+        const detail = await read(
+          await call(`/${kind}/${saved.id}`, "GET", undefined, cookie),
+          200,
+        );
+        assert.equal(detail.imageUrl, expected);
+        const page = await read(
+          await call(`/${kind}?limit=15`, "GET", undefined, cookie),
+          200,
+        );
+        assert.equal(
+          page[kind].find((item: { id: string }) => item.id === saved.id)
+            ?.imageUrl,
+          expected,
+        );
+        const linked = await read(
+          await call(`/packages/${owner.id}`, "GET", undefined, cookie),
+          200,
+        );
+        assert.equal(
+          linked.sections[0].widgets[0][linkedKind].imageUrl,
+          expected,
+        );
+      }
+      const adminDetail = await read(
+        await call(`/admin/${kind}/${saved.id}`, "GET", undefined, adminCookie),
+        200,
+      );
+      assert.equal(adminDetail.imageUrl, expected);
+      const adminPage = await read(
+        await call(`/admin/${kind}?limit=15`, "GET", undefined, adminCookie),
+        200,
+      );
+      assert.equal(
+        adminPage[kind].find((item: { id: string }) => item.id === saved.id)
+          ?.imageUrl,
+        expected,
+      );
+    };
+    await verify(null);
+    for (const state of ["set", "replace", "remove"] as const) {
+      const thumbnail =
+        state === "remove"
+          ? null
+          : await read(
+              await uploadCanvas(
+                new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]),
+                "image/png",
+              ),
+              201,
+            );
+      saved = await read(
+        await call(
+          `/admin/${kind}/${saved.id}`,
+          "PATCH",
+          {
+            ...content,
+            thumbnailMediaId: thumbnail?.id ?? null,
+            expectedUpdatedAt: saved.updatedAt,
+          },
+          adminCookie,
+        ),
+        200,
+      );
+      await verify(thumbnail?.url ?? null);
+    }
+  }
 });
 
 test("catalog title conflicts preserve names, slugs, and unchanged-title edits", async () => {

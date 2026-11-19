@@ -79,7 +79,7 @@ export function ThumbnailField({
     <FormField
       className="full"
       label="Card thumbnail"
-      description={`Optional. JPEG, PNG, or WebP, up to ${MAX_IMAGE_SIZE_BYTES / 1024 / 1024} MiB. Independent of canvas photos — reordering photos will not change it.`}
+      description={`Optional. JPEG, PNG, or WebP, up to ${MAX_IMAGE_SIZE_BYTES / 1024 / 1024} MiB. A branded default is used when no thumbnail is set. Independent of canvas photos.`}
     >
       {(field) => (
         <div className="thumbnail-field">
@@ -94,7 +94,12 @@ export function ThumbnailField({
                 aria-label="View thumbnail full size"
                 title="Click to view full size"
               >
-                <img src={previewUrl} alt="Current card thumbnail" width={80} height={60} />
+                <img
+                  src={previewUrl}
+                  alt="Current card thumbnail"
+                  width={80}
+                  height={60}
+                />
                 <span className="thumbnail-field-thumb-hint" aria-hidden="true">
                   View
                 </span>

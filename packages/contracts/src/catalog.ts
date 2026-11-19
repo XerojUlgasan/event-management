@@ -15,6 +15,7 @@ export type CatalogServicePreview = {
   slug: string;
   name: string;
   description: string;
+  /** Dedicated card thumbnail. Null displays the shared default. */
   imageUrl: string | null;
 };
 export type CatalogPackagePreview = CatalogServicePreview;
@@ -67,6 +68,7 @@ export type CatalogPackage = PackageContent & {
   customForBookingRequestId: string | null;
   id: string;
   slug: string;
+  /** Dedicated card thumbnail. Canvas photos do not supply a fallback. */
   imageUrl: string | null;
   archivedAt: string | null;
   createdAt: string;

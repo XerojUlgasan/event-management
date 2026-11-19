@@ -12,13 +12,9 @@ export async function packageDto(
     kind: "package",
     id: row.id,
   });
-  const widgets = sections.flatMap((section) => section.widgets);
   const thumbnailUrl = row.thumbnail_media_id
     ? `/v1/catalog-media/${row.thumbnail_media_id}`
     : null;
-  const canvasPhotoUrl =
-    widgets.find((widget) => widget.type === "photo" && widget.media)?.media
-      ?.url ?? null;
   return {
     id: row.id,
     slug: row.slug,
@@ -33,7 +29,7 @@ export async function packageDto(
     },
     sections,
     description: row.description,
-    imageUrl: thumbnailUrl ?? canvasPhotoUrl,
+    imageUrl: thumbnailUrl,
     archivedAt: row.archived_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),

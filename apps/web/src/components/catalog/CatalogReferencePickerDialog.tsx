@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Badge, Button, Dialog, FormField, Input } from "@event-management/ui";
+import {
+  Badge,
+  Button,
+  CatalogThumbnail,
+  Dialog,
+  FormField,
+  Input,
+} from "@event-management/ui";
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 import { getAdminServices } from "../../lib/data/catalog/services";
 import { getAdminPackages } from "../../lib/data/catalog/packages";
@@ -138,13 +145,10 @@ export function CatalogReferencePickerDialog({
             aria-pressed={item.id === selectedId}
             onClick={() => onSelect(item)}
           >
-            {item.imageUrl ? (
-              <img src={catalogMediaSrc(item.imageUrl)} alt="" />
-            ) : (
-              <span className="pe-reference-option-image" aria-hidden="true">
-                No photo
-              </span>
-            )}
+            <CatalogThumbnail
+              className="pe-reference-option-image"
+              src={item.imageUrl ? catalogMediaSrc(item.imageUrl) : null}
+            />
             <span className="pe-reference-option-copy">
               <strong>{item.name}</strong>
               <span>{item.description}</span>

@@ -10,7 +10,14 @@ import { join } from "node:path";
 
 // Vite processes the real TSX and its CSS imports, as the Astro SSR build does.
 const root = fileURLToPath(new URL("../../", import.meta.url));
-let server, cacheDir, canvas, publicDetails, publicPackage, ui, scrollLock;
+let server,
+  cacheDir,
+  canvas,
+  publicDetails,
+  publicPackage,
+  publicCards,
+  ui,
+  scrollLock;
 before(async () => {
   cacheDir = await mkdtemp(join(tmpdir(), "clemora-catalog-ssr-"));
   server = await createServer({
@@ -37,6 +44,9 @@ before(async () => {
   );
   publicPackage = await server.ssrLoadModule(
     "/src/components/public/catalog/PublicPackageDetail.tsx",
+  );
+  publicCards = await server.ssrLoadModule(
+    "/src/components/public/catalog/CatalogCards.tsx",
   );
   ui = await server.ssrLoadModule(
     "/@fs" +
@@ -458,4 +468,33 @@ test("package cards use a single whole-card action and inert editor or unavailab
     }),
     /<img/,
   );
+});
+
+test("public catalog thumbnails use the brand for absent images and retain dedicated images", () => {
+  for (const [component, item] of [
+    [publicCards.PackageCards, packageItem],
+    [publicCards.ServiceCards, service],
+  ]) {
+    const empty = render(component, {
+      items: [{ ...item, id: "one", imageUrl: null }],
+    });
+    assert.match(empty, /ui-catalog-thumbnail-brand/);
+    assert.doesNotMatch(empty, /data-catalog-thumbnail-image/);
+    const dedicated = render(component, {
+      items: [{ ...item, id: "one", imageUrl: "/dedicated.jpg" }],
+    });
+    assert.match(
+      dedicated,
+      /data-catalog-thumbnail-image="true"[^>]*src="\/dedicated.jpg"/,
+    );
+    assert.match(dedicated, /ui-catalog-thumbnail-brand/);
+  }
+  const reference = render(ui.CatalogWidgetContent, {
+    widget: {
+      ...serviceWidget,
+      service: { ...serviceWidget.service, imageUrl: null },
+    },
+  });
+  assert.match(reference, /ui-catalog-thumbnail-brand/);
+  assert.doesNotMatch(reference, /data-catalog-thumbnail-image/);
 });

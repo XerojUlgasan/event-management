@@ -1537,14 +1537,12 @@ textarea.ui-control {
 .ui-catalog-reference-card > .ui-catalog-caption {
   display: block;
 }
-.ui-catalog-reference-card > img {
+.ui-catalog-reference-card > .ui-catalog-thumbnail {
   display: block;
   width: 100%;
   height: 45%;
   min-height: 0;
-  object-fit: contain;
   flex: 0 1 auto;
-  background: var(--accent-soft);
 }
 .ui-catalog-reference-details {
   display: flex;
@@ -1596,4 +1594,37 @@ textarea.ui-control {
     );
     flex: none;
   }
+}
+
+.ui-catalog-thumbnail {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--brand-paper);
+}
+.ui-catalog-thumbnail-brand {
+  position: absolute;
+  inset: 12%;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+.ui-catalog-thumbnail > img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ui-catalog-reference-card > .ui-catalog-thumbnail > img {
+  object-fit: contain;
+}
+.ui-catalog-thumbnail:has(> img:not([hidden])) > .ui-catalog-thumbnail-brand {
+  display: none;
+}
+.ui-catalog-thumbnail > img[hidden] {
+  display: none;
 }

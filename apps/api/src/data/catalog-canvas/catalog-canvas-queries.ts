@@ -18,7 +18,7 @@ export const listCanvasPackagesData = (db: Database, ids: string[]) =>
   ids.length
     ? db
         .selectFrom("packages")
-        .select(["id", "slug", "name", "description", "canvas"])
+        .select(["id", "slug", "name", "description", "thumbnail_media_id"])
         .where("id", "in", ids)
         .where("package_type", "=", "catalog")
         .where("archived_at", "is", null)
@@ -28,7 +28,7 @@ export const listCanvasServicesData = (db: Database, ids: string[]) =>
   ids.length
     ? db
         .selectFrom("services")
-        .select(["id", "slug", "name", "description", "canvas"])
+        .select(["id", "slug", "name", "description", "thumbnail_media_id"])
         .where("id", "in", ids)
         .where("archived_at", "is", null)
         .execute()

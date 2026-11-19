@@ -6,6 +6,7 @@ import {
   type CatalogWidget,
 } from "@event-management/contracts/catalog";
 import type { CSSProperties, ReactNode } from "react";
+import { CatalogThumbnail } from "../atoms/CatalogThumbnail";
 
 type WidgetStyle = CSSProperties & { "--catalog-widget-h": number };
 export const CATALOG_GRID = {
@@ -104,9 +105,7 @@ export function CatalogWidgetContent({
   if ((widget.type === "service" || widget.type === "package") && reference) {
     const content = (
       <>
-        {reference.imageUrl && (
-          <img src={reference.imageUrl} alt="" loading="lazy" />
-        )}
+        <CatalogThumbnail src={reference.imageUrl} />
         <span className="ui-catalog-reference-details">
           <span className="ui-catalog-reference-name">{reference.name}</span>
           {reference.description && (

@@ -10,10 +10,6 @@ export async function serviceAdminDto(db: Database, s: Selectable<Services>) {
   const thumbnailUrl = s.thumbnail_media_id
     ? `/v1/catalog-media/${s.thumbnail_media_id}`
     : null;
-  const canvasPhotoUrl =
-    sections
-      .flatMap((section) => section.widgets)
-      .find((w) => w.type === "photo" && w.media)?.media?.url ?? null;
   return {
     id: s.id,
     slug: s.slug,
@@ -22,7 +18,7 @@ export async function serviceAdminDto(db: Database, s: Selectable<Services>) {
     fixedPricePesos: s.fixed_price_pesos,
     includedHours: s.included_hours,
     description: s.description,
-    imageUrl: thumbnailUrl ?? canvasPhotoUrl,
+    imageUrl: thumbnailUrl,
     sections,
     createdAt: s.created_at.toISOString(),
     updatedAt: s.updated_at.toISOString(),

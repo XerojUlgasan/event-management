@@ -14,6 +14,12 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+<<<<<<< Updated upstream
+=======
+| [Automatic image tool tracking](2026-11-19_11-59-15_automatic-image-tool-tracking.md) | Mandatory vision tool execution records / main | complete | Locally verified and migrated; server-side traces, live provider and hosted rollout separate |
+| [Conversation image messages](2026-11-19_11-38-25_conversation-image-messages.md) | Private images and saved vision observations / main | complete | Locally verified; live-model quality and hosted rollout remain separate |
+| [Catalog default thumbnails](2026-11-19_11-18-16_catalog-default-thumbnails.md) | Dedicated thumbnail or shared branded default / main | complete | Review scoped diff; API/catalog/browser checks pass; unrelated workspace check failures and hosted rollout remain separate |
+>>>>>>> Stashed changes
 | [AI human handoff](2026-11-19_00-57-12_ai-human-handoff.md) | Latest JSONB, safe mutation and admin indicator / main | complete | Locally verified; live-model evaluation and hosted rollout separate |
 | [Remove mandatory evidence selection](2026-11-19_00-19-05_remove-mandatory-evidence-selection.md) | Optional tool use from the first step / main | complete | Review scoped diff; 62 focused tests, API types, Edge bundle and guidance checks pass; live-model quality remains unverified |
 | [Assistant evidence grounding](2026-11-18_23-41-18_assistant-evidence-grounding.md) | Historical mandatory evidence selection / main | complete | Superseded by removal of the mandatory selector; original test results apply to that earlier implementation |

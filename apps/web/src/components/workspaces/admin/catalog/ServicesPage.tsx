@@ -62,7 +62,6 @@ function ServiceCard({
   return (
     <CatalogCard
       image={item.imageUrl ? catalogMediaSrc(item.imageUrl) : undefined}
-      imageFallback="No service photo available"
       eyebrow="Event service"
       title={item.name || "Untitled service"}
       description={item.description}
@@ -150,7 +149,9 @@ export function ServicesPage() {
       savedDuringEditRef.current = false;
       savedRef.current = { id, updatedAt: item.updatedAt };
       // Reset to untouched, seed preview from the existing imageUrl.
-      editThumbnail.reset(item.imageUrl ? catalogMediaSrc(item.imageUrl) : null);
+      editThumbnail.reset(
+        item.imageUrl ? catalogMediaSrc(item.imageUrl) : null,
+      );
       setEditing(content(item));
     } catch (err) {
       if (!mounted.current) return;
@@ -159,7 +160,10 @@ export function ServicesPage() {
       if (mounted.current) setBusy(false);
     }
   };
-  const save = async (form: ServiceContent, thumbnailId: string | null | undefined) => {
+  const save = async (
+    form: ServiceContent,
+    thumbnailId: string | null | undefined,
+  ) => {
     try {
       const { id, updatedAt } = savedRef.current;
       const result =
@@ -350,7 +354,8 @@ export function ServicesPage() {
             setCreating(null);
             // Transfer the create thumbnail into the edit slot before opening the editor.
             editThumbnail.reset(createThumbnail.previewUrl);
-            editThumbnail.mediaIdRef.current = createThumbnail.mediaIdRef.current;
+            editThumbnail.mediaIdRef.current =
+              createThumbnail.mediaIdRef.current;
             setEditing(form);
           }}
           validate={validateServiceDetails}
@@ -407,7 +412,7 @@ export function ServicesPage() {
             ) : (
               <div className="pe-card-preview">
                 <ServiceCard
-                  item={form}
+                  item={{ ...form, imageUrl: editThumbnail.previewUrl }}
                   action={
                     <CatalogCardActions
                       name={form.name}

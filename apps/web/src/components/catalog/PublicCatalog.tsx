@@ -9,6 +9,7 @@ import { usePagination } from "../../lib/pagination/use-pagination";
 import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
 import {
   Button,
+  CatalogThumbnail,
   Pagination,
   NativeDialog,
   useNotifications,
@@ -33,7 +34,6 @@ import {
 } from "../../lib/utils/formatting/money";
 import { CatalogDetailPreview } from "./CatalogDetailPreview";
 import { ServiceCanvas } from "./CatalogContent";
-import { photos } from "../../demo/catalog/photos";
 import { CatalogFiltersForm } from "./CatalogFiltersForm";
 
 type Kind = CatalogKind;
@@ -49,15 +49,7 @@ function PackageCard({
   return (
     <article className="catalog-card">
       <div className="catalog-card-image">
-        <img
-          src={packageImageSrc(item.imageUrl) || photos.dinner}
-          alt=""
-          loading="lazy"
-          onError={(event) => {
-            event.currentTarget.onerror = null;
-            event.currentTarget.src = photos.dinner;
-          }}
-        />
+        <CatalogThumbnail src={packageImageSrc(item.imageUrl)} />
       </div>
       <div className="catalog-card-body">
         <span className="catalog-card-kicker">Event package</span>
@@ -91,9 +83,7 @@ function ServiceCard({
   return (
     <article className="catalog-card">
       <div className="catalog-card-image">
-        {item.imageUrl && (
-          <img src={packageImageSrc(item.imageUrl)} alt="" loading="lazy" />
-        )}
+        <CatalogThumbnail src={packageImageSrc(item.imageUrl)} />
       </div>
       <div className="catalog-card-body">
         <span className="catalog-card-kicker">Event service</span>

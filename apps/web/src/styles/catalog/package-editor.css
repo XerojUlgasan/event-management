@@ -48,7 +48,7 @@
   border-radius: 10px;
   overflow: hidden;
 }
-.pe-card > img {
+.pe-card > .ui-catalog-thumbnail {
   width: 100%;
   height: 210px;
   object-fit: cover;
@@ -800,8 +800,7 @@ dialog.pe-media-dialog::backdrop {
   display: flex;
   flex-direction: column;
 }
-.pe-card > img,
-.pe-card-image-placeholder {
+.pe-card > .ui-catalog-thumbnail {
   flex-shrink: 0;
 }
 .pe-card-body {
@@ -882,8 +881,7 @@ dialog.pe-media-dialog::backdrop {
 .pe-reference-option:focus-visible {
   background: var(--surface-muted);
 }
-.pe-reference-option img,
-.pe-reference-option-image {
+.pe-reference-option > .pe-reference-option-image {
   flex: 0 0 72px;
   width: 72px;
   height: 58px;
@@ -1017,7 +1015,8 @@ dialog.thumbnail-lightbox:not([open]) {
   object-fit: contain;
   border-radius: 6px;
   display: block;
-  box-shadow: 0 24px 60px color-mix(in srgb, var(--overlay-black) 60%, var(--transparent));
+  box-shadow: 0 24px 60px
+    color-mix(in srgb, var(--overlay-black) 60%, var(--transparent));
 }
 
 .thumbnail-lightbox-close {

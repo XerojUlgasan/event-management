@@ -14,7 +14,6 @@ import {
 } from "../../lib/data/catalog/packages";
 import { priceLabel } from "../../lib/utils/formatting/money";
 import { PackageCanvas } from "./CatalogContent";
-import { photos } from "../../demo/catalog/photos";
 import { useThumbnail } from "../../lib/utils/catalog/use-thumbnail";
 import "../../styles/catalog/package-editor.css";
 
@@ -34,7 +33,7 @@ export function PackageCard({
 }) {
   return (
     <CatalogCard
-      image={packageImageSrc(item.imageUrl ?? null) || photos.dinner}
+      image={packageImageSrc(item.imageUrl ?? null) || undefined}
       eyebrow="Event package"
       title={item.name || "Untitled package"}
       description={item.description}
@@ -121,7 +120,12 @@ export function PackageEditor({
       onSave={async (content) => {
         if (saveCustom) await saveCustom(content);
         else if (initial)
-          await updatePackage(initial.id, content, initial.updatedAt, thumbnail.mediaIdRef.current);
+          await updatePackage(
+            initial.id,
+            content,
+            initial.updatedAt,
+            thumbnail.mediaIdRef.current,
+          );
         else await createPackage(content, thumbnail.mediaIdRef.current);
       }}
       renderDetails={(content, setContent) => (
@@ -156,7 +160,9 @@ export function PackageEditor({
           />
         ) : (
           <div className="pe-card-preview">
-            <PackageCard item={content} />
+            <PackageCard
+              item={{ ...content, imageUrl: thumbnail.previewUrl }}
+            />
           </div>
         )
       }

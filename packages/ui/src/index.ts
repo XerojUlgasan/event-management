@@ -9,6 +9,7 @@ export { Select } from "./atoms/Select";
 export { Badge } from "./atoms/Badge";
 export type { BadgeTone } from "./atoms/Badge";
 export { Avatar } from "./atoms/Avatar";
+export { CatalogThumbnail } from "./atoms/CatalogThumbnail";
 export { Wordmark } from "./atoms/Wordmark";
 export { ActionLink } from "./atoms/ActionLink";
 export { SectionCounter } from "./atoms/SectionCounter";
