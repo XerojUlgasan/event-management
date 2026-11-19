@@ -1,4 +1,10 @@
 import {
+  insertMessageImagesData,
+  listMessageImagesData,
+  matchingMessageImagesData,
+  type SavedMessageImage,
+} from "./message-images.js";
+import {
   clearPendingAiHandoff,
   parseAiHandoff,
 } from "../../utils/ai-handoff.js";
@@ -18,6 +24,9 @@ export async function createMessageData(
   senderRole: "customer" | "admin",
   body: string,
   requestId?: string,
+  images: SavedMessageImage[] = [],
+  imageHashes = images.map((image) => image.content_hash),
+  preflight = false,
 ) {
   return db.transaction().execute(async (trx) => {
     const conversation = await trx
@@ -42,7 +51,8 @@ export async function createMessageData(
           previous.conversation_id !== conversation.id ||
           previous.sender_id !== senderId ||
           previous.sender_role !== senderRole ||
-          previous.body !== body
+          previous.body !== body ||
+          !(await matchingMessageImagesData(trx, previous.id, imageHashes))
         )
           throw new Error("Message request conflict");
         const sender = await trx
@@ -57,6 +67,7 @@ export async function createMessageData(
           replayed: true,
           message: {
             ...previous,
+            images: await listMessageImagesData(trx, previous.id),
             sender_display_name: sender.display_name,
             sender_email: sender.email,
           },
@@ -69,6 +80,7 @@ export async function createMessageData(
     )
       throw new Error("Conversation is closed");
     if (conversation.guest_identity_id) assertGuestActive(conversation);
+    if (preflight) return null;
     const previousHandoff = parseAiHandoff(conversation.ai_handoff);
     const aiHandoff =
       senderRole === "admin"
@@ -98,6 +110,7 @@ export async function createMessageData(
     // Another conversation can insert the same globally unique ID while its
     // row lock is held. Do not expose that message to this customer.
     if (!row) throw new Error("Message request conflict");
+    await insertMessageImagesData(trx, row.id, conversation.id, images);
     await trx
       .updateTable("conversations")
       .set({
@@ -125,6 +138,7 @@ export async function createMessageData(
       replayed: false,
       message: {
         ...row,
+        images,
         sender_display_name: sender.display_name,
         sender_email: sender.email,
       },

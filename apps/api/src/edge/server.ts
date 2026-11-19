@@ -1,3 +1,4 @@
+import { messageBodyLimit } from "../constants/http.js";
 import { env } from "../utils/env.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
@@ -20,6 +21,7 @@ import {
 const allowedOrigins = env.WEB_ORIGINS;
 
 const loaders = {
+  "message-images": () => import("../controllers/message-images/index.js"),
   "guest-chat": () => import("../controllers/guest-chat/index.js"),
   ai: () => import("../controllers/ai/index.js"),
   health: () => import("../controllers/health/index.js"),
@@ -104,7 +106,14 @@ async function createFamilyApp(id: RouteFamilyId) {
     await next();
   });
   for (const limit of bodyLimits[id] ?? [])
-    family.use(limit.path, bodyLimit({ maxSize: limit.maxSize }));
+    family.use(limit.path, (c, next) =>
+      bodyLimit({
+        maxSize:
+          id === "messages" || id === "guest-chat"
+            ? messageBodyLimit(c.req.path, c.req.header("content-type"))
+            : limit.maxSize,
+      })(c, next),
+    );
   if (id === "booking-requests")
     family.use("/admin/booking-requests/*", (c, next) =>
       bodyLimit({ maxSize: bookingBodyLimit(c.req.path) })(c, next),

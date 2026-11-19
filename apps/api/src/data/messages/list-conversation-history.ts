@@ -1,3 +1,4 @@
+import { messageImagesSelection } from "./message-images.js";
 import { sql, type Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 
@@ -10,7 +11,7 @@ export function listConversationHistoryData(
   // Each turn sees all history through its own saved customer message.
   return db
     .selectFrom("messages as m")
-    .select(["m.id", "m.sender_role", "m.body"])
+    .select(["m.id", "m.sender_role", "m.body", messageImagesSelection()])
     .where("m.conversation_id", "=", conversationId)
     .where(
       sql<boolean>`(m.created_at, m.id) <= (

@@ -1,3 +1,7 @@
+import {
+  messageRequestBody,
+  parseMessageInput,
+} from "./parse-message-input.js";
 import { createRoute } from "@hono/zod-openapi";
 import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
@@ -5,7 +9,7 @@ import {
   customerMessageBodySchema,
   customerMessageResultSchema,
 } from "./schemas.js";
-import { json, errors, body } from "./http.js";
+import { json, errors } from "./http.js";
 import { sendCustomerMessageService } from "../../services/messages/send-customer-message.js";
 
 export const sendCustomerMessageRoute = createRoute({
@@ -13,7 +17,7 @@ export const sendCustomerMessageRoute = createRoute({
   path: "/messages/conversation/messages",
   tags: ["Messages"],
   summary: "Send a message to the Clemora team",
-  request: { body: body(customerMessageBodySchema) },
+  request: { body: messageRequestBody(customerMessageBodySchema) },
   responses: {
     201: {
       content: json(customerMessageResultSchema),
@@ -24,12 +28,13 @@ export const sendCustomerMessageRoute = createRoute({
     403: errors[403],
     404: errors[404],
     409: errors[409],
+    502: { description: "Image interpretation or storage failed" },
   },
 });
 export const sendCustomerMessageRouteHandler: AppRouteHandler<
   typeof sendCustomerMessageRoute
 > = async (c) => {
-  const input = c.req.valid("json");
+  const input = await parseMessageInput(c);
   try {
     const result = await sendCustomerMessageService(
       c.get("db"),
@@ -38,6 +43,7 @@ export const sendCustomerMessageRouteHandler: AppRouteHandler<
       input.conversationId,
       c.req.raw.signal,
       input.requestId,
+      input.images,
     );
     return c.json(result, 201);
   } catch (error) {

@@ -1,1 +1,4 @@
 export const MAX_MESSAGE_BODY_LENGTH = 4000;
+
+export const MAX_MESSAGE_IMAGES = 4;
+export const MAX_MESSAGE_IMAGE_PIXELS = 16_000_000;

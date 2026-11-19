@@ -75,16 +75,30 @@ export function mergeGuestThread(
   };
 }
 
-export type PendingGuestSend = { body: string; requestId: string };
+export type PendingGuestSend = {
+  body: string;
+  requestId: string;
+  files?: File[];
+};
 /** An uncertain delivery is retried with the original key and payload. */
 export function prepareGuestSend(
   pending: PendingGuestSend | null,
   draft: string,
   createId: () => string,
+  files: File[] = [],
 ): PendingGuestSend | null {
   if (pending) return pending;
   const body = draft.trim();
-  return body ? { body, requestId: createId() } : null;
+  return body || files.length
+    ? { body, requestId: createId(), ...(files.length ? { files } : {}) }
+    : null;
+}
+
+/** Only requests that may have been saved reserve the guest allowance. */
+export function guestReservedSends(
+  outbox: Record<string, { definitelyUnsent?: boolean }>,
+) {
+  return Object.values(outbox).filter((item) => !item.definitelyUnsent).length;
 }
 
 /** Reserve a slot for each unresolved request until its outcome is known. */

@@ -16,10 +16,15 @@ import { ApiError } from "../../../lib/http/request";
 import {
   addGuestSentMessages,
   guestRemaining,
+  guestReservedSends,
   mergeGuestAllowance,
   mergeGuestThread,
   prepareGuestSend,
 } from "../../../lib/services/messages/guest-thread";
+import {
+  MessageAttachments,
+  MessageImages,
+} from "../../messages/MessageImages";
 import { assertCursorMoved } from "../../../lib/services/messages/older-page";
 
 export default function PublicChat() {
@@ -31,8 +36,11 @@ export default function PublicChat() {
       string,
       {
         body: string;
+        files: File[];
         createdAt: string;
         failed: boolean;
+        error?: string;
+        definitelyUnsent?: boolean;
         loginRequired?: boolean;
         expired?: boolean;
       }
@@ -49,6 +57,7 @@ export default function PublicChat() {
   const [expired, setExpired] = useState(false);
   const [admin, setAdmin] = useState(false);
   const [draft, setDraft] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const [newMessages, setNewMessages] = useState(false);
   const messageList = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
@@ -105,6 +114,7 @@ export default function PublicChat() {
       ) {
         updateOutbox(() => ({}));
         setDraft("");
+        setFiles([]);
       }
       if (threadRef.current?.conversation.id === result.conversation.id) {
         updateOutbox((current) => {
@@ -215,12 +225,13 @@ export default function PublicChat() {
   }, [open, loading, admin, thread, outbox]);
   const deliver = async (
     conversationId: string,
-    item: { body: string; requestId: string; createdAt: string },
+    item: { body: string; files: File[]; requestId: string; createdAt: string },
   ) => {
     updateOutbox((current) => ({
       ...current,
       [item.requestId]: {
         body: item.body,
+        files: item.files,
         createdAt: item.createdAt,
         failed: false,
       },
@@ -231,6 +242,7 @@ export default function PublicChat() {
         conversationId,
         item.body,
         item.requestId,
+        item.files,
       );
       setThread((current) =>
         current && current.conversation.id === conversationId
@@ -272,8 +284,19 @@ export default function PublicChat() {
               ...current,
               [item.requestId]: {
                 body: item.body,
+                files: item.files,
                 createdAt: item.createdAt,
                 failed: true,
+                definitelyUnsent:
+                  item.files.length > 0 &&
+                  cause instanceof ApiError &&
+                  [400, 413, 502].includes(cause.status),
+                error:
+                  item.files.length &&
+                  cause instanceof ApiError &&
+                  [400, 413, 502].includes(cause.status)
+                    ? cause.message
+                    : undefined,
                 expired: cause instanceof ApiError && cause.status === 410,
                 loginRequired:
                   cause instanceof ApiError &&
@@ -311,7 +334,12 @@ export default function PublicChat() {
   };
   const send = () => {
     const current = threadRef.current;
-    const item = prepareGuestSend(null, draft, () => crypto.randomUUID());
+    const item = prepareGuestSend(
+      null,
+      draft,
+      () => crypto.randomUUID(),
+      files,
+    );
     if (
       !current ||
       !item ||
@@ -319,14 +347,16 @@ export default function PublicChat() {
       current.guest.loginRequired ||
       guestRemaining(
         current.guest.remainingMessages,
-        Object.keys(outboxRef.current).length,
+        guestReservedSends(outboxRef.current),
       ) === 0
     )
       return;
     setDraft("");
+    setFiles([]);
     setError("");
     void deliver(current.conversation.id, {
       ...item,
+      files: item.files ?? [],
       createdAt: new Date().toISOString(),
     });
     draftInput.current?.focus();
@@ -445,6 +475,7 @@ export default function PublicChat() {
                   Object.entries(outbox).map(([id, item]): ChatMessage => ({
                     id,
                     body: item.body,
+                    pendingFiles: item.files,
                     createdAt: item.createdAt,
                     quotationId: null,
                     senderId: null,
@@ -468,6 +499,7 @@ export default function PublicChat() {
                       <div className="public-chat-message-body">
                         {message.body}
                       </div>
+                      <MessageImages message={message} />
                       {item?.failed && (
                         <div className="message-delivery-error" role="alert">
                           {item.expired ? (
@@ -476,13 +508,14 @@ export default function PublicChat() {
                             "Not sent. Sign in to continue."
                           ) : (
                             <>
-                              Delivery could not be confirmed.{" "}
+                              {item.error || "Delivery could not be confirmed."}{" "}
                               {!expired && (
                                 <Button
                                   variant="link"
                                   onClick={() =>
                                     void deliver(thread.conversation.id, {
                                       body: item.body,
+                                      files: item.files,
                                       requestId: message.id,
                                       createdAt: item.createdAt,
                                     })
@@ -520,6 +553,7 @@ export default function PublicChat() {
                       updateOutbox(() => ({}));
                       setThread(null);
                       setDraft("");
+                      setFiles([]);
                       void openChat();
                     }}
                   >
@@ -560,6 +594,7 @@ export default function PublicChat() {
                   void send();
                 }}
               >
+                <MessageAttachments files={files} onChange={setFiles} />
                 <Textarea
                   variant="plain"
                   rows={1}
@@ -583,10 +618,10 @@ export default function PublicChat() {
                 <Button
                   type="submit"
                   disabled={
-                    !draft.trim() ||
+                    (!draft.trim() && !files.length) ||
                     guestRemaining(
                       thread.guest.remainingMessages,
-                      Object.keys(outbox).length,
+                      guestReservedSends(outbox),
                     ) === 0
                   }
                   aria-label="Send message"
@@ -602,7 +637,7 @@ export default function PublicChat() {
               <div className="handover">
                 {guestRemaining(
                   thread.guest.remainingMessages,
-                  Object.keys(outbox).length,
+                  guestReservedSends(outbox),
                 )}{" "}
                 guest messages remaining
               </div>

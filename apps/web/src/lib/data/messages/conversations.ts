@@ -1,4 +1,5 @@
 import type { AiHandoff } from "@event-management/contracts/ai-handoff";
+import type { MessageImage } from "@event-management/contracts/message-images";
 import { request } from "../../http/request";
 
 export type ConversationStatus = "active" | "closed";
@@ -12,6 +13,8 @@ export type ChatMessage = {
   senderName: string;
   createdAt: string;
   readAt: string | null;
+  images?: MessageImage[];
+  pendingFiles?: File[];
 };
 
 export type ChatConversation = {
@@ -43,6 +46,20 @@ export type ChatThread = {
   nextCursor: string | null;
 };
 
+export function messagePayload(
+  body: string,
+  images: File[],
+  fields: Record<string, string | undefined>,
+) {
+  if (!images.length) return { body, ...fields };
+  const form = new FormData();
+  form.set("body", body);
+  for (const [key, value] of Object.entries(fields))
+    if (value !== undefined) form.set(key, value);
+  images.forEach((image) => form.append("images", image));
+  return form;
+}
+
 const cursorQuery = (cursor?: string) =>
   cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
 export const getMyConversation = () =>
@@ -66,16 +83,16 @@ export const sendMyMessage = (
   body: string,
   conversationId?: string,
   requestId?: string,
+  images: File[] = [],
 ) =>
   request<{
     message: ChatMessage;
     assistantMessage: ChatMessage | null;
     assistantError: string | null;
-  }>("/messages/conversation/messages", {
-    body,
-    conversationId,
-    requestId,
-  });
+  }>(
+    "/messages/conversation/messages",
+    messagePayload(body, images, { conversationId, requestId }),
+  );
 export const getAdminConversations = (cursor?: string) =>
   request<{ conversations: ChatConversation[]; nextCursor: string | null }>(
     `/admin/conversations${cursorQuery(cursor)}`,
@@ -84,13 +101,21 @@ export const getAdminConversation = (id: string, cursor?: string) =>
   request<ChatThread>(
     `/admin/conversations/${encodeURIComponent(id)}${cursorQuery(cursor)}`,
   );
-export const sendAdminMessage = (id: string, body: string) =>
+export const sendAdminMessage = (
+  id: string,
+  body: string,
+  requestId: string,
+  images: File[] = [],
+) =>
   request<{
     message: ChatMessage;
     aiEnabled: boolean;
     aiVersion: number;
     aiHandoff: AiHandoff | null;
-  }>(`/admin/conversations/${encodeURIComponent(id)}/messages`, { body });
+  }>(
+    `/admin/conversations/${encodeURIComponent(id)}/messages`,
+    messagePayload(body, images, { requestId }),
+  );
 export const updateAdminConversationAi = (
   id: string,
   aiEnabled: boolean,

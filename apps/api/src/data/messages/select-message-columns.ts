@@ -1,3 +1,4 @@
+import { messageImagesSelection } from "./message-images.js";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 
@@ -8,6 +9,7 @@ export function selectMessageColumnsData(db: Database, conversationId: string) {
     .selectFrom("messages as m")
     .leftJoin("users as sender", "sender.id", "m.sender_id")
     .select((eb) => [
+      messageImagesSelection(),
       "m.id",
       "m.guest_origin",
       "m.conversation_id",

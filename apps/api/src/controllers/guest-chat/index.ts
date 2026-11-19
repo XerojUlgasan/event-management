@@ -41,7 +41,8 @@ routes.onError((error, c) => {
       { error: error.message, ...(error.code ? { code: error.code } : {}) },
       error.status,
     );
-  if (error instanceof HTTPException) return error.getResponse();
+  if (error instanceof HTTPException)
+    return c.json({ error: error.message }, error.status);
   console.error("guest-chat", { outcome: "failed" });
   return jsonError(c, "Unable to complete guest chat request", 500);
 });

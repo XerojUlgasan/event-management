@@ -1,3 +1,7 @@
+import {
+  messageImageInterpretationSchema,
+  type MessageImage,
+} from "@event-management/contracts/message-images";
 import { parseAiHandoff } from "../../utils/ai-handoff.js";
 import type {
   ConversationWithCustomer,
@@ -6,6 +10,7 @@ import type {
 
 export type MessageDto = {
   id: string;
+  images: MessageImage[];
   body: string;
   quotationId: string | null;
   senderId: string | null;
@@ -47,6 +52,23 @@ export function messageDto(row: MessageWithSender): MessageDto {
         : "customer";
   return {
     id: row.id,
+    images: (row.images ?? []).map((value) => {
+      const image = value as {
+        id: string;
+        mime_type: MessageImage["mimeType"];
+        byte_size: number;
+        interpretation: unknown;
+      };
+      return {
+        id: image.id,
+        url: `/v1/message-images/${image.id}`,
+        mimeType: image.mime_type,
+        byteSize: image.byte_size,
+        interpretation: messageImageInterpretationSchema.parse(
+          image.interpretation,
+        ),
+      };
+    }),
     body: row.body,
     quotationId: row.quotation_id,
     senderId: row.sender_id,

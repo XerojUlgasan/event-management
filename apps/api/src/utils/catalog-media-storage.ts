@@ -60,7 +60,7 @@ export async function putCatalogMedia(
   key: string,
   bytes: Uint8Array,
   contentType: string,
-  options: { upsert?: boolean } = {},
+  options: { upsert?: boolean; abortSignal?: AbortSignal } = {},
 ) {
   const { url, apiKey, bucket } = env.STORAGE;
   const response = await fetch(
@@ -72,7 +72,10 @@ export async function putCatalogMedia(
         "x-upsert": options.upsert ? "true" : "false",
       }),
       body: Buffer.from(bytes),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.any([
+        AbortSignal.timeout(30_000),
+        ...(options.abortSignal ? [options.abortSignal] : []),
+      ]),
     },
   );
   if (!response.ok) throw new Error("Media storage write failed");

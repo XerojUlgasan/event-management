@@ -17,6 +17,7 @@ import { useConversationList } from "../../../../lib/services/messages/use-conve
 import { assertCursorMoved } from "../../../../lib/services/messages/older-page";
 import { MessagesWorkspace } from "../../../messages/MessagesWorkspace";
 import {
+  addSentMessages,
   mergeAiStateByVersion,
   mergePolledThread,
   prependOlder,
@@ -208,27 +209,29 @@ export function MessagesPage() {
     }
   };
 
-  const send = async (body: string) => {
+  const send = async (body: string, files: File[], requestId: string) => {
     if (!activeId) return;
     const conversationId = activeId;
-    const result = await sendAdminMessage(conversationId, body);
+    const result = await sendAdminMessage(
+      conversationId,
+      body,
+      requestId,
+      files,
+    );
     const aiState = rememberAiState(conversationId, result);
     localMessages.current.add(result.message.id);
-    setThread((current) =>
-      current && current.conversation.id === conversationId
-        ? {
-            ...current,
-            conversation: {
-              ...current.conversation,
-              ...aiState,
-              status: "active",
-              lastMessage: result.message,
-              updatedAt: result.message.createdAt,
-            },
-            messages: [...current.messages, result.message],
-          }
-        : current,
-    );
+    setThread((current) => {
+      if (!current || current.conversation.id !== conversationId)
+        return current;
+      const merged = addSentMessages(current, [result.message]);
+      return {
+        ...merged,
+        conversation: {
+          ...merged.conversation,
+          ...mergeAiStateByVersion(current.conversation, aiState),
+        },
+      };
+    });
     setConversations((current) =>
       current.map((item) =>
         item.id === conversationId ? { ...item, ...aiState } : item,

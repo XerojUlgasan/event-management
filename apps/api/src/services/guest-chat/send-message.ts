@@ -1,3 +1,9 @@
+import { serializeMessageRequest } from "../messages/serialize-message-request.js";
+import {
+  prepareMessageImages,
+  cleanupMessageImages,
+  type CheckedMessageImage,
+} from "../messages/prepare-message-images.js";
 import type { GuestDatabase } from "../../data/guest-chat/guest-conversation.js";
 import { guestStatus } from "../../data/guest-chat/guest-conversation.js";
 import {
@@ -15,8 +21,35 @@ export async function sendGuestMessageService(
   body: string,
   requestId: string,
   abortSignal?: AbortSignal,
+  imageFiles: CheckedMessageImage[] = [],
 ) {
-  const saved = await saveGuestMessageData(db, id, token, body, requestId);
+  const saved = await serializeMessageRequest(`guest:${id}`, async () => {
+    const replay = await saveGuestMessageData(
+      db,
+      id,
+      token,
+      body,
+      requestId,
+      [],
+      imageFiles.map((image) => image.contentHash),
+      true,
+    );
+    const images = replay
+      ? []
+      : await prepareMessageImages(db, id, imageFiles, abortSignal);
+    let saved;
+    try {
+      saved =
+        replay ??
+        (await saveGuestMessageData(db, id, token, body, requestId, images));
+      if (!saved) throw new Error("Message persistence failed");
+    } catch (error) {
+      await cleanupMessageImages(images);
+      throw error;
+    }
+    if (saved.replay && images.length) await cleanupMessageImages(images);
+    return saved;
+  });
   const message = messageDto(saved.message);
   let assistantMessage = saved.assistantMessage
     ? messageDto(saved.assistantMessage)

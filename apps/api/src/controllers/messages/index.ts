@@ -1,3 +1,4 @@
+import { HTTPException } from "hono/http-exception";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { jsonError } from "../../utils/service-result.js";
 import { createMiddleware } from "hono/factory";
@@ -52,6 +53,12 @@ const routes = new OpenAPIHono<HonoEnv>({
         400,
       );
   },
+});
+routes.onError((error, c) => {
+  if (error instanceof HTTPException)
+    return c.json({ error: error.message }, error.status);
+  console.error("messages", { outcome: "failed" });
+  return c.json({ error: "Unable to complete message request" }, 500);
 });
 const customerOnly = createMiddleware<HonoEnv>(async (c, next) => {
   if (c.get("session").user.role !== "customer")

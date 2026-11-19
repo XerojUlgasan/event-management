@@ -17,6 +17,7 @@ export type ConversationWithCustomer = ConversationRow & {
 };
 
 export type MessageWithSender = Selectable<Messages> & {
+  images?: unknown[];
   sender_display_name: string | null;
   sender_email: string | null;
 };

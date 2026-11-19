@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { matchRouteFamily } from "../src/edge/match-route.js";
 import {
+  messageBodyLimit,
+  MESSAGE_UPLOAD_BODY_LIMIT_BYTES,
   bookingBodyLimit,
   CATALOG_JSON_BODY_LIMIT_BYTES,
   SMALL_JSON_BODY_LIMIT_BYTES,
@@ -78,6 +80,29 @@ test("package attachment uses the booking route family and small body cap", () =
   );
   assert.equal(
     bookingBodyLimit("/v1/admin/booking-requests/id/package"),
+    SMALL_JSON_BODY_LIMIT_BYTES,
+  );
+});
+
+test("message image reads and multipart send caps agree in Node and Edge paths", () => {
+  assert.equal(matchRouteFamily("/v1/message-images/id"), "message-images");
+  for (const path of [
+    "/v1/messages/conversation/messages",
+    "/messages/conversation/messages",
+    "/v1/admin/conversations/id/messages",
+    "/guest/conversations/id/messages",
+  ]) {
+    assert.equal(
+      messageBodyLimit(path, "multipart/form-data; boundary=test"),
+      MESSAGE_UPLOAD_BODY_LIMIT_BYTES,
+    );
+    assert.equal(
+      messageBodyLimit(path, "application/json"),
+      SMALL_JSON_BODY_LIMIT_BYTES,
+    );
+  }
+  assert.equal(
+    messageBodyLimit("/guest/conversations/id/claim", "multipart/form-data"),
     SMALL_JSON_BODY_LIMIT_BYTES,
   );
 });

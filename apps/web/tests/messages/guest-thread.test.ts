@@ -5,6 +5,7 @@ import type { ChatMessage } from "../../src/lib/data/messages/conversations";
 import {
   addGuestSentMessages,
   guestRemaining,
+  guestReservedSends,
   mergeGuestAllowance,
   mergeGuestMessages,
   mergeGuestThread,
@@ -75,6 +76,23 @@ test("an uncertain send retries the original request even if the draft changes",
     prepareGuestSend(null, "   ", () => "unused"),
     null,
   );
+});
+
+test("confirmed image rejections release guest slots while uncertain sends remain reserved", () => {
+  const rejected = Object.fromEntries(
+    Array.from({ length: 5 }, (_, index) => [
+      String(index),
+      { definitelyUnsent: true },
+    ]),
+  );
+  assert.equal(guestRemaining(5, guestReservedSends(rejected)), 5);
+  const withUncertain = {
+    ...rejected,
+    pending: {},
+    uncertain: { definitelyUnsent: false },
+  };
+  assert.equal(guestRemaining(5, guestReservedSends(withUncertain)), 3);
+  assert.equal(guestRemaining(0, guestReservedSends(rejected)), 0);
 });
 
 test("overlapping guest sends reserve slots and stale responses cannot restore allowance", () => {

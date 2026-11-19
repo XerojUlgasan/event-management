@@ -1,3 +1,4 @@
+import { ApiError } from "../../../lib/http/request";
 import { navigateWorkspace } from "../../../lib/navigation/workspace-navigation";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import { useEffect, useRef, useState } from "react";
@@ -98,7 +99,12 @@ export function CustomerDashboard({
   const [outbox, setOutbox] = useState<
     Record<
       string,
-      { conversationId: string; message: ChatMessage; failed: boolean }
+      {
+        conversationId: string;
+        message: ChatMessage;
+        failed: boolean;
+        error?: string;
+      }
     >
   >({});
   const [dialogError, setDialogError] = useState("");
@@ -362,6 +368,7 @@ export function CustomerDashboard({
         message.body,
         conversation.id,
         message.id,
+        message.pendingFiles ?? [],
       );
       const sent = result.assistantMessage
         ? [result.message, result.assistantMessage]
@@ -402,24 +409,36 @@ export function CustomerDashboard({
             : current,
         );
       }
-    } catch {
+    } catch (cause) {
+      const error =
+        message.pendingFiles?.length &&
+        cause instanceof ApiError &&
+        [400, 413, 502].includes(cause.status)
+          ? cause.message
+          : undefined;
       setOutbox((current) =>
         current[message.id]
           ? {
               ...current,
-              [message.id]: { ...current[message.id], failed: true },
+              [message.id]: { ...current[message.id], failed: true, error },
             }
           : current,
       );
     }
   };
 
-  const sendMessage = async (body: string, thread = messageThread) => {
+  const sendMessage = async (
+    body: string,
+    files: File[] = [],
+    requestId: string = crypto.randomUUID(),
+    thread = messageThread,
+  ) => {
     const conversation = thread?.conversation;
     if (!conversation) return;
     const message: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: requestId,
       body,
+      pendingFiles: files,
       quotationId: null,
       senderId: conversation.customerId,
       senderRole: "customer",
@@ -471,7 +490,7 @@ export function CustomerDashboard({
       setMessageOpen(false);
       setConversationOpen(true);
       go("Messages");
-      void sendMessage(body, thread);
+      void sendMessage(body, [], crypto.randomUUID(), thread);
     } catch (cause) {
       setDialogError(notifyError(cause, "Unable to open your conversation."));
     } finally {
@@ -754,6 +773,15 @@ export function CustomerDashboard({
                     ),
                 )
                 .map((item) => item.message.id)}
+              failedMessageErrors={Object.fromEntries(
+                Object.entries(outbox)
+                  .filter(
+                    ([, item]) =>
+                      item.conversationId === selectedConversationId &&
+                      item.error,
+                  )
+                  .map(([id, item]) => [id, item.error ?? ""]),
+              )}
               onRetryMessage={(id) => {
                 const item = outbox[id];
                 const conversation = messageThread?.conversation;

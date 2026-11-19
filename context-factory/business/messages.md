@@ -38,6 +38,8 @@ The customer and admin use the conversation to communicate and create transactio
 
 ## AI and human handling
 
+Customers, guests, and administrators may attach images to their messages, with an optional text caption. Each image has a saved AI interpretation linked to its message. Customer AI history includes those observations from both senders while preserving message order and provenance. Original images are retained privately and are sent only to the vision interpretation step. An interpretation records uncertain observations; customers must still confirm their desired event details. Admin image messages follow the same takeover rule as text messages.
+
 - AI replies are enabled by default per conversation. Only a System Administrator can change the toggle.
 - A successfully sent admin message or quotation switches that conversation to human handling. AI stays off until an admin explicitly re-enables it; failed sends do not change the preference.
 - Customers can continue messaging while AI is off. Re-enabling AI applies to future customer messages, without generating replies to the backlog.

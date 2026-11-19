@@ -1,8 +1,10 @@
+import { messageImageSchema } from "@event-management/contracts/message-images";
 import { aiHandoffSchema } from "@event-management/contracts/ai-handoff";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import { z } from "@hono/zod-openapi";
 
 export const messageBodySchema = z.object({
+  requestId: z.string().uuid().optional(),
   conversationId: z.string().uuid().optional(),
   body: z
     .string()
@@ -21,6 +23,7 @@ export const customerMessageBodySchema = messageBodySchema.extend({
 export const messageSchema = z.object({
   id: z.string().uuid(),
   body: z.string(),
+  images: z.array(messageImageSchema),
   quotationId: z.string().uuid().nullable(),
   senderId: z.string().uuid().nullable(),
   senderRole: z.enum(["admin", "customer", "assistant"]),
