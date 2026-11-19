@@ -22,6 +22,7 @@ The [identity reference](identity.md) defines these responsibilities. Admin mean
 
 - A request may have no initial catalog `package_id`. In that state, its package and price are not yet known; views show "Package to be prepared" and "To be discussed" rather than inventing a zero price.
 - Only a System Administrator assigns an available catalog package to a request without a package, or prepares a booking-owned private package from scratch. Existing catalog choices and private proposals retain their history. A private proposal may also start as a copy of a catalog package.
+- Admin package preparation, catalog assignment, and quotation work are eligible while a request is `under_review`, `needs_details`, or `accepted`; accepting it first is unnecessary. Declined and cancelled requests retain readable packages and quotation history but cannot receive those changes. Package, revision, and conversation prerequisites still apply; see [quotations](quotations.md).
 - A selected catalog package's current name, price, and maximum guests come from that record. Private proposals and saved quotation amounts have separate owners. A prepared catalog or private package is required before creating a quotation.
 - Requested dates and times express the customer's preferences until the admin creates operational schedules. A schedule does not change the customer's requested details.
 - The preferred location describes the physical event location; it is not selected from a location catalog.

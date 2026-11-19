@@ -42,7 +42,11 @@ import {
   saveQuotation,
   sendQuotation,
 } from "../../lib/data/quotations/quotations";
-import { getAdminBookingRequest } from "../../lib/data/booking-requests/requests";
+import {
+  getAdminBookingRequest,
+  type BookingStatus,
+} from "../../lib/data/booking-requests/requests";
+import { ApiError } from "../../lib/http/request";
 
 const formatWhen = (value: string) => formatEnPhDateTime(new Date(value));
 
@@ -337,12 +341,144 @@ export function Quotations({
   bookingId,
   admin,
   quotationId,
+  bookingStatus,
+  refreshBooking,
+  proposalAvailable = true,
 }: {
   bookingId?: string;
   admin: boolean;
   quotationId?: string;
+  bookingStatus?: BookingStatus;
+  refreshBooking?: () => Promise<void>;
+  proposalAvailable?: boolean;
 }) {
   const { notify, notifyError } = useNotifications();
+  const bookingScope = JSON.stringify([bookingId, admin, quotationId]);
+  const bookingScopeRef = useRef({ key: bookingScope, generation: 0 });
+
+  if (bookingScopeRef.current.key !== bookingScope) {
+    bookingScopeRef.current = {
+      key: bookingScope,
+      generation: bookingScopeRef.current.generation + 1,
+    };
+  }
+
+  const mountedRef = useRef(false);
+  const bookingRefreshSequence = useRef(0);
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  const [loadedBooking, setLoadedBooking] = useState<{
+    id: string;
+    status: BookingStatus;
+    generation: number;
+  } | null>(null);
+  const [bookingError, setBookingError] = useState("");
+  const [needsBookingRefresh, setNeedsBookingRefresh] = useState(false);
+  const [refreshingBooking, setRefreshingBooking] = useState(false);
+  const status =
+    bookingStatus ??
+    (loadedBooking &&
+    loadedBooking.id === bookingId &&
+    loadedBooking.generation === bookingScopeRef.current.generation
+      ? loadedBooking.status
+      : undefined);
+  const canWrite =
+    admin &&
+    !!bookingId &&
+    !!status &&
+    status !== "declined" &&
+    status !== "cancelled" &&
+    !needsBookingRefresh &&
+    !refreshingBooking;
+  const canWriteRef = useRef(canWrite);
+  const eligibilityRef = useRef({ allowed: canWrite, generation: 0 });
+
+  if (eligibilityRef.current.allowed !== canWrite) {
+    eligibilityRef.current = {
+      allowed: canWrite,
+      generation: eligibilityRef.current.generation + 1,
+    };
+  }
+
+  canWriteRef.current = canWrite;
+
+  async function loadBooking() {
+    if (!bookingId || !admin) return;
+
+    const requestGeneration = bookingScopeRef.current.generation;
+    const sequence = ++bookingRefreshSequence.current;
+
+    const isCurrent = () =>
+      mountedRef.current &&
+      bookingScopeRef.current.generation === requestGeneration &&
+      bookingRefreshSequence.current === sequence;
+
+    canWriteRef.current = false;
+    setNeedsBookingRefresh(true);
+    setRefreshingBooking(true);
+    setBookingError("");
+
+    try {
+      if (refreshBooking) await refreshBooking();
+      else {
+        const result = await getAdminBookingRequest(bookingId);
+
+        if (!isCurrent()) return;
+
+        setLoadedBooking({
+          id: bookingId,
+          status: result.bookingRequest.status,
+          generation: requestGeneration,
+        });
+      }
+
+      if (!isCurrent()) return;
+
+      if ((await load()) && isCurrent()) setNeedsBookingRefresh(false);
+    } catch (cause) {
+      if (!isCurrent()) return;
+
+      setBookingError(notifyError(cause, "Unable to refresh the booking."));
+      setNeedsBookingRefresh(true);
+    } finally {
+      if (isCurrent()) setRefreshingBooking(false);
+    }
+  }
+  useEffect(() => {
+    setNeedsBookingRefresh(false);
+    setRefreshingBooking(false);
+    setBookingError("");
+  }, [bookingScope]);
+  useEffect(() => {
+    if (!admin || bookingStatus !== undefined || !bookingId) return;
+
+    let active = true;
+    const requestGeneration = bookingScopeRef.current.generation;
+    setLoadedBooking(null);
+    setBookingError("");
+    void getAdminBookingRequest(bookingId)
+      .then((result) => {
+        if (active)
+          setLoadedBooking({
+            id: bookingId,
+            status: result.bookingRequest.status,
+            generation: requestGeneration,
+          });
+      })
+      .catch((cause) => {
+        if (active)
+          setBookingError(notifyError(cause, "Unable to load the booking."));
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [admin, bookingId, bookingStatus, bookingScope]);
   const generation = useRequestGeneration();
   const [services, setServices] = useState<AdminService[]>([]);
   const [serviceError, setServiceError] = useState("");
@@ -465,6 +601,8 @@ export function Quotations({
         setItems(resolved.currentDraft?.items ?? []);
 
       setDraft(resolved.currentDraft);
+
+      return true;
     } catch (cause) {
       if (
         !generation.isCurrent(currentGeneration) ||
@@ -498,24 +636,60 @@ export function Quotations({
     };
   }, [bookingId, admin, quotationId]);
 
-  async function action(successMessage: string, fn: () => Promise<unknown>) {
+  useEffect(() => {
+    if (!canWrite) setShowRevision(false);
+  }, [canWrite]);
+
+  useEffect(() => {
+    setBusy(false);
+  }, [bookingScope]);
+
+  async function action(
+    successMessage: string,
+    fn: (canContinue: () => boolean) => Promise<unknown>,
+  ) {
+    if (!canWriteRef.current) return;
+
+    const scopeGeneration = bookingScopeRef.current.generation;
+    const eligibilityGeneration = eligibilityRef.current.generation;
+
+    const isCurrent = () =>
+      mountedRef.current &&
+      bookingScopeRef.current.generation === scopeGeneration;
+
+    const canContinue = () =>
+      isCurrent() &&
+      canWriteRef.current &&
+      eligibilityRef.current.generation === eligibilityGeneration;
+
     setBusy(true);
     setError("");
 
     try {
-      await fn();
+      await fn(canContinue);
+
+      if (!canContinue()) return;
+
       notify(successMessage);
 
       if (pagination.page !== 1) pagination.reset();
       else await load();
     } catch (cause) {
+      if (!canContinue()) return;
+
+      if (cause instanceof ApiError && cause.status === 409) {
+        canWriteRef.current = false;
+        setNeedsBookingRefresh(true);
+      }
+
       setError(notifyError(cause, "Unable to update quotation."));
     } finally {
-      setBusy(false);
+      if (isCurrent()) setBusy(false);
     }
   }
 
   const update = (index: number, patch: Partial<QuotationItem>) =>
+    canWriteRef.current &&
     setItems((current) =>
       current.map((line, i) => (i === index ? { ...line, ...patch } : line)),
     );
@@ -567,6 +741,21 @@ export function Quotations({
 
   return (
     <section className="quotation-builder" aria-label="Quotations">
+      {admin && (status === "declined" || status === "cancelled") && (
+        <p>This request is {status}. Packages and quotations are read-only.</p>
+      )}
+      {admin && (bookingError || needsBookingRefresh) && (
+        <p role="alert">
+          {bookingError || "Refresh the booking before retrying."}{" "}
+          <Button
+            variant="secondary"
+            disabled={refreshingBooking}
+            onClick={() => void loadBooking()}
+          >
+            Refresh booking
+          </Button>
+        </p>
+      )}
       {admin && quotationId && bookingId && (
         <p className="quotation-meta">
           <a href={`/app/bookings/${encodeURIComponent(bookingId)}`}>
@@ -592,24 +781,48 @@ export function Quotations({
       {adminEmpty && (
         <section className="quotation-empty">
           <h2>No quotation yet</h2>
-          <p className="quotation-lede">
-            Create a draft from the current package price. You can add
-            adjustments before sending it.
-          </p>
-          <Button
-            disabled={busy}
-            onClick={() =>
-              void action("Quotation draft created.", async () => {
-                const booking = await getAdminBookingRequest(bookingId);
-                await createQuotation(
-                  bookingId,
-                  booking.bookingRequest.updatedAt,
-                );
-              })
-            }
-          >
-            Create draft
-          </Button>
+          {canWrite && !proposalAvailable && (
+            <p>Prepare or choose a package before creating a quotation.</p>
+          )}
+          {canWrite && proposalAvailable && (
+            <>
+              <p className="quotation-lede">
+                Create a draft from the current package price. You can add
+                adjustments before sending it.
+              </p>
+              <Button
+                disabled={busy}
+                onClick={() =>
+                  void action(
+                    "Quotation draft created.",
+                    async (canContinue) => {
+                      const booking = await getAdminBookingRequest(bookingId);
+
+                      if (!canContinue()) return;
+
+                      if (
+                        !canWriteRef.current ||
+                        ["declined", "cancelled"].includes(
+                          booking.bookingRequest.status,
+                        )
+                      ) {
+                        canWriteRef.current = false;
+                        setNeedsBookingRefresh(true);
+                        throw new Error("Refresh the booking before retrying.");
+                      }
+
+                      await createQuotation(
+                        bookingId,
+                        booking.bookingRequest.updatedAt,
+                      );
+                    },
+                  )
+                }
+              >
+                Create draft
+              </Button>
+            </>
+          )}
         </section>
       )}
 
@@ -617,7 +830,7 @@ export function Quotations({
         <p className="quotation-lede">No quotations yet.</p>
       )}
 
-      {admin && draft && serviceError && (
+      {canWrite && draft && serviceError && (
         <p role="alert">
           {serviceError}{" "}
           <Button
@@ -633,8 +846,11 @@ export function Quotations({
         </p>
       )}
 
-      {admin && draft && (
-        <fieldset className="quotation-stack" disabled={busy}>
+      {admin && draft && !canWrite && (
+        <QuotationSummaryRead quotation={draft} />
+      )}
+      {admin && draft && canWrite && (
+        <fieldset className="quotation-stack" disabled={busy || !canWrite}>
           <div className="quotation-offer-head">
             <div>
               <h2 className="quotation-offer-title">Version {draft.version}</h2>
@@ -658,8 +874,8 @@ export function Quotations({
             </p>
           )}
           <p className="quotation-lede">
-            Package base stays {formatPesosFromMinor(draft.baseAmountMinor)}. Each adjustment
-            below is added to it or taken off it.
+            Package base stays {formatPesosFromMinor(draft.baseAmountMinor)}.
+            Each adjustment below is added to it or taken off it.
           </p>
 
           {serviceCursor && (
@@ -680,6 +896,7 @@ export function Quotations({
               busy={busy}
               onChange={(patch) => update(index, patch)}
               onRemove={() =>
+                canWriteRef.current &&
                 setItems((current) => current.filter((_, i) => i !== index))
               }
             />
@@ -690,6 +907,7 @@ export function Quotations({
               variant="secondary"
               disabled={items.length >= MAX_QUOTATION_ITEMS}
               onClick={() =>
+                canWriteRef.current &&
                 setItems((current) => [
                   ...current,
                   {
@@ -732,24 +950,32 @@ export function Quotations({
             <Button
               disabled={busy || editorTotal < 0}
               onClick={() =>
-                void action("Quotation saved and sent.", async () => {
-                  const saved = await saveQuotation(
-                    draft.id,
-                    draft.updatedAt,
-                    items,
-                  );
-                  setDraft(saved.quotation);
-                  setItems(saved.quotation.items);
-                  setRows((current) =>
-                    current.map((quote) =>
-                      quote.id === saved.quotation.id ? saved.quotation : quote,
-                    ),
-                  );
-                  await sendQuotation(
-                    saved.quotation.id,
-                    saved.quotation.updatedAt,
-                  );
-                })
+                void action(
+                  "Quotation saved and sent.",
+                  async (canContinue) => {
+                    const saved = await saveQuotation(
+                      draft.id,
+                      draft.updatedAt,
+                      items,
+                    );
+
+                    if (!canContinue()) return;
+
+                    setDraft(saved.quotation);
+                    setItems(saved.quotation.items);
+                    setRows((current) =>
+                      current.map((quote) =>
+                        quote.id === saved.quotation.id
+                          ? saved.quotation
+                          : quote,
+                      ),
+                    );
+                    await sendQuotation(
+                      saved.quotation.id,
+                      saved.quotation.updatedAt,
+                    );
+                  },
+                )
               }
             >
               Save and send
@@ -775,13 +1001,14 @@ export function Quotations({
                   onClick={() =>
                     void action(
                       "Quotation revision started. Review and save the draft.",
-                      async () => {
+                      async (canContinue) => {
                         await reviseQuotation(
                           draft.id,
                           draft.updatedAt,
                           reason.trim(),
                         );
-                        setReason("");
+
+                        if (canContinue()) setReason("");
                       },
                     )
                   }
@@ -800,7 +1027,7 @@ export function Quotations({
           {!admin && (
             <p className="quotation-lede">Discuss this offer in Messages.</p>
           )}
-          {admin && (
+          {admin && canWrite && (
             <div className="quotation-revision">
               {!showRevision ? (
                 <div className="quotation-actions quotation-actions-start">
@@ -843,14 +1070,17 @@ export function Quotations({
                       onClick={() =>
                         void action(
                           "Quotation revision started. Review and save the draft.",
-                          async () => {
+                          async (canContinue) => {
                             await reviseQuotation(
                               currentOffer.id,
                               currentOffer.updatedAt,
                               reason.trim(),
                             );
-                            setReason("");
-                            setShowRevision(false);
+
+                            if (canContinue()) {
+                              setReason("");
+                              setShowRevision(false);
+                            }
                           },
                         )
                       }

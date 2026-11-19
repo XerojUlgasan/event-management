@@ -21,6 +21,7 @@ import {
   getAdminBookingRequest,
   updateBookingRequestStatus,
   type BookingRequest,
+  type BookingStatus,
 } from "../../../../lib/data/booking-requests/requests";
 import { getBookingPackage } from "../../../../lib/data/booking-requests/packages";
 import { ApiError } from "../../../../lib/http/request";
@@ -176,7 +177,15 @@ function RequestStatusForm({
   );
 }
 
-function BookingQuotations({ bookingId }: { bookingId: string }) {
+function BookingQuotations({
+  bookingId,
+  status,
+  refreshBooking,
+}: {
+  bookingId: string;
+  status: BookingStatus;
+  refreshBooking: () => Promise<void>;
+}) {
   const [state, setState] = useState<"loading" | "ready" | "missing" | "error">(
     "loading",
   );
@@ -212,10 +221,15 @@ function BookingQuotations({ bookingId }: { bookingId: string }) {
       </p>
     );
 
-  if (state === "missing")
-    return <p>Prepare or choose a package before creating a quotation.</p>;
-
-  return <Quotations bookingId={bookingId} admin />;
+  return (
+    <Quotations
+      bookingId={bookingId}
+      admin
+      bookingStatus={status}
+      refreshBooking={refreshBooking}
+      proposalAvailable={state === "ready"}
+    />
+  );
 }
 
 export function BookingRequestPage({
@@ -425,7 +439,9 @@ export function BookingRequestPage({
                         {item.packageName && item.packagePrice ? (
                           <>
                             {item.packageName} ·{" "}
-                            {formatPesosFromMinor(item.packagePrice.amountMinor)}{" "}
+                            {formatPesosFromMinor(
+                              item.packagePrice.amountMinor,
+                            )}{" "}
                             · up to {item.packageMaxGuests} guests
                           </>
                         ) : (
@@ -558,6 +574,7 @@ export function BookingRequestPage({
               <BookingPackage
                 id={item.id}
                 admin
+                refreshBooking={refresh}
                 editable={!["declined", "cancelled"].includes(item.status)}
                 onChanged={() => {
                   setProposalRevision((value) => value + 1);
@@ -576,6 +593,8 @@ export function BookingRequestPage({
               <BookingQuotations
                 key={`${item.id}:${proposalRevision}`}
                 bookingId={item.id}
+                status={item.status}
+                refreshBooking={refresh}
               />
             </div>
           )}

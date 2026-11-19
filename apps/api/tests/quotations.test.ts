@@ -170,6 +170,403 @@ async function create(b: any) {
   ).quotation;
 }
 
+const proposalContent = {
+  name: "Status matrix proposal",
+  description: "Synthetic proposal without media",
+  maxGuests: 50,
+  price: { kind: "fixed", currency: "PHP", amountMinor: 100000 },
+  sections: [],
+};
+
+type MatrixOperation =
+  | "create"
+  | "revise"
+  | "save"
+  | "send"
+  | "scratch"
+  | "copy"
+  | "update"
+  | "attach";
+
+// Every operation gets its own booking and satisfies all non-status prerequisites.
+async function matrixFixture(operation: MatrixOperation) {
+  const b = await booking(
+    ["scratch", "update", "attach"].includes(operation) ? null : packageId,
+  );
+  let q: any;
+  let custom: any;
+
+  if (["revise", "save", "send"].includes(operation)) q = await create(b);
+
+  if (operation === "update")
+    custom = await read(
+      await call(`/admin/booking-requests/${b.id}/custom-package`, "POST", {
+        ...proposalContent,
+        expectedBookingUpdatedAt: b.updatedAt,
+      }),
+      200,
+    );
+
+  const source =
+    operation === "copy"
+      ? await read(await call(`/admin/booking-requests/${b.id}/package`), 200)
+      : undefined;
+  const currentBooking = custom?.bookingRequest ?? b;
+
+  const invoke = () => {
+    switch (operation) {
+      case "create":
+        return call(`/admin/booking-requests/${b.id}/quotations`, "POST", {
+          expectedUpdatedAt: currentBooking.updatedAt,
+        });
+      case "revise":
+        return call(`/admin/quotations/${q.id}/revision`, "POST", {
+          expectedUpdatedAt: q.updatedAt,
+          reason: "Review proposal",
+        });
+      case "save":
+        return call(`/admin/quotations/${q.id}`, "PATCH", {
+          expectedUpdatedAt: q.updatedAt,
+          items: [],
+        });
+      case "send":
+        return call(`/admin/quotations/${q.id}/send`, "POST", {
+          expectedUpdatedAt: q.updatedAt,
+        });
+      case "scratch":
+      case "copy":
+        return call(`/admin/booking-requests/${b.id}/custom-package`, "POST", {
+          ...proposalContent,
+          expectedBookingUpdatedAt: currentBooking.updatedAt,
+          ...(source ? { expectedUpdatedAt: source.package.updatedAt } : {}),
+        });
+      case "update":
+        return call(`/admin/booking-requests/${b.id}/custom-package`, "PATCH", {
+          ...proposalContent,
+          description: "Updated synthetic proposal",
+          expectedBookingUpdatedAt: currentBooking.updatedAt,
+          expectedUpdatedAt: custom.package.updatedAt,
+        });
+      case "attach":
+        return call(`/admin/booking-requests/${b.id}/package`, "POST", {
+          packageId,
+          expectedBookingUpdatedAt: currentBooking.updatedAt,
+        });
+    }
+  };
+
+  return { id: b.id, invoke };
+}
+
+// Include booking, proposals, quotations, conversation, messages and all audits;
+// no other tests execute concurrently in this suite.
+async function matrixSnapshot(id: string) {
+  const result = await pool.query(
+    `SELECT
+      (SELECT row_to_json(b) FROM booking_requests b WHERE b.id = $1) AS booking,
+      (SELECT coalesce(json_agg(p ORDER BY p.id), '[]') FROM packages p WHERE p.custom_for_booking_request_id = $1) AS proposals,
+      (SELECT coalesce(json_agg(p ORDER BY p.id), '[]') FROM packages p WHERE p.package_type = 'catalog') AS catalog,
+      (SELECT coalesce(json_agg(q ORDER BY q.id), '[]') FROM quotations q WHERE q.booking_request_id = $1) AS quotations,
+      (SELECT coalesce(json_agg(c ORDER BY c.id), '[]') FROM conversations c WHERE c.booking_request_id = $1) AS conversations,
+      (SELECT coalesce(json_agg(m ORDER BY m.id), '[]') FROM messages m JOIN conversations c ON c.id = m.conversation_id WHERE c.booking_request_id = $1) AS messages,
+      (SELECT coalesce(json_agg(a ORDER BY a.id), '[]') FROM audit_events a) AS audits`,
+    [id],
+  );
+
+  return result.rows[0];
+}
+
+const matrixOperations: MatrixOperation[] = [
+  "create",
+  "revise",
+  "save",
+  "send",
+  "scratch",
+  "copy",
+  "update",
+  "attach",
+];
+
+test("booking status eligibility for every quotation and proposal write", async () => {
+  for (const status of [
+    "under_review",
+    "needs_details",
+    "accepted",
+    "declined",
+    "cancelled",
+  ]) {
+    for (const operation of matrixOperations) {
+      const fixture = await matrixFixture(operation);
+      // Set status without changing the revision, so the status guard itself is tested.
+      await pool.query(
+        "UPDATE booking_requests SET status = $1 WHERE id = $2",
+        [status, fixture.id],
+      );
+      const before = await matrixSnapshot(fixture.id);
+      const response = await fixture.invoke();
+      const closed = status === "declined" || status === "cancelled";
+      assert.equal(
+        response.status,
+        closed ? 409 : ["create", "revise"].includes(operation) ? 201 : 200,
+        `${status} ${operation}: ${await response.clone().text()}`,
+      );
+
+      if (closed)
+        assert.deepEqual(
+          await matrixSnapshot(fixture.id),
+          before,
+          `${status} ${operation} committed effects`,
+        );
+      else
+        assert.notDeepEqual(
+          await matrixSnapshot(fixture.id),
+          before,
+          `${status} ${operation} did not persist`,
+        );
+    }
+  }
+});
+
+test("closed conversations permit proposal and draft preparation but block delivery", async () => {
+  const b = await booking(null);
+  await db
+    .updateTable("conversations")
+    .set({ status: "closed", closed_at: new Date() })
+    .where("booking_request_id", "=", b.id)
+    .execute();
+  const custom = await read(
+    await call(`/admin/booking-requests/${b.id}/custom-package`, "POST", {
+      ...proposalContent,
+      expectedBookingUpdatedAt: b.updatedAt,
+    }),
+    200,
+  );
+  const q = await create(custom.bookingRequest);
+  const before = await matrixSnapshot(b.id);
+  const response = await call(`/admin/quotations/${q.id}/send`, "POST", {
+    expectedUpdatedAt: q.updatedAt,
+  });
+  assert.equal(response.status, 409, await response.clone().text());
+  assert.deepEqual(await matrixSnapshot(b.id), before);
+});
+
+test("quotation and package prerequisites reject independently without effects", async () => {
+  async function rejected(
+    id: string,
+    request: () => Response | Promise<Response>,
+    error: string,
+  ) {
+    const before = await matrixSnapshot(id);
+    const result = await read(await request(), 409);
+    assert.equal(result.error, error);
+    assert.deepEqual(await matrixSnapshot(id), before);
+  }
+
+  const duplicate = await booking();
+  await create(duplicate);
+  const fresh = (
+    await read(await call(`/admin/booking-requests/${duplicate.id}`), 200)
+  ).bookingRequest;
+  await rejected(
+    duplicate.id,
+    () =>
+      call(`/admin/booking-requests/${duplicate.id}/quotations`, "POST", {
+        expectedUpdatedAt: fresh.updatedAt,
+      }),
+    "Revise the active quotation instead",
+  );
+
+  const archived = await db
+    .insertInto("packages")
+    .values({
+      slug: `archived-${randomUUID()}`,
+      name: "Archived synthetic package",
+      max_guests: 50,
+      price: 1000,
+      archived_at: new Date(),
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  const attach = await booking(null);
+  await rejected(
+    attach.id,
+    () =>
+      call(`/admin/booking-requests/${attach.id}/package`, "POST", {
+        packageId: archived.id,
+        expectedBookingUpdatedAt: attach.updatedAt,
+      }),
+    "Package is unavailable or changed",
+  );
+  const copyArchived = await booking(null);
+  await rejected(
+    copyArchived.id,
+    () =>
+      call(
+        `/admin/booking-requests/${copyArchived.id}/custom-package`,
+        "POST",
+        {
+          ...proposalContent,
+          sourcePackageId: archived.id,
+          expectedUpdatedAt: archived.updated_at.toISOString(),
+          expectedBookingUpdatedAt: copyArchived.updatedAt,
+        },
+      ),
+    "Archived packages cannot be customized",
+  );
+
+  const staleBooking = await booking(null);
+  await pool.query(
+    "UPDATE booking_requests SET updated_at = updated_at + interval '1 second' WHERE id = $1",
+    [staleBooking.id],
+  );
+  await rejected(
+    staleBooking.id,
+    () =>
+      call(
+        `/admin/booking-requests/${staleBooking.id}/custom-package`,
+        "POST",
+        {
+          ...proposalContent,
+          expectedBookingUpdatedAt: staleBooking.updatedAt,
+        },
+      ),
+    "Booking or package changed. Refresh and try again",
+  );
+
+  const source = await db
+    .insertInto("packages")
+    .values({
+      slug: `source-${randomUUID()}`,
+      name: "Synthetic source package",
+      max_guests: 50,
+      price: 1000,
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  const staleSource = await booking(null);
+  await pool.query(
+    "UPDATE packages SET updated_at = updated_at + interval '1 second' WHERE id = $1",
+    [source.id],
+  );
+  await rejected(
+    staleSource.id,
+    () =>
+      call(`/admin/booking-requests/${staleSource.id}/custom-package`, "POST", {
+        ...proposalContent,
+        sourcePackageId: source.id,
+        expectedUpdatedAt: source.updated_at.toISOString(),
+        expectedBookingUpdatedAt: staleSource.updatedAt,
+      }),
+    "Booking or package changed. Refresh and try again",
+  );
+
+  const staleCustom = await booking(null);
+  const custom = await read(
+    await call(
+      `/admin/booking-requests/${staleCustom.id}/custom-package`,
+      "POST",
+      {
+        ...proposalContent,
+        expectedBookingUpdatedAt: staleCustom.updatedAt,
+      },
+    ),
+    200,
+  );
+  await pool.query(
+    "UPDATE packages SET updated_at = updated_at + interval '1 second' WHERE id = $1",
+    [custom.package.id],
+  );
+  await rejected(
+    staleCustom.id,
+    () =>
+      call(
+        `/admin/booking-requests/${staleCustom.id}/custom-package`,
+        "PATCH",
+        {
+          ...proposalContent,
+          expectedUpdatedAt: custom.package.updatedAt,
+          expectedBookingUpdatedAt: custom.bookingRequest.updatedAt,
+        },
+      ),
+    "Booking or package changed. Refresh and try again",
+  );
+});
+
+test("booking closure and writes serialize on the booking lock", async () => {
+  for (const operation of matrixOperations) {
+    const fixture = await matrixFixture(operation);
+    const before = await matrixSnapshot(fixture.id);
+    const client = await pool.connect();
+    let pending: Promise<Response> | undefined;
+
+    try {
+      await client.query("BEGIN");
+      const pid = (await client.query("SELECT pg_backend_pid() AS pid")).rows[0]
+        .pid;
+      // Preserve the revision to exercise the locked status recheck, including
+      // custom-package writes that performed their first check before the lock.
+      await client.query(
+        "UPDATE booking_requests SET status = 'declined' WHERE id = $1",
+        [fixture.id],
+      );
+      pending = Promise.resolve(fixture.invoke());
+      const deadline = Date.now() + 10000;
+      let blocked = false;
+
+      while (Date.now() < deadline && !blocked) {
+        const result = await pool.query(
+          "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))) AS blocked",
+          [pid],
+        );
+        blocked = result.rows[0].blocked;
+
+        if (!blocked) await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+
+      assert.ok(blocked, `${operation} did not wait for the booking lock`);
+      await client.query("COMMIT");
+      const response = await pending;
+      assert.equal(
+        response.status,
+        409,
+        `${operation}: ${await response.clone().text()}`,
+      );
+      const after = await matrixSnapshot(fixture.id);
+      assert.deepEqual(
+        after,
+        { ...before, booking: { ...before.booking, status: "declined" } },
+        `${operation} committed effects after closure`,
+      );
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+
+      if (pending) await pending;
+    }
+
+    // The inverse ordering: the write commits while open, then closure keeps it as history.
+    const earlier = await matrixFixture(operation);
+    const response = await earlier.invoke();
+    assert.equal(
+      response.status,
+      ["create", "revise"].includes(operation) ? 201 : 200,
+      `${operation}: ${await response.clone().text()}`,
+    );
+    const beforeClose = await matrixSnapshot(earlier.id);
+    await read(
+      await call(`/admin/booking-requests/${earlier.id}/status`, "PATCH", {
+        status: "declined",
+        reason: "Request closed after preparation",
+      }),
+      200,
+    );
+    const afterClose = await matrixSnapshot(earlier.id);
+    assert.deepEqual(afterClose.proposals, beforeClose.proposals);
+    assert.deepEqual(afterClose.quotations, beforeClose.quotations);
+    assert.deepEqual(afterClose.messages, beforeClose.messages);
+  }
+});
+
 test("quotation delivery, ownership, removed customer actions and admin revision history", async () => {
   const b = await booking();
   let q = await create(b);

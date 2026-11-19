@@ -14,6 +14,8 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Booking package and quotation status implementation](2026-11-19_22-43-07_booking-proposal-status-implementation.md) | Open-status writes, closed history, conflict and async-scope guards / main | complete | Review scoped uncommitted diff; local verification passed and task runtime removed; no migration required |
+| [Booking package and quotation status spec](2026-11-19_22-20-00_booking-proposal-status-spec.md) | Open-status eligibility and quotation UI gap / main | complete | Spec reviewed and documentation checks passed; application implementation remains separate |
 | [Catalog indexing scheduling](2026-11-19_21-52-00_catalog-index-scheduling.md) | Manual ensure-scheduled queue intent and no duplicate active work / main | complete | Review scoped diff; deploy matching API/frontend together; no schema migration required |
 | [Combined catalog text](2026-11-19_21-19-36_combined-catalog-text.md) | One text entry per listing; separate photos / main | complete | Review scoped diff; rebuild existing text through Index pending with matching worker code |
 | [Unique knowledge search results](2026-11-19_21-13-26_unique-knowledge-search-results.md) | Best eligible chunk per listing before top-five limit / main | complete | Review scoped API/test diff; browser, live provider, and hosted rollout remain separate |

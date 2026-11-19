@@ -23,23 +23,36 @@ import {
 } from "../../lib/data/catalog/packages";
 import { PackageCanvas } from "../catalog/CatalogContent";
 import { PackageEditor } from "../catalog/PackageEditor";
+import { ApiError } from "../../lib/http/request";
 
 export function BookingPackage({
   id,
   admin,
   onChanged,
   editable = true,
+  refreshBooking,
 }: {
   id: string;
   admin: boolean;
   editable?: boolean;
   onChanged?: () => void;
+  refreshBooking?: () => Promise<void>;
 }) {
   const { notifyError } = useNotifications();
   const generation = useRequestGeneration();
   const [loaded, setLoaded] = useState<BookingPackageResult | null>(null);
   const [history, setHistory] = useState<PackageHistoryEntry[]>([]);
   const [editing, setEditing] = useState(false);
+  const [needsRefresh, setNeedsRefresh] = useState(false);
+  const canEdit = admin && editable && !needsRefresh;
+  const canEditRef = useRef(canEdit);
+  canEditRef.current = canEdit;
+  useEffect(() => {
+    if (!canEdit) {
+      setEditing(false);
+      setSelecting(false);
+    }
+  }, [canEdit]);
   const [options, setOptions] = useState<PublicPackage[]>([]);
   const [optionCursor, setOptionCursor] = useState<string | null>(null);
   const [selected, setSelected] = useState("");
@@ -94,6 +107,8 @@ export function BookingPackage({
       setNextCursor(audit?.nextCursor ?? null);
       setLoadedKey(requestKey);
       setLoadedIdentity(identity);
+
+      return true;
     } catch (cause) {
       if (
         !generation.isCurrent(current) ||
@@ -124,6 +139,32 @@ export function BookingPackage({
   return (
     <section aria-label="Package" className="booking-current-package">
       {busy && <p role="status">Loading package…</p>}
+      {needsRefresh && (
+        <p role="alert">
+          Refresh the booking before retrying.{" "}
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+
+              try {
+                if (!refreshBooking) return;
+
+                await refreshBooking();
+
+                if (await load()) setNeedsRefresh(false);
+              } catch (cause) {
+                setError(notifyError(cause, "Unable to refresh the booking."));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Refresh booking
+          </Button>
+        </p>
+      )}
       {error && (
         <p role="alert">
           {error}{" "}
@@ -137,7 +178,7 @@ export function BookingPackage({
           {!loaded.package && (
             <p>Package to be prepared. Amount to be discussed.</p>
           )}
-          {admin && editable && (
+          {canEdit && (
             <div className="booking-actions">
               <Button disabled={busy} onClick={() => setEditing(true)}>
                 {loaded.package ? "Edit package" : "Create custom package"}
@@ -155,7 +196,7 @@ export function BookingPackage({
               )}
             </div>
           )}
-          {selecting && !loaded.package && (
+          {selecting && canEdit && !loaded.package && (
             <div>
               <label>
                 Catalog package{" "}
@@ -184,7 +225,7 @@ export function BookingPackage({
                 onClick={async () => {
                   const option = options.find((item) => item.id === selected);
 
-                  if (!option) return;
+                  if (!option || !canEditRef.current) return;
 
                   setBusy(true);
 
@@ -198,6 +239,11 @@ export function BookingPackage({
                     await load();
                     onChanged?.();
                   } catch (cause) {
+                    if (cause instanceof ApiError && cause.status === 409) {
+                      canEditRef.current = false;
+                      setNeedsRefresh(true);
+                    }
+
                     setError(notifyError(cause, "Unable to assign package."));
                   } finally {
                     setBusy(false);
@@ -211,9 +257,7 @@ export function BookingPackage({
               </Button>
             </div>
           )}
-          {loaded.package && (
-            <PackageCanvas item={loaded.package} />
-          )}
+          {loaded.package && <PackageCanvas item={loaded.package} />}
         </>
       )}
       {admin &&
@@ -269,7 +313,7 @@ export function BookingPackage({
             />
           </details>
         )}
-      {loadedIdentity === identity && editing && loaded && (
+      {loadedIdentity === identity && editing && canEdit && loaded && (
         <PackageEditor
           initial={loaded.package}
           onClose={() => {
@@ -285,20 +329,33 @@ export function BookingPackage({
             onChanged?.();
           }}
           saveCustom={async (content) => {
-            await saveBookingPackage(
-              id,
-              content,
-              {
-                expectedBookingUpdatedAt: loaded.bookingUpdatedAt,
-                ...(loaded.package
-                  ? { expectedUpdatedAt: loaded.package.updatedAt }
-                  : {}),
-                ...(loaded.package?.packageType === "catalog"
-                  ? { sourcePackageId: loaded.package.id }
-                  : {}),
-              },
-              loaded.package?.packageType === "custom",
-            );
+            if (!canEditRef.current)
+              throw new Error("This request is read-only.");
+
+            try {
+              await saveBookingPackage(
+                id,
+                content,
+                {
+                  expectedBookingUpdatedAt: loaded.bookingUpdatedAt,
+                  ...(loaded.package
+                    ? { expectedUpdatedAt: loaded.package.updatedAt }
+                    : {}),
+                  ...(loaded.package?.packageType === "catalog"
+                    ? { sourcePackageId: loaded.package.id }
+                    : {}),
+                },
+                loaded.package?.packageType === "custom",
+              );
+            } catch (cause) {
+              if (cause instanceof ApiError && cause.status === 409) {
+                canEditRef.current = false;
+                setNeedsRefresh(true);
+                setError(notifyError(cause, "Unable to save package."));
+              }
+
+              throw cause;
+            }
           }}
         />
       )}
