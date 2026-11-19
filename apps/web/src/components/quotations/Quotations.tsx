@@ -2,7 +2,6 @@ import "../../styles/booking-requests/booking-request.css";
 import {
   MAX_QUOTATION_ITEMS,
   MAX_QUOTATION_DESCRIPTION_LENGTH,
-  MAX_QUOTATION_REASON_LENGTH,
   MAX_QUOTATION_AMOUNT_MINOR,
 } from "@event-management/contracts/quotations";
 import type {
@@ -27,11 +26,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Button,
-  FormField,
   Input,
   Pagination,
   Select,
-  Textarea,
   useNotifications,
 } from "@event-management/ui";
 import {
@@ -54,7 +51,7 @@ const statusLabel: Record<QuotationStatus, string> = {
   draft: "Draft",
   sent: "Sent",
   accepted: "Accepted",
-  superseded: "Superseded",
+  superseded: "Replaced",
 };
 
 const statusTone: Record<
@@ -67,27 +64,8 @@ const statusTone: Record<
   superseded: "neutral",
 };
 
-const kindLabels: Record<QuotationItem["kind"], string> = {
-  addition: "Addition",
-  deduction: "Deduction",
-  substitution: "Substitution",
-  adjustment: "Other adjustment",
-};
-
 function QuotationStatusBadge({ status }: { status: QuotationStatus }) {
   return <Badge tone={statusTone[status]}>{statusLabel[status]}</Badge>;
-}
-
-function lineTotals(items: QuotationItem[]) {
-  const additions = items
-    .filter((line) => line.direction === "add")
-    .reduce((sum, line) => sum + line.amountMinor, 0);
-
-  const deductions = items
-    .filter((line) => line.direction === "deduct")
-    .reduce((sum, line) => sum + line.amountMinor, 0);
-
-  return { additions, deductions };
 }
 
 function readingIntro(quotation: Quotation) {
@@ -110,45 +88,40 @@ export function QuotationSummaryRead({ quotation }: { quotation: Quotation }) {
   return (
     <div className="quotation-offer">
       <div className="quotation-offer-hero">
-        <div>
-          <p className="quotation-lede">
-            Offer total · Version {quotation.version}
-          </p>
+        <div className="quotation-offer-hero-left">
+          <span className="quotation-offer-label">
+            Offer total · v{quotation.version}
+          </span>
           <strong className="quotation-hero-total">
             {formatPesosFromMinor(quotation.totalAmountMinor)}
           </strong>
+          <span className="quotation-offer-meta">
+            {readingIntro(quotation)}
+          </span>
         </div>
         <QuotationStatusBadge status={quotation.status} />
       </div>
-      <p className="quotation-lede">{readingIntro(quotation)}</p>
       {quotation.revisionReason && (
-        <p className="quotation-meta">
+        <p className="quotation-revision-note">
           Revision note: {quotation.revisionReason}
         </p>
       )}
-      <div className="quotation-summary-lines">
-        <div className="quotation-summary-line">
-          <div>
-            <b>Package base</b>
-            <span className="quotation-item-note">Included</span>
-          </div>
-          <b>{formatPesosFromMinor(quotation.baseAmountMinor)}</b>
+      <div className="quotation-receipt">
+        <div className="quotation-receipt-row">
+          <span>Package base</span>
+          <span>{formatPesosFromMinor(quotation.baseAmountMinor)}</span>
         </div>
+        {quotation.items.length > 0 && (
+          <span className="quotation-receipt-section-label">Adjustments</span>
+        )}
         {quotation.items.map((line) => (
-          <div className="quotation-summary-line" key={line.id}>
-            <div>
-              <b>{line.description || "Untitled adjustment"}</b>
-              <span className="quotation-item-note">
-                {line.direction === "deduct"
-                  ? "Takes off the total"
-                  : "Adds to the total"}
-              </span>
-            </div>
-            <b
+          <div className="quotation-receipt-row" key={line.id}>
+            <span>{line.description || "Untitled adjustment"}</span>
+            <span
               className={
                 line.direction === "deduct"
                   ? "quotation-amount-deduct"
-                  : undefined
+                  : "quotation-amount-add"
               }
             >
               {formatSignedPesosFromMinor(
@@ -156,9 +129,13 @@ export function QuotationSummaryRead({ quotation }: { quotation: Quotation }) {
                   ? -line.amountMinor
                   : line.amountMinor,
               )}
-            </b>
+            </span>
           </div>
         ))}
+        <div className="quotation-receipt-row quotation-receipt-total">
+          <span>Total</span>
+          <span>{formatPesosFromMinor(quotation.totalAmountMinor)}</span>
+        </div>
       </div>
       <p className="quotation-fine">
         This offer does not confirm the booking or reserve the date.
@@ -176,27 +153,39 @@ function QuotationMathBox({
   items: QuotationItem[];
   totalMinor: number;
 }) {
-  const { additions, deductions } = lineTotals(items);
-
   return (
     <>
-      <div className="quotation-math" aria-live="polite">
-        <div>
+      <div
+        className="quotation-receipt quotation-receipt-standalone"
+        aria-live="polite"
+      >
+        <div className="quotation-receipt-row">
           <span>Package base</span>
           <span>{formatPesosFromMinor(baseAmountMinor)}</span>
         </div>
-        <div>
-          <span>Additions</span>
-          <span>{formatSignedPesosFromMinor(additions)}</span>
-        </div>
-        <div>
-          <span>Deductions</span>
-          <span className="quotation-amount-deduct">
-            {formatSignedPesosFromMinor(-deductions)}
-          </span>
-        </div>
-        <div className="quotation-math-grand">
-          <span>Offer total</span>
+        {items.length > 0 && (
+          <span className="quotation-receipt-section-label">Adjustments</span>
+        )}
+        {items.map((line) => (
+          <div className="quotation-receipt-row" key={line.id}>
+            <span>{line.description || <em>Untitled adjustment</em>}</span>
+            <span
+              className={
+                line.direction === "deduct"
+                  ? "quotation-amount-deduct"
+                  : "quotation-amount-add"
+              }
+            >
+              {formatSignedPesosFromMinor(
+                line.direction === "deduct"
+                  ? -line.amountMinor
+                  : line.amountMinor,
+              )}
+            </span>
+          </div>
+        ))}
+        <div className="quotation-receipt-row quotation-receipt-total">
+          <span>Total</span>
           <span>{formatPesosFromMinor(totalMinor)}</span>
         </div>
       </div>
@@ -210,130 +199,57 @@ function QuotationMathBox({
   );
 }
 
-function QuotationAdjustmentCard({
+function QuotationAdjustmentReadRow({
   line,
   index,
   services,
   busy,
-  onChange,
   onRemove,
 }: {
   line: QuotationItem;
   index: number;
   services: AdminService[];
   busy: boolean;
-  onChange: (patch: Partial<QuotationItem>) => void;
   onRemove: () => void;
 }) {
+  const serviceName =
+    services.find((s) => s.id === line.serviceId)?.name ?? null;
+  const isDeduct = line.direction === "deduct";
+
   return (
-    <article className="quotation-adjustment">
-      <div className="quotation-adjustment-head">
-        <strong>Adjustment {index + 1}</strong>
-        <Button variant="link" size="small" disabled={busy} onClick={onRemove}>
+    <div className="quotation-adj-card">
+      <div className="quotation-adj-card-main">
+        <div className="quotation-adj-card-desc-row">
+          <span
+            className={`quotation-adj-card-dir ${isDeduct ? "quotation-adj-card-dir--deduct" : "quotation-adj-card-dir--add"}`}
+          >
+            {isDeduct ? "Deduct" : "Add"}
+          </span>
+          <span className="quotation-adj-card-desc">
+            {line.description || <em>No description</em>}
+          </span>
+        </div>
+        {serviceName && (
+          <span className="quotation-adj-card-service">{serviceName}</span>
+        )}
+      </div>
+      <div className="quotation-adj-card-right">
+        <span
+          className={`quotation-adj-card-amount ${isDeduct ? "quotation-amount-deduct" : "quotation-amount-add"}`}
+        >
+          {isDeduct ? "−" : "+"}&nbsp;{formatPesosFromMinor(line.amountMinor)}
+        </span>
+        <Button
+          variant="link"
+          size="small"
+          disabled={busy}
+          onClick={onRemove}
+          aria-label={`Remove adjustment ${index + 1}`}
+        >
           Remove
         </Button>
       </div>
-      <div className="quotation-adjustment-fields">
-        <FormField label="Description" className="quotation-field-wide">
-          {(props) => (
-            <Input
-              {...props}
-              maxLength={MAX_QUOTATION_DESCRIPTION_LENGTH}
-              value={line.description}
-              onChange={(event) =>
-                onChange({ description: event.target.value })
-              }
-            />
-          )}
-        </FormField>
-        <FormField label="Effect on the total">
-          {(props) => (
-            <Select
-              {...props}
-              value={line.direction}
-              onChange={(event) =>
-                onChange({
-                  direction: event.target.value === "deduct" ? "deduct" : "add",
-                })
-              }
-            >
-              <option value="add">Adds to the total</option>
-              <option value="deduct">Takes off the total</option>
-            </Select>
-          )}
-        </FormField>
-        <FormField label="Change type">
-          {(props) => (
-            <Select
-              {...props}
-              value={line.kind}
-              onChange={(event) => {
-                const kind = event.target.value;
-
-                if (
-                  kind === "addition" ||
-                  kind === "deduction" ||
-                  kind === "substitution" ||
-                  kind === "adjustment"
-                )
-                  onChange({ kind });
-              }}
-            >
-              {(
-                Object.entries(kindLabels) as [QuotationItem["kind"], string][]
-              ).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
-        <FormField label="Related service">
-          {(props) => (
-            <Select
-              {...props}
-              value={line.serviceId ?? ""}
-              onChange={(event) =>
-                onChange({ serviceId: event.target.value || null })
-              }
-            >
-              <option value="">None</option>
-              {line.serviceId &&
-                !services.some((service) => service.id === line.serviceId) && (
-                  <option value={line.serviceId}>
-                    Selected service ({line.serviceId})
-                  </option>
-                )}
-              {services.map((service) => (
-                <option key={service.id} value={service.id}>
-                  {service.name}
-                  {service.archivedAt ? " (archived)" : ""}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
-        <FormField label="Amount (PHP)">
-          {(props) => (
-            <Input
-              {...props}
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="0.01"
-              max={centavosToPesos(MAX_QUOTATION_AMOUNT_MINOR)}
-              value={centavosToPesos(line.amountMinor) || ""}
-              onChange={(event) =>
-                onChange({
-                  amountMinor: pesosToCentavos(Number(event.target.value)),
-                })
-              }
-            />
-          )}
-        </FormField>
-      </div>
-    </article>
+    </div>
   );
 }
 
@@ -479,11 +395,13 @@ export function Quotations({
       active = false;
     };
   }, [admin, bookingId, bookingStatus, bookingScope]);
+
   const generation = useRequestGeneration();
   const [services, setServices] = useState<AdminService[]>([]);
   const [serviceError, setServiceError] = useState("");
   const [serviceCursor, setServiceCursor] = useState<string | null>(null);
   const [serviceLoading, setServiceLoading] = useState(false);
+
   async function loadServices(cursor?: string) {
     const current = generation.current();
     setServiceLoading(true);
@@ -506,18 +424,19 @@ export function Quotations({
       if (generation.isCurrent(current)) setServiceLoading(false);
     }
   }
+
   const [rows, setRows] = useState<Quotation[]>([]),
     [draft, setDraft] = useState<Quotation | null>(null),
     [items, setItems] = useState<QuotationItem[]>([]);
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  const [pendingItem, setPendingItem] = useState<QuotationItem | null>(null);
+  const [revisingOffer, setRevisingOffer] = useState<Quotation | null>(null);
   const [loadedPageKey, setLoadedPageKey] = useState("");
   const [loadedScope, setLoadedScope] = useState("");
   const [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [reason, setReason] = useState("");
-  const [showRevision, setShowRevision] = useState(false);
+    [error, setError] = useState("");
   const [offer, setOffer] = useState<Quotation | null>(null);
   const [previousDraftVersion, setPreviousDraftVersion] = useState<
     number | null
@@ -621,6 +540,7 @@ export function Quotations({
         setLoading(false);
     }
   }
+
   useEffect(() => {
     void load();
 
@@ -635,10 +555,6 @@ export function Quotations({
       generation.bump();
     };
   }, [bookingId, admin, quotationId]);
-
-  useEffect(() => {
-    if (!canWrite) setShowRevision(false);
-  }, [canWrite]);
 
   useEffect(() => {
     setBusy(false);
@@ -687,12 +603,6 @@ export function Quotations({
       if (isCurrent()) setBusy(false);
     }
   }
-
-  const update = (index: number, patch: Partial<QuotationItem>) =>
-    canWriteRef.current &&
-    setItems((current) =>
-      current.map((line, i) => (i === index ? { ...line, ...patch } : line)),
-    );
 
   const editorTotal =
     (draft?.baseAmountMinor ?? 0) +
@@ -849,6 +759,7 @@ export function Quotations({
       {admin && draft && !canWrite && (
         <QuotationSummaryRead quotation={draft} />
       )}
+
       {admin && draft && canWrite && (
         <fieldset className="quotation-stack" disabled={busy || !canWrite}>
           <div className="quotation-offer-head">
@@ -860,23 +771,10 @@ export function Quotations({
                     Draft revision of version {previousDraftVersion}.
                   </p>
                 )}
-                <p className="quotation-meta">
-                  Review the adjustments and save. Nothing is sent until you
-                  choose Save and send.
-                </p>
               </div>
             </div>
             <QuotationStatusBadge status="draft" />
           </div>
-          {!draft.adjustmentsReviewed && (
-            <p className="quotation-lede">
-              Review the adjustments and save to confirm your review.
-            </p>
-          )}
-          <p className="quotation-lede">
-            Package base stays {formatPesosFromMinor(draft.baseAmountMinor)}.
-            Each adjustment below is added to it or taken off it.
-          </p>
 
           {serviceCursor && (
             <Button
@@ -887,42 +785,153 @@ export function Quotations({
               Load more services
             </Button>
           )}
-          {items.map((line, index) => (
-            <QuotationAdjustmentCard
-              key={line.id}
-              line={line}
-              index={index}
-              services={services}
-              busy={busy}
-              onChange={(patch) => update(index, patch)}
-              onRemove={() =>
-                canWriteRef.current &&
-                setItems((current) => current.filter((_, i) => i !== index))
-              }
-            />
-          ))}
 
-          <div className="quotation-actions quotation-actions-start">
-            <Button
-              variant="secondary"
-              disabled={items.length >= MAX_QUOTATION_ITEMS}
-              onClick={() =>
-                canWriteRef.current &&
-                setItems((current) => [
-                  ...current,
-                  {
-                    id: crypto.randomUUID(),
-                    direction: "add",
-                    kind: "adjustment",
-                    description: "",
-                    amountMinor: 0,
-                    serviceId: null,
-                  },
-                ])
-              }
-            >
-              Add adjustment
-            </Button>
+          <div className="quotation-adj-section">
+            <div className="quotation-adj-section-header">
+              <span>Adjustments</span>
+            </div>
+
+            {items.length > 0 && (
+              <div className="quotation-adj-list">
+                {items.map((line, index) => (
+                  <QuotationAdjustmentReadRow
+                    key={line.id}
+                    line={line}
+                    index={index}
+                    services={services}
+                    busy={busy}
+                    onRemove={() =>
+                      canWriteRef.current &&
+                      setItems((current) =>
+                        current.filter((_, i) => i !== index),
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            )}
+
+            {pendingItem && (
+              <div className="quotation-adj-pending">
+                <div className="quotation-adj-pending-row">
+                  <Input
+                    id="adj-pending-desc"
+                    aria-label="New adjustment description"
+                    className="quotation-adj-desc"
+                    placeholder="Description"
+                    autoFocus
+                    maxLength={MAX_QUOTATION_DESCRIPTION_LENGTH}
+                    value={pendingItem.description}
+                    onChange={(event) =>
+                      setPendingItem((p) =>
+                        p ? { ...p, description: event.target.value } : p,
+                      )
+                    }
+                  />
+                  <Select
+                    id="adj-pending-service"
+                    aria-label="New adjustment related service"
+                    className="quotation-adj-service"
+                    value={pendingItem.serviceId ?? ""}
+                    onChange={(event) =>
+                      setPendingItem((p) =>
+                        p ? { ...p, serviceId: event.target.value || null } : p,
+                      )
+                    }
+                  >
+                    <option value="">No service</option>
+                    {services.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.name}
+                        {service.archivedAt ? " (archived)" : ""}
+                      </option>
+                    ))}
+                  </Select>
+                  <Select
+                    id="adj-pending-dir"
+                    aria-label="New adjustment effect"
+                    className="quotation-adj-dir"
+                    value={pendingItem.direction}
+                    onChange={(event) =>
+                      setPendingItem((p) =>
+                        p
+                          ? {
+                              ...p,
+                              direction:
+                                event.target.value === "deduct"
+                                  ? "deduct"
+                                  : "add",
+                            }
+                          : p,
+                      )
+                    }
+                  >
+                    <option value="add">+ Add</option>
+                    <option value="deduct">− Deduct</option>
+                  </Select>
+                  <Input
+                    id="adj-pending-amount"
+                    aria-label="New adjustment amount in pesos"
+                    className="quotation-adj-amount"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    max={centavosToPesos(MAX_QUOTATION_AMOUNT_MINOR)}
+                    value={centavosToPesos(pendingItem.amountMinor) || ""}
+                    onChange={(event) =>
+                      setPendingItem((p) =>
+                        p
+                          ? {
+                              ...p,
+                              amountMinor: pesosToCentavos(
+                                Number(event.target.value),
+                              ),
+                            }
+                          : p,
+                      )
+                    }
+                  />
+                </div>
+                <div className="quotation-pending-actions">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setPendingItem(null)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setItems((current) => [...current, pendingItem]);
+                      setPendingItem(null);
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {!pendingItem && (
+              <div className="quotation-adj-section-footer">
+                <Button
+                  variant="secondary"
+                  disabled={items.length >= MAX_QUOTATION_ITEMS}
+                  onClick={() =>
+                    setPendingItem({
+                      id: crypto.randomUUID(),
+                      direction: "add",
+                      kind: "adjustment",
+                      description: "",
+                      amountMinor: 0,
+                      serviceId: null,
+                    })
+                  }
+                >
+                  Add adjustment
+                </Button>
+              </div>
+            )}
           </div>
 
           <QuotationMathBox
@@ -939,160 +948,342 @@ export function Quotations({
             <Button
               variant="secondary"
               disabled={busy}
-              onClick={() =>
-                void action("Quotation adjustments saved.", () =>
-                  saveQuotation(draft.id, draft.updatedAt, items),
-                )
-              }
+              onClick={() => {
+                setDraft(null);
+                setOffer(draft);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={busy}
+              onClick={async () => {
+                if (!canWriteRef.current) return;
+
+                setBusy(true);
+                setError("");
+
+                try {
+                  const saved = await saveQuotation(
+                    draft.id,
+                    draft.updatedAt,
+                    items,
+                  );
+
+                  notify("Adjustments saved.");
+                  setRows((current) =>
+                    current.map((q) =>
+                      q.id === saved.quotation.id ? saved.quotation : q,
+                    ),
+                  );
+                  setDraft(null);
+                  setPendingItem(null);
+                  setOffer(saved.quotation);
+                } catch (cause) {
+                  if (cause instanceof ApiError && cause.status === 409) {
+                    canWriteRef.current = false;
+                    setNeedsBookingRefresh(true);
+                  }
+
+                  setError(notifyError(cause, "Unable to save adjustments."));
+                } finally {
+                  setBusy(false);
+                }
+              }}
             >
               Save adjustments
             </Button>
-            <Button
-              disabled={busy || editorTotal < 0}
-              onClick={() =>
-                void action(
-                  "Quotation saved and sent.",
-                  async (canContinue) => {
-                    const saved = await saveQuotation(
-                      draft.id,
-                      draft.updatedAt,
-                      items,
-                    );
-
-                    if (!canContinue()) return;
-
-                    setDraft(saved.quotation);
-                    setItems(saved.quotation.items);
-                    setRows((current) =>
-                      current.map((quote) =>
-                        quote.id === saved.quotation.id
-                          ? saved.quotation
-                          : quote,
-                      ),
-                    );
-                    await sendQuotation(
-                      saved.quotation.id,
-                      saved.quotation.updatedAt,
-                    );
-                  },
-                )
-              }
-            >
-              Save and send
-            </Button>
           </div>
-
-          {admin && (
-            <div className="quotation-revision quotation-revision-quiet">
-              <FormField label="Reason for the revision">
-                {(props) => (
-                  <Textarea
-                    {...props}
-                    maxLength={MAX_QUOTATION_REASON_LENGTH}
-                    value={reason}
-                    onChange={(event) => setReason(event.target.value)}
-                  />
-                )}
-              </FormField>
-              <div className="quotation-actions quotation-actions-start">
-                <Button
-                  variant="secondary"
-                  disabled={busy || !reason.trim()}
-                  onClick={() =>
-                    void action(
-                      "Quotation revision started. Review and save the draft.",
-                      async (canContinue) => {
-                        await reviseQuotation(
-                          draft.id,
-                          draft.updatedAt,
-                          reason.trim(),
-                        );
-
-                        if (canContinue()) setReason("");
-                      },
-                    )
-                  }
-                >
-                  Start another revision
-                </Button>
-              </div>
-            </div>
-          )}
         </fieldset>
       )}
 
-      {!draft && currentOffer && (
+      {!draft && currentOffer && !revisingOffer && (
         <div className="quotation-stack">
           <QuotationSummaryRead quotation={currentOffer} />
           {!admin && (
             <p className="quotation-lede">Discuss this offer in Messages.</p>
           )}
           {admin && canWrite && (
-            <div className="quotation-revision">
-              {!showRevision ? (
-                <div className="quotation-actions quotation-actions-start">
-                  <Button disabled={busy} onClick={() => setShowRevision(true)}>
-                    Revise this offer
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <h3>Revise this offer</h3>
-                  {currentOffer.status === "accepted" && (
-                    <p className="quotation-lede">
-                      Starting a revision immediately supersedes this accepted
-                      offer.
-                    </p>
-                  )}
-                  <FormField label="Reason for the revision">
-                    {(props) => (
-                      <Textarea
-                        {...props}
-                        maxLength={MAX_QUOTATION_REASON_LENGTH}
-                        value={reason}
-                        onChange={(event) => setReason(event.target.value)}
-                      />
-                    )}
-                  </FormField>
-                  <div className="quotation-actions">
-                    <Button
-                      variant="secondary"
-                      disabled={busy}
-                      onClick={() => {
-                        setShowRevision(false);
-                        setReason("");
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      disabled={busy || !reason.trim()}
-                      onClick={() =>
-                        void action(
-                          "Quotation revision started. Review and save the draft.",
-                          async (canContinue) => {
-                            await reviseQuotation(
-                              currentOffer.id,
-                              currentOffer.updatedAt,
-                              reason.trim(),
-                            );
-
-                            if (canContinue()) {
-                              setReason("");
-                              setShowRevision(false);
-                            }
-                          },
-                        )
-                      }
-                    >
-                      Start revision
-                    </Button>
-                  </div>
-                </>
-              )}
+            <div className="quotation-actions quotation-actions-start">
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => {
+                  setRevisingOffer(currentOffer);
+                  setItems(currentOffer.items);
+                  setPendingItem(null);
+                }}
+              >
+                Revise
+              </Button>
+              <Button
+                disabled={busy}
+                onClick={() =>
+                  void action("Offer sent to chat.", async () => {
+                    await sendQuotation(
+                      currentOffer.id,
+                      currentOffer.updatedAt,
+                    );
+                  })
+                }
+              >
+                Send to chat
+              </Button>
             </div>
           )}
         </div>
+      )}
+
+      {!draft && revisingOffer && canWrite && (
+        <fieldset className="quotation-stack" disabled={busy || !canWrite}>
+          <div className="quotation-offer-head">
+            <div>
+              <h2 className="quotation-offer-title">
+                Revising v{revisingOffer.version}
+              </h2>
+            </div>
+            <QuotationStatusBadge status="draft" />
+          </div>
+
+          {serviceCursor && (
+            <Button
+              variant="secondary"
+              disabled={serviceLoading}
+              onClick={() => void loadServices(serviceCursor)}
+            >
+              Load more services
+            </Button>
+          )}
+
+          <div className="quotation-adj-section">
+            <div className="quotation-adj-section-header">
+              <span>Adjustments</span>
+            </div>
+
+            {items.length > 0 && (
+              <div className="quotation-adj-list">
+                {items.map((line, index) => (
+                  <QuotationAdjustmentReadRow
+                    key={line.id}
+                    line={line}
+                    index={index}
+                    services={services}
+                    busy={busy}
+                    onRemove={() =>
+                      canWriteRef.current &&
+                      setItems((current) =>
+                        current.filter((_, i) => i !== index),
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            )}
+
+            {pendingItem && (
+              <div className="quotation-adj-pending">
+                <div className="quotation-adj-pending-row">
+                  <Input
+                    id="adj-rev-desc"
+                    aria-label="New adjustment description"
+                    className="quotation-adj-desc"
+                    placeholder="Description"
+                    autoFocus
+                    maxLength={MAX_QUOTATION_DESCRIPTION_LENGTH}
+                    value={pendingItem.description}
+                    onChange={(event) =>
+                      setPendingItem((p) =>
+                        p ? { ...p, description: event.target.value } : p,
+                      )
+                    }
+                  />
+                  <Select
+                    id="adj-rev-service"
+                    aria-label="New adjustment related service"
+                    className="quotation-adj-service"
+                    value={pendingItem.serviceId ?? ""}
+                    onChange={(event) =>
+                      setPendingItem((p) =>
+                        p ? { ...p, serviceId: event.target.value || null } : p,
+                      )
+                    }
+                  >
+                    <option value="">No service</option>
+                    {services.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.name}
+                        {service.archivedAt ? " (archived)" : ""}
+                      </option>
+                    ))}
+                  </Select>
+                  <Select
+                    id="adj-rev-dir"
+                    aria-label="New adjustment effect"
+                    className="quotation-adj-dir"
+                    value={pendingItem.direction}
+                    onChange={(event) =>
+                      setPendingItem((p) =>
+                        p
+                          ? {
+                              ...p,
+                              direction:
+                                event.target.value === "deduct"
+                                  ? "deduct"
+                                  : "add",
+                            }
+                          : p,
+                      )
+                    }
+                  >
+                    <option value="add">+ Add</option>
+                    <option value="deduct">− Deduct</option>
+                  </Select>
+                  <Input
+                    id="adj-rev-amount"
+                    aria-label="New adjustment amount in pesos"
+                    className="quotation-adj-amount"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    max={centavosToPesos(MAX_QUOTATION_AMOUNT_MINOR)}
+                    value={centavosToPesos(pendingItem.amountMinor) || ""}
+                    onChange={(event) =>
+                      setPendingItem((p) =>
+                        p
+                          ? {
+                              ...p,
+                              amountMinor: pesosToCentavos(
+                                Number(event.target.value),
+                              ),
+                            }
+                          : p,
+                      )
+                    }
+                  />
+                </div>
+                <div className="quotation-pending-actions">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setPendingItem(null)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setItems((current) => [...current, pendingItem]);
+                      setPendingItem(null);
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {!pendingItem && (
+              <div className="quotation-adj-section-footer">
+                <Button
+                  variant="secondary"
+                  disabled={items.length >= MAX_QUOTATION_ITEMS}
+                  onClick={() =>
+                    setPendingItem({
+                      id: crypto.randomUUID(),
+                      direction: "add",
+                      kind: "adjustment",
+                      description: "",
+                      amountMinor: 0,
+                      serviceId: null,
+                    })
+                  }
+                >
+                  Add adjustment
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <QuotationMathBox
+            baseAmountMinor={revisingOffer.baseAmountMinor}
+            items={items}
+            totalMinor={
+              revisingOffer.baseAmountMinor +
+              items.reduce(
+                (sum, line) =>
+                  sum +
+                  (line.direction === "add"
+                    ? line.amountMinor
+                    : -line.amountMinor),
+                0,
+              )
+            }
+          />
+
+          <p className="quotation-fine">
+            This offer does not confirm the booking or reserve the date.
+          </p>
+
+          <div className="quotation-actions">
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={() => {
+                setRevisingOffer(null);
+                setItems([]);
+                setPendingItem(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={busy}
+              onClick={async () => {
+                if (!canWriteRef.current) return;
+
+                setBusy(true);
+                setError("");
+
+                try {
+                  const revised = await reviseQuotation(
+                    revisingOffer.id,
+                    revisingOffer.updatedAt,
+                    "Revised",
+                  );
+                  const saved = await saveQuotation(
+                    revised.quotation.id,
+                    revised.quotation.updatedAt,
+                    items,
+                  );
+
+                  notify("Revision saved.");
+                  setRevisingOffer(null);
+                  setItems([]);
+                  setPendingItem(null);
+                  setRows((current) => [
+                    ...current.map((q) =>
+                      q.id === revisingOffer.id
+                        ? { ...q, status: "superseded" as const }
+                        : q,
+                    ),
+                    saved.quotation,
+                  ]);
+                  setOffer(saved.quotation);
+                } catch (cause) {
+                  if (cause instanceof ApiError && cause.status === 409) {
+                    canWriteRef.current = false;
+                    setNeedsBookingRefresh(true);
+                  }
+
+                  setError(notifyError(cause, "Unable to save revision."));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Save revision
+            </Button>
+          </div>
+        </fieldset>
       )}
 
       {(earlierVersions.length > 0 || pagination.page > 1 || !!nextCursor) && (
