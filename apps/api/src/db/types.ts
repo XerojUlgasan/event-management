@@ -48,6 +48,22 @@ export interface AuditEvents {
   metadata: Generated<Json>;
 }
 
+export interface BackgroundJobs {
+  attempts: Generated<number>;
+  available_at: Generated<Timestamp>;
+  completed_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  dedupe_key: string | null;
+  id: Generated<string>;
+  last_error: string | null;
+  lease_expires_at: Timestamp | null;
+  lease_token: string | null;
+  payload: Generated<Json>;
+  status: Generated<string>;
+  type: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface BookingRequests {
   contact_name: string;
   created_at: Generated<Timestamp>;
@@ -238,6 +254,7 @@ export interface Users {
 export interface DB {
   ai_tool_calls: AiToolCalls;
   audit_events: AuditEvents;
+  background_jobs: BackgroundJobs;
   booking_request_status_history: BookingRequestStatusHistory;
   booking_requests: BookingRequests;
   catalog_knowledge: CatalogKnowledge;

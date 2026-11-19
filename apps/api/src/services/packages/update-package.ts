@@ -10,7 +10,7 @@ import {
 import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
 import { packageDto } from "./package-response.js";
 import { syncCatalogKnowledge } from "../ai/workflows/sync-catalog-knowledge.js";
-import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
+import { enqueueBackgroundJobService } from "../background-jobs/enqueue-job.js";
 import { error, nextUpdate } from "./package-rules.js";
 import { duplicateTitle, catalogTitle } from "../../utils/catalog-title.js";
 import { findCatalogTitleData } from "../../data/catalog/find-catalog-title.js";
@@ -43,12 +43,15 @@ export async function updatePackageService(
       );
       if (current.thumbnail_media_id)
         previousMediaIds.push(current.thumbnail_media_id);
-      await syncCatalogKnowledge(trx, { kind: "package", id });
+      const chunks = await syncCatalogKnowledge(trx, { kind: "package", id });
+      if (chunks.length)
+        await enqueueBackgroundJobService(trx, "embed_package", {
+          packageId: id,
+        });
       return packageDto(trx, row);
     });
     if (!("status" in outcome)) {
       await promoteOwnerCatalogMediaService(db, { kind: "package", id });
-      await scheduleCatalogEmbeddingRefresh(db, [{ kind: "package", id }]);
       await cleanupCatalogMediaService(db, previousMediaIds);
     }
     return outcome;

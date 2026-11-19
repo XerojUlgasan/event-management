@@ -15,6 +15,7 @@ import {
   Dialog,
   Icon,
   InfoDisclosure,
+  Markdown,
   Textarea,
   useNotifications,
 } from "@event-management/ui";
@@ -744,7 +745,7 @@ export function MessagesWorkspace({
                       </div>
                     </div>
                   ) : (
-                    message.body
+                    <Markdown source={message.body} variant="message" />
                   )}
                   {failedMessageIds.includes(message.id) && (
                     <div className="message-delivery-error" role="alert">

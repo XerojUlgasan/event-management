@@ -115,9 +115,6 @@ export function createEnv(source: EnvSource) {
     get SEED_CLOCK() {
       return source.SEED_CLOCK;
     },
-    get CATALOG_EMBEDDING_AWAIT() {
-      return source.CATALOG_EMBEDDING_AWAIT === "true";
-    },
     get SEED_RANDOM_SEED() {
       return source.SEED_RANDOM_SEED ?? "clemora-scenario-v1";
     },

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
-import { after, before, test } from "node:test";
+import { after, afterEach, before, test } from "node:test";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { HonoEnv } from "../../src/types/hono.js";
 import routes from "../../src/controllers/ai/index.js";
@@ -24,7 +24,7 @@ import { updateServiceService } from "../../src/services/services/update-service
 import { archiveServiceService } from "../../src/services/services/archive-service.js";
 import { deleteServiceService } from "../../src/services/services/delete-service.js";
 import { refreshCatalogEmbeddingsService } from "../../src/services/ai/workflows/refresh-catalog-embeddings.js";
-import { waitForCatalogEmbeddingRefresh } from "../../src/services/ai/workflows/schedule-catalog-embedding-refresh.js";
+import { runOneBackgroundJob } from "../../src/services/background-jobs/run-worker.js";
 import { readCatalogEmbeddingImage } from "../../src/services/ai/retrieval/read-catalog-embedding-image.js";
 import { syncCatalogKnowledge } from "../../src/services/ai/workflows/sync-catalog-knowledge.js";
 import {
@@ -123,6 +123,18 @@ function getDb() {
     throw new Error("Disposable catalog embedding database is not ready");
   return db;
 }
+
+async function drainCatalogJobs(database: Kysely<DB>) {
+  const signal = AbortSignal.timeout(30_000);
+  while (await runOneBackgroundJob(database, { signal })) {
+    signal.throwIfAborted();
+  }
+}
+
+afterEach(async () => {
+  // Each case owns its queue; delayed retries must not leak into later cases.
+  if (db) await db.deleteFrom("background_jobs").execute();
+});
 
 function mediaWidget(
   id: string,
@@ -451,7 +463,7 @@ before(async () => {
 });
 
 after(async () => {
-  if (db) await waitForCatalogEmbeddingRefresh(db).catch(() => {});
+  if (db) await drainCatalogJobs(db).catch(() => {});
   await db?.destroy();
   await new Promise<void>((resolve) => {
     if (storageServer?.listening) storageServer.close(() => resolve());
@@ -891,7 +903,7 @@ test("re-saving the same sample photo retains its embedding after media replacem
     actorId,
   );
   assert.ok(!("status" in listing));
-  await waitForCatalogEmbeddingRefresh(getDb());
+  await drainCatalogJobs(getDb());
 
   const originalSections = sectionsSchema.parse(listing.sections);
   const originalPhoto = originalSections
@@ -924,7 +936,12 @@ test("re-saving the same sample photo retains its embedding after media replacem
     actorId,
   );
   assert.ok(!("status" in updated));
-  await waitForCatalogEmbeddingRefresh(getDb());
+  assert.equal(
+    gatewayCalls.length,
+    previousGatewayCalls,
+    "updates defer provider work",
+  );
+  await drainCatalogJobs(getDb());
 
   const updatedSections = sectionsSchema.parse(updated.sections);
   assert.equal(updatedSections[0]?.id, originalSectionId);
@@ -1044,7 +1061,7 @@ test("catalog create, update, and archive mutations refresh their owners", async
     actorId,
   );
   assert.ok(!("status" in service));
-  await waitForCatalogEmbeddingRefresh(getDb());
+  await drainCatalogJobs(getDb());
   const serviceOwner = { kind: "service", id: service.id } as const;
   assert.ok((await knowledgeRows(serviceOwner)).length > 0);
 
@@ -1054,7 +1071,7 @@ test("catalog create, update, and archive mutations refresh their owners", async
     actorId,
   );
   assert.ok(!("status" in packageListing));
-  await waitForCatalogEmbeddingRefresh(getDb());
+  await drainCatalogJobs(getDb());
   const packageOwner = { kind: "package", id: packageListing.id } as const;
   const initialPackageRows = await knowledgeRows(packageOwner);
   assert.ok(initialPackageRows.some((row) => row.chunk_key === "overview"));
@@ -1075,7 +1092,7 @@ test("catalog create, update, and archive mutations refresh their owners", async
     actorId,
   );
   assert.ok(!("status" in updatedPackage));
-  await waitForCatalogEmbeddingRefresh(getDb());
+  await drainCatalogJobs(getDb());
   const revisedPackageRows = await knowledgeRows(packageOwner);
   assert.match(
     revisedPackageRows.find((row) => row.chunk_key === "overview")
@@ -1098,7 +1115,7 @@ test("catalog create, update, and archive mutations refresh their owners", async
     actorId,
   );
   assert.ok(!("status" in updatedService));
-  await waitForCatalogEmbeddingRefresh(getDb());
+  await drainCatalogJobs(getDb());
   assert.match(
     (await knowledgeRows(serviceOwner)).find(
       (row) => row.chunk_key === "overview",
@@ -1108,12 +1125,12 @@ test("catalog create, update, and archive mutations refresh their owners", async
   assert.deepEqual(await knowledgeRows(packageOwner), revisedPackageRows);
 
   await archiveServiceService(getDb(), service.id);
-  await waitForCatalogEmbeddingRefresh(getDb());
+  await drainCatalogJobs(getDb());
   assert.deepEqual(await knowledgeRows(serviceOwner), []);
   assert.deepEqual(await knowledgeRows(packageOwner), revisedPackageRows);
 
   await archivePackageService(getDb(), packageListing.id);
-  await waitForCatalogEmbeddingRefresh(getDb());
+  await drainCatalogJobs(getDb());
   assert.deepEqual(await knowledgeRows(packageOwner), []);
 });
 
@@ -1126,11 +1143,11 @@ test("service deletion removes its knowledge and an in-flight edit cannot save s
     actorId,
   );
   assert.ok(!("status" in deletable));
-  await waitForCatalogEmbeddingRefresh(getDb());
+  await drainCatalogJobs(getDb());
   const deletableOwner = { kind: "service", id: deletable.id } as const;
   assert.ok((await knowledgeRows(deletableOwner)).length > 0);
   await deleteServiceService(getDb(), deletable.id);
-  await waitForCatalogEmbeddingRefresh(getDb());
+  await drainCatalogJobs(getDb());
   assert.deepEqual(await knowledgeRows(deletableOwner), []);
 
   setGatewayHandler();
@@ -1232,7 +1249,7 @@ test("automatic save stays successful with missing embedding config and manual r
       actorId,
     );
     assert.ok(!("status" in listing));
-    await waitForCatalogEmbeddingRefresh(getDb());
+    await drainCatalogJobs(getDb());
 
     const owner = { kind: "package", id: listing.id } as const;
     const pendingRows = await knowledgeRows(owner);
@@ -1269,69 +1286,202 @@ test("automatic save stays successful with missing embedding config and manual r
   }
 });
 
-test("await mode completes catalog embeddings before save returns and contains provider failure", async () => {
-  const previousAwaitMode = process.env.CATALOG_EMBEDDING_AWAIT;
-  process.env.CATALOG_EMBEDDING_AWAIT = "true";
-
+test("package and service creates and updates roll back when enqueue fails", async () => {
+  const actorId = await createAdminId();
+  setGatewayHandler();
+  const existingPackage = await createPackageService(
+    getDb(),
+    packageContent("Atomic package"),
+    actorId,
+  );
+  const existingService = await createServiceService(
+    getDb(),
+    serviceContent("Atomic service"),
+    actorId,
+  );
+  assert.ok(!("status" in existingPackage));
+  assert.ok(!("status" in existingService));
+  const snapshot = () =>
+    Promise.all([
+      getDb().selectFrom("packages").selectAll().orderBy("id").execute(),
+      getDb().selectFrom("services").selectAll().orderBy("id").execute(),
+      getDb().selectFrom("media_assets").selectAll().orderBy("id").execute(),
+      getDb()
+        .selectFrom("catalog_knowledge")
+        .selectAll()
+        .orderBy("id")
+        .execute(),
+      getDb().selectFrom("background_jobs").selectAll().orderBy("id").execute(),
+    ]);
+  const before = await snapshot();
+  await sql`CREATE FUNCTION public.reject_fixture_background_job() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN RAISE EXCEPTION 'fixture enqueue unavailable'; END;
+  $$`.execute(getDb());
+  await sql`CREATE TRIGGER reject_fixture_background_job BEFORE INSERT ON public.background_jobs
+    FOR EACH ROW EXECUTE FUNCTION public.reject_fixture_background_job()`.execute(
+    getDb(),
+  );
   try {
-    const actorId = await createAdminId();
-    setGatewayHandler();
-    const packageListing = await createPackageService(
-      getDb(),
-      packageContent("Awaited package"),
-      actorId,
-    );
-    assert.ok(!("status" in packageListing));
-    const packageOwner = {
-      kind: "package",
-      id: packageListing.id,
-    } as const;
-    const packageRows = await knowledgeRows(packageOwner);
-    assert.equal(packageRows.length, 3);
-    assert.ok(
-      packageRows.every(
-        (row) =>
-          row.embedding !== null &&
-          row.embedding_model === embeddingModel &&
-          row.embedded_at !== null,
+    await assert.rejects(
+      createPackageService(
+        getDb(),
+        packageContent("Rolled back package create"),
+        actorId,
       ),
+      /fixture enqueue unavailable/,
     );
-    assert.equal(gatewayCalls.length, 3);
-
-    setGatewayHandler(
-      () =>
-        new Response(
-          JSON.stringify({ error: { message: "fixture failure" } }),
-          {
-            status: 503,
-            headers: { "Content-Type": "application/json" },
-          },
-        ),
-    );
-    const serviceListing = await createServiceService(
-      getDb(),
-      serviceContent("Awaited service"),
-      actorId,
-    );
-    assert.ok(!("status" in serviceListing));
-    const serviceOwner = {
-      kind: "service",
-      id: serviceListing.id,
-    } as const;
-    const serviceRows = await knowledgeRows(serviceOwner);
-    assert.equal(serviceRows.length, 3);
-    assert.ok(
-      serviceRows.every(
-        (row) =>
-          row.embedding === null &&
-          row.embedding_model === null &&
-          row.embedded_at === null,
+    await assert.rejects(
+      createServiceService(
+        getDb(),
+        serviceContent("Rolled back service create"),
+        actorId,
       ),
+      /fixture enqueue unavailable/,
     );
-    assert.equal(gatewayCalls.length, 3);
+    await assert.rejects(
+      updatePackageService(
+        getDb(),
+        existingPackage.id,
+        {
+          ...packageContent("Rolled back package update"),
+          expectedUpdatedAt: existingPackage.updatedAt,
+        },
+        actorId,
+      ),
+      /fixture enqueue unavailable/,
+    );
+    await assert.rejects(
+      updateServiceService(
+        getDb(),
+        existingService.id,
+        {
+          ...serviceContent("Rolled back service update"),
+          expectedUpdatedAt: existingService.updatedAt,
+        },
+        actorId,
+      ),
+      /fixture enqueue unavailable/,
+    );
+    assert.deepEqual(
+      await snapshot(),
+      before,
+      "listing, canvas, media, knowledge and jobs must commit together",
+    );
+    assert.equal(gatewayCalls.length, 0);
   } finally {
-    if (previousAwaitMode === undefined)
-      delete process.env.CATALOG_EMBEDDING_AWAIT;
-    else process.env.CATALOG_EMBEDDING_AWAIT = previousAwaitMode;
+    await sql`DROP TRIGGER reject_fixture_background_job ON public.background_jobs`.execute(
+      getDb(),
+    );
+    await sql`DROP FUNCTION public.reject_fixture_background_job()`.execute(
+      getDb(),
+    );
   }
+});
+
+test("catalog saves leave text and photo embeddings to the background worker", async () => {
+  const actorId = await createAdminId();
+  setGatewayHandler();
+  const packageListing = await createPackageService(
+    getDb(),
+    packageContent("Deferred package"),
+    actorId,
+  );
+  assert.ok(!("status" in packageListing));
+  assert.equal(
+    gatewayCalls.length,
+    0,
+    "saving a listing never calls the provider",
+  );
+  const packageOwner = { kind: "package", id: packageListing.id } as const;
+  assert.ok(
+    (await knowledgeRows(packageOwner)).every((row) => row.embedding === null),
+  );
+  const packageJob = await getDb()
+    .selectFrom("background_jobs")
+    .selectAll()
+    .where("type", "=", "embed_package")
+    .where("dedupe_key", "=", packageListing.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(packageJob.status, "pending");
+  assert.deepEqual(packageJob.payload, { packageId: packageListing.id });
+
+  await drainCatalogJobs(getDb());
+  assert.equal(gatewayCalls.length, 3);
+  assert.ok(
+    (await knowledgeRows(packageOwner)).every((row) => row.embedding !== null),
+  );
+  assert.ok(
+    gatewayCalls.some((call) =>
+      call.body.providerOptions?.google.content.some((parts) =>
+        parts.some((part) => part.inlineData.data.length > 0),
+      ),
+    ),
+    "worker embeds actual photo bytes",
+  );
+  assert.equal(
+    (
+      await getDb()
+        .selectFrom("background_jobs")
+        .select("status")
+        .where("id", "=", packageJob.id)
+        .executeTakeFirstOrThrow()
+    ).status,
+    "completed",
+  );
+
+  setGatewayHandler(
+    () =>
+      new Response(JSON.stringify({ error: { message: "fixture failure" } }), {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      }),
+  );
+  const serviceListing = await createServiceService(
+    getDb(),
+    serviceContent("Deferred service"),
+    actorId,
+  );
+  assert.ok(!("status" in serviceListing));
+  assert.equal(gatewayCalls.length, 0);
+  const serviceOwner = { kind: "service", id: serviceListing.id } as const;
+  await drainCatalogJobs(getDb());
+  assert.equal(gatewayCalls.length, 3);
+  assert.ok(
+    (await knowledgeRows(serviceOwner)).every((row) => row.embedding === null),
+  );
+  const serviceJob = await getDb()
+    .selectFrom("background_jobs")
+    .selectAll()
+    .where("type", "=", "embed_service")
+    .where("dedupe_key", "=", serviceListing.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(
+    serviceJob.status,
+    "pending",
+    "partial embedding failures remain retryable",
+  );
+  assert.equal(serviceJob.attempts, 1);
+  assert.ok(new Date(serviceJob.available_at).getTime() > Date.now());
+
+  setGatewayHandler();
+  await getDb()
+    .updateTable("background_jobs")
+    .set({ available_at: new Date(0) })
+    .where("id", "=", serviceJob.id)
+    .execute();
+  await drainCatalogJobs(getDb());
+  assert.equal(gatewayCalls.length, 3);
+  assert.ok(
+    (await knowledgeRows(serviceOwner)).every((row) => row.embedding !== null),
+  );
+  assert.equal(
+    (
+      await getDb()
+        .selectFrom("background_jobs")
+        .select("status")
+        .where("id", "=", serviceJob.id)
+        .executeTakeFirstOrThrow()
+    ).status,
+    "completed",
+  );
 });

@@ -17,6 +17,7 @@ let server,
   publicPackage,
   publicCards,
   ui,
+  markdownUi,
   scrollLock;
 before(async () => {
   cacheDir = await mkdtemp(join(tmpdir(), "clemora-catalog-ssr-"));
@@ -53,6 +54,15 @@ before(async () => {
       fileURLToPath(
         new URL(
           "../../../../packages/ui/src/organisms/CatalogCanvas.tsx",
+          import.meta.url,
+        ),
+      ),
+  );
+  markdownUi = await server.ssrLoadModule(
+    "/@fs" +
+      fileURLToPath(
+        new URL(
+          "../../../../packages/ui/src/molecules/Markdown.tsx",
           import.meta.url,
         ),
       ),
@@ -259,7 +269,7 @@ test("empty media has meaningful fallback and Markdown requests light mode", () 
     assert.ok(html.includes(message));
     assert.doesNotMatch(html, /<img|<video/);
   }
-  const html = render(ui.CatalogMarkdown, { source: "**Light content**" });
+  const html = render(markdownUi.Markdown, { source: "**Light content**" });
   assert.match(html, /data-color-mode="light"/);
   assert.match(html, /<strong>Light content<\/strong>/);
 });

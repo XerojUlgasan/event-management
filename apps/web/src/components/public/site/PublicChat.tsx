@@ -1,4 +1,10 @@
-import { ActionLink, Button, Icon, Textarea } from "@event-management/ui";
+import {
+  ActionLink,
+  Button,
+  Icon,
+  Markdown,
+  Textarea,
+} from "@event-management/ui";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getMe } from "../../../lib/data/auth/session";
@@ -466,7 +472,7 @@ export default function PublicChat() {
                           : message.senderName}
                       </strong>
                       <div className="public-chat-message-body">
-                        {message.body}
+                        <Markdown source={message.body} variant="message" />
                       </div>
                       {item?.failed && (
                         <div className="message-delivery-error" role="alert">

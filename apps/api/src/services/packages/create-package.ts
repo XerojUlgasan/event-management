@@ -8,7 +8,7 @@ import {
 } from "../catalog-canvas/replace-catalog-sections.js";
 import { packageDto } from "./package-response.js";
 import { syncCatalogKnowledge } from "../ai/workflows/sync-catalog-knowledge.js";
-import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
+import { enqueueBackgroundJobService } from "../background-jobs/enqueue-job.js";
 import { error } from "./package-rules.js";
 import { duplicateTitle, catalogTitle } from "../../utils/catalog-title.js";
 import { findCatalogTitleData } from "../../data/catalog/find-catalog-title.js";
@@ -31,7 +31,14 @@ export async function createPackageService(
         content,
         actorId,
       );
-      await syncCatalogKnowledge(trx, { kind: "package", id: row.id });
+      const chunks = await syncCatalogKnowledge(trx, {
+        kind: "package",
+        id: row.id,
+      });
+      if (chunks.length)
+        await enqueueBackgroundJobService(trx, "embed_package", {
+          packageId: row.id,
+        });
       return packageDto(trx, row);
     });
     if (!("status" in outcome)) {
@@ -39,9 +46,6 @@ export async function createPackageService(
         kind: "package",
         id: outcome.id,
       });
-      await scheduleCatalogEmbeddingRefresh(db, [
-        { kind: "package", id: outcome.id },
-      ]);
     }
     return outcome;
   } catch (cause) {

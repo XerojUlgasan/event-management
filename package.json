@@ -3,10 +3,10 @@
   "private": true,
   "packageManager": "pnpm@11.21.0",
   "scripts": {
-    "dev": "node scripts/dev-supabase.mjs && pnpm build:edge && concurrently --names edge,web --prefix-colors blue,green \"node scripts/dev-edge.mjs\" \"cross-env PUBLIC_API_URL=/v1 API_PROXY_TARGET=http://127.0.0.1:54321 ASTRO_DEV_BACKGROUND=0 pnpm dev:web\"",
+    "dev": "node scripts/dev-supabase.mjs && pnpm build:edge && concurrently --names edge,web,jobs --prefix-colors blue,green,magenta \"node scripts/dev-edge.mjs\" \"cross-env PUBLIC_API_URL=/v1 API_PROXY_TARGET=http://127.0.0.1:54321 ASTRO_DEV_BACKGROUND=0 pnpm dev:web\" \"node scripts/dev-background-jobs.mjs\"",
     "dev:edge": "pnpm --filter @event-management/supabase functions:serve",
-    "all": "pnpm dev:prepare && concurrently --kill-others-on-fail --names api,web --prefix-colors blue,green \"pnpm dev:api\" \"cross-env ASTRO_DEV_BACKGROUND=0 pnpm dev:web\"",
-    "all:storybook": "pnpm dev:prepare && concurrently --kill-others-on-fail --names api,web,storybook --prefix-colors blue,green,magenta \"pnpm dev:api\" \"cross-env ASTRO_DEV_BACKGROUND=0 pnpm dev:web\" \"pnpm storybook\"",
+    "all": "pnpm dev:prepare && concurrently --kill-others-on-fail --names api,web,jobs --prefix-colors blue,green,magenta \"pnpm dev:api\" \"cross-env ASTRO_DEV_BACKGROUND=0 pnpm dev:web\" \"pnpm worker:background-jobs\"",
+    "all:storybook": "pnpm dev:prepare && concurrently --kill-others-on-fail --names api,web,storybook,jobs --prefix-colors blue,green,magenta,yellow \"pnpm dev:api\" \"cross-env ASTRO_DEV_BACKGROUND=0 pnpm dev:web\" \"pnpm storybook\" \"pnpm worker:background-jobs\"",
     "all:web": "pnpm dev:web",
     "dev:prepare": "node scripts/dev-setup.mjs",
     "dev:web": "pnpm --filter @event-management/web dev",
@@ -37,7 +37,8 @@
     "supabase:status": "pnpm --filter @event-management/supabase status",
     "build:edge": "pnpm --filter @event-management/api build:edge",
     "check:web-structure": "node scripts/check-web-structure.mjs",
-    "test:guidance": "node --test context-factory/tools/check-guidance.test.mjs"
+    "test:guidance": "node --test context-factory/tools/check-guidance.test.mjs",
+    "worker:background-jobs": "pnpm --filter @event-management/api worker:background-jobs"
   },
   "devDependencies": {
     "concurrently": "^10.0.6",

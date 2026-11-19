@@ -1371,6 +1371,72 @@ textarea.ui-control {
   text-decoration: none;
 }
 
+.wmde-markdown.ui-markdown {
+  background: var(--transparent);
+  color: inherit;
+  font-family: inherit;
+}
+.wmde-markdown.ui-markdown-message {
+  min-width: 0;
+  max-width: 100%;
+  font-size: inherit;
+  line-height: inherit;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ui-markdown-message :is(p, li) {
+  white-space: pre-wrap;
+}
+.ui-markdown-message :is(p, ul, ol, blockquote, pre, table) {
+  margin-block: 0 0.65em;
+}
+.ui-markdown-message :is(ul, ol) {
+  padding-left: 1.5em;
+}
+.ui-markdown-message ul {
+  list-style-type: disc;
+}
+.ui-markdown-message ol {
+  list-style-type: decimal;
+}
+.ui-markdown-message :is(h1, h2, h3, h4, h5, h6) {
+  margin-block: 0.75em 0.4em;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  font-family: inherit;
+  font-size: 1em;
+  line-height: inherit;
+}
+.ui-markdown-message :is(h1, h2, h3, h4, h5, h6) > a:empty {
+  display: none;
+}
+.ui-markdown-message a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ui-markdown-message a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.ui-markdown-message blockquote {
+  color: inherit;
+  border-left-color: currentColor;
+}
+.ui-markdown-message :is(pre, table) {
+  max-width: 100%;
+  overflow-x: auto;
+  color: var(--text-primary);
+  background: var(--surface-subtle);
+}
+.ui-markdown-message table {
+  display: block;
+}
+.ui-markdown-message :not(pre) > code {
+  color: var(--text-primary);
+  background: var(--surface-muted);
+}
 /* Shared author and public catalog canvas. The container, not the viewport,
    determines when the authored grid stacks. */
 .ui-catalog-canvas {

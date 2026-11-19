@@ -15,6 +15,7 @@ export { ActionLink } from "./atoms/ActionLink";
 export { SectionCounter } from "./atoms/SectionCounter";
 
 // Molecules
+export { Markdown } from "./molecules/Markdown";
 export { Pagination } from "./molecules/Pagination";
 export type { PaginationProps } from "./molecules/Pagination";
 export { Brand } from "./molecules/Brand";
@@ -46,7 +47,6 @@ export {
   CatalogCanvas,
   CatalogSections,
   CatalogWidgetContent,
-  CatalogMarkdown,
   CatalogGridGuides,
   CatalogGridRuler,
   CATALOG_GRID,

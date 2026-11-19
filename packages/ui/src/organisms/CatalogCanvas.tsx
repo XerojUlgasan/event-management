@@ -1,5 +1,3 @@
-import MarkdownPreview from "@uiw/react-markdown-preview";
-import rehypeSanitize from "rehype-sanitize";
 import {
   CATALOG_COLUMNS,
   type CatalogSection,
@@ -7,6 +5,7 @@ import {
 } from "@event-management/contracts/catalog";
 import type { CSSProperties, ReactNode } from "react";
 import { CatalogThumbnail } from "../atoms/CatalogThumbnail";
+import { Markdown } from "../molecules/Markdown";
 
 type WidgetStyle = CSSProperties & { "--catalog-widget-h": number };
 export const CATALOG_GRID = {
@@ -68,17 +67,6 @@ export function CatalogCanvas({
     >
       <div className="ui-catalog-frame">{children}</div>
     </div>
-  );
-}
-
-export function CatalogMarkdown({ source }: { source: string }) {
-  return (
-    <MarkdownPreview
-      source={source}
-      rehypePlugins={[rehypeSanitize]}
-      wrapperElement={{ "data-color-mode": "light" }}
-      disableCopy
-    />
   );
 }
 
@@ -152,7 +140,7 @@ export function CatalogWidgetContent({
       className={`ui-catalog-widget-content ui-catalog-${widget.type === "service" || widget.type === "package" ? "reference" : widget.type}`}
     >
       {widget.type === "markdown" && (
-        <CatalogMarkdown source={widget.markdown || ""} />
+        <Markdown source={widget.markdown || ""} />
       )}
       {widget.type === "photo" &&
         (url ? (

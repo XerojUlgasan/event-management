@@ -95,6 +95,27 @@ model AiToolCall {
   @@map("ai_tool_calls")
 }
 
+// State checks, pending-job deduplication, and RLS live in SQL.
+model BackgroundJob {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type           String
+  payload        Json      @default("{}") @db.JsonB
+  dedupeKey      String?   @map("dedupe_key")
+  status         String    @default("pending")
+  attempts       Int       @default(0)
+  availableAt    DateTime  @default(now()) @map("available_at") @db.Timestamptz(6)
+  leaseToken     String?   @map("lease_token") @db.Uuid
+  leaseExpiresAt DateTime? @map("lease_expires_at") @db.Timestamptz(6)
+  lastError      String?   @map("last_error")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  @@index([status, availableAt])
+  @@index([status, leaseExpiresAt])
+  @@map("background_jobs")
+}
+
 model Session {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @map("user_id") @db.Uuid

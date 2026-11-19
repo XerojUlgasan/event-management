@@ -400,7 +400,6 @@
 }
 
 .public-chat-message-body {
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .public-chat-panel .chat-input textarea::placeholder {

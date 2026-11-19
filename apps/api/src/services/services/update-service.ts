@@ -6,7 +6,7 @@ import { updateServiceData } from "../../data/services/update-service.js";
 import { error, nextUpdate } from "../packages/package-rules.js";
 import { serviceAdminDto } from "./service-response.js";
 import { syncCatalogKnowledge } from "../ai/workflows/sync-catalog-knowledge.js";
-import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
+import { enqueueBackgroundJobService } from "../background-jobs/enqueue-job.js";
 import { readCatalogSectionsService } from "../catalog-canvas/read-catalog-sections.js";
 import {
   InvalidCatalogMedia,
@@ -54,12 +54,15 @@ export async function updateServiceService(
         );
       if (current.thumbnail_media_id)
         previousMedia.push(current.thumbnail_media_id);
-      await syncCatalogKnowledge(trx, { kind: "service", id });
+      const chunks = await syncCatalogKnowledge(trx, { kind: "service", id });
+      if (chunks.length)
+        await enqueueBackgroundJobService(trx, "embed_service", {
+          serviceId: id,
+        });
       return serviceAdminDto(trx, row);
     });
     if (!("status" in outcome)) {
       await promoteOwnerCatalogMediaService(db, { kind: "service", id });
-      await scheduleCatalogEmbeddingRefresh(db, [{ kind: "service", id }]);
       await cleanupCatalogMediaService(db, previousMedia);
     }
     return outcome;

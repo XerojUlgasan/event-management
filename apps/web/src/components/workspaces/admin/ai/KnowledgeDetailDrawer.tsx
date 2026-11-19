@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Badge,
   Button,
-  CatalogMarkdown,
+  Markdown,
   Drawer,
   Pagination,
 } from "@event-management/ui";
@@ -105,7 +105,7 @@ export function KnowledgeDetailDrawer({
                   <KnowledgeHelp text="Old content awaiting reconciliation; excluded from coverage." />
                 )}
                 {chunk.contentMarkdown && (
-                  <CatalogMarkdown source={chunk.contentMarkdown} />
+                  <Markdown source={chunk.contentMarkdown} />
                 )}
                 {chunk.kind === "photo" && chunk.mediaUrl && (
                   <img

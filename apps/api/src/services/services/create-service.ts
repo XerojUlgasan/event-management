@@ -4,7 +4,7 @@ import type { ServiceContent } from "../../controllers/services/schemas.js";
 import { createServiceData } from "../../data/services/create-service.js";
 import { serviceAdminDto } from "./service-response.js";
 import { syncCatalogKnowledge } from "../ai/workflows/sync-catalog-knowledge.js";
-import { scheduleCatalogEmbeddingRefresh } from "../ai/workflows/schedule-catalog-embedding-refresh.js";
+import { enqueueBackgroundJobService } from "../background-jobs/enqueue-job.js";
 import {
   InvalidCatalogMedia,
   replaceCatalogSectionsService,
@@ -36,7 +36,14 @@ export async function createServiceService(
         { sections: data.sections ?? [] },
         actorId,
       );
-      await syncCatalogKnowledge(trx, { kind: "service", id: row.id });
+      const chunks = await syncCatalogKnowledge(trx, {
+        kind: "service",
+        id: row.id,
+      });
+      if (chunks.length)
+        await enqueueBackgroundJobService(trx, "embed_service", {
+          serviceId: row.id,
+        });
       return serviceAdminDto(trx, row);
     });
     if (!("status" in outcome)) {
@@ -44,9 +51,6 @@ export async function createServiceService(
         kind: "service",
         id: outcome.id,
       });
-      await scheduleCatalogEmbeddingRefresh(db, [
-        { kind: "service", id: outcome.id },
-      ]);
     }
     return outcome;
   } catch (cause) {

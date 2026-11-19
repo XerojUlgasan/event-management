@@ -14,6 +14,8 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Conversation Markdown](2026-11-19_16-31-50_conversation-markdown.md) | Shared catalog/message renderer / main | complete | Review scoped diff; synthetic browser and local checks pass; unrelated structure/design/guidance issues remain |
+| [Catalog background jobs](2026-11-19_15-53-34_catalog-background-jobs.md) | Durable automatic catalog embeddings / main | complete | Review diff; hosted rollout and live provider verification remain separate |
 <<<<<<< Updated upstream
 =======
 | [Automatic image tool tracking](2026-11-19_11-59-15_automatic-image-tool-tracking.md) | Mandatory vision tool execution records / main | complete | Locally verified and migrated; server-side traces, live provider and hosted rollout separate |

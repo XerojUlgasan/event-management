@@ -1,6 +1,6 @@
 import {
   CatalogCanvas,
-  CatalogMarkdown,
+  Markdown,
   CatalogSections,
   CatalogWidgetContent,
 } from "@event-management/ui";
@@ -113,7 +113,7 @@ export function ServiceCanvas({ item }: { item: ServiceContent }) {
       <div className="catalog-detail-intro">
         <h1>{item.name || "Untitled service"}</h1>
         <div className="catalog-detail-summary">
-          <CatalogMarkdown source={item.description} />
+          <Markdown source={item.description} />
         </div>
         <div className="catalog-detail-meta">
           <strong>{pricing.price}</strong>
