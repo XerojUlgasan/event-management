@@ -30,6 +30,10 @@ const names = [
   "clock",
   "location",
   "camera",
+  "eye",
+  "edit",
+  "save",
+  "trash",
   "undo",
   "redo",
 ] satisfies IconName[];

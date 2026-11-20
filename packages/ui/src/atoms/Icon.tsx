@@ -137,6 +137,29 @@ const iconPaths = {
       <circle cx="12" cy="13" r="4" />
     </>
   ),
+  eye: (
+    <>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  edit: (
+    <>
+      <path d="m4 20 4-.8L19 8a2.1 2.1 0 0 0-3-3L5 16l-1 4Z" />
+      <path d="m14 7 3 3" />
+    </>
+  ),
+  save: (
+    <>
+      <path d="M5 3h12l4 4v14H3V3h2Z" />
+      <path d="M7 3v6h9V3M7 21v-8h10v8" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5" />
+    </>
+  ),
   undo: (
     <>
       <path d="M9 14 4 9l5-5" />

@@ -14,6 +14,7 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Package editor UI](2026-11-20_23-43-08_package-editor-ui.md) | Modal details, compact add-ons and icon toolbar / main | complete | Independently reviewed; local UI checks pass; review scoped diff, no migration required |
 | [Package service terms](2026-11-20_23-03-00_package-service-terms.md) | Included widget terms and custom-only JSONB add-ons / main | complete | Code verified and independently reviewed; apply matching migration/API/web together; quotations deferred |
 | [Hide new package widgets](2026-11-20_22-32-42_hide-package-widget.md) | Creation-only pause / main | complete | New package widgets hidden; existing references and Service widgets preserved; no migration required |
 | [Isolated room runtime](2026-11-20_20-56-22_isolated-room-runtime.md) | Migrated, seeded, independently running test rooms / main | complete | test is running; use room create/start/status/stop; check retained stopped after two-room isolation proof |

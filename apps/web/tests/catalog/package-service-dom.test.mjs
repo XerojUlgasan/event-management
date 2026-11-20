@@ -19,6 +19,7 @@ let window,
   Addons,
   Terms,
   PackageEditor,
+  CatalogEditor,
   Provider;
 let root, container, requests, failReset;
 
@@ -159,6 +160,9 @@ before(async () => {
   ));
   ({ PackageEditor } = await server.ssrLoadModule(
     "/src/components/catalog/PackageEditor.tsx",
+  ));
+  ({ CatalogEditor } = await server.ssrLoadModule(
+    "/src/components/catalog/CatalogEditor.tsx",
   ));
   ({ NotificationProvider: Provider } = await server.ssrLoadModule(
     "/@fs" +
@@ -323,6 +327,14 @@ test("add-on picker copies defaults, rejects overlap, and local override survive
     ],
     [5000, 4, 900],
   );
+  const tableRegion = document.querySelector(
+    '[role="region"][aria-label="Add-on services"]',
+  );
+  assert.equal(tableRegion?.tabIndex, 0);
+  assert.equal(
+    button("Remove Photography").getAttribute("title"),
+    "Remove Photography",
+  );
   await click("Settings for Photography");
   await change("Fixed price", "6000");
   await change("Included hours", "5");
@@ -340,6 +352,10 @@ test("add-on picker copies defaults, rejects overlap, and local override survive
   await click("Settings for Photography");
   assert.equal(input("Fixed price").value, "6000");
   assert.equal(input("Included hours").value, "5");
+  await click("Save settings");
+  await click("Remove Photography");
+  assert.equal(latest.addonServices.length, 0);
+  assert.match(document.body.textContent, /No add-on services yet/);
 });
 
 test("add-on picker prevents selecting a service already included", async () => {
@@ -391,13 +407,25 @@ test("private editor saves included overrides and add-ons and reopens both witho
   await click("Included service settings");
   assert.equal(input("Included hours").value, "7");
   await click("Save settings");
+  const opener = button("Private package details");
+  opener.focus();
   await click("Private package details");
+
+  const details = [...document.querySelectorAll("dialog")].find((node) =>
+    node.textContent.includes("Add-on services"),
+  );
+
+  assert.ok(details?.open);
+  assert.equal(details.parentElement, document.body);
   assert.match(document.body.textContent, /Add-on services/);
   await click("Add service");
   await click("Music");
+  assert.ok(details.querySelector("table"));
   await click("Settings for Music");
   await change("Fixed price", "7000");
   await click("Save settings");
+  await click("Done");
+  assert.equal(document.activeElement, opener);
   await click("Save private package");
   assert.deepEqual(saved.sections[0].widgets[0].serviceTerms, {
     includedHours: 7,
@@ -415,6 +443,132 @@ test("private editor saves included overrides and add-ons and reopens both witho
   await click("Private package details");
   await click("Settings for Music");
   assert.equal(input("Fixed price").value, "7000");
+});
+
+test("details modal dismisses on Escape and restores its opener", async () => {
+  await render(PackageEditor, {
+    initial: packageItem,
+    onClose: () => {},
+    onSaved: () => {},
+    saveCustom: async () => {},
+  });
+  const opener = button("Private package details");
+  opener.focus();
+  await click("Private package details");
+
+  const modal = [...document.querySelectorAll("dialog")].find((node) =>
+    node.textContent.includes("Add-on services"),
+  );
+
+  assert.ok(modal?.open);
+  await act(async () =>
+    modal.dispatchEvent(new window.Event("cancel", { cancelable: true })),
+  );
+  await flush();
+  assert.equal(modal.isConnected, false);
+  assert.equal(document.activeElement, opener);
+});
+
+test("details shortcuts undo and redo add-ons but leave text and nested dialogs alone", async () => {
+  await render(PackageEditor, {
+    initial: packageItem,
+    onClose: () => {},
+    onSaved: () => {},
+    saveCustom: async () => {},
+  });
+  await click("Private package details");
+  await click("Add service");
+  await click("Music");
+  assert.ok(button("Settings for Music"));
+
+  async function shortcut(target, key, options = {}) {
+    const event = new window.KeyboardEvent("keydown", {
+      key,
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+      ...options,
+    });
+    await act(async () => target.dispatchEvent(event));
+    await flush();
+
+    return event;
+  }
+
+  const textField = document.querySelector("textarea");
+  assert.equal((await shortcut(textField, "z")).defaultPrevented, false);
+  assert.ok(button("Settings for Music"));
+  await click("Settings for Music");
+  assert.equal(
+    (await shortcut(button("Save settings"), "z")).defaultPrevented,
+    false,
+  );
+  await click("Save settings");
+  assert.equal(
+    (await shortcut(button("Add service"), "z")).defaultPrevented,
+    true,
+  );
+  assert.match(document.body.textContent, /No add-on services yet/);
+  assert.equal(
+    (await shortcut(button("Done"), "z", { shiftKey: true })).defaultPrevented,
+    true,
+  );
+  assert.ok(button("Settings for Music"));
+});
+
+test("thumbnail Escape does not dismiss the details modal", async () => {
+  await render(PackageEditor, {
+    initial: { ...packageItem, imageUrl: "https://example.test/thumbnail.png" },
+    onClose: () => {},
+    onSaved: () => {},
+    saveCustom: async () => {},
+  });
+  await click("Private package details");
+  await click("View thumbnail full size");
+  const lightbox = document.querySelector(
+    'dialog[aria-label="Thumbnail preview"]',
+  );
+  const details = lightbox.closest("dialog.modal-backdrop");
+  assert.ok(lightbox.open && details.open);
+  const event = new window.Event("cancel", { cancelable: true });
+  await act(async () => lightbox.dispatchEvent(event));
+  assert.equal(event.defaultPrevented, false);
+  assert.ok(details.isConnected && details.open);
+});
+
+test("blank editor name keeps the editor open and focuses its name field", async () => {
+  await render(PackageEditor, {
+    initial: { ...packageItem, name: "" },
+    onClose: () => {},
+    onSaved: () => {},
+    saveCustom: async () => {},
+  });
+  await click("Save private package");
+  assert.match(document.body.textContent, /Enter a package name/);
+  assert.equal(
+    document.activeElement.getAttribute("aria-label"),
+    "Private package name",
+  );
+  assert.equal(document.querySelector("dialog.modal-backdrop"), null);
+});
+
+test("service canvas validation returns to the editor rather than details", async () => {
+  await render(CatalogEditor, {
+    initial: { name: "Service", sections: [] },
+    entity: "service",
+    onClose: () => {},
+    onSaved: () => {},
+    onSave: async () => {},
+    validate: () => undefined,
+    validateCanvas: () => "Add a service image before saving.",
+    renderDetails: () => "Details content",
+    renderPreview: () => "Preview content",
+  });
+  await click("Preview");
+  await click("Save changes");
+  assert.match(document.body.textContent, /Add a service image before saving/);
+  assert.equal(document.querySelector("dialog.modal-backdrop"), null);
+  assert.ok(button("Preview"));
 });
 
 test("catalog editor does not show private add-on controls", async () => {

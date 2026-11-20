@@ -146,6 +146,7 @@ export function ThumbnailField({
             ref={lightboxRef}
             className="thumbnail-lightbox"
             aria-label="Thumbnail preview"
+            onCancel={(event) => event.stopPropagation()}
             onClick={(e) => {
               // Close when clicking the backdrop (outside the image).
               if (e.target === e.currentTarget) closeLightbox(e);

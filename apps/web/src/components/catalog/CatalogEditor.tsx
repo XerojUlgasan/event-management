@@ -1,6 +1,7 @@
 import { lockCatalogScroll } from "./catalog-scroll-lock";
 import {
   Button,
+  Dialog,
   Icon,
   Input,
   NativeDialog,
@@ -221,6 +222,7 @@ export function CatalogEditor<T extends CanvasContent>({
   onSaved,
   onSave,
   validate,
+  validateCanvas,
   renderDetails,
   renderPreview,
   saveLabel = "Save changes",
@@ -233,6 +235,7 @@ export function CatalogEditor<T extends CanvasContent>({
   onSaved: () => void;
   onSave: (content: T) => Promise<void>;
   validate?: (content: T) => string | undefined;
+  validateCanvas?: (content: T) => string | undefined;
   renderDetails: (
     content: T,
     setContent: Dispatch<SetStateAction<T>>,
@@ -266,6 +269,8 @@ export function CatalogEditor<T extends CanvasContent>({
   const [canUndo, setCanUndo] = useState(false),
     [canRedo, setCanRedo] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const detailsRef = useRef<HTMLDivElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
   const [markdownEditing, setMarkdownEditing] = useState<{
     sectionId: string;
     widgetId: string;
@@ -379,9 +384,13 @@ export function CatalogEditor<T extends CanvasContent>({
       const target = event.target instanceof HTMLElement ? event.target : null;
 
       // Text fields keep their native text undo; other dialogs keep their own shortcuts.
+      const targetDialog = target?.closest("dialog");
+      const detailsDialog = detailsRef.current?.closest("dialog");
+
       if (
         isTextField(target) ||
-        target?.closest("dialog") !== dialogRef.current
+        !targetDialog ||
+        (targetDialog !== dialogRef.current && targetDialog !== detailsDialog)
       )
         return;
 
@@ -646,7 +655,13 @@ export function CatalogEditor<T extends CanvasContent>({
     const dialog = dialogRef.current;
 
     const trap = (event: KeyboardEvent) => {
-      if (event.key !== "Tab" || !dialog) return;
+      if (
+        event.key !== "Tab" ||
+        !dialog ||
+        (event.target instanceof Element &&
+          event.target.closest("dialog") !== dialog)
+      )
+        return;
 
       const controls = [
         ...dialog.querySelectorAll<HTMLElement>(
@@ -678,6 +693,15 @@ export function CatalogEditor<T extends CanvasContent>({
   }, []);
 
   const save = async () => {
+    if (!content.name.trim()) {
+      setError(notifyError(validate?.(content) || `Enter a ${entity} name.`));
+      setSettings(false);
+      setPreview(false);
+      nameRef.current?.focus();
+
+      return;
+    }
+
     const validationError = validate?.(content);
 
     if (validationError) {
@@ -687,10 +711,9 @@ export function CatalogEditor<T extends CanvasContent>({
       return;
     }
 
-    const canvasError = validateCatalogCanvas(
-      content.sections,
-      new Set(Object.keys(files)),
-    );
+    const canvasError =
+      validateCanvas?.(content) ||
+      validateCatalogCanvas(content.sections, new Set(Object.keys(files)));
 
     if (canvasError) {
       setError(notifyError(canvasError));
@@ -774,6 +797,7 @@ export function CatalogEditor<T extends CanvasContent>({
             <small>{title.toUpperCase()} NAME</small>
             <Input
               variant="plain"
+              ref={nameRef}
               aria-label={`${title} name`}
               maxLength={nameMaxLength}
               value={content.name}
@@ -802,37 +826,42 @@ export function CatalogEditor<T extends CanvasContent>({
             />
             <Button
               variant="secondary"
-              onClick={() => setSettings(!settings)}
+              size="icon"
+              icon="settings"
+              aria-label={`${title} details`}
+              title={`${title} details`}
+              aria-haspopup="dialog"
               aria-expanded={settings}
-            >
-              ⚙ &nbsp; {title} details
-            </Button>
+              onClick={() => setSettings(true)}
+            />
             <Button
               variant="secondary"
-              onClick={() => {
-                setPreview(!preview);
-                setSettings(false);
-              }}
-            >
-              {preview ? "✎  Back to editor" : "◉  Preview"}
-            </Button>
-            <Button variant="secondary" onClick={cancel} disabled={busy}>
-              Cancel
-            </Button>
-            <Button onClick={() => void save()} disabled={busy}>
-              {busy ? "Saving…" : saveLabel}
-            </Button>
+              size="icon"
+              icon={preview ? "edit" : "eye"}
+              aria-label={preview ? "Back to editor" : "Preview"}
+              title={preview ? "Back to editor" : "Preview"}
+              aria-pressed={preview}
+              onClick={() => setPreview(!preview)}
+            />
+            <Button
+              variant="secondary"
+              size="icon"
+              icon="close"
+              aria-label="Cancel"
+              title="Cancel"
+              onClick={cancel}
+              disabled={busy}
+            />
+            <Button
+              size="icon"
+              icon="save"
+              aria-label={busy ? "Saving…" : saveLabel}
+              title={busy ? "Saving…" : saveLabel}
+              pending={busy}
+              onClick={() => void save()}
+            />
           </div>
         </header>
-        {settings && (
-          <div className="pe-settings">
-            <h2>{title} details</h2>
-            {renderDetails(content, setContent)}
-            <Button variant="secondary" onClick={() => setSettings(false)}>
-              Done
-            </Button>
-          </div>
-        )}
         {error && (
           <p className="pe-error" role="alert">
             {error}
@@ -1333,6 +1362,18 @@ export function CatalogEditor<T extends CanvasContent>({
           </div>
         )}
       </fieldset>
+      {settings &&
+        createPortal(
+          <Dialog
+            title={`${title} details`}
+            className="pe-details-dialog"
+            onClose={() => setSettings(false)}
+            actions={<Button onClick={() => setSettings(false)}>Done</Button>}
+          >
+            <div ref={detailsRef}>{renderDetails(content, setContent)}</div>
+          </Dialog>,
+          document.body,
+        )}
       {mediaEditing && editingMedia && (
         <PackageMediaSettings
           entity={entity}

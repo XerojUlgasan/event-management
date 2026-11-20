@@ -410,11 +410,8 @@ export function ServicesPage() {
             setEditing(null);
             void load();
           }}
-          validate={(form) => {
-            const detailsError = validateServiceDetails(form);
-
-            if (detailsError) return detailsError;
-
+          validate={validateServiceDetails}
+          validateCanvas={(form) => {
             if (
               !form.sections.some((section) =>
                 section.widgets.some(

@@ -95,22 +95,6 @@ export function PackageCanvas({
           <div className="catalog-detail-action">{bookingAction}</div>
         )}
       </div>
-      {showAddons && !!item.addonServices?.length && (
-        <section>
-          <h2>Add-on services</h2>
-          {item.addonServices.map((addon) => {
-            const pricing = servicePricingLabels(addon);
-
-            return (
-              <p key={addon.id}>
-                <strong>{addon.service?.name ?? "Unavailable service"}</strong>{" "}
-                · {pricing.price}
-                {pricing.excess && ` · ${pricing.excess}`}
-              </p>
-            );
-          })}
-        </section>
-      )}
       <CatalogSections
         sections={resolveSections(item.sections)}
         includedServices
@@ -125,6 +109,52 @@ export function PackageCanvas({
             : undefined
         }
       />
+      {showAddons && !!item.addonServices?.length && (
+        <section className="catalog-addons">
+          <h2>Addon Services</h2>
+          <div className="catalog-addons-grid">
+            {item.addonServices.map((addon) => {
+              const pricing = servicePricingLabels(addon);
+              const widget: CatalogWidget = {
+                id: addon.id,
+                type: "service",
+                x: 0,
+                y: 0,
+                w: 6,
+                h: 5,
+                markdown: "",
+                media: null,
+                alt: "",
+                caption: "",
+                autoplay: false,
+                serviceId: addon.serviceId,
+                service: addon.service,
+              };
+
+              return (
+                <article className="catalog-addon" key={addon.id}>
+                  {addon.service ? (
+                    <CatalogWidgetContent
+                      widget={resolveWidget(widget)}
+                      onOpenService={
+                        openCatalog
+                          ? (id) => openCatalog({ entity: "service", id })
+                          : undefined
+                      }
+                    />
+                  ) : (
+                    <p>Unavailable service</p>
+                  )}
+                  <p className="catalog-addon-pricing">
+                    <strong>{pricing.price}</strong>
+                    {pricing.excess && <span>{pricing.excess}</span>}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </CatalogCanvas>
   );
 }

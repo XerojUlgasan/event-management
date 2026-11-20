@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Button, Icon } from "@event-management/ui";
+import { Button, DataTable } from "@event-management/ui";
 import {
   MAX_PACKAGE_ADDON_SERVICES,
   type PackageContent,
+  type PackageAddonService,
 } from "@event-management/contracts/catalog";
 import { servicePricingLabels } from "../../lib/utils/formatting/money";
 import { CatalogReferencePickerDialog } from "./CatalogReferencePickerDialog";
@@ -23,42 +24,80 @@ export function PackageAddonServices({
   const selected = addons.find((item) => item.id === editing);
 
   return (
-    <section>
+    <section className="pe-addons">
       <h3>Add-on services</h3>
-      <p>
+      <p className="pe-addons-help">
         Optional services for this private package. Prices are saved with this
         package.
       </p>
-      {addons.map((item) => {
-        const labels = servicePricingLabels(item);
+      {addons.length ? (
+        <DataTable<PackageAddonService>
+          className="pe-addon-table"
+          label="Add-on services"
+          minWidth={510}
+          rows={addons}
+          rowKey={(item) => item.id}
+          columns={[
+            {
+              key: "service",
+              header: "Service",
+              cell: (item) => item.service?.name ?? "Unavailable service",
+            },
+            {
+              key: "pricing",
+              header: "Package pricing",
+              cell: (item) => {
+                const labels = servicePricingLabels(item);
 
-        return (
-          <div key={item.id}>
-            <strong>{item.service?.name ?? "Unavailable service"}</strong> ·{" "}
-            {labels.price}
-            {labels.excess && ` · ${labels.excess}`}
-            <Button
-              variant="plain"
-              aria-label={`Settings for ${item.service?.name ?? "add-on service"}`}
-              aria-haspopup="dialog"
-              onClick={() => setEditing(item.id)}
-            >
-              <Icon name="more" size={20} />
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() =>
-                onChange({
-                  ...content,
-                  addonServices: addons.filter((entry) => entry.id !== item.id),
-                })
-              }
-            >
-              Remove
-            </Button>
-          </div>
-        );
-      })}
+                return (
+                  <div className="pe-addon-pricing">
+                    {labels.price}
+                    {labels.excess && <span>{labels.excess}</span>}
+                  </div>
+                );
+              },
+            },
+            {
+              key: "actions",
+              header: "Actions",
+              cell: (item) => {
+                const name = item.service?.name ?? "add-on service";
+
+                return (
+                  <div className="pe-addon-actions">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      icon="edit"
+                      aria-label={`Settings for ${name}`}
+                      title={`Settings for ${name}`}
+                      aria-haspopup="dialog"
+                      onClick={() => setEditing(item.id)}
+                    />
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      icon="trash"
+                      aria-label={`Remove ${name}`}
+                      title={`Remove ${name}`}
+                      onClick={() =>
+                        onChange({
+                          ...content,
+                          addonServices: addons.filter(
+                            (entry) => entry.id !== item.id,
+                          ),
+                        })
+                      }
+                    />
+                  </div>
+                );
+              },
+            },
+          ]}
+        />
+      ) : (
+        <p className="pe-addon-empty">No add-on services yet.</p>
+      )}
       {error && <p role="alert">{error}</p>}
       <Button
         variant="secondary"
