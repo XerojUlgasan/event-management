@@ -9,6 +9,8 @@ export function QuotationOfferCard({
   busy,
   onRevise,
   onSend,
+  onAccept,
+  onRequestRevision,
 }: {
   quotation: Quotation;
   admin: boolean;
@@ -16,12 +18,28 @@ export function QuotationOfferCard({
   busy: boolean;
   onRevise: () => void;
   onSend: () => void;
+  onAccept?: () => void;
+  onRequestRevision?: () => void;
 }) {
   return (
     <div className="quotation-stack">
       <QuotationSummaryRead quotation={quotation} />
-      {!admin && (
-        <p className="quotation-lede">Discuss this offer in Messages.</p>
+      {!admin && quotation.status === "sent" && (
+        <div className="quotation-actions">
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={onRequestRevision}
+          >
+            Request revision
+          </Button>
+          <Button disabled={busy} onClick={onAccept}>
+            Accept
+          </Button>
+        </div>
+      )}
+      {!admin && quotation.status === "accepted" && (
+        <p className="quotation-lede">You accepted this quotation.</p>
       )}
       {admin && canWrite && (
         <div className="quotation-actions">

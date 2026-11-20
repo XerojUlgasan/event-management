@@ -18,6 +18,8 @@ export const getQuotations = (
 ) => {
   const query = new URLSearchParams();
 
+  query.set("limit", "5");
+
   if (options.cursor) query.set("cursor", options.cursor);
 
   if (options.quotationId) query.set("quotationId", options.quotationId);
@@ -67,4 +69,14 @@ export const reviseQuotation = (
   request<{ quotation: Quotation }>(`/admin${quote(id)}/revision`, {
     expectedUpdatedAt,
     reason,
+  });
+
+export const acceptQuotation = (id: string, expectedUpdatedAt: string) =>
+  request<{ quotation: Quotation }>(`${quote(id)}/accept`, {
+    expectedUpdatedAt,
+  });
+
+export const requestRevision = (id: string, expectedUpdatedAt: string) =>
+  request<{ quotation: Quotation }>(`${quote(id)}/request-revision`, {
+    expectedUpdatedAt,
   });

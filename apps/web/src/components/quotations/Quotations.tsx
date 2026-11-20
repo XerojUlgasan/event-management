@@ -11,6 +11,8 @@ import {
   reviseQuotation,
   saveQuotation,
   sendQuotation,
+  acceptQuotation,
+  requestRevision,
 } from "../../lib/data/quotations/quotations";
 import { ApiError } from "../../lib/http/request";
 import { QuotationDraftEditor } from "./QuotationDraftEditor";
@@ -177,6 +179,22 @@ export function Quotations({
 
     void action("Offer sent to chat.", async () => {
       await sendQuotation(target.id, target.updatedAt);
+    });
+  }
+
+  function acceptOffer() {
+    if (!offer) return;
+
+    void action("Quotation accepted.", async () => {
+      await acceptQuotation(offer.id, offer.updatedAt);
+    });
+  }
+
+  function requestOfferRevision() {
+    if (!offer) return;
+
+    void action("Revision requested.", async () => {
+      await requestRevision(offer.id, offer.updatedAt);
     });
   }
 
@@ -382,7 +400,6 @@ export function Quotations({
           onSend={sendOffer}
         />
       )}
-
       {admin && revisingOffer && canWrite && (
         <QuotationDraftEditor
           draft={draft}
@@ -413,6 +430,8 @@ export function Quotations({
           busy={busy}
           onRevise={startRevision}
           onSend={sendOffer}
+          onAccept={acceptOffer}
+          onRequestRevision={requestOfferRevision}
         />
       )}
 

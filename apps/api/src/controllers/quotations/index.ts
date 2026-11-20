@@ -29,6 +29,14 @@ import {
   sendQuotationRoute,
   sendQuotationRouteHandler,
 } from "./send-quotation.js";
+import {
+  acceptQuotationRoute,
+  acceptQuotationRouteHandler,
+} from "./accept-quotation.js";
+import {
+  requestRevisionQuotationRoute,
+  requestRevisionQuotationRouteHandler,
+} from "./request-revision-quotation.js";
 
 const routes = new OpenAPIHono<HonoEnv>({
   defaultHook: (result, c) =>
@@ -67,5 +75,10 @@ routes.openapi(getQuotationRoute, getQuotationRouteHandler);
 routes.openapi(saveQuotationRoute, saveQuotationRouteHandler);
 routes.openapi(sendQuotationRoute, sendQuotationRouteHandler);
 routes.openapi(reviseAdminQuotationRoute, reviseAdminQuotationRouteHandler);
+routes.openapi(acceptQuotationRoute, acceptQuotationRouteHandler);
+routes.openapi(
+  requestRevisionQuotationRoute,
+  requestRevisionQuotationRouteHandler,
+);
 
 export default routes;
