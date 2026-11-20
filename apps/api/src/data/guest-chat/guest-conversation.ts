@@ -1,15 +1,22 @@
-import { sql, type Kysely, type Transaction, type Selectable } from "kysely";
+import { type Kysely, type Transaction, type Selectable } from "kysely";
 import type { Conversations, DB } from "../../db/types.js";
 import {
   GUEST_CUSTOMER_MESSAGE_LIMIT,
   GUEST_INACTIVITY_TTL_MS,
   type GuestChatStatus,
 } from "@event-management/contracts/guest-chat";
+import {
+  guestIsActive,
+  conversationActivity,
+  withConversationActivity,
+} from "./activity.js";
 import { hashSessionToken } from "../../utils/session.js";
 
 export type GuestDatabase = Kysely<DB>;
 
-export type GuestConversation = Selectable<Conversations>;
+export type GuestConversation = Selectable<Conversations> & {
+  last_activity_at: Date;
+};
 
 export class GuestChatError extends Error {
   constructor(
@@ -28,7 +35,7 @@ export function guestStatus(conversation: GuestConversation): GuestChatStatus {
       0,
       GUEST_CUSTOMER_MESSAGE_LIMIT - conversation.guest_customer_message_count,
     ),
-    expiresAt: conversation.guest_expires_at!.toISOString(),
+    expiresAt: guestExpiry(conversation.last_activity_at).toISOString(),
     loginRequired:
       conversation.guest_customer_message_count >= GUEST_CUSTOMER_MESSAGE_LIMIT,
   };
@@ -39,18 +46,12 @@ export function guestExpiry(now = new Date()) {
 }
 
 export function assertGuestActive(conversation: GuestConversation) {
-  if (
-    conversation.guest_expires_at &&
-    conversation.guest_expires_at.getTime() <= Date.now()
-  )
+  if (guestExpiry(conversation.last_activity_at).getTime() <= Date.now())
     throw new GuestChatError(
       410,
       "This guest conversation expired. Start a new chat.",
       "guest_expired",
     );
-
-  if (conversation.status !== "active")
-    throw new GuestChatError(409, "Conversation is closed");
 }
 
 export async function lockGuestConversation(
@@ -79,9 +80,10 @@ export async function lockGuestConversation(
 
   if (!identity) throw new GuestChatError(404, "Conversation not found");
 
-  assertGuestActive(conversation);
+  const enriched = await withConversationActivity(trx, conversation);
+  assertGuestActive(enriched);
 
-  return conversation;
+  return enriched;
 }
 
 export async function bootstrapGuestConversationData(
@@ -101,33 +103,32 @@ export async function bootstrapGuestConversationData(
       .where("token_hash", "=", hash)
       .forUpdate()
       .executeTakeFirstOrThrow();
-    const current = await trx
+    // Lock existing rows first, then read activity using a fresh statement snapshot.
+    await trx
       .selectFrom("conversations")
-      .selectAll()
+      .select("id")
       .where("guest_identity_id", "=", identity.id)
-      .where("status", "=", "active")
       .forUpdate()
+      .execute();
+    const current = await trx
+      .selectFrom("conversations as c")
+      .selectAll("c")
+      .select(conversationActivity().as("last_activity_at"))
+      .where("c.guest_identity_id", "=", identity.id)
+      .where(guestIsActive())
+      .orderBy(conversationActivity(), "desc")
+      .orderBy("c.id", "desc")
       .executeTakeFirst();
 
-    if (current && current.guest_expires_at!.getTime() > Date.now())
-      return current;
+    if (current) return current;
 
-    if (current)
-      await trx
-        .updateTable("conversations")
-        .set({ status: "closed", closed_at: sql`clock_timestamp()` })
-        .where("id", "=", current.id)
-        .execute();
-
-    return trx
+    const created = await trx
       .insertInto("conversations")
-      .values({
-        customer_id: null,
-        guest_identity_id: identity.id,
-        guest_expires_at: guestExpiry(),
-      })
+      .values({ customer_id: null, guest_identity_id: identity.id })
       .returningAll()
       .executeTakeFirstOrThrow();
+
+    return { ...created, last_activity_at: created.created_at };
   });
 }
 

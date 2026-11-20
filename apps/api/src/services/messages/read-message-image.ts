@@ -35,9 +35,7 @@ export async function readMessageImageService(
     guestToken &&
     !image.customer_id &&
     image.guest_identity_id &&
-    image.status === "active" &&
-    image.guest_expires_at &&
-    image.guest_expires_at.getTime() > Date.now()
+    image.guest_active
   )
     allowed = await ownsMessageImageGuestData(
       db,

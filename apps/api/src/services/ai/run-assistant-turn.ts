@@ -75,9 +75,6 @@ export async function runAssistantTurnService({
       sender_email: null,
     });
 
-  if (conversation.status !== "active")
-    throw new Error("Conversation is closed");
-
   if (!conversation.ai_enabled || conversation.ai_version !== aiVersion)
     return null;
 
@@ -200,7 +197,6 @@ export async function runAssistantTurnService({
 
       if (
         !stillOwned ||
-        current.status !== "active" ||
         !current.ai_enabled ||
         current.ai_version !== aiVersion
       )

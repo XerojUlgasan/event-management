@@ -201,7 +201,6 @@ const conversation = {
   customerName: "Example customer",
   customerEmail: "example@example.com",
   bookingRequestId: null,
-  status: "active",
   aiEnabled: true,
   aiVersion: 0,
   lastMessage: messages.at(-1),
@@ -336,9 +335,45 @@ for (const viewerRole of ["customer", "admin"]) {
       render({ ...conversation, aiReplyPending: true, aiEnabled: false }),
       /AI is preparing a reply/,
     );
-    assert.doesNotMatch(
-      render({ ...conversation, aiReplyPending: true, status: "closed" }),
-      /AI is preparing a reply/,
+  });
+}
+
+for (const viewerRole of ["customer", "admin"]) {
+  test(`${viewerRole} can use a booking conversation without lifecycle fields`, () => {
+    const bookingConversation = {
+      ...conversation,
+      bookingRequestId: "booking",
+    };
+
+    const html = renderToStaticMarkup(
+      createElement(
+        ui.NotificationProvider,
+        null,
+        createElement(MessagesWorkspace, {
+          title: "Messages",
+          viewerRole,
+          conversations: [bookingConversation],
+          activeConversation: bookingConversation,
+          activeId: bookingConversation.id,
+          onSelect() {},
+          onToggleAi() {},
+          messages,
+          loading: false,
+          error: null,
+          async onSend() {},
+          conversationOpen: true,
+          listEmpty: { title: "Empty", body: "Empty" },
+          threadEmpty: { title: "Empty", body: "Empty" },
+        }),
+      ),
     );
+
+    assert.match(html, /aria-label="Write a message"/);
+    assert.doesNotMatch(html, /conversation is closed|>Closed</);
+
+    if (viewerRole === "admin") {
+      assert.match(html, /aria-label="AI replies"/);
+      assert.doesNotMatch(html, /aria-label="AI replies"[^>]*disabled/);
+    }
   });
 }

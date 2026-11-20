@@ -1,12 +1,10 @@
+import { withConversationActivity } from "../guest-chat/activity.js";
 import {
   assertImageMessageJobLeaseData,
   type ImageMessageJobLease,
 } from "./message-processing.js";
 import { sql, type Kysely } from "kysely";
-import {
-  assertGuestActive,
-  guestExpiry,
-} from "../guest-chat/guest-conversation.js";
+import { assertGuestActive } from "../guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
 import { linkToolCallsToReplyData } from "../ai/link-tool-calls-to-reply.js";
 
@@ -35,10 +33,10 @@ export function createAssistantMessageData(
           conversation.claimed_guest_identity_id === guestIdentityId
         : conversation.customer_id === customerId && customerId !== null);
 
-    if (!owned || conversation.status !== "active")
-      throw new Error("Conversation is unavailable");
+    if (!owned) throw new Error("Conversation is unavailable");
 
-    if (conversation.guest_identity_id) assertGuestActive(conversation);
+    if (conversation.guest_identity_id)
+      assertGuestActive(await withConversationActivity(trx, conversation));
 
     if (jobLease)
       await assertImageMessageJobLeaseData(trx, jobLease, abortSignal);
@@ -94,9 +92,6 @@ export function createAssistantMessageData(
       .updateTable("conversations")
       .set({
         updated_at: message.created_at,
-        ...(conversation.guest_identity_id
-          ? { guest_expires_at: guestExpiry(message.created_at) }
-          : {}),
       })
       .where("id", "=", conversationId)
       .execute();

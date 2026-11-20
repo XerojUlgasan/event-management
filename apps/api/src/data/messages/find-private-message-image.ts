@@ -1,3 +1,4 @@
+import { guestIsActive } from "../guest-chat/activity.js";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 
@@ -13,9 +14,8 @@ export function findPrivateMessageImageData(db: Kysely<DB>, id: string) {
       "i.interpretation",
       "c.customer_id",
       "c.guest_identity_id",
-      "c.guest_expires_at",
-      "c.status",
     ])
+    .select(guestIsActive().as("guest_active"))
     .where("i.id", "=", id)
     .executeTakeFirst();
 }

@@ -37,8 +37,6 @@ export const messageSchema = z.object({
   readAt: z.string().nullable(),
 });
 
-export const conversationStatusSchema = z.enum(["active", "closed"]);
-
 export const conversationSchema = z.object({
   id: z.string().uuid(),
   customerId: z.string().uuid().nullable(),
@@ -52,12 +50,10 @@ export const conversationSchema = z.object({
   eventStartsAt: z.string().nullable(),
   eventEndsAt: z.string().nullable(),
   guestCount: z.number().int().positive().nullable(),
-  status: conversationStatusSchema,
   aiEnabled: z.boolean(),
   aiVersion: z.number().int().nonnegative(),
   aiReplyPending: z.boolean(),
   aiHandoff: aiHandoffSchema.nullable().optional(),
-  closedAt: z.string().nullable(),
   lastMessage: messageSchema.nullable(),
   unreadCount: z.number().int().nonnegative(),
   updatedAt: z.string(),

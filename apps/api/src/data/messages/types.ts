@@ -4,6 +4,7 @@ import type { Conversations, Messages } from "../../db/types.js";
 type ConversationRow = Selectable<Conversations>;
 
 export type ConversationWithCustomer = ConversationRow & {
+  last_activity_at: Date;
   ai_reply_pending: boolean;
   customer_display_name: string | null;
   customer_email: string | null;

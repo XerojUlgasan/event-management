@@ -1,3 +1,6 @@
+import { withConversationActivity } from "../guest-chat/activity.js";
+import { assertGuestActive } from "../guest-chat/guest-conversation.js";
+import { guestIsActive } from "../guest-chat/activity.js";
 import { sql, type Kysely, type Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 import type {
@@ -31,8 +34,7 @@ const replyPendingCondition = (messageAlias: string) => {
 
   return sql`j.status in ('pending', 'running')
   and ${m("sender_role")} = 'customer'
-  and c.status = 'active' and c.ai_enabled
-  and (c.guest_identity_id is null or c.guest_expires_at > clock_timestamp())
+  and c.ai_enabled and ${guestIsActive()}
   and j.payload->>'messageId' = ${m("id")}::text
   and j.payload->>'conversationId' = c.id::text
   and j.payload->>'aiVersion' = c.ai_version::text
@@ -150,6 +152,22 @@ export async function saveMessageImageObservationData(
   signal: AbortSignal,
 ) {
   await db.transaction().execute(async (trx) => {
+    const image = await trx
+      .selectFrom("message_images as i")
+      .innerJoin("messages as m", "m.id", "i.message_id")
+      .select("m.conversation_id")
+      .where("i.id", "=", imageId)
+      .executeTakeFirstOrThrow();
+    const conversation = await trx
+      .selectFrom("conversations")
+      .selectAll()
+      .where("id", "=", image.conversation_id)
+      .forUpdate()
+      .executeTakeFirstOrThrow();
+
+    if (conversation.guest_identity_id)
+      assertGuestActive(await withConversationActivity(trx, conversation));
+
     await assertImageMessageJobLeaseData(trx, lease, signal);
     await trx
       .updateTable("message_images")

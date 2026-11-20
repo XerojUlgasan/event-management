@@ -319,11 +319,10 @@ test("customer request IDs replay safely and reject collisions", async () => {
     400,
   );
 
-  const closedAt = new Date();
   const updatedAt = new Date("2020-01-01T00:00:00Z");
   await db
     .updateTable("conversations")
-    .set({ status: "closed", closed_at: closedAt, updated_at: updatedAt })
+    .set({ updated_at: updatedAt })
     .where("id", "=", ids[0])
     .execute();
   const replay = await read(
@@ -342,11 +341,9 @@ test("customer request IDs replay safely and reject collisions", async () => {
   });
   const closed = await db
     .selectFrom("conversations")
-    .select(["status", "closed_at", "updated_at"])
+    .select("updated_at")
     .where("id", "=", ids[0])
     .executeTakeFirstOrThrow();
-  assert.equal(closed.status, "closed");
-  assert.equal(closed.closed_at?.getTime(), closedAt.getTime());
   assert.equal(closed.updated_at.getTime(), updatedAt.getTime());
 
   const sharedId = randomUUID();
@@ -642,7 +639,7 @@ test("customers can start a separate conversation without losing the previous on
   );
 });
 
-test("old general threads stay open and explicitly closed threads can reopen", async () => {
+test("old general threads stay available", async () => {
   const thread = await read(
     await call("/messages/conversation", "GET", undefined, chatCustomerCookie),
     200,
@@ -675,7 +672,7 @@ test("old general threads stay open and explicitly closed threads can reopen", a
     ),
     200,
   );
-  assert.equal(active.conversation.status, "active");
+  assert.equal("status" in active.conversation, false);
   assert.equal("expiresAt" in active.conversation, false);
   await read(
     await call(
@@ -686,11 +683,6 @@ test("old general threads stay open and explicitly closed threads can reopen", a
     ),
     201,
   );
-  await db
-    .updateTable("conversations")
-    .set({ status: "closed", closed_at: new Date() })
-    .where("id", "=", thread.conversation.id)
-    .execute();
   await read(
     await call(
       "/messages/conversation/messages",
@@ -709,8 +701,7 @@ test("old general threads stay open and explicitly closed threads can reopen", a
     ),
     200,
   );
-  assert.equal(reopened.conversation.status, "active");
-  assert.equal(reopened.conversation.closedAt, null);
+  assert.equal("closedAt" in reopened.conversation, false);
   assert.deepEqual(
     reopened.messages.map((message: any) => message.body),
     ["Can you help?", "Hello again"],
@@ -727,7 +718,7 @@ test("old general threads stay open and explicitly closed threads can reopen", a
   );
 });
 
-test("old booking conversations remain active and explicitly closed history stays closed", async () => {
+test("old booking conversations remain available", async () => {
   for (const pastEnd of [false, true]) {
     const booking = (
       await read(
@@ -806,7 +797,7 @@ test("old booking conversations remain active and explicitly closed history stay
 
       const row = list.conversations.find((item: any) => item.id === linked.id);
 
-      assert.equal(row?.status, "active");
+      assert.equal("status" in row, false);
       assert.equal("expiresAt" in row, false);
     }
 
@@ -818,7 +809,7 @@ test("old booking conversations remain active and explicitly closed history stay
         await call(path, "GET", undefined, cookie),
         200,
       );
-      assert.equal(result.conversation.status, "active");
+      assert.equal("status" in result.conversation, false);
       assert.equal(
         result.conversation.eventEndsAt,
         pastEnd ? old.toISOString() : null,
@@ -843,29 +834,6 @@ test("old booking conversations remain active and explicitly closed history stay
       ),
       201,
     );
-    await db
-      .updateTable("conversations")
-      .set({ status: "closed", closed_at: new Date() })
-      .where("id", "=", linked.id)
-      .execute();
-    await read(
-      await call(
-        "/messages/conversation/messages",
-        "POST",
-        { body: "Blocked", conversationId: linked.id },
-        chatCustomerCookie,
-      ),
-      409,
-    );
-    await read(
-      await call(
-        `/admin/conversations/${linked.id}/messages`,
-        "POST",
-        { body: "Blocked" },
-        adminCookie,
-      ),
-      409,
-    );
     const closed = await read(
       await call(
         `/messages/conversations/${linked.id}`,
@@ -875,7 +843,7 @@ test("old booking conversations remain active and explicitly closed history stay
       ),
       200,
     );
-    assert.equal(closed.conversation.status, "closed");
+    assert.equal("status" in closed.conversation, false);
     assert.deepEqual(
       closed.messages.map((message: any) => message.body),
       ["Customer message", "Admin reply"],
@@ -889,7 +857,14 @@ test("message routes appear in the OpenAPI document", async () => {
     spec.paths["/v1/messages/conversation"].get.responses["200"].content[
       "application/json"
     ].schema;
-  assert.ok(threadSchema.properties.conversation.properties.status);
+  assert.equal(
+    "status" in threadSchema.properties.conversation.properties,
+    false,
+  );
+  assert.equal(
+    "closedAt" in threadSchema.properties.conversation.properties,
+    false,
+  );
   assert.equal(
     "expiresAt" in threadSchema.properties.conversation.properties,
     false,
@@ -915,7 +890,6 @@ test("admin conversation pages include empty threads and order by precise update
       ids.map((id) => ({
         id,
         customer_id: customerId,
-        status: "active",
         updated_at: new Date("2090-01-01T00:00:00.000Z"),
       })),
     )
@@ -1040,7 +1014,6 @@ test("customer conversation and thread pages are bounded, scoped, and keep preci
       conversations.map((id) => ({
         id,
         customer_id: chatCustomerId,
-        status: "active",
         updated_at: new Date("2091-01-01T00:00:00Z"),
       })),
     )

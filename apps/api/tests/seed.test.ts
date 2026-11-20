@@ -664,7 +664,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
         OR previous.version <> 1 OR previous.status <> 'superseded' OR q.revision_reason IS NULL
         OR previous.superseded_at <> q.created_at OR previous.items <> q.items))
       OR (q.sent_at IS NOT NULL AND (m.id IS NULL OR c.booking_request_id <> b.id
-        OR c.status <> 'active' OR m.sender_id <> q.created_by OR m.sender_role <> 'admin'
+        OR m.sender_id <> q.created_by OR m.sender_role <> 'admin'
         OR m.created_at <> q.sent_at OR q.sent_at < q.created_at))
       OR (q.sent_at IS NULL AND m.id IS NOT NULL)
       OR NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.entity_id = q.id
@@ -907,10 +907,6 @@ test("seed creates demo users and conversations while preserving unrelated data 
   // Closing a parent after seeding must not replace its quotations with a different booking.
   await pool.query(
     "UPDATE booking_requests SET status = 'cancelled' WHERE id = $1",
-    [quotation.booking_request_id],
-  );
-  await pool.query(
-    "UPDATE conversations SET status = 'closed', closed_at = now() WHERE booking_request_id = $1",
     [quotation.booking_request_id],
   );
   const quotationsBeforeRerun = await pool.query(

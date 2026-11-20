@@ -1,3 +1,4 @@
+import { withConversationActivity } from "../guest-chat/activity.js";
 import {
   assertImageMessageJobLeaseData,
   type ImageMessageJobLease,
@@ -5,10 +6,7 @@ import {
 import { sql, type Kysely } from "kysely";
 import type { AiHandoff } from "@event-management/contracts/ai-handoff";
 import type { DB } from "../../db/types.js";
-import {
-  assertGuestActive,
-  guestExpiry,
-} from "../guest-chat/guest-conversation.js";
+import { assertGuestActive } from "../guest-chat/guest-conversation.js";
 import { finishToolCallData } from "../ai/finish-tool-call.js";
 import { linkToolCallsToReplyData } from "../ai/link-tool-calls-to-reply.js";
 
@@ -55,10 +53,10 @@ export function requestHumanHandoffData({
         : scope.customerId !== null &&
           conversation.customer_id === scope.customerId);
 
-    if (!owned || conversation.status !== "active")
-      throw new Error("Assistant turn is no longer active");
+    if (!owned) throw new Error("Assistant turn is no longer active");
 
-    if (conversation.guest_identity_id) assertGuestActive(conversation);
+    if (conversation.guest_identity_id)
+      assertGuestActive(await withConversationActivity(trx, conversation));
 
     if (scope.jobLease)
       await assertImageMessageJobLeaseData(trx, scope.jobLease, abortSignal);
@@ -145,9 +143,6 @@ export function requestHumanHandoffData({
           ai_enabled: false,
           ai_version: conversation.ai_version + 1,
           updated_at: message.created_at,
-          ...(conversation.guest_identity_id
-            ? { guest_expires_at: guestExpiry(message.created_at) }
-            : {}),
         })
         .where("id", "=", scope.conversationId)
         .execute();

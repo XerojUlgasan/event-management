@@ -1,3 +1,4 @@
+import { conversationActivity } from "../guest-chat/activity.js";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 import { conversationAiReplyPendingSelection } from "./message-processing.js";
@@ -14,15 +15,13 @@ export function selectConversationColumnsData(db: Database) {
       "c.id",
       "c.guest_identity_id",
       "c.claimed_guest_identity_id",
-      "c.guest_expires_at",
+      conversationActivity().as("last_activity_at"),
       "c.guest_customer_message_count",
       "c.customer_id",
-      "c.status",
       "c.ai_enabled",
       "c.ai_version",
       conversationAiReplyPendingSelection(),
       "c.ai_handoff",
-      "c.closed_at",
       "c.booking_request_id",
       "c.created_at",
       "c.updated_at",

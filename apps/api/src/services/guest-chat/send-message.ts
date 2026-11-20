@@ -109,7 +109,7 @@ export async function sendGuestMessageService(
     assistantMessage,
     assistantError,
     guest: guestStatus(
-      current?.guest_expires_at ? current : saved.conversation,
+      current?.guest_identity_id ? current : saved.conversation,
     ),
   };
 }

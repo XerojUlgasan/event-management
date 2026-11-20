@@ -1,3 +1,4 @@
+import { withConversationActivity } from "./activity.js";
 import { hashSessionToken } from "../../utils/session.js";
 import {
   assertGuestActive,
@@ -46,14 +47,13 @@ export function claimGuestConversationData(
       return { conversationId: id };
     }
 
-    assertGuestActive(conversation);
+    assertGuestActive(await withConversationActivity(trx, conversation));
     await trx
       .updateTable("conversations")
       .set({
         customer_id: customerId,
         claimed_guest_identity_id: identity.id,
         guest_identity_id: null,
-        guest_expires_at: null,
       })
       .where("id", "=", id)
       .execute();

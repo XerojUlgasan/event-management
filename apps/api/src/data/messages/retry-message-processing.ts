@@ -1,3 +1,4 @@
+import { withConversationActivity } from "../guest-chat/activity.js";
 import { sql, type Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 import {
@@ -42,14 +43,14 @@ export async function retryMessageProcessingData(
     )
       throw new RetryMessageProcessingError(404, "Conversation not found");
 
-    if (conversation.status !== "active")
-      throw new RetryMessageProcessingError(409, "Conversation is closed");
-
     if (conversation.guest_identity_id) {
       try {
-        assertGuestActive(conversation);
+        assertGuestActive(await withConversationActivity(trx, conversation));
       } catch {
-        throw new RetryMessageProcessingError(409, "Conversation is closed");
+        throw new RetryMessageProcessingError(
+          409,
+          "Guest conversation expired",
+        );
       }
     }
 

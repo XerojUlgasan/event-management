@@ -14,7 +14,6 @@ const conversation = {
   id: "one",
   aiVersion: 2,
   aiEnabled: true,
-  status: "active",
 } as ChatConversation;
 
 const message = (
@@ -84,10 +83,4 @@ test("a linked reply observed while a job is still replying prevents a delayed a
   const reply = message("reply", "assistant", "sent");
   assert.equal(hasObservedReply([source, unrelated], "sent"), false);
   assert.equal(hasObservedReply([source, unrelated, reply], "sent"), true);
-});
-
-test("closing a conversation settles local pending replies", () => {
-  const closed = { ...conversation, status: "closed" as const };
-  assert.equal(hasLocalReplyPending(pending, closed), false);
-  assert.deepEqual(reconcilePendingReplies(pending, closed, []), {});
 });

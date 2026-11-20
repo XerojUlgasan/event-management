@@ -59,7 +59,7 @@ export const sendAdminMessageRouteHandler: AppRouteHandler<
       201,
     );
 
-  return result.kind === "closed"
-    ? jsonError(c, "Conversation is closed", 409)
+  return result.kind === "expired"
+    ? jsonError(c, "Guest conversation expired", 409)
     : jsonError(c, "Conversation not found", 404);
 };

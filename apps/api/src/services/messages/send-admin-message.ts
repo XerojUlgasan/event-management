@@ -22,7 +22,7 @@ export type SendAdminMessageResult =
       aiHandoff: AiHandoff | null;
     }
   | { kind: "not-found" }
-  | { kind: "closed" };
+  | { kind: "expired" };
 
 async function performSend(
   db: Kysely<DB>,
@@ -36,8 +36,6 @@ async function performSend(
   const conversation = await findConversationData(db, id);
 
   if (!conversation) return { kind: "not-found" };
-
-  if (conversation.status === "closed") return { kind: "closed" };
 
   let images: Awaited<ReturnType<typeof prepareMessageImages>> = [];
 
@@ -83,11 +81,7 @@ async function performSend(
   } catch (error) {
     await cleanupMessageImages(images);
 
-    if (
-      error instanceof GuestChatError ||
-      (error instanceof Error && error.message === "Conversation is closed")
-    )
-      return { kind: "closed" };
+    if (error instanceof GuestChatError) return { kind: "expired" };
 
     if (error instanceof Error && error.message === "Conversation not found")
       return { kind: "not-found" };

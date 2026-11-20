@@ -5,8 +5,6 @@ import type {
 } from "@event-management/contracts/message-images";
 import { request } from "../../http/request";
 
-export type ConversationStatus = "active" | "closed";
-
 export type ChatMessage = {
   id: string;
   quotationId: string | null;
@@ -35,8 +33,6 @@ export type ChatConversation = {
   eventStartsAt: string | null;
   eventEndsAt: string | null;
   guestCount: number | null;
-  status: ConversationStatus;
-  closedAt: string | null;
   aiEnabled: boolean;
   aiReplyPending?: boolean;
   aiVersion: number;

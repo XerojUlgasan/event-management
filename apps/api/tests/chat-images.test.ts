@@ -383,16 +383,6 @@ test("reply pending is conversation-wide and follows job, reply, and AI eligibil
   );
   assert.equal(first.message.processing.replyPending, true);
   assert.equal((await thread(id)).conversation.aiReplyPending, true);
-  await pool.query(
-    "UPDATE conversations SET status = 'closed', closed_at = clock_timestamp() WHERE id = $1",
-    [id],
-  );
-  assert.equal((await thread(id)).conversation.aiReplyPending, false);
-  await pool.query(
-    "UPDATE conversations SET status = 'active', closed_at = null WHERE id = $1",
-    [id],
-  );
-
   // The first job remains visible to the aggregate even when it is outside the page.
   await pool.query(
     "UPDATE background_jobs SET status = 'failed', completed_at = clock_timestamp() WHERE dedupe_key = $1",
@@ -489,7 +479,7 @@ test("expired guest conversations do not report pending AI replies", async () =>
     await import("../src/data/messages/find-conversation.js");
   assert.equal((await findConversationData(db, id))?.ai_reply_pending, true);
   await pool.query(
-    "UPDATE conversations SET guest_expires_at = clock_timestamp() - interval '1 second' WHERE id = $1",
+    "UPDATE messages SET created_at = clock_timestamp() - interval '25 hours' WHERE conversation_id = $1",
     [id],
   );
   assert.equal((await findConversationData(db, id))?.ai_reply_pending, false);

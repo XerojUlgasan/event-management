@@ -715,7 +715,7 @@ test("requests enforce roles, published package availability, current package de
     .executeTakeFirst();
   assert.ok(linkedConversation);
   assert.equal(linkedConversation.customer_id, customerId);
-  assert.equal(linkedConversation.status, "active");
+  assert.equal("status" in linkedConversation, false);
   assert.equal("event_starts_at" in linkedConversation, false);
   assert.equal("event_ends_at" in linkedConversation, false);
   assert.equal("guest_count" in linkedConversation, false);
@@ -2095,22 +2095,6 @@ test("general conversation can become one package-less request atomically", asyn
     ).package,
     null,
   );
-  const closed = await db
-    .insertInto("conversations")
-    .values({ customer_id: customerId, status: "closed" })
-    .returning("id")
-    .executeTakeFirstOrThrow();
-  assert.equal(
-    (
-      await call(
-        "/booking-requests",
-        "POST",
-        { ...input, conversationId: closed.id },
-        customerCookie,
-      )
-    ).status,
-    409,
-  );
   const unbound = await db
     .insertInto("conversations")
     .values({ customer_id: customerId })
@@ -2155,7 +2139,6 @@ test("general conversation can become one package-less request atomically", asyn
     .insertInto("conversations")
     .values({
       guest_identity_id: guest.id,
-      guest_expires_at: new Date(Date.now() + 60000),
     })
     .returning("id")
     .executeTakeFirstOrThrow();

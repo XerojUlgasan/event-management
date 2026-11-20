@@ -100,7 +100,6 @@ export function MessagesWorkspace({
   threadEmpty,
   onNewChat,
   newChatBusy = false,
-  readOnly = false,
   sendDisabled = false,
   hasOlder = false,
   loadingOlder = false,
@@ -149,7 +148,6 @@ export function MessagesWorkspace({
   threadEmpty: { title: string; body: string };
   onNewChat?: () => void;
   newChatBusy?: boolean;
-  readOnly?: boolean;
   sendDisabled?: boolean;
   hasOlder?: boolean;
   loadingOlder?: boolean;
@@ -196,8 +194,7 @@ export function MessagesWorkspace({
 
   const aiReplyPending =
     !!activeId &&
-    active?.status === "active" &&
-    !!active.aiEnabled &&
+    !!active?.aiEnabled &&
     (localAiReplyPending || !!active.aiReplyPending);
   const isTeam = viewerRole === "customer";
   const singleConversation =
@@ -222,18 +219,9 @@ export function MessagesWorkspace({
     string | null
   >(null);
   useEffect(() => {
-    if (
-      resumeBooking &&
-      active?.id &&
-      !active.bookingRequestId &&
-      active.status === "active"
-    )
+    if (resumeBooking && active?.id && !active.bookingRequestId)
       setBookingConversationId(active.id);
-  }, [resumeBooking, active?.id, active?.bookingRequestId, active?.status]);
-  const closedBookingForCustomer =
-    isTeam && active?.status === "closed" && !!active.bookingRequestId;
-  const closedForCustomer =
-    isTeam && active?.status === "closed" && !active.bookingRequestId;
+  }, [resumeBooking, active?.id, active?.bookingRequestId]);
 
   useEffect(() => {
     setSendError("");
@@ -391,7 +379,6 @@ export function MessagesWorkspace({
     if (
       (!body && !files.length) ||
       (!isTeam && sending) ||
-      readOnly ||
       sendDisabled ||
       !activeId ||
       (!isTeam && pendingSendIds.current.has(activeId))
@@ -610,9 +597,6 @@ export function MessagesWorkspace({
           <div className="message-thread-title">
             <span className="message-thread-name">
               <strong>{activeName}</strong>
-              {active?.status === "closed" && (
-                <Badge tone="neutral">Closed</Badge>
-              )}
             </span>
             <small>{activeDetail}</small>
           </div>
@@ -625,7 +609,6 @@ export function MessagesWorkspace({
                 aria-pressed={active.aiEnabled}
                 title="Automatically reply to customer messages with AI"
                 pending={pendingAiToggle}
-                disabled={active.status !== "active"}
                 onClick={() =>
                   onToggleAi(active.id, !active.aiEnabled, active.aiVersion)
                 }
@@ -659,17 +642,14 @@ export function MessagesWorkspace({
               )}
             </div>
           )}
-          {viewerRole === "customer" &&
-            active &&
-            !active.bookingRequestId &&
-            active.status === "active" && (
-              <Button
-                variant="secondary"
-                onClick={() => setBookingConversationId(active.id)}
-              >
-                Create booking request
-              </Button>
-            )}
+          {viewerRole === "customer" && active && !active.bookingRequestId && (
+            <Button
+              variant="secondary"
+              onClick={() => setBookingConversationId(active.id)}
+            >
+              Create booking request
+            </Button>
+          )}
           {active?.bookingRequestId && (
             <div
               className="message-head-actions"
@@ -855,16 +835,14 @@ export function MessagesWorkspace({
                     <div className="message-delivery-error" role="alert">
                       {failedMessageErrors[message.id] ||
                         "Delivery could not be confirmed."}{" "}
-                      {!readOnly &&
-                        !closedBookingForCustomer &&
-                        onRetryMessage && (
-                          <Button
-                            variant="link"
-                            onClick={() => onRetryMessage(message.id)}
-                          >
-                            Retry
-                          </Button>
-                        )}
+                      {onRetryMessage && (
+                        <Button
+                          variant="link"
+                          onClick={() => onRetryMessage(message.id)}
+                        >
+                          Retry
+                        </Button>
+                      )}
                     </div>
                   )}
                   <small className="message-meta">
@@ -888,85 +866,61 @@ export function MessagesWorkspace({
           </p>
         )}
 
-        {readOnly && (
-          <p className="messages-closed-note">
-            This conversation is closed. Its history is kept for reference.
-          </p>
-        )}
-        {closedBookingForCustomer && (
-          <p className="messages-closed-note">
-            This booking conversation is closed. Start a new chat to message the
-            team.
-          </p>
-        )}
-        {closedForCustomer && (
-          <p className="messages-closed-note">
-            This conversation is closed. Send a message to reopen it; the
-            history stays here.
-          </p>
-        )}
-
-        {!readOnly && !closedBookingForCustomer && (
-          <form
-            className={`thread-input message-composer ${isTeam ? "customer-composer" : ""}`}
-            onSubmit={submit}
-          >
-            <label htmlFor="conversation-message">
-              {isTeam ? "Message the Styled by AMAC team" : "Reply to customer"}
-            </label>
-            <MessageAttachments
-              files={files}
-              onChange={(next) =>
-                activeId &&
-                setFileDrafts((previous) => ({ ...previous, [activeId]: next }))
+        <form
+          className={`thread-input message-composer ${isTeam ? "customer-composer" : ""}`}
+          onSubmit={submit}
+        >
+          <label htmlFor="conversation-message">
+            {isTeam ? "Message the Styled by AMAC team" : "Reply to customer"}
+          </label>
+          <MessageAttachments
+            files={files}
+            onChange={(next) =>
+              activeId &&
+              setFileDrafts((previous) => ({ ...previous, [activeId]: next }))
+            }
+            disabled={!activeId || (!isTeam && sending) || sendDisabled}
+          />
+          <Textarea
+            variant="plain"
+            ref={composer}
+            rows={2}
+            id="conversation-message"
+            aria-label="Write a message"
+            placeholder="Write a message…"
+            value={draft}
+            disabled={!activeId || (!isTeam && sending) || sendDisabled}
+            maxLength={MAX_MESSAGE_BODY_LENGTH}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                (isTeam ? !event.shiftKey : event.ctrlKey || event.metaKey) &&
+                !event.nativeEvent.isComposing
+              ) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
               }
-              disabled={!activeId || (!isTeam && sending) || sendDisabled}
-            />
-            <Textarea
-              variant="plain"
-              ref={composer}
-              rows={2}
-              id="conversation-message"
-              aria-label="Write a message"
-              placeholder={
-                closedForCustomer
-                  ? "Send a message to reopen this conversation"
-                  : "Write a message…"
+            }}
+          />
+          <div className="message-composer-actions">
+            {!isTeam && <small>Ctrl/⌘ + Enter to send</small>}
+            <Button
+              type="submit"
+              icon="arrow"
+              pending={!isTeam && sending}
+              aria-label={isTeam ? "Send message" : undefined}
+              disabled={
+                (!draft.trim() && !files.length) ||
+                !activeId ||
+                (!isTeam && sending) ||
+                sendDisabled
               }
-              value={draft}
-              disabled={!activeId || (!isTeam && sending) || sendDisabled}
-              maxLength={MAX_MESSAGE_BODY_LENGTH}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (
-                  event.key === "Enter" &&
-                  (isTeam ? !event.shiftKey : event.ctrlKey || event.metaKey) &&
-                  !event.nativeEvent.isComposing
-                ) {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
-            />
-            <div className="message-composer-actions">
-              {!isTeam && <small>Ctrl/⌘ + Enter to send</small>}
-              <Button
-                type="submit"
-                icon="arrow"
-                pending={!isTeam && sending}
-                aria-label={isTeam ? "Send message" : undefined}
-                disabled={
-                  (!draft.trim() && !files.length) ||
-                  !activeId ||
-                  (!isTeam && sending) ||
-                  sendDisabled
-                }
-              >
-                {!isTeam && (sending ? "Sending…" : "Send message")}
-              </Button>
-            </div>
-          </form>
-        )}
+            >
+              {!isTeam && (sending ? "Sending…" : "Send message")}
+            </Button>
+          </div>
+        </form>
       </section>
       {quotationId && (
         <Dialog title="Quotation" onClose={() => setQuotationId(null)}>

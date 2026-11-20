@@ -262,8 +262,7 @@ export default function PublicChat() {
   }, [open, loading, thread?.conversation.id, expired]);
   const aiReplyPending =
     !expired &&
-    thread?.conversation.status === "active" &&
-    !!thread.conversation.aiEnabled &&
+    !!thread?.conversation.aiEnabled &&
     (!!thread.conversation.aiReplyPending ||
       hasLocalReplyPending(pendingReplies, thread.conversation));
 

@@ -19,9 +19,7 @@ export function reconcilePendingReplies(
       ([, item]) =>
         item.conversationId !== conversation.id ||
         item.aiVersion > conversation.aiVersion ||
-        (item.aiVersion === conversation.aiVersion &&
-          conversation.aiEnabled &&
-          conversation.status === "active"),
+        (item.aiVersion === conversation.aiVersion && conversation.aiEnabled),
     ),
   );
 
@@ -49,8 +47,7 @@ export function hasLocalReplyPending(
     (item) =>
       item.conversationId === conversation.id &&
       item.aiVersion === conversation.aiVersion &&
-      conversation.aiEnabled &&
-      conversation.status === "active",
+      conversation.aiEnabled,
   );
 }
 

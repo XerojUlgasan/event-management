@@ -1,3 +1,4 @@
+import { guestIsActive } from "../guest-chat/activity.js";
 import { jobDefinitions } from "../../services/background-jobs/job-definitions.js";
 import { randomUUID } from "node:crypto";
 import { sql, type Kysely, type Transaction } from "kysely";
@@ -182,7 +183,7 @@ async function retryOrFail(
       exists(select 1 from messages reply where reply.reply_to_message_id::text = ${job.dedupe_key})
       or ((payload->>'aiVersion' is null or payload->>'suppressReply' = 'true'
         or exists(select 1 from conversations c where c.id::text = payload->>'conversationId'
-          and (not c.ai_enabled or c.ai_version::text is distinct from payload->>'aiVersion' or c.status <> 'active')))
+          and (not c.ai_enabled or c.ai_version::text is distinct from payload->>'aiVersion' or not ${guestIsActive()})))
         and not exists(select 1 from message_images i where i.message_id::text = ${job.dedupe_key} and i.interpretation is null))
       ) and payload ? 'aiVersion' and exists(select 1 from messages trigger
         where trigger.id::text = ${job.dedupe_key} and trigger.id::text = payload->>'messageId'

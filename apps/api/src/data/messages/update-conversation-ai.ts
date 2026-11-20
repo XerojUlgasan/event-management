@@ -1,3 +1,4 @@
+import { withConversationActivity } from "../guest-chat/activity.js";
 import { parseAiHandoff } from "../../utils/ai-handoff.js";
 import type { Kysely } from "kysely";
 import { assertGuestActive } from "../guest-chat/guest-conversation.js";
@@ -21,13 +22,11 @@ export function updateConversationAiData(
 
     if (conversation.guest_identity_id) {
       try {
-        assertGuestActive(conversation);
+        assertGuestActive(await withConversationActivity(trx, conversation));
       } catch {
-        return { kind: "closed" as const };
+        return { kind: "expired" as const };
       }
     }
-
-    if (conversation.status !== "active") return { kind: "closed" as const };
 
     if (conversation.ai_version !== expectedAiVersion)
       return { kind: "stale" as const };

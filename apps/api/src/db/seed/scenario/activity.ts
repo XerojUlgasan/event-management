@@ -382,17 +382,10 @@ export async function seedScenarioActivity(
     )
       history += 1;
 
-    const closed =
-      booking.status === "declined" ||
-      booking.status === "cancelled" ||
-      index % 17 === 0;
-
     if (
       await insertIfNew(db, "conversations", {
         id: scenarioId(`conversation:${index}`),
         customer_id: customer.id,
-        status: closed ? "closed" : "active",
-        closed_at: closed ? input.now : null,
         booking_request_id: booking.id,
         created_at: input.now,
         updated_at: new Date(input.now.getTime() - 1000),

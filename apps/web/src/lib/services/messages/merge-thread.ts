@@ -66,7 +66,6 @@ export function addSentMessages(thread: ChatThread, sent: ChatMessage[]) {
     ...thread,
     conversation: {
       ...thread.conversation,
-      status: "active" as const,
       lastMessage: latest ?? previousLast,
       updatedAt:
         latest && latest.createdAt > thread.conversation.updatedAt

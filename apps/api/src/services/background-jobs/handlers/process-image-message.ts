@@ -1,3 +1,7 @@
+import {
+  assertGuestActive,
+  guestExpiry,
+} from "../../../data/guest-chat/guest-conversation.js";
 import { MessageProcessingError } from "../../messages/message-processing-error.js";
 import { createHash, randomUUID } from "node:crypto";
 import { type Kysely } from "kysely";
@@ -106,6 +110,16 @@ export async function processImageMessageJob(
   )
     throw new MessageProcessingError("invalid_payload");
 
+  const initial = await findConversationData(db, payload.conversationId);
+
+  if (initial?.guest_identity_id) {
+    try {
+      assertGuestActive(initial);
+    } catch {
+      return;
+    }
+  }
+
   const turnId = randomUUID();
 
   for (const image of images) {
@@ -193,7 +207,8 @@ export async function processImageMessageJob(
       current &&
       (!current.ai_enabled ||
         current.ai_version !== payload.aiVersion ||
-        current.status !== "active")
+        (current.guest_identity_id &&
+          Date.now() >= guestExpiry(current.last_activity_at).getTime()))
     ) {
       return;
     }

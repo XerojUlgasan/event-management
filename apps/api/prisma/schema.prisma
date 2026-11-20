@@ -26,11 +26,9 @@ model User {
 model Conversation {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   customerId      String?   @map("customer_id") @db.Uuid
-  status          String    @default("active")
   aiEnabled       Boolean   @default(true) @map("ai_enabled")
   aiVersion       Int       @default(0) @map("ai_version")
   aiHandoff       Json?     @map("ai_handoff") @db.JsonB
-  closedAt        DateTime? @map("closed_at") @db.Timestamptz(6)
   bookingRequestId String?  @unique @map("booking_request_id") @db.Uuid
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -40,13 +38,12 @@ model Conversation {
   guestIdentity GuestChatIdentity? @relation("GuestOwner", fields: [guestIdentityId], references: [id], onDelete: Restrict)
   claimedGuestIdentityId String? @map("claimed_guest_identity_id") @db.Uuid
   claimedGuestIdentity GuestChatIdentity? @relation("GuestClaim", fields: [claimedGuestIdentityId], references: [id], onDelete: Restrict)
-  guestExpiresAt DateTime? @map("guest_expires_at") @db.Timestamptz(6)
   guestCustomerMessageCount Int @default(0) @map("guest_customer_message_count")
   guestRequests GuestMessageRequest[]
   messages        Message[]
 
   @@index([claimedGuestIdentityId], map: "conversations_claimed_guest_identity_idx")
-  @@index([status])
+  @@index([guestIdentityId, createdAt(sort: Desc), id(sort: Desc)], map: "conversations_guest_activity_idx")
   @@index([customerId, createdAt])
   @@index([updatedAt(sort: Desc), id(sort: Desc)])
   @@map("conversations")

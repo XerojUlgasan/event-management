@@ -37,7 +37,6 @@ export async function createBookingRequestService(
         !conversation ||
         conversation.customer_id !== customerId ||
         conversation.guest_identity_id ||
-        conversation.status !== "active" ||
         conversation.booking_request_id
       )
         return error("Conversation is unavailable", 409);

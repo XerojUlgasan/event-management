@@ -5,7 +5,7 @@ import {
 import type { Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 
-// Caller holds the booking lock. Check conversation status under a lock in the delivery transaction.
+// Caller holds the booking lock; lock the conversation during delivery.
 export async function createQuotationMessageData(
   trx: Transaction<DB>,
   bookingId: string,
@@ -19,7 +19,7 @@ export async function createQuotationMessageData(
     .forUpdate()
     .executeTakeFirst();
 
-  if (!conversation || conversation.status !== "active") return false;
+  if (!conversation) return false;
 
   const message = await trx
     .insertInto("messages")

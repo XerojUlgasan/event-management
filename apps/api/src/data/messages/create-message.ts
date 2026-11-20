@@ -1,3 +1,4 @@
+import { withConversationActivity } from "../guest-chat/activity.js";
 import {
   enqueueImageMessageProcessingData,
   messageProcessingSelection,
@@ -13,10 +14,7 @@ import {
   parseAiHandoff,
 } from "../../utils/ai-handoff.js";
 import { sql, type Kysely } from "kysely";
-import {
-  assertGuestActive,
-  guestExpiry,
-} from "../guest-chat/guest-conversation.js";
+import { assertGuestActive } from "../guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
 
 type Database = Kysely<DB>;
@@ -92,13 +90,8 @@ export async function createMessageData(
       }
     }
 
-    if (
-      conversation.status === "closed" &&
-      (senderRole === "admin" || conversation.booking_request_id)
-    )
-      throw new Error("Conversation is closed");
-
-    if (conversation.guest_identity_id) assertGuestActive(conversation);
+    if (conversation.guest_identity_id)
+      assertGuestActive(await withConversationActivity(trx, conversation));
 
     if (preflight) return null;
 
@@ -146,11 +139,6 @@ export async function createMessageData(
       .updateTable("conversations")
       .set({
         updated_at: row.created_at,
-        ...(conversation.guest_identity_id
-          ? { guest_expires_at: guestExpiry(row.created_at) }
-          : {}),
-        status: "active",
-        closed_at: null,
         ai_enabled: aiEnabled,
         ai_version: aiVersion,
         ai_handoff: aiHandoff,

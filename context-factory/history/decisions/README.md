@@ -8,6 +8,7 @@ Preserve historical reasoning. When a decision changes, link a successor and mar
 
 | Record | Status / purpose |
 | --- | --- |
+| [Derive conversation availability](2026-11-20_derive-conversation-availability.md) | Accepted removal of stored closure and guest deadlines; expiry follows saved activity and ownership |
 | [Retire quotation acceptance](2026-11-20_retire-quotation-acceptance.md) | Accepted removal of quotation acceptance state/timestamps; admin revisions and booking-request acceptance remain |
 | [Catalog indexing scheduling](2026-11-19_catalog-index-scheduling.md) | Accepted manual ensure-scheduled no-ops for active jobs; catalog saves retain refresh successors |
 | [Combined catalog text](2026-11-19_combined-catalog-text.md) | Accepted one text entry per package/service across all sections, with only photo widgets indexed separately |

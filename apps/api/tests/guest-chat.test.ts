@@ -165,11 +165,15 @@ function send(
 }
 
 async function expired(thread: any) {
-  await db
-    .updateTable("conversations")
-    .set({ guest_expires_at: new Date(Date.now() - 1000) })
-    .where("id", "=", thread.conversation.id)
-    .execute();
+  const id = thread.conversation.id;
+  await pool.query(
+    "UPDATE conversations SET created_at = clock_timestamp() - interval '25 hours' WHERE id = $1",
+    [id],
+  );
+  await pool.query(
+    "UPDATE messages SET created_at = clock_timestamp() - interval '25 hours' WHERE conversation_id = $1",
+    [id],
+  );
 }
 
 test("bootstrap issues opaque httponly cookies, rejects caller-chosen identities, and reuses one active conversation under concurrency", async () => {
@@ -193,7 +197,6 @@ test("bootstrap issues opaque httponly cookies, rejects caller-chosen identities
         .selectFrom("conversations")
         .select("id")
         .where("guest_identity_id", "is not", null)
-        .where("status", "=", "active")
         .execute()
     ).length,
     1,
@@ -201,6 +204,56 @@ test("bootstrap issues opaque httponly cookies, rejects caller-chosen identities
   const unknown = await guest(`em_guest=${"A".repeat(43)}`);
   assert.notEqual(unknown.cookie, `em_guest=${"A".repeat(43)}`);
 });
+
+for (const operation of ["read", "bootstrap"] as const) {
+  test(`${operation} refreshes activity after waiting for a conversation lock`, async () => {
+    const thread = await guest();
+    const id = thread.conversation.id;
+    await expired(thread);
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT id FROM conversations WHERE id = $1 FOR UPDATE",
+        [id],
+      );
+      const pending =
+        operation === "read"
+          ? call(`/guest/conversations/${id}`, thread.cookie)
+          : call("/guest/conversation", thread.cookie, {});
+      const deadline = Date.now() + 5000;
+      let blocked = false;
+
+      while (Date.now() < deadline) {
+        const result = await pool.query(
+          "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))) AS blocked",
+          [client.processID],
+        );
+
+        if (result.rows[0].blocked) {
+          blocked = true;
+          break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
+      assert.ok(blocked, "request must wait for the locked conversation");
+      await client.query(
+        "INSERT INTO messages (conversation_id, sender_role, body) VALUES ($1, 'assistant', 'Recent reply')",
+        [id],
+      );
+      await client.query("COMMIT");
+      const response = await read(await pending, 200);
+      assert.equal(response.conversation.id, id);
+      assert.equal(response.messages.at(-1).body, "Recent reply");
+    } finally {
+      await client.query("ROLLBACK").catch(() => {});
+      client.release();
+    }
+  });
+}
 
 test("guest catalog calls are persisted under the guest message and replay does not execute them twice", async () => {
   useReply("Here are the catalog options");
@@ -388,7 +441,7 @@ test("five customer writes and five AI replies are allowed; sixth is readable lo
     200,
   );
   assert.equal(readable.messages.length, 10);
-  assert.equal(readable.conversation.status, "active");
+  assert.equal("status" in readable.conversation, false);
   const provenance = await db
     .selectFrom("messages")
     .select(["sender_id", "guest_origin"])
@@ -584,17 +637,11 @@ test("reads and AI preferences do not extend inactivity; messages from customer,
   useReply("Sliding reply");
   const thread = await guest();
   const id = thread.conversation.id;
-  const createdAt = (
-    await db
-      .selectFrom("conversations")
-      .select("created_at")
-      .where("id", "=", id)
-      .executeTakeFirstOrThrow()
-  ).created_at;
-  const early = new Date(Date.now() + 3600000);
+  const activity = new Date(Date.now() - 23 * 3600000);
+  const early = new Date(activity.getTime() + 24 * 3600000);
   await db
     .updateTable("conversations")
-    .set({ guest_expires_at: early })
+    .set({ created_at: activity })
     .where("id", "=", id)
     .execute();
   const readThread = await read(
@@ -611,22 +658,12 @@ test("reads and AI preferences do not extend inactivity; messages from customer,
     200,
   );
   assert.equal(
-    (
-      await db
-        .selectFrom("conversations")
-        .select("guest_expires_at")
-        .where("id", "=", id)
-        .executeTakeFirstOrThrow()
-    ).guest_expires_at!.toISOString(),
+    (await read(await call(`/guest/conversations/${id}`, thread.cookie), 200))
+      .guest.expiresAt,
     early.toISOString(),
   );
   const sent = await read(await send(thread), 201);
   assert.ok(Date.parse(sent.guest.expiresAt) > early.getTime());
-  await db
-    .updateTable("conversations")
-    .set({ guest_expires_at: early })
-    .where("id", "=", id)
-    .execute();
   await read(
     await call(`/admin/conversations/${id}/messages`, team.cookie, {
       body: "Team reply",
@@ -638,8 +675,12 @@ test("reads and AI preferences do not extend inactivity; messages from customer,
     .selectAll()
     .where("id", "=", id)
     .executeTakeFirstOrThrow();
-  assert.ok(row.guest_expires_at!.getTime() > early.getTime());
-  assert.equal(row.created_at.toISOString(), createdAt.toISOString());
+  const afterAdmin = await read(
+    await call(`/guest/conversations/${id}`, thread.cookie),
+    200,
+  );
+  assert.ok(Date.parse(afterAdmin.guest.expiresAt) > early.getTime());
+  assert.equal(row.created_at.toISOString(), activity.toISOString());
   await expired(thread);
   assert.equal(
     (await read(await call(`/guest/conversations/${id}`, thread.cookie), 410))
@@ -729,6 +770,15 @@ test("claim requires both cookies, preserves IDs/history/provenance, revokes gue
   assert.equal(owned.messages[0].id, sent.message.id);
   assert.equal(owned.messages[0].senderId, null);
   assert.equal(owned.messages[0].senderName, "Guest");
+  await expired(thread);
+  await read(await call(`/messages/conversations/${id}`, customer.cookie), 200);
+  await read(
+    await call("/messages/conversation/messages", customer.cookie, {
+      conversationId: id,
+      body: "Still available after claim",
+    }),
+    201,
+  );
   await read(await call(`/messages/conversations/${id}`, other.cookie), 404);
   assert.equal((await guest(thread.cookie)).messages.length, 0);
   const row = await db
@@ -736,7 +786,6 @@ test("claim requires both cookies, preserves IDs/history/provenance, revokes gue
     .selectAll()
     .where("id", "=", id)
     .executeTakeFirstOrThrow();
-  assert.equal(row.guest_expires_at, null);
   assert.equal(row.guest_identity_id, null);
 });
 
@@ -886,12 +935,8 @@ test("guest takeover invalidates a delayed AI reply through an off/on cycle with
     201,
   );
   const expiry = (
-    await db
-      .selectFrom("conversations")
-      .select("guest_expires_at")
-      .where("id", "=", id)
-      .executeTakeFirstOrThrow()
-  ).guest_expires_at!.toISOString();
+    await read(await call(`/guest/conversations/${id}`, thread.cookie), 200)
+  ).guest.expiresAt;
   await read(
     await app.request(`/v1/admin/conversations/${id}/ai`, {
       method: "PATCH",

@@ -327,11 +327,11 @@ test("booking status eligibility for every quotation and proposal write", async 
   }
 });
 
-test("closed conversations permit proposal and draft preparation but block delivery", async () => {
+test("booking conversations permit proposal preparation and delivery regardless of activity", async () => {
   const b = await booking(null);
   await db
     .updateTable("conversations")
-    .set({ status: "closed", closed_at: new Date() })
+    .set({ created_at: new Date("2020-01-01T00:00:00Z") })
     .where("booking_request_id", "=", b.id)
     .execute();
   const custom = await read(
@@ -342,12 +342,13 @@ test("closed conversations permit proposal and draft preparation but block deliv
     200,
   );
   const q = await create(custom.bookingRequest);
-  const before = await matrixSnapshot(b.id);
-  const response = await call(`/admin/quotations/${q.id}/send`, "POST", {
-    expectedUpdatedAt: q.updatedAt,
-  });
-  assert.equal(response.status, 409, await response.clone().text());
-  assert.deepEqual(await matrixSnapshot(b.id), before);
+  const response = await read(
+    await call(`/admin/quotations/${q.id}/send`, "POST", {
+      expectedUpdatedAt: q.updatedAt,
+    }),
+    200,
+  );
+  assert.equal(response.quotation.status, "sent");
 });
 
 test("quotation and package prerequisites reject independently without effects", async () => {
@@ -886,7 +887,7 @@ test("old active booking conversations receive exact quotation versions", async 
   }
 });
 
-test("item validation, arithmetic, concurrent stale writes and closed delivery", async () => {
+test("item validation, arithmetic, concurrent stale writes and old-thread delivery", async () => {
   const b = await booking();
   let q = await create(b);
   const item = {
@@ -922,7 +923,7 @@ test("item validation, arithmetic, concurrent stale writes and closed delivery",
   assert.equal(q.totalAmountMinor, 102500);
   await db
     .updateTable("conversations")
-    .set({ status: "closed", closed_at: new Date() })
+    .set({ created_at: new Date("2020-01-01T00:00:00Z") })
     .where("booking_request_id", "=", b.id)
     .execute();
   assert.equal(
@@ -931,7 +932,7 @@ test("item validation, arithmetic, concurrent stale writes and closed delivery",
         expectedUpdatedAt: q.updatedAt,
       })
     ).status,
-    409,
+    200,
   );
   assert.equal(
     (
@@ -941,7 +942,7 @@ test("item validation, arithmetic, concurrent stale writes and closed delivery",
         .where("id", "=", q.id)
         .executeTakeFirstOrThrow()
     ).status,
-    "draft",
+    "sent",
   );
   assert.equal(
     (
@@ -951,7 +952,7 @@ test("item validation, arithmetic, concurrent stale writes and closed delivery",
         .where("quotation_id", "=", q.id)
         .execute()
     ).length,
-    0,
+    1,
   );
 });
 

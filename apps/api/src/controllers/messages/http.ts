@@ -9,7 +9,10 @@ export const errors = {
   401: { content: json(errorSchema), description: "Not signed in" },
   403: { content: json(errorSchema), description: "Wrong account role" },
   404: { content: json(errorSchema), description: "Conversation not found" },
-  409: { content: json(errorSchema), description: "Conversation is closed" },
+  409: {
+    content: json(errorSchema),
+    description: "Conflict or guest conversation expired",
+  },
 };
 
 export const idParams = z.object({ id: z.string().uuid() });

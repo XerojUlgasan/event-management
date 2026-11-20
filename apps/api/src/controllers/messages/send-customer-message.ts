@@ -54,10 +54,6 @@ export const sendCustomerMessageRouteHandler: AppRouteHandler<
       return jsonError(c, error.message, 404);
     }
 
-    if (error instanceof Error && error.message === "Conversation is closed") {
-      return jsonError(c, error.message, 409);
-    }
-
     if (
       error instanceof Error &&
       error.message === "Message request conflict"

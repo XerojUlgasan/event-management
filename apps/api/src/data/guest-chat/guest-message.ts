@@ -7,11 +7,7 @@ import {
 import { sql } from "kysely";
 import type { GuestDatabase } from "./guest-conversation.js";
 import { GUEST_CUSTOMER_MESSAGE_LIMIT } from "@event-management/contracts/guest-chat";
-import {
-  guestExpiry,
-  GuestChatError,
-  lockGuestConversation,
-} from "./guest-conversation.js";
+import { GuestChatError, lockGuestConversation } from "./guest-conversation.js";
 import { selectMessageColumnsData } from "../messages/select-message-columns.js";
 
 export async function saveGuestMessageData(
@@ -121,7 +117,6 @@ export async function saveGuestMessageData(
       .updateTable("conversations")
       .set({
         updated_at: message.created_at,
-        guest_expires_at: guestExpiry(message.created_at),
         guest_customer_message_count:
           conversation.guest_customer_message_count + 1,
       })
@@ -141,7 +136,7 @@ export async function saveGuestMessageData(
       .execute();
 
     return {
-      conversation: updated,
+      conversation: { ...updated, last_activity_at: message.created_at },
       message: {
         ...message,
         images,

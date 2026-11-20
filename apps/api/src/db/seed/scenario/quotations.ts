@@ -50,7 +50,6 @@ export async function seedScenarioQuotations(
       "b.customer_id",
       "b.status",
       "c.id as conversation_id",
-      "c.status as conversation_status",
     ])
     .where(
       "b.id",
@@ -89,8 +88,7 @@ export async function seedScenarioQuotations(
     (booking) =>
       seededBookings.has(booking.id) ||
       (!occupiedBookings.has(booking.id) &&
-        !["declined", "cancelled"].includes(booking.status) &&
-        booking.conversation_status === "active"),
+        !["declined", "cancelled"].includes(booking.status)),
   );
 
   // Keep previously selected parents even when a user later closes their request.

@@ -478,7 +478,6 @@ export function MessagesPage() {
           setThread(null);
         }}
         conversationOpen={conversationOpen}
-        readOnly={thread?.conversation.status === "closed"}
         listEmpty={{
           title: "No conversations yet",
           body: "Customer conversations will appear here when they are created.",

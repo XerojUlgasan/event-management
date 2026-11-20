@@ -23,8 +23,8 @@ export async function updateConversationAiService(
     error:
       result.kind === "not-found"
         ? "Conversation not found"
-        : result.kind === "closed"
-          ? "Conversation is closed"
+        : result.kind === "expired"
+          ? "Guest conversation expired"
           : "Conversation changed. Refresh and try again.",
   };
 }

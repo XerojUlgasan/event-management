@@ -40,7 +40,7 @@ export async function sendQuotationService(
       id,
     );
 
-    if (!delivered) return failure("Linked conversation is closed", 409);
+    if (!delivered) return failure("Linked conversation not found", 409);
 
     const now = new Date();
     await supersedeActiveQuotationsData(trx, booking.id, now);

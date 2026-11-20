@@ -215,7 +215,7 @@ Messages retain history and unread/read state. Opening a thread marks the other 
 
 Customers can also start a general conversation without a booking request. That chat does not create an inquiry or reserve anything.
 
-Conversations do not automatically expire. Existing closed booking-linked conversations remain read-only and block quotation delivery. A customer message can reopen a closed general conversation.
+Signed-in conversations do not automatically expire and have no stored closed state. Previously closed booking-linked conversations support messaging and quotation delivery. Guest expiry is derived from the latest saved message, falling back to creation time, plus 24 hours.
 
 Source: [conversation context](../apps/web/src/components/messages/ConversationContext.tsx), [customer message sending](../apps/api/src/services/messages/send-customer-message.ts), and [admin message sending](../apps/api/src/services/messages/send-admin-message.ts).
 
@@ -268,7 +268,7 @@ For example, using illustrative amounts:
 
 A package-only quotation with no adjustments is valid. A negative total cannot be sent.
 
-Sending requires an open request, an editable draft, reviewed adjustments, and an active linked conversation. The sent status, quotation message, and audit entry are recorded together. The screen saves the draft before attempting delivery, so a delivery failure can leave a saved internal draft without recording a successful send.
+Sending requires an open request, an editable draft, reviewed adjustments, and the linked booking conversation. The sent status, quotation message, and audit entry are recorded together. The screen saves the draft before attempting delivery, so a delivery failure can leave a saved internal draft without recording a successful send.
 
 When the customer requests changes:
 

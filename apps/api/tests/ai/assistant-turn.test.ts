@@ -320,23 +320,16 @@ test("AI control is per conversation, authorized, versioned, and skips generatio
   assert.equal(held.assistantMessage, null);
   assert.equal(held.assistantError, null);
   assert.equal(model.doGenerateCalls.length, 0);
-  await db
-    .updateTable("conversations")
-    .set({ status: "closed", closed_at: new Date() })
-    .where("id", "=", id)
-    .execute();
   const reopened = await send(id, "Continue with the human team");
   assert.equal(reopened.assistantMessage, null);
   assert.equal(reopened.assistantError, null);
   assert.equal(model.doGenerateCalls.length, 0);
   const reopenedConversation = await db
     .selectFrom("conversations")
-    .select(["status", "closed_at", "ai_enabled", "ai_version"])
+    .select(["ai_enabled", "ai_version"])
     .where("id", "=", id)
     .executeTakeFirstOrThrow();
   assert.deepEqual(reopenedConversation, {
-    status: "active",
-    closed_at: null,
     ai_enabled: false,
     ai_version: 1,
   });
@@ -359,12 +352,7 @@ test("AI control is per conversation, authorized, versioned, and skips generatio
   assert.equal(answered.assistantError, null);
   assert.equal(model.doGenerateCalls.length, 1);
 
-  await db
-    .updateTable("conversations")
-    .set({ status: "closed" })
-    .where("id", "=", id)
-    .execute();
-  assert.equal((await setAi(id, false, 2)).status, 409);
+  assert.equal((await setAi(id, false, 2)).status, 200);
 });
 
 test("simultaneous toggle requests with the same version cannot overwrite each other", async () => {
@@ -773,7 +761,7 @@ test("provider failure, missing configuration, and empty output preserve the cus
   }
 });
 
-test("unauthorized/closed sends fail before generation, and admin messages do not trigger AI", async () => {
+test("unauthorized sends fail before generation, and admin messages do not trigger AI", async () => {
   useReply("Should not run");
   const id = await conversation();
   assert.equal(
@@ -785,26 +773,6 @@ test("unauthorized/closed sends fail before generation, and admin messages do no
     ).status,
     404,
   );
-  await db
-    .updateTable("conversations")
-    .set({ status: "closed" })
-    .where("id", "=", id)
-    .execute();
-  await assert.rejects(
-    runAssistantTurnService({
-      db,
-      conversationId: id,
-      customerId: customer.id,
-      customerMessageId: randomUUID(),
-      aiVersion: 0,
-    }),
-    /Conversation is closed/,
-  );
-  await db
-    .updateTable("conversations")
-    .set({ status: "active" })
-    .where("id", "=", id)
-    .execute();
   assert.equal(
     (
       await call(`/admin/conversations/${id}/messages`, team.cookie, {

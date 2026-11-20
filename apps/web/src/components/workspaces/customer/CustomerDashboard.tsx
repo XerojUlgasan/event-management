@@ -364,7 +364,6 @@ export function CustomerDashboard({
             )))
           ? {
               ...item,
-              status: "active",
               lastMessage: message,
               updatedAt: message.createdAt,
             }
@@ -485,27 +484,6 @@ export function CustomerDashboard({
       );
 
       if (result.assistantError) notifyError(new Error(result.assistantError));
-
-      if (conversation.status === "closed") {
-        setMessageThread((current) =>
-          current?.conversation.id === conversation.id
-            ? {
-                ...current,
-                conversation: {
-                  ...current.conversation,
-                  status: "active",
-                  closedAt: null,
-                  packageId: null,
-                  packageName: null,
-                  eventType: null,
-                  eventStartsAt: null,
-                  eventEndsAt: null,
-                  guestCount: null,
-                },
-              }
-            : current,
-        );
-      }
     } catch (cause) {
       const error =
         message.pendingFiles?.length &&

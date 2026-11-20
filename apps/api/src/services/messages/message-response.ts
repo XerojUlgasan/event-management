@@ -36,11 +36,9 @@ export type ConversationDto = {
   eventStartsAt: string | null;
   eventEndsAt: string | null;
   guestCount: number | null;
-  status: "active" | "closed";
   aiEnabled: boolean;
   aiVersion: number;
   aiReplyPending: boolean;
-  closedAt: string | null;
   lastMessage: MessageDto | null;
   unreadCount: number;
   updatedAt: string;
@@ -116,14 +114,12 @@ export function conversationDto(
       ? new Date(row.event_ends_at).toISOString()
       : null,
     guestCount: row.guest_count,
-    status: row.status as ConversationDto["status"],
     aiEnabled: row.ai_enabled,
     aiVersion: row.ai_version,
     aiReplyPending: row.ai_reply_pending,
     ...(viewer === "admin"
       ? { aiHandoff: parseAiHandoff(row.ai_handoff) }
       : {}),
-    closedAt: row.closed_at ? new Date(row.closed_at).toISOString() : null,
     lastMessage,
     unreadCount,
     updatedAt: row.updated_at.toISOString(),
