@@ -409,3 +409,50 @@
   color: var(--muted);
   line-height: 1.6;
 }
+
+/* ── Catalog listing pages (/packages, /services) ───────────────────────── */
+
+/* Tighten the section padding — .section defaults to 108px top which is
+   designed for homepage hero sections, not listing pages. */
+.catalog-page {
+  padding-top: 56px;
+  padding-bottom: 80px;
+}
+
+/* Page header: heading + subtitle close together, separated from the filter
+   bar by a clear but not excessive gap. */
+.catalog-page-header {
+  margin-bottom: 32px;
+}
+.catalog-page-header h1 {
+  margin: 0 0 8px;
+}
+.catalog-page-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* Constrain the filter bar width so it doesn't use the full page grid.
+   Auto-fit columns: each field takes its natural width, actions snap right. */
+.catalog-page-filters .catalog-filter-fields {
+  grid-template-columns: repeat(auto-fit, minmax(180px, max-content)) auto;
+  gap: 12px 16px;
+}
+
+@media (max-width: 600px) {
+  .catalog-page {
+    padding-top: 36px;
+    padding-bottom: 56px;
+  }
+  .catalog-page-header {
+    margin-bottom: 24px;
+  }
+  .catalog-page-filters .catalog-filter-fields {
+    grid-template-columns: 1fr;
+  }
+  .catalog-page-filters .catalog-filter-actions {
+    padding-top: 0;
+  }
+}

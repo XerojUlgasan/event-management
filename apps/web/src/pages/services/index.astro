@@ -47,11 +47,13 @@ const hasFilters = Object.values(filters).some((v) => v !== undefined);
   title="Services | Styled by AMAC"
   description="Published event services from Styled by AMAC."
 >
-  <section class="section">
-    <h1 class="section-title small">All services</h1>
-    <p>Explore services for your gathering.</p>
+  <section class="section catalog-page">
+    <div class="catalog-page-header">
+      <h1 class="section-title small">All services</h1>
+      <p>Explore services for your gathering.</p>
+    </div>
 
-    <form method="get" action="/services" class="catalog-filters" aria-label="Filter services">
+    <form method="get" action="/services" class="catalog-filters catalog-page-filters" aria-label="Filter services">
       <div class="catalog-filter-fields">
         <label class="ui-field" for="svc-event-type">
           <span>Event type</span>
