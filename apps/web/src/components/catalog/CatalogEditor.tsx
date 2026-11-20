@@ -867,9 +867,7 @@ export function CatalogEditor<T extends CanvasContent>({
                   </Select>
                 </label>
               )}
-              {(
-                ["photo", "markdown", "video", "service", "package"] as const
-              ).map((t) => (
+              {(["photo", "markdown", "video", "service"] as const).map((t) => (
                 <Button
                   variant="secondary"
                   key={t}

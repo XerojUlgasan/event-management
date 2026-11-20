@@ -698,7 +698,7 @@ async function readiness(plan, state) {
   return (
     state.phase === "ready" &&
     (await alive(state.supervisor)) &&
-    state.children?.length === 3 &&
+    state.children?.length === (await serviceCommands(plan)).length &&
     (await Promise.all(state.children.map(alive))).every(Boolean) &&
     (
       await Promise.all([
@@ -793,10 +793,12 @@ async function seedSmoke(plan, env, require) {
   });
 }
 
-export function serviceCommands(
+export async function serviceCommands(
   plan,
   config = join(plan.stateDir, "astro.config.mjs"),
 ) {
+  const manifest = await json(join(plan.path, "package.json"));
+
   return [
     // tsx watch stays alive after EADDRINUSE; the existing start script fails with the process.
     ["api", ["--filter", "@event-management/api", "start"]],
@@ -816,7 +818,9 @@ export function serviceCommands(
         String(plan.ports.web),
       ],
     ],
-    ["worker", ["worker:background-jobs"]],
+    ...(manifest?.scripts?.["worker:background-jobs"]
+      ? [["worker", ["worker:background-jobs"]]]
+      : []),
   ];
 }
 
@@ -989,10 +993,10 @@ async function supervise(plan, token) {
       config,
       `import config from ${JSON.stringify(pathToFileURL(join(plan.path, "apps/web/astro.config.mjs")).href)};\nexport default {...config, server:{...config.server,host:${JSON.stringify(plan.ip)},port:${plan.ports.web}},vite:{...config.vite,envDir:${JSON.stringify(plan.stateDir)},server:{...config.vite?.server,strictPort:true}}};\n`,
     );
-    await update({ stage: "starting API, website and background worker" });
+    await update({ stage: "starting room application services" });
     const exits = [];
 
-    for (const [label, args] of serviceCommands(plan, config)) {
+    for (const [label, args] of await serviceCommands(plan, config)) {
       assertRunning();
       const log = await appendLog(plan, label);
       const child = spawn(process.execPath, [runner, "_service", ...args], {
@@ -1051,7 +1055,7 @@ async function supervise(plan, token) {
 
     await update({ stage: "checking database, seed login and catalog" });
     await seedSmoke(plan, env, require);
-    // Do not declare readiness while a worker failed during the smoke check.
+    // Do not declare readiness while a service failed during the smoke check.
     assertRunning();
 
     if (

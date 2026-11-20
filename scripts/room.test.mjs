@@ -273,7 +273,7 @@ test("port allocator detects IPv6-only listeners needed by the Node API", async 
 
 test("Astro resolves the planned relative config and the API command fails with its process", async () => {
   const plan = roomPlan("/repo", "test", 0);
-  const commands = Object.fromEntries(serviceCommands(plan));
+  const commands = Object.fromEntries(await serviceCommands(plan));
   assert.deepEqual(commands.api, [
     "--filter",
     "@event-management/api",
@@ -292,6 +292,32 @@ test("Astro resolves the planned relative config and the API command fails with 
   });
 
   assert.equal(path, expected);
+});
+
+test("rooms start a worker only when the selected revision provides its command", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "clemora-room-revision-"));
+  const plan = { ...roomPlan("/repo", "test", 0), path: directory };
+
+  try {
+    for (const enabled of [false, true]) {
+      await writeFile(
+        join(directory, "package.json"),
+        JSON.stringify({
+          scripts: enabled
+            ? { "worker:background-jobs": "node worker.js" }
+            : {},
+        }),
+      );
+      const commands = await serviceCommands(plan);
+
+      assert.deepEqual(
+        commands.map(([name]) => name),
+        enabled ? ["api", "web", "worker"] : ["api", "web"],
+      );
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test(
