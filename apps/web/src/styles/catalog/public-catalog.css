@@ -469,6 +469,16 @@
 .catalog-page-filter-icon { display: flex; align-items: center; }
 .catalog-page-filter-toggle > .catalog-filters { margin-top: 16px; }
 
+/* Align the Apply/Clear buttons to the bottom of the filter fields row,
+   matching the app catalog. The shared .catalog-filter-fields uses
+   align-items: start — override it here so buttons sit beside the inputs. */
+.catalog-page .catalog-filter-fields {
+  align-items: end;
+}
+.catalog-page .catalog-filter-actions {
+  padding-top: 0;
+}
+
 @media (max-width: 700px) {
   .catalog-page { padding-top: 28px; padding-bottom: 48px; }
 }
