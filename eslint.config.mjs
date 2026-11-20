@@ -34,6 +34,7 @@ export default [
       "**/.secrets/**",
       "**/.impeccable/**",
       ".scratch/**",
+      ".room/**",
       ".agents/**",
       ".agent/**",
       ".claude/**",

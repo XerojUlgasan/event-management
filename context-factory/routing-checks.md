@@ -19,6 +19,7 @@ For contributor-guidance changes, walk each affected row from root AGENTS.md thr
 | Repository guide edit | Documentation → docs + technical writing → affected owners/incoming references. Run guidance checks; research/defense is not mandatory. |
 | Whole-paper polish or literature/defense | Documentation → recursive review, plus Research's relevant source/method/defense workflow. Check full scope, citations, evidence, prose, and final rendered artifact. |
 | Prepare/open PR | Pull requests → requested base/complete diff → review + relevant checks. PR preparation does not authorize merge/deploy. |
+| Create, test in, or remove a worktree | Test worktrees in .room → short task name + explicit revision → local tools and affected area verification. Preserve dirty checkouts; confirm service/database targets before runtime work; remove through Git only after inspecting saved work. |
 | Resume unfinished work | Runs index → newest relevant topic/checkout → predecessor and linked decisions/checks. Confirm current Git/source; preserve outstanding work and original authorization. |
 | Record a new choice or check | History decision/verification index → matching template. Proposal is not approval; old passes do not establish current behavior. |
 

@@ -164,6 +164,8 @@ API routes are mounted under `/v1` in `apps/api/src/app.ts`. HTTP contracts and 
 
 Requires Node.js 22.22+, pnpm (the version is pinned in `package.json`), and Docker with Docker Compose.
 
+Use `.room/<name>` for local test worktrees, with short names such as `catalog`, `quotes`, or `pr45`. Follow the [worktree guide](context-factory/workflows/implement/references/worktrees.md) for creation, testing, and cleanup. Worktree contents are ignored by the parent checkout and its formatting/lint sweeps.
+
 ```sh
 pnpm install
 pnpm dev

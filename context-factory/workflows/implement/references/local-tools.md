@@ -2,6 +2,8 @@
 
 Read when choosing commands or interpreting local runtime evidence. Inspect current [root](../../../../package.json), [API](../../../../apps/api/package.json), and [web](../../../../apps/web/package.json) scripts before execution.
 
+For an isolated checkout, follow [test worktrees in .room](worktrees.md) for short names, creation, test setup, and cleanup.
+
 | Need | Starting point / boundary |
 | --- | --- |
 | Types | `pnpm check`; includes web structure and package checks, not browser proof |
