@@ -247,7 +247,6 @@ model Quotation {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   sentAt DateTime? @map("sent_at") @db.Timestamptz(6)
-  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(6)
   supersededAt DateTime? @map("superseded_at") @db.Timestamptz(6)
   offeredPackageId String @map("offered_package_id") @db.Uuid
   adjustmentsReviewed Boolean @default(true) @map("adjustments_reviewed")

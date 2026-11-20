@@ -47,7 +47,6 @@ const quotation = (status = "draft") => ({
   createdAt: time,
   updatedAt: time,
   sentAt: status === "sent" ? time : null,
-  acceptedAt: status === "accepted" ? time : null,
   supersededAt: null,
   offeredPackageId: "package-1",
   adjustmentsReviewed: true,
@@ -87,7 +86,7 @@ function fakeFetch(url, options = {}) {
       json({
         quotations: [...(q ? [q] : []), ...(scenario.history ?? [])],
         currentDraft: q?.status === "draft" ? q : null,
-        currentOffer: q && ["sent", "accepted"].includes(q.status) ? q : null,
+        currentOffer: q?.status === "sent" ? q : null,
         previousDraftVersion: null,
         nextCursor: null,
       }),
@@ -722,9 +721,9 @@ test("message quotation reloads booking status when its exact version changes", 
   );
 });
 
-test("closed booking preserves accepted offer and expandable superseded history", async () => {
+test("closed booking preserves sent offer and expandable superseded history", async () => {
   scenario = {
-    quote: quotation("accepted"),
+    quote: quotation("sent"),
     history: [
       {
         ...quotation("superseded"),
@@ -741,7 +740,7 @@ test("closed booking preserves accepted offer and expandable superseded history"
     bookingId: "booking-1",
     bookingStatus: "declined",
   });
-  assert.match(container.textContent, /Accepted/);
+  assert.match(container.textContent, /Sent/);
   assert.match(container.textContent, /Earlier versions/);
 
   const history = [...container.querySelectorAll("button")].find((element) =>

@@ -6,7 +6,7 @@ Styled by AMAC, still named Clemora internally, supports this overall journey:
 
 An accepted request, a sent quotation, and an operational schedule are separate records. **None currently confirms a booking or reserves a date.**
 
-This document describes the source inspected on 2026-11-15, on `main` at `311c4cf`, including the local files present during the investigation. The [root README](../README.md) owns product scope, implementation status, and setup. This is a process explanation, not a new business-policy decision.
+This document's original process investigation inspected source on 2026-11-15, on `main` at `311c4cf`, including the local files present during the investigation. Its quotation boundaries below reflect the current `draft`, `sent`, and `superseded` model. The [root README](../README.md) owns product scope, implementation status, and setup. This is a process explanation, not a new business-policy decision.
 
 ## Overall flow
 
@@ -283,9 +283,8 @@ The old sent offer remains in history. The new draft stays hidden from the custo
 
 Further boundaries:
 
-- Customer replies do not change quotation status or create drafts.
-- Customers have no current quotation acceptance or revision action.
-- Existing historical accepted quotations remain readable and can be revised by an admin.
+- Quotation statuses are `draft`, `sent`, and `superseded`; customer replies do not change status or create drafts.
+- Customers discuss agreement, concerns, or requested changes through chat. An admin starts any revision, and the prior offer remains readable in history as superseded.
 - Quotations have no automatic expiry.
 - Later package or schedule changes do not recalculate saved offers or automatically require a revision.
 - Saved offers preserve financial amounts, not a complete historical copy of every package description and event detail.

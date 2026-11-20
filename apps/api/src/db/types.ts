@@ -209,7 +209,6 @@ export interface Packages {
 }
 
 export interface Quotations {
-  accepted_at: Timestamp | null;
   adjustments_reviewed: Generated<boolean>;
   base_amount_minor: number;
   booking_request_id: string;

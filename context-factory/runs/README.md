@@ -14,6 +14,8 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Remove quotation legacy conversion](2026-11-20_20-24-06_remove-quotation-legacy-conversion.md) | No legacy quotation conversion / main | complete | Simplified migration verified; local checksum reconciled with schema and application data unchanged |
+| [Quotation acceptance cleanup](2026-11-20_20-20-37_quotation-acceptance-cleanup.md) | Retired quotation acceptance model / main | complete | Review scoped diff; local migration/runtime and verification complete; hosted rollout separate |
 | [Booking package and quotation status implementation](2026-11-19_22-43-07_booking-proposal-status-implementation.md) | Open-status writes, closed history, conflict and async-scope guards / main | complete | Review scoped uncommitted diff; local verification passed and task runtime removed; no migration required |
 | [Booking package and quotation status spec](2026-11-19_22-20-00_booking-proposal-status-spec.md) | Open-status eligibility and quotation UI gap / main | complete | Spec reviewed and documentation checks passed; application implementation remains separate |
 | [Catalog indexing scheduling](2026-11-19_21-52-00_catalog-index-scheduling.md) | Manual ensure-scheduled queue intent and no duplicate active work / main | complete | Review scoped diff; deploy matching API/frontend together; no schema migration required |

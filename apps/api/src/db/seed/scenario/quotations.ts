@@ -175,7 +175,6 @@ export async function seedScenarioQuotations(
           created_at: createdAt,
           updated_at: supersededAt ?? sentAt ?? createdAt,
           sent_at: sentAt,
-          accepted_at: null,
           superseded_at: supersededAt,
           offered_package_id: pkg.id,
           adjustments_reviewed: status !== "draft",

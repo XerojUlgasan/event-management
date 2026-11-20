@@ -74,7 +74,6 @@ export function dto(row: Quote): Quotation {
     createdAt: row.created_at.toISOString(),
     updatedAt: row.revision,
     sentAt: iso(row.sent_at),
-    acceptedAt: iso(row.accepted_at),
     supersededAt: iso(row.superseded_at),
     offeredPackageId: row.offered_package_id,
     adjustmentsReviewed: row.adjustments_reviewed,

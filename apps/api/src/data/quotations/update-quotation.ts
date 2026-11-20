@@ -26,5 +26,5 @@ export const supersedeActiveQuotationsData = (
       updated_at: nextQuoteRevision,
     })
     .where("booking_request_id", "=", bookingId)
-    .where("status", "in", ["sent", "accepted"])
+    .where("status", "=", "sent")
     .execute();

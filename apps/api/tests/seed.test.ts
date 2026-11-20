@@ -627,7 +627,6 @@ test("seed creates demo users and conversations while preserving unrelated data 
     count(*)::int AS quotations, count(DISTINCT q.booking_request_id)::int AS bookings,
     count(*) FILTER (WHERE q.status = 'draft')::int AS drafts,
     count(*) FILTER (WHERE q.status = 'sent')::int AS sent,
-    count(*) FILTER (WHERE q.status = 'accepted')::int AS accepted,
     count(*) FILTER (WHERE q.status = 'superseded')::int AS superseded,
     count(*) FILTER (WHERE jsonb_array_length(q.items) = 0)::int AS base_only,
     count(*) FILTER (WHERE q.sent_at IS NOT NULL)::int AS delivered,
@@ -638,7 +637,6 @@ test("seed creates demo users and conversations while preserving unrelated data 
     bookings: 50,
     drafts: 17,
     sent: 33,
-    accepted: 0,
     superseded: 50,
     base_only: 26,
     delivered: 83,
@@ -660,7 +658,6 @@ test("seed creates demo users and conversations while preserving unrelated data 
       OR q.total_amount_minor < 0 OR q.created_at > q.updated_at
       OR (q.status = 'draft' AND (q.sent_at IS NOT NULL OR q.adjustments_reviewed))
       OR (q.status <> 'draft' AND (q.sent_at IS NULL OR NOT q.adjustments_reviewed))
-      OR (q.status = 'accepted') IS DISTINCT FROM (q.accepted_at IS NOT NULL)
       OR (q.status = 'superseded') IS DISTINCT FROM (q.superseded_at IS NOT NULL)
       OR (q.version = 1 AND q.previous_quotation_id IS NOT NULL)
       OR (q.version = 2 AND (previous.id IS NULL OR previous.booking_request_id <> q.booking_request_id
@@ -675,13 +672,11 @@ test("seed creates demo users and conversations while preserving unrelated data 
         AND a.actor_id = q.created_by)
       OR (q.sent_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM audit_events a
         WHERE a.entity_id = q.id AND a.action = 'quotation.sent' AND a.actor_id = q.created_by))
-      OR (q.accepted_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM audit_events a
-        WHERE a.entity_id = q.id AND a.action = 'quotation.accepted' AND a.actor_id = b.customer_id))
     )`);
   assert.deepEqual(quotationViolations.rows, []);
   const activeDuplicates =
     await pool.query(`SELECT booking_request_id FROM quotations
-    WHERE status IN ('draft', 'sent', 'accepted') GROUP BY booking_request_id HAVING count(*) > 1`);
+    WHERE status IN ('draft', 'sent') GROUP BY booking_request_id HAVING count(*) > 1`);
   assert.deepEqual(activeDuplicates.rows, []);
   const sampleQuotation = await pool.query<{
     id: string;
@@ -918,32 +913,6 @@ test("seed creates demo users and conversations while preserving unrelated data 
     "UPDATE conversations SET status = 'closed', closed_at = now() WHERE booking_request_id = $1",
     [quotation.booking_request_id],
   );
-  // A prior version of the application could accept a sent scenario quotation.
-  const historical =
-    await pool.query(`SELECT q.id, q.booking_request_id, q.version, b.customer_id
-    FROM quotations q JOIN booking_requests b ON b.id = q.booking_request_id
-    WHERE b.reference LIKE 'SCN-%' AND q.status = 'sent' ORDER BY q.id LIMIT 1`);
-  assert.equal(historical.rowCount, 1);
-  const historicalQuote = historical.rows[0];
-  const acceptedAt = new Date("2026-10-31T00:00:05.000Z");
-  await pool.query(
-    "UPDATE quotations SET status = 'accepted', accepted_at = $1 WHERE id = $2",
-    [acceptedAt, historicalQuote.id],
-  );
-  const historicalAudit = await pool.query(
-    `INSERT INTO audit_events
-    (actor_id, action, entity_type, entity_id, metadata, created_at)
-    VALUES ($1, 'quotation.accepted', 'quotation', $2, $3, $4) RETURNING *`,
-    [
-      historicalQuote.customer_id,
-      historicalQuote.id,
-      JSON.stringify({
-        bookingRequestId: historicalQuote.booking_request_id,
-        version: historicalQuote.version,
-      }),
-      acceptedAt,
-    ],
-  );
   const quotationsBeforeRerun = await pool.query(
     "SELECT * FROM quotations ORDER BY id",
   );
@@ -995,22 +964,6 @@ test("seed creates demo users and conversations while preserving unrelated data 
   assert.deepEqual(
     (await pool.query("SELECT * FROM audit_events ORDER BY id")).rows,
     auditsBeforeRerun.rows,
-  );
-  const preservedAcceptance = await pool.query(
-    "SELECT status, accepted_at FROM quotations WHERE id = $1",
-    [historicalQuote.id],
-  );
-  assert.deepEqual(preservedAcceptance.rows[0], {
-    status: "accepted",
-    accepted_at: acceptedAt,
-  });
-  assert.deepEqual(
-    (
-      await pool.query("SELECT * FROM audit_events WHERE id = $1", [
-        historicalAudit.rows[0].id,
-      ])
-    ).rows[0],
-    historicalAudit.rows[0],
   );
   assert.deepEqual(
     (

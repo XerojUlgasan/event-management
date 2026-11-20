@@ -34,7 +34,7 @@ export async function reviseQuotationService(
     if (row.revision !== expected)
       return failure("Quotation changed. Refresh and try again", 409);
 
-    if (closed(booking) || !["draft", "sent", "accepted"].includes(row.status))
+    if (closed(booking) || !["draft", "sent"].includes(row.status))
       return failure("Only an active quotation can be revised", 409);
 
     const rows = await quotationWriteStateData(trx, booking.id, id);

@@ -19,7 +19,6 @@ const quotation = (
   createdAt: `2090-01-${String(version).padStart(2, "0")}T00:00:00.000Z`,
   updatedAt: `2090-01-${String(version).padStart(2, "0")}T00:00:00.000Z`,
   sentAt,
-  acceptedAt: null,
   supersededAt: status === "superseded" ? "2090-02-01T00:00:00.000Z" : null,
   offeredPackageId: null,
   adjustmentsReviewed: true,
@@ -128,17 +127,13 @@ test("propagates page loading errors", async () => {
 });
 
 test("skips superseded versions that were never sent", async () => {
-  const accepted = quotation(1, "accepted", "2090-01-01T00:00:00.000Z");
+  const sent = quotation(1, "sent", "2090-01-01T00:00:00.000Z");
 
   const result = await findLatestSentQuotation("booking-1", true, async () =>
-    page([
-      quotation(3, "draft", null),
-      quotation(2, "superseded", null),
-      accepted,
-    ]),
+    page([quotation(3, "draft", null), quotation(2, "superseded", null), sent]),
   );
 
-  assert.equal(result, accepted);
+  assert.equal(result, sent);
 });
 
 test("rejects repeated pagination cursors rather than looping or claiming no offer", async () => {

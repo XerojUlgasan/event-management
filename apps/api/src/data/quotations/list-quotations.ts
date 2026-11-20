@@ -63,7 +63,7 @@ export async function quotationWriteStateData(
     .selectFrom("quotations")
     .select([
       sql<number>`coalesce(max(version), 0)::int`.as("max_version"),
-      sql<boolean>`coalesce(bool_or(status in ('draft', 'sent', 'accepted')), false)`.as(
+      sql<boolean>`coalesce(bool_or(status in ('draft', 'sent')), false)`.as(
         "has_active",
       ),
       sql<boolean>`coalesce(bool_or(status = 'draft' and id <> ${excludeId ?? null}::uuid), false)`.as(

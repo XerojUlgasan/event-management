@@ -43,13 +43,7 @@ export async function listQuotationService(
     customer
       ? Promise.resolve(undefined)
       : currentQuoteData(db, bookingId, ["draft"], false, input.quotationId),
-    currentQuoteData(
-      db,
-      bookingId,
-      ["sent", "accepted"],
-      customer,
-      input.quotationId,
-    ),
+    currentQuoteData(db, bookingId, ["sent"], customer, input.quotationId),
   ]);
   const previous = draft?.previous_quotation_id
     ? await findQuoteData(db, draft.previous_quotation_id)

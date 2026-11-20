@@ -53,17 +53,12 @@ const formatWhen = (value: string) => formatEnPhDateTime(new Date(value));
 const statusLabel: Record<QuotationStatus, string> = {
   draft: "Draft",
   sent: "Sent",
-  accepted: "Accepted",
   superseded: "Superseded",
 };
 
-const statusTone: Record<
-  QuotationStatus,
-  "warning" | "info" | "success" | "neutral"
-> = {
+const statusTone: Record<QuotationStatus, "warning" | "info" | "neutral"> = {
   draft: "warning",
   sent: "info",
-  accepted: "success",
   superseded: "neutral",
 };
 
@@ -91,10 +86,6 @@ function lineTotals(items: QuotationItem[]) {
 }
 
 function readingIntro(quotation: Quotation) {
-  if (quotation.status === "accepted" && quotation.acceptedAt) {
-    return `Version ${quotation.version} was accepted on ${formatWhen(quotation.acceptedAt)}.`;
-  }
-
   if (quotation.status === "sent" && quotation.sentAt) {
     return `Version ${quotation.version} was sent on ${formatWhen(quotation.sentAt)}.`;
   }
@@ -562,10 +553,7 @@ export function Quotations({
                 quotations: [quotation],
                 nextCursor: null,
                 currentDraft: null,
-                currentOffer:
-                  quotation.status === "sent" || quotation.status === "accepted"
-                    ? quotation
-                    : null,
+                currentOffer: quotation.status === "sent" ? quotation : null,
                 previousDraftVersion: null,
               })))()
           : bookingId
@@ -1038,12 +1026,6 @@ export function Quotations({
               ) : (
                 <>
                   <h3>Revise this offer</h3>
-                  {currentOffer.status === "accepted" && (
-                    <p className="quotation-lede">
-                      Starting a revision immediately supersedes this accepted
-                      offer.
-                    </p>
-                  )}
                   <FormField label="Reason for the revision">
                     {(props) => (
                       <Textarea

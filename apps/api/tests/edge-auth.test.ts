@@ -38,6 +38,17 @@ test("Edge OpenAPI loads every router including auth", async () => {
   assert.equal(document.paths["/v1/quotations/{id}/accept"], undefined);
   assert.equal(document.paths["/v1/quotations/{id}/revision"], undefined);
   assert.ok(document.paths["/v1/admin/quotations/{id}/revision"]);
+  const quotation =
+    document.paths["/v1/quotations/{id}"].get.responses[200].content[
+      "application/json"
+    ].schema.properties.quotation;
+  assert.deepEqual(quotation.properties.status.enum, [
+    "draft",
+    "sent",
+    "superseded",
+  ]);
+  assert.equal("acceptedAt" in quotation.properties, false);
+  assert.equal(quotation.required.includes("acceptedAt"), false);
 });
 
 test("Edge loads nested and top-level quotation/private package routes with authentication", async () => {

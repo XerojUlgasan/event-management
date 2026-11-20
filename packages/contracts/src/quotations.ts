@@ -3,7 +3,7 @@ export type QuotationDirection = "add" | "deduct";
 export type QuotationKind =
   "addition" | "deduction" | "substitution" | "adjustment";
 
-export type QuotationStatus = "draft" | "sent" | "accepted" | "superseded";
+export type QuotationStatus = "draft" | "sent" | "superseded";
 
 export type QuotationItem = {
   id: string;
@@ -26,7 +26,6 @@ export type Quotation = {
   createdAt: string;
   updatedAt: string;
   sentAt: string | null;
-  acceptedAt: string | null;
   supersededAt: string | null;
   offeredPackageId: string | null;
   adjustmentsReviewed: boolean;

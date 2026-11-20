@@ -21,7 +21,7 @@ This reference describes intended business behavior. The [current implementation
 ## Rules and boundaries
 
 - Only System Administrators create, revise, save, or send quotations. Customers view offers and communicate through chat. Quotations and chat replies do not confirm the booking, reserve dates, create event schedules, or establish a payment workflow.
-- Existing accepted quotations, acceptance timestamps, and audit records remain as history. They stay readable and can be revised by an admin; the customer acceptance and revision actions have been removed.
+- Quotation statuses are `draft`, `sent`, and `superseded`. Customers discuss agreement, concerns, and requests for another offer through chat; replies do not change quotation status or create drafts. An admin revision supersedes the prior offer and keeps its version link, reason, adjustments, financial values, messages, and audit history readable.
 - The original inquiry's package choice stays recorded separately from the current proposal. A quotation preserves its offered price and adjustments; package descriptions, services, and event details remain part of the current proposal and booking.
 - Later package or event edits do not change saved quotation amounts. The admin must discuss changes affecting the agreed price or delivery and explicitly revise the offer when a new quotation is needed.
 - Adding a service to a package does not automatically price it or establish availability. Quotation adjustments are entered and reviewed by the admin; an offer cannot be sent with a negative total.

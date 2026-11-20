@@ -1244,20 +1244,14 @@ test("package and service changes preserve quoted amounts; revisions use the cur
       200,
     )
   ).quotation;
-  // Simulate a historical acceptance created before the customer endpoint was removed.
-  await db
-    .updateTable("quotations")
-    .set({ status: "accepted", accepted_at: new Date() })
-    .where("id", "=", q.id)
-    .execute();
   q = (
     await read(
       await call(`/quotations/${q.id}`, "GET", undefined, customerCookie),
       200,
     )
   ).quotation;
-  assert.equal(q.status, "accepted");
-  assert.ok(q.acceptedAt);
+  assert.equal(q.status, "sent");
+  assert.equal("acceptedAt" in q, false);
   assert.equal(q.baseAmountMinor, 100000);
   assert.equal(q.totalAmountMinor, 80000);
   assert.deepEqual(q.items, items);

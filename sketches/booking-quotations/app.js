@@ -96,7 +96,7 @@ function offerTable() {
       </div>
       <strong>${pesos(192500.25)}</strong>
     </div>
-    <p class="fine">Accepting this offer does not confirm the booking or reserve the date.</p>`;
+    <p class="fine">A sent quotation does not confirm a booking or reserve a date.</p>`;
 }
 
 function revisionBox() {
@@ -104,7 +104,7 @@ function revisionBox() {
     <section class="stack">
       <div>
         <h2>Revise this offer</h2>
-        <p class="lede">Starting a revision replaces version 2. The customer has to accept the new version.</p>
+        <p class="lede">Starting a revision supersedes version 2 and creates a draft. The customer can discuss the sent offer through chat.</p>
       </div>
       <label class="field"><span>Reason for the revision</span>
         <textarea class="control" data-revision maxlength="500" placeholder="What should the customer review?">${escape(state.revisionReason)}</textarea>
@@ -212,7 +212,7 @@ function editor() {
         <button class="button secondary" type="button" data-action="add">Add adjustment</button>
       </div>
       ${mathBox()}
-      <p class="fine">Accepting this offer does not confirm the booking or reserve the date.</p>
+      <p class="fine">A sent quotation does not confirm a booking or reserve a date.</p>
       <div class="actions">
         <button class="button secondary" type="button" data-action="save">Save adjustments</button>
         <button class="button" type="button" data-action="send" ${figures.total < 0 ? "disabled" : ""}>Save and send</button>
@@ -287,7 +287,7 @@ function summary() {
   const status = draft ? `<span class="badge badge-warning">Draft</span>` : `<span class="badge badge-info">Sent</span>`;
   const intro = draft
     ? "Version 2 is a draft. Check the adjustments, then save or send."
-    : "Version 2 was sent on Nov 11, 2026, 5:43 PM. The customer has not accepted it.";
+    : "Version 2 was sent on Nov 11, 2026, 5:43 PM. The customer can discuss it with the team in Messages.";
   return `
     <div class="stack">
       <div class="panel stack">
@@ -300,7 +300,7 @@ function summary() {
         </div>
         <p class="lede">${intro}</p>
         ${draft ? "" : `<div>${lineHtml}</div>`}
-        <p class="fine">Accepting this offer does not confirm the booking or reserve the date.</p>
+        <p class="fine">A sent quotation does not confirm a booking or reserve a date.</p>
         ${draft ? `<div>${state.lines.map(adjustmentCard).join("")}</div><div class="actions" style="justify-content:flex-start"><button class="button secondary" type="button" data-action="add">Add adjustment</button></div>${mathBox()}` : ""}
         <div class="actions">
           ${draft
