@@ -42,32 +42,30 @@ const hasFilters = Object.values(filters).some((v) => v !== undefined);
 >
   <section class="section catalog-page">
     <div class="catalog-page-header">
-      <h1 class="section-title small">All packages</h1>
-      <p>Explore packages for your gathering.</p>
-    </div>
+      <div class="catalog-page-header-copy">
+        <h1 class="section-title small">All packages</h1>
+        <p>Explore packages for your gathering.</p>
+      </div>
 
-    <form method="get" action="/packages" class="catalog-filters catalog-page-filters" aria-label="Filter packages">
-      <div class="catalog-filter-fields">
-        <label class="ui-field" for="pkg-event-type">
-          <span>Event type</span>
-          <select id="pkg-event-type" name="eventType" class="ui-control" onchange="this.form.submit()">
-            <option value="">All event types</option>
-            {EVENT_TYPES.map((type) => (
-              <option value={type} selected={filters.eventType === type}>{type}</option>
-            ))}
-          </select>
-        </label>
-        <div class="catalog-filter-actions">
-          <button type="submit" class="button button-primary">Apply filters</button>
+      <form method="get" action="/packages" class="catalog-filters catalog-page-filters" aria-label="Filter packages">
+        <div class="catalog-filter-fields">
+          <label class="ui-field" for="pkg-event-type">
+            <span>Event type</span>
+            <select id="pkg-event-type" name="eventType" class="ui-control" onchange="this.form.submit()">
+              <option value="">All event types</option>
+              {EVENT_TYPES.map((type) => (
+                <option value={type} selected={filters.eventType === type}>{type}</option>
+              ))}
+            </select>
+          </label>
           {hasFilters && (
-            <a href="/packages" class="button button-secondary">Clear</a>
+            <div class="catalog-filter-actions">
+              <a href="/packages" class="button button-secondary">Clear</a>
+            </div>
           )}
         </div>
-      </div>
-      <p class="catalog-filter-hint">
-        Filter packages by event type to find the right fit for your celebration.
-      </p>
-    </form>
+      </form>
+    </div>
 
     {unavailable && (
       <Toast tone="danger" placement="inline">

@@ -412,47 +412,83 @@
 
 /* ── Catalog listing pages (/packages, /services) ───────────────────────── */
 
-/* Tighten the section padding — .section defaults to 108px top which is
-   designed for homepage hero sections, not listing pages. */
+/* Override the homepage hero padding — listing pages need much less. */
 .catalog-page {
-  padding-top: 56px;
+  padding-top: 40px;
   padding-bottom: 80px;
 }
 
-/* Page header: heading + subtitle close together, separated from the filter
-   bar by a clear but not excessive gap. */
+/* Heading row: title + subtitle on the left, filter controls on the right.
+   Wraps to stacked on narrow viewports. */
 .catalog-page-header {
-  margin-bottom: 32px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
 }
-.catalog-page-header h1 {
-  margin: 0 0 8px;
+
+.catalog-page-header-copy h1 {
+  margin: 0 0 6px;
 }
-.catalog-page-header p {
+.catalog-page-header-copy p {
   margin: 0;
   color: var(--muted);
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
-/* Constrain the filter bar width so it doesn't use the full page grid.
-   Auto-fit columns: each field takes its natural width, actions snap right. */
+/* Inline filter: dropdown + optional Clear link, no extra chrome */
+.catalog-page-filters {
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+}
 .catalog-page-filters .catalog-filter-fields {
-  grid-template-columns: repeat(auto-fit, minmax(180px, max-content)) auto;
-  gap: 12px 16px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  grid-template-columns: unset;
+}
+.catalog-page-filters .ui-field {
+  gap: 4px;
+}
+.catalog-page-filters .ui-field span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.catalog-page-filters .ui-control {
+  min-width: 180px;
+}
+.catalog-page-filters .catalog-filter-actions {
+  padding-top: 0;
+  align-self: flex-end;
+}
+.catalog-page-filters .catalog-filter-hint {
+  display: none;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   .catalog-page {
-    padding-top: 36px;
-    padding-bottom: 56px;
+    padding-top: 28px;
+    padding-bottom: 48px;
   }
   .catalog-page-header {
-    margin-bottom: 24px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
   }
   .catalog-page-filters .catalog-filter-fields {
-    grid-template-columns: 1fr;
+    flex-wrap: wrap;
   }
-  .catalog-page-filters .catalog-filter-actions {
-    padding-top: 0;
+  .catalog-page-filters .ui-control {
+    min-width: 0;
+    width: 100%;
   }
 }
