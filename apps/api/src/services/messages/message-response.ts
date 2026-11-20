@@ -1,27 +1,10 @@
-import {
-  messageImageInterpretationSchema,
-  type MessageProcessing,
-  type MessageImage,
-} from "@event-management/contracts/message-images";
+import type { ChatMessage } from "@event-management/contracts/messages";
 import { parseAiHandoff } from "../../utils/ai-handoff.js";
-import type {
-  ConversationWithCustomer,
-  MessageWithSender,
-} from "../../data/messages/types.js";
+import type { ConversationWithCustomer } from "../../data/messages/types.js";
 
-export type MessageDto = {
-  id: string;
-  images: MessageImage[];
-  processing: MessageProcessing | null;
-  body: string;
-  quotationId: string | null;
-  replyToMessageId: string | null;
-  senderId: string | null;
-  senderRole: "admin" | "customer" | "assistant";
-  senderName: string;
-  createdAt: string;
-  readAt: string | null;
-};
+export { messageDto } from "../../utils/message-dto.js";
+
+export type MessageDto = ChatMessage;
 
 export type ConversationDto = {
   id: string;
@@ -44,52 +27,6 @@ export type ConversationDto = {
   updatedAt: string;
   aiHandoff?: ReturnType<typeof parseAiHandoff>;
 };
-
-export function messageDto(row: MessageWithSender): MessageDto {
-  const role: MessageDto["senderRole"] =
-    row.sender_role === "assistant"
-      ? "assistant"
-      : row.sender_role === "admin"
-        ? "admin"
-        : "customer";
-
-  return {
-    id: row.id,
-    processing: row.processing ?? null,
-    images: (row.images ?? []).map((value) => {
-      const image = value as {
-        id: string;
-        mime_type: MessageImage["mimeType"];
-        byte_size: number;
-        interpretation: unknown;
-      };
-
-      return {
-        id: image.id,
-        url: `/v1/message-images/${image.id}`,
-        mimeType: image.mime_type,
-        byteSize: image.byte_size,
-        interpretation:
-          image.interpretation == null
-            ? null
-            : messageImageInterpretationSchema.parse(image.interpretation),
-      };
-    }),
-    body: row.body,
-    quotationId: row.quotation_id,
-    replyToMessageId: row.reply_to_message_id,
-    senderId: row.sender_id,
-    senderRole: role,
-    senderName:
-      role === "assistant"
-        ? "AMAC AI"
-        : (row.sender_display_name ??
-          row.sender_email ??
-          (role === "customer" ? "Guest" : "Clemora team")),
-    createdAt: row.created_at.toISOString(),
-    readAt: row.read_at?.toISOString() ?? null,
-  };
-}
 
 export function conversationDto(
   row: ConversationWithCustomer,

@@ -30,6 +30,12 @@ import {
 } from "../../../lib/services/messages/pending-replies";
 import { assertCursorMoved } from "../../../lib/services/messages/older-page";
 import { conversationLoadError } from "../../../lib/services/messages/load-error";
+import { shouldRefreshAiMetadata } from "../../../lib/services/messages/realtime-event";
+import {
+  startVisiblePolling,
+  useRealtimeThread,
+  useThreadVisible,
+} from "../../../lib/services/messages/use-realtime-thread";
 import { MessagesWorkspace } from "../../messages/MessagesWorkspace";
 import {
   addSentMessages,
@@ -134,6 +140,8 @@ export function CustomerDashboard({
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | null
   >(null);
+  const selectedConversationRef = useRef(selectedConversationId);
+  selectedConversationRef.current = selectedConversationId;
   const pendingBookingReference = new URLSearchParams(search).get("request");
   const requestedConversation = new URLSearchParams(search).get("conversation");
   useEffect(() => {
@@ -258,11 +266,62 @@ export function CustomerDashboard({
     };
   }, [tab, pendingBookingReference, notifyError, referenceAttempt]);
 
+  const singleConversation =
+    messageConversations.length === 1 &&
+    messageConversations[0]?.id === selectedConversationId &&
+    !inbox.nextCursor;
+  const threadVisible = useThreadVisible(
+    conversationOpen || singleConversation,
+  );
+  const pollingVisible = useRef(false);
+  pollingVisible.current = tab === "Messages" && threadVisible;
+
+  const refreshThread = useRef<() => void>(() => {});
+
+  useRealtimeThread({
+    id: selectedConversationId,
+    enabled:
+      tab === "Messages" &&
+      threadVisible &&
+      messageThread?.conversation.id === selectedConversationId,
+    admin: false,
+    onRejoin: () => refreshThread.current(),
+    onMessage: (message) => {
+      if (
+        document.visibilityState === "visible" &&
+        messageThread &&
+        shouldRefreshAiMetadata(messageThread.conversation, message)
+      )
+        refreshThread.current();
+
+      localMessages.current.add(message.id);
+      setMessageThread((current) =>
+        addSentMessagesToConversation(current, selectedConversationId!, [
+          message,
+        ]),
+      );
+      setPendingReplies((current) =>
+        messageThread
+          ? reconcilePendingReplies(current, messageThread.conversation, [
+              message,
+            ])
+          : current,
+      );
+      setOutbox((current) => {
+        const next = { ...current };
+        delete next[message.id];
+
+        return next;
+      });
+    },
+  });
+
   useEffect(() => {
     if (tab !== "Messages" || !selectedConversationId) return;
 
     let active = true;
     let inFlight = false;
+    let reloadRequested = false;
     const id = selectedConversationId;
     olderRequest.current++;
     olderPending.current = false;
@@ -274,7 +333,19 @@ export function CustomerDashboard({
     );
 
     const load = async () => {
-      if (inFlight) return;
+      if (
+        !active ||
+        selectedConversationRef.current !== id ||
+        !pollingVisible.current ||
+        document.visibilityState !== "visible"
+      )
+        return;
+
+      if (inFlight) {
+        reloadRequested = true;
+
+        return;
+      }
 
       inFlight = true;
       const revision = replyRevision.current;
@@ -303,7 +374,11 @@ export function CustomerDashboard({
           localMessages.current.delete(message.id),
         );
         setMessageThread((current) => {
-          const merged = mergePolledThread(current, thread, unacknowledged);
+          const merged = mergePolledThread(
+            current,
+            thread,
+            new Set([...unacknowledged, ...localMessages.current]),
+          );
 
           if (merged.gap)
             setHistoryNotice(
@@ -327,18 +402,28 @@ export function CustomerDashboard({
       } finally {
         inFlight = false;
 
-        if (active) setThreadLoading(false);
+        if (active) {
+          setThreadLoading(false);
+
+          if (reloadRequested) {
+            reloadRequested = false;
+            void load();
+          }
+        }
       }
     };
 
-    void load();
-
-    const timer = window.setInterval(() => void load(), 5000);
+    refreshThread.current = () => void load();
+    const stopPolling = startVisiblePolling(
+      refreshThread.current,
+      threadVisible,
+    );
 
     return () => {
       active = false;
       olderRequest.current++;
-      window.clearInterval(timer);
+      refreshThread.current = () => {};
+      stopPolling();
     };
   }, [
     tab,
@@ -346,6 +431,7 @@ export function CustomerDashboard({
     notifyError,
     threadRevision,
     setMessageConversations,
+    threadVisible,
   ]);
 
   const showSentInList = (

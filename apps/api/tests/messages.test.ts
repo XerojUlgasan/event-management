@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import { exportJWK, generateKeyPair, jwtVerify } from "jose";
 import { Pool } from "pg";
 import { sql } from "kysely";
 import { hashSessionToken } from "../src/utils/session.js";
@@ -199,6 +200,194 @@ async function read(response: Response, status: number): Promise<any> {
 
   return response.status === 204 ? null : response.json();
 }
+
+test("Realtime token is limited to the live session and one signed-in conversation", async (t) => {
+  const existingKey = process.env.REALTIME_JWT_SIGNING_JWK;
+  const existingSecret = process.env.REALTIME_JWT_SECRET;
+  t.after(() => {
+    if (existingKey === undefined) delete process.env.REALTIME_JWT_SIGNING_JWK;
+    else process.env.REALTIME_JWT_SIGNING_JWK = existingKey;
+
+    if (existingSecret === undefined) delete process.env.REALTIME_JWT_SECRET;
+    else process.env.REALTIME_JWT_SECRET = existingSecret;
+  });
+  delete process.env.REALTIME_JWT_SIGNING_JWK;
+  delete process.env.REALTIME_JWT_SECRET;
+
+  const id = randomUUID();
+  const guestConversationId = randomUUID();
+  const guestIdentity = await db
+    .insertInto("guest_chat_identities")
+    .values({ token_hash: randomUUID() })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  await db
+    .insertInto("conversations")
+    .values([
+      { id, customer_id: customerId },
+      { id: guestConversationId, guest_identity_id: guestIdentity.id },
+    ])
+    .execute();
+  t.after(async () => {
+    await db
+      .deleteFrom("conversations")
+      .where("id", "in", [id, guestConversationId])
+      .execute();
+    await db
+      .deleteFrom("guest_chat_identities")
+      .where("id", "=", guestIdentity.id)
+      .execute();
+  });
+
+  const issue = (conversationId: string, cookie?: string) =>
+    call("/auth/realtime-token", "POST", { conversationId }, cookie);
+
+  await read(await issue(id), 401);
+  await read(await issue("invalid", customerCookie), 400);
+  await read(await issue(id, otherCustomerCookie), 404);
+  await read(await issue(guestConversationId, adminCookie), 404);
+  await read(await issue(id, customerCookie), 503);
+
+  const kid = randomUUID();
+  const pair = await generateKeyPair("ES256", { extractable: true });
+  process.env.REALTIME_JWT_SIGNING_JWK = JSON.stringify({
+    ...(await exportJWK(pair.privateKey)),
+    kid,
+  });
+
+  for (const cookie of [customerCookie, adminCookie]) {
+    const response = await issue(id, cookie);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    const result = await read(response, 200);
+    const { payload, protectedHeader } = await jwtVerify(
+      result.token,
+      pair.publicKey,
+      {
+        algorithms: ["ES256"],
+        audience: "authenticated",
+      },
+    );
+    const session = await db
+      .selectFrom("sessions")
+      .select(["id", "user_id"])
+      .where(
+        "token_hash",
+        "=",
+        hashSessionToken(cookie.slice("em_session=".length)),
+      )
+      .executeTakeFirstOrThrow();
+
+    assert.equal(protectedHeader.kid, kid);
+    assert.equal(payload.sub, session.user_id);
+    assert.equal(payload.role, "authenticated");
+    assert.equal(payload.clemora_scope, "conversation_messages");
+    assert.equal(payload.clemora_session_id, session.id);
+    assert.equal(payload.conversation_id, id);
+    assert.ok(payload.exp && payload.iat);
+    assert.equal(payload.exp - payload.iat, 300);
+    assert.equal(new Date(result.expiresAt).getTime(), payload.exp * 1000);
+  }
+});
+
+test("read receipts mark only incoming messages through a saved keyset boundary", async (t) => {
+  const conversationId = randomUUID();
+  const otherId = randomUUID();
+  const afterBoundaryId = "00000000-0000-4000-8000-000000000003";
+  const boundaryId = "00000000-0000-4000-8000-000000000002";
+  const ownId = "00000000-0000-4000-8000-000000000001";
+  const beforeId = randomUUID();
+  const foreignId = randomUUID();
+  await db
+    .insertInto("conversations")
+    .values([
+      { id: conversationId, customer_id: customerId },
+      { id: otherId, customer_id: customerId },
+    ])
+    .execute();
+  t.after(async () => {
+    await db
+      .deleteFrom("conversations")
+      .where("id", "in", [conversationId, otherId])
+      .execute();
+  });
+
+  await db
+    .insertInto("messages")
+    .values([
+      {
+        id: beforeId,
+        conversation_id: conversationId,
+        sender_role: "assistant",
+        body: "Previous",
+        created_at: "2026-11-21T00:00:00.000001Z",
+      },
+      {
+        id: ownId,
+        conversation_id: conversationId,
+        sender_role: "customer",
+        sender_id: customerId,
+        body: "Own message",
+        created_at: "2026-11-21T00:00:00.000002Z",
+      },
+      {
+        id: boundaryId,
+        conversation_id: conversationId,
+        sender_role: "assistant",
+        body: "Boundary",
+        created_at: "2026-11-21T00:00:00.000002Z",
+      },
+      {
+        id: afterBoundaryId,
+        conversation_id: conversationId,
+        sender_role: "assistant",
+        body: "Later by UUID",
+        created_at: "2026-11-21T00:00:00.000002Z",
+      },
+      {
+        id: foreignId,
+        conversation_id: otherId,
+        sender_role: "assistant",
+        body: "Different conversation",
+      },
+    ])
+    .execute();
+
+  const customerPath = `/messages/conversations/${conversationId}/read`;
+  const adminPath = `/admin/conversations/${conversationId}/read`;
+
+  const receipt = (path: string, messageId: string, cookie?: string) =>
+    call(path, "POST", { messageId }, cookie);
+
+  const readAt = async (id: string) =>
+    (
+      await db
+        .selectFrom("messages")
+        .select("read_at")
+        .where("id", "=", id)
+        .executeTakeFirstOrThrow()
+    ).read_at;
+
+  await read(await receipt(customerPath, boundaryId), 401);
+  await read(await receipt(customerPath, boundaryId, otherCustomerCookie), 404);
+  await read(await receipt(adminPath, boundaryId, customerCookie), 403);
+  await read(await receipt(customerPath, foreignId, customerCookie), 404);
+  await read(await receipt(customerPath, randomUUID(), customerCookie), 404);
+  assert.equal(await readAt(boundaryId), null);
+
+  await read(await receipt(customerPath, boundaryId, customerCookie), 204);
+  assert.ok(await readAt(beforeId));
+  const firstReceipt = await readAt(boundaryId);
+  assert.ok(firstReceipt);
+  assert.equal(await readAt(ownId), null);
+  assert.equal(await readAt(afterBoundaryId), null);
+  assert.equal(await readAt(foreignId), null);
+  await read(await receipt(customerPath, boundaryId, customerCookie), 204);
+  assert.deepEqual(await readAt(boundaryId), firstReceipt);
+
+  await read(await receipt(adminPath, boundaryId, adminCookie), 204);
+  assert.ok(await readAt(ownId));
+  assert.equal(await readAt(afterBoundaryId), null);
+});
 
 test("customer request IDs replay safely and reject collisions", async () => {
   const ids = Array.from({ length: 3 }, () => randomUUID());
@@ -871,6 +1060,13 @@ test("message routes appear in the OpenAPI document", async () => {
   );
   assert.ok(spec.paths["/v1/messages/conversations"].post);
   assert.ok(spec.paths["/v1/messages/conversation/messages"].post);
+  assert.ok(
+    spec.paths["/v1/messages/conversations/{id}/read"].post.responses["204"],
+  );
+  assert.ok(
+    spec.paths["/v1/admin/conversations/{id}/read"].post.responses["204"],
+  );
+  assert.ok(spec.paths["/v1/auth/realtime-token"].post.responses["200"]);
 
   assert.equal(spec.paths["/v1/messages/conversation/context"], undefined);
 

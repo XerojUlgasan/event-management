@@ -46,6 +46,12 @@ import {
   getCustomerConversationByIdRoute,
   getCustomerConversationByIdRouteHandler,
 } from "./get-customer-conversation-by-id.js";
+import {
+  markAdminConversationReadRoute,
+  markAdminConversationReadRouteHandler,
+  markCustomerConversationReadRoute,
+  markCustomerConversationReadRouteHandler,
+} from "./mark-conversation-read.js";
 
 const routes = new OpenAPIHono<HonoEnv>({
   defaultHook: (result, c) => {
@@ -108,5 +114,13 @@ routes.openapi(updateConversationAiRoute, updateConversationAiRouteHandler);
 
 routes.openapi(retryCustomerMessageRoute, retryCustomerMessageRouteHandler);
 routes.openapi(retryAdminMessageRoute, retryAdminMessageRouteHandler);
+routes.openapi(
+  markCustomerConversationReadRoute,
+  markCustomerConversationReadRouteHandler,
+);
+routes.openapi(
+  markAdminConversationReadRoute,
+  markAdminConversationReadRouteHandler,
+);
 
 export default routes;

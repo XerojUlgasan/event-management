@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./messages": "./src/messages.ts",
+    "./realtime-events": "./src/realtime-events.ts",
     "./message-images": "./src/message-images.ts",
     "./ai-handoff": "./src/ai-handoff.ts",
     "./guest-chat": "./src/guest-chat.ts",

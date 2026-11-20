@@ -14,6 +14,7 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Realtime message bubbles](2026-11-21_02-35-00_conversation-realtime.md) | Signed-in open conversations / main | complete | Local browser, socket, and Edge verified. Use both migrations and the Realtime environment setup for rollout. |
 | [Direct quotation sending and package add-ons](2026-11-21_00-49-10_direct-quotation-send.md) | Send or Cancel and shared package actions / main | complete | Local browser, API, and Edge passed. Check migration before coordinated rollout. |
 | [Inline quotation editing](2026-11-21_00-11-00_inline-quotation-editing.md) | On-page editing and add-on rollout diagnosis / main | complete | Apply the quotation add-on migration on the intended database. |
 | [Quotation package add-ons](2026-11-21_00-00-00_quotation-package-addons.md) | Automatic add-on charges and compact quotation controls / main | complete | Reviewed and tested locally. Release the matching migration, API, and web together. |

@@ -4,6 +4,7 @@ import {
 } from "../../utils/ai-handoff.js";
 import type { Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
+import { publishConversationMessageData } from "./publish-conversation-message.js";
 
 // Caller holds the booking lock; lock the conversation during delivery.
 export async function createQuotationMessageData(
@@ -31,7 +32,7 @@ export async function createQuotationMessageData(
       quotation_id: quotationId,
       read_at: null,
     })
-    .returning("created_at")
+    .returning(["id", "created_at"])
     .executeTakeFirstOrThrow();
   await trx
     .updateTable("conversations")
@@ -48,6 +49,9 @@ export async function createQuotationMessageData(
     })
     .where("id", "=", conversation.id)
     .execute();
+
+  if (conversation.customer_id)
+    await publishConversationMessageData(trx, conversation.id, message.id);
 
   return true;
 }

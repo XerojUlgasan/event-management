@@ -9,6 +9,7 @@ import type { DB } from "../../db/types.js";
 import { assertGuestActive } from "../guest-chat/guest-conversation.js";
 import { finishToolCallData } from "../ai/finish-tool-call.js";
 import { linkToolCallsToReplyData } from "../ai/link-tool-calls-to-reply.js";
+import { publishConversationMessageData } from "./publish-conversation-message.js";
 
 export type HumanHandoffScope = {
   conversationId: string;
@@ -166,6 +167,9 @@ export function requestHumanHandoffData({
       customerMessageId: scope.customerMessageId,
       assistantMessageId: message.id,
     });
+
+    if (!previous && conversation.customer_id)
+      await publishConversationMessageData(trx, conversation.id, message.id);
 
     return { ...message, sender_display_name: null, sender_email: null };
   });

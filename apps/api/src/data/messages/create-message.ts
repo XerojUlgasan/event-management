@@ -16,6 +16,7 @@ import {
 import { sql, type Kysely } from "kysely";
 import { assertGuestActive } from "../guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
+import { publishConversationMessageData } from "./publish-conversation-message.js";
 
 type Database = Kysely<DB>;
 
@@ -150,6 +151,9 @@ export async function createMessageData(
       .select(["display_name", "email"])
       .where("id", "=", senderId)
       .executeTakeFirstOrThrow();
+
+    if (conversation.customer_id)
+      await publishConversationMessageData(trx, conversation.id, row.id);
 
     return {
       aiEnabled,

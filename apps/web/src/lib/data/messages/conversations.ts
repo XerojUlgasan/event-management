@@ -1,24 +1,18 @@
 import type { AiHandoff } from "@event-management/contracts/ai-handoff";
-import type {
-  MessageImage,
-  MessageProcessing,
-} from "@event-management/contracts/message-images";
 import { request } from "../../http/request";
 
-export type ChatMessage = {
-  id: string;
-  quotationId: string | null;
-  body: string;
-  senderId: string | null;
-  senderRole: "admin" | "customer" | "assistant";
-  replyToMessageId?: string | null;
-  senderName: string;
-  createdAt: string;
-  readAt: string | null;
-  images?: MessageImage[];
-  pendingFiles?: File[];
-  processing?: MessageProcessing | null;
-};
+type PersistedChatMessage =
+  import("@event-management/contracts/messages").ChatMessage;
+
+export type ChatMessage = Omit<
+  PersistedChatMessage,
+  "replyToMessageId" | "images" | "processing"
+> &
+  Partial<
+    Pick<PersistedChatMessage, "replyToMessageId" | "images" | "processing">
+  > & {
+    pendingFiles?: File[];
+  };
 
 export type ChatConversation = {
   id: string;
@@ -160,4 +154,19 @@ export const updateAdminConversationAi = (
     { aiEnabled, expectedAiVersion },
     undefined,
     "PATCH",
+  );
+
+export const getRealtimeToken = (conversationId: string) =>
+  request<{ token: string; expiresAt: string }>("/auth/realtime-token", {
+    conversationId,
+  });
+
+export const markConversationRead = (
+  id: string,
+  messageId: string,
+  admin: boolean,
+) =>
+  request<void>(
+    `${admin ? "/admin" : "/messages"}/conversations/${encodeURIComponent(id)}/read`,
+    { messageId },
   );

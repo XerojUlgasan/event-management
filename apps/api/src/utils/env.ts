@@ -45,6 +45,30 @@ export function createEnv(source: EnvSource) {
     }
   }
 
+  function localRealtimeSecret() {
+    const secret = configured("REALTIME_JWT_SECRET");
+    const target = configured("SUPABASE_URL");
+
+    if (!secret || !target || source.NODE_ENV === "production")
+      return undefined;
+
+    try {
+      const url = new URL(target);
+
+      if (url.protocol !== "http:" && url.protocol !== "https:")
+        return undefined;
+
+      const isLoopback = ["localhost", "127.0.0.1", "[::1]"].includes(
+        url.hostname,
+      );
+      const isLocalEdgeGateway = url.origin === "http://kong:8000";
+
+      return isLoopback || isLocalEdgeGateway ? secret : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   return {
     get API_PORT() {
       return Number(source.API_PORT ?? 3000);
@@ -110,6 +134,12 @@ export function createEnv(source: EnvSource) {
       if (!url || !apiKey) throw new Error("Media storage is not configured");
 
       return { url, apiKey, bucket };
+    },
+    get REALTIME_SIGNING() {
+      return {
+        jwk: configured("REALTIME_JWT_SIGNING_JWK"),
+        localSecret: localRealtimeSecret(),
+      };
     },
     get AI_TEXT() {
       const apiKey = configured("AI_GATEWAY_API_KEY");

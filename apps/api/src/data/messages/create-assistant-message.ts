@@ -7,6 +7,7 @@ import { sql, type Kysely } from "kysely";
 import { assertGuestActive } from "../guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
 import { linkToolCallsToReplyData } from "../ai/link-tool-calls-to-reply.js";
+import { publishConversationMessageData } from "./publish-conversation-message.js";
 
 export function createAssistantMessageData(
   db: Kysely<DB>,
@@ -95,6 +96,9 @@ export function createAssistantMessageData(
       })
       .where("id", "=", conversationId)
       .execute();
+
+    if (conversation.customer_id)
+      await publishConversationMessageData(trx, conversation.id, message.id);
 
     return { ...message, sender_display_name: null, sender_email: null };
   });
