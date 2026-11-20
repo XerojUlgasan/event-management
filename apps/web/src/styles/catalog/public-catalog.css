@@ -414,25 +414,15 @@
 
 /* Override the homepage hero padding — listing pages need much less. */
 .catalog-page {
-  padding-top: 40px;
+  padding-top: 48px;
   padding-bottom: 80px;
 }
 
-/* Heading row: title + subtitle on the left, filter controls on the right.
-   Wraps to stacked on narrow viewports. */
 .catalog-page-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 28px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--border-subtle);
-  flex-wrap: wrap;
+  margin-bottom: 24px;
 }
-
 .catalog-page-header-copy h1 {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
 }
 .catalog-page-header-copy p {
   margin: 0;
@@ -441,54 +431,9 @@
   line-height: 1.5;
 }
 
-/* Inline filter: dropdown + optional Clear link, no extra chrome */
-.catalog-page-filters {
-  flex-shrink: 0;
-  padding: 0;
-  border: 0;
-}
-.catalog-page-filters .catalog-filter-fields {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  grid-template-columns: unset;
-}
-.catalog-page-filters .ui-field {
-  gap: 4px;
-}
-.catalog-page-filters .ui-field span {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.catalog-page-filters .ui-control {
-  min-width: 180px;
-}
-.catalog-page-filters .catalog-filter-actions {
-  padding-top: 0;
-  align-self: flex-end;
-}
-.catalog-page-filters .catalog-filter-hint {
-  display: none;
-}
-
 @media (max-width: 700px) {
   .catalog-page {
-    padding-top: 28px;
+    padding-top: 32px;
     padding-bottom: 48px;
-  }
-  .catalog-page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 20px;
-  }
-  .catalog-page-filters .catalog-filter-fields {
-    flex-wrap: wrap;
-  }
-  .catalog-page-filters .ui-control {
-    min-width: 0;
-    width: 100%;
   }
 }
