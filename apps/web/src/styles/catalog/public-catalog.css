@@ -414,38 +414,32 @@
 
 /* Override the homepage hero padding — listing pages need much less. */
 .catalog-page {
-  padding-top: 48px;
+  padding-top: 40px;
   padding-bottom: 80px;
 }
 
-/* Header row: title+subtitle left, filter toggle button right */
+/* Stacked header: title → subtitle → filter toggle button */
 .catalog-page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
   margin-bottom: 24px;
-  flex-wrap: wrap;
 }
 
 .catalog-page-header-copy h1 {
   margin: 0 0 8px;
 }
 .catalog-page-header-copy p {
-  margin: 0;
+  margin: 0 0 20px;
   color: var(--muted);
   font-size: 15px;
   line-height: 1.5;
 }
 
-/* Filter toggle — <details><summary> pattern, no JS required */
+/* Filter toggle — <details><summary>, no JS required */
 .catalog-page-filter-toggle {
-  flex-shrink: 0;
-  margin-top: 8px;
+  display: inline-block;
 }
 
 .catalog-page-filter-toggle > summary {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
   list-style: none;
@@ -460,46 +454,21 @@
   user-select: none;
   transition: background 120ms ease, border-color 120ms ease;
 }
-.catalog-page-filter-toggle > summary::-webkit-details-marker {
-  display: none;
-}
-.catalog-page-filter-toggle > summary::marker {
-  display: none;
-}
-.catalog-page-filter-toggle > summary:hover {
-  background: var(--surface-muted);
-  border-color: var(--border-default);
-}
+.catalog-page-filter-toggle > summary::-webkit-details-marker { display: none; }
+.catalog-page-filter-toggle > summary::marker { display: none; }
+.catalog-page-filter-toggle > summary:hover { background: var(--surface-muted); }
 .catalog-page-filter-toggle > summary:focus-visible {
   outline: 2px solid var(--accent-strong);
   outline-offset: 2px;
 }
-
-/* Highlight the button when filters are active */
-.catalog-page-filter-toggle[open] > summary,
-.catalog-page-filter-toggle > summary[data-active] {
+.catalog-page-filter-toggle[open] > summary {
   color: var(--wine, var(--accent-strong));
   border-color: var(--accent-border, var(--accent-strong));
   background: var(--accent-faint);
 }
-
-.catalog-page-filter-icon {
-  display: flex;
-  align-items: center;
-}
-
-/* Filter panel sits below the header row, full width */
-.catalog-page-filter-toggle > .catalog-filters {
-  margin-top: 16px;
-}
+.catalog-page-filter-icon { display: flex; align-items: center; }
+.catalog-page-filter-toggle > .catalog-filters { margin-top: 16px; }
 
 @media (max-width: 700px) {
-  .catalog-page {
-    padding-top: 32px;
-    padding-bottom: 48px;
-  }
-  .catalog-page-header {
-    flex-direction: column;
-    gap: 12px;
-  }
+  .catalog-page { padding-top: 28px; padding-bottom: 48px; }
 }
