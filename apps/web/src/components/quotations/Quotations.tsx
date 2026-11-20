@@ -172,10 +172,11 @@ export function Quotations({
   }
 
   function sendOffer() {
-    if (!offer) return;
+    const target = offer ?? draft;
+    if (!target) return;
 
     void action("Offer sent to chat.", async () => {
-      await sendQuotation(offer.id, offer.updatedAt);
+      await sendQuotation(target.id, target.updatedAt);
     });
   }
 
@@ -248,10 +249,11 @@ export function Quotations({
   }
 
   function startRevision() {
-    if (!offer) return;
+    const target = offer ?? draft;
+    if (!target) return;
 
-    setRevisingOffer(offer);
-    setItems(offer.items);
+    setRevisingOffer(target);
+    setItems(target.items);
     setPendingItem(null);
   }
 
@@ -370,7 +372,18 @@ export function Quotations({
         <QuotationSummaryRead quotation={draft} />
       )}
 
-      {admin && (draft || revisingOffer) && canWrite && (
+      {admin && draft && canWrite && !revisingOffer && (
+        <QuotationOfferCard
+          quotation={draft}
+          admin={admin}
+          canWrite={canWrite}
+          busy={busy}
+          onRevise={startRevision}
+          onSend={sendOffer}
+        />
+      )}
+
+      {admin && revisingOffer && canWrite && (
         <QuotationDraftEditor
           draft={draft}
           revisingOffer={revisingOffer}
