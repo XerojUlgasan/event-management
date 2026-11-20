@@ -428,6 +428,11 @@
   line-height: 1.5;
 }
 
+/* Gap between the toolbar/filter and the card grid below */
+.catalog-page .catalog-browser {
+  margin-bottom: 28px;
+}
+
 @media (max-width: 700px) {
   .catalog-page { padding-top: 28px; padding-bottom: 48px; }
 }
