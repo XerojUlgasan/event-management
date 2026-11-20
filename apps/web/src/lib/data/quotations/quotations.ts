@@ -14,9 +14,11 @@ const quote = (id: string) => `/quotations/${encodeURIComponent(id)}`;
 export const getQuotations = (
   id: string,
   admin: boolean,
-  options: { cursor?: string; quotationId?: string } = {},
+  options: { cursor?: string; quotationId?: string; limit?: number } = {},
 ) => {
   const query = new URLSearchParams();
+
+  query.set("limit", String(options.limit ?? 5));
 
   if (options.cursor) query.set("cursor", options.cursor);
 
@@ -67,4 +69,14 @@ export const reviseQuotation = (
   request<{ quotation: Quotation }>(`/admin${quote(id)}/revision`, {
     expectedUpdatedAt,
     reason,
+  });
+
+export const acceptQuotation = (id: string, expectedUpdatedAt: string) =>
+  request<{ quotation: Quotation }>(`${quote(id)}/accept`, {
+    expectedUpdatedAt,
+  });
+
+export const requestRevision = (id: string, expectedUpdatedAt: string) =>
+  request<{ quotation: Quotation }>(`${quote(id)}/request-revision`, {
+    expectedUpdatedAt,
   });

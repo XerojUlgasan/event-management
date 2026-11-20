@@ -1,341 +1,29 @@
 import "../../styles/booking-requests/booking-request.css";
-import {
-  MAX_QUOTATION_ITEMS,
-  MAX_QUOTATION_DESCRIPTION_LENGTH,
-  MAX_QUOTATION_REASON_LENGTH,
-  MAX_QUOTATION_AMOUNT_MINOR,
-} from "@event-management/contracts/quotations";
-import type {
-  Quotation,
-  QuotationItem,
-  QuotationStatus,
-} from "@event-management/contracts/quotations";
-import { usePagination } from "../../lib/pagination/use-pagination";
-import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
-import {
-  centavosToPesos,
-  formatPesosFromMinor,
-  formatSignedPesosFromMinor,
-  pesosToCentavos,
-} from "../../lib/utils/formatting/money";
-import { formatEnPhDateTime } from "../../lib/utils/formatting/dates";
-import {
-  getAdminServices,
-  type AdminService,
-} from "../../lib/data/catalog/services";
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Badge,
-  Button,
-  FormField,
-  Input,
-  Pagination,
-  Select,
-  Textarea,
-  useNotifications,
-} from "@event-management/ui";
-import {
-  createQuotation,
-  getQuotation,
-  getQuotations,
-  reviseQuotation,
-  saveQuotation,
-  sendQuotation,
-} from "../../lib/data/quotations/quotations";
+import { useEffect, useMemo, useRef } from "react";
+import type { QuotationItem } from "@event-management/contracts/quotations";
+import { Button, useNotifications } from "@event-management/ui";
 import {
   getAdminBookingRequest,
   type BookingStatus,
 } from "../../lib/data/booking-requests/requests";
+import {
+  createQuotation,
+  reviseQuotation,
+  saveQuotation,
+  sendQuotation,
+  acceptQuotation,
+  requestRevision,
+} from "../../lib/data/quotations/quotations";
 import { ApiError } from "../../lib/http/request";
-
-const formatWhen = (value: string) => formatEnPhDateTime(new Date(value));
-
-const statusLabel: Record<QuotationStatus, string> = {
-  draft: "Draft",
-  sent: "Sent",
-  accepted: "Accepted",
-  superseded: "Superseded",
-};
-
-const statusTone: Record<
-  QuotationStatus,
-  "warning" | "info" | "success" | "neutral"
-> = {
-  draft: "warning",
-  sent: "info",
-  accepted: "success",
-  superseded: "neutral",
-};
-
-const kindLabels: Record<QuotationItem["kind"], string> = {
-  addition: "Addition",
-  deduction: "Deduction",
-  substitution: "Substitution",
-  adjustment: "Other adjustment",
-};
-
-function QuotationStatusBadge({ status }: { status: QuotationStatus }) {
-  return <Badge tone={statusTone[status]}>{statusLabel[status]}</Badge>;
-}
-
-function lineTotals(items: QuotationItem[]) {
-  const additions = items
-    .filter((line) => line.direction === "add")
-    .reduce((sum, line) => sum + line.amountMinor, 0);
-
-  const deductions = items
-    .filter((line) => line.direction === "deduct")
-    .reduce((sum, line) => sum + line.amountMinor, 0);
-
-  return { additions, deductions };
-}
-
-function readingIntro(quotation: Quotation) {
-  if (quotation.status === "accepted" && quotation.acceptedAt) {
-    return `Version ${quotation.version} was accepted on ${formatWhen(quotation.acceptedAt)}.`;
-  }
-
-  if (quotation.status === "sent" && quotation.sentAt) {
-    return `Version ${quotation.version} was sent on ${formatWhen(quotation.sentAt)}.`;
-  }
-
-  if (quotation.status === "superseded" && quotation.supersededAt) {
-    return `Version ${quotation.version} was sent on ${quotation.sentAt ? formatWhen(quotation.sentAt) : "an earlier date"}. Replaced by a newer version.`;
-  }
-
-  return `Version ${quotation.version}.`;
-}
-
-export function QuotationSummaryRead({ quotation }: { quotation: Quotation }) {
-  return (
-    <div className="quotation-offer">
-      <div className="quotation-offer-hero">
-        <div>
-          <p className="quotation-lede">
-            Offer total · Version {quotation.version}
-          </p>
-          <strong className="quotation-hero-total">
-            {formatPesosFromMinor(quotation.totalAmountMinor)}
-          </strong>
-        </div>
-        <QuotationStatusBadge status={quotation.status} />
-      </div>
-      <p className="quotation-lede">{readingIntro(quotation)}</p>
-      {quotation.revisionReason && (
-        <p className="quotation-meta">
-          Revision note: {quotation.revisionReason}
-        </p>
-      )}
-      <div className="quotation-summary-lines">
-        <div className="quotation-summary-line">
-          <div>
-            <b>Package base</b>
-            <span className="quotation-item-note">Included</span>
-          </div>
-          <b>{formatPesosFromMinor(quotation.baseAmountMinor)}</b>
-        </div>
-        {quotation.items.map((line) => (
-          <div className="quotation-summary-line" key={line.id}>
-            <div>
-              <b>{line.description || "Untitled adjustment"}</b>
-              <span className="quotation-item-note">
-                {line.direction === "deduct"
-                  ? "Takes off the total"
-                  : "Adds to the total"}
-              </span>
-            </div>
-            <b
-              className={
-                line.direction === "deduct"
-                  ? "quotation-amount-deduct"
-                  : undefined
-              }
-            >
-              {formatSignedPesosFromMinor(
-                line.direction === "deduct"
-                  ? -line.amountMinor
-                  : line.amountMinor,
-              )}
-            </b>
-          </div>
-        ))}
-      </div>
-      <p className="quotation-fine">
-        This offer does not confirm the booking or reserve the date.
-      </p>
-    </div>
-  );
-}
-
-function QuotationMathBox({
-  baseAmountMinor,
-  items,
-  totalMinor,
-}: {
-  baseAmountMinor: number;
-  items: QuotationItem[];
-  totalMinor: number;
-}) {
-  const { additions, deductions } = lineTotals(items);
-
-  return (
-    <>
-      <div className="quotation-math" aria-live="polite">
-        <div>
-          <span>Package base</span>
-          <span>{formatPesosFromMinor(baseAmountMinor)}</span>
-        </div>
-        <div>
-          <span>Additions</span>
-          <span>{formatSignedPesosFromMinor(additions)}</span>
-        </div>
-        <div>
-          <span>Deductions</span>
-          <span className="quotation-amount-deduct">
-            {formatSignedPesosFromMinor(-deductions)}
-          </span>
-        </div>
-        <div className="quotation-math-grand">
-          <span>Offer total</span>
-          <span>{formatPesosFromMinor(totalMinor)}</span>
-        </div>
-      </div>
-      {totalMinor < 0 && (
-        <p className="quotation-negative-warn" role="alert">
-          The total is below zero. Raise an amount or remove a deduction before
-          sending.
-        </p>
-      )}
-    </>
-  );
-}
-
-function QuotationAdjustmentCard({
-  line,
-  index,
-  services,
-  busy,
-  onChange,
-  onRemove,
-}: {
-  line: QuotationItem;
-  index: number;
-  services: AdminService[];
-  busy: boolean;
-  onChange: (patch: Partial<QuotationItem>) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <article className="quotation-adjustment">
-      <div className="quotation-adjustment-head">
-        <strong>Adjustment {index + 1}</strong>
-        <Button variant="link" size="small" disabled={busy} onClick={onRemove}>
-          Remove
-        </Button>
-      </div>
-      <div className="quotation-adjustment-fields">
-        <FormField label="Description" className="quotation-field-wide">
-          {(props) => (
-            <Input
-              {...props}
-              maxLength={MAX_QUOTATION_DESCRIPTION_LENGTH}
-              value={line.description}
-              onChange={(event) =>
-                onChange({ description: event.target.value })
-              }
-            />
-          )}
-        </FormField>
-        <FormField label="Effect on the total">
-          {(props) => (
-            <Select
-              {...props}
-              value={line.direction}
-              onChange={(event) =>
-                onChange({
-                  direction: event.target.value === "deduct" ? "deduct" : "add",
-                })
-              }
-            >
-              <option value="add">Adds to the total</option>
-              <option value="deduct">Takes off the total</option>
-            </Select>
-          )}
-        </FormField>
-        <FormField label="Change type">
-          {(props) => (
-            <Select
-              {...props}
-              value={line.kind}
-              onChange={(event) => {
-                const kind = event.target.value;
-
-                if (
-                  kind === "addition" ||
-                  kind === "deduction" ||
-                  kind === "substitution" ||
-                  kind === "adjustment"
-                )
-                  onChange({ kind });
-              }}
-            >
-              {(
-                Object.entries(kindLabels) as [QuotationItem["kind"], string][]
-              ).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
-        <FormField label="Related service">
-          {(props) => (
-            <Select
-              {...props}
-              value={line.serviceId ?? ""}
-              onChange={(event) =>
-                onChange({ serviceId: event.target.value || null })
-              }
-            >
-              <option value="">None</option>
-              {line.serviceId &&
-                !services.some((service) => service.id === line.serviceId) && (
-                  <option value={line.serviceId}>
-                    Selected service ({line.serviceId})
-                  </option>
-                )}
-              {services.map((service) => (
-                <option key={service.id} value={service.id}>
-                  {service.name}
-                  {service.archivedAt ? " (archived)" : ""}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
-        <FormField label="Amount (PHP)">
-          {(props) => (
-            <Input
-              {...props}
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="0.01"
-              max={centavosToPesos(MAX_QUOTATION_AMOUNT_MINOR)}
-              value={centavosToPesos(line.amountMinor) || ""}
-              onChange={(event) =>
-                onChange({
-                  amountMinor: pesosToCentavos(Number(event.target.value)),
-                })
-              }
-            />
-          )}
-        </FormField>
-      </div>
-    </article>
-  );
-}
+import { QuotationDraftEditor } from "./QuotationDraftEditor";
+import { QuotationEmptyState } from "./QuotationEmptyState";
+import { QuotationHistory } from "./QuotationHistory";
+import { QuotationNotices } from "./QuotationNotices";
+import { QuotationOfferCard } from "./QuotationOfferCard";
+import { QuotationSummaryRead } from "./QuotationSummaryRead";
+import { useQuotationEligibility } from "./use-quotation-eligibility";
+import { useQuotationServices } from "./use-quotation-services";
+import { useQuotationsData } from "./use-quotations-data";
 
 export function Quotations({
   bookingId,
@@ -344,6 +32,7 @@ export function Quotations({
   bookingStatus,
   refreshBooking,
   proposalAvailable = true,
+  historyLimit,
 }: {
   bookingId?: string;
   admin: boolean;
@@ -351,298 +40,80 @@ export function Quotations({
   bookingStatus?: BookingStatus;
   refreshBooking?: () => Promise<void>;
   proposalAvailable?: boolean;
+  historyLimit?: number;
 }) {
   const { notify, notifyError } = useNotifications();
-  const bookingScope = JSON.stringify([bookingId, admin, quotationId]);
-  const bookingScopeRef = useRef({ key: bookingScope, generation: 0 });
 
-  if (bookingScopeRef.current.key !== bookingScope) {
-    bookingScopeRef.current = {
-      key: bookingScope,
-      generation: bookingScopeRef.current.generation + 1,
-    };
-  }
+  const loadRef = useRef<() => Promise<unknown>>(async () => undefined);
 
-  const mountedRef = useRef(false);
-  const bookingRefreshSequence = useRef(0);
-  useEffect(() => {
-    mountedRef.current = true;
-
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-  const [loadedBooking, setLoadedBooking] = useState<{
-    id: string;
-    status: BookingStatus;
-    generation: number;
-  } | null>(null);
-  const [bookingError, setBookingError] = useState("");
-  const [needsBookingRefresh, setNeedsBookingRefresh] = useState(false);
-  const [refreshingBooking, setRefreshingBooking] = useState(false);
-  const status =
-    bookingStatus ??
-    (loadedBooking &&
-    loadedBooking.id === bookingId &&
-    loadedBooking.generation === bookingScopeRef.current.generation
-      ? loadedBooking.status
-      : undefined);
-  const canWrite =
-    admin &&
-    !!bookingId &&
-    !!status &&
-    status !== "declined" &&
-    status !== "cancelled" &&
-    !needsBookingRefresh &&
-    !refreshingBooking;
-  const canWriteRef = useRef(canWrite);
-  const eligibilityRef = useRef({ allowed: canWrite, generation: 0 });
-
-  if (eligibilityRef.current.allowed !== canWrite) {
-    eligibilityRef.current = {
-      allowed: canWrite,
-      generation: eligibilityRef.current.generation + 1,
-    };
-  }
-
-  canWriteRef.current = canWrite;
-
-  async function loadBooking() {
-    if (!bookingId || !admin) return;
-
-    const requestGeneration = bookingScopeRef.current.generation;
-    const sequence = ++bookingRefreshSequence.current;
-
-    const isCurrent = () =>
-      mountedRef.current &&
-      bookingScopeRef.current.generation === requestGeneration &&
-      bookingRefreshSequence.current === sequence;
-
-    canWriteRef.current = false;
-    setNeedsBookingRefresh(true);
-    setRefreshingBooking(true);
-    setBookingError("");
-
-    try {
-      if (refreshBooking) await refreshBooking();
-      else {
-        const result = await getAdminBookingRequest(bookingId);
-
-        if (!isCurrent()) return;
-
-        setLoadedBooking({
-          id: bookingId,
-          status: result.bookingRequest.status,
-          generation: requestGeneration,
-        });
-      }
-
-      if (!isCurrent()) return;
-
-      if ((await load()) && isCurrent()) setNeedsBookingRefresh(false);
-    } catch (cause) {
-      if (!isCurrent()) return;
-
-      setBookingError(notifyError(cause, "Unable to refresh the booking."));
-      setNeedsBookingRefresh(true);
-    } finally {
-      if (isCurrent()) setRefreshingBooking(false);
-    }
-  }
-  useEffect(() => {
-    setNeedsBookingRefresh(false);
-    setRefreshingBooking(false);
-    setBookingError("");
-  }, [bookingScope]);
-  useEffect(() => {
-    if (!admin || bookingStatus !== undefined || !bookingId) return;
-
-    let active = true;
-    const requestGeneration = bookingScopeRef.current.generation;
-    setLoadedBooking(null);
-    setBookingError("");
-    void getAdminBookingRequest(bookingId)
-      .then((result) => {
-        if (active)
-          setLoadedBooking({
-            id: bookingId,
-            status: result.bookingRequest.status,
-            generation: requestGeneration,
-          });
-      })
-      .catch((cause) => {
-        if (active)
-          setBookingError(notifyError(cause, "Unable to load the booking."));
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [admin, bookingId, bookingStatus, bookingScope]);
-  const generation = useRequestGeneration();
-  const [services, setServices] = useState<AdminService[]>([]);
-  const [serviceError, setServiceError] = useState("");
-  const [serviceCursor, setServiceCursor] = useState<string | null>(null);
-  const [serviceLoading, setServiceLoading] = useState(false);
-  async function loadServices(cursor?: string) {
-    const current = generation.current();
-    setServiceLoading(true);
-
-    try {
-      const result = await getAdminServices({ cursor });
-
-      if (!generation.isCurrent(current)) return;
-
-      setServices((previous) =>
-        cursor ? [...previous, ...result.services] : result.services,
-      );
-      setServiceCursor(result.nextCursor);
-      setServiceError("");
-    } catch (cause) {
-      if (!generation.isCurrent(current)) return;
-
-      setServiceError(notifyError(cause, "Unable to load services."));
-    } finally {
-      if (generation.isCurrent(current)) setServiceLoading(false);
-    }
-  }
-  const [rows, setRows] = useState<Quotation[]>([]),
-    [draft, setDraft] = useState<Quotation | null>(null),
-    [items, setItems] = useState<QuotationItem[]>([]);
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
-  const [loadedPageKey, setLoadedPageKey] = useState("");
-  const [loadedScope, setLoadedScope] = useState("");
-  const [loading, setLoading] = useState(true),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [reason, setReason] = useState("");
-  const [showRevision, setShowRevision] = useState(false);
-  const [offer, setOffer] = useState<Quotation | null>(null);
-  const [previousDraftVersion, setPreviousDraftVersion] = useState<
-    number | null
-  >(null);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const identity = JSON.stringify([
-    bookingId ?? null,
+  const {
+    status,
+    canWrite,
+    canWriteRef,
+    eligibilityRef,
+    mountedRef,
+    bookingScopeRef,
+    bookingError,
+    needsBookingRefresh,
+    setNeedsBookingRefresh,
+    refreshingBooking,
+    loadBooking,
+  } = useQuotationEligibility({
     admin,
-    quotationId ?? null,
-  ]);
-  const pagination = usePagination(identity);
-  const pageRequest = useRef(0);
-  const currentPageKey = JSON.stringify([
-    bookingId ?? null,
+    bookingId,
+    quotationId,
+    bookingStatus,
+    refreshBooking,
+    load: () => loadRef.current(),
+  });
+
+  const data = useQuotationsData({
+    bookingId,
     admin,
-    quotationId ?? null,
-    pagination.cursor ?? null,
-  ]);
-  const pageKeyRef = useRef(currentPageKey);
-  pageKeyRef.current = currentPageKey;
-  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(
-    null,
-  );
-
-  async function load(cursor = pagination.cursor) {
-    const currentGeneration = generation.current();
-    const sequence = ++pageRequest.current;
-    const key = JSON.stringify([
-      bookingId ?? null,
-      admin,
-      quotationId ?? null,
-      cursor ?? null,
-    ]);
-    setLoading(true);
-    setError("");
-
-    try {
-      const result =
-        quotationId && !admin
-          ? (() =>
-              getQuotation(quotationId).then(({ quotation }) => ({
-                quotations: [quotation],
-                nextCursor: null,
-                currentDraft: null,
-                currentOffer:
-                  quotation.status === "sent" || quotation.status === "accepted"
-                    ? quotation
-                    : null,
-                previousDraftVersion: null,
-              })))()
-          : bookingId
-            ? await getQuotations(bookingId, admin, { cursor, quotationId })
-            : {
-                quotations: [],
-                nextCursor: null,
-                currentDraft: null,
-                currentOffer: null,
-                previousDraftVersion: null,
-              };
-
-      const resolved = await result;
-
-      if (
-        !generation.isCurrent(currentGeneration) ||
-        sequence !== pageRequest.current ||
-        pageKeyRef.current !== key
-      )
-        return;
-
-      setRows(resolved.quotations);
-      setLoadedPageKey(key);
-      setLoadedScope(identity);
-      setNextCursor(resolved.nextCursor);
-      setOffer(resolved.currentOffer);
-      setPreviousDraftVersion(resolved.previousDraftVersion);
-
-      if (
-        draftRef.current?.id !== resolved.currentDraft?.id ||
-        draftRef.current?.updatedAt !== resolved.currentDraft?.updatedAt
-      )
-        setItems(resolved.currentDraft?.items ?? []);
-
-      setDraft(resolved.currentDraft);
-
-      return true;
-    } catch (cause) {
-      if (
-        !generation.isCurrent(currentGeneration) ||
-        sequence !== pageRequest.current ||
-        pageKeyRef.current !== key
-      )
-        return;
-
-      setError(notifyError(cause, "Unable to load quotations."));
-    } finally {
-      if (
-        generation.isCurrent(currentGeneration) &&
-        sequence === pageRequest.current &&
-        pageKeyRef.current === key
-      )
-        setLoading(false);
-    }
-  }
-  useEffect(() => {
-    void load();
-
-    return () => {
-      pageRequest.current++;
-    };
-  }, [bookingId, admin, quotationId, pagination.cursor]);
-  useEffect(() => {
-    if (admin) void loadServices();
-
-    return () => {
-      generation.bump();
-    };
-  }, [bookingId, admin, quotationId]);
-
-  useEffect(() => {
-    if (!canWrite) setShowRevision(false);
-  }, [canWrite]);
+    quotationId,
+    historyLimit,
+  });
+  loadRef.current = data.load;
+  const {
+    services,
+    serviceError,
+    serviceCursor,
+    serviceLoading,
+    loadServices,
+  } = useQuotationServices({ admin, bookingId, quotationId });
+  const {
+    rows,
+    setRows,
+    draft,
+    setDraft,
+    items,
+    setItems,
+    pendingItem,
+    setPendingItem,
+    revisingOffer,
+    setRevisingOffer,
+    loadedPageKey,
+    loadedScope,
+    loading,
+    busy,
+    setBusy,
+    error,
+    setError,
+    offer,
+    setOffer,
+    previousDraftVersion,
+    nextCursor,
+    pagination,
+    currentPageKey,
+    expandedHistoryId,
+    setExpandedHistoryId,
+    load,
+    identity,
+  } = data;
 
   useEffect(() => {
     setBusy(false);
-  }, [bookingScope]);
+  }, [identity]);
 
   async function action(
     successMessage: string,
@@ -688,30 +159,167 @@ export function Quotations({
     }
   }
 
-  const update = (index: number, patch: Partial<QuotationItem>) =>
-    canWriteRef.current &&
-    setItems((current) =>
-      current.map((line, i) => (i === index ? { ...line, ...patch } : line)),
-    );
+  function createDraft() {
+    if (!bookingId) return;
 
-  const editorTotal =
-    (draft?.baseAmountMinor ?? 0) +
-    items.reduce(
-      (sum, line) =>
-        sum + (line.direction === "add" ? line.amountMinor : -line.amountMinor),
-      0,
+    void action("Quotation draft created.", async (canContinue) => {
+      const booking = await getAdminBookingRequest(bookingId);
+
+      if (!canContinue()) return;
+
+      if (
+        !canWriteRef.current ||
+        ["declined", "cancelled"].includes(booking.bookingRequest.status)
+      ) {
+        canWriteRef.current = false;
+        setNeedsBookingRefresh(true);
+        throw new Error("Refresh the booking before retrying.");
+      }
+
+      await createQuotation(bookingId, booking.bookingRequest.updatedAt);
+    });
+  }
+
+  function sendOffer() {
+    const target = offer ?? draft;
+    if (!target) return;
+
+    void action("Offer sent to chat.", async () => {
+      await sendQuotation(target.id, target.updatedAt);
+    });
+  }
+
+  function acceptOffer() {
+    if (!offer) return;
+
+    void action("Quotation accepted.", async () => {
+      await acceptQuotation(offer.id, offer.updatedAt);
+    });
+  }
+
+  function requestOfferRevision() {
+    if (!offer) return;
+
+    void action("Revision requested.", async () => {
+      await requestRevision(offer.id, offer.updatedAt);
+    });
+  }
+
+  async function saveDraft() {
+    if (!canWriteRef.current || (!revisingOffer && !draft)) return;
+
+    setBusy(true);
+    setError("");
+
+    try {
+      if (revisingOffer) {
+        const revised = await reviseQuotation(
+          revisingOffer.id,
+          revisingOffer.updatedAt,
+          "Revised",
+        );
+        const saved = await saveQuotation(
+          revised.quotation.id,
+          revised.quotation.updatedAt,
+          items,
+        );
+
+        notify("Revision saved.");
+        setRevisingOffer(null);
+        setItems([]);
+        setPendingItem(null);
+        setRows((current) => [
+          ...current.map((quotation) =>
+            quotation.id === revisingOffer.id
+              ? { ...quotation, status: "superseded" as const }
+              : quotation,
+          ),
+          saved.quotation,
+        ]);
+        setOffer(saved.quotation);
+      } else {
+        const saved = await saveQuotation(draft!.id, draft!.updatedAt, items);
+
+        notify("Adjustments saved.");
+        setRows((current) =>
+          current.map((quotation) =>
+            quotation.id === saved.quotation.id ? saved.quotation : quotation,
+          ),
+        );
+        setDraft(null);
+        setPendingItem(null);
+        setOffer(saved.quotation);
+      }
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 409) {
+        canWriteRef.current = false;
+        setNeedsBookingRefresh(true);
+      }
+
+      setError(notifyError(cause, "Unable to save."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function cancelEdit() {
+    if (revisingOffer) setRevisingOffer(null);
+    else if (draft) {
+      setDraft(null);
+      setOffer(draft);
+    }
+
+    setItems([]);
+    setPendingItem(null);
+  }
+
+  function startRevision() {
+    const target = offer ?? draft;
+    if (!target) return;
+
+    setRevisingOffer(target);
+    setItems(target.items);
+    setPendingItem(null);
+  }
+
+  function removeItem(index: number) {
+    if (!canWriteRef.current) return;
+
+    setItems((current) =>
+      current.filter((_, itemIndex) => itemIndex !== index),
     );
+  }
+
+  function startAddAdjustment() {
+    setPendingItem({
+      id: crypto.randomUUID(),
+      direction: "add",
+      kind: "adjustment",
+      description: "",
+      amountMinor: 0,
+      serviceId: null,
+    });
+  }
+
+  function updatePending(patch: Partial<QuotationItem>) {
+    setPendingItem((current) => (current ? { ...current, ...patch } : current));
+  }
+
+  function addPending() {
+    if (!pendingItem) return;
+
+    setItems((current) => [...current, pendingItem]);
+    setPendingItem(null);
+  }
 
   const sorted = useMemo(
     () => [...rows].sort((a, b) => b.version - a.version),
     [rows],
   );
 
-  const currentOffer = offer;
-
   const earlierVersions =
     loadedPageKey === currentPageKey
-      ? sorted.filter((q) => q.status === "superseded")
+      ? sorted.filter((quotation) => quotation.status === "superseded")
       : [];
 
   const adminEmpty =
@@ -741,89 +349,28 @@ export function Quotations({
 
   return (
     <section className="quotation-builder" aria-label="Quotations">
-      {admin && (status === "declined" || status === "cancelled") && (
-        <p>This request is {status}. Packages and quotations are read-only.</p>
-      )}
-      {admin && (bookingError || needsBookingRefresh) && (
-        <p role="alert">
-          {bookingError || "Refresh the booking before retrying."}{" "}
-          <Button
-            variant="secondary"
-            disabled={refreshingBooking}
-            onClick={() => void loadBooking()}
-          >
-            Refresh booking
-          </Button>
-        </p>
-      )}
-      {admin && quotationId && bookingId && (
-        <p className="quotation-meta">
-          <a href={`/app/bookings/${encodeURIComponent(bookingId)}`}>
-            Open booking quotations to continue editing revisions
-          </a>
-        </p>
-      )}
-
-      {loading && <p role="status">Loading quotations…</p>}
-      {error && (
-        <p role="alert">
-          {error}{" "}
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() => void load()}
-          >
-            Refresh quotations
-          </Button>
-        </p>
-      )}
+      <QuotationNotices
+        admin={admin}
+        status={status}
+        bookingError={bookingError}
+        needsBookingRefresh={needsBookingRefresh}
+        refreshingBooking={refreshingBooking}
+        onRefreshBooking={() => void loadBooking()}
+        bookingId={bookingId}
+        quotationId={quotationId}
+        loading={loading}
+        error={error}
+        busy={busy}
+        onReload={() => void load()}
+      />
 
       {adminEmpty && (
-        <section className="quotation-empty">
-          <h2>No quotation yet</h2>
-          {canWrite && !proposalAvailable && (
-            <p>Prepare or choose a package before creating a quotation.</p>
-          )}
-          {canWrite && proposalAvailable && (
-            <>
-              <p className="quotation-lede">
-                Create a draft from the current package price. You can add
-                adjustments before sending it.
-              </p>
-              <Button
-                disabled={busy}
-                onClick={() =>
-                  void action(
-                    "Quotation draft created.",
-                    async (canContinue) => {
-                      const booking = await getAdminBookingRequest(bookingId);
-
-                      if (!canContinue()) return;
-
-                      if (
-                        !canWriteRef.current ||
-                        ["declined", "cancelled"].includes(
-                          booking.bookingRequest.status,
-                        )
-                      ) {
-                        canWriteRef.current = false;
-                        setNeedsBookingRefresh(true);
-                        throw new Error("Refresh the booking before retrying.");
-                      }
-
-                      await createQuotation(
-                        bookingId,
-                        booking.bookingRequest.updatedAt,
-                      );
-                    },
-                  )
-                }
-              >
-                Create draft
-              </Button>
-            </>
-          )}
-        </section>
+        <QuotationEmptyState
+          canWrite={canWrite}
+          proposalAvailable={proposalAvailable}
+          busy={busy}
+          onCreateDraft={createDraft}
+        />
       )}
 
       {!loading && !error && !admin && rows.length === 0 && (
@@ -849,304 +396,65 @@ export function Quotations({
       {admin && draft && !canWrite && (
         <QuotationSummaryRead quotation={draft} />
       )}
-      {admin && draft && canWrite && (
-        <fieldset className="quotation-stack" disabled={busy || !canWrite}>
-          <div className="quotation-offer-head">
-            <div>
-              <h2 className="quotation-offer-title">Version {draft.version}</h2>
-              <div className="quotation-meta-stack">
-                {previousDraftVersion != null && (
-                  <p className="quotation-meta">
-                    Draft revision of version {previousDraftVersion}.
-                  </p>
-                )}
-                <p className="quotation-meta">
-                  Review the adjustments and save. Nothing is sent until you
-                  choose Save and send.
-                </p>
-              </div>
-            </div>
-            <QuotationStatusBadge status="draft" />
-          </div>
-          {!draft.adjustmentsReviewed && (
-            <p className="quotation-lede">
-              Review the adjustments and save to confirm your review.
-            </p>
-          )}
-          <p className="quotation-lede">
-            Package base stays {formatPesosFromMinor(draft.baseAmountMinor)}.
-            Each adjustment below is added to it or taken off it.
-          </p>
 
-          {serviceCursor && (
-            <Button
-              variant="secondary"
-              disabled={serviceLoading}
-              onClick={() => void loadServices(serviceCursor)}
-            >
-              Load more services
-            </Button>
-          )}
-          {items.map((line, index) => (
-            <QuotationAdjustmentCard
-              key={line.id}
-              line={line}
-              index={index}
-              services={services}
-              busy={busy}
-              onChange={(patch) => update(index, patch)}
-              onRemove={() =>
-                canWriteRef.current &&
-                setItems((current) => current.filter((_, i) => i !== index))
-              }
-            />
-          ))}
-
-          <div className="quotation-actions quotation-actions-start">
-            <Button
-              variant="secondary"
-              disabled={items.length >= MAX_QUOTATION_ITEMS}
-              onClick={() =>
-                canWriteRef.current &&
-                setItems((current) => [
-                  ...current,
-                  {
-                    id: crypto.randomUUID(),
-                    direction: "add",
-                    kind: "adjustment",
-                    description: "",
-                    amountMinor: 0,
-                    serviceId: null,
-                  },
-                ])
-              }
-            >
-              Add adjustment
-            </Button>
-          </div>
-
-          <QuotationMathBox
-            baseAmountMinor={draft.baseAmountMinor}
-            items={items}
-            totalMinor={editorTotal}
-          />
-
-          <p className="quotation-fine">
-            This offer does not confirm the booking or reserve the date.
-          </p>
-
-          <div className="quotation-actions">
-            <Button
-              variant="secondary"
-              disabled={busy}
-              onClick={() =>
-                void action("Quotation adjustments saved.", () =>
-                  saveQuotation(draft.id, draft.updatedAt, items),
-                )
-              }
-            >
-              Save adjustments
-            </Button>
-            <Button
-              disabled={busy || editorTotal < 0}
-              onClick={() =>
-                void action(
-                  "Quotation saved and sent.",
-                  async (canContinue) => {
-                    const saved = await saveQuotation(
-                      draft.id,
-                      draft.updatedAt,
-                      items,
-                    );
-
-                    if (!canContinue()) return;
-
-                    setDraft(saved.quotation);
-                    setItems(saved.quotation.items);
-                    setRows((current) =>
-                      current.map((quote) =>
-                        quote.id === saved.quotation.id
-                          ? saved.quotation
-                          : quote,
-                      ),
-                    );
-                    await sendQuotation(
-                      saved.quotation.id,
-                      saved.quotation.updatedAt,
-                    );
-                  },
-                )
-              }
-            >
-              Save and send
-            </Button>
-          </div>
-
-          {admin && (
-            <div className="quotation-revision quotation-revision-quiet">
-              <FormField label="Reason for the revision">
-                {(props) => (
-                  <Textarea
-                    {...props}
-                    maxLength={MAX_QUOTATION_REASON_LENGTH}
-                    value={reason}
-                    onChange={(event) => setReason(event.target.value)}
-                  />
-                )}
-              </FormField>
-              <div className="quotation-actions quotation-actions-start">
-                <Button
-                  variant="secondary"
-                  disabled={busy || !reason.trim()}
-                  onClick={() =>
-                    void action(
-                      "Quotation revision started. Review and save the draft.",
-                      async (canContinue) => {
-                        await reviseQuotation(
-                          draft.id,
-                          draft.updatedAt,
-                          reason.trim(),
-                        );
-
-                        if (canContinue()) setReason("");
-                      },
-                    )
-                  }
-                >
-                  Start another revision
-                </Button>
-              </div>
-            </div>
-          )}
-        </fieldset>
+      {admin && draft && canWrite && !revisingOffer && (
+        <QuotationOfferCard
+          quotation={draft}
+          admin={admin}
+          canWrite={canWrite}
+          busy={busy}
+          onRevise={startRevision}
+          onSend={sendOffer}
+        />
+      )}
+      {admin && revisingOffer && canWrite && (
+        <QuotationDraftEditor
+          draft={draft}
+          revisingOffer={revisingOffer}
+          previousDraftVersion={previousDraftVersion}
+          items={items}
+          pendingItem={pendingItem}
+          services={services}
+          serviceCursor={serviceCursor}
+          serviceLoading={serviceLoading}
+          busy={busy}
+          onRemoveItem={removeItem}
+          onStartAdd={startAddAdjustment}
+          onUpdatePending={updatePending}
+          onCancelPending={() => setPendingItem(null)}
+          onAddPending={addPending}
+          onRefreshServices={(cursor) => void loadServices(cursor)}
+          onCancel={cancelEdit}
+          onSave={() => void saveDraft()}
+        />
       )}
 
-      {!draft && currentOffer && (
-        <div className="quotation-stack">
-          <QuotationSummaryRead quotation={currentOffer} />
-          {!admin && (
-            <p className="quotation-lede">Discuss this offer in Messages.</p>
-          )}
-          {admin && canWrite && (
-            <div className="quotation-revision">
-              {!showRevision ? (
-                <div className="quotation-actions quotation-actions-start">
-                  <Button disabled={busy} onClick={() => setShowRevision(true)}>
-                    Revise this offer
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <h3>Revise this offer</h3>
-                  {currentOffer.status === "accepted" && (
-                    <p className="quotation-lede">
-                      Starting a revision immediately supersedes this accepted
-                      offer.
-                    </p>
-                  )}
-                  <FormField label="Reason for the revision">
-                    {(props) => (
-                      <Textarea
-                        {...props}
-                        maxLength={MAX_QUOTATION_REASON_LENGTH}
-                        value={reason}
-                        onChange={(event) => setReason(event.target.value)}
-                      />
-                    )}
-                  </FormField>
-                  <div className="quotation-actions">
-                    <Button
-                      variant="secondary"
-                      disabled={busy}
-                      onClick={() => {
-                        setShowRevision(false);
-                        setReason("");
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      disabled={busy || !reason.trim()}
-                      onClick={() =>
-                        void action(
-                          "Quotation revision started. Review and save the draft.",
-                          async (canContinue) => {
-                            await reviseQuotation(
-                              currentOffer.id,
-                              currentOffer.updatedAt,
-                              reason.trim(),
-                            );
-
-                            if (canContinue()) {
-                              setReason("");
-                              setShowRevision(false);
-                            }
-                          },
-                        )
-                      }
-                    >
-                      Start revision
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
+      {!draft && offer && !revisingOffer && (
+        <QuotationOfferCard
+          quotation={offer}
+          admin={admin}
+          canWrite={canWrite}
+          busy={busy}
+          onRevise={startRevision}
+          onSend={sendOffer}
+          onAccept={acceptOffer}
+          onRequestRevision={requestOfferRevision}
+        />
       )}
 
-      {(earlierVersions.length > 0 || pagination.page > 1 || !!nextCursor) && (
-        <section
-          className="quotation-history"
-          aria-labelledby="quotation-history-title"
-        >
-          <h2 id="quotation-history-title">Earlier versions</h2>
-          {earlierVersions.map((quotation) => {
-            const expanded = expandedHistoryId === quotation.id;
-
-            return (
-              <div key={quotation.id}>
-                <Button
-                  variant="plain"
-                  className="quotation-history-item"
-                  aria-expanded={expanded}
-                  onClick={() =>
-                    setExpandedHistoryId(expanded ? null : quotation.id)
-                  }
-                >
-                  <span>
-                    <strong>
-                      Version {quotation.version} ·{" "}
-                      {statusLabel[quotation.status]}
-                    </strong>
-                    <span>
-                      {quotation.sentAt
-                        ? `Sent ${formatWhen(quotation.sentAt)}`
-                        : `Created ${formatWhen(quotation.createdAt)}`}
-                    </span>
-                  </span>
-                  <b>{formatPesosFromMinor(quotation.totalAmountMinor)}</b>
-                </Button>
-                {expanded && (
-                  <div className="quotation-history-body">
-                    <QuotationSummaryRead quotation={quotation} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {!quotationId && (
-            <Pagination
-              page={pagination.page}
-              hasNextPage={!!nextCursor}
-              onPrevious={pagination.previous}
-              onNext={() => pagination.next(nextCursor)}
-              pending={loading || busy || loadedPageKey !== currentPageKey}
-              label="Quotation history"
-            />
-          )}
-        </section>
-      )}
+      <QuotationHistory
+        quotations={earlierVersions}
+        expandedId={expandedHistoryId}
+        onToggle={(id) =>
+          setExpandedHistoryId(expandedHistoryId === id ? null : id)
+        }
+        page={pagination.page}
+        hasNextPage={!!nextCursor}
+        onPrevious={pagination.previous}
+        onNext={() => pagination.next(nextCursor)}
+        pending={loading || busy || loadedPageKey !== currentPageKey}
+        showPagination={!quotationId}
+      />
     </section>
   );
 }

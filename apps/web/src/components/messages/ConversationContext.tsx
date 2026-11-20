@@ -22,7 +22,8 @@ import {
   BookingStatusBadge,
 } from "../booking-requests/BookingRequestDisplay";
 import { PackagePreview } from "../catalog/PackagePreview";
-import { QuotationSummaryRead } from "../quotations/Quotations";
+import { QuotationSummaryRead } from "../quotations/QuotationSummaryRead";
+import { Quotations } from "../quotations/Quotations";
 import { adminBookingRequestPath, customerPaths } from "../app/routes";
 
 export type ConversationContextView = "details" | "package" | "quotation";
@@ -162,6 +163,8 @@ export function ConversationContext({
         } else if (view === "package") {
           const response = await getBookingPackage(bookingId, admin);
           result = { kind: "package", package: response.package };
+        } else if (admin) {
+          return; // admin quotation view is handled by the Quotations component directly
         } else {
           result = {
             kind: "quotation",
@@ -208,6 +211,17 @@ export function ConversationContext({
         onClose={onClose}
         showBookingAction={false}
       />
+    );
+
+  if (view === "quotation" && admin)
+    return (
+      <Dialog
+        title="Latest sent quotation"
+        onClose={onClose}
+        className="conversation-quotation-dialog"
+      >
+        <Quotations bookingId={bookingId} admin={true} historyLimit={3} />
+      </Dialog>
     );
 
   const body = (
