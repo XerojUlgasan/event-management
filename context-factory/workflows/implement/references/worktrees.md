@@ -1,49 +1,63 @@
-# Test worktrees in .room
+# Test environments in .room
 
-Use `.room/<name>` under the primary checkout for separate Git checkouts you or the user can test. Each folder is the worktree root, with `apps/`, `packages/`, and its own working files directly inside it. Keep existing worktrees elsewhere until a move is explicitly requested.
+When asked to **create or start a room**, deliver a running test environment with dependencies installed, migrations deployed, and seeded data. Use the room runner below; creating a Git checkout alone is incomplete.
 
-## Choose a short name
+## Names and revisions
 
-Use one or two lowercase words in kebab-case describing the feature or purpose: `catalog`, `quotes`, `chat-fix`, `pr45`. Use `test` for a general committed baseline. If a name is occupied, reuse it only when it belongs to the same task; otherwise add a meaningful suffix such as `quotes-api`. Avoid timestamps, random IDs, repeated repository names, and vague names such as `worktree1`. Branch names remain separate and use `codex/` for new agent branches.
+Rooms live directly under the primary checkout's `.room/<name>`, with `apps/` and `packages/` directly inside each worktree. Use short lowercase names describing the feature or purpose: `catalog`, `quotes`, `chat-fix`, `pr45`, or `test`. Prefer one or two words in kebab-case; avoid timestamps, random IDs, repeated repository names, and `worktree1`. Preserve existing rooms and worktrees elsewhere.
 
-## Create or select a checkout
+Inspect `git status --short`, `git rev-parse HEAD`, and `git worktree list` first. From a linked worktree, locate and return to the primary checkout before running the commands below. Choose the requested revision explicitly: new rooms contain committed files at that revision and do not inherit unfinished changes from the primary checkout. Transfer only task-authorized changes when testing unfinished work. Existing rooms retain their current revision and local changes.
 
-1. From the primary checkout, inspect `git status --short`, `git rev-parse HEAD`, and `git worktree list`. From a linked worktree, locate the primary checkout in that list and return there before creating another room. Keep all rooms directly under the primary `.room`; avoid nesting rooms inside rooms.
-2. Select the intended branch or commit explicitly. Worktrees contain committed files at that revision; they do **not** inherit uncommitted changes, local environment files, dependencies, or the primary checkout's ignored files. If testing an unfinished change, agree which files or commit belong to the task and transfer only that work; preserve the source checkout.
-3. Choose one command below, run from the primary checkout. Replace the sample name, branch, and revision for the task; inspect existing destinations first.
+## Create, start, and inspect
+
+The runner requires Linux for process ownership checks, plus the [local development prerequisites](../../../../README.md#local-development). Run from the primary checkout:
 
 ```sh
-# A disposable committed snapshot, including when main is already checked out.
-git worktree add --detach .room/test HEAD
+# Create a detached test checkout at the selected commit or branch, then prepare it.
+pnpm room create quotes HEAD
 
-# An existing local branch that is not checked out elsewhere.
-git worktree add .room/quotes codex/quotes
+# Prepare and start an existing room, including the original .room/test.
+pnpm room start test
 
-# A new task branch from an explicitly selected starting revision.
-git worktree add -b codex/chat-fix .room/chat-fix HEAD
+pnpm room status test
+pnpm room list
 ```
 
-Git refuses a branch already checked out in another worktree. Use that checkout or a detached snapshot of its commit instead of forcing it. Never overwrite an occupied folder or reset an existing branch to create a room.
+The runner installs each room's dependencies with the frozen lockfile, starts a uniquely named local Supabase project with database, Storage and Studio, runs the selected revision's `db:deploy` and `db:seed`, then starts its Node API, website, and background worker. It checks actual HTTP readiness and seeded authentication before reporting ready. Preparation errors leave the room unready and identify private logs; resolve the failing step and retry. A running, healthy start is idempotent and does not rerun preparation over active browser sessions.
 
-Confirm `git -C .room/test status --short` and `git -C .room/test rev-parse HEAD` (substitute your name), then check `git worktree list`. Report the path, branch or detached commit, and whether task changes are present. A detached room is suitable for testing; create a `codex/` branch there before retaining new commits.
+The room uses the **Node API** against its own Supabase database and Storage. Restart the room after API or worker code changes so those foreground processes load the edited source; the website retains Astro development reloads. Unused Realtime, mail, analytics, Storage vector service, and Edge Runtime are disabled for rooms; Supabase Auth remains enabled to supply Storage credentials. Application sign-in still belongs to the Node API, and SQL pgvector remains available. This tests application behavior; it does not prove the Edge Function bundle. Follow [local tools](local-tools.md) and the selected revision's area guidance for additional checks. Read that room's `AGENTS.md` and task router; retain these setup rules from the primary checkout when testing a revision that predates the runner.
 
-## Prepare and test
+## Isolation and configuration
 
-- Read the selected worktree's `AGENTS.md` and task router. When testing an older revision that predates this guide, also retain these room setup and cleanup rules from the primary checkout. Record which revision and local changes you actually test.
-- Run commands from inside the selected room. Inspect its package scripts, then install dependencies there with `pnpm install --frozen-lockfile` when needed. Keep separate `node_modules` directories so package links and generated files resolve to that checkout.
-- Follow [local tools](local-tools.md) and the affected area's verification guidance for the closest relevant checks. Parent checks and workspace filters target the primary checkout; they do not test all rooms. The primary `.room` contents are Git-ignored except for `.gitkeep`, and excluded from its ESLint and Prettier sweeps.
-- Configure any required local environment from the selected revision's examples without recording credentials in guidance or test reports. A worktree isolates source files, **not** databases, containers, ports, storage, or background workers. Read [local development](../../../../README.md#local-development), inspect the actual targets and running processes, and choose nonconflicting ports and authorized test data before runtime tests. Confirm the browser/API are serving the intended room and revision.
-- Startup can apply migrations, and workers can consume existing jobs or call paid providers. Room creation does not authorize shared data changes or service restarts. Use an explicitly configured disposable target where isolation is needed; changing a folder name alone does not create one.
+Each room has a persisted allocation of ports and a distinct loopback address for its browser origin. This separates host-bound login and guest cookies, which different ports on the same hostname would share. Use the exact website URL reported by `status`; replacing its host with `localhost` defeats cookie isolation. Its API URLs and allowed origin point to that room. Containers, database and Storage volumes, background workers, and process ownership are separate from the primary development stack and other rooms.
 
-## Keep or remove
+Runtime manifests, generated configuration, logs, and private environment files live under `.room/.state/<name>/`. The runner leaves checked-in application configuration untouched. Parent Git, formatting, linting, and pnpm workspace sweeps exclude room contents; run feature checks from inside the selected worktree. Record the actual revision, local changes, URLs, migration/seed outcome, and readiness evidence when handing over a room.
 
-Leave a room available while the user is testing it and report its path and verification limits. Before cleanup, stop only services owned by that room, inspect `git -C .room/test status --short --untracked-files=all --ignored`, and review its branch/detached commits for work that must be retained. Save or hand off changes, untracked files, ignored local files, and detached commits before removal; a clean tracked status alone does not prove the room is disposable.
+Room configuration starts from that revision's environment examples. The runner does not inherit primary database targets or automatically copy provider credentials. Put optional room-specific settings in `.room/.state/<name>/overrides.env`, then stop/start to load them. Database, Storage, ports, and origins remain owned by the runner. Keep private values out of chat, tracked files, and verification records. Use the selected revision's [seed guide](../../../../docs/SEED.md) and fixture source for local sign-in; do not repeat passwords in guidance.
 
-When cleanup is authorized and the room's work is retained or deliberately disposable, run from the primary checkout:
+Basic login, seeded catalog and application flows work without external providers. The override file supports AI provider keys and model names only. Live AI and embeddings require valid room-specific settings and separate verification. Firebase and other external integrations are outside the room runner; report those capabilities as unavailable. Starting a configured worker can make paid provider calls. Creating a room does not authorize copying production data or changing the primary stack.
+
+## Stop and remove
+
+To stop services while keeping the room available for later testing, run:
 
 ```sh
+pnpm room stop test
+```
+
+Stop terminates only the room's owned application processes and Supabase project and retains the worktree and database/Storage data. A later start deploys pending migrations and reruns the existing insert-only seed without resetting the database. Never use a reset to make startup pass or stop unrelated processes to free a room's port.
+
+Before removing a room, inspect `git -C .room/test status --short --untracked-files=all --ignored` and its branch/detached commits. Save or hand off tracked changes, untracked files, ignored local files, detached commits, and test data that must be retained. A clean tracked status alone does not prove the room is disposable. Create a `codex/` branch inside a detached room before retaining new commits.
+
+Rooms created by the runner already use detached HEAD. To remove a room from Git's worktree registrations and delete its checkout, use the following sequence from the primary checkout **after removal is authorized and needed work is saved**:
+
+```sh
+pnpm room stop test
 git worktree remove .room/test
 git worktree list
+pnpm room list
 ```
 
-Use Git removal without `--force`; investigate a refusal. Keep task branches unless deleting them is separately authorized. Preserve other agents' rooms and the tracked `.room/.gitkeep`. Retain unfinished task evidence through [runs](../../../runs/README.md) when work spans sessions.
+Stop before removal: the runner requires a registered worktree to stop its services. Use no `--force`; investigate a refusal. These commands retain database/Storage volumes and `.room/.state/test/` (including private configuration and logs). Consequently, `pnpm room list` can still show the retained allocation as `worktree unavailable`. There is currently no `pnpm room remove` or purge command.
+
+Keep branches, retained state, and data volumes unless their deletion is explicitly authorized. Preserve other rooms and `.room/.gitkeep`. Retain unfinished work through [runs](../../../runs/README.md) across sessions.

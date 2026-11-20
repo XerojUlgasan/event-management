@@ -164,7 +164,7 @@ API routes are mounted under `/v1` in `apps/api/src/app.ts`. HTTP contracts and 
 
 Requires Node.js 22.22+, pnpm (the version is pinned in `package.json`), and Docker with Docker Compose.
 
-Use `.room/<name>` for local test worktrees, with short names such as `catalog`, `quotes`, or `pr45`. Follow the [worktree guide](context-factory/workflows/implement/references/worktrees.md) for creation, testing, and cleanup. Worktree contents are ignored by the parent checkout and its formatting/lint sweeps.
+Use `.room/<name>` for isolated test environments, with short names such as `catalog`, `quotes`, or `pr45`. From the primary checkout, run `pnpm room create quotes HEAD` for a new room or `pnpm room start quotes` for an existing one. Both commands install dependencies, start the room's own Supabase stack, deploy that revision's migrations, seed test data, and start its Node API, website, and background worker before checking readiness. Each room has its own ports, browser loopback address, containers, database volume, and Storage. `pnpm room status quotes` shows its URLs; `pnpm room stop quotes` stops only that room and retains its data. Follow the [worktree guide](context-factory/workflows/implement/references/worktrees.md) for credentials, optional providers, and cleanup. Worktree contents are ignored by the parent checkout and its formatting/lint sweeps.
 
 ```sh
 pnpm install

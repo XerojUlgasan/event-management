@@ -3,6 +3,8 @@
   "private": true,
   "packageManager": "pnpm@11.21.0",
   "scripts": {
+    "room": "node scripts/room.mjs",
+    "test:room": "node --test scripts/room.test.mjs",
     "dev": "node scripts/dev-supabase.mjs && pnpm build:edge && concurrently --names edge,web,jobs --prefix-colors blue,green,magenta \"node scripts/dev-edge.mjs\" \"cross-env PUBLIC_API_URL=/v1 API_PROXY_TARGET=http://127.0.0.1:54321 ASTRO_DEV_BACKGROUND=0 pnpm dev:web\" \"node scripts/dev-background-jobs.mjs\"",
     "dev:edge": "pnpm --filter @event-management/supabase functions:serve",
     "all": "pnpm dev:prepare && concurrently --kill-others-on-fail --names api,web,jobs --prefix-colors blue,green,magenta \"pnpm dev:api\" \"cross-env ASTRO_DEV_BACKGROUND=0 pnpm dev:web\" \"pnpm worker:background-jobs\"",
