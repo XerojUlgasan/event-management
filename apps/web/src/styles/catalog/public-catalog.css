@@ -433,6 +433,15 @@
   margin-bottom: 28px;
 }
 
+/* Align all filter fields and the Apply/Clear buttons to the bottom
+   of the row so varying label/description heights don't cause misalignment. */
+.catalog-page .catalog-filter-fields {
+  align-items: end;
+}
+.catalog-page .catalog-filter-actions {
+  padding-top: 0;
+}
+
 @media (max-width: 700px) {
   .catalog-page { padding-top: 28px; padding-bottom: 48px; }
 }
