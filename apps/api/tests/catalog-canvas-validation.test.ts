@@ -317,3 +317,55 @@ test("shared schema can generate an OpenAPI document", () => {
   });
   assert.ok(document.paths?.["/package"]?.post?.requestBody);
 });
+
+test("included service terms remain optional and require positive whole values", () => {
+  const widget = {
+    ...markdown(),
+    type: "service",
+    markdown: "",
+    serviceId: randomUUID(),
+  };
+  const parsed = sectionsSchema.parse([section([widget])]);
+  assert.equal("serviceTerms" in parsed[0].widgets[0], false);
+
+  for (const terms of [
+    { includedHours: null, hourlyRatePesos: null },
+    { includedHours: 3, hourlyRatePesos: 800 },
+    { includedHours: null, hourlyRatePesos: 800 },
+  ]) {
+    const parsed = sectionsSchema.parse([
+      section([{ ...widget, serviceTerms: terms }]),
+    ]);
+    const { media: _media, ...stored } = parsed[0].widgets[0];
+    assert.equal(
+      storedSectionsSchema.safeParse([section([{ ...stored, mediaId: null }])])
+        .success,
+      true,
+    );
+  }
+
+  for (const terms of [
+    { includedHours: 0, hourlyRatePesos: null },
+    { includedHours: 1.5, hourlyRatePesos: null },
+    { includedHours: 3, hourlyRatePesos: -1 },
+    { includedHours: 3, hourlyRatePesos: 0.5 },
+    { includedHours: 3, hourlyRatePesos: 800, fixedPricePesos: 2000 },
+  ])
+    assert.equal(
+      sectionsSchema.safeParse([section([{ ...widget, serviceTerms: terms }])])
+        .success,
+      false,
+    );
+
+  assert.equal(
+    sectionsSchema.safeParse([
+      section([
+        {
+          ...markdown(),
+          serviceTerms: { includedHours: null, hourlyRatePesos: null },
+        },
+      ]),
+    ]).success,
+    false,
+  );
+});

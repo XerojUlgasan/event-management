@@ -246,6 +246,7 @@ export async function saveCustomPackageService(
         { kind: "package", id: saved.id },
         content,
         actorId,
+        create ? current?.id : undefined,
       );
 
       if (!create && current?.thumbnail_media_id)

@@ -165,10 +165,12 @@ model Package {
   bookingRequests BookingRequest[] @relation("InquiryPackage")
   knowledge CatalogKnowledge[]
   canvas          Json              @default("[]") @db.JsonB
+  addonServices   Json              @default("[]") @map("addon_services") @db.JsonB
   thumbnailMediaId String?          @map("thumbnail_media_id") @db.Uuid
   thumbnailMedia MediaAsset? @relation("PackageThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@index([canvas(ops: JsonbPathOps)], type: Gin, map: "packages_canvas_idx")
+  @@index([addonServices(ops: JsonbPathOps)], type: Gin, map: "packages_addon_services_idx")
   @@map("packages")
 }
 

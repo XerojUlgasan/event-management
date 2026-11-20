@@ -126,7 +126,12 @@ test("returns current public facts and ordered canvas references with visibility
       caption: "Example photo",
     }),
     widget("markdown", { y: 2, markdown: "Later text" }),
-    widget("service", { y: 1, serviceId: service.id, caption: "Featured" }),
+    widget("service", {
+      y: 1,
+      serviceId: service.id,
+      caption: "Featured",
+      serviceTerms: { includedHours: 2, hourlyRatePesos: 75 },
+    }),
     widget("package", {
       y: 3,
       packageId: hidden.id,
@@ -210,6 +215,10 @@ test("returns current public facts and ordered canvas references with visibility
     ),
   );
   assert.match(result.markdown, /Linked service: Music/);
+  assert.match(result.markdown, /Included in the package price/);
+  assert.match(result.markdown, /Included hours: 2/);
+  assert.match(result.markdown, /Excess hourly rate: PHP 75 per hour/);
+  assert.doesNotMatch(result.markdown, /Excess hourly rate: PHP 100 per hour/);
   assert.match(
     result.markdown,
     /Photo: \/images\/wedding.jpg[\s\S]*Alt: A table[\s\S]*Caption: Example photo/,
@@ -233,6 +242,25 @@ test("returns current public facts and ordered canvas references with visibility
     serviceDetail.markdown,
     /Price: PHP 500 fixed[\s\S]*Included hours: 3[\s\S]*Additional hourly rate: PHP 100 per hour/,
   );
+  await db
+    .updateTable("services")
+    .set({ archived_at: new Date() })
+    .where("id", "=", service.id)
+    .execute();
+  const archivedReference = await getPublicCatalogItemService({
+    db,
+    input: { catalogType: "package", id: pkg.id },
+  });
+  assert.match(
+    archivedReference.markdown,
+    /Linked service details are unavailable/,
+  );
+  assert.match(archivedReference.markdown, /Included hours: 2/);
+  assert.match(
+    archivedReference.markdown,
+    /Excess hourly rate: PHP 75 per hour/,
+  );
+  assert.doesNotMatch(archivedReference.markdown, /Linked service: Music/);
   await assert.rejects(
     getPublicCatalogItemService({
       db,

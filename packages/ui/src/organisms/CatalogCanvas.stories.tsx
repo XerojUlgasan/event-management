@@ -376,3 +376,52 @@ export const EmptyGuides: Story = {
     </div>
   ),
 };
+
+export const IncludedService: Story = {
+  args: {
+    includedServices: true,
+    sections: [
+      {
+        id: "included",
+        title: "Included",
+        widgets: [
+          widget("service", "service", {
+            serviceId: "service",
+            service: {
+              id: "service",
+              slug: "service",
+              name: "Photography",
+              description: "Event coverage",
+              imageUrl: null,
+            },
+            serviceTerms: { includedHours: 4, hourlyRatePesos: 500 },
+          }),
+        ],
+      },
+    ],
+  },
+};
+
+export const LegacyIncludedService: Story = {
+  args: {
+    ...IncludedService.args,
+    sections: [
+      {
+        id: "legacy",
+        title: "Legacy",
+        widgets: [
+          widget("legacy", "service", {
+            serviceId: "service",
+            service: {
+              id: "service",
+              slug: "service",
+              name: "Photography",
+              description: "Event coverage",
+              imageUrl: null,
+            },
+          }),
+        ],
+      },
+    ],
+  },
+};

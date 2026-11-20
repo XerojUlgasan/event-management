@@ -71,6 +71,7 @@ export function storedCanvasWidget(
 ) {
   return {
     ...widget,
+    id: widget.id.toLowerCase(),
     mediaId,
     ...(widget.type === "service"
       ? { serviceId: serviceId?.toLowerCase() }

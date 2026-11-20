@@ -11,7 +11,10 @@ import {
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 import { getAdminServices } from "../../lib/data/catalog/services";
 import { getAdminPackages } from "../../lib/data/catalog/packages";
-import type { CatalogServicePreview } from "@event-management/contracts/catalog";
+import type {
+  CatalogServicePreview,
+  ServicePricing,
+} from "@event-management/contracts/catalog";
 import { catalogMediaSrc } from "../../lib/data/catalog/media";
 
 // API pages include pricing and nested canvases; widgets only carry this preview.
@@ -36,12 +39,16 @@ export function CatalogReferencePickerDialog({
   onCaptionChange,
   onSelect,
   onClose,
+  hideCaption = false,
 }: {
+  hideCaption?: boolean;
   kind: "service" | "package";
   selectedId?: string | null;
   caption: string;
   onCaptionChange: (caption: string) => void;
-  onSelect: (item: CatalogServicePreview) => void;
+  onSelect: (
+    item: CatalogServicePreview & { pricing?: ServicePricing },
+  ) => void;
   onClose: () => void;
 }) {
   const plural = kind === "package" ? "packages" : "services";
@@ -57,13 +64,25 @@ export function CatalogReferencePickerDialog({
 
     const page = await getAdminServices(query);
 
-    return { items: page.services.map(preview), nextCursor: page.nextCursor };
+    return {
+      items: page.services.map((service) => ({
+        ...preview(service),
+        pricing: {
+          fixedPricePesos: service.fixedPricePesos,
+          includedHours: service.includedHours,
+          hourlyRatePesos: service.hourlyRatePesos,
+        },
+      })),
+      nextCursor: page.nextCursor,
+    };
   };
 
   const searchRef = useRef<HTMLInputElement>(null);
   const requestId = useRef(0);
   const [search, setSearch] = useState("");
-  const [items, setItems] = useState<CatalogServicePreview[]>([]);
+  const [items, setItems] = useState<
+    (CatalogServicePreview & { pricing?: ServicePricing })[]
+  >([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -202,16 +221,18 @@ export function CatalogReferencePickerDialog({
           </Button>
         )}
       </div>
-      <FormField label="Caption (optional)">
-        {(props) => (
-          <Input
-            {...props}
-            value={caption}
-            maxLength={MAX_CATALOG_TEXT_LENGTH}
-            onChange={(event) => onCaptionChange(event.target.value)}
-          />
-        )}
-      </FormField>
+      {!hideCaption && (
+        <FormField label="Caption (optional)">
+          {(props) => (
+            <Input
+              {...props}
+              value={caption}
+              maxLength={MAX_CATALOG_TEXT_LENGTH}
+              onChange={(event) => onCaptionChange(event.target.value)}
+            />
+          )}
+        </FormField>
+      )}
       <p className="pe-reference-picker-note">Changes apply when you save.</p>
     </Dialog>,
     document.body,

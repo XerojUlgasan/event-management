@@ -15,6 +15,13 @@ export async function readStoredCanvasData(db: Database, owner: CanvasOwner) {
   return row ? storedSectionsSchema.parse(row.canvas) : [];
 }
 
+export const readPackageAddonServicesData = (db: Database, id: string) =>
+  db
+    .selectFrom("packages")
+    .select(["package_type", "addon_services"])
+    .where("id", "=", id)
+    .executeTakeFirstOrThrow();
+
 export const listCanvasPackagesData = (db: Database, ids: string[]) =>
   ids.length
     ? db
@@ -80,11 +87,17 @@ export async function updateStoredCanvasData(
   db: Transaction<DB>,
   owner: CanvasOwner,
   sections: unknown,
+  addonServices?: unknown,
 ) {
   const table = owner.kind === "package" ? "packages" : "services";
   await db
     .updateTable(table)
-    .set({ canvas: sql`${JSON.stringify(sections)}::jsonb` })
+    .set({
+      canvas: sql`${JSON.stringify(sections)}::jsonb`,
+      ...(owner.kind === "package"
+        ? { addon_services: sql`${JSON.stringify(addonServices ?? [])}::jsonb` }
+        : {}),
+    })
     .where("id", "=", owner.id)
     .executeTakeFirstOrThrow();
 }

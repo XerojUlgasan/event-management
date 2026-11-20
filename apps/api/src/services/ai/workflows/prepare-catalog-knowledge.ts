@@ -1,6 +1,7 @@
 import type { CatalogSection } from "@event-management/contracts/catalog";
 import type { Selectable } from "kysely";
 import type { Packages, Services } from "../../../db/types.js";
+import { includedServiceTermsLines } from "../catalog-service-terms.js";
 
 type PackageRecord = Pick<
   Selectable<Packages>,
@@ -105,7 +106,17 @@ function prepareSections(input: PrepareCatalogKnowledgeInput) {
       const context = `${listingLabel(input)}\nSection: ${section.title}`;
 
       if (widget.type === "service" || widget.type === "package") {
-        if (widget.caption) text.push(`${context}\nCaption: ${widget.caption}`);
+        if (input.kind === "package" && widget.type === "service")
+          text.push(
+            [
+              context,
+              `Included service ID: ${widget.serviceId ?? "not specified"}`,
+              ...includedServiceTermsLines(widget.serviceTerms),
+              ...nonemptyLine("Caption", widget.caption),
+            ].join("\n"),
+          );
+        else if (widget.caption)
+          text.push(`${context}\nCaption: ${widget.caption}`);
 
         continue;
       }

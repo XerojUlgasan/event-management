@@ -319,7 +319,7 @@ const serviceWidget = {
   },
 };
 
-test("linked service cards render on public and private canvases without prices or inclusion claims", () => {
+test("linked service cards render on public and private canvases", () => {
   const item = {
     ...packageItem,
     sections: [
@@ -339,7 +339,6 @@ test("linked service cards render on public and private canvases without prices 
     assert.match(html, /href="\/services\/photo-booth"/);
     assert.match(html, /Ask us about a photo booth for your event/);
     assert.match(html, /src="\/images\/wedding.jpg"/);
-    assert.doesNotMatch(html, /Included|Optional|additional charge/);
   }
 
   const card = render(ui.CatalogWidgetContent, { widget: serviceWidget });
@@ -535,4 +534,92 @@ test("public catalog thumbnails use the brand for absent images and retain dedic
   });
   assert.match(reference, /ui-catalog-thumbnail-brand/);
   assert.doesNotMatch(reference, /data-catalog-thumbnail-image/);
+});
+
+test("package services display local terms while service pages stay neutral and add-ons stay private", () => {
+  const service = {
+    id: "s",
+    slug: "s",
+    name: "Photography",
+    description: "Coverage",
+    imageUrl: null,
+  };
+  const widget = {
+    ...photo,
+    id: "service",
+    type: "service",
+    media: null,
+    serviceId: "s",
+    service,
+    serviceTerms: { includedHours: 3, hourlyRatePesos: 800 },
+  };
+  const sections = [{ id: "section", title: "", widgets: [widget] }];
+  const addon = {
+    id: "addon",
+    serviceId: "s",
+    service,
+    fixedPricePesos: null,
+    includedHours: null,
+    hourlyRatePesos: 1200,
+  };
+  const item = {
+    name: "Package",
+    description: "",
+    maxGuests: 100,
+    price: { kind: "fixed", currency: "PHP", amountMinor: 100000 },
+    sections,
+    addonServices: [addon],
+  };
+  const publicHtml = render(canvas.PackageCanvas, { item });
+  assert.match(
+    publicHtml,
+    /Included · 3 hours included · ₱800 \/ additional hour/,
+  );
+  assert.doesNotMatch(publicHtml, /Add-on services/);
+  const privateHtml = render(canvas.PackageCanvas, { item, showAddons: true });
+  assert.match(privateHtml, /Add-on services/);
+  assert.match(privateHtml, /₱1,200 \/ hour/);
+  const serviceHtml = render(canvas.ServiceCanvas, {
+    item: {
+      ...item,
+      fixedPricePesos: null,
+      includedHours: null,
+      hourlyRatePesos: 800,
+    },
+  });
+  assert.doesNotMatch(serviceHtml, /Included ·/);
+  const legacyHtml = render(canvas.PackageCanvas, {
+    item: {
+      ...item,
+      sections: [
+        { ...sections[0], widgets: [{ ...widget, serviceTerms: undefined }] },
+      ],
+    },
+  });
+  assert.match(
+    legacyHtml,
+    /Included · Hours unspecified · Excess rate unspecified/,
+  );
+});
+
+test("unavailable service preserves package-owned included terms only in package context", () => {
+  const widget = {
+    ...serviceWidget,
+    service: null,
+    serviceTerms: { includedHours: 6, hourlyRatePesos: 1250 },
+  };
+  const sections = [{ id: "unavailable", title: "", widgets: [widget] }];
+  const packageHtml = render(canvas.PackageCanvas, {
+    item: { ...packageItem, sections },
+  });
+  assert.match(packageHtml, /This service is unavailable/);
+  assert.match(
+    packageHtml,
+    /Included · 6 hours included · ₱1,250 \/ additional hour/,
+  );
+  const serviceHtml = render(canvas.ServiceCanvas, {
+    item: { ...service, sections },
+  });
+  assert.match(serviceHtml, /This service is unavailable/);
+  assert.doesNotMatch(serviceHtml, /Included|₱1,250|additional hour/);
 });

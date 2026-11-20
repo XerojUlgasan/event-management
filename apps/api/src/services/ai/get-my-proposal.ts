@@ -16,6 +16,7 @@ type Proposal = Pick<
   | "price"
   | "updatedAt"
   | "sections"
+  | "addonServices"
 >;
 
 export type MyProposalResult =
@@ -83,6 +84,7 @@ export async function getMyProposalService({
       // Preserve the complete sections/widgets, including each original Markdown
       // string. Do not summarize, flatten, truncate, or recursively expand them.
       sections: pkg.sections,
+      addonServices: pkg.addonServices,
     },
   };
 }

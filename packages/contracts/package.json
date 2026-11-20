@@ -9,6 +9,7 @@
     "./pagination": "./src/pagination.ts",
     "./catalog": "./src/catalog.ts",
     "./catalog-knowledge": "./src/catalog-knowledge.ts",
+    "./catalog-service-terms": "./src/catalog-service-terms.ts",
     "./catalog-canvas": "./src/catalog-canvas.ts",
     "./catalog-filters": "./src/catalog-filters.ts",
     "./catalog-slug": "./src/catalog-slug.ts",

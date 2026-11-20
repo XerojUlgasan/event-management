@@ -82,8 +82,10 @@ export function CatalogWidgetContent({
   servicePlaceholder,
   onOpenService,
   onOpenPackage,
+  includedService = false,
 }: {
   widget: CatalogWidget;
+  includedService?: boolean;
   editor?: boolean;
   mediaPlaceholder?: ReactNode;
   servicePlaceholder?: ReactNode;
@@ -96,12 +98,26 @@ export function CatalogWidgetContent({
   const entity = widget.type === "package" ? "package" : "service";
   const onOpen = entity === "package" ? onOpenPackage : onOpenService;
 
+  const includedTerms = includedService && widget.type === "service" && (
+    <span>
+      Included ·{" "}
+      {widget.serviceTerms?.includedHours == null
+        ? "Hours unspecified"
+        : `${widget.serviceTerms.includedHours} hours included`}{" "}
+      ·{" "}
+      {widget.serviceTerms?.hourlyRatePesos == null
+        ? "Excess rate unspecified"
+        : `₱${widget.serviceTerms.hourlyRatePesos.toLocaleString("en-PH")} / additional hour`}
+    </span>
+  );
+
   if ((widget.type === "service" || widget.type === "package") && reference) {
     const content = (
       <>
         <CatalogThumbnail src={reference.imageUrl} />
         <span className="ui-catalog-reference-details">
           <span className="ui-catalog-reference-name">{reference.name}</span>
+          {includedTerms}
           {reference.description && (
             <span className="ui-catalog-reference-description">
               {reference.description}
@@ -172,6 +188,7 @@ export function CatalogWidgetContent({
             <div className="ui-catalog-empty">Add a video</div>
           ))
         ))}
+      {includedTerms}
       {widget.type === "service" &&
         (servicePlaceholder ?? (
           <div className="ui-catalog-empty">
@@ -194,10 +211,12 @@ export function CatalogWidgetContent({
 
 export function CatalogSections({
   sections,
+  includedServices = false,
   onOpenService,
   onOpenPackage,
 }: {
   sections: CatalogSection[];
+  includedServices?: boolean;
   onOpenService?: (id: string) => void;
   onOpenPackage?: (id: string) => void;
 }) {
@@ -224,6 +243,7 @@ export function CatalogSections({
                   >
                     <CatalogWidgetContent
                       widget={widget}
+                      includedService={includedServices}
                       onOpenService={onOpenService}
                       onOpenPackage={onOpenPackage}
                     />

@@ -1,3 +1,5 @@
+export const MAX_PACKAGE_ADDON_SERVICES = 100;
+
 export const MAX_CATALOG_SECTIONS = 20;
 export const MAX_CATALOG_WIDGETS = 100;
 export const MAX_WIDGET_MARKDOWN_LENGTH = 20000;
@@ -35,6 +37,7 @@ export type CatalogWidget = {
   caption: string;
   autoplay: boolean;
   serviceId?: string | null;
+  serviceTerms?: IncludedServiceTerms;
   service?: CatalogServicePreview | null;
   packageId?: string | null;
   package?: CatalogPackagePreview | null;
@@ -52,6 +55,17 @@ export type ServicePricing = {
   includedHours: number | null;
 };
 
+export type IncludedServiceTerms = {
+  includedHours: number | null;
+  hourlyRatePesos: number | null;
+};
+
+export type PackageAddonService = ServicePricing & {
+  id: string;
+  serviceId: string;
+  service?: CatalogServicePreview | null;
+};
+
 export type ServiceContent = ServicePricing & {
   name: string;
   description: string;
@@ -65,6 +79,7 @@ export type PackagePrice = {
 };
 
 export type PackageContent = {
+  addonServices?: PackageAddonService[];
   name: string;
   description: string;
   maxGuests: number;
@@ -73,6 +88,7 @@ export type PackageContent = {
 };
 
 export type CatalogPackage = PackageContent & {
+  addonServices: PackageAddonService[];
   packageType: "catalog" | "custom";
   customForBookingRequestId: string | null;
   id: string;

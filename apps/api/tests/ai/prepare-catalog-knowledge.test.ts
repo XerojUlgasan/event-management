@@ -79,6 +79,47 @@ test("package overview uses peso units and capacity", () => {
   assert.match(overview?.contentMarkdown ?? "", /Capacity: up to 80 guests\./);
 });
 
+test("package knowledge preserves local inclusion terms without borrowing catalog rates", () => {
+  const included = widget("service", "included", 0, 0, {
+    serviceId: "service-reference",
+    serviceTerms: { includedHours: 3, hourlyRatePesos: 800 },
+  });
+  const input: PrepareCatalogKnowledgeInput = {
+    kind: "package",
+    record: packageRecord,
+    sections: [section("Inclusions", [included])],
+  };
+  const text = prepareCatalogKnowledge(input)[0].contentMarkdown;
+  assert.match(text, /Included service ID: service-reference/);
+  assert.match(text, /Included in the package price/);
+  assert.match(text, /Included hours: 3/);
+  assert.match(text, /Excess hourly rate: PHP 800 per hour/);
+  const changed = prepareCatalogKnowledge({
+    ...input,
+    sections: [
+      section("Inclusions", [
+        {
+          ...included,
+          serviceTerms: { includedHours: 4, hourlyRatePesos: 900 },
+        },
+      ]),
+    ],
+  })[0].contentMarkdown;
+  assert.notEqual(changed, text);
+  const legacy = prepareCatalogKnowledge({
+    ...input,
+    sections: [section("Inclusions", [widget("service", "legacy", 0, 0)])],
+  })[0].contentMarkdown;
+  assert.match(legacy, /Included hours: not specified/);
+  assert.match(legacy, /Excess hourly rate: not specified/);
+  const servicePage = prepareCatalogKnowledge({
+    kind: "service",
+    record: serviceRecord,
+    sections: input.sections,
+  })[0].contentMarkdown;
+  assert.doesNotMatch(servicePage, /Included in the package price/);
+});
+
 test("service overview distinguishes hourly pricing from included hours and extra time", () => {
   const hourly = prepareCatalogKnowledge({
     kind: "service",

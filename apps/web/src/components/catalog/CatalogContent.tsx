@@ -53,15 +53,18 @@ export function WidgetContent({
   widget,
   editor = false,
   mediaPlaceholder,
+  includedService = false,
 }: {
   widget: CatalogWidget;
   editor?: boolean;
+  includedService?: boolean;
   mediaPlaceholder?: ReactNode;
 }) {
   return (
     <CatalogWidgetContent
       widget={resolveWidget(widget)}
       editor={editor}
+      includedService={includedService}
       mediaPlaceholder={mediaPlaceholder}
     />
   );
@@ -70,8 +73,10 @@ export function WidgetContent({
 export function PackageCanvas({
   item,
   bookingAction,
+  showAddons = false,
 }: {
   item: PackageContent;
+  showAddons?: boolean;
   bookingAction?: ReactNode;
 }) {
   const openCatalog = useCatalogNavigation();
@@ -90,8 +95,25 @@ export function PackageCanvas({
           <div className="catalog-detail-action">{bookingAction}</div>
         )}
       </div>
+      {showAddons && !!item.addonServices?.length && (
+        <section>
+          <h2>Add-on services</h2>
+          {item.addonServices.map((addon) => {
+            const pricing = servicePricingLabels(addon);
+
+            return (
+              <p key={addon.id}>
+                <strong>{addon.service?.name ?? "Unavailable service"}</strong>{" "}
+                · {pricing.price}
+                {pricing.excess && ` · ${pricing.excess}`}
+              </p>
+            );
+          })}
+        </section>
+      )}
       <CatalogSections
         sections={resolveSections(item.sections)}
+        includedServices
         onOpenService={
           openCatalog
             ? (id) => openCatalog({ entity: "service", id })

@@ -3,12 +3,15 @@ import {
   sectionsSchema,
   storedSectionsSchema,
 } from "@event-management/contracts/catalog-canvas";
+import { packageAddonServicesSchema } from "@event-management/contracts/catalog-service-terms";
+import type { PackageAddonService } from "@event-management/contracts/catalog";
 import type { z } from "zod";
 import type { Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 import type { CanvasOwner } from "../../data/catalog-canvas/catalog-canvas-types.js";
 import {
   readStoredCanvasData,
+  readPackageAddonServicesData,
   lockCanvasServiceData,
   lockCanvasPackageData,
   findCanvasMediaOwnersData,
@@ -25,15 +28,73 @@ export class InvalidCatalogMedia extends Error {}
 export async function replaceCatalogSectionsService(
   db: Transaction<DB>,
   owner: CanvasOwner,
-  content: { sections: z.infer<typeof sectionsSchema> },
+  content: {
+    sections: z.infer<typeof sectionsSchema>;
+    addonServices?: PackageAddonService[];
+  },
   actorId: string,
+  sourcePackageId?: string,
 ) {
   const previous = await readStoredCanvasData(db, owner);
+  const baseline = sourcePackageId
+    ? await readStoredCanvasData(db, { kind: "package", id: sourcePackageId })
+    : previous;
+  const packageRow =
+    owner.kind === "package"
+      ? await readPackageAddonServicesData(db, owner.id)
+      : undefined;
+  const addonServices = packageAddonServicesSchema.parse(
+    content.addonServices ?? [],
+  );
+
+  if (addonServices.length && packageRow?.package_type !== "custom")
+    throw new InvalidCatalogMedia(
+      "Add-on services are only allowed on private custom packages",
+    );
+
+  if (
+    owner.kind === "service" &&
+    content.sections.some((section) =>
+      section.widgets.some((widget) => widget.serviceTerms !== undefined),
+    )
+  )
+    throw new InvalidCatalogMedia(
+      "Package service terms are not allowed on service pages",
+    );
+
+  const includedServiceIds = new Set(
+    content.sections.flatMap((section) =>
+      section.widgets.flatMap((widget) =>
+        widget.type === "service" && widget.serviceId
+          ? [widget.serviceId.toLowerCase()]
+          : [],
+      ),
+    ),
+  );
+
+  if (
+    addonServices.some((addon) =>
+      includedServiceIds.has(addon.serviceId.toLowerCase()),
+    )
+  )
+    throw new InvalidCatalogMedia(
+      "A service cannot be both included and an add-on",
+    );
+
+  const existingAddons = new Set(
+    packageAddonServicesSchema
+      .parse(packageRow?.addon_services ?? [])
+      .map(
+        (addon) => `${addon.id.toLowerCase()}:${addon.serviceId.toLowerCase()}`,
+      ),
+  );
 
   const existing = new Set(
-    previous.flatMap((s) =>
+    baseline.flatMap((s) =>
       s.widgets.flatMap((w) =>
-        w.type === "service" && w.serviceId ? [`${w.id}:${w.serviceId}`] : [],
+        w.type === "service" && w.serviceId
+          ? [`${w.id.toLowerCase()}:${w.serviceId}`]
+          : [],
       ),
     ),
   );
@@ -43,9 +104,10 @@ export async function replaceCatalogSectionsService(
   );
 
   const serviceIds = [
-    ...new Set(
-      refs.flatMap((w) => (w.serviceId ? [w.serviceId.toLowerCase()] : [])),
-    ),
+    ...new Set([
+      ...refs.flatMap((w) => (w.serviceId ? [w.serviceId.toLowerCase()] : [])),
+      ...addonServices.map((addon) => addon.serviceId.toLowerCase()),
+    ]),
   ].sort();
 
   for (const id of serviceIds) {
@@ -53,19 +115,25 @@ export async function replaceCatalogSectionsService(
 
     if (
       (!service || service.archived_at) &&
-      refs.some(
+      (refs.some(
         (w) =>
-          w.serviceId?.toLowerCase() === id && !existing.has(`${w.id}:${id}`),
-      )
+          w.serviceId?.toLowerCase() === id &&
+          !existing.has(`${w.id.toLowerCase()}:${id}`),
+      ) ||
+        addonServices.some(
+          (addon) =>
+            addon.serviceId.toLowerCase() === id &&
+            !existingAddons.has(`${addon.id.toLowerCase()}:${id}`),
+        ))
     )
       throw new InvalidCatalogMedia("Selected service is unavailable");
   }
 
   const existingPackages = new Set(
-    previous.flatMap((section) =>
+    baseline.flatMap((section) =>
       section.widgets.flatMap((widget) =>
         widget.type === "package" && widget.packageId
-          ? [`${widget.id}:${widget.packageId}`]
+          ? [`${widget.id.toLowerCase()}:${widget.packageId}`]
           : [],
       ),
     ),
@@ -93,7 +161,7 @@ export async function replaceCatalogSectionsService(
       packageRefs.some(
         (widget) =>
           widget.packageId?.toLowerCase() === id &&
-          !existingPackages.has(`${widget.id}:${id}`),
+          !existingPackages.has(`${widget.id.toLowerCase()}:${id}`),
       )
     )
       throw new InvalidCatalogMedia("Selected package is unavailable");
@@ -191,11 +259,24 @@ export async function replaceCatalogSectionsService(
       widgets.push(storedCanvasWidget(inputWidget, mediaId));
     }
 
-    sections.push({ id: section.id, title: section.title, widgets });
+    sections.push({
+      id: section.id.toLowerCase(),
+      title: section.title,
+      widgets,
+    });
   }
 
   const validatedSections = storedSectionsSchema.parse(sections);
-  await updateStoredCanvasData(db, owner, validatedSections);
+  await updateStoredCanvasData(
+    db,
+    owner,
+    validatedSections,
+    addonServices.map(({ service: _preview, ...addon }) => ({
+      ...addon,
+      id: addon.id.toLowerCase(),
+      serviceId: addon.serviceId.toLowerCase(),
+    })),
+  );
 
   return previousMediaIds;
 }

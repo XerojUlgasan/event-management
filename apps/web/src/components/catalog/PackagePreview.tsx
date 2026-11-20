@@ -104,6 +104,7 @@ export function PackagePreview({
           {item && (
             <PackageCanvas
               item={item}
+              showAddons={item.packageType === "custom"}
               bookingAction={
                 showBookingAction ? (
                   <Button onClick={book}>Book now</Button>

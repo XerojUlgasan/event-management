@@ -10,7 +10,15 @@ export const contentSchema = z.object({
   fixedPricePesos: z.number().int().positive().max(2147483647).nullable(),
   includedHours: z.number().int().positive().max(2147483647).nullable(),
   description: text,
-  sections: sectionsSchema.optional(),
+  sections: sectionsSchema
+    .refine(
+      (sections) =>
+        sections.every((section) =>
+          section.widgets.every((widget) => widget.serviceTerms === undefined),
+        ),
+      "Package service terms are not allowed on service pages",
+    )
+    .optional(),
   thumbnailMediaId: z.string().uuid().nullable().optional(),
 });
 

@@ -8,6 +8,7 @@ Preserve historical reasoning. When a decision changes, link a successor and mar
 
 | Record | Status / purpose |
 | --- | --- |
+| [Package service terms](2026-11-20_package-service-terms.md) | Accepted package-owned inclusion terms and custom-only JSONB add-ons; quotations deferred |
 | [Derive conversation availability](2026-11-20_derive-conversation-availability.md) | Accepted removal of stored closure and guest deadlines; expiry follows saved activity and ownership |
 | [Retire quotation acceptance](2026-11-20_retire-quotation-acceptance.md) | Accepted removal of quotation acceptance state/timestamps; admin revisions and booking-request acceptance remain |
 | [Catalog indexing scheduling](2026-11-19_catalog-index-scheduling.md) | Accepted manual ensure-scheduled no-ops for active jobs; catalog saves retain refresh successors |

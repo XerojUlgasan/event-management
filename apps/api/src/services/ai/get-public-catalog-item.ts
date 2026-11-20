@@ -10,6 +10,7 @@ import {
 import { encodePageCursor, parsePageCursor } from "../../utils/pagination.js";
 import { readCatalogSectionsService } from "../catalog-canvas/read-catalog-sections.js";
 import { catalogKnowledgeDigest } from "./catalog-knowledge-hash.js";
+import { includedServiceTermsLines } from "./catalog-service-terms.js";
 
 export const getPublicCatalogItemInputSchema = z.strictObject({
   catalogType: z.enum(["package", "service"]),
@@ -123,6 +124,21 @@ export async function getPublicCatalogItemService({
               widget.type === "package" ? widget.package : widget.service;
 
             if (
+              !reference &&
+              item.type === "package" &&
+              widget.type === "service"
+            ) {
+              lines.push(
+                "",
+                `Included service ID: ${widget.serviceId ?? "not specified"}`,
+                "Linked service details are unavailable.",
+                ...includedServiceTermsLines(widget.serviceTerms),
+                `Caption: ${widget.caption}`,
+              );
+              continue;
+            }
+
+            if (
               !reference ||
               (widget.type === "package" && !publicPackages.has(reference.id))
             )
@@ -135,6 +151,9 @@ export async function getPublicCatalogItemService({
               `Type: ${widget.type}`,
               `URL: ${link(widget.type, reference.slug)}`,
               `Caption: ${widget.caption}`,
+              ...(item.type === "package" && widget.type === "service"
+                ? includedServiceTermsLines(widget.serviceTerms)
+                : []),
             );
           }
         }

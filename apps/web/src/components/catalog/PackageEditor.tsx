@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button, useNotifications } from "@event-management/ui";
 import type { PackageContent } from "@event-management/contracts/catalog";
+import { PackageAddonServices } from "./PackageAddonServices";
 import { CatalogCreateDialog } from "./CatalogCreateDialog";
 import { PackageDetailsFields } from "./PackageDetailsFields";
 import { validatePackageDetails } from "../../lib/utils/catalog/details-validation";
@@ -111,6 +112,7 @@ export function PackageEditor({
               maxGuests: initial.maxGuests,
               price: initial.price,
               sections: initial.sections,
+              addonServices: initial.addonServices,
             }
           : draft
       }
@@ -132,15 +134,20 @@ export function PackageEditor({
         else await createPackage(content, thumbnail.mediaIdRef.current);
       }}
       renderDetails={(content, setContent) => (
-        <PackageDetailsFields
-          content={content}
-          onChange={setContent}
-          privateProposal={!!saveCustom}
-          thumbnailPreviewUrl={thumbnail.previewUrl}
-          onThumbnailChange={thumbnail.handleChange}
-          onThumbnailError={(msg) => notifyError(msg)}
-          onThumbnailBusyChange={thumbnail.setUploading}
-        />
+        <>
+          <PackageDetailsFields
+            content={content}
+            onChange={setContent}
+            privateProposal={!!saveCustom}
+            thumbnailPreviewUrl={thumbnail.previewUrl}
+            onThumbnailChange={thumbnail.handleChange}
+            onThumbnailError={(msg) => notifyError(msg)}
+            onThumbnailBusyChange={thumbnail.setUploading}
+          />
+          {saveCustom && (
+            <PackageAddonServices content={content} onChange={setContent} />
+          )}
+        </>
       )}
       renderPreview={(content, mode) =>
         mode === "customer" ? (
@@ -160,6 +167,7 @@ export function PackageEditor({
               ) : undefined
             }
             item={content}
+            showAddons={!!saveCustom}
           />
         ) : (
           <div className="pe-card-preview">

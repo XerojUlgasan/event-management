@@ -257,7 +257,12 @@ export function BookingPackage({
               </Button>
             </div>
           )}
-          {loaded.package && <PackageCanvas item={loaded.package} />}
+          {loaded.package && (
+            <PackageCanvas
+              item={loaded.package}
+              showAddons={loaded.package.packageType === "custom"}
+            />
+          )}
         </>
       )}
       {admin &&
@@ -293,13 +298,13 @@ export function BookingPackage({
                   <details>
                     <summary>Previous content</summary>
                     <p>{entry.before.description}</p>
-                    <PackageCanvas item={entry.before} />
+                    <PackageCanvas item={entry.before} showAddons />
                   </details>
                 )}
                 <details>
                   <summary>Saved content</summary>
                   <p>{entry.after.description}</p>
-                  <PackageCanvas item={entry.after} />
+                  <PackageCanvas item={entry.after} showAddons />
                 </details>
               </details>
             ))}

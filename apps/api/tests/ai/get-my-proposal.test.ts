@@ -168,11 +168,35 @@ test("proposal is scoped to the authenticated conversation and reads current pri
           alt: "Table",
           caption: "Setup",
         }),
-        widget("service", { y: 10, serviceId: service.id, caption: "Music" }),
+        widget("service", {
+          y: 10,
+          serviceId: service.id,
+          caption: "Music",
+          serviceTerms: { includedHours: 4, hourlyRatePesos: 75 },
+        }),
       ],
     },
   ];
   const updatedAt = new Date("2098-01-01T00:00:00.000Z");
+  const addonService = await db
+    .insertInto("services")
+    .values({
+      slug: `addon-${randomUUID()}`,
+      name: "Private add-on",
+      description: "",
+      hourly_rate_pesos: 900,
+      fixed_price_pesos: 6000,
+      included_hours: 3,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const addon = {
+    id: randomUUID(),
+    serviceId: addonService.id,
+    fixedPricePesos: 5500,
+    includedHours: 4,
+    hourlyRatePesos: 700,
+  };
   const custom = await db
     .insertInto("packages")
     .values({
@@ -186,6 +210,7 @@ test("proposal is scoped to the authenticated conversation and reads current pri
       published_at: null,
       updated_at: updatedAt,
       canvas: sql`${JSON.stringify(sections)}::jsonb`,
+      addon_services: sql`${JSON.stringify([addon])}::jsonb`,
     })
     .returning("id")
     .executeTakeFirstOrThrow();
@@ -204,6 +229,18 @@ test("proposal is scoped to the authenticated conversation and reads current pri
     amountMinor: 125000,
   });
   assert.equal(result.proposal.updatedAt, updatedAt.toISOString());
+  assert.equal(result.proposal.addonServices.length, 1);
+  assert.equal(result.proposal.addonServices[0].fixedPricePesos, 5500);
+  assert.equal(result.proposal.addonServices[0].includedHours, 4);
+  assert.equal(result.proposal.addonServices[0].hourlyRatePesos, 700);
+  assert.equal(
+    result.proposal.addonServices[0].service?.name,
+    "Private add-on",
+  );
+  assert.deepEqual(result.proposal.sections[0].widgets[2].serviceTerms, {
+    includedHours: 4,
+    hourlyRatePesos: 75,
+  });
   assert.deepEqual(
     result.proposal.sections,
     await readCatalogSectionsService(db, { kind: "package", id: custom.id }),

@@ -42,6 +42,7 @@ import {
 } from "../../lib/services/catalog/save-catalog-media";
 import { WidgetContent } from "./CatalogContent";
 import { PackageMediaSettings } from "./PackageMediaSettings";
+import { ServiceTermsDialog } from "./ServiceTermsDialog";
 import { CatalogReferencePickerDialog } from "./CatalogReferencePickerDialog";
 import "react-grid-layout/css/styles.css";
 import "../../styles/catalog/package-editor.css";
@@ -207,7 +208,11 @@ function MarkdownSettings({
   );
 }
 
-type CanvasContent = { name: string; sections: CatalogSection[] };
+type CanvasContent = {
+  name: string;
+  sections: CatalogSection[];
+  addonServices?: { serviceId: string }[];
+};
 
 export function CatalogEditor<T extends CanvasContent>({
   initial,
@@ -266,6 +271,10 @@ export function CatalogEditor<T extends CanvasContent>({
     widgetId: string;
   } | null>(null);
   const [referenceEditing, setReferenceEditing] = useState<{
+    sectionId: string;
+    widgetId: string;
+  } | null>(null);
+  const [termsEditing, setTermsEditing] = useState<{
     sectionId: string;
     widgetId: string;
   } | null>(null);
@@ -412,6 +421,12 @@ export function CatalogEditor<T extends CanvasContent>({
     displayContent.sections
       .find((s) => s.id === referenceEditing.sectionId)
       ?.widgets.find((w) => w.id === referenceEditing.widgetId);
+
+  const editingTerms =
+    termsEditing &&
+    displayContent.sections
+      .find((s) => s.id === termsEditing.sectionId)
+      ?.widgets.find((w) => w.id === termsEditing.widgetId);
 
   const editingMarkdown =
     markdownEditing &&
@@ -1182,6 +1197,25 @@ export function CatalogEditor<T extends CanvasContent>({
                                   <Icon name="more" size={20} />
                                 </Button>
                               )}
+                              {entity === "package" &&
+                                w.type === "service" &&
+                                w.serviceId && (
+                                  <Button
+                                    variant="plain"
+                                    className="pe-widget-settings"
+                                    type="button"
+                                    aria-label="Included service settings"
+                                    aria-haspopup="dialog"
+                                    onClick={() =>
+                                      setTermsEditing({
+                                        sectionId: section.id,
+                                        widgetId: w.id,
+                                      })
+                                    }
+                                  >
+                                    <Icon name="more" size={20} />
+                                  </Button>
+                                )}
                               {w.type === "markdown" && (
                                 <Button
                                   variant="plain"
@@ -1239,7 +1273,11 @@ export function CatalogEditor<T extends CanvasContent>({
                                     })
                                   }
                                 >
-                                  <WidgetContent widget={w} editor />
+                                  <WidgetContent
+                                    widget={w}
+                                    editor
+                                    includedService={entity === "package"}
+                                  />
                                 </Button>
                               ) : (
                                 <MediaWidget
@@ -1328,16 +1366,69 @@ export function CatalogEditor<T extends CanvasContent>({
               })
             }
             onSelect={(item) => {
+              if (
+                entity === "package" &&
+                editingReference.type === "service" &&
+                content.addonServices?.some(
+                  (addon) =>
+                    addon.serviceId.toLowerCase() === item.id.toLowerCase(),
+                )
+              ) {
+                setError(
+                  notifyError(
+                    "This service is already an add-on. Remove it from add-ons before including it.",
+                  ),
+                );
+                setReferenceEditing(null);
+
+                return;
+              }
+
+              const { pricing, ...reference } = item;
               changeWidget(referenceEditing.sectionId, editingReference.id, {
                 ...(editingReference.type === "package"
-                  ? { packageId: item.id, package: item }
-                  : { serviceId: item.id, service: item }),
+                  ? { packageId: item.id, package: reference }
+                  : {
+                      serviceId: item.id,
+                      service: reference,
+                      ...(entity === "package" &&
+                      item.id !== editingReference.serviceId &&
+                      pricing
+                        ? {
+                            serviceTerms: {
+                              includedHours: pricing.includedHours,
+                              hourlyRatePesos: pricing.hourlyRatePesos,
+                            },
+                          }
+                        : {}),
+                    }),
               });
               setReferenceEditing(null);
             }}
             onClose={() => setReferenceEditing(null)}
           />
         )}
+      {termsEditing && editingTerms?.serviceId && (
+        <ServiceTermsDialog
+          serviceId={editingTerms.serviceId}
+          terms={
+            editingTerms.serviceTerms ?? {
+              includedHours: null,
+              hourlyRatePesos: null,
+            }
+          }
+          onSave={(value) => {
+            changeWidget(termsEditing.sectionId, editingTerms.id, {
+              serviceTerms: {
+                includedHours: value.includedHours,
+                hourlyRatePesos: value.hourlyRatePesos,
+              },
+            });
+            setTermsEditing(null);
+          }}
+          onClose={() => setTermsEditing(null)}
+        />
+      )}
       {markdownEditing && editingMarkdown && (
         <MarkdownSettings
           widget={editingMarkdown}

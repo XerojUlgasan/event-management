@@ -12,6 +12,8 @@ export {
 import { z } from "@hono/zod-openapi";
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 
+import { packageAddonServicesSchema } from "@event-management/contracts/catalog-service-terms";
+
 const text = z.string().trim().max(MAX_CATALOG_TEXT_LENGTH);
 
 export const priceSchema = z.object({
@@ -32,6 +34,7 @@ export const contentSchema = z
     maxGuests: z.number().int().positive().max(2147483647),
     price: packagePriceSchema,
     sections: sectionsSchema,
+    addonServices: packageAddonServicesSchema.optional(),
     thumbnailMediaId: z.string().uuid().nullable().optional(),
   })
   .strict();
@@ -44,6 +47,7 @@ export const publicSchema = z.object({
   maxGuests: z.number(),
   price: priceSchema,
   sections: z.array(sectionSchema),
+  addonServices: packageAddonServicesSchema.default([]),
   id: z.string().uuid(),
   slug: z.string(),
   description: z.string(),

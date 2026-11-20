@@ -11,6 +11,8 @@ import {
   MAX_CATALOG_WIDGET_Y,
 } from "@event-management/contracts/limits/catalog";
 
+import { includedServiceTermsSchema } from "@event-management/contracts/catalog-service-terms";
+
 const text = z.string().trim().max(MAX_CATALOG_TEXT_LENGTH);
 
 export const sampleCatalogPhotoPaths: readonly string[] = [
@@ -79,6 +81,7 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
       caption: text,
       autoplay: z.boolean().default(false),
       serviceId: z.string().uuid().nullable().optional(),
+      serviceTerms: includedServiceTermsSchema.optional(),
       packageId: z.string().uuid().nullable().optional(),
       package: z
         .object({
@@ -115,6 +118,13 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
           code: "custom",
           message: "Choose an uploaded file",
           path: ["media", "id"],
+        });
+
+      if (widget.serviceTerms !== undefined && widget.type !== "service")
+        ctx.addIssue({
+          code: "custom",
+          message: "Service terms are only available for service widgets",
+          path: ["serviceTerms"],
         });
 
       if (widget.autoplay && widget.type !== "video")
@@ -269,6 +279,7 @@ const storedWidgetSchema = z
       .refine((id) => id === id.toLowerCase(), "Package ID must be canonical")
       .nullable()
       .optional(),
+    serviceTerms: includedServiceTermsSchema.optional(),
     serviceId: z
       .string()
       .uuid()

@@ -1,4 +1,7 @@
-import type { ServiceContent } from "@event-management/contracts/catalog";
+import type {
+  ServiceContent,
+  ServicePricing,
+} from "@event-management/contracts/catalog";
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 import { FormField, Input, Textarea } from "@event-management/ui";
 import { ThumbnailField } from "./ThumbnailField";
@@ -14,7 +17,10 @@ export function ServiceDetailsFields({
   content: ServiceContent;
   onChange: (content: ServiceContent) => void;
   thumbnailPreviewUrl: string | null;
-  onThumbnailChange: (mediaId: string | null, previewUrl: string | null) => void;
+  onThumbnailChange: (
+    mediaId: string | null,
+    previewUrl: string | null,
+  ) => void;
   onThumbnailError: (message: string) => void;
   onThumbnailBusyChange: (busy: boolean) => void;
 }) {
@@ -33,6 +39,26 @@ export function ServiceDetailsFields({
           />
         )}
       </FormField>
+      <ServicePricingFields content={content} onChange={onChange} />
+      <ThumbnailField
+        previewUrl={thumbnailPreviewUrl}
+        onChange={onThumbnailChange}
+        onError={onThumbnailError}
+        onBusyChange={onThumbnailBusyChange}
+      />
+    </div>
+  );
+}
+
+export function ServicePricingFields<T extends ServicePricing>({
+  content,
+  onChange,
+}: {
+  content: T;
+  onChange: (content: T) => void;
+}) {
+  return (
+    <>
       <FormField
         label={
           content.includedHours != null
@@ -119,12 +145,6 @@ export function ServiceDetailsFields({
           />
         )}
       </FormField>
-      <ThumbnailField
-        previewUrl={thumbnailPreviewUrl}
-        onChange={onThumbnailChange}
-        onError={onThumbnailError}
-        onBusyChange={onThumbnailBusyChange}
-      />
-    </div>
+    </>
   );
 }
