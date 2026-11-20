@@ -22,7 +22,7 @@ import {
   BookingStatusBadge,
 } from "../booking-requests/BookingRequestDisplay";
 import { PackagePreview } from "../catalog/PackagePreview";
-import { QuotationSummaryRead } from "../quotations/Quotations";
+import { QuotationSummaryRead } from "../quotations/QuotationSummaryRead";
 import { adminBookingRequestPath, customerPaths } from "../app/routes";
 
 export type ConversationContextView = "details" | "package" | "quotation";
