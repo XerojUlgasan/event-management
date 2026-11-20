@@ -47,55 +47,66 @@ const hasFilters = Object.values(filters).some((v) => v !== undefined);
     <h1 class="section-title small">All packages</h1>
     <p>Explore packages for your gathering.</p>
 
-    <form method="get" action="/packages" class="catalog-filter-bar">
-      <label>
-        Event type
-        <select name="eventType" onchange="this.form.submit()">
-          <option value="">All types</option>
-          {EVENT_TYPES.map((type) => (
-            <option value={type} selected={filters.eventType === type}>
-              {type}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Min price (₱)
-        <input
-          type="number"
-          name="minPricePesos"
-          min="0"
-          step="1"
-          value={filters.minPricePesos ?? ""}
-          placeholder="Any"
-        />
-      </label>
-      <label>
-        Max price (₱)
-        <input
-          type="number"
-          name="maxPricePesos"
-          min="0"
-          step="1"
-          value={filters.maxPricePesos ?? ""}
-          placeholder="Any"
-        />
-      </label>
-      <label>
-        Guests
-        <input
-          type="number"
-          name="guests"
-          min="1"
-          step="1"
-          value={filters.guests ?? ""}
-          placeholder="Any"
-        />
-      </label>
-      <button type="submit" class="button button-secondary">Filter</button>
-      {hasFilters && (
-        <a href="/packages" class="button button-secondary">Clear</a>
-      )}
+    <form method="get" action="/packages" class="catalog-filters" aria-label="Filter packages">
+      <div class="catalog-filter-fields">
+        <label class="ui-field" for="pkg-event-type">
+          <span>Event type</span>
+          <select id="pkg-event-type" name="eventType" class="ui-control" onchange="this.form.submit()">
+            <option value="">All event types</option>
+            {EVENT_TYPES.map((type) => (
+              <option value={type} selected={filters.eventType === type}>{type}</option>
+            ))}
+          </select>
+        </label>
+        <label class="ui-field" for="pkg-min-price">
+          <span>Min price (₱)</span>
+          <input
+            id="pkg-min-price"
+            class="ui-control"
+            type="number"
+            name="minPricePesos"
+            min="0"
+            step="1"
+            value={filters.minPricePesos ?? ""}
+            placeholder="No minimum"
+          />
+        </label>
+        <label class="ui-field" for="pkg-max-price">
+          <span>Max price (₱)</span>
+          <input
+            id="pkg-max-price"
+            class="ui-control"
+            type="number"
+            name="maxPricePesos"
+            min="0"
+            step="1"
+            value={filters.maxPricePesos ?? ""}
+            placeholder="No maximum"
+          />
+        </label>
+        <label class="ui-field" for="pkg-guests">
+          <span>Number of guests</span>
+          <input
+            id="pkg-guests"
+            class="ui-control"
+            type="number"
+            name="guests"
+            min="1"
+            step="1"
+            value={filters.guests ?? ""}
+            placeholder="Any guest count"
+          />
+        </label>
+        <div class="catalog-filter-actions">
+          <button type="submit" class="button button-primary">Apply filters</button>
+          {hasFilters && (
+            <a href="/packages" class="button button-secondary">Clear</a>
+          )}
+        </div>
+      </div>
+      <p class="catalog-filter-hint">
+        Prices are package totals. Enter your guest count to see packages that can fit your event.
+      </p>
     </form>
 
     {unavailable && (
