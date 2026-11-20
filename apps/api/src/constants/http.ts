@@ -8,6 +8,11 @@ export const CATALOG_JSON_BODY_LIMIT_BYTES = 3 * 1024 * 1024;
 export const QUOTATION_JSON_BODY_LIMIT_BYTES = 2 * 1024 * 1024;
 
 export function bookingBodyLimit(path: string) {
+  if (
+    /^\/(?:v1\/)?admin\/booking-requests\/[^/]+\/quotations\/send$/.test(path)
+  )
+    return QUOTATION_JSON_BODY_LIMIT_BYTES;
+
   if (/^\/(?:v1\/)?admin\/booking-requests\/[^/]+\/custom-package$/.test(path))
     return CATALOG_JSON_BODY_LIMIT_BYTES;
 

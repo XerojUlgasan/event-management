@@ -19,7 +19,10 @@ import {
 } from "../../data/catalog-canvas/catalog-canvas-queries.js";
 import { lockCatalogMediaData } from "../../data/catalog-media/lock-catalog-media.js";
 import { createCatalogMediaData } from "../../data/catalog-media/create-catalog-media.js";
-import { storedCanvasWidget } from "../../utils/catalog-canvas.js";
+import {
+  canvasServiceIds,
+  storedCanvasWidget,
+} from "../../utils/catalog-canvas.js";
 import { listCatalogMediaIdsService } from "./read-catalog-sections.js";
 import { listOwnerMediaIdsData } from "../../data/catalog-media/catalog-media-ownership.js";
 
@@ -62,15 +65,7 @@ export async function replaceCatalogSectionsService(
       "Package service terms are not allowed on service pages",
     );
 
-  const includedServiceIds = new Set(
-    content.sections.flatMap((section) =>
-      section.widgets.flatMap((widget) =>
-        widget.type === "service" && widget.serviceId
-          ? [widget.serviceId.toLowerCase()]
-          : [],
-      ),
-    ),
-  );
+  const includedServiceIds = canvasServiceIds(content.sections);
 
   if (
     addonServices.some((addon) =>

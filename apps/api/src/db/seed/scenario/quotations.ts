@@ -147,17 +147,12 @@ export async function seedScenarioQuotations(
       );
 
     for (const version of [1, 2]) {
-      const status: QuotationStatus =
-        version === 1 ? "superseded" : index % 3 === 0 ? "draft" : "sent";
-      const createdAt = new Date(
-        input.now.getTime() + (version === 1 ? 0 : 3_000),
+      const status: QuotationStatus = version === 1 ? "superseded" : "sent";
+      const sentAt = new Date(
+        input.now.getTime() + (version === 1 ? 1_000 : 4_000),
       );
-      const sentAt =
-        status === "draft"
-          ? null
-          : new Date(input.now.getTime() + (version === 1 ? 1_000 : 4_000));
       const supersededAt =
-        version === 1 ? new Date(input.now.getTime() + 3_000) : null;
+        version === 1 ? new Date(input.now.getTime() + 4_000) : null;
       plan.push({
         booking,
         row: {
@@ -170,12 +165,12 @@ export async function seedScenarioQuotations(
           items: JSON.stringify(items),
           status,
           created_by: admin.id,
-          created_at: createdAt,
-          updated_at: supersededAt ?? sentAt ?? createdAt,
+          created_at: sentAt,
+          updated_at: supersededAt ?? sentAt,
           sent_at: sentAt,
           superseded_at: supersededAt,
           offered_package_id: pkg.id,
-          adjustments_reviewed: status !== "draft",
+          adjustments_reviewed: true,
           previous_quotation_id: version === 1 ? null : quoteId(booking.id, 1),
           revision_reason:
             version === 1
@@ -201,8 +196,7 @@ export async function seedScenarioQuotations(
     if (!inserted) continue;
 
     if (
-      row.sent_at &&
-      (await insertIfNew(db, "messages", {
+      await insertIfNew(db, "messages", {
         id: scenarioId(`quotation-message:${row.id}`),
         conversation_id: booking.conversation_id,
         sender_id: admin.id,
@@ -211,53 +205,31 @@ export async function seedScenarioQuotations(
         quotation_id: row.id,
         created_at: row.sent_at,
         read_at: null,
-      }))
+      })
     )
       quotationMessages += 1;
 
-    const events = [
-      {
-        action: row.version === 1 ? "quotation.created" : "quotation.revised",
-        actor: admin.id,
-        at: row.created_at,
-      },
-      ...(row.sent_at && (row.version === 2 || row.items !== "[]")
-        ? [
-            {
-              action: "quotation.updated",
-              actor: admin.id,
-              at: new Date(row.created_at.getTime() + 500),
-            },
-          ]
-        : []),
-      ...(row.sent_at
-        ? [{ action: "quotation.sent", actor: admin.id, at: row.sent_at }]
-        : []),
-    ];
-
-    for (const event of events) {
-      if (
-        await insertIfNew(db, "audit_events", {
-          id: scenarioId(`quotation-audit:${row.id}:${event.action}`),
-          actor_id: event.actor,
-          action: event.action,
-          entity_type: "quotation",
-          entity_id: row.id,
-          metadata: JSON.stringify({
-            bookingRequestId: booking.id,
-            version: row.version,
-            ...(row.previous_quotation_id
-              ? {
-                  previousQuotationId: row.previous_quotation_id,
-                  reason: row.revision_reason,
-                }
-              : {}),
-          }),
-          created_at: event.at,
-        })
-      )
-        quotationAuditEvents += 1;
-    }
+    if (
+      await insertIfNew(db, "audit_events", {
+        id: scenarioId(`quotation-audit:${row.id}:quotation.sent`),
+        actor_id: admin.id,
+        action: "quotation.sent",
+        entity_type: "quotation",
+        entity_id: row.id,
+        metadata: JSON.stringify({
+          bookingRequestId: booking.id,
+          version: row.version,
+          ...(row.previous_quotation_id
+            ? {
+                previousQuotationId: row.previous_quotation_id,
+                reason: row.revision_reason,
+              }
+            : {}),
+        }),
+        created_at: row.sent_at,
+      })
+    )
+      quotationAuditEvents += 1;
   }
 
   return {

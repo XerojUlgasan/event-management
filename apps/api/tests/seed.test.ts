@@ -635,12 +635,12 @@ test("seed creates demo users and conversations while preserving unrelated data 
   assert.deepEqual(quotationCoverage.rows[0], {
     quotations: 100,
     bookings: 50,
-    drafts: 17,
-    sent: 33,
+    drafts: 0,
+    sent: 50,
     superseded: 50,
     base_only: 26,
-    delivered: 83,
-    audit_events: 253,
+    delivered: 100,
+    audit_events: 100,
   });
   const quotationViolations = await pool.query(`SELECT q.id FROM quotations q
     JOIN booking_requests b ON b.id = q.booking_request_id
@@ -656,8 +656,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
       OR NOT clemora_quotation_items_valid(q.items)
       OR q.total_amount_minor <> clemora_quotation_total(q.base_amount_minor, q.items)
       OR q.total_amount_minor < 0 OR q.created_at > q.updated_at
-      OR (q.status = 'draft' AND (q.sent_at IS NOT NULL OR q.adjustments_reviewed))
-      OR (q.status <> 'draft' AND (q.sent_at IS NULL OR NOT q.adjustments_reviewed))
+      OR q.sent_at IS NULL OR NOT q.adjustments_reviewed OR q.status = 'draft'
       OR (q.status = 'superseded') IS DISTINCT FROM (q.superseded_at IS NOT NULL)
       OR (q.version = 1 AND q.previous_quotation_id IS NOT NULL)
       OR (q.version = 2 AND (previous.id IS NULL OR previous.booking_request_id <> q.booking_request_id
@@ -666,12 +665,8 @@ test("seed creates demo users and conversations while preserving unrelated data 
       OR (q.sent_at IS NOT NULL AND (m.id IS NULL OR c.booking_request_id <> b.id
         OR m.sender_id <> q.created_by OR m.sender_role <> 'admin'
         OR m.created_at <> q.sent_at OR q.sent_at < q.created_at))
-      OR (q.sent_at IS NULL AND m.id IS NOT NULL)
-      OR NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.entity_id = q.id
-        AND a.action = CASE WHEN q.version = 1 THEN 'quotation.created' ELSE 'quotation.revised' END
-        AND a.actor_id = q.created_by)
-      OR (q.sent_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM audit_events a
-        WHERE a.entity_id = q.id AND a.action = 'quotation.sent' AND a.actor_id = q.created_by))
+      OR NOT EXISTS (SELECT 1 FROM audit_events a
+        WHERE a.entity_id = q.id AND a.action = 'quotation.sent' AND a.actor_id = q.created_by)
     )`);
   assert.deepEqual(quotationViolations.rows, []);
   const activeDuplicates =
@@ -685,7 +680,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
   }>(`
     SELECT q.id, q.booking_request_id, u.email FROM quotations q
     JOIN booking_requests b ON b.id = q.booking_request_id JOIN users u ON u.id = b.customer_id
-    WHERE q.status = 'draft' ORDER BY q.id LIMIT 1`);
+    WHERE q.status = 'sent' ORDER BY q.id LIMIT 1`);
   const quotation = sampleQuotation.rows[0];
   assert.ok(quotation);
   const violations = await pool.query(
@@ -901,7 +896,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
     scenarioPackage.rows[0].id,
   ]);
   await pool.query(
-    "UPDATE quotations SET base_amount_minor = base_amount_minor + 123, total_amount_minor = total_amount_minor + 123, revision_reason = 'Edited draft' WHERE id = $1",
+    "UPDATE quotations SET base_amount_minor = base_amount_minor + 123, total_amount_minor = total_amount_minor + 123, revision_reason = 'Preservation fixture' WHERE id = $1",
     [quotation.id],
   );
   // Closing a parent after seeding must not replace its quotations with a different booking.
@@ -1039,11 +1034,10 @@ test("seed creates demo users and conversations while preserving unrelated data 
     )
   ).quotations;
   assert.equal(adminQuotations.length, 2);
-  assert.equal(customerQuotations.length, 1);
-  assert.equal(customerQuotations[0].status, "superseded");
-  assert.ok(
-    !customerQuotations.some((row: { id: string }) => row.id === quotation.id),
-  );
+  assert.equal(customerQuotations.length, 2);
+  assert.equal(customerQuotations[0].id, quotation.id);
+  assert.equal(customerQuotations[0].status, "sent");
+  assert.equal(customerQuotations[1].status, "superseded");
   const offeredQuotation = (
     await read(
       `/quotations/${customerQuotations[0].id}`,

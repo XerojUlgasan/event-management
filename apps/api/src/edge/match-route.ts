@@ -13,7 +13,6 @@ export const routeFamilies = [
     prefixes: [
       "/v1/admin/booking-requests",
       "/v1/booking-requests",
-      "/v1/admin/quotations",
       "/v1/quotations",
     ],
   },

@@ -69,6 +69,8 @@ const iconPaths = {
   ),
   chevron: <path d="m9 18 6-6-6-6" />,
   check: <path d="m5 12 4 4L19 6" />,
+  plus: <path d="M12 5v14M5 12h14" />,
+  minus: <path d="M5 12h14" />,
   arrow: (
     <>
       <path d="M5 12h14M13 6l6 6-6 6" />

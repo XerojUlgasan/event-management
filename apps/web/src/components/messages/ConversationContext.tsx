@@ -235,7 +235,7 @@ export function ConversationContext({
             <p className="conversation-details-note">
               Latest sent quotation · Version {content.quotation.version}
             </p>
-            <QuotationSummaryRead quotation={content.quotation} />
+            <QuotationSummaryRead quotation={content.quotation} current />
           </>
         ) : (
           <div className="conversation-context-empty">

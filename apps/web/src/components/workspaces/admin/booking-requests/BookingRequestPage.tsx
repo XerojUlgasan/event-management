@@ -180,11 +180,11 @@ function RequestStatusForm({
 function BookingQuotations({
   bookingId,
   status,
-  refreshBooking,
+  onBookingChanged,
 }: {
   bookingId: string;
   status: BookingStatus;
-  refreshBooking: () => Promise<void>;
+  onBookingChanged: (booking: BookingRequest) => void;
 }) {
   const [state, setState] = useState<"loading" | "ready" | "missing" | "error">(
     "loading",
@@ -226,7 +226,7 @@ function BookingQuotations({
       bookingId={bookingId}
       admin
       bookingStatus={status}
-      refreshBooking={refreshBooking}
+      onBookingChanged={onBookingChanged}
       proposalAvailable={state === "ready"}
     />
   );
@@ -268,7 +268,12 @@ export function BookingRequestPage({
           "The request changed while refreshing. Please try again.",
         );
 
-      setItem(result.bookingRequest);
+      const next = result.bookingRequest;
+      setItem((current) =>
+        current?.id === next.id && current.updatedAt > next.updatedAt
+          ? current
+          : next,
+      );
       setRefreshKey((value) => value + 1);
     } catch (cause) {
       if (generation.isCurrent(current)) {
@@ -594,7 +599,14 @@ export function BookingRequestPage({
                 key={`${item.id}:${proposalRevision}`}
                 bookingId={item.id}
                 status={item.status}
-                refreshBooking={refresh}
+                onBookingChanged={(booking) => {
+                  setItem((current) =>
+                    current?.id === booking.id &&
+                    current.updatedAt < booking.updatedAt
+                      ? booking
+                      : current,
+                  );
+                }}
               />
             </div>
           )}

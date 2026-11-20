@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button, DataTable } from "@event-management/ui";
 import {
   MAX_PACKAGE_ADDON_SERVICES,
@@ -7,7 +7,7 @@ import {
 } from "@event-management/contracts/catalog";
 import { servicePricingLabels } from "../../lib/utils/formatting/money";
 import { CatalogReferencePickerDialog } from "./CatalogReferencePickerDialog";
-import { ServiceTermsDialog } from "./ServiceTermsDialog";
+import { PackageAddonActions } from "./PackageAddonActions";
 
 export function PackageAddonServices({
   content,
@@ -18,10 +18,8 @@ export function PackageAddonServices({
 }) {
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState("");
-  const [editing, setEditing] = useState<string | null>(null);
+  const addServiceRef = useRef<HTMLButtonElement>(null);
   const addons = content.addonServices ?? [];
-
-  const selected = addons.find((item) => item.id === editing);
 
   return (
     <section className="pe-addons">
@@ -60,38 +58,31 @@ export function PackageAddonServices({
             {
               key: "actions",
               header: "Actions",
-              cell: (item) => {
-                const name = item.service?.name ?? "add-on service";
-
-                return (
-                  <div className="pe-addon-actions">
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      icon="edit"
-                      aria-label={`Settings for ${name}`}
-                      title={`Settings for ${name}`}
-                      aria-haspopup="dialog"
-                      onClick={() => setEditing(item.id)}
-                    />
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      icon="trash"
-                      aria-label={`Remove ${name}`}
-                      title={`Remove ${name}`}
-                      onClick={() =>
-                        onChange({
-                          ...content,
-                          addonServices: addons.filter(
-                            (entry) => entry.id !== item.id,
-                          ),
-                        })
-                      }
-                    />
-                  </div>
-                );
-              },
+              cell: (item) => (
+                <PackageAddonActions
+                  className="pe-addon-actions"
+                  name={item.service?.name ?? "add-on service"}
+                  serviceId={item.serviceId}
+                  pricing={item}
+                  removeFocus={addServiceRef}
+                  onEdit={(pricing) =>
+                    onChange({
+                      ...content,
+                      addonServices: addons.map((entry) =>
+                        entry.id === item.id ? { ...entry, ...pricing } : entry,
+                      ),
+                    })
+                  }
+                  onRemove={() =>
+                    onChange({
+                      ...content,
+                      addonServices: addons.filter(
+                        (entry) => entry.id !== item.id,
+                      ),
+                    })
+                  }
+                />
+              ),
             },
           ]}
         />
@@ -100,6 +91,7 @@ export function PackageAddonServices({
       )}
       {error && <p role="alert">{error}</p>}
       <Button
+        ref={addServiceRef}
         variant="secondary"
         disabled={addons.length >= MAX_PACKAGE_ADDON_SERVICES}
         onClick={() => setPicking(true)}
@@ -160,23 +152,6 @@ export function PackageAddonServices({
               ],
             });
             setPicking(false);
-          }}
-        />
-      )}
-      {selected && (
-        <ServiceTermsDialog
-          addon
-          serviceId={selected.serviceId}
-          terms={selected}
-          onClose={() => setEditing(null)}
-          onSave={(pricing) => {
-            onChange({
-              ...content,
-              addonServices: addons.map((item) =>
-                item.id === selected.id ? { ...item, ...pricing } : item,
-              ),
-            });
-            setEditing(null);
           }}
         />
       )}

@@ -3007,23 +3007,29 @@ test("quotations do not retain removed package media or grant historical media a
       201,
     )
   ).bookingRequest;
-  const draft = (
-    await read(
-      await call(
-        `/admin/booking-requests/${booking.id}/quotations`,
-        "POST",
-        { expectedUpdatedAt: booking.updatedAt },
-        adminCookie,
-      ),
-      201,
-    )
-  ).quotation;
+  const { preparation } = await read(
+    await call(
+      `/admin/booking-requests/${booking.id}/quotations/prepare`,
+      "GET",
+      undefined,
+      adminCookie,
+    ),
+    200,
+  );
   const sent = (
     await read(
       await call(
-        `/admin/quotations/${draft.id}/send`,
+        `/admin/booking-requests/${booking.id}/quotations/send`,
         "POST",
-        { expectedUpdatedAt: draft.updatedAt },
+        {
+          requestId: randomUUID(),
+          expectedBookingUpdatedAt: preparation.expectedBookingUpdatedAt,
+          packageId: preparation.packageId,
+          expectedPackageUpdatedAt: preparation.expectedPackageUpdatedAt,
+          currentOffer: preparation.currentOffer,
+          revisionReason: null,
+          items: [],
+        },
         adminCookie,
       ),
       200,

@@ -1,30 +1,24 @@
 # Quotations
 
-A quotation is the admin's price offer for a customer's booking inquiry. It sets out the package price, any additions or deductions, and the total for the customer to review. This domain covers preparing private proposals, sending offers, customer feedback through chat, admin revisions, and quotation history.
-
-This reference describes intended business behavior. The [current implementation](../../README.md#private-packages-and-quotations) records what is available today; describing a workflow here does not mean it is already implemented.
+A quotation is the admin's price offer for a customer's booking inquiry. It sets out the package price, add-on charges, manual fees or discounts, and the total for the customer to review. The [root README](../../README.md#private-packages-and-quotations) records the current implementation.
 
 ## People and responsibilities
 
-- **Admin:** Discusses requirements with the customer, prepares the package proposal and quotation, reviews adjustments, sends offers, and handles revisions. As defined in [identity and responsibilities](identity.md), admin means the System Administrator. Any System Administrator may continue this work, with their actions recorded.
-- **Customer:** Explains their requirements, views their own proposal and sent quotations, and uses chat to say whether they agree with an offer, raise concerns, or request a new quotation. Customers do not edit quotations or see internal drafts.
+- **Admin:** Discusses requirements, prepares the package and quotation, sends offers, and handles revisions. Any System Administrator can do this work, with their actions recorded.
+- **Customer:** Views their own proposal and sent quotations. The customer uses chat to agree, raise concerns, or request a revised offer.
 
 ## Main workflow and handoffs
 
-1. The customer submits a [booking request](booking-requests.md), with or without an initial package. Its linked [conversation](messages.md) gives the customer and admin a place to discuss requirements.
-2. The admin prepares the proposal using a selected catalog package or a private custom package for that booking. A private package can be built from scratch or tailored from a catalog package without changing the public catalog. Requests without a package must have one prepared before quotation creation.
-3. The admin creates a quotation draft from the current proposal price and enters any manual additions or deductions. Clemora calculates the total; a package-only offer is also valid.
-4. The admin saves and sends the offer. The customer can review that exact version from the booking details or its message in the linked conversation.
-5. The customer responds through chat. A reply records the conversation without changing quotation status or creating a draft. When a new offer is needed, the admin starts a revision with a reason. Starting it immediately marks the previous offer as superseded; it remains in history.
-6. The new draft uses the current proposal price and carries over the previous adjustments. The admin reviews those adjustments, saves, and sends the new version. The draft stays internal until sent, and the customer continues the discussion through chat.
+1. The customer submits a [booking request](booking-requests.md), with or without an initial package. The linked [conversation](messages.md) is where the customer and admin discuss requirements.
+2. The admin chooses a catalog package or prepares a private custom package for the request. An available proposal and an open request are required to prepare the quotation.
+3. The quotation editor uses the current proposal price and includes every private package add-on. Add services in the private package. The quotation's Edit and Remove controls reuse private package add-on actions. Confirming an edit replaces the package's saved terms. Confirming removal takes the service out of that package and refreshes the quotation. Both actions leave the service catalog intact.
+4. The admin completes add-on hours and reviews the total. Use **Cancel** to discard unsent quotation changes or **Send** to record the completed version and publish its exact-version message together. Confirmed package updates have their own save and persist after quotation cancellation.
+5. If a customer asks for changes through chat, the admin prepares a revision with a reason. The editor starts from the current package and add-ons. The previous offer remains active until its replacement successfully sends, then stays readable in history with its amounts, message, and revision links.
 
 ## Rules and boundaries
 
-- Only System Administrators create, revise, save, or send quotations. Customers view offers and communicate through chat. Quotations and chat replies do not confirm the booking, reserve dates, create event schedules, or establish a payment workflow.
-- Quotation statuses are `draft`, `sent`, and `superseded`. Customers discuss agreement, concerns, and requests for another offer through chat; replies do not change quotation status or create drafts. An admin revision supersedes the prior offer and keeps its version link, reason, adjustments, financial values, messages, and audit history readable.
-- The original inquiry's package choice stays recorded separately from the current proposal. A quotation preserves its offered price and adjustments; package descriptions, services, and event details remain part of the current proposal and booking.
-- Later package or event edits do not change saved quotation amounts. The admin must discuss changes affecting the agreed price or delivery and explicitly revise the offer when a new quotation is needed.
-- Included service widgets are covered by the package base price. Custom-package add-ons and local excess-hour terms do not automatically become quotation charges or establish availability. Quotation integration is deferred; adjustments remain entered and reviewed by the admin, and an offer cannot be sent with a negative total.
-- Drafts can be edited. Sent offers retain their financial history, and changes require a new version rather than rewriting the old offer.
-- Quotations have no automatic expiry. Sending requires the linked booking conversation. Conversation age, inactivity, and the parent event end time do not block delivery. Declined or cancelled requests cannot receive quotation edits or new offers. Previously closed booking conversations remain available for messaging and quotation delivery.
-- Requested dates and operational schedules remain separate from quotation discussions. Schedule changes do not themselves require a new quotation. The [product scope](../../README.md#product-scope) governs confirmation and other commitments.
+- Included service widgets are covered by the package base price. Extensions may be recorded as manual adjustments. Calculate a fixed-price add-on as base price plus whole extra hours times the excess rate. An hourly-only add-on needs a positive whole number of booked hours. Manual fees and discounts carry no catalog service selection.
+- The server validates all current add-ons and calculates the total. Send requires complete pricing, a nonnegative total, current booking and proposal data, and the linked conversation. Resolve an unavailable add-on in the private package before sending. Refresh and review if the package or current offer has changed. Repeating the same send request should produce one offer and one message.
+- Sent and superseded versions retain their financial history as packages and services change. A revision creates a new version. Legacy unsent records are retained without a draft workflow.
+- Declined and cancelled requests are read-only. Quotations have no automatic expiry. A signed-in booking conversation remains available for delivery.
+- Quotations and chat replies do not confirm a booking, reserve dates, create event schedules, or establish a payment workflow. The [product scope](../../README.md#product-scope) governs these commitments.

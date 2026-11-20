@@ -8,7 +8,6 @@ import {
   CATALOG_JSON_BODY_LIMIT_BYTES,
   MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
   SMALL_JSON_BODY_LIMIT_BYTES,
-  QUOTATION_JSON_BODY_LIMIT_BYTES,
   bookingBodyLimit,
 } from "../constants/http.js";
 import type { HonoEnv } from "../types/hono.js";
@@ -78,7 +77,6 @@ const bodyLimits: Partial<
   "booking-requests": [
     { path: "/booking-requests", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
     { path: "/booking-requests/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
-    { path: "/admin/quotations/*", maxSize: QUOTATION_JSON_BODY_LIMIT_BYTES },
     { path: "/quotations/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
   ],
 };

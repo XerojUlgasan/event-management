@@ -1,6 +1,6 @@
 import { z } from "@hono/zod-openapi";
 import { json } from "../booking-requests/http.js";
-import { quotationSchema } from "./schemas.js";
+import { preparationSchema, quotationSchema } from "./schemas.js";
 
 export const quoteResult = {
   content: json(z.object({ quotation: quotationSchema })),
@@ -12,10 +12,13 @@ export const listResult = {
     z.object({
       quotations: z.array(quotationSchema),
       nextCursor: z.string().nullable(),
-      currentDraft: quotationSchema.nullable(),
       currentOffer: quotationSchema.nullable(),
-      previousDraftVersion: z.number().nullable(),
     }),
   ),
   description: "Quotation history",
+};
+
+export const preparationResult = {
+  content: json(z.object({ preparation: preparationSchema })),
+  description: "Current package and offer terms for preparing a quotation",
 };

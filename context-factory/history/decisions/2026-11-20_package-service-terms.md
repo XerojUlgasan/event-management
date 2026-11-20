@@ -15,7 +15,7 @@ Service widgets previously referenced listings without defining inclusion. The u
 - A private custom package may additionally own an `addonServices` JSONB array. Each entry references a reusable service and stores its local fixed price, covered hours and hourly rate, or hourly-only pricing. Catalog packages cannot contain add-ons.
 - Defaults are copied when a service is attached or explicitly reset. Subsequent catalog edits do not rewrite package terms. Missing legacy terms remain unspecified until an admin saves them.
 - The existing service picker and direct three-dot settings dialog pattern own selection and editing. Adding or editing services never recalculates the package base price.
-- Quotation calculations, automatic add-on charges, partial-hour rounding, and structured quotation-term snapshots are deferred. Existing financial quotations remain unchanged.
+- Quotation calculations, automatic add-on charges, partial-hour rounding, and structured quotation-term snapshots are deferred. Existing financial quotations remain unchanged. The later [quotation package add-ons decision](2026-11-21_quotation-package-addons.md) records the subsequent quotation work.
 
 ## Alternatives considered
 

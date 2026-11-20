@@ -5,7 +5,6 @@ export function listQuotesPageData(
   db: Database,
   bookingId: string,
   input: {
-    customer: boolean;
     quotationId?: string;
     beforeVersion?: number;
     limit: number;
@@ -15,12 +14,9 @@ export function listQuotesPageData(
     .selectFrom("quotations")
     .selectAll()
     .select(quoteRevision.as("revision"))
-    .where("booking_request_id", "=", bookingId);
-
-  if (input.customer)
-    query = query
-      .where("status", "!=", "draft")
-      .where("sent_at", "is not", null);
+    .where("booking_request_id", "=", bookingId)
+    .where("status", "!=", "draft")
+    .where("sent_at", "is not", null);
 
   if (input.quotationId) query = query.where("id", "=", input.quotationId);
 
@@ -33,45 +29,28 @@ export function listQuotesPageData(
     .execute();
 }
 
-export function currentQuoteData(
-  db: Database,
-  bookingId: string,
-  statuses: string[],
-  customer: boolean,
-  quotationId?: string,
-) {
-  let query = db
+// Legacy preparation could supersede an offer before a replacement was
+// delivered. Use the last delivered version when no sent offer exists.
+export function latestDeliveredQuoteData(db: Database, bookingId: string) {
+  return db
     .selectFrom("quotations")
     .selectAll()
     .select(quoteRevision.as("revision"))
     .where("booking_request_id", "=", bookingId)
-    .where("status", "in", statuses);
-
-  if (customer) query = query.where("sent_at", "is not", null);
-
-  if (quotationId) query = query.where("id", "=", quotationId);
-
-  return query.orderBy("version", "desc").limit(1).executeTakeFirst();
+    .where("status", "!=", "draft")
+    .where("sent_at", "is not", null)
+    .orderBy(sql<boolean>`status = 'sent'`, "desc")
+    .orderBy("version", "desc")
+    .limit(1)
+    .executeTakeFirst();
 }
 
-export async function quotationWriteStateData(
-  db: Database,
-  bookingId: string,
-  excludeId?: string,
-) {
+export async function latestQuoteVersionData(db: Database, bookingId: string) {
   const result = await db
     .selectFrom("quotations")
-    .select([
-      sql<number>`coalesce(max(version), 0)::int`.as("max_version"),
-      sql<boolean>`coalesce(bool_or(status in ('draft', 'sent')), false)`.as(
-        "has_active",
-      ),
-      sql<boolean>`coalesce(bool_or(status = 'draft' and id <> ${excludeId ?? null}::uuid), false)`.as(
-        "has_other_draft",
-      ),
-    ])
+    .select(sql<number>`coalesce(max(version), 0)::int`.as("version"))
     .where("booking_request_id", "=", bookingId)
     .executeTakeFirstOrThrow();
 
-  return result;
+  return result.version;
 }

@@ -1,5 +1,6 @@
 import { type Insertable, type Transaction } from "kysely";
 import type { DB, Quotations } from "../../db/types.js";
+import { quoteRevision } from "./quotation-revision.js";
 
 export const createQuotationData = (
   db: Transaction<DB>,
@@ -8,5 +9,6 @@ export const createQuotationData = (
   db
     .insertInto("quotations")
     .values(values)
-    .returning("id")
+    .returningAll()
+    .returning(quoteRevision.as("revision"))
     .executeTakeFirstOrThrow();

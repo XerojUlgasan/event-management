@@ -30,6 +30,22 @@ export function canvasMediaIds(sections: StoredSections) {
   ];
 }
 
+export function canvasServiceIds(
+  sections: Array<{
+    widgets: Array<{ type: string; serviceId?: string | null }>;
+  }>,
+) {
+  return new Set(
+    sections.flatMap((section) =>
+      section.widgets.flatMap((widget) =>
+        widget.type === "service" && widget.serviceId
+          ? [widget.serviceId.toLowerCase()]
+          : [],
+      ),
+    ),
+  );
+}
+
 export function catalogMediaUrl(media: Asset) {
   return media.source === "upload"
     ? `/v1/catalog-media/${media.id}`

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Quotation } from "../../src/lib/data/quotations/quotations";
-import { findLatestSentQuotation } from "../../src/lib/services/quotations/latest-sent-quotation.ts";
+import { getLatestSentQuotation } from "../../src/lib/services/quotations/latest-sent-quotation.ts";
 
 const quotation = (
   version: number,
@@ -27,120 +27,48 @@ const quotation = (
   items: [],
 });
 
-const page = (quotations: Quotation[], nextCursor: string | null = null) => ({
-  quotations,
-  nextCursor,
-  currentDraft: null,
-  currentOffer: null,
-  previousDraftVersion: null,
-});
+for (const admin of [false, true]) {
+  test(`latest offer uses the booking scope for ${admin ? "admins" : "customers"}`, async () => {
+    const latest = quotation(2, "sent", "2090-02-02T00:00:00.000Z");
+    const calls: unknown[][] = [];
 
-test("admin lookup skips a newer unsent draft and returns the newest sent version", async () => {
-  const sent = quotation(2, "sent", "2090-02-02T00:00:00.000Z");
-  const calls: unknown[][] = [];
+    const actual = await getLatestSentQuotation(
+      "booking-1",
+      admin,
+      async (...args) => {
+        calls.push(args);
 
-  const result = await findLatestSentQuotation(
-    "booking-1",
-    true,
-    async (...args) => {
-      calls.push(args);
+        return {
+          quotations: [],
+          nextCursor: "more-history",
+          currentOffer: latest,
+        };
+      },
+    );
 
-      return page([
-        quotation(3, "draft", null),
-        sent,
-        quotation(1, "superseded", "2090-01-01T00:00:00.000Z"),
-      ]);
-    },
-  );
-
-  assert.equal(result, sent);
-  assert.deepEqual(calls, [["booking-1", true, {}]]);
-});
-
-test("a superseded sent quotation remains eligible even when a newer draft exists", async () => {
-  const sent = quotation(2, "superseded", "2090-02-02T00:00:00.000Z");
-
-  const result = await findLatestSentQuotation("booking-1", false, async () =>
-    page([quotation(3, "draft", null), sent]),
-  );
-
-  assert.equal(result, sent);
-});
-
-test("lookup follows cursors, including after an empty page, with booking and role scope", async () => {
-  const sent = quotation(1, "sent", "2090-01-01T00:00:00.000Z");
-  const calls: unknown[][] = [];
-  const pages = [
-    page([quotation(2, "draft", null)], "cursor-empty"),
-    page([], "cursor-sent"),
-    page([sent]),
-  ];
-
-  const result = await findLatestSentQuotation(
-    "booking-1",
-    false,
-    async (...args) => {
-      calls.push(args);
-      const nextPage = pages.shift();
-
-      if (!nextPage)
-        throw new Error("loader should only be called for available pages");
-
-      return nextPage;
-    },
-  );
-
-  assert.equal(result, sent);
-  assert.deepEqual(calls, [
-    ["booking-1", false, {}],
-    ["booking-1", false, { cursor: "cursor-empty" }],
-    ["booking-1", false, { cursor: "cursor-sent" }],
-  ]);
-});
-
-test("returns null when every page has no sent quotation", async () => {
-  const pages = [
-    page([quotation(2, "draft", null)], "next"),
-    page([quotation(1, "draft", null)]),
-  ];
-
-  const result = await findLatestSentQuotation("booking-1", true, async () => {
-    const nextPage = pages.shift();
-
-    if (!nextPage)
-      throw new Error("loader should only be called for available pages");
-
-    return nextPage;
+    assert.equal(actual, latest);
+    assert.deepEqual(calls, [["booking-1", admin]]);
   });
+}
 
-  assert.equal(result, null);
+test("latest offer can be a delivered fallback from older records", async () => {
+  const latest = quotation(2, "superseded", "2090-02-02T00:00:00.000Z");
+
+  const actual = await getLatestSentQuotation("booking-1", false, async () => ({
+    quotations: [latest],
+    nextCursor: null,
+    currentOffer: latest,
+  }));
+
+  assert.equal(actual, latest);
 });
 
-test("propagates page loading errors", async () => {
-  const error = new Error("quotation page unavailable");
-  await assert.rejects(
-    findLatestSentQuotation("booking-1", false, async () => {
-      throw error;
-    }),
-    error,
-  );
-});
+test("returns null when the booking has no delivered offer", async () => {
+  const actual = await getLatestSentQuotation("booking-1", false, async () => ({
+    quotations: [],
+    nextCursor: null,
+    currentOffer: null,
+  }));
 
-test("skips superseded versions that were never sent", async () => {
-  const sent = quotation(1, "sent", "2090-01-01T00:00:00.000Z");
-
-  const result = await findLatestSentQuotation("booking-1", true, async () =>
-    page([quotation(3, "draft", null), quotation(2, "superseded", null), sent]),
-  );
-
-  assert.equal(result, sent);
-});
-
-test("rejects repeated pagination cursors rather than looping or claiming no offer", async () => {
-  await assert.rejects(
-    findLatestSentQuotation("booking-1", true, async () =>
-      page([], "repeated"),
-    ),
-    /Unable to load quotation history/,
-  );
+  assert.equal(actual, null);
 });

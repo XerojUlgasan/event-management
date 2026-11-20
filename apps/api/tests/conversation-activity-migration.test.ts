@@ -129,29 +129,34 @@ test("derived conversation activity preserves history and makes a formerly close
     );
     process.env.DB_NAME = name;
     ({ db: runtime } = await import("../src/db/client.js"));
-    const { findQuoteData } =
-      await import("../src/data/quotations/find-quotation.js");
+    const { prepareQuotationService } =
+      await import("../src/services/quotations/prepare-quotation.js");
     const { sendQuotationService } =
       await import("../src/services/quotations/send-quotation.js");
-    const current = await findQuoteData(runtime, quote);
-    assert.ok(current);
-    const sent = await sendQuotationService(
-      runtime,
-      quote,
-      actor,
-      current.revision,
-    );
-    assert.equal("error" in sent, false);
+    const prepared = await prepareQuotationService(runtime, booking);
+    assert.ok("bookingRequestId" in prepared);
+    const sentId = randomUUID();
+    const sent = await sendQuotationService(runtime, booking, actor, {
+      requestId: sentId,
+      expectedBookingUpdatedAt: prepared.expectedBookingUpdatedAt,
+      packageId: prepared.packageId,
+      expectedPackageUpdatedAt: prepared.expectedPackageUpdatedAt,
+      currentOffer: prepared.currentOffer,
+      revisionReason: null,
+      items: [],
+    });
+    assert.ok("status" in sent && sent.status === "sent");
+    assert.equal(sent.version, 2);
     assert.equal(
       (await pool.query("SELECT status FROM quotations WHERE id=$1", [quote]))
         .rows[0].status,
-      "sent",
+      "draft",
     );
     assert.equal(
       (
         await pool.query(
           "SELECT count(*)::int AS count FROM messages WHERE quotation_id=$1",
-          [quote],
+          [sentId],
         )
       ).rows[0].count,
       1,

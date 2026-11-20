@@ -31,6 +31,8 @@ const names = [
   "location",
   "camera",
   "eye",
+  "plus",
+  "minus",
   "edit",
   "save",
   "trash",

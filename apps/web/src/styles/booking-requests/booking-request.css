@@ -341,14 +341,6 @@
   justify-content: space-between;
   gap: 16px;
 }
-.quotation-adjustment-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px 16px;
-}
-.quotation-adjustment-fields .quotation-field-wide {
-  grid-column: 1 / -1;
-}
 .quotation-math {
   display: grid;
   gap: 8px;
@@ -451,7 +443,6 @@
 }
 
 @media (max-width: 800px) {
-  .quotation-adjustment-fields,
   .quotation-summary-line {
     grid-template-columns: 1fr;
   }

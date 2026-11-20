@@ -14,6 +14,9 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Direct quotation sending and package add-ons](2026-11-21_00-49-10_direct-quotation-send.md) | Send or Cancel and shared package actions / main | complete | Local browser, API, and Edge passed. Check migration before coordinated rollout. |
+| [Inline quotation editing](2026-11-21_00-11-00_inline-quotation-editing.md) | On-page editing and add-on rollout diagnosis / main | complete | Apply the quotation add-on migration on the intended database. |
+| [Quotation package add-ons](2026-11-21_00-00-00_quotation-package-addons.md) | Automatic add-on charges and compact quotation controls / main | complete | Reviewed and tested locally. Release the matching migration, API, and web together. |
 | [Package editor UI](2026-11-20_23-43-08_package-editor-ui.md) | Modal details, compact add-ons and icon toolbar / main | complete | Independently reviewed; local UI checks pass; review scoped diff, no migration required |
 | [Package service terms](2026-11-20_23-03-00_package-service-terms.md) | Included widget terms and custom-only JSONB add-ons / main | complete | Code verified and independently reviewed; apply matching migration/API/web together; quotations deferred |
 | [Hide new package widgets](2026-11-20_22-32-42_hide-package-widget.md) | Creation-only pause / main | complete | New package widgets hidden; existing references and Service widgets preserved; no migration required |

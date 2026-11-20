@@ -4,6 +4,8 @@ Date: 2026-11-19 (Asia/Manila)
 Status: implemented and locally verified; hosted rollout remains unverified  
 Baseline: clean `main` at `e4ff29442ab7ca112ef0a203b87bf04a03f5416c` before the specification work; implementation remains uncommitted
 
+This is a historical implementation record. The [Send and Cancel decision](../../context-factory/history/decisions/2026-11-21_direct-quotation-send.md) replaces the draft workflow below. The booking status rules still apply.
+
 ## Outcome and interpretation
 
 System Administrators can prepare a quotation, create or edit a private custom package, and assign a catalog package while a booking request is **Under review**, **Needs details**, or **Accepted for processing**. Declined and cancelled requests retain readable records but cannot receive these changes. Acceptance is not a prerequisite for package or quotation preparation.
@@ -30,7 +32,7 @@ Admin reads, package previews/history, and quotation history remain available on
 
 These findings describe the inspected baseline. The links identify the current source owners; the implementation below resolves the UI gaps.
 
-- [Quotation context](../../apps/api/src/services/quotations/quotation-context.ts) defines a closed booking as `declined` or `cancelled`. [Create](../../apps/api/src/services/quotations/create-quotation.ts), [revise](../../apps/api/src/services/quotations/revise-quotation.ts), [save](../../apps/api/src/services/quotations/save-quotation.ts), and [send](../../apps/api/src/services/quotations/send-quotation.ts) all enforce that rule inside transactions. There is no accepted-only guard to remove.
+- [Quotation context](../../apps/api/src/services/quotations/quotation-context.ts) defines a closed booking as `declined` or `cancelled`. The then-current create, revise, save, and send services all enforced that rule inside transactions. There is no accepted-only guard to remove.
 - [Custom-package save](../../apps/api/src/services/booking-requests/save-custom-package.ts) rejects those two statuses before staging media and again after locking the booking. [Catalog assignment](../../apps/api/src/services/booking-requests/attach-booking-package.ts) rejects them inside the booking transaction. [Booking routes](../../apps/api/src/controllers/booking-requests/index.ts) and [quotation routes](../../apps/api/src/controllers/quotations/index.ts) require a session and System Administrator permissions for writes.
 - [BookingRequestPage](../../apps/web/src/components/workspaces/admin/booking-requests/BookingRequestPage.tsx) passes `editable={!['declined', 'cancelled'].includes(item.status)}` to [BookingPackage](../../apps/web/src/components/booking-requests/BookingPackage.tsx). Its **Create custom package**, **Edit package**, and **Choose catalog package** entry actions already follow the requested status rule.
 - The same page's `BookingQuotations` wrapper checked whether a proposal existed but passed no booking status or edit permission to [Quotations](../../apps/web/src/components/quotations/Quotations.tsx). That component rendered **Create draft**, draft adjustments, **Save adjustments**, **Save and send**, and revision actions using admin/draft/offer state. A closed booking with a package could therefore display write actions that failed with `409` at the API.

@@ -4,13 +4,13 @@ import { sendQuotationService } from "../../services/quotations/send-quotation.j
 import type { AppRouteHandler } from "../../types/hono.js";
 import { body, errors } from "../booking-requests/http.js";
 import { quoteResult } from "./responses.js";
-import { expectedBody, idParams } from "./schemas.js";
+import { idParams, sendBody } from "./schemas.js";
 
 export const sendQuotationRoute = createRoute({
   method: "post",
-  path: "/admin/quotations/{id}/send",
+  path: "/admin/booking-requests/{id}/quotations/send",
   tags: ["Quotations"],
-  request: { params: idParams, body: body(expectedBody) },
+  request: { params: idParams, body: body(sendBody) },
   responses: { 200: quoteResult, ...errors },
 });
 
@@ -21,7 +21,7 @@ export const sendQuotationRouteHandler: AppRouteHandler<
     c.get("db"),
     c.req.valid("param").id,
     c.get("session").user.id,
-    c.req.valid("json").expectedUpdatedAt,
+    c.req.valid("json"),
   );
 
   return "message" in r

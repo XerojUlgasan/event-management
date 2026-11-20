@@ -1,5 +1,3 @@
-import { type Transaction } from "kysely";
-import type { DB } from "../../db/types.js";
 import { quoteRevision, type Database } from "./quotation-revision.js";
 
 export const findQuoteData = (db: Database, id: string) =>
@@ -10,11 +8,11 @@ export const findQuoteData = (db: Database, id: string) =>
     .where("id", "=", id)
     .executeTakeFirst();
 
-export const lockQuoteData = (db: Transaction<DB>, id: string) =>
+export const findQuoteSendAuditData = (db: Database, id: string) =>
   db
-    .selectFrom("quotations")
-    .selectAll()
-    .select(quoteRevision.as("revision"))
-    .where("id", "=", id)
-    .forUpdate()
+    .selectFrom("audit_events")
+    .select("metadata")
+    .where("entity_type", "=", "quotation")
+    .where("entity_id", "=", id)
+    .where("action", "=", "quotation.sent")
     .executeTakeFirst();

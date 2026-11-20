@@ -4,7 +4,6 @@ import type { DB } from "../../db/types.js";
 import type { Content } from "../../controllers/packages/schemas.js";
 import { findBookingRequestData } from "../../data/booking-requests/find-booking-request.js";
 import { lockBookingRequestData } from "../../data/booking-requests/lock-booking-request.js";
-import { touchBookingRevisionData } from "../../data/booking-requests/booking-revision.js";
 import { findCustomPackageData } from "../../data/booking-requests/find-custom-package.js";
 import { findAnyPackageData } from "../../data/booking-requests/find-any-package.js";
 import { lockAnyPackageData } from "../../data/booking-requests/lock-any-package.js";
@@ -16,11 +15,10 @@ import {
 } from "../catalog-canvas/replace-catalog-sections.js";
 import { findCatalogMediaData } from "../../data/catalog-media/find-catalog-media.js";
 import { createCatalogMediaData } from "../../data/catalog-media/create-catalog-media.js";
-import { createAuditEventData } from "../../data/audit/create-audit-event.js";
 import { updatePackageData } from "../../data/packages/update-package.js";
 import { packageDto } from "../packages/package-response.js";
 import { nextUpdate } from "../packages/package-rules.js";
-import { bookingRequestDtos } from "./booking-request-response.js";
+import { customPackageResult } from "./custom-package-result.js";
 import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
 import { pendingCatalogMediaKey } from "../../utils/catalog-media-paths.js";
 import { promoteOwnerCatalogMediaService } from "../catalog-media/promote-catalog-media.js";
@@ -252,30 +250,13 @@ export async function saveCustomPackageService(
       if (!create && current?.thumbnail_media_id)
         previousMediaIds.push(current.thumbnail_media_id);
 
-      await touchBookingRevisionData(trx, id);
-      const updatedBooking = await findBookingRequestData(trx, id);
-
-      if (!updatedBooking)
-        throw new Error("Saved booking request is unavailable");
-
-      const pkg = await packageDto(trx, saved);
-      await createAuditEventData(trx, {
-        actor_id: actorId,
-        action: create
-          ? "booking.custom_package_created"
-          : "booking.custom_package_updated",
-        entity_type: "booking_request",
-        entity_id: id,
-        metadata: JSON.stringify({
-          previousPackageId: current?.id ?? null,
-          packageId: saved.id,
-          before,
-          after: pkg,
-        }),
+      return customPackageResult(trx, {
+        bookingId: id,
+        actorId,
+        create,
+        before,
+        saved,
       });
-      const [bookingRequest] = await bookingRequestDtos(trx, [updatedBooking]);
-
-      return { package: pkg, bookingRequest };
     });
 
     if (!("status" in outcome))

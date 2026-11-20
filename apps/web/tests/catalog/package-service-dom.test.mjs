@@ -354,6 +354,8 @@ test("add-on picker copies defaults, rejects overlap, and local override survive
   assert.equal(input("Included hours").value, "5");
   await click("Save settings");
   await click("Remove Photography");
+  assert.equal(latest.addonServices.length, 1);
+  await click("Remove package add-on");
   assert.equal(latest.addonServices.length, 0);
   assert.match(document.body.textContent, /No add-on services yet/);
 });

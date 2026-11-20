@@ -6,6 +6,7 @@ import {
   MESSAGE_UPLOAD_BODY_LIMIT_BYTES,
   bookingBodyLimit,
   CATALOG_JSON_BODY_LIMIT_BYTES,
+  QUOTATION_JSON_BODY_LIMIT_BYTES,
   SMALL_JSON_BODY_LIMIT_BYTES,
 } from "../src/constants/http.js";
 
@@ -38,7 +39,7 @@ test("route families follow the longest owned prefix", () => {
     "booking-requests",
   );
   assert.equal(
-    matchRouteFamily("/v1/admin/quotations/id/send"),
+    matchRouteFamily("/v1/admin/booking-requests/id/quotations/send"),
     "booking-requests",
   );
   assert.equal(matchRouteFamily("/v1/quotations/id"), "booking-requests");
@@ -68,6 +69,18 @@ test("unknown paths and near-miss prefixes stay unmatched", () => {
   assert.equal(matchRouteFamily("/v1/admin"), null);
   assert.equal(matchRouteFamily("/v1/media"), null);
   assert.equal(matchRouteFamily("/openapi.json"), null);
+  assert.equal(matchRouteFamily("/v1/admin/quotations/id/send"), null);
+});
+
+test("quotation delivery keeps the full item-list cap in Node and Edge", () => {
+  assert.equal(
+    bookingBodyLimit("/v1/admin/booking-requests/id/quotations/send"),
+    QUOTATION_JSON_BODY_LIMIT_BYTES,
+  );
+  assert.equal(
+    bookingBodyLimit("/admin/booking-requests/id/quotations/send"),
+    QUOTATION_JSON_BODY_LIMIT_BYTES,
+  );
 });
 
 test("package attachment uses the booking route family and small body cap", () => {

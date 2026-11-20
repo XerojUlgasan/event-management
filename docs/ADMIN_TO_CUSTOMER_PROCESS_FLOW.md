@@ -6,7 +6,7 @@ Styled by AMAC, still named Clemora internally, supports this overall journey:
 
 An accepted request, a sent quotation, and an operational schedule are separate records. **None currently confirms a booking or reserves a date.**
 
-This document's original process investigation inspected source on 2026-11-15, on `main` at `311c4cf`, including the local files present during the investigation. Its quotation boundaries below reflect the current `draft`, `sent`, and `superseded` model. The [root README](../README.md) owns product scope, implementation status, and setup. This is a process explanation, not a new business-policy decision.
+This document's original process investigation inspected source on 2026-11-15, on `main` at `311c4cf`, including the local files present during the investigation. The quotation section below reflects the Send and Cancel flow. The [root README](../README.md) owns product scope, implementation status, and setup. This is a process explanation, not a new business-policy decision.
 
 ## Overall flow
 
@@ -65,7 +65,7 @@ The admin process is:
 
 The customer can browse service listings and discuss a service with the admin.
 
-Selecting or linking a service does not automatically add a charge, establish availability, or create a standalone service booking. The current formal inquiry process starts from a package. The admin enters any quotation additions or deductions explicitly.
+Service browsing and links help the customer discuss options with the admin. The admin adds requested extras to the private package so they appear in each new quotation.
 
 Source: [admin Services screen](../apps/web/src/components/workspaces/admin/catalog/ServicesPage.tsx) and [service operations](../apps/api/src/services/services/).
 
@@ -209,7 +209,7 @@ The conversation provides separate controls:
 | Current package | The current proposal, including a private custom package when present           |
 | Quotation       | The latest quotation version that was actually sent                             |
 
-A quotation message opens the exact version linked to that message, so an older offer remains inspectable after a revision. The header's Quotation control can still show a previously sent offer while a newer draft is being prepared.
+A quotation message opens the exact version linked to that message, so an older offer remains inspectable after a revision. The header's Quotation control shows the most recently delivered offer while the admin prepares a replacement.
 
 Messages retain history and unread/read state. Opening a thread marks the other side's messages as read. Both workspaces refresh every five seconds. Earlier conversations and messages load as the user scrolls.
 
@@ -249,48 +249,19 @@ Source: [booking package screen](../apps/web/src/components/booking-requests/Boo
 
 ## 9. Quotations and revisions
 
-Only admins create, save, revise, and send quotations.
+Only System Administrators prepare and send quotations.
 
-The process is:
+1. Open the booking's **Quotation** tab and prepare an offer. The editor shows the current package base price and every private package add-on.
+2. Enter whole extra hours for fixed-price add-ons or whole booked hours for hourly-only ones. Add any manual fee or discount.
+3. To add a service, add it in the private package. The quotation's Edit and Remove actions use the same private package controls. Confirmation immediately saves the package change and refreshes the numbers in the editor.
+4. Choose **Cancel** to discard the unsent quotation, or **Send** to record the exact offer and add its message to the linked conversation. A confirmed change to the package persists after cancellation.
+5. The customer opens an offer through the booking details or the exact-version message and responds through chat.
 
-1. Open the booking's **Quotation** tab.
-2. Create a draft from the current proposal's price.
-3. Add manual additions or deductions, if needed.
-4. Review the calculated total.
-5. Save the adjustments.
-6. Choose **Save and send**.
-7. The system marks the quotation as sent and adds an exact-version message to the linked conversation.
-8. The customer opens the offer and responds through chat.
+A package-only quotation is valid. The server requires an open request, current proposal, complete add-on pricing and hours, a nonnegative total, and a linked conversation. Quote and message creation succeed together.
 
-For example, using illustrative amounts:
+For a revision, the admin supplies a reason and reviews the current package and add-ons. Cancelling or failing to send leaves the previous offer active. When the replacement sends, the previous offer becomes superseded and remains in history with its original amounts and message.
 
-**₱40,000 package + ₱5,000 addition − ₱2,000 deduction = ₱43,000 offer.**
-
-A package-only quotation with no adjustments is valid. A negative total cannot be sent.
-
-Sending requires an open request, an editable draft, reviewed adjustments, and the linked booking conversation. The sent status, quotation message, and audit entry are recorded together. The screen saves the draft before attempting delivery, so a delivery failure can leave a saved internal draft without recording a successful send.
-
-When the customer requests changes:
-
-1. The customer explains the request through chat.
-2. The admin starts a revision and supplies a reason.
-3. The previous offer immediately becomes `superseded`.
-4. A new internal draft uses the current proposal price.
-5. Previous adjustments are copied for review.
-6. The admin reviews, saves, and sends the next version.
-
-The old sent offer remains in history. The new draft stays hidden from the customer until sent.
-
-Further boundaries:
-
-- Quotation statuses are `draft`, `sent`, and `superseded`; customer replies do not change status or create drafts.
-- Customers discuss agreement, concerns, or requested changes through chat. An admin starts any revision, and the prior offer remains readable in history as superseded.
-- Quotations have no automatic expiry.
-- Later package or schedule changes do not recalculate saved offers or automatically require a revision.
-- Saved offers preserve financial amounts, not a complete historical copy of every package description and event detail.
-- Declined and cancelled requests cannot receive quotation edits or new offers.
-
-Source: [quotation creation](../apps/api/src/services/quotations/create-quotation.ts), [quotation saving](../apps/api/src/services/quotations/save-quotation.ts), [quotation delivery](../apps/api/src/services/quotations/send-quotation.ts), [quotation revision](../apps/api/src/services/quotations/revise-quotation.ts), and [customer quotation visibility](../apps/api/src/data/quotations/list-quotations.ts).
+Source: [quotation editor](../apps/web/src/components/quotations/Quotations.tsx), [quotation delivery](../apps/api/src/services/quotations/send-quotation.ts), and [quotation history](../apps/api/src/data/quotations/list-quotations.ts).
 
 ## 10. Event days and operational scheduling
 

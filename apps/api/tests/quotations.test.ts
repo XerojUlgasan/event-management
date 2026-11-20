@@ -3,6 +3,19 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import type {
+  CatalogSection,
+  PackageAddonService,
+} from "@event-management/contracts/catalog";
+import {
+  MAX_QUOTATION_AMOUNT_MINOR,
+  MAX_QUOTATION_DESCRIPTION_LENGTH,
+  MAX_QUOTATION_ITEMS,
+  type Quotation,
+  type QuotationAddonItem,
+  type QuotationPreparation,
+  type SendQuotationInput,
+} from "@event-management/contracts/quotations";
 import { Pool } from "pg";
 import { hashSessionToken } from "../src/utils/session.js";
 
@@ -17,6 +30,7 @@ let customerCookie: string;
 let secondAdminCookie: string;
 let otherCookie: string;
 let customerId: string;
+let adminId: string;
 let packageId: string;
 
 before(async () => {
@@ -71,7 +85,9 @@ before(async () => {
 
     return { cookie: `em_session=${token}`, id: user.id };
   }
-  adminCookie = (await session("admin")).cookie;
+  const admin = await session("admin");
+  adminCookie = admin.cookie;
+  adminId = admin.id;
   secondAdminCookie = (await session("admin")).cookie;
   const customer = await session("customer");
   customerCookie = customer.cookie;
@@ -159,13 +175,52 @@ async function booking(selectedPackageId: string | null = packageId) {
   ).bookingRequest;
 }
 
-async function create(b: any) {
+const quotationPath = (bookingId: string) =>
+  `/admin/booking-requests/${bookingId}/quotations`;
+
+async function prepare(bookingId: string): Promise<QuotationPreparation> {
+  return (await read(await call(`${quotationPath(bookingId)}/prepare`), 200))
+    .preparation;
+}
+
+function sendInput(
+  prepared: QuotationPreparation,
+  items: SendQuotationInput["items"] = [],
+  revisionReason = prepared.currentOffer ? "Updated proposal" : null,
+): SendQuotationInput {
+  const {
+    expectedBookingUpdatedAt,
+    packageId,
+    expectedPackageUpdatedAt,
+    currentOffer,
+  } = prepared;
+
+  return {
+    requestId: randomUUID(),
+    expectedBookingUpdatedAt,
+    packageId,
+    expectedPackageUpdatedAt,
+    currentOffer,
+    revisionReason,
+    items,
+  };
+}
+
+function sendRequest(bookingId: string, input: unknown, cookie = adminCookie) {
+  return call(`${quotationPath(bookingId)}/send`, "POST", input, cookie);
+}
+
+async function send(
+  bookingId: string,
+  input?: SendQuotationInput,
+): Promise<Quotation> {
   return (
     await read(
-      await call(`/admin/booking-requests/${b.id}/quotations`, "POST", {
-        expectedUpdatedAt: b.updatedAt,
-      }),
-      201,
+      await sendRequest(
+        bookingId,
+        input ?? sendInput(await prepare(bookingId)),
+      ),
+      200,
     )
   ).quotation;
 }
@@ -178,25 +233,16 @@ const proposalContent = {
   sections: [],
 };
 
-type MatrixOperation =
-  | "create"
-  | "revise"
-  | "save"
-  | "send"
-  | "scratch"
-  | "copy"
-  | "update"
-  | "attach";
+type MatrixOperation = "send" | "scratch" | "copy" | "update" | "attach";
 
 // Every operation gets its own booking and satisfies all non-status prerequisites.
 async function matrixFixture(operation: MatrixOperation) {
   const b = await booking(
     ["scratch", "update", "attach"].includes(operation) ? null : packageId,
   );
-  let q: any;
+  const input =
+    operation === "send" ? sendInput(await prepare(b.id)) : undefined;
   let custom: any;
-
-  if (["revise", "save", "send"].includes(operation)) q = await create(b);
 
   if (operation === "update")
     custom = await read(
@@ -215,24 +261,8 @@ async function matrixFixture(operation: MatrixOperation) {
 
   const invoke = () => {
     switch (operation) {
-      case "create":
-        return call(`/admin/booking-requests/${b.id}/quotations`, "POST", {
-          expectedUpdatedAt: currentBooking.updatedAt,
-        });
-      case "revise":
-        return call(`/admin/quotations/${q.id}/revision`, "POST", {
-          expectedUpdatedAt: q.updatedAt,
-          reason: "Review proposal",
-        });
-      case "save":
-        return call(`/admin/quotations/${q.id}`, "PATCH", {
-          expectedUpdatedAt: q.updatedAt,
-          items: [],
-        });
       case "send":
-        return call(`/admin/quotations/${q.id}/send`, "POST", {
-          expectedUpdatedAt: q.updatedAt,
-        });
+        return sendRequest(b.id, input);
       case "scratch":
       case "copy":
         return call(`/admin/booking-requests/${b.id}/custom-package`, "POST", {
@@ -277,9 +307,6 @@ async function matrixSnapshot(id: string) {
 }
 
 const matrixOperations: MatrixOperation[] = [
-  "create",
-  "revise",
-  "save",
   "send",
   "scratch",
   "copy",
@@ -307,7 +334,7 @@ test("booking status eligibility for every quotation and proposal write", async 
       const closed = status === "declined" || status === "cancelled";
       assert.equal(
         response.status,
-        closed ? 409 : ["create", "revise"].includes(operation) ? 201 : 200,
+        closed ? 409 : 200,
         `${status} ${operation}: ${await response.clone().text()}`,
       );
 
@@ -341,14 +368,9 @@ test("booking conversations permit proposal preparation and delivery regardless 
     }),
     200,
   );
-  const q = await create(custom.bookingRequest);
-  const response = await read(
-    await call(`/admin/quotations/${q.id}/send`, "POST", {
-      expectedUpdatedAt: q.updatedAt,
-    }),
-    200,
-  );
-  assert.equal(response.quotation.status, "sent");
+  assert.equal(custom.package.packageType, "custom");
+  const quotation = await send(b.id);
+  assert.equal(quotation.status, "sent");
 });
 
 test("quotation and package prerequisites reject independently without effects", async () => {
@@ -362,20 +384,6 @@ test("quotation and package prerequisites reject independently without effects",
     assert.equal(result.error, error);
     assert.deepEqual(await matrixSnapshot(id), before);
   }
-
-  const duplicate = await booking();
-  await create(duplicate);
-  const fresh = (
-    await read(await call(`/admin/booking-requests/${duplicate.id}`), 200)
-  ).bookingRequest;
-  await rejected(
-    duplicate.id,
-    () =>
-      call(`/admin/booking-requests/${duplicate.id}/quotations`, "POST", {
-        expectedUpdatedAt: fresh.updatedAt,
-      }),
-    "Revise the active quotation instead",
-  );
 
   const archived = await db
     .insertInto("packages")
@@ -550,7 +558,7 @@ test("booking closure and writes serialize on the booking lock", async () => {
     const response = await earlier.invoke();
     assert.equal(
       response.status,
-      ["create", "revise"].includes(operation) ? 201 : 200,
+      200,
       `${operation}: ${await response.clone().text()}`,
     );
     const beforeClose = await matrixSnapshot(earlier.id);
@@ -568,903 +576,27 @@ test("booking closure and writes serialize on the booking lock", async () => {
   }
 });
 
-test("quotation delivery, ownership, removed customer actions and admin revision history", async () => {
-  const b = await booking();
-  let q = await create(b);
-  const linkedConversation = await db
-    .selectFrom("conversations")
-    .select("id")
-    .where("booking_request_id", "=", b.id)
-    .executeTakeFirstOrThrow();
-  assert.deepEqual(q.items, []);
-  assert.equal(q.totalAmountMinor, 100000);
-  assert.deepEqual(
-    (
-      await read(
-        await call(
-          `/booking-requests/${b.id}/quotations`,
-          "GET",
-          undefined,
-          customerCookie,
-        ),
-        200,
-      )
-    ).quotations,
-    [],
-  );
-  assert.equal(
-    (await call(`/quotations/${q.id}`, "GET", undefined, otherCookie)).status,
-    404,
-  );
-  assert.equal(
-    (await call(`/quotations/${q.id}`, "GET", undefined, customerCookie))
-      .status,
-    404,
-  );
-  assert.equal(
-    (
-      await call(
-        `/admin/booking-requests/${b.id}/quotations`,
-        "POST",
-        { expectedUpdatedAt: b.updatedAt },
-        customerCookie,
-      )
-    ).status,
-    403,
-  );
-  assert.equal(
-    (
-      await call(
-        `/admin/quotations/${q.id}`,
-        "PATCH",
-        { expectedUpdatedAt: q.updatedAt, items: [] },
-        customerCookie,
-      )
-    ).status,
-    403,
-  );
-  assert.equal(
-    (
-      await call(
-        `/admin/quotations/${q.id}/send`,
-        "POST",
-        { expectedUpdatedAt: q.updatedAt },
-        customerCookie,
-      )
-    ).status,
-    403,
-  );
-  const stale = q.updatedAt;
-  q = (
-    await read(
-      await call(`/admin/quotations/${q.id}`, "PATCH", {
-        expectedUpdatedAt: q.updatedAt,
-        items: [],
-      }),
-      200,
-    )
-  ).quotation;
-  assert.equal(
-    (
-      await call(`/admin/quotations/${q.id}/send`, "POST", {
-        expectedUpdatedAt: stale,
-      })
-    ).status,
-    409,
-  );
-  const beforeDelivery = await read(
-    await call(`/admin/conversations/${linkedConversation.id}`),
-    200,
-  );
-  assert.equal(beforeDelivery.conversation.aiEnabled, true);
-  assert.equal(beforeDelivery.conversation.aiVersion, 0);
-  q = (
-    await read(
-      await call(`/admin/quotations/${q.id}/send`, "POST", {
-        expectedUpdatedAt: q.updatedAt,
-      }),
-      200,
-    )
-  ).quotation;
-  const afterDelivery = await read(
-    await call(`/admin/conversations/${linkedConversation.id}`),
-    200,
-  );
-  assert.equal(afterDelivery.conversation.aiEnabled, false);
-  assert.equal(afterDelivery.conversation.aiVersion, 1);
-  const msg = await db
-    .selectFrom("messages")
-    .selectAll()
-    .where("quotation_id", "=", q.id)
-    .execute();
-  assert.equal(msg.length, 1);
-  assert.equal(
-    (await call(`/quotations/${q.id}`, "GET", undefined, customerCookie))
-      .status,
-    200,
-  );
-  assert.equal(
-    (await call(`/quotations/${q.id}`, "GET", undefined, otherCookie)).status,
-    404,
-  );
-  const beforeQuotes = await db
-    .selectFrom("quotations")
-    .selectAll()
-    .where("booking_request_id", "=", b.id)
-    .execute();
-  const beforeAudits = await db
-    .selectFrom("audit_events")
-    .selectAll()
-    .where("entity_type", "=", "quotation")
-    .execute();
-
-  for (const action of ["accept", "revision"]) {
-    assert.equal(
-      (
-        await call(
-          `/quotations/${q.id}/${action}`,
-          "POST",
-          { expectedUpdatedAt: q.updatedAt, reason: "Change terms" },
-          customerCookie,
-        )
-      ).status,
-      404,
-    );
-  }
-
-  assert.equal(
-    (
-      await call(
-        `/admin/quotations/${q.id}/revision`,
-        "POST",
-        { expectedUpdatedAt: q.updatedAt, reason: "Change terms" },
-        customerCookie,
-      )
-    ).status,
-    403,
-  );
-  assert.deepEqual(
-    await db
-      .selectFrom("quotations")
-      .selectAll()
-      .where("booking_request_id", "=", b.id)
-      .execute(),
-    beforeQuotes,
-  );
-  assert.deepEqual(
-    await db
-      .selectFrom("audit_events")
-      .selectAll()
-      .where("entity_type", "=", "quotation")
-      .execute(),
-    beforeAudits,
-  );
-  const conversation = await db
-    .selectFrom("conversations")
-    .select("id")
-    .where("booking_request_id", "=", b.id)
-    .executeTakeFirstOrThrow();
-  await read(
-    await call(
-      "/messages/conversation/messages",
-      "POST",
-      { body: "Please change the offer.", conversationId: conversation.id },
-      customerCookie,
-    ),
-    201,
-  );
-  await read(
-    await call(`/admin/conversations/${conversation.id}/messages`, "POST", {
-      body: "Let's discuss this offer.",
-    }),
-    201,
-  );
-  assert.deepEqual(
-    await db
-      .selectFrom("quotations")
-      .selectAll()
-      .where("booking_request_id", "=", b.id)
-      .execute(),
-    beforeQuotes,
-  );
-  assert.deepEqual(
-    await db
-      .selectFrom("audit_events")
-      .selectAll()
-      .where("entity_type", "=", "quotation")
-      .execute(),
-    beforeAudits,
-  );
-  await read(
-    await call(`/admin/quotations/${q.id}/revision`, "POST", {
-      expectedUpdatedAt: q.updatedAt,
-      reason: "Change terms",
-    }),
-    201,
-  );
-  assert.equal(
-    (
-      await db
-        .selectFrom("quotations")
-        .select("status")
-        .where("id", "=", q.id)
-        .executeTakeFirstOrThrow()
-    ).status,
-    "superseded",
-  );
-  const history = (
-    await read(
-      await call(
-        `/booking-requests/${b.id}/quotations`,
-        "GET",
-        undefined,
-        customerCookie,
-      ),
-      200,
-    )
-  ).quotations;
-  assert.equal(history.length, 1);
-  assert.equal(
-    (
-      await db
-        .selectFrom("booking_requests")
-        .select("status")
-        .where("id", "=", b.id)
-        .executeTakeFirstOrThrow()
-    ).status,
-    "under_review",
-  );
-  assert.equal(
-    (
-      await db
-        .selectFrom("events_day")
-        .select("id")
-        .where("booking_request_id", "=", b.id)
-        .execute()
-    ).length,
-    0,
-  );
-});
-
-test("old active booking conversations receive exact quotation versions", async () => {
-  for (const pastEnd of [false, true]) {
-    const b = await booking();
-    const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
-    const conversation = await db
-      .selectFrom("conversations")
-      .select("id")
-      .where("booking_request_id", "=", b.id)
-      .executeTakeFirstOrThrow();
-    await db
-      .updateTable("conversations")
-      .set({ created_at: old })
-      .where("id", "=", conversation.id)
-      .execute();
-
-    if (pastEnd) {
-      await db
-        .updateTable("booking_requests")
-        .set({ starts_at: new Date(old.getTime() - 3600000), ends_at: old })
-        .where("id", "=", b.id)
-        .execute();
-    }
-
-    let q = await create(b);
-    q = (
-      await read(
-        await call(`/admin/quotations/${q.id}`, "PATCH", {
-          expectedUpdatedAt: q.updatedAt,
-          items: [],
-        }),
-        200,
-      )
-    ).quotation;
-    q = (
-      await read(
-        await call(`/admin/quotations/${q.id}/send`, "POST", {
-          expectedUpdatedAt: q.updatedAt,
-        }),
-        200,
-      )
-    ).quotation;
-    assert.equal(q.status, "sent");
-    const messages = await db
-      .selectFrom("messages")
-      .selectAll()
-      .where("quotation_id", "=", q.id)
-      .execute();
-    assert.equal(messages.length, 1);
-    assert.equal(messages[0].conversation_id, conversation.id);
-    assert.equal(messages[0].sender_role, "admin");
-    const audits = await db
-      .selectFrom("audit_events")
-      .selectAll()
-      .where("entity_id", "=", q.id)
-      .where("action", "=", "quotation.sent")
-      .execute();
-    assert.equal(audits.length, 1);
-    assert.equal(audits[0].actor_id, messages[0].sender_id);
-  }
-});
-
-test("item validation, arithmetic, concurrent stale writes and old-thread delivery", async () => {
-  const b = await booking();
-  let q = await create(b);
-  const item = {
-    id: randomUUID(),
-    direction: "add",
-    kind: "adjustment",
-    description: "Extra",
-    amountMinor: 2500,
-    serviceId: null,
-  };
-  assert.equal(
-    (
-      await call(`/admin/quotations/${q.id}`, "PATCH", {
-        expectedUpdatedAt: q.updatedAt,
-        items: [{ ...item, serviceId: randomUUID() }],
-      })
-    ).status,
-    400,
-  );
-  const responses = await Promise.all([
-    call(`/admin/quotations/${q.id}`, "PATCH", {
-      expectedUpdatedAt: q.updatedAt,
-      items: [item],
-    }),
-    call(`/admin/quotations/${q.id}`, "PATCH", {
-      expectedUpdatedAt: q.updatedAt,
-      items: [item],
-    }),
-  ]);
-  assert.deepEqual(responses.map((r) => r.status).sort(), [200, 409]);
-  q = ((await responses.find((r) => r.status === 200)!.json()) as any)
-    .quotation;
-  assert.equal(q.totalAmountMinor, 102500);
-  await db
-    .updateTable("conversations")
-    .set({ created_at: new Date("2020-01-01T00:00:00Z") })
-    .where("booking_request_id", "=", b.id)
-    .execute();
-  assert.equal(
-    (
-      await call(`/admin/quotations/${q.id}/send`, "POST", {
-        expectedUpdatedAt: q.updatedAt,
-      })
-    ).status,
-    200,
-  );
-  assert.equal(
-    (
-      await db
-        .selectFrom("quotations")
-        .select("status")
-        .where("id", "=", q.id)
-        .executeTakeFirstOrThrow()
-    ).status,
-    "sent",
-  );
-  assert.equal(
-    (
-      await db
-        .selectFrom("messages")
-        .select("id")
-        .where("quotation_id", "=", q.id)
-        .execute()
-    ).length,
-    1,
-  );
-});
-
-test("requested-day changes preserve the sent price", async () => {
-  const b = await booking();
-  let q = await create(b);
-  q = (
-    await read(
-      await call(`/admin/quotations/${q.id}/send`, "POST", {
-        expectedUpdatedAt: q.updatedAt,
-      }),
-      200,
-    )
-  ).quotation;
-  await db
-    .updateTable("booking_requests")
-    .set({
-      requested_days: JSON.stringify([
-        {
-          date: "2099-01-01",
-          startsAt: "2099-01-01T01:00:00.000Z",
-          endsAt: "2099-01-01T03:00:00.000Z",
-        },
-        { date: "2099-01-03", startsAt: null, endsAt: null },
-      ]),
-    })
-    .where("id", "=", b.id)
-    .execute();
-  const current = (
-    await read(
-      await call(`/quotations/${q.id}`, "GET", undefined, customerCookie),
-      200,
-    )
-  ).quotation;
-  assert.equal(current.status, "sent");
-  assert.equal(current.totalAmountMinor, q.totalAmountMinor);
-});
-
-test("another admin edits, sends and revises with audit", async () => {
-  const b = await booking();
-  let q = await create(b);
-  q = (
-    await read(
-      await call(
-        `/admin/quotations/${q.id}`,
-        "PATCH",
-        { expectedUpdatedAt: q.updatedAt, items: [] },
-        secondAdminCookie,
-      ),
-      200,
-    )
-  ).quotation;
-  q = (
-    await read(
-      await call(
-        `/admin/quotations/${q.id}/send`,
-        "POST",
-        { expectedUpdatedAt: q.updatedAt },
-        secondAdminCookie,
-      ),
-      200,
-    )
-  ).quotation;
-  const old = q.id;
-  q = (
-    await read(
-      await call(
-        `/admin/quotations/${q.id}/revision`,
-        "POST",
-        { expectedUpdatedAt: q.updatedAt, reason: "Review details" },
-        secondAdminCookie,
-      ),
-      201,
-    )
-  ).quotation;
-  assert.equal(q.previousQuotationId, old);
-  assert.equal(q.adjustmentsReviewed, false);
-  assert.equal(
-    (
-      await db
-        .selectFrom("audit_events")
-        .select("action")
-        .where("entity_id", "in", [old, q.id])
-        .execute()
-    ).length,
-    4,
-  );
-});
-
-test("invalid service references fail and historical wording remains stable", async () => {
-  const b = await booking();
-  let q = await create(b);
-  const service = await db
-    .insertInto("services")
-    .values({
-      name: "Original wording",
-      slug: `service-${randomUUID()}`,
-      description: "Details",
-    })
-    .returning("id")
-    .executeTakeFirstOrThrow();
-  const item = {
-    id: randomUUID(),
-    direction: "add",
-    kind: "addition",
-    description: "Original wording",
-    amountMinor: 100,
-    serviceId: service.id,
-  };
-  q = (
-    await read(
-      await call(`/admin/quotations/${q.id}`, "PATCH", {
-        expectedUpdatedAt: q.updatedAt,
-        items: [item],
-      }),
-      200,
-    )
-  ).quotation;
-  q = (
-    await read(
-      await call(`/admin/quotations/${q.id}/send`, "POST", {
-        expectedUpdatedAt: q.updatedAt,
-      }),
-      200,
-    )
-  ).quotation;
-  await db
-    .updateTable("services")
-    .set({ name: "Renamed", archived_at: new Date() })
-    .where("id", "=", service.id)
-    .execute();
-  const displayed = (
-    await read(
-      await call(`/quotations/${q.id}`, "GET", undefined, customerCookie),
-      200,
-    )
-  ).quotation;
-  assert.equal(displayed.items[0].description, "Original wording");
-  const next = (
-    await read(
-      await call(`/admin/quotations/${q.id}/revision`, "POST", {
-        expectedUpdatedAt: q.updatedAt,
-        reason: "Review",
-      }),
-      201,
-    )
-  ).quotation;
-  assert.equal(
-    (
-      await call(`/admin/quotations/${next.id}`, "PATCH", {
-        expectedUpdatedAt: next.updatedAt,
-        items: [item],
-      })
-    ).status,
-    400,
-  );
-  assert.equal(
-    (
-      await call(`/admin/quotations/${next.id}`, "PATCH", {
-        expectedUpdatedAt: next.updatedAt,
-        items: [{ ...item, serviceId: randomUUID() }],
-      })
-    ).status,
-    400,
-  );
-});
-
-test("message failure rolls back send status, message and audit", async () => {
-  const b = await booking();
-  const q = await create(b);
-  await pool.query(
-    "CREATE FUNCTION reject_quote_test() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.quotation_id IS NOT NULL THEN RAISE EXCEPTION 'test delivery failure'; END IF; RETURN NEW; END $$",
-  );
-  await pool.query(
-    "CREATE TRIGGER reject_quote_test BEFORE INSERT ON messages FOR EACH ROW EXECUTE FUNCTION reject_quote_test()",
-  );
-
-  try {
-    assert.equal(
-      (
-        await call(`/admin/quotations/${q.id}/send`, "POST", {
-          expectedUpdatedAt: q.updatedAt,
-        })
-      ).status,
-      500,
-    );
-    assert.equal(
-      (
-        await db
-          .selectFrom("quotations")
-          .select("status")
-          .where("id", "=", q.id)
-          .executeTakeFirstOrThrow()
-      ).status,
-      "draft",
-    );
-    assert.equal(
-      (
-        await db
-          .selectFrom("messages")
-          .select("id")
-          .where("quotation_id", "=", q.id)
-          .execute()
-      ).length,
-      0,
-    );
-    const conversation = await db
-      .selectFrom("conversations")
-      .select(["ai_enabled", "ai_version"])
-      .where("booking_request_id", "=", b.id)
-      .executeTakeFirstOrThrow();
-    assert.deepEqual(conversation, { ai_enabled: true, ai_version: 0 });
-    assert.equal(
-      (
-        await db
-          .selectFrom("audit_events")
-          .select("id")
-          .where("entity_id", "=", q.id)
-          .where("action", "=", "quotation.sent")
-          .execute()
-      ).length,
-      0,
-    );
-  } finally {
-    await pool.query("DROP TRIGGER reject_quote_test ON messages");
-    await pool.query("DROP FUNCTION reject_quote_test()");
-  }
-});
-
-test("package and service changes preserve quoted amounts; revisions use the current price", async () => {
-  const pkg = await db
-    .insertInto("packages")
-    .values({
-      name: "Financial history",
-      slug: `financial-${randomUUID()}`,
-      price: 1000,
-      max_guests: 100,
-    })
-    .returning("id")
-    .executeTakeFirstOrThrow();
-  const service = await db
-    .insertInto("services")
-    .values({
-      name: "Original service",
-      slug: `financial-service-${randomUUID()}`,
-      description: "Original coverage",
-    })
-    .returning("id")
-    .executeTakeFirstOrThrow();
-  const b = await booking(pkg.id);
-  let q = await create(b);
-  const items = [
-    {
-      id: randomUUID(),
-      direction: "deduct",
-      kind: "deduction",
-      description: "Agreed discount",
-      amountMinor: 20000,
-      serviceId: null,
-    },
-  ];
-  q = (
-    await read(
-      await call(`/admin/quotations/${q.id}`, "PATCH", {
-        expectedUpdatedAt: q.updatedAt,
-        items,
-      }),
-      200,
-    )
-  ).quotation;
-  await db
-    .updateTable("packages")
-    .set({ name: "Changed proposal", price: 1500, updated_at: new Date() })
-    .where("id", "=", pkg.id)
-    .execute();
-  await db
-    .updateTable("services")
-    .set({
-      description: "Changed coverage",
-      archived_at: new Date(),
-      updated_at: new Date(),
-    })
-    .where("id", "=", service.id)
-    .execute();
-  q = (
-    await read(
-      await call(`/admin/quotations/${q.id}/send`, "POST", {
-        expectedUpdatedAt: q.updatedAt,
-      }),
-      200,
-    )
-  ).quotation;
-  q = (
-    await read(
-      await call(`/quotations/${q.id}`, "GET", undefined, customerCookie),
-      200,
-    )
-  ).quotation;
-  assert.equal(q.status, "sent");
-  assert.equal("acceptedAt" in q, false);
-  assert.equal(q.baseAmountMinor, 100000);
-  assert.equal(q.totalAmountMinor, 80000);
-  assert.deepEqual(q.items, items);
-  assert.equal(q.offeredPackageId, pkg.id);
-
-  for (const field of [
-    "offeredPackageUpdatedAt",
-    "offeredPackageTerms",
-    "basisCurrent",
-  ])
-    assert.equal(field in q, false);
-
-  let revised = (
-    await read(
-      await call(`/admin/quotations/${q.id}/revision`, "POST", {
-        expectedUpdatedAt: q.updatedAt,
-        reason: "Offer the updated package price",
-      }),
-      201,
-    )
-  ).quotation;
-  assert.equal(revised.baseAmountMinor, 150000);
-  assert.equal(revised.totalAmountMinor, 130000);
-  assert.deepEqual(revised.items, items);
-  assert.equal(revised.adjustmentsReviewed, false);
-  assert.equal(
-    (
-      await call(`/admin/quotations/${revised.id}/send`, "POST", {
-        expectedUpdatedAt: revised.updatedAt,
-      })
-    ).status,
-    409,
-  );
-  revised = (
-    await read(
-      await call(`/admin/quotations/${revised.id}`, "PATCH", {
-        expectedUpdatedAt: revised.updatedAt,
-        items,
-      }),
-      200,
-    )
-  ).quotation;
-  await read(
-    await call(`/admin/quotations/${revised.id}/send`, "POST", {
-      expectedUpdatedAt: revised.updatedAt,
-    }),
-    200,
-  );
-  const history = (
-    await read(
-      await call(
-        `/booking-requests/${b.id}/quotations`,
-        "GET",
-        undefined,
-        customerCookie,
-      ),
-      200,
-    )
-  ).quotations;
-  assert.equal(history[0].status, "sent");
-  assert.equal(history[1].status, "superseded");
-  assert.ok(history[1].supersededAt);
-  assert.equal(history[1].baseAmountMinor, 100000);
-  assert.equal(history[1].totalAmountMinor, 80000);
-  assert.deepEqual(history[1].items, items);
-  const audit = await db
-    .selectFrom("audit_events")
-    .select("action")
-    .where("entity_id", "=", q.id)
-    .execute();
-  assert(audit.some((row) => row.action === "quotation.sent"));
-});
-
-test("schedule and timezone changes do not alter saved amounts", async () => {
-  const b = await booking();
-  await db
-    .updateTable("booking_requests")
-    .set({ requested_days: null, status: "accepted" })
-    .where("id", "=", b.id)
-    .execute();
-  const day = await db
-    .insertInto("events_day")
-    .values({
-      booking_request_id: b.id,
-      day: "2099-01-01",
-      starts_at: new Date("2099-01-01T01:00:00Z"),
-      ends_at: new Date("2099-01-01T03:00:00Z"),
-    })
-    .returning("id")
-    .executeTakeFirstOrThrow();
-  const latest = (
-    await read(
-      await call(`/booking-requests/${b.id}`, "GET", undefined, customerCookie),
-      200,
-    )
-  ).bookingRequest;
-  let q = await create(latest);
-  q = (
-    await read(
-      await call(`/admin/quotations/${q.id}/send`, "POST", {
-        expectedUpdatedAt: q.updatedAt,
-      }),
-      200,
-    )
-  ).quotation;
-  await db
-    .updateTable("events_day")
-    .set({ status: "cancelled" })
-    .where("id", "=", day.id)
-    .execute();
-  await db
-    .updateTable("booking_requests")
-    .set({ time_zone: "Asia/Tokyo" })
-    .where("id", "=", b.id)
-    .execute();
-  const current = (
-    await read(
-      await call(`/quotations/${q.id}`, "GET", undefined, customerCookie),
-      200,
-    )
-  ).quotation;
-  assert.equal(current.status, "sent");
-  assert.equal(current.totalAmountMinor, q.totalAmountMinor);
-});
-
-test("private package edits remain visible separately while quotations retain their own amounts", async () => {
-  const b = await booking();
-  const before = await read(
-    await call(`/admin/booking-requests/${b.id}/package`),
-    200,
-  );
-  const content = {
-    name: "Private proposal",
-    description: "Current description",
-    maxGuests: 100,
-    price: { kind: "fixed", currency: "PHP", amountMinor: 120000 },
-    sections: [],
-  };
-  const custom = await read(
-    await call(`/admin/booking-requests/${b.id}/custom-package`, "POST", {
-      ...content,
-      expectedUpdatedAt: before.package.updatedAt,
-      expectedBookingUpdatedAt: before.bookingUpdatedAt,
-    }),
-    200,
-  );
-  let q = await create(custom.bookingRequest);
-  assert.equal(q.offeredPackageId, custom.package.id);
-  const edited = await read(
-    await call(`/admin/booking-requests/${b.id}/custom-package`, "PATCH", {
-      ...content,
-      description: "Updated description",
-      price: { kind: "fixed", currency: "PHP", amountMinor: 180000 },
-      expectedUpdatedAt: custom.package.updatedAt,
-      expectedBookingUpdatedAt: custom.bookingRequest.updatedAt,
-    }),
-    200,
-  );
-  q = (
-    await read(
-      await call(`/admin/quotations/${q.id}/send`, "POST", {
-        expectedUpdatedAt: q.updatedAt,
-      }),
-      200,
-    )
-  ).quotation;
-  const current = await read(
-    await call(
-      `/booking-requests/${b.id}/package`,
-      "GET",
-      undefined,
-      customerCookie,
-    ),
-    200,
-  );
-  assert.equal(current.package.description, "Updated description");
-  assert.equal(current.package.price.amountMinor, 180000);
-  assert.equal(q.totalAmountMinor, 120000);
-  assert.equal(
-    (
-      await read(
-        await call(`/quotations/${q.id}`, "GET", undefined, customerCookie),
-        200,
-      )
-    ).quotation.totalAmountMinor,
-    120000,
-  );
-  assert.equal(edited.bookingRequest.packageId, b.packageId);
-});
-
 test("quotation and package histories paginate independently without losing current versions", async () => {
   const b = await booking();
-  const current = await create(b);
+  const current = await send(b.id);
   await pool.query(
     `INSERT INTO quotations (booking_request_id,version,currency,base_amount_minor,total_amount_minor,items,status,created_by,sent_at,offered_package_id,adjustments_reviewed)
     SELECT q.booking_request_id, n, q.currency, q.base_amount_minor, q.total_amount_minor, q.items,
-      CASE WHEN n = 2 THEN 'sent' ELSE 'superseded' END, q.created_by, now(), q.offered_package_id, true
+      'superseded', q.created_by, now(), q.offered_package_id, true
     FROM quotations q CROSS JOIN generate_series(2, 35) n WHERE q.id = $1`,
     [current.id],
   );
   const base = `/admin/booking-requests/${b.id}/quotations?limit=10`;
   const first = await read(await call(base), 200);
   assert.equal(first.quotations.length, 10);
-  assert.equal(first.currentDraft.id, current.id);
-  assert.equal(first.currentOffer.version, 2);
+  assert.equal(first.currentOffer.id, current.id);
   assert.ok(first.nextCursor);
   const second = await read(
     await call(`${base}&cursor=${encodeURIComponent(first.nextCursor)}`),
     200,
   );
   assert.equal(second.quotations[0].version, 25);
-  assert.equal(second.currentDraft.id, current.id);
+  assert.equal(second.currentOffer.id, current.id);
   const removedId = first.quotations.at(-1).id;
   await pool.query("DELETE FROM quotations WHERE id = $1", [removedId]);
   const repeated = await read(
@@ -1495,8 +627,7 @@ test("quotation and package histories paginate independently without losing curr
     200,
   );
   assert.ok(customer.quotations.every((q: any) => q.status !== "draft"));
-  assert.equal(customer.currentDraft, null);
-  assert.equal(customer.currentOffer.version, 2);
+  assert.equal(customer.currentOffer.id, current.id);
   await read(
     await call(
       `/booking-requests/${b.id}/quotations?cursor=${encodeURIComponent(first.nextCursor)}`,
@@ -1589,14 +720,7 @@ test("quotation and package histories paginate independently without losing curr
 test("package-less inquiries require a proposal and support private custom packages", async () => {
   const b = await booking(null);
   assert.equal(b.packageId, null);
-  assert.equal(
-    (
-      await call(`/admin/booking-requests/${b.id}/quotations`, "POST", {
-        expectedUpdatedAt: b.updatedAt,
-      })
-    ).status,
-    409,
-  );
+  await read(await call(`${quotationPath(b.id)}/prepare`), 409);
   assert.deepEqual(
     (await read(await call(`/admin/booking-requests/${b.id}/quotations`), 200))
       .quotations,
@@ -1651,7 +775,8 @@ test("package-less inquiries require a proposal and support private custom packa
     200,
   );
   assert.equal(history.history[0].before, null);
-  await create(result.bookingRequest);
+  const prepared = await prepare(result.bookingRequest.id);
+  assert.equal(prepared.packageId, result.package.id);
 });
 
 test("catalog attachment and scratch proposal serialize on the same inquiry", async () => {
@@ -1692,9 +817,444 @@ test("catalog attachment and scratch proposal serialize on the same inquiry", as
   );
 });
 
-test("quotation delivery clears pending handoff only on a successful committed admin response", async () => {
+function includedService(serviceId: string): CatalogSection[] {
+  return [
+    {
+      id: randomUUID(),
+      title: "Included services",
+      widgets: [
+        {
+          id: randomUUID(),
+          type: "service",
+          serviceId,
+          x: 0,
+          y: 0,
+          w: 6,
+          h: 4,
+          markdown: "",
+          media: null,
+          alt: "",
+          caption: "",
+          autoplay: false,
+          serviceTerms: { includedHours: 2, hourlyRatePesos: 750 },
+        },
+      ],
+    },
+  ];
+}
+
+async function quotationAddonsFixture() {
+  const b = await booking(null);
+  const suffix = randomUUID().slice(0, 8);
+
+  const [fixed, hourly, included] = await db
+    .insertInto("services")
+    .values(
+      ["Photo booth", "Extra lighting", "On-site support"].map((name) => ({
+        name: `${name} ${suffix}`,
+        slug: `quote-addon-${randomUUID()}`,
+        description: "Quotation add-on fixture",
+        fixed_price_pesos: 9000,
+        hourly_rate_pesos: 1500,
+        included_hours: 6,
+      })),
+    )
+    .returning(["id", "name"])
+    .execute();
+
+  const addonServices: PackageAddonService[] = [
+    {
+      id: randomUUID(),
+      serviceId: fixed.id,
+      fixedPricePesos: 1500,
+      hourlyRatePesos: 300,
+      includedHours: 3,
+    },
+    {
+      id: randomUUID(),
+      serviceId: hourly.id,
+      fixedPricePesos: null,
+      hourlyRatePesos: 650,
+      includedHours: null,
+    },
+  ];
+  const content = {
+    ...proposalContent,
+    addonServices,
+    sections: includedService(included.id),
+  };
+  const endpoint = `/admin/booking-requests/${b.id}/custom-package`;
+  const proposal = await read(
+    await call(endpoint, "POST", {
+      ...content,
+      expectedBookingUpdatedAt: b.updatedAt,
+    }),
+    200,
+  );
+
+  return {
+    b,
+    proposal,
+    content,
+    included,
+    serviceNames: [fixed.name, hourly.name],
+    update: (changes: Partial<typeof content>) =>
+      call(endpoint, "PATCH", {
+        ...content,
+        ...changes,
+        expectedUpdatedAt: proposal.package.updatedAt,
+        expectedBookingUpdatedAt: proposal.bookingRequest.updatedAt,
+      }),
+  };
+}
+
+test("preparation is admin-only, repeatable, and creates no records", async () => {
   const b = await booking();
-  const q = await create(b);
+  const path = quotationPath(b.id);
+  const before = await matrixSnapshot(b.id);
+
+  await read(await call(`${path}/prepare`, "GET", undefined, ""), 401);
+  await read(
+    await call(`${path}/prepare`, "GET", undefined, customerCookie),
+    403,
+  );
+  const prepared = await prepare(b.id);
+  assert.deepEqual(prepared, {
+    bookingRequestId: b.id,
+    expectedBookingUpdatedAt: b.updatedAt,
+    packageId,
+    expectedPackageUpdatedAt: new Date(
+      before.catalog.find((pkg: { id: string }) => pkg.id === packageId)
+        .updated_at,
+    ).toISOString(),
+    currentOffer: null,
+    baseAmountMinor: 100000,
+    items: [],
+  });
+  assert.deepEqual(await prepare(b.id), prepared);
+  await read(await sendRequest(b.id, sendInput(prepared), customerCookie), 403);
+
+  // Retired routes cannot create, save, revise or deliver a persisted draft.
+  const quoteId = randomUUID();
+  assert.equal(
+    (await call(path, "POST", { expectedUpdatedAt: b.updatedAt })).status,
+    404,
+  );
+
+  for (const [suffix, method] of [
+    ["", "PATCH"],
+    ["/revision", "POST"],
+    ["/send", "POST"],
+  ]) {
+    assert.equal(
+      (await call(`/admin/quotations/${quoteId}${suffix}`, method, {})).status,
+      404,
+    );
+  }
+
+  assert.deepEqual(await matrixSnapshot(b.id), before);
+});
+
+test("a send commits one offer, exact conversation message and audit across concurrent retries", async () => {
+  const b = await booking();
+  const input = sendInput(await prepare(b.id));
+  const [first, retry] = await Promise.all([
+    sendRequest(b.id, input),
+    sendRequest(b.id, input),
+  ]);
+  const { quotation } = await read(first, 200);
+  assert.deepEqual(await read(retry, 200), { quotation });
+  assert.equal(quotation.id, input.requestId);
+  assert.equal(quotation.version, 1);
+  assert.equal(quotation.status, "sent");
+  assert.equal(quotation.previousQuotationId, null);
+  assert.equal(quotation.createdBy, adminId);
+
+  const after = await matrixSnapshot(b.id);
+  assert.equal(after.quotations.length, 1);
+  assert.equal(after.messages.length, 1);
+  assert.equal(after.messages[0].quotation_id, quotation.id);
+  assert.equal(after.messages[0].sender_id, adminId);
+  assert.equal(after.messages[0].conversation_id, after.conversations[0].id);
+  assert.equal(after.conversations[0].ai_enabled, false);
+
+  const events = after.audits.filter(
+    (row: { entity_id: string }) => row.entity_id === quotation.id,
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].action, "quotation.sent");
+  assert.equal(events[0].actor_id, adminId);
+  assert.equal(after.booking.status, "under_review");
+
+  await read(
+    await sendRequest(b.id, { ...input, items: [manual("add", 1000)] }),
+    409,
+  );
+  await read(await sendRequest(b.id, input, secondAdminCookie), 409);
+  assert.deepEqual(await matrixSnapshot(b.id), after);
+
+  // The customer can read the exact delivered offer and sends feedback in chat.
+  const quotePath = `/quotations/${quotation.id}`;
+  assert.deepEqual(
+    await read(await call(quotePath, "GET", undefined, customerCookie), 200),
+    { quotation },
+  );
+  await read(await call(quotePath, "GET", undefined, otherCookie), 404);
+
+  for (const action of ["accept", "revision"]) {
+    assert.equal(
+      (await call(`${quotePath}/${action}`, "POST", {}, customerCookie)).status,
+      404,
+    );
+  }
+
+  await read(
+    await call(
+      "/messages/conversation/messages",
+      "POST",
+      {
+        body: "Please change the offer.",
+        conversationId: after.conversations[0].id,
+      },
+      customerCookie,
+    ),
+    201,
+  );
+  const feedback = await matrixSnapshot(b.id);
+  assert.deepEqual(feedback.quotations, after.quotations);
+  assert.equal(feedback.messages.length, 2);
+  assert.deepEqual(feedback.audits, after.audits);
+});
+
+test("only one of two competing revisions sends and supersedes the current offer", async () => {
+  const b = await booking();
+  const first = await send(b.id);
+  const before = await matrixSnapshot(b.id);
+  const prepared = await prepare(b.id);
+  assert.equal(prepared.currentOffer?.id, first.id);
+  assert.deepEqual(await matrixSnapshot(b.id), before);
+  await read(await sendRequest(b.id, sendInput(prepared, [], null)), 400);
+  assert.deepEqual(await matrixSnapshot(b.id), before);
+
+  const left = sendInput(
+    prepared,
+    [manual("deduct", 1500)],
+    "Early booking discount",
+  );
+  const right = sendInput(prepared, [manual("add", 5000)], "Delivery fee");
+  const responses = await Promise.all([
+    sendRequest(b.id, left, secondAdminCookie),
+    sendRequest(b.id, right),
+  ]);
+  assert.deepEqual(
+    responses.map((response) => response.status).sort(),
+    [200, 409],
+  );
+
+  const winner = responses.find((response) => response.status === 200);
+
+  assert.ok(winner);
+  const { quotation } = await read(winner, 200);
+  assert.equal(quotation.version, 2);
+  assert.equal(quotation.previousQuotationId, first.id);
+  const successfulInput = quotation.id === left.requestId ? left : right;
+  assert.equal(quotation.revisionReason, successfulInput.revisionReason);
+  const snapshot = await matrixSnapshot(b.id);
+  assert.equal(snapshot.messages.length, 2);
+  assert.equal(snapshot.quotations.length, 2);
+  assert.equal(
+    snapshot.quotations.find((row: Quotation) => row.id === first.id).status,
+    "superseded",
+  );
+  assert.equal(
+    snapshot.quotations.find((row: Quotation) => row.id === quotation.id)
+      .status,
+    "sent",
+  );
+  assert.equal(
+    snapshot.messages.find(
+      (row: { quotation_id: string }) => row.quotation_id === quotation.id,
+    ).sender_id,
+    quotation.createdBy,
+  );
+  const customerHistory = await read(
+    await call(
+      `/booking-requests/${b.id}/quotations`,
+      "GET",
+      undefined,
+      customerCookie,
+    ),
+    200,
+  );
+  assert.equal(customerHistory.currentOffer.id, quotation.id);
+  assert.deepEqual(
+    customerHistory.quotations.map((q: Quotation) => [q.id, q.status]),
+    [
+      [quotation.id, "sent"],
+      [first.id, "superseded"],
+    ],
+  );
+});
+
+function manual(direction: "add" | "deduct", amountMinor: number) {
+  return {
+    id: randomUUID(),
+    direction,
+    kind: direction === "add" ? ("addition" as const) : ("deduction" as const),
+    description: direction === "add" ? "Transport fee" : "Event discount",
+    amountMinor,
+    serviceId: null,
+  };
+}
+
+test("send rejects stale booking, package and offer revisions without partial writes", async () => {
+  const b = await booking();
+  const prepared = await prepare(b.id);
+  const input = sendInput(prepared);
+  let before = await matrixSnapshot(b.id);
+
+  for (const invalid of [
+    { ...input, expectedBookingUpdatedAt: "1900-01-01T00:00:00Z" },
+    { ...input, expectedPackageUpdatedAt: "1900-01-01T00:00:00Z" },
+    { ...input, packageId: randomUUID() },
+    {
+      ...input,
+      currentOffer: {
+        id: randomUUID(),
+        updatedAt: prepared.expectedBookingUpdatedAt,
+      },
+    },
+  ]) {
+    await read(await sendRequest(b.id, invalid), 409);
+  }
+
+  await read(
+    await sendRequest(b.id, { ...input, revisionReason: "No prior offer" }),
+    400,
+  );
+  assert.deepEqual(await matrixSnapshot(b.id), before);
+
+  const first = await send(b.id, input);
+  const replacement = sendInput(await prepare(b.id));
+  before = await matrixSnapshot(b.id);
+  await read(
+    await sendRequest(b.id, {
+      ...replacement,
+      currentOffer: { id: first.id, updatedAt: "1900-01-01T00:00:00Z" },
+    }),
+    409,
+  );
+  assert.deepEqual(await matrixSnapshot(b.id), before);
+
+  const other = await booking();
+  await read(
+    await sendRequest(other.id, {
+      ...sendInput(await prepare(other.id)),
+      requestId: input.requestId,
+    }),
+    409,
+  );
+  assert.equal((await matrixSnapshot(other.id)).quotations.length, 0);
+});
+
+test("manual fees and discounts retain the bounds and cannot carry service references", async () => {
+  const b = await booking();
+  const prepared = await prepare(b.id);
+  const fee = manual("add", 3000);
+  const discount = manual("deduct", 500);
+  const before = await matrixSnapshot(b.id);
+
+  for (const items of [
+    [{ ...fee, serviceId: randomUUID() }],
+    [{ ...fee, amountMinor: 1.5 }],
+    [{ ...fee, description: " " }],
+    [fee, { ...discount, id: fee.id.toUpperCase() }],
+    Array.from({ length: MAX_QUOTATION_ITEMS + 1 }, () => manual("add", 100)),
+    [manual("deduct", 100001)],
+    [manual("add", MAX_QUOTATION_AMOUNT_MINOR)],
+  ]) {
+    await read(await sendRequest(b.id, { ...sendInput(prepared), items }), 400);
+  }
+
+  assert.deepEqual(await matrixSnapshot(b.id), before);
+  const q = await send(b.id, sendInput(prepared, [fee, discount]));
+  assert.deepEqual(q.items, [fee, discount]);
+  assert.equal(q.totalAmountMinor, 102500);
+  assert.deepEqual((await prepare(b.id)).items, [fee, discount]);
+});
+
+test("a legacy saved draft stays intact and the last delivered offer stays current", async () => {
+  const b = await booking();
+  const first = await send(
+    b.id,
+    sendInput(await prepare(b.id), [manual("add", 900)]),
+  );
+  await pool.query(
+    "UPDATE quotations SET status = 'superseded', superseded_at = now() WHERE id = $1",
+    [first.id],
+  );
+  const legacy = (
+    await pool.query(
+      `INSERT INTO quotations (booking_request_id, version, currency, base_amount_minor, total_amount_minor,
+       status, created_by, offered_package_id, adjustments_reviewed, previous_quotation_id, revision_reason)
+     VALUES ($1, 2, 'PHP', 99000, 99000, 'draft', $2, $3, false, $4, 'Abandoned preparation')
+     RETURNING id`,
+      [b.id, adminId, packageId, first.id],
+    )
+  ).rows[0].id;
+  const before = await matrixSnapshot(b.id);
+
+  for (const [path, cookie] of [
+    [quotationPath(b.id), adminCookie],
+    [`/booking-requests/${b.id}/quotations`, customerCookie],
+  ]) {
+    const history = await read(await call(path, "GET", undefined, cookie), 200);
+    assert.equal(history.currentOffer.id, first.id);
+    assert.deepEqual(
+      history.quotations.map((q: Quotation) => q.id),
+      [first.id],
+    );
+    assert.equal("currentDraft" in history, false);
+  }
+
+  await read(
+    await call(`/quotations/${legacy}`, "GET", undefined, customerCookie),
+    404,
+  );
+  const prepared = await prepare(b.id);
+  assert.equal(prepared.currentOffer?.id, first.id);
+  assert.deepEqual(prepared.items, first.items);
+  assert.deepEqual(await matrixSnapshot(b.id), before);
+  const replacement = await send(
+    b.id,
+    sendInput(prepared, [], "Replace delivered offer"),
+  );
+  assert.equal(replacement.version, 3);
+  assert.equal(replacement.previousQuotationId, first.id);
+  const after = await matrixSnapshot(b.id);
+  assert.deepEqual(
+    after.quotations.find((row: Quotation) => row.id === legacy),
+    before.quotations.find((row: Quotation) => row.id === legacy),
+  );
+});
+
+test("missing conversation and a message insertion failure roll back the entire send", async () => {
+  const without = await booking();
+  await db
+    .deleteFrom("conversations")
+    .where("booking_request_id", "=", without.id)
+    .execute();
+  const absent = await matrixSnapshot(without.id);
+  await read(
+    await sendRequest(without.id, sendInput(await prepare(without.id))),
+    409,
+  );
+  assert.deepEqual(await matrixSnapshot(without.id), absent);
+
+  const b = await booking();
+  const first = await send(b.id);
+  const replacement = sendInput(await prepare(b.id));
   const pending = {
     reason: "needs_admin_review",
     summary: "The customer needs a quotation.",
@@ -1705,49 +1265,459 @@ test("quotation delivery clears pending handoff only on a successful committed a
     .set({ ai_handoff: pending, ai_enabled: false, ai_version: 1 })
     .where("booking_request_id", "=", b.id)
     .execute();
+  const before = await matrixSnapshot(b.id);
   await pool.query(
-    "CREATE FUNCTION reject_handoff_quote_test() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.quotation_id IS NOT NULL THEN RAISE EXCEPTION 'fixture delivery failure'; END IF; RETURN NEW; END $$",
+    "CREATE FUNCTION reject_quote_message_test() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.quotation_id IS NOT NULL THEN RAISE EXCEPTION 'fixture delivery failure'; END IF; RETURN NEW; END $$",
   );
   await pool.query(
-    "CREATE TRIGGER reject_handoff_quote_test BEFORE INSERT ON messages FOR EACH ROW EXECUTE FUNCTION reject_handoff_quote_test()",
+    "CREATE TRIGGER reject_quote_message_test BEFORE INSERT ON messages FOR EACH ROW EXECUTE FUNCTION reject_quote_message_test()",
   );
 
   try {
-    assert.equal(
-      (
-        await call(`/admin/quotations/${q.id}/send`, "POST", {
-          expectedUpdatedAt: q.updatedAt,
-        })
-      ).status,
-      500,
-    );
-    const failed = await db
-      .selectFrom("conversations")
-      .select(["ai_handoff", "ai_version"])
-      .where("booking_request_id", "=", b.id)
-      .executeTakeFirstOrThrow();
-    assert.deepEqual(failed, { ai_handoff: pending, ai_version: 1 });
+    assert.equal((await sendRequest(b.id, replacement)).status, 500);
+    assert.deepEqual(await matrixSnapshot(b.id), before);
+    assert.equal((await prepare(b.id)).currentOffer?.id, first.id);
   } finally {
-    await pool.query("DROP TRIGGER reject_handoff_quote_test ON messages");
-    await pool.query("DROP FUNCTION reject_handoff_quote_test()");
+    await pool.query("DROP TRIGGER reject_quote_message_test ON messages");
+    await pool.query("DROP FUNCTION reject_quote_message_test()");
   }
 
-  assert.equal(
-    (
-      await call(`/admin/quotations/${q.id}/send`, "POST", {
-        expectedUpdatedAt: q.updatedAt,
-      })
-    ).status,
+  const sent = await send(b.id, replacement);
+  assert.equal(sent.previousQuotationId, first.id);
+  const current = await matrixSnapshot(b.id);
+  assert.deepEqual(current.conversations[0].ai_handoff, {
+    ...pending,
+    pending: false,
+  });
+  assert.equal(current.conversations[0].ai_version, 2);
+  assert.equal(current.messages.length, 2);
+});
+
+test("prepared add-ons are mandatory and delivery derives every immutable term from the package", async () => {
+  const { b, content, included, serviceNames } = await quotationAddonsFixture();
+  const before = await matrixSnapshot(b.id);
+  const prepared = await prepare(b.id);
+  assert.deepEqual(await matrixSnapshot(b.id), before);
+  assert.deepEqual(
+    prepared.items.map((item) => item.serviceId),
+    content.addonServices.map((addon) => addon.serviceId),
+  );
+  const [fixed, hourly] = prepared.items as [
+    QuotationAddonItem,
+    QuotationAddonItem,
+  ];
+  assert.deepEqual([fixed.description, hourly.description], serviceNames);
+  assert.equal(fixed.amountMinor, 150000);
+  assert.equal(fixed.addon.hours, 0);
+  assert.equal(hourly.addon.hours, null);
+  assert.equal(hourly.amountMinor, null);
+  const fixedCharge = { id: fixed.id, addon: { hours: 2 } };
+  const hourlyCharge = { id: hourly.id, addon: { hours: 3 } };
+
+  for (const items of [
+    [],
+    [fixedCharge],
+    [fixedCharge, { ...hourlyCharge, id: randomUUID() }],
+    [fixedCharge, hourlyCharge, { id: included.id, addon: { hours: 1 } }],
+    [fixedCharge, manual("add", 130000)],
+  ]) {
+    await read(await sendRequest(b.id, sendInput(prepared, items)), 409);
+  }
+
+  for (const items of [
+    [fixedCharge, { ...hourlyCharge, addon: { hours: 0 } }],
+    [
+      fixedCharge,
+      { ...hourlyCharge, addon: { hours: MAX_QUOTATION_AMOUNT_MINOR } },
+    ],
+    [fixedCharge, { ...hourlyCharge, addon: { hours: null } }],
+    [
+      fixedCharge,
+      { ...hourlyCharge, addon: { hours: 2, hourlyRateOverrideMinor: 1 } },
+    ],
+    [
+      fixedCharge,
+      { ...hourlyCharge, addon: { hours: 2, source: hourly.addon.source } },
+    ],
+    [
+      fixedCharge,
+      hourlyCharge,
+      { ...hourlyCharge, id: hourly.id.toUpperCase() },
+    ],
+    [
+      fixedCharge,
+      hourlyCharge,
+      { ...manual("add", 4500), serviceId: included.id },
+    ],
+  ]) {
+    await read(await sendRequest(b.id, { ...sendInput(prepared), items }), 400);
+  }
+
+  assert.deepEqual(await matrixSnapshot(b.id), before);
+
+  const fee = manual("add", 2500);
+  const sent = await send(
+    b.id,
+    sendInput(prepared, [fixedCharge, hourlyCharge, fee]),
+  );
+  assert.deepEqual(
+    sent.items.map((item) => item.amountMinor),
+    [210000, 195000, 2500],
+  );
+  assert.deepEqual(
+    sent.items.flatMap((item) => (item.addon ? [item.addon.source] : [])),
+    [fixed.addon.source, hourly.addon.source],
+  );
+  assert.equal(sent.totalAmountMinor, 507500);
+  const visible = (
+    await read(
+      await call(`/quotations/${sent.id}`, "GET", undefined, customerCookie),
+      200,
+    )
+  ).quotation;
+  assert.deepEqual(
+    visible.items.map((item: QuotationAddonItem) => item.amountMinor),
+    [210000, 195000, 2500],
+  );
+  assert.ok(visible.items.every((item: QuotationAddonItem) => !item.addon));
+  assert.match(visible.items[0].description, /3 included hours/);
+  assert.match(visible.items[0].description, /2 extra hours/);
+  const revision = await prepare(b.id);
+  assert.deepEqual(
+    revision.items.map((item) => item.addon?.hours),
+    [2, 3, undefined],
+  );
+});
+
+test("package add-on edits and deletion are isolated and version the owning proposal", async () => {
+  const { b, proposal, content } = await quotationAddonsFixture();
+  const [fixed, hourly] = content.addonServices;
+  const path = `/admin/booking-requests/${b.id}/custom-package/addons`;
+  const prepared = await prepare(b.id);
+  const sent = await send(
+    b.id,
+    sendInput(prepared, [
+      { id: fixed.id, addon: { hours: 2 } },
+      { id: hourly.id, addon: { hours: 3 } },
+    ]),
+  );
+  const pending = await prepare(b.id);
+  const privateBefore = await matrixSnapshot(b.id);
+  const servicesBefore = (
+    await pool.query("SELECT * FROM services ORDER BY id")
+  ).rows;
+  const source = {
+    packageId: proposal.package.id,
+    expectedBookingUpdatedAt: proposal.bookingRequest.updatedAt,
+    expectedUpdatedAt: proposal.package.updatedAt,
+  };
+  const pricing = {
+    fixedPricePesos: 2000,
+    includedHours: 4,
+    hourlyRatePesos: 400,
+  };
+
+  await read(
+    await call(
+      `${path}/${fixed.id}`,
+      "PATCH",
+      { ...source, ...pricing },
+      customerCookie,
+    ),
+    403,
+  );
+  await read(
+    await call(`${path}/${fixed.id}`, "PATCH", {
+      ...source,
+      ...pricing,
+      serviceId: hourly.serviceId,
+    }),
+    400,
+  );
+  await read(
+    await call(`${path}/${fixed.id}`, "PATCH", {
+      ...source,
+      ...pricing,
+      includedHours: null,
+    }),
+    400,
+  );
+  await read(
+    await call(`${path}/${fixed.id}`, "DELETE", { ...source, packageId }),
+    409,
+  );
+  await read(await call(`${path}/${randomUUID()}`, "DELETE", source), 404);
+  assert.deepEqual(await matrixSnapshot(b.id), privateBefore);
+
+  const updated = await read(
+    await call(`${path}/${fixed.id}`, "PATCH", { ...source, ...pricing }),
     200,
   );
-  const sent = await db
-    .selectFrom("conversations")
-    .select(["ai_handoff", "ai_enabled", "ai_version"])
-    .where("booking_request_id", "=", b.id)
-    .executeTakeFirstOrThrow();
-  assert.deepEqual(sent, {
-    ai_handoff: { ...pending, pending: false },
-    ai_enabled: false,
-    ai_version: 2,
-  });
+  const current = await matrixSnapshot(b.id);
+  const nextAddon = { ...fixed, ...pricing };
+  assert.deepEqual(current.proposals, [
+    {
+      ...privateBefore.proposals[0],
+      updated_at: current.proposals[0].updated_at,
+      addon_services: [nextAddon, hourly],
+    },
+  ]);
+  assert.notEqual(
+    current.proposals[0].updated_at,
+    privateBefore.proposals[0].updated_at,
+  );
+  assert.notEqual(
+    updated.bookingRequest.updatedAt,
+    source.expectedBookingUpdatedAt,
+  );
+  assert.deepEqual(current.catalog, privateBefore.catalog);
+  assert.deepEqual(current.messages, privateBefore.messages);
+  assert.deepEqual(current.quotations, privateBefore.quotations);
+  assert.deepEqual(
+    (await pool.query("SELECT * FROM services ORDER BY id")).rows,
+    servicesBefore,
+  );
+  assert.equal(updated.package.addonServices[0].service.id, fixed.serviceId);
+  assert.equal(
+    updated.package.price.amountMinor,
+    proposal.package.price.amountMinor,
+  );
+  const history = await read(
+    await call(`/admin/booking-requests/${b.id}/package-history`),
+    200,
+  );
+  assert.equal(history.history[0].after.addonServices[0].fixedPricePesos, 2000);
+  assert.equal(
+    history.history[0].before.addonServices[0].fixedPricePesos,
+    1500,
+  );
+
+  await read(await call(`${path}/${hourly.id}`, "DELETE", source), 409);
+  await read(
+    await sendRequest(
+      b.id,
+      sendInput(pending, [
+        { id: fixed.id, addon: { hours: 2 } },
+        { id: hourly.id, addon: { hours: 3 } },
+      ]),
+    ),
+    409,
+  );
+  const revised = await prepare(b.id);
+  assert.deepEqual(revised.currentOffer, pending.currentOffer);
+  assert.equal(revised.items[0].amountMinor, 280000);
+  assert.equal(revised.items[0].addon?.source.includedHours, 4);
+
+  const deleted = await read(
+    await call(`${path}/${hourly.id}`, "DELETE", {
+      packageId: updated.package.id,
+      expectedBookingUpdatedAt: updated.bookingRequest.updatedAt,
+      expectedUpdatedAt: updated.package.updatedAt,
+    }),
+    200,
+  );
+  assert.deepEqual(
+    deleted.package.addonServices.map((addon: PackageAddonService) => addon.id),
+    [fixed.id],
+  );
+  const afterDelete = await matrixSnapshot(b.id);
+  assert.deepEqual(afterDelete.proposals, [
+    {
+      ...current.proposals[0],
+      updated_at: afterDelete.proposals[0].updated_at,
+      addon_services: [nextAddon],
+    },
+  ]);
+  assert.deepEqual(afterDelete.quotations, current.quotations);
+  const finalPreparation = await prepare(b.id);
+  const replacement = await send(
+    b.id,
+    sendInput(finalPreparation, [{ id: fixed.id, addon: { hours: 2 } }]),
+  );
+  assert.equal(replacement.totalAmountMinor, 380000);
+  const historical = (
+    await read(
+      await call(`/quotations/${sent.id}`, "GET", undefined, customerCookie),
+      200,
+    )
+  ).quotation;
+  assert.equal(historical.totalAmountMinor, sent.totalAmountMinor);
+  assert.equal(historical.items.length, 2);
+});
+
+test("archiving an add-on blocks delivery until an admin deletes it from the package", async () => {
+  const { b, proposal, content } = await quotationAddonsFixture();
+  const [fixed, hourly] = content.addonServices;
+  const prepared = await prepare(b.id);
+  await db
+    .updateTable("services")
+    .set({ archived_at: new Date() })
+    .where("id", "=", hourly.serviceId)
+    .execute();
+  const before = await matrixSnapshot(b.id);
+  await read(
+    await sendRequest(
+      b.id,
+      sendInput(prepared, [
+        { id: fixed.id, addon: { hours: 0 } },
+        { id: hourly.id, addon: { hours: 1 } },
+      ]),
+    ),
+    409,
+  );
+  assert.equal(
+    (await prepare(b.id)).items[1].addon?.requiresRemoval,
+    "archived",
+  );
+  assert.deepEqual(await matrixSnapshot(b.id), before);
+  await read(
+    await call(
+      `/admin/booking-requests/${b.id}/custom-package/addons/${hourly.id}`,
+      "DELETE",
+      {
+        packageId: proposal.package.id,
+        expectedBookingUpdatedAt: proposal.bookingRequest.updatedAt,
+        expectedUpdatedAt: proposal.package.updatedAt,
+      },
+    ),
+    200,
+  );
+  const fresh = await prepare(b.id);
+  assert.deepEqual(
+    fresh.items.map((item) => item.id),
+    [fixed.id],
+  );
+  const sent = await send(
+    b.id,
+    sendInput(fresh, [{ id: fixed.id, addon: { hours: 0 } }]),
+  );
+  assert.equal(sent.totalAmountMinor, 250000);
+});
+
+test("revision rates and base price follow saved package changes while delivered terms stay stable", async () => {
+  const { b, content, update, proposal } = await quotationAddonsFixture();
+  const [fixed, hourly] = content.addonServices;
+  const items = [
+    { id: fixed.id, addon: { hours: 2 } },
+    { id: hourly.id, addon: { hours: 3 } },
+  ];
+  const first = await send(b.id, sendInput(await prepare(b.id), items));
+  const customerPath = `/quotations/${first.id}`;
+  const firstVisible = (
+    await read(await call(customerPath, "GET", undefined, customerCookie), 200)
+  ).quotation;
+  const stale = sendInput(await prepare(b.id), items);
+  const edited = await read(
+    await update({
+      price: { ...content.price, amountMinor: 180000 },
+      addonServices: [{ ...fixed, hourlyRatePesos: 500 }, hourly],
+    }),
+    200,
+  );
+  assert.equal(edited.package.id, proposal.package.id);
+  assert.equal(edited.package.price.amountMinor, 180000);
+  await db
+    .updateTable("services")
+    .set({ name: "Renamed service" })
+    .where("id", "=", fixed.serviceId)
+    .execute();
+  await db
+    .updateTable("booking_requests")
+    .set({ time_zone: "Asia/Singapore" })
+    .where("id", "=", b.id)
+    .execute();
+  const before = await matrixSnapshot(b.id);
+  await read(await sendRequest(b.id, stale), 409);
+  assert.deepEqual(await matrixSnapshot(b.id), before);
+
+  const fresh = await prepare(b.id);
+  assert.equal(fresh.baseAmountMinor, 180000);
+  assert.equal(fresh.items[0].description, "Renamed service");
+  assert.equal(fresh.items[0].amountMinor, 250000);
+  assert.equal(fresh.currentOffer?.id, first.id);
+  const next = await send(b.id, sendInput(fresh, items));
+  assert.equal(next.totalAmountMinor, 625000);
+  const old = (
+    await read(await call(customerPath, "GET", undefined, customerCookie), 200)
+  ).quotation;
+  assert.equal(old.totalAmountMinor, firstVisible.totalAmountMinor);
+  assert.deepEqual(old.items, firstVisible.items);
+});
+
+test("delivery permits a full-sized adjustment payload above the ordinary booking limit", async () => {
+  const b = await booking();
+
+  const items = Array.from({ length: MAX_QUOTATION_ITEMS }, () => ({
+    ...manual("add", 1),
+    description: "a".repeat(MAX_QUOTATION_DESCRIPTION_LENGTH),
+  }));
+
+  const q = await send(b.id, sendInput(await prepare(b.id), items));
+  assert.equal(q.items.length, MAX_QUOTATION_ITEMS);
+  assert.equal(q.totalAmountMinor, 100000 + MAX_QUOTATION_ITEMS);
+});
+
+test("the Edge dispatcher loads protected quotation routes and delivers through the same service", async () => {
+  const { app: edge } = await import("../src/edge/server.js");
+  const b = await booking();
+  const path = `/v1${quotationPath(b.id)}`;
+  await read(await edge.request(`${path}/prepare`), 401);
+  const { preparation } = await read(
+    await edge.request(`${path}/prepare`, { headers: { Cookie: adminCookie } }),
+    200,
+  );
+  const input = sendInput(preparation, [manual("add", 500)]);
+  const { quotation } = await read(
+    await edge.request(`${path}/send`, {
+      method: "POST",
+      headers: { Cookie: adminCookie, "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+    200,
+  );
+  assert.equal(quotation.totalAmountMinor, 100500);
+  const { messages, quotations } = await matrixSnapshot(b.id);
+  assert.equal(quotations.length, 1);
+  assert.equal(messages[0].quotation_id, quotation.id);
+});
+
+test("closed inquiries and other private packages cannot be changed through an add-on action", async () => {
+  const first = await quotationAddonsFixture();
+  const second = await quotationAddonsFixture();
+  const addonId = first.content.addonServices[0].id;
+  const firstSource = {
+    packageId: first.proposal.package.id,
+    expectedBookingUpdatedAt: first.proposal.bookingRequest.updatedAt,
+    expectedUpdatedAt: first.proposal.package.updatedAt,
+  };
+  const firstPath = `/admin/booking-requests/${first.b.id}/custom-package/addons/${addonId}`;
+  const secondPath = `/admin/booking-requests/${second.b.id}/custom-package/addons/${addonId}`;
+  await read(
+    await call(secondPath, "DELETE", {
+      ...firstSource,
+      expectedBookingUpdatedAt: second.proposal.bookingRequest.updatedAt,
+    }),
+    409,
+  );
+
+  const pricing = {
+    hourlyRatePesos: 230,
+    fixedPricePesos: null,
+    includedHours: null,
+  };
+
+  for (const status of ["declined", "cancelled"]) {
+    // Keep the revision constant so the locked booking status is decisive.
+    await pool.query("UPDATE booking_requests SET status = $1 WHERE id = $2", [
+      status,
+      first.b.id,
+    ]);
+    const before = await matrixSnapshot(first.b.id);
+    await read(
+      await call(firstPath, "PATCH", { ...firstSource, ...pricing }),
+      409,
+    );
+    await read(await call(firstPath, "DELETE", firstSource), 409);
+    assert.deepEqual(await matrixSnapshot(first.b.id), before);
+  }
 });

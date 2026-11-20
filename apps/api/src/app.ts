@@ -5,7 +5,6 @@ import {
   SMALL_JSON_BODY_LIMIT_BYTES,
   CATALOG_JSON_BODY_LIMIT_BYTES,
   MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
-  QUOTATION_JSON_BODY_LIMIT_BYTES,
   bookingBodyLimit,
 } from "./constants/http.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
@@ -119,10 +118,6 @@ app.use(
 );
 app.use("/v1/admin/booking-requests/*", (c, next) =>
   bodyLimit({ maxSize: bookingBodyLimit(c.req.path) })(c, next),
-);
-app.use(
-  "/v1/admin/quotations/*",
-  bodyLimit({ maxSize: QUOTATION_JSON_BODY_LIMIT_BYTES }),
 );
 app.use(
   "/v1/quotations/*",

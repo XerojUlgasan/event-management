@@ -1,21 +1,10 @@
-import { type Transaction, type Updateable } from "kysely";
-import type { DB, Quotations } from "../../db/types.js";
+import type { Transaction } from "kysely";
+import type { DB } from "../../db/types.js";
 import { nextQuoteRevision } from "./quotation-revision.js";
 
-export const updateQuotationData = (
+export const supersedeQuotationData = (
   db: Transaction<DB>,
   id: string,
-  values: Updateable<Quotations>,
-) =>
-  db
-    .updateTable("quotations")
-    .set({ ...values, updated_at: nextQuoteRevision })
-    .where("id", "=", id)
-    .execute();
-
-export const supersedeActiveQuotationsData = (
-  db: Transaction<DB>,
-  bookingId: string,
   now: Date,
 ) =>
   db
@@ -25,6 +14,6 @@ export const supersedeActiveQuotationsData = (
       superseded_at: now,
       updated_at: nextQuoteRevision,
     })
-    .where("booking_request_id", "=", bookingId)
+    .where("id", "=", id)
     .where("status", "=", "sent")
     .execute();
