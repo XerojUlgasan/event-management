@@ -220,7 +220,7 @@ export function ConversationContext({
         onClose={onClose}
         className="conversation-quotation-dialog"
       >
-        <Quotations bookingId={bookingId} admin={true} />
+        <Quotations bookingId={bookingId} admin={true} historyLimit={3} />
       </Dialog>
     );
 

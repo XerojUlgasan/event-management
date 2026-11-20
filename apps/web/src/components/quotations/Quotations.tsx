@@ -32,6 +32,7 @@ export function Quotations({
   bookingStatus,
   refreshBooking,
   proposalAvailable = true,
+  historyLimit,
 }: {
   bookingId?: string;
   admin: boolean;
@@ -39,6 +40,7 @@ export function Quotations({
   bookingStatus?: BookingStatus;
   refreshBooking?: () => Promise<void>;
   proposalAvailable?: boolean;
+  historyLimit?: number;
 }) {
   const { notify, notifyError } = useNotifications();
 
@@ -65,7 +67,12 @@ export function Quotations({
     load: () => loadRef.current(),
   });
 
-  const data = useQuotationsData({ bookingId, admin, quotationId });
+  const data = useQuotationsData({
+    bookingId,
+    admin,
+    quotationId,
+    historyLimit,
+  });
   loadRef.current = data.load;
   const {
     services,

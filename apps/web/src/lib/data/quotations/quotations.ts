@@ -14,11 +14,11 @@ const quote = (id: string) => `/quotations/${encodeURIComponent(id)}`;
 export const getQuotations = (
   id: string,
   admin: boolean,
-  options: { cursor?: string; quotationId?: string } = {},
+  options: { cursor?: string; quotationId?: string; limit?: number } = {},
 ) => {
   const query = new URLSearchParams();
 
-  query.set("limit", "5");
+  query.set("limit", String(options.limit ?? 5));
 
   if (options.cursor) query.set("cursor", options.cursor);
 

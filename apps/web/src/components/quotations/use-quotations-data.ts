@@ -15,10 +15,12 @@ export function useQuotationsData({
   bookingId,
   admin,
   quotationId,
+  historyLimit,
 }: {
   bookingId?: string;
   admin: boolean;
   quotationId?: string;
+  historyLimit?: number;
 }) {
   const { notifyError } = useNotifications();
   const generation = useRequestGeneration();
@@ -87,7 +89,11 @@ export function useQuotationsData({
                 previousDraftVersion: null,
               })))()
           : bookingId
-            ? await getQuotations(bookingId, admin, { cursor, quotationId })
+            ? await getQuotations(bookingId, admin, {
+                cursor,
+                quotationId,
+                limit: historyLimit,
+              })
             : {
                 quotations: [],
                 nextCursor: null,
