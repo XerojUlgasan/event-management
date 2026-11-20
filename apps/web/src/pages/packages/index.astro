@@ -15,9 +15,6 @@ const filters: CatalogFilters = {
   eventType: EVENT_TYPES.includes(q.get("eventType") as any)
     ? (q.get("eventType") as CatalogFilters["eventType"])
     : undefined,
-  guests: q.get("guests") ? Number(q.get("guests")) : undefined,
-  minPricePesos: q.get("minPricePesos") ? Number(q.get("minPricePesos")) : undefined,
-  maxPricePesos: q.get("maxPricePesos") ? Number(q.get("maxPricePesos")) : undefined,
 };
 
 let packages: PublicPackage[] = [];
@@ -58,45 +55,6 @@ const hasFilters = Object.values(filters).some((v) => v !== undefined);
             ))}
           </select>
         </label>
-        <label class="ui-field" for="pkg-min-price">
-          <span>Min price (₱)</span>
-          <input
-            id="pkg-min-price"
-            class="ui-control"
-            type="number"
-            name="minPricePesos"
-            min="0"
-            step="1"
-            value={filters.minPricePesos ?? ""}
-            placeholder="No minimum"
-          />
-        </label>
-        <label class="ui-field" for="pkg-max-price">
-          <span>Max price (₱)</span>
-          <input
-            id="pkg-max-price"
-            class="ui-control"
-            type="number"
-            name="maxPricePesos"
-            min="0"
-            step="1"
-            value={filters.maxPricePesos ?? ""}
-            placeholder="No maximum"
-          />
-        </label>
-        <label class="ui-field" for="pkg-guests">
-          <span>Number of guests</span>
-          <input
-            id="pkg-guests"
-            class="ui-control"
-            type="number"
-            name="guests"
-            min="1"
-            step="1"
-            value={filters.guests ?? ""}
-            placeholder="Any guest count"
-          />
-        </label>
         <div class="catalog-filter-actions">
           <button type="submit" class="button button-primary">Apply filters</button>
           {hasFilters && (
@@ -105,7 +63,7 @@ const hasFilters = Object.values(filters).some((v) => v !== undefined);
         </div>
       </div>
       <p class="catalog-filter-hint">
-        Prices are package totals. Enter your guest count to see packages that can fit your event.
+        Filter packages by event type to find the right fit for your celebration.
       </p>
     </form>
 
