@@ -418,65 +418,14 @@
   padding-bottom: 80px;
 }
 
-/* Stacked header: title → subtitle → filter toggle button */
-.catalog-page-header {
-  margin-bottom: 24px;
-}
-
-.catalog-page-header-copy h1 {
+.catalog-page h1 {
   margin: 0 0 8px;
 }
-.catalog-page-header-copy p {
-  margin: 0 0 20px;
+.catalog-page-subtitle {
+  margin: 0 0 24px;
   color: var(--muted);
   font-size: 15px;
   line-height: 1.5;
-}
-
-/* Filter toggle — <details><summary>, no JS required */
-.catalog-page-filter-toggle {
-  display: inline-block;
-}
-
-.catalog-page-filter-toggle > summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  list-style: none;
-  cursor: pointer;
-  padding: 10px 14px;
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  background: var(--surface-base);
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 600;
-  user-select: none;
-  transition: background 120ms ease, border-color 120ms ease;
-}
-.catalog-page-filter-toggle > summary::-webkit-details-marker { display: none; }
-.catalog-page-filter-toggle > summary::marker { display: none; }
-.catalog-page-filter-toggle > summary:hover { background: var(--surface-muted); }
-.catalog-page-filter-toggle > summary:focus-visible {
-  outline: 2px solid var(--accent-strong);
-  outline-offset: 2px;
-}
-.catalog-page-filter-toggle[open] > summary {
-  color: var(--wine, var(--accent-strong));
-  border-color: var(--accent-border, var(--accent-strong));
-  background: var(--accent-faint);
-}
-.catalog-page-filter-icon { display: flex; align-items: center; }
-.catalog-page-filter-toggle > .catalog-filters { margin-top: 16px; }
-
-/* Align the Apply/Clear buttons to the bottom of the filter fields row,
-   matching the app catalog. The shared .catalog-filter-fields uses
-   align-items: start — override it here so buttons sit beside the inputs. */
-.catalog-page .catalog-filter-fields {
-  align-items: end;
-}
-.catalog-page .catalog-filter-actions {
-  padding-top: 0;
 }
 
 @media (max-width: 700px) {

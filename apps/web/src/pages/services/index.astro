@@ -17,9 +17,7 @@ const filters: CatalogFilters = {
     ? (q.get("eventType") as CatalogFilters["eventType"])
     : undefined,
   pricingType:
-    pricingType === "fixed" || pricingType === "hourly"
-      ? pricingType
-      : undefined,
+    pricingType === "fixed" || pricingType === "hourly" ? pricingType : undefined,
   minPricePesos: q.get("minPricePesos") ? Number(q.get("minPricePesos")) : undefined,
   maxPricePesos: q.get("maxPricePesos") ? Number(q.get("maxPricePesos")) : undefined,
 };
@@ -49,24 +47,32 @@ const hasPricingType = filters.pricingType !== undefined;
   description="Published event services from Styled by AMAC."
 >
   <section class="section catalog-page">
-    <div class="catalog-page-header">
-      <div class="catalog-page-header-copy">
-        <h1 class="section-title small">All services</h1>
-        <p>Explore services for your gathering.</p>
+    <h1 class="section-title small">All services</h1>
+    <p class="catalog-page-subtitle">Explore services for your gathering.</p>
+
+    <div class="catalog-browser">
+      <div class="catalog-toolbar">
+        <p class="catalog-results-summary">
+          {services.length > 0
+            ? `Showing ${services.length} services${hasFilters ? " matching your filters" : ""}`
+            : ""}
+        </p>
+        <button
+          type="button"
+          class="button button-secondary button-size-icon catalog-filter-toggle"
+          aria-label={hasFilters ? "Hide filters" : "Show filters"}
+          aria-expanded={hasFilters ? "true" : "false"}
+          aria-controls="svc-filters"
+          data-active={hasFilters || undefined}
+          onclick="const p=document.getElementById('svc-filters');const hidden=p.hidden;p.hidden=!hidden;this.setAttribute('aria-expanded',hidden ? 'true' : 'false');"
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+          </svg>
+        </button>
       </div>
 
-      <details class="catalog-page-filter-toggle" open={hasFilters || undefined}>
-        <summary aria-label={hasFilters ? "Filters active — show filters" : "Show filters"}>
-          <span class="catalog-page-filter-icon" aria-hidden="true">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-            </svg>
-          </span>
-          <span class="catalog-page-filter-label">
-            {hasFilters ? "Filters active" : "Show filters"}
-          </span>
-        </summary>
-
+      <div id="svc-filters" hidden={!hasFilters || undefined}>
         <form method="get" action="/services" class="catalog-filters" aria-label="Filter services">
           <div class="catalog-filter-fields">
             <label class="ui-field" for="svc-event-type">
@@ -90,45 +96,21 @@ const hasPricingType = filters.pricingType !== undefined;
             {hasPricingType && (
               <>
                 <label class="ui-field" for="svc-min-price">
-                  <span>
-                    {filters.pricingType === "fixed" ? "Min fixed price (₱)" : "Min hourly rate (₱)"}
-                  </span>
-                  <input
-                    id="svc-min-price"
-                    class="ui-control"
-                    type="number"
-                    name="minPricePesos"
-                    min="0"
-                    step="1"
-                    value={filters.minPricePesos ?? ""}
-                    placeholder="No minimum"
-                  />
+                  <span>{filters.pricingType === "fixed" ? "Min fixed price (₱)" : "Min hourly rate (₱)"}</span>
+                  <input id="svc-min-price" class="ui-control" type="number" name="minPricePesos"
+                    min="0" step="1" value={filters.minPricePesos ?? ""} placeholder="No minimum" />
                 </label>
                 <label class="ui-field" for="svc-max-price">
-                  <span>
-                    {filters.pricingType === "fixed" ? "Max fixed price (₱)" : "Max hourly rate (₱)"}
-                  </span>
-                  <input
-                    id="svc-max-price"
-                    class="ui-control"
-                    type="number"
-                    name="maxPricePesos"
-                    min="0"
-                    step="1"
-                    value={filters.maxPricePesos ?? ""}
-                    placeholder="No maximum"
-                  />
+                  <span>{filters.pricingType === "fixed" ? "Max fixed price (₱)" : "Max hourly rate (₱)"}</span>
+                  <input id="svc-max-price" class="ui-control" type="number" name="maxPricePesos"
+                    min="0" step="1" value={filters.maxPricePesos ?? ""} placeholder="No maximum" />
                 </label>
               </>
             )}
             <div class="catalog-filter-actions">
               <button type="submit" class="button button-primary">Apply filters</button>
-              <button
-                type="button"
-                class="button button-secondary"
-                onclick="window.location.href='/services'"
-                disabled={!hasFilters}
-              >
+              <button type="button" class="button button-secondary"
+                onclick="window.location.href='/services'" disabled={!hasFilters}>
                 Clear
               </button>
             </div>
@@ -141,7 +123,7 @@ const hasPricingType = filters.pricingType !== undefined;
                 : "Choose fixed-price or hourly-only services to filter prices separately."}
           </p>
         </form>
-      </details>
+      </div>
     </div>
 
     {unavailable && (
