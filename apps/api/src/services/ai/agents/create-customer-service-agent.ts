@@ -5,6 +5,10 @@ import { customerServicePrompt } from "../prompts/customer-service-prompt.js";
 import { createSearchPublicCatalogTool } from "../tools/search-public-catalog.js";
 import { createGetPublicCatalogItemTool } from "../tools/get-public-catalog-item.js";
 import { createGetMyProposalTool } from "../tools/get-my-proposal.js";
+import {
+  createGetMyRequestHistoryTool,
+  createGetMySentQuotationTool,
+} from "../tools/get-my-booking-facts.js";
 import { createUpdateConversationMemoryTool } from "../tools/update-conversation-memory.js";
 import type { AssistantToolContext } from "../tools/assistant-tool-context.js";
 
@@ -48,11 +52,19 @@ export function createCustomerServiceAgent(options: AssistantToolContext) {
         : {}),
       searchPublicCatalog: createSearchPublicCatalogTool(toolContext),
       getPublicCatalogItem: createGetPublicCatalogItemTool(toolContext),
-      ...(options.proposalScope
+      ...(options.customerScope
         ? {
             getMyProposal: createGetMyProposalTool({
               ...toolContext,
-              proposalScope: options.proposalScope,
+              proposalScope: options.customerScope,
+            }),
+            getMySentQuotation: createGetMySentQuotationTool({
+              ...toolContext,
+              customerScope: options.customerScope,
+            }),
+            getMyRequestHistory: createGetMyRequestHistoryTool({
+              ...toolContext,
+              customerScope: options.customerScope,
             }),
           }
         : {}),

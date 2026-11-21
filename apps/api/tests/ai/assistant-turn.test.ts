@@ -6,6 +6,10 @@ import { after, before, test } from "node:test";
 import { Pool } from "pg";
 import { sql } from "kysely";
 import { MockLanguageModelV4, MockProviderV4 } from "ai/test";
+import type {
+  Quotation,
+  QuotationPreparation,
+} from "@event-management/contracts/quotations";
 import {
   customerMessageResultSchema,
   threadSchema,
@@ -21,6 +25,8 @@ import { getMyProposalService } from "../../src/services/ai/get-my-proposal.js";
 const database = `em_ai_test_${randomUUID().replaceAll("-", "")}`;
 
 const modelId = "fixture/text-model";
+const liveModelId = process.env.TEXT_MODEL;
+const liveGatewayKey = process.env.AI_GATEWAY_API_KEY;
 let admin: Pool;
 let pool: Pool;
 let app: typeof import("../../src/app.js").app;
@@ -69,6 +75,8 @@ function useToolCalls(
       | "searchPublicCatalog"
       | "getPublicCatalogItem"
       | "getMyProposal"
+      | "getMySentQuotation"
+      | "getMyRequestHistory"
       | "requestHumanHandoff"
       | "updateConversationMemory";
     input: Record<string, unknown>;
@@ -490,6 +498,400 @@ async function booking(ownerId: string, reference: string) {
       .executeTakeFirstOrThrow()
   ).id;
 }
+
+async function bookingFactsConversation() {
+  const bookingId = await booking(customer.id, `AI-FACTS-${randomUUID()}`);
+  const id = await conversation();
+  await db
+    .updateTable("conversations")
+    .set({ booking_request_id: bookingId })
+    .where("id", "=", id)
+    .executeTakeFirstOrThrow();
+
+  return { id, bookingId };
+}
+
+async function deliverBookingFactQuotation(
+  bookingId: string,
+  id: string,
+  description: string,
+  amountMinor: number,
+) {
+  const path = `/admin/booking-requests/${bookingId}/quotations`;
+  const preparationResponse = await call(`${path}/prepare`, team.cookie);
+  assert.equal(preparationResponse.status, 200);
+  const { preparation }: { preparation: QuotationPreparation } =
+    await preparationResponse.json();
+  const {
+    expectedBookingUpdatedAt,
+    packageId,
+    expectedPackageUpdatedAt,
+    currentOffer,
+  } = preparation;
+  const response = await call(`${path}/send`, team.cookie, {
+    requestId: randomUUID(),
+    expectedBookingUpdatedAt,
+    packageId,
+    expectedPackageUpdatedAt,
+    currentOffer,
+    revisionReason: currentOffer ? "Quotation revision fixture reason" : null,
+    items: [
+      {
+        id: randomUUID(),
+        direction: "add",
+        kind: "addition",
+        description,
+        amountMinor,
+        serviceId: null,
+      },
+    ],
+  });
+  assert.equal(response.status, 200, await response.clone().text());
+  const { quotation }: { quotation: Quotation } = await response.json();
+  const state = await db
+    .selectFrom("conversations")
+    .select(["ai_enabled", "ai_version"])
+    .where("id", "=", id)
+    .executeTakeFirstOrThrow();
+  assert.equal(state.ai_enabled, false);
+  assert.equal((await setAi(id, true, state.ai_version)).status, 200);
+
+  return quotation;
+}
+
+async function updateBookingFactStatus(
+  bookingId: string,
+  status: "needs_details" | "accepted",
+  reason: string,
+) {
+  const response = await app.request(
+    `/v1/admin/booking-requests/${bookingId}/status`,
+    {
+      method: "PATCH",
+      headers: { Cookie: team.cookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ status, reason }),
+    },
+  );
+  assert.equal(response.status, 200);
+}
+
+async function assertBookingFactAudit(
+  result: Awaited<ReturnType<typeof send>>,
+  toolName: "getMySentQuotation" | "getMyRequestHistory",
+  expectedOutput: Record<string, unknown>,
+) {
+  assert.equal(result.assistantError, null);
+  assert.ok(result.assistantMessage);
+  const records = await db
+    .selectFrom("ai_tool_calls")
+    .select([
+      "status",
+      "tool_call_id",
+      "turn_id",
+      "input",
+      "output",
+      "error_code",
+      "completed_at",
+      "assistant_message_id",
+    ])
+    .where("customer_message_id", "=", result.message.id)
+    .where("tool_name", "=", toolName)
+    .execute();
+  assert.ok(
+    records.length > 0,
+    `Missing ${toolName} audit. Fixture reply: ${result.assistantMessage.body}`,
+  );
+
+  for (const record of records) {
+    assert.equal(record.status, "succeeded");
+    assert.deepEqual(record.input, {});
+    assert.ok(record.completed_at);
+    assert.ok(record.tool_call_id);
+    assert.equal(record.error_code, null);
+    assert.equal(record.assistant_message_id, result.assistantMessage.id);
+    assert.deepEqual(record.output, expectedOutput);
+  }
+
+  return result.assistantMessage.body;
+}
+
+async function latestBookingStatusTimestamp(bookingId: string) {
+  const row = await db
+    .selectFrom("booking_request_status_history")
+    .select("created_at")
+    .where("booking_request_id", "=", bookingId)
+    .orderBy("created_at", "desc")
+    .orderBy("id", "desc")
+    .executeTakeFirstOrThrow();
+
+  return row.created_at.toISOString();
+}
+
+function bookingFactToolOutput(
+  toolName: "getMySentQuotation" | "getMyRequestHistory",
+) {
+  const answerStep = model.doGenerateCalls[1];
+
+  for (const message of answerStep.prompt) {
+    if (message.role !== "tool") continue;
+
+    for (const part of message.content) {
+      if (part.type !== "tool-result" || part.toolName !== toolName) continue;
+
+      assert.equal(part.output.type, "json");
+
+      return part.output.value;
+    }
+  }
+
+  assert.fail(`Missing model evidence for ${toolName}`);
+}
+
+test("quotation follow-up gets the latest delivered version only and audits the read", async () => {
+  const { id, bookingId } = await bookingFactsConversation();
+  const toolName = "getMySentQuotation";
+  const first = await deliverBookingFactQuotation(
+    bookingId,
+    id,
+    "Old transport fee",
+    27500,
+  );
+
+  useToolCalls([{ toolName, input: {} }]);
+  const original = await send(id, "What was the total of my sent quotation?");
+  await assertBookingFactAudit(original, toolName, {
+    status: "found",
+    version: first.version,
+    sentAt: first.sentAt,
+  });
+
+  const latest = await deliverBookingFactQuotation(
+    bookingId,
+    id,
+    "Garden lighting",
+    87542,
+  );
+  await db
+    .insertInto("quotations")
+    .values({
+      booking_request_id: bookingId,
+      version: latest.version + 1,
+      base_amount_minor: 999000,
+      total_amount_minor: 999000,
+      created_by: team.id,
+      offered_package_id: packageId,
+      status: "draft",
+    })
+    .execute();
+  useToolCalls([{ toolName, input: {} }]);
+  const revised = await send(
+    id,
+    "And what's the total now, including the extra charge?",
+  );
+
+  assert.deepEqual(bookingFactToolOutput(toolName), {
+    status: "found",
+    quotation: {
+      version: latest.version,
+      currency: "PHP",
+      baseAmountPesos: 1000,
+      totalAmountPesos: 1875.42,
+      sentAt: latest.sentAt,
+      items: [
+        {
+          kind: "addition",
+          direction: "add",
+          description: "Garden lighting",
+          amountPesos: 875.42,
+        },
+      ],
+    },
+  });
+  await assertBookingFactAudit(revised, toolName, {
+    status: "found",
+    version: latest.version,
+    sentAt: latest.sentAt,
+  });
+});
+
+test("status follow-up gets only the latest change and audits it without the reason", async () => {
+  const { id, bookingId } = await bookingFactsConversation();
+  const toolName = "getMyRequestHistory";
+  const reason = "Please send your reception start time.";
+  await updateBookingFactStatus(bookingId, "needs_details", reason);
+  useToolCalls([{ toolName, input: {} }]);
+  const original = await send(id, "Why does it say Needs details?");
+  const firstChange = await latestBookingStatusTimestamp(bookingId);
+  assert.deepEqual(bookingFactToolOutput(toolName), {
+    status: "found",
+    latestChange: { status: "needs_details", reason, createdAt: firstChange },
+  });
+  await assertBookingFactAudit(original, toolName, {
+    status: "found",
+    requestStatus: "needs_details",
+    changedAt: firstChange,
+  });
+
+  const latestReason = "The venue layout was reviewed.";
+  useToolCalls([{ toolName, input: {} }]);
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (options) => {
+    if (model.doGenerateCalls.length === 0)
+      await updateBookingFactStatus(bookingId, "accepted", latestReason);
+
+    return generate(options);
+  };
+  const updated = await send(id, "And why did the request status change now?");
+  assert.match(
+    JSON.stringify(turnContext(0).context),
+    /"status":"needs_details"/,
+  );
+  const latestChange = await latestBookingStatusTimestamp(bookingId);
+  assert.deepEqual(bookingFactToolOutput(toolName), {
+    status: "found",
+    latestChange: {
+      status: "accepted",
+      reason: latestReason,
+      createdAt: latestChange,
+    },
+  });
+  await assertBookingFactAudit(updated, toolName, {
+    status: "found",
+    requestStatus: "accepted",
+    changedAt: latestChange,
+  });
+});
+
+test("booking reads distinguish unlinked, unsent, and missing status history", async () => {
+  const unlinked = await conversation();
+  const linked = await bookingFactsConversation();
+  const calls = [
+    { toolName: "getMySentQuotation", input: {} },
+    { toolName: "getMyRequestHistory", input: {} },
+  ] as const;
+
+  for (const { id, statuses } of [
+    { id: unlinked, statuses: ["no_linked_request", "no_linked_request"] },
+    { id: linked.id, statuses: ["no_sent_quotation", "no_status_history"] },
+  ]) {
+    useToolCalls([...calls]);
+    const result = await send(
+      id,
+      "What's my latest quotation and when did my inquiry status change?",
+    );
+
+    for (const [index, { toolName }] of calls.entries()) {
+      const expected = { status: statuses[index] };
+      assert.deepEqual(bookingFactToolOutput(toolName), expected);
+      await assertBookingFactAudit(result, toolName, expected);
+    }
+  }
+});
+
+test(
+  "live AMAC model rereads the quotation and status after they change",
+  { skip: process.env.AMAC_LIVE_TOOL_TESTS !== "1" },
+  async () => {
+    assert.ok(
+      liveModelId && liveGatewayKey,
+      "Configure the live AMAC text model and Gateway key",
+    );
+    const previousProvider = globalThis.AI_SDK_DEFAULT_PROVIDER;
+    process.env.TEXT_MODEL = liveModelId;
+    process.env.AI_GATEWAY_API_KEY = liveGatewayKey;
+    delete globalThis.AI_SDK_DEFAULT_PROVIDER;
+
+    try {
+      const { id, bookingId } = await bookingFactsConversation();
+      const first = await deliverBookingFactQuotation(
+        bookingId,
+        id,
+        "Transport",
+        27500,
+      );
+      const firstReply = await assertBookingFactAudit(
+        await send(id, "What is the total on the quotation AMAC sent me?"),
+        "getMySentQuotation",
+        { status: "found", version: first.version, sentAt: first.sentAt },
+      );
+      assert.match(firstReply, /(?<![\d,])1,?275(?!\d|,\d|\.\d*[1-9])/);
+      assert.match(firstReply, /₱|\bPHP\b|\bpesos?\b/i);
+
+      const latest = await deliverBookingFactQuotation(
+        bookingId,
+        id,
+        "Garden lighting",
+        87542,
+      );
+      const revisedReply = await assertBookingFactAudit(
+        await send(
+          id,
+          "And what's the total now, and what is the extra charge for?",
+        ),
+        "getMySentQuotation",
+        { status: "found", version: latest.version, sentAt: latest.sentAt },
+      );
+      const revisedTotal = /(?<![\d,])1,?875\.42(?!\d)/;
+      const historical = /\b(?:earlier|previous|prior|older|version 1)\b/i;
+      const lines = revisedReply.split("\n");
+      assert.ok(
+        lines.some(
+          (line) =>
+            revisedTotal.test(line) &&
+            /\btotal(?:s)?\b/i.test(line) &&
+            !historical.test(line),
+        ),
+        `Expected the revised amount as the current total. Fixture reply: ${revisedReply}`,
+      );
+      assert.match(revisedReply, /₱|\bPHP\b|\bpesos?\b/i);
+      assert.match(revisedReply, /garden lighting/i);
+
+      // The tool result excludes older offers. The saved chat still contains
+      // the first answer, which the live model may acknowledge as historical.
+      for (const paragraph of revisedReply.split(/\n\s*\n/)) {
+        if (/1,?275|\btransport\b/i.test(paragraph))
+          assert.match(paragraph, historical);
+      }
+
+      await updateBookingFactStatus(
+        bookingId,
+        "needs_details",
+        "Please provide the reception start time.",
+      );
+      const statusReply = await assertBookingFactAudit(
+        await send(id, "It says Needs details. What does AMAC need from me?"),
+        "getMyRequestHistory",
+        {
+          status: "found",
+          requestStatus: "needs_details",
+          changedAt: await latestBookingStatusTimestamp(bookingId),
+        },
+      );
+      assert.match(statusReply, /(?:reception|start).{0,35}time/i);
+
+      await updateBookingFactStatus(
+        bookingId,
+        "accepted",
+        "The venue layout was reviewed.",
+      );
+      const updatedReply = await assertBookingFactAudit(
+        await send(id, "I see it changed again. What was the latest reason?"),
+        "getMyRequestHistory",
+        {
+          status: "found",
+          requestStatus: "accepted",
+          changedAt: await latestBookingStatusTimestamp(bookingId),
+        },
+      );
+      assert.match(updatedReply, /venue layout/i);
+      assert.doesNotMatch(updatedReply, /reception start time/i);
+    } finally {
+      process.env.TEXT_MODEL = modelId;
+      process.env.AI_GATEWAY_API_KEY = "fixture-key";
+      globalThis.AI_SDK_DEFAULT_PROVIDER = previousProvider;
+    }
+  },
+);
 
 test("general chat sends current time and null booking context without persisting it", async () => {
   useReply("General reply");
@@ -1316,6 +1718,22 @@ test("invalid tool arguments cannot execute a search", async () => {
   assert.equal(calls.length, 0);
 });
 
+test("private booking reads reject model-supplied scope before execution", async () => {
+  const { id } = await bookingFactsConversation();
+  const foreignBooking = await booking(other.id, `FOREIGN-${randomUUID()}`);
+  useToolCalls([
+    { toolName: "getMySentQuotation", input: { bookingId: foreignBooking } },
+    { toolName: "getMyRequestHistory", input: { customerId: other.id } },
+  ]);
+  const result = await send(id, "Read the quotation and latest status change");
+  const calls = await db
+    .selectFrom("ai_tool_calls")
+    .select("id")
+    .where("customer_message_id", "=", result.message.id)
+    .execute();
+  assert.equal(calls.length, 0);
+});
+
 test("oversized model tool batches are rejected before recording or searching", async () => {
   useCatalogCalls(
     Array.from({ length: 13 }, () => ({ catalogType: "package" })),
@@ -1934,6 +2352,8 @@ test("the assistant can answer directly without calling a tool", async () => {
     model.doGenerateCalls[0].tools?.map((entry) => entry.name).sort(),
     [
       "getMyProposal",
+      "getMyRequestHistory",
+      "getMySentQuotation",
       "getPublicCatalogItem",
       "requestHumanHandoff",
       "searchPublicCatalog",

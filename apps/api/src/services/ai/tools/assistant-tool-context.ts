@@ -12,7 +12,7 @@ export type AssistantToolContext = {
   onPersistenceFailure: () => void;
   canRecord?: () => boolean;
   canExecute?: () => boolean;
-  proposalScope?: { customerId: string; conversationId: string };
+  customerScope?: { customerId: string; conversationId: string };
   resultCharacterBudget?: number;
   handoffScope?: HumanHandoffScope;
   memoryScope?: ConversationMemoryScope & { expectedMemory: string | null };

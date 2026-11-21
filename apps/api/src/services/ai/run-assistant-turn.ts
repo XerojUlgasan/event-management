@@ -206,7 +206,7 @@ export async function runAssistantTurnService({
     },
     resultCharacterBudget: maxInputCharacters - inputCharacters,
     ...(!guestIdentityId && customerId
-      ? { proposalScope: { customerId, conversationId } }
+      ? { customerScope: { customerId, conversationId } }
       : {}),
     onPersistenceFailure: () => {
       persistenceFailed = true;

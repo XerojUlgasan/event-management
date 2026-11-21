@@ -14,6 +14,7 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Latest quotation and request status tools](2026-11-21_19-03-14_latest-booking-tools.md) | Current customer inquiry reads / main | complete | Review the local diff and use the opt-in live test for future model changes. |
 | [AMAC AI conversation memory](2026-11-21_13-28-31_conversation-memory.md) | One Markdown note per conversation / main | complete | Apply the additive migration before the matching API and worker rollout. |
 | [In-app notification bells](2026-11-21_12-13-39_notification-bells.md) | Admin and customer workspace / main | complete | Apply the matching migrations and builds when rollout is authorized. |
 | [Realtime message bubbles](2026-11-21_02-35-00_conversation-realtime.md) | Signed-in open conversations / main | complete | Local browser, socket, and Edge verified. Use both migrations and the Realtime environment setup for rollout. |

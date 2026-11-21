@@ -34,3 +34,14 @@ export function listStatusHistoryData(
     .limit(input.limit + 1)
     .execute();
 }
+
+export function latestStatusHistoryData(db: Database, bookingId: string) {
+  return db
+    .selectFrom("booking_request_status_history")
+    .selectAll()
+    .where("booking_request_id", "=", bookingId)
+    .orderBy("created_at", "desc")
+    .orderBy("id", "desc")
+    .limit(1)
+    .executeTakeFirst();
+}

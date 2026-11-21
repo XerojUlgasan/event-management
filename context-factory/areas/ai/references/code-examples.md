@@ -4,25 +4,25 @@ These links describe the implemented path. Inspect the linked source when changi
 
 ## How the model knows its tools
 
-The [customer-service agent factory](../../../../apps/api/src/services/ai/agents/create-customer-service-agent.ts) passes an explicit map to `ToolLoopAgent`. Its registration has this shape; the actual factory also supplies its proposal-budget guard:
+The [customer-service agent factory](../../../../apps/api/src/services/ai/agents/create-customer-service-agent.ts) passes an explicit map to `ToolLoopAgent`. This excerpt shows public catalog and private proposal registration:
 
 ```ts
 tools: {
   searchPublicCatalog: createSearchPublicCatalogTool(toolContext),
   getPublicCatalogItem: createGetPublicCatalogItemTool(toolContext),
   // Registered only when the turn has trusted customer/conversation scope:
-  ...(options.proposalScope
+  ...(options.customerScope
     ? {
         getMyProposal: createGetMyProposalTool({
           ...toolContext,
-          proposalScope: options.proposalScope,
+          proposalScope: options.customerScope,
         }),
       }
     : {}),
 }
 ```
 
-The map key is the tool name the model can request. The SDK sends tools' names, descriptions, and input schemas with the model request. From the first step, the model can answer directly or choose public catalog tools and, for customers, the private proposal tool. The SDK validates arguments, runs the server's `execute` callback, and supplies results to the next model step. The database handle and executable server code stay on the server.
+The map key is the tool name the model can request. The SDK sends tools' names, descriptions, and input schemas with the model request. From the first step, the model can answer directly or choose tools available to the current conversation. The SDK validates arguments, runs the server's `execute` callback, and supplies results to the next model step. The database handle and executable server code stay on the server.
 
 A direct answer does not require a tool call or create an execution record. Actual calls retain their SDK invocation IDs and pass through the existing audited adapters. Source choice and interpretation remain model decisions, which synthetic dispatch tests cannot prove correct.
 
@@ -45,6 +45,8 @@ The factory closes over the database, triggering message ID, turn ID, and activi
 ## One turn, from message to reply
 
 The customer-only [getMyProposal adapter](../../../../apps/api/src/services/ai/tools/get-my-proposal.ts) takes no model arguments. Its server-bound scope identifies the conversation; the [service](../../../../apps/api/src/services/ai/get-my-proposal.ts) verifies ownership and reads the current domain proposal. The model receives structured JSON containing full original `sections[].widgets[]`, without a Markdown text conversion. Normal missing-request/unprepared results are distinct from access/read failures. Audit output contains status, result hash/size, and package/section/widget metadata rather than copied private text. Proposal results share the remaining context/history character budget and fail explicitly if they cannot fit. An in-flight guest claim does not add customer capabilities to the original guest turn.
+
+[getMySentQuotation and getMyRequestHistory](../../../../apps/api/src/services/ai/tools/get-my-booking-facts.ts) use the same signed-in scope. They check conversation and inquiry ownership before reading the latest delivered quotation or status change. The quotation projection converts stored centavos to pesos before the model sees it. Their audit rows record result status and version or change metadata. The system prompt calls for a current-turn lookup on applicable initial and follow-up questions.
 
 1. Only image-containing messages commit a durable `process_image_message` job with the human message. The [Node handler](../../../../apps/api/src/services/background-jobs/handlers/process-image-message.ts) validates and interprets saved images, then calls [runAssistantTurnService](../../../../apps/api/src/services/ai/run-assistant-turn.ts) for an eligible customer/guest turn with captured server-resolved identity, conversation/message IDs, AI version and the current job lease. Text-only customer/guest sends call the same assistant service in the synchronous request after an abortable wait of up to five seconds for earlier image jobs; timeout leaves the message saved and returns `assistantError` without queueing the text turn. This wait covers earlier image jobs only; it does not serialize concurrent text turns or later image messages. The entry verifies ownership/activity and loads causal history through the trigger, including completed earlier-trigger replies even when those replies were saved after this message arrived. Later customer turns remain excluded.
 2. [assistant-context.ts](../../../../apps/api/src/services/ai/assistant-context.ts) builds current server context. Guests receive no private booking projection. Eligible previous search/detail inputs and cursors can support continuation; saved prices and Markdown do not become current evidence. The entry labels previous assistant messages as historical claims and places current context beside the latest customer message, preserving the full history and its provenance.

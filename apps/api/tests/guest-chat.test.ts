@@ -945,7 +945,10 @@ test("in-flight guest AI remains guest-scoped after claim; takeover suppresses i
   assert.equal(completed.assistantMessage.body, "Delayed guest reply");
   const prompt = JSON.stringify(capturedPrompt);
   assert.ok(!prompt.includes("Private package marker"));
-  assert.doesNotMatch(JSON.stringify(capturedTools), /getMyProposal/);
+  assert.doesNotMatch(
+    JSON.stringify(capturedTools),
+    /getMyProposal|getMySentQuotation|getMyRequestHistory/,
+  );
   const owned = await read(
     await call(`/messages/conversations/${id}`, customer.cookie),
     200,
