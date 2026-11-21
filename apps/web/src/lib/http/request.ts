@@ -20,6 +20,7 @@ export class ApiError extends Error {
     message: string,
     public status: number,
     public code?: string,
+    public resourceId?: string,
   ) {
     super(message);
   }
@@ -60,6 +61,7 @@ export async function request<T>(
     const result = (await response.json().catch(() => ({}))) as {
       success?: boolean;
       code?: string;
+      resourceId?: string;
       error?:
         | string
         | { issues?: { path?: (string | number)[]; message?: string }[] };
@@ -80,6 +82,7 @@ export async function request<T>(
             : "Unable to complete the request. Please try again.",
       response.status,
       result.code,
+      typeof result.resourceId === "string" ? result.resourceId : undefined,
     );
   }
 

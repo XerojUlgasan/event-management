@@ -8,7 +8,7 @@ import { encodePageCursor, parsePageCursor } from "../../utils/pagination.js";
 import { bookingRequestDtos } from "./booking-request-response.js";
 
 const positionSchema = z.object({
-  createdAt: z.iso
+  submittedAt: z.iso
     .datetime()
     .refine(
       (value) =>
@@ -41,7 +41,7 @@ export async function listAdminBookingRequestsPageService(
   });
 
   const page = createPage(rows, input.limit, (row) =>
-    encodePageCursor(scope, { createdAt: row.cursor_created_at, id: row.id }),
+    encodePageCursor(scope, { submittedAt: row.cursor_submitted_at, id: row.id }),
   );
 
   return {

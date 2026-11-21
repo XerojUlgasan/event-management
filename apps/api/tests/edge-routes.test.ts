@@ -5,10 +5,26 @@ import {
   messageBodyLimit,
   MESSAGE_UPLOAD_BODY_LIMIT_BYTES,
   bookingBodyLimit,
+  BOOKING_CREATE_JSON_BODY_LIMIT_BYTES,
   CATALOG_JSON_BODY_LIMIT_BYTES,
   QUOTATION_JSON_BODY_LIMIT_BYTES,
   SMALL_JSON_BODY_LIMIT_BYTES,
 } from "../src/constants/http.js";
+
+test("manual booking submissions have room for service selections and UTF-8 notes", () => {
+  assert.equal(
+    bookingBodyLimit("/v1/booking-requests"),
+    BOOKING_CREATE_JSON_BODY_LIMIT_BYTES,
+  );
+  assert.equal(
+    bookingBodyLimit("/booking-requests"),
+    BOOKING_CREATE_JSON_BODY_LIMIT_BYTES,
+  );
+  assert.equal(
+    bookingBodyLimit("/v1/booking-requests/id/requested-day-times"),
+    SMALL_JSON_BODY_LIMIT_BYTES,
+  );
+});
 
 test("route families follow the longest owned prefix", () => {
   assert.equal(matchRouteFamily("/v1/admin/ai/knowledge"), "ai");

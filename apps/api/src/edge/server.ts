@@ -8,6 +8,7 @@ import {
   CATALOG_JSON_BODY_LIMIT_BYTES,
   MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
   SMALL_JSON_BODY_LIMIT_BYTES,
+  BUSINESS_INFORMATION_JSON_BODY_LIMIT_BYTES,
   bookingBodyLimit,
 } from "../constants/http.js";
 import type { HonoEnv } from "../types/hono.js";
@@ -24,6 +25,8 @@ const loaders = {
   "guest-chat": () => import("../controllers/guest-chat/index.js"),
   ai: () => import("../controllers/ai/index.js"),
   health: () => import("../controllers/health/index.js"),
+  "business-information": () =>
+    import("../controllers/business-information/index.js"),
   "catalog-media": () => import("../controllers/catalog-media/index.js"),
   services: () => import("../controllers/services/index.js"),
   packages: () => import("../controllers/packages/index.js"),
@@ -83,6 +86,12 @@ const bodyLimits: Partial<
     { path: "/booking-requests/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
     { path: "/quotations/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
   ],
+  "business-information": [
+    {
+      path: "/admin/business-information",
+      maxSize: BUSINESS_INFORMATION_JSON_BODY_LIMIT_BYTES,
+    },
+  ],
 };
 
 const familyApps = new Map<RouteFamilyId, Promise<OpenAPIHono<HonoEnv>>>();
@@ -116,7 +125,9 @@ async function createFamilyApp(id: RouteFamilyId) {
         maxSize:
           id === "messages" || id === "guest-chat"
             ? messageBodyLimit(c.req.path, c.req.header("content-type"))
-            : limit.maxSize,
+            : id === "booking-requests"
+              ? bookingBodyLimit(c.req.path)
+              : limit.maxSize,
       })(c, next),
     );
 

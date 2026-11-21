@@ -45,7 +45,7 @@ export const sendGuestMessageRoute = createRoute({
 export const sendGuestMessageRouteHandler: AppRouteHandler<
   typeof sendGuestMessageRoute
 > = async (c) => {
-  const input = await parseMessageInput(c, true);
+  const input = await parseMessageInput(c, "guest");
   const { body, requestId } = input;
 
   return c.json(

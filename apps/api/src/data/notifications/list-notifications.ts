@@ -36,3 +36,23 @@ export function listNotificationsData(
     ])
     .executeTakeFirstOrThrow();
 }
+
+export function listNotificationBookingsData(
+  db: Kysely<DB>,
+  ids: string[],
+  viewer: { id: string; role: string },
+) {
+  if (ids.length === 0) return [];
+
+  let query = db
+    .selectFrom("booking_requests")
+    .where("submitted_at", "is not", null)
+    .select(["id", "event_type", "preferred_date"])
+    .$narrowType<{ event_type: string; preferred_date: string }>()
+    .where("id", "in", ids);
+
+  if (viewer.role !== "admin")
+    query = query.where("customer_id", "=", viewer.id);
+
+  return query.execute();
+}

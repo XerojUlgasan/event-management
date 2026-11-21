@@ -1,3 +1,4 @@
+import { BookingIntake } from "../booking-requests/BookingIntake";
 import { useEffect, useState } from "react";
 import {
   Button,
@@ -42,7 +43,7 @@ function EventDetails({
   return (
     <div className="conversation-details">
       <div className="conversation-details-heading">
-        <span>Request {booking.reference}</span>
+        <span>Booking request</span>
         <BookingStatusBadge status={booking.status} />
       </div>
       <h3>{booking.eventType}</h3>
@@ -72,6 +73,10 @@ function EventDetails({
           <dd>{booking.specialRequests || "None provided"}</dd>
         </div>
       </dl>
+      <BookingIntake
+        requestedServices={booking.requestedServices}
+        budget={booking.budget}
+      />
       <h4>Requested dates</h4>
       <p className="conversation-details-note">
         Times use {booking.timeZone}. These dates are not reserved.

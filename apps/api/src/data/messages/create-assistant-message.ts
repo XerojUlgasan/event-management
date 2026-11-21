@@ -3,7 +3,7 @@ import {
   assertImageMessageJobLeaseData,
   type ImageMessageJobLease,
 } from "./message-processing.js";
-import { sql, type Kysely } from "kysely";
+import { sql, type Kysely, type Transaction } from "kysely";
 import { assertGuestActive } from "../guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
 import { linkToolCallsToReplyData } from "../ai/link-tool-calls-to-reply.js";
@@ -54,52 +54,105 @@ export function createAssistantMessageData(
 
       if (previous)
         return { ...previous, sender_display_name: null, sender_email: null };
+
+      // An earlier slow answer must not become the next reply target after a newer
+      // turn delivered a booking summary or receipt.
+      if (conversation.booking_request_id) {
+        const laterBookingReply = await trx
+          .selectFrom("ai_tool_calls as action")
+          .innerJoin(
+            "messages as trigger",
+            "trigger.id",
+            "action.customer_message_id",
+          )
+          .innerJoin("messages as original", (join) =>
+            join.on("original.id", "=", toolTurn.customerMessageId),
+          )
+          .select("action.id")
+          .where("trigger.conversation_id", "=", conversationId)
+          .where("action.tool_name", "in", [
+            "reviewBookingDraft",
+            "submitBookingRequest",
+          ])
+          .where("action.assistant_message_id", "is not", null)
+          .where(
+            sql<boolean>`action.output->>'status' in ('review_ready', 'submitted')`,
+          )
+          .where(
+            sql<boolean>`(trigger.created_at, trigger.id) > (original.created_at, original.id)`,
+          )
+          .executeTakeFirst();
+
+        if (laterBookingReply) return null;
+      }
     }
 
     if (!conversation.ai_enabled || conversation.ai_version !== aiVersion)
       return null;
 
-    const message = await trx
-      .insertInto("messages")
-      .values({
-        conversation_id: conversationId,
-        created_at: sql<Date>`clock_timestamp()`,
-        sender_id: null,
-        sender_role: "assistant",
-        body,
-        reply_to_message_id: toolTurn?.customerMessageId ?? null,
-      })
-      .returningAll()
-      .executeTakeFirstOrThrow();
+    return createAssistantMessageInTransactionData(trx, {
+      conversationId,
+      customerId: conversation.customer_id,
+      body,
+      toolTurn,
+    });
+  });
+}
 
-    if (toolTurn)
-      await trx
-        .updateTable("guest_message_requests")
-        .set({
-          assistant_message_id: message.id,
-          assistant_error: null,
-          completed: true,
-        })
-        .where("message_id", "=", toolTurn.customerMessageId)
-        .execute();
+export async function createAssistantMessageInTransactionData(
+  trx: Transaction<DB>,
+  {
+    conversationId,
+    customerId,
+    body,
+    toolTurn,
+  }: {
+    conversationId: string;
+    customerId: string | null;
+    body: string;
+    toolTurn?: { turnId: string; customerMessageId: string };
+  },
+) {
+  const message = await trx
+    .insertInto("messages")
+    .values({
+      conversation_id: conversationId,
+      created_at: sql<Date>`clock_timestamp()`,
+      sender_id: null,
+      sender_role: "assistant",
+      body,
+      reply_to_message_id: toolTurn?.customerMessageId ?? null,
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
 
-    if (toolTurn)
-      await linkToolCallsToReplyData(trx, {
-        ...toolTurn,
-        assistantMessageId: message.id,
-      });
-
+  if (toolTurn)
     await trx
-      .updateTable("conversations")
+      .updateTable("guest_message_requests")
       .set({
-        updated_at: message.created_at,
+        assistant_message_id: message.id,
+        assistant_error: null,
+        completed: true,
       })
-      .where("id", "=", conversationId)
+      .where("message_id", "=", toolTurn.customerMessageId)
       .execute();
 
-    if (conversation.customer_id)
-      await publishConversationMessageData(trx, conversation.id, message.id);
+  if (toolTurn)
+    await linkToolCallsToReplyData(trx, {
+      ...toolTurn,
+      assistantMessageId: message.id,
+    });
 
-    return { ...message, sender_display_name: null, sender_email: null };
-  });
+  await trx
+    .updateTable("conversations")
+    .set({
+      updated_at: message.created_at,
+    })
+    .where("id", "=", conversationId)
+    .execute();
+
+  if (customerId)
+    await publishConversationMessageData(trx, conversationId, message.id);
+
+  return { ...message, sender_display_name: null, sender_email: null };
 }

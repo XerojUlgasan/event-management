@@ -16,6 +16,7 @@ export type ConversationDto = {
   bookingRequestId: string | null;
   bookingRequestReference: string | null;
   eventType: string | null;
+  eventPreferredDate: string | null;
   eventStartsAt: string | null;
   eventEndsAt: string | null;
   guestCount: number | null;
@@ -44,6 +45,7 @@ export function conversationDto(
     bookingRequestId: row.booking_request_id,
     bookingRequestReference: row.booking_request_reference,
     eventType: row.event_type,
+    eventPreferredDate: row.event_preferred_date,
     eventStartsAt: row.event_starts_at
       ? new Date(row.event_starts_at).toISOString()
       : null,

@@ -26,6 +26,7 @@ export function AdminSidebar({
     Calendar: "calendar",
     Packages: "box",
     Services: "spark",
+    BusinessInformation: "info",
     Inventory: "box",
     Operations: "clipboard",
     Reports: "chart",
@@ -33,6 +34,7 @@ export function AdminSidebar({
   };
   const labelFor: Partial<Record<NavKey, string>> = {
     Customers: "Customers",
+    BusinessInformation: "Business information",
   };
 
   return (

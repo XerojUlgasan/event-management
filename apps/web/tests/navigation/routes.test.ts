@@ -8,7 +8,7 @@ import {
   customerPaths,
   customerTab,
   workspaceReturnPath,
-} from "../../src/components/app/routes";
+} from "../../src/components/app/routes.ts";
 
 const admin = { role: "admin" };
 
@@ -19,6 +19,14 @@ const customer = { role: "customer" };
 const id = "01c8d471-f0c5-4b16-8594-3bb08e497761";
 
 const detail = `/app/bookings/${id}`;
+
+test("business information is an admin workspace route", () => {
+  const path = "/app/business-information";
+  assert.equal(adminKey(path), "BusinessInformation");
+  assert.equal(allowedWorkspacePath(admin, path), true);
+  assert.equal(workspaceReturnPath(admin, path), path);
+  assert.equal(allowedWorkspacePath(customer, path), false);
+});
 
 test("knowledge catalog is an admin workspace with a role-scoped return path", () => {
   const path = "/app/ai/knowledge";

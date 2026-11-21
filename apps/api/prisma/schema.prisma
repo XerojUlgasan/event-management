@@ -298,28 +298,32 @@ model AuditEvent {
 }
 
 model BookingRequest {
+  submittedAt DateTime? @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  durationMode String? @map("duration_mode")
+  requestedServices Json? @map("requested_services") @db.JsonB
+  budget String?
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   reference String @unique
-  customerId String @map("customer_id") @db.Uuid
+  customerId String? @map("customer_id") @db.Uuid
   packageId String? @map("package_id") @db.Uuid
-  eventType String @map("event_type")
-  preferredDate String @map("preferred_date")
+  eventType String? @map("event_type")
+  preferredDate String? @map("preferred_date")
   requestedDays Json? @map("requested_days") @db.JsonB
   estimatedDuration String @default("undecided") @map("estimated_duration")
   estimatedDurationDays Int? @map("estimated_duration_days")
   startsAt DateTime? @map("starts_at") @db.Timestamptz(6)
   endsAt DateTime? @map("ends_at") @db.Timestamptz(6)
-  timeZone String @map("time_zone")
+  timeZone String? @map("time_zone")
   guestCount Int? @map("guest_count")
-  contactName String @map("contact_name")
-  phoneNumber String @map("phone_number")
+  contactName String? @map("contact_name")
+  phoneNumber String? @map("phone_number")
   preferredVenueLocation String? @map("preferred_venue_location")
   specialRequests String? @map("special_requests")
   status String @default("under_review")
   outOfRange Boolean @map("out_of_range")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-  customer User @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  customer User? @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   package Package? @relation("InquiryPackage", fields: [packageId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   customPackage Package? @relation("CustomBookingPackage")
   quotations Quotation[]
@@ -362,6 +366,14 @@ model EventDay {
   @@index([bookingRequestId, day])
   @@index([replacementEventDayId, bookingRequestId])
   @@map("events_day")
+}
+
+model BusinessInformation {
+  id          Int      @id
+  information Json     @default("{}") @db.JsonB
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("business_information")
 }
 
 model GuestChatIdentity {

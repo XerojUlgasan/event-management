@@ -423,6 +423,9 @@ test("returns only the last earlier replied catalog search in this conversation"
     customerMessageId: currentCustomer.id,
   });
   assert.deepEqual(beforeCurrentReply, {
+    triggerMessageId: firstCustomer.id,
+    replyId: firstReply.id,
+    replyBody: "assistant fixture",
     input: { catalogType: "package", minPricePesos: 100 },
     output: { items: [{ id: "old" }], nextCursor: "cursor-old" },
   });
@@ -514,4 +517,56 @@ test("enables RLS and denies client-role table privileges", async () => {
       );
     assert.equal(roleAccess.rows[0]?.has_privilege, false, `${rolname} access`);
   }
+});
+
+test("ordinal choices correspond to the links that appeared in the delivered answer", async () => {
+  const { buildPreviousCatalogSearchContext } =
+    await import("../../src/services/ai/assistant-context.js");
+  const thread = await createConversation();
+  const query = await createMessage(thread.id, "customer");
+  const turnId = randomUUID();
+
+  const candidates = ["first", "hidden", "third"].map((name) => ({
+    id: randomUUID(),
+    name,
+    type: "package",
+    url: "/packages/" + name,
+    privateField: "ignore",
+  }));
+
+  for (const items of [candidates.slice(0, 2), candidates.slice(2)]) {
+    const call = await startToolCallData(db, startInput(turnId, query.id));
+    await finishToolCallData(db, {
+      id: call.id,
+      status: "succeeded",
+      output: { results: items, nextCursor: null },
+    });
+  }
+
+  const reply = await createMessage(thread.id, "assistant");
+  await db
+    .updateTable("messages")
+    .set({ body: "1. [Third](/packages/third)\n2. [First](/packages/first)" })
+    .where("id", "=", reply.id)
+    .execute();
+  await linkToolCallsToReplyData(db, {
+    turnId,
+    customerMessageId: query.id,
+    assistantMessageId: reply.id,
+  });
+  const next = await createMessage(thread.id, "customer");
+  const context = await buildPreviousCatalogSearchContext({
+    db,
+    conversationId: thread.id,
+    customerMessageId: next.id,
+  });
+  assert.deepEqual(
+    context?.shownItems?.map((item) => item.name),
+    ["third", "first"],
+  );
+  assert.equal(context?.shownItems?.[1]?.id, candidates[0]?.id);
+  assert.doesNotMatch(
+    JSON.stringify(context?.shownItems),
+    /privateField|hidden/,
+  );
 });

@@ -3,6 +3,7 @@ import type { ConversationMemoryScope } from "../../../data/messages/conversatio
 import type { MessageWithSender } from "../../../data/messages/types.js";
 import type { Kysely } from "kysely";
 import type { DB } from "../../../db/types.js";
+import type { BookingDraftScope } from "../../../data/messages/booking-draft-guard.js";
 
 export type AssistantToolContext = {
   db: Kysely<DB>;
@@ -16,6 +17,9 @@ export type AssistantToolContext = {
   resultCharacterBudget?: number;
   handoffScope?: HumanHandoffScope;
   memoryScope?: ConversationMemoryScope & { expectedMemory: string | null };
+  draftScope?: BookingDraftScope;
+  carryForwardBudget?: string;
+  onDraftChanged?: (selection: boolean, complete: boolean) => void;
   onHandoffCommitted?: (message: MessageWithSender) => void;
   isHandoffCommitted?: () => boolean;
 };

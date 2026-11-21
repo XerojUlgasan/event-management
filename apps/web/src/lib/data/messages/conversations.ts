@@ -12,6 +12,7 @@ export type ChatMessage = Omit<
     Pick<PersistedChatMessage, "replyToMessageId" | "images" | "processing">
   > & {
     pendingFiles?: File[];
+    reviewMessageId?: string;
   };
 
 export type ChatConversation = {
@@ -24,6 +25,7 @@ export type ChatConversation = {
   bookingRequestId: string | null;
   bookingRequestReference: string | null;
   eventType: string | null;
+  eventPreferredDate?: string | null;
   eventStartsAt: string | null;
   eventEndsAt: string | null;
   guestCount: number | null;
@@ -92,6 +94,7 @@ export const sendMyMessage = (
   conversationId?: string,
   requestId?: string,
   images: File[] = [],
+  reviewMessageId?: string,
 ) =>
   request<{
     message: ChatMessage;
@@ -99,7 +102,11 @@ export const sendMyMessage = (
     assistantError: string | null;
   }>(
     "/messages/conversation/messages",
-    messagePayload(body, images, { conversationId, requestId }),
+    messagePayload(body, images, {
+      conversationId,
+      requestId,
+      reviewMessageId,
+    }),
   );
 
 export const getAdminConversations = (cursor?: string) =>

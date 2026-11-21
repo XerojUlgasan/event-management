@@ -53,6 +53,7 @@ export const changeBookingPackageAddon = (
 export type PackageHistoryEntry = {
   id: string;
   actorId: string | null;
+  actorName?: string | null;
   action: string;
   before: CatalogPackage | null;
   after: CatalogPackage;

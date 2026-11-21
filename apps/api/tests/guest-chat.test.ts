@@ -8,6 +8,7 @@ import { MockLanguageModelV4, MockProviderV4 } from "ai/test";
 import { humanHandoffAcknowledgement } from "../src/data/messages/request-human-handoff.js";
 import { threadSchema } from "../src/controllers/messages/schemas.js";
 import { hashSessionToken } from "../src/utils/session.js";
+import { runAssistantTurnService } from "../src/services/ai/run-assistant-turn.js";
 
 const database = `em_guest_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -224,11 +225,14 @@ for (const operation of ["read", "bootstrap"] as const) {
           : call("/guest/conversation", thread.cookie, {});
       const deadline = Date.now() + 5000;
       let blocked = false;
+      const {
+        rows: [{ pid }],
+      } = await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
 
       while (Date.now() < deadline) {
         const result = await pool.query(
           "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))) AS blocked",
-          [client.processID],
+          [pid],
         );
 
         if (result.rows[0].blocked) {
@@ -366,6 +370,86 @@ test("guests receive public catalog details as Markdown with owned audit records
   assert.equal(model.doGenerateCalls.length, 2);
 });
 
+test("guests can use current public business information in a reply", async () => {
+  await pool.query(
+    "UPDATE business_information SET information = $1 WHERE id = 1",
+    [
+      JSON.stringify({
+        about: { name: "Clemora Events" },
+        contact: { phone: "12345" },
+      }),
+    ],
+  );
+  useReply("unused");
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+
+    if (model.doGenerateCalls.length === 1)
+      return {
+        ...result,
+        content: [
+          {
+            type: "tool-call",
+            toolCallId: "guest-business",
+            toolName: "getBusinessInformation",
+            input: "{}",
+          },
+        ],
+        finishReason: { unified: "tool-calls", raw: undefined },
+      };
+
+    const toolMessage = args[0].prompt.find(
+      (message) => message.role === "tool",
+    );
+
+    assert.ok(toolMessage);
+
+    const part = toolMessage.content.find(
+      (item) =>
+        item.type === "tool-result" &&
+        item.toolName === "getBusinessInformation",
+    );
+
+    assert.ok(
+      part && part.type === "tool-result" && part.output.type === "json",
+    );
+    assert.deepEqual(part.output.value, {
+      status: "found",
+      information: { name: "Clemora Events", phone: "12345" },
+    });
+    const value = part.output.value as {
+      information: { name: string; phone: string };
+    };
+
+    return {
+      ...result,
+      content: [
+        {
+          type: "text",
+          text: `${value.information.name}: ${value.information.phone}`,
+        },
+      ],
+    };
+  };
+  const thread = await guest();
+  const sent = await read(await send(thread, "How can I contact you?"), 201);
+  assert.equal(sent.assistantMessage?.body, "Clemora Events: 12345");
+  const audit = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", sent.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(audit.tool_name, "getBusinessInformation");
+  assert.equal(audit.status, "succeeded");
+  assert.deepEqual(audit.input, {});
+  assert.deepEqual(audit.output, {
+    status: "found",
+    fields: ["name", "phone"],
+  });
+  assert.equal(audit.assistant_message_id, sent.assistantMessage.id);
+});
+
 test("guests can answer directly and receive public catalog and handoff tools", async () => {
   useReply("Hello from AMAC AI");
   const thread = await guest();
@@ -377,11 +461,13 @@ test("guests can answer directly and receive public catalog and handoff tools", 
   assert.deepEqual(
     model.doGenerateCalls[0].tools?.map((entry) => entry.name).sort(),
     [
+      "getBusinessInformation",
       "getPublicCatalogItem",
       "requestHumanHandoff",
       "searchPublicCatalog",
+      "updateBookingDraft",
       "updateConversationMemory",
-    ],
+    ].sort(),
   );
   const calls = await db
     .selectFrom("ai_tool_calls")
@@ -389,6 +475,144 @@ test("guests can answer directly and receive public catalog and handoff tools", 
     .where("customer_message_id", "=", response.message.id)
     .execute();
   assert.equal(calls.length, 0);
+});
+
+test("guest draft tool cannot write after the conversation is claimed", async () => {
+  let release!: () => void;
+  let entered!: () => void;
+
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+
+  useReply("unused");
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+
+    if (model.doGenerateCalls.length !== 1) return result;
+
+    entered();
+    await held;
+
+    return {
+      ...result,
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "delayed-draft",
+          toolName: "updateBookingDraft",
+          input: JSON.stringify({ eventType: "Birthday" }),
+        },
+      ],
+      finishReason: { unified: "tool-calls", raw: undefined },
+    };
+  };
+  const thread = await guest();
+  const pending = send(thread, "Please plan a birthday");
+  await started;
+  await read(
+    await call(
+      `/guest/conversations/${thread.conversation.id}/claim`,
+      `${customer.cookie}; ${thread.cookie}`,
+      {},
+    ),
+    200,
+  );
+  release();
+  await read(await pending, 201);
+  const row = await pool.query(
+    "SELECT 1 FROM conversations WHERE id = $1 AND booking_request_id IS NOT NULL",
+    [thread.conversation.id],
+  );
+  assert.equal(row.rowCount, 0);
+});
+
+test("a guest turn waiting on claim cannot read a customer's new draft", async () => {
+  useReply("Continuing");
+  const thread = await guest();
+  const id = thread.conversation.id;
+  const original = await db
+    .selectFrom("conversations")
+    .select(["guest_identity_id", "ai_version"])
+    .where("id", "=", id)
+    .executeTakeFirstOrThrow();
+  const message = await db
+    .insertInto("messages")
+    .values({
+      conversation_id: id,
+      sender_id: null,
+      sender_role: "customer",
+      guest_origin: true,
+      body: "Please help",
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const marker = `private-${randomUUID()}`;
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      "SELECT id FROM conversations WHERE id = $1 FOR UPDATE",
+      [id],
+    );
+    await client.query(
+      "UPDATE conversations SET customer_id = $2, claimed_guest_identity_id = guest_identity_id, guest_identity_id = NULL WHERE id = $1",
+      [id, customer.id],
+    );
+    const draft = await client.query(
+      "INSERT INTO booking_requests (customer_id, event_type, submitted_at, reference, out_of_range) VALUES ($1, $2, NULL, $3, false) RETURNING id",
+      [customer.id, marker, `BR-${randomUUID()}`],
+    );
+    await client.query(
+      "UPDATE conversations SET booking_request_id = $2 WHERE id = $1",
+      [id, draft.rows[0].id],
+    );
+    const {
+      rows: [{ pid }],
+    } = await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+    const pending = runAssistantTurnService({
+      db,
+      conversationId: id,
+      customerId: null,
+      customerMessageId: message.id,
+      aiVersion: original.ai_version,
+      guestIdentityId: original.guest_identity_id!,
+    });
+    let blocked = false;
+    const deadline = Date.now() + 5000;
+
+    while (Date.now() < deadline && !blocked) {
+      const result = await pool.query(
+        "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))) AS blocked",
+        [pid],
+      );
+      blocked = result.rows[0].blocked;
+
+      if (!blocked) await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+
+    assert.ok(blocked);
+    await client.query("COMMIT");
+    await pending;
+    assert.doesNotMatch(
+      JSON.stringify(model.doGenerateCalls[0].prompt),
+      new RegExp(marker),
+    );
+    assert.ok(
+      !model.doGenerateCalls[0].tools?.some(
+        (entry) => entry.name === "updateBookingDraft",
+      ),
+    );
+  } finally {
+    await client.query("ROLLBACK");
+    client.release();
+  }
 });
 
 test("guest conversation memory follows the conversation through claim", async () => {

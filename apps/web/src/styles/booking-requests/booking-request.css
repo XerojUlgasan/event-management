@@ -2,6 +2,41 @@
   max-width: 1160px;
   margin: 0 auto;
 }
+.booking-addons h3 {
+  font-weight: 600;
+}
+.booking-addons .pe-addon-table .ui-data-table th:last-child {
+  width: 72px;
+}
+.booking-addon-hours {
+  display: grid;
+  gap: 4px;
+  width: 7.25rem;
+}
+.booking-addon-picker ul {
+  max-height: 14rem;
+  overflow-y: auto;
+  padding: 0;
+  margin: 12px 0;
+  list-style: none;
+}
+.booking-addon-picker li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px;
+}
+.booking-addon-scroll-note {
+  display: none;
+}
+@media (max-width: 630px) {
+  .booking-addon-scroll-note {
+    display: block;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+}
 .booking-request-nav {
   display: flex;
   justify-content: space-between;

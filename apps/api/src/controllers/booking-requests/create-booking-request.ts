@@ -16,6 +16,18 @@ export const createBookingRequestRoute = createRoute({
       description: "Request submitted",
     },
     ...errors,
+    409: {
+      ...errors[409],
+      content: json(
+        z.object({
+          error: z.string(),
+          code: z
+            .enum(["requested_addon_conflict", "booking_package_changed"])
+            .optional(),
+          resourceId: z.string().uuid().optional(),
+        }),
+      ),
+    },
   },
 });
 
@@ -28,8 +40,19 @@ export const createBookingRequestRouteHandler: AppRouteHandler<
     c.req.valid("json"),
   );
 
-  if ("message" in result)
+  if ("message" in result) {
+    if ("code" in result)
+      return c.json(
+        {
+          error: result.message,
+          code: result.code,
+          ...("resourceId" in result ? { resourceId: result.resourceId } : {}),
+        },
+        409,
+      );
+
     return jsonError(c, result.message, result.status);
+  }
 
   return c.json({ bookingRequest: result }, 201);
 };

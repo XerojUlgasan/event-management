@@ -45,6 +45,7 @@ export async function getBookingPackageHistoryService(
       return {
         id: row.id,
         actorId: row.actor_id,
+        actorName: row.actor_name,
         action: row.action,
         before: metadata.before,
         after: metadata.after,

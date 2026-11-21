@@ -14,6 +14,15 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Manual booking add-ons](2026-11-22_01-16-37_manual-booking-add-ons.md) | Service selection, hours, and admin review / main | complete | Review the local changes before rollout with the existing booking-draft migration. |
+| [Natural booking conversations](2026-11-22_01-10-04_natural-booking-chat.md) | AMAC language, intake pacing and consent / main | complete | Live model and browser flows verified. Review before rollout. |
+| [Single-row booking drafts](2026-11-22_00-39-41_single-row-booking-drafts.md) | AMAC intake and submission / main | complete | Deploy the forward migration and matching application builds together. |
+| [AMAC conversational booking](2026-11-21_23-50-39_conversational-booking.md) | Chat intake and confirmed same-thread requests / main | complete | See the single-row booking successor before rollout. |
+| [Readable request and history labels](2026-11-21_22-41-21_readable-request-labels.md) | Booking, chat, notifications, and admin history / main | complete | Browser and disposable database verified. Review the local diff before rollout. |
+| [AMAC AI business information](2026-11-21_22-00-22_assistant-business-information.md) | Public profile lookup / main | complete | Verified locally and through the configured Gateway model. Hosted rollout is separate. |
+| [Missing business information](2026-11-21_21-54-30_missing-business-information.md) | Empty editor and first save / main | complete | Local browser and isolated persistence verified. |
+| [Simplify business information](2026-11-21_21-21-55_simplify-business-information.md) | Ten basic fields, admin editor/shared footer / main | complete | Approved and locally verified; review the local diff before release. |
+| [Business information](2026-11-21_21-06-32_business-information.md) | Profile persistence and draft retention / main | complete | Implementation and final first-save review passed; preserve successor footer scope and review the combined diff before release. |
 | [Latest quotation and request status tools](2026-11-21_19-03-14_latest-booking-tools.md) | Current customer inquiry reads / main | complete | Review the local diff and use the opt-in live test for future model changes. |
 | [AMAC AI conversation memory](2026-11-21_13-28-31_conversation-memory.md) | One Markdown note per conversation / main | complete | Apply the additive migration before the matching API and worker rollout. |
 | [In-app notification bells](2026-11-21_12-13-39_notification-bells.md) | Admin and customer workspace / main | complete | Apply the matching migrations and builds when rollout is authorized. |

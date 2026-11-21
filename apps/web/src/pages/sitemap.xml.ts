@@ -6,7 +6,7 @@ import {
 } from "../lib/server/catalog/load-catalog";
 
 export const GET: APIRoute = async ({ url }) => {
-  let paths = ["/", "/about", "/packages", "/services"];
+  let paths = ["/", "/packages", "/services"];
 
   try {
     const [packages, services] = await Promise.all([

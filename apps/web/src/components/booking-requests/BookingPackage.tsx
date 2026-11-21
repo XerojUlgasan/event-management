@@ -278,7 +278,7 @@ export function BookingPackage({
                   {entry.action === "booking.custom_package_created"
                     ? "Created"
                     : "Updated"}{" "}
-                  · {entry.actorId ?? "Unknown administrator"}
+                  · {entry.actorName?.trim() || "Unknown administrator"}
                 </summary>
                 <p>
                   Previous:{" "}

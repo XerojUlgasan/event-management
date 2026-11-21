@@ -1,3 +1,7 @@
+import {
+  reviewForComposition,
+  reviewForSend,
+} from "../../lib/services/messages/booking-review";
 import { navigateWorkspace } from "../../lib/navigation/workspace-navigation";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import {
@@ -26,6 +30,7 @@ import type {
   ChatConversation,
   ChatMessage,
 } from "../../lib/data/messages/conversations";
+import { bookingDate } from "../booking-requests/BookingRequestDisplay";
 import { ConversationBooking } from "../booking-requests/ConversationBooking";
 import { Quotations } from "../quotations/Quotations";
 import {
@@ -110,12 +115,10 @@ export function MessagesWorkspace({
   localAiReplyPending = false,
   localImageFiles,
   requestedQuotationId,
-  resumeBooking = false,
   onBookingSubmitted,
   onBookingClosed,
 }: {
   requestedQuotationId?: string | null;
-  resumeBooking?: boolean;
   onBookingSubmitted?: () => void;
   onBookingClosed?: () => void;
   title: string;
@@ -134,7 +137,12 @@ export function MessagesWorkspace({
   loading: boolean;
   error: string | null;
   onRetry?: () => void;
-  onSend: (body: string, files: File[], requestId: string) => Promise<void>;
+  onSend: (
+    body: string,
+    files: File[],
+    requestId: string,
+    reviewMessageId?: string,
+  ) => Promise<void>;
   failedMessageIds?: string[];
   failedMessageErrors?: Record<string, string>;
   onRetryMessage?: (id: string) => void;
@@ -165,9 +173,21 @@ export function MessagesWorkspace({
   const visibleQuotationId = requestedQuotationId ?? quotationId;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draft = activeId ? (drafts[activeId] ?? "") : "";
+  const reviewPins = useRef<Record<string, string | null | undefined>>({});
 
   const setDraft = (value: string) => {
-    if (activeId) setDrafts((previous) => ({ ...previous, [activeId]: value }));
+    if (!activeId) return;
+
+    if (viewerRole === "customer")
+      reviewPins.current[activeId] = reviewForComposition(
+        draft,
+        value,
+        reviewPins.current[activeId],
+        messages,
+      );
+
+    setSendError("");
+    setDrafts((previous) => ({ ...previous, [activeId]: value }));
   };
 
   const [fileDrafts, setFileDrafts] = useState<Record<string, File[]>>({});
@@ -222,10 +242,6 @@ export function MessagesWorkspace({
   const [bookingConversationId, setBookingConversationId] = useState<
     string | null
   >(null);
-  useEffect(() => {
-    if (resumeBooking && active?.id && !active.bookingRequestId)
-      setBookingConversationId(active.id);
-  }, [resumeBooking, active?.id, active?.bookingRequestId]);
 
   useEffect(() => {
     setSendError("");
@@ -394,6 +410,9 @@ export function MessagesWorkspace({
     const sentDraft = draft;
     const sentFiles = files;
     const previous = sendKeys.current[conversationId];
+    const reviewMessageId = isTeam
+      ? reviewForSend(reviewPins.current[conversationId], files.length > 0)
+      : undefined;
 
     const requestId =
       previous &&
@@ -407,9 +426,10 @@ export function MessagesWorkspace({
 
     if (isTeam) {
       setDrafts((previous) => ({ ...previous, [conversationId]: "" }));
+      delete reviewPins.current[conversationId];
       setFileDrafts((previous) => ({ ...previous, [conversationId]: [] }));
       delete sendKeys.current[conversationId];
-      void onSend(body, sentFiles, requestId);
+      void onSend(body, sentFiles, requestId, reviewMessageId);
       composer.current?.focus();
 
       return;
@@ -495,12 +515,11 @@ export function MessagesWorkspace({
                     {conversation.eventType}
                   </em>
                 )}
-                {conversation.bookingRequestReference && (
+                {conversation.bookingRequestId && (
                   <small className="conversation-reference">
-                    {conversation.bookingRequestReference}
-                    {conversation.eventStartsAt
-                      ? ` · ${enPhDayFormatter.format(new Date(conversation.eventStartsAt))}`
-                      : ""}
+                    {conversation.eventPreferredDate
+                      ? `Requested ${bookingDate(conversation.eventPreferredDate)}`
+                      : "Date to be arranged"}
                   </small>
                 )}
                 <small>{preview(conversation)}</small>
@@ -691,12 +710,8 @@ export function MessagesWorkspace({
           <div className="message-event-context">
             <Icon name="calendar" size={16} />
             <strong>{active.eventType || "Event inquiry"}</strong>
-            <span>{active.bookingRequestReference}</span>
-            {active.eventStartsAt && (
-              <span>
-                Requested{" "}
-                {enPhDayFormatter.format(new Date(active.eventStartsAt))}
-              </span>
+            {active.eventPreferredDate && (
+              <span>Requested {bookingDate(active.eventPreferredDate)}</span>
             )}
           </div>
         )}

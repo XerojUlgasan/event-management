@@ -5,6 +5,7 @@ import {
   SMALL_JSON_BODY_LIMIT_BYTES,
   CATALOG_JSON_BODY_LIMIT_BYTES,
   MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
+  BUSINESS_INFORMATION_JSON_BODY_LIMIT_BYTES,
   bookingBodyLimit,
 } from "./constants/http.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
@@ -23,6 +24,7 @@ import packageRoutes from "./controllers/packages/index.js";
 import healthRoutes from "./controllers/health/index.js";
 import userRoutes from "./controllers/users/index.js";
 import catalogMediaRoutes from "./controllers/catalog-media/index.js";
+import businessInformationRoutes from "./controllers/business-information/index.js";
 import { MAX_VIDEO_SIZE_BYTES } from "@event-management/contracts/limits/videos";
 import type { HonoEnv } from "./types/hono.js";
 
@@ -109,13 +111,11 @@ app.use(
 );
 app.route("/v1", serviceRoutes);
 app.route("/v1", packageRoutes);
-app.use(
-  "/v1/booking-requests",
-  bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
+app.use("/v1/booking-requests", (c, next) =>
+  bodyLimit({ maxSize: bookingBodyLimit(c.req.path) })(c, next),
 );
-app.use(
-  "/v1/booking-requests/*",
-  bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
+app.use("/v1/booking-requests/*", (c, next) =>
+  bodyLimit({ maxSize: bookingBodyLimit(c.req.path) })(c, next),
 );
 app.use("/v1/admin/booking-requests/*", (c, next) =>
   bodyLimit({ maxSize: bookingBodyLimit(c.req.path) })(c, next),
@@ -144,6 +144,11 @@ app.route("/v1", notificationRoutes);
 app.route("/v1", guestChatRoutes);
 app.route("/v1", authRoutes);
 app.route("/v1", userRoutes);
+app.use(
+  "/v1/admin/business-information",
+  bodyLimit({ maxSize: BUSINESS_INFORMATION_JSON_BODY_LIMIT_BYTES }),
+);
+app.route("/v1", businessInformationRoutes);
 
 app.doc("/openapi.json", {
   openapi: "3.0.0",

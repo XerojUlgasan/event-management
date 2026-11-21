@@ -118,7 +118,7 @@ function Workspace({
         .then(({ conversationId }) => {
           if (active)
             window.location.replace(
-              `/app/messages?conversation=${encodeURIComponent(conversationId)}${new URLSearchParams(search).get("createRequest") === "1" ? "&createRequest=1" : ""}`,
+              `/app/messages?conversation=${encodeURIComponent(conversationId)}`,
             );
         })
         .catch(() => {
@@ -223,7 +223,7 @@ function Workspace({
                 void signOut()
                   .then(() =>
                     window.location.assign(
-                      `/login?guest=${encodeURIComponent(guestId)}${new URLSearchParams(search).get("createRequest") === "1" ? "&createRequest=1" : ""}`,
+                      `/login?guest=${encodeURIComponent(guestId)}`,
                     ),
                   )
                   .catch(() => {});

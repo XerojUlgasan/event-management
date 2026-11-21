@@ -1,7 +1,11 @@
 import { Button, Icon } from "@event-management/ui";
 import type { BookingRequest } from "../../lib/data/booking-requests/requests";
 import { groupCustomerEvents } from "../../lib/services/booking-requests/customer-event-timeline";
-import { bookingDate, BookingStatusBadge } from "./BookingRequestDisplay";
+import {
+  bookingDate,
+  bookingRequestLabel,
+  BookingStatusBadge,
+} from "./BookingRequestDisplay";
 import { localInput } from "../../lib/utils/event-days/event-day-time";
 import { formatEnPh } from "../../lib/utils/formatting/dates";
 
@@ -137,16 +141,13 @@ export function CustomerEventTimeline({
                           </p>
                         )}
                         <div className="event-timeline-footer">
-                          <span className="event-timeline-reference">
-                            Request {item.reference}
-                          </span>
                           <div className="event-timeline-actions">
                             {onOpenChat && (
                               <Button
                                 variant="light"
                                 icon="message"
                                 onClick={() => onOpenChat(item.reference)}
-                                aria-label={`Open chat for request ${item.reference}`}
+                                aria-label={`Open chat for ${bookingRequestLabel(item.eventType, date)}`}
                               >
                                 Open chat
                               </Button>
@@ -154,7 +155,7 @@ export function CustomerEventTimeline({
                             <Button
                               variant="secondary"
                               onClick={() => onDetails(item)}
-                              aria-label={`View details for request ${item.reference}`}
+                              aria-label={`View details for ${bookingRequestLabel(item.eventType, date)}`}
                             >
                               View details <Icon name="arrow" size={15} />
                             </Button>

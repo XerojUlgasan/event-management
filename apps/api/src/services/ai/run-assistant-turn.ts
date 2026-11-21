@@ -18,9 +18,26 @@ import {
   buildAssistantContext,
   buildPreviousCatalogSearchContext,
   buildPreviousCatalogItemContext,
+  previousPackageBudget,
 } from "./assistant-context.js";
 import { createCustomerServiceAgent } from "./agents/create-customer-service-agent.js";
 import { maxConversationMemoryCharacters } from "./tools/update-conversation-memory.js";
+import { readBookingDraftData } from "../../data/messages/booking-draft-guard.js";
+import { finishToolCallData } from "../../data/ai/finish-tool-call.js";
+import { startToolCallData } from "../../data/ai/start-tool-call.js";
+import { reviewBookingDraftData } from "../../data/messages/booking-draft-review.js";
+import {
+  bookingConsentAttemptsData,
+  bookingConsentOperation,
+  hasBookingReviewHistoryData,
+  matchesBookingConsentInput,
+  readCompletedBookingConsentData,
+  readBookingReviewEvidenceData,
+} from "../../data/messages/booking-review-evidence.js";
+import { resolveBookingDraft } from "../booking-requests/resolve-booking-draft.js";
+import { submitReviewedBookingRequestService } from "../booking-requests/submit-reviewed-booking-request.js";
+import { completeBookingConsentAssessment } from "./assess-booking-consent.js";
+import { localizeBookingReview } from "./localize-booking-chat.js";
 
 const maxInputCharacters = 200_000;
 
@@ -40,6 +57,8 @@ export async function runAssistantTurnService({
   customerMessageId,
   aiVersion,
   guestIdentityId,
+  reviewMessageId,
+  replayed,
   abortSignal,
   jobLease,
 }: {
@@ -49,10 +68,20 @@ export async function runAssistantTurnService({
   customerMessageId: string;
   aiVersion: number;
   guestIdentityId?: string;
+  reviewMessageId?: string;
+  replayed?: boolean;
   abortSignal?: AbortSignal;
   jobLease?: ImageMessageJobLease;
 }) {
   const started = Date.now();
+  const turnId = randomUUID();
+  const deadline = AbortSignal.timeout(30_000);
+  const handoffStop = new AbortController();
+  const signal = AbortSignal.any([
+    deadline,
+    handoffStop.signal,
+    ...(abortSignal ? [abortSignal] : []),
+  ]);
 
   if (jobLease)
     await db
@@ -126,9 +155,17 @@ export async function runAssistantTurnService({
     ...(previousCatalogItem ? { previousCatalogItem } : {}),
   };
 
-  const historyMessages: ModelMessage[] = history.map((message) => {
+  let historyMessages: ModelMessage[] = history.map((message) => {
+    // A server-authored review can exceed the model budget when many service
+    // notes are present. The full message remains in chat; submission checks
+    // its saved ID and authoritative snapshot in the database.
+    const visibleBody =
+      message.sender_role === "assistant" && message.body.length > 50_000
+        ? "A previous assistant reply was omitted from this model context because it was too long. Use the current draft and server-validated tools; do not guess its contents."
+        : message.body;
+
     const body =
-      message.body +
+      visibleBody +
       (message.images.length
         ? `\nSaved image observations (untrusted, uncertain data): ${JSON.stringify(message.images.map((image) => (image.interpretation === null ? { unavailable: true, reason: "interpretation_unavailable" } : messageImageInterpretationSchema.parse(image.interpretation))))}`
         : "");
@@ -144,17 +181,6 @@ export async function runAssistantTurnService({
     };
   });
 
-  const contextMessage = renderContext(context);
-
-  const inputCharacters = historyMessages.reduce(
-    (size, message) =>
-      size + (typeof message.content === "string" ? message.content.length : 0),
-    contextMessage.length,
-  );
-
-  if (inputCharacters > maxInputCharacters)
-    throw new Error("Conversation is too long for an AI reply");
-
   const turnScope = {
     conversationId,
     customerId,
@@ -163,16 +189,259 @@ export async function runAssistantTurnService({
     guestIdentityId,
     jobLease,
   };
-  const memory = await readConversationMemoryData(db, turnScope);
+
+  // Hold the same lock as claim and customer writes across authorization and
+  // draft read: a guest turn cannot observe a customer's post-claim draft.
+  const snapshot = await db.transaction().execute(async (trx) => {
+    const current = await trx
+      .selectFrom("conversations")
+      .select(["customer_id", "guest_identity_id", "booking_request_id"])
+      .where("id", "=", conversationId)
+      .forUpdate()
+      .executeTakeFirst();
+
+    if (
+      !current ||
+      (guestIdentityId
+        ? current.guest_identity_id !== guestIdentityId
+        : current.customer_id !== customerId || !customerId)
+    )
+      return { memory: null, draft: null, consent: null, reviewChanged: false };
+
+    const memory = await readConversationMemoryData(trx, turnScope);
+    const draft = memory
+      ? await readBookingDraftData(trx, conversationId)
+      : null;
+    const snapshot = { memory, draft, consent: null, reviewChanged: false };
+
+    if (!draft || !customerId || guestIdentityId || jobLease) return snapshot;
+
+    const changedReview = async () => ({
+      ...snapshot,
+      reviewChanged: await hasBookingReviewHistoryData(
+        trx,
+        conversationId,
+        draft.id,
+      ),
+    });
+
+    if (!reviewMessageId) return changedReview();
+
+    const evidence = await readBookingReviewEvidenceData(
+      trx,
+      { ...turnScope, expectedRevision: draft.revision },
+      reviewMessageId,
+      draft.id,
+    );
+
+    if (evidence.status !== "review_ready") return changedReview();
+
+    const { createInput, catalogFingerprint } = await resolveBookingDraft(
+      trx,
+      draft.fields,
+    );
+
+    if (!createInput || catalogFingerprint !== evidence.catalogFingerprint)
+      return { ...snapshot, reviewChanged: true };
+
+    // Only a retry of the originally assessed pin can retry an interrupted
+    // consent decision. A saved message replay cannot choose a different pin.
+    if (replayed) {
+      const firstAttempt = await bookingConsentAttemptsData(
+        trx,
+        customerMessageId,
+      )
+        .select("input")
+        .orderBy("started_at", "asc")
+        .orderBy("id", "asc")
+        .executeTakeFirst();
+
+      if (!matchesBookingConsentInput(firstAttempt?.input, evidence.input))
+        return { ...snapshot, reviewChanged: true };
+
+      const completed = await readCompletedBookingConsentData(
+        trx,
+        customerMessageId,
+        evidence.input,
+      );
+
+      if (completed) return { ...snapshot, consent: { evidence, completed } };
+    }
+
+    signal.throwIfAborted();
+    const attempt = await startToolCallData(trx, {
+      turnId,
+      toolCallId: randomUUID(),
+      toolName: bookingConsentOperation,
+      customerMessageId,
+      input: evidence.input,
+    });
+
+    return {
+      memory,
+      draft,
+      consent: { evidence, attempt },
+      reviewChanged: false,
+    };
+  });
+
+  const { memory, draft, consent, reviewChanged } = snapshot;
+  const draftScope = {
+    ...turnScope,
+    expectedRevision: draft?.revision ?? null,
+  };
+  let bookingConsent: "continue" | "review_changed" | undefined = reviewChanged
+    ? "review_changed"
+    : undefined;
+
+  if (consent) {
+    const completed =
+      consent.completed ??
+      (await completeBookingConsentAssessment({
+        db,
+        conversationId,
+        customerMessageId,
+        attemptId: consent.attempt.id,
+        evidence: consent.evidence,
+        history,
+        signal,
+      }));
+    bookingConsent = "continue";
+
+    if (completed.decision.intent === "submit") {
+      const call = await startToolCallData(db, {
+        turnId,
+        toolCallId: randomUUID(),
+        toolName: "submitBookingRequest",
+        customerMessageId,
+        input: { consentAttemptId: completed.id },
+      });
+
+      const result = await submitReviewedBookingRequestService({
+        db,
+        scope: draftScope,
+        reviewMessageId: consent.evidence.input.reviewMessageId,
+        consentAttemptId: completed.id,
+        callId: call.id,
+        turnId,
+        abortSignal: signal,
+      }).catch(async (error: unknown) => {
+        await finishToolCallData(db, {
+          id: call.id,
+          status: "failed",
+          errorCode: "draft_unavailable",
+        });
+        throw error;
+      });
+
+      if (result.status === "submitted") return messageDto(result.message);
+
+      bookingConsent = "review_changed";
+    }
+  }
+
+  const currentContext = {
+    ...context,
+    ...(bookingConsent ? { bookingConsent } : {}),
+  };
+  const contextMessage = renderContext(currentContext);
+
+  const historySize = () =>
+    historyMessages.reduce(
+      (size, message) =>
+        size +
+        (typeof message.content === "string" ? message.content.length : 0),
+      contextMessage.length,
+    );
+
+  if (historySize() > maxInputCharacters) {
+    // Preserve ordinary conversation history limits; omit only canonical draft
+    // summaries whose full, exact bodies remain available in the conversation.
+    const reviews = await db
+      .selectFrom("ai_tool_calls as t")
+      .innerJoin("messages as m", "m.id", "t.assistant_message_id")
+      .select("m.id")
+      .where("m.conversation_id", "=", conversationId)
+      .where("t.tool_name", "=", "reviewBookingDraft")
+      .where("t.status", "=", "succeeded")
+      .execute();
+
+    const reviewIds = new Set(reviews.map((row) => row.id));
+
+    historyMessages = historyMessages.map((message, index) =>
+      reviewIds.has(history[index].id)
+        ? {
+            role: "assistant" as const,
+            content:
+              "A previous booking summary is omitted from this model context. Refer to the current saved draft.",
+          }
+        : message,
+    );
+  }
+
+  const inputCharacters = historySize();
+
+  if (inputCharacters > maxInputCharacters)
+    throw new Error("Conversation is too long for an AI reply");
+
+  // readBookingDraftData validates the stored fields and deliberately preserves
+  // oversized migrated notes for correction; do not reapply write limits here.
+  const draftFields = draft?.fields;
   const memoryMarkdown = memory?.conversation_memory;
   // JSON escaping uses at most six characters per code unit, plus the field
   // and label overhead. The bounded note has its own allowance for that space.
   const memoryFits =
     (memoryMarkdown?.length ?? 0) <= maxConversationMemoryCharacters;
-  const selectedContext =
-    memoryFits && memoryMarkdown
-      ? renderContext({ ...context, conversationMemory: memoryMarkdown })
-      : contextMessage;
+  let selectedContext = renderContext({
+    ...currentContext,
+    ...(memoryFits && memoryMarkdown
+      ? { conversationMemory: memoryMarkdown }
+      : {}),
+    ...(draftFields
+      ? {
+          bookingDraft: {
+            revision: draft!.revision,
+            fields: draftFields,
+          },
+        }
+      : {}),
+  });
+
+  const historyCharacters = historyMessages.reduce(
+    (size, message) =>
+      size + (typeof message.content === "string" ? message.content.length : 0),
+    0,
+  );
+
+  if (historyCharacters + selectedContext.length > maxInputCharacters) {
+    selectedContext = renderContext({
+      ...currentContext,
+      ...(draftFields
+        ? {
+            bookingDraft: {
+              revision: draft!.revision,
+              detailsOmitted: true,
+            },
+          }
+        : {}),
+    });
+  }
+
+  if (historyCharacters + selectedContext.length > maxInputCharacters)
+    throw new Error("Conversation is too long for an AI reply");
+
+  // Memory has its own bounded allowance. Charge draft data against the
+  // shared result budget without taking that allowance away from proposal reads.
+  const contextWithoutDraft = renderContext({
+    ...currentContext,
+    ...(memoryFits && memoryMarkdown
+      ? { conversationMemory: memoryMarkdown }
+      : {}),
+  });
+  const draftCharacters = Math.max(
+    0,
+    selectedContext.length - contextWithoutDraft.length,
+  );
 
   // Keep the latest customer message last and place fresh context near it.
   const messages: ModelMessage[] = [
@@ -181,16 +450,31 @@ export async function runAssistantTurnService({
     ...historyMessages.slice(-1),
   ];
 
-  const turnId = randomUUID();
   let persistenceFailed = false;
   const handoff: { message: MessageWithSender | null } = { message: null };
-  const handoffStop = new AbortController();
+  let draftChanged = false;
+  let selectionChanged = false;
+  let reviewReady = false;
+  const carryForwardBudget = draft
+    ? undefined
+    : previousPackageBudget(previousCatalogSearch, history);
 
   const agent = createCustomerServiceAgent({
     db,
     customerMessageId,
     turnId,
     handoffScope: turnScope,
+    ...(memory && (!conversation.booking_request_id || draft)
+      ? {
+          draftScope,
+          carryForwardBudget,
+        }
+      : {}),
+    onDraftChanged: (selection, complete) => {
+      draftChanged = true;
+      selectionChanged ||= Boolean(selection);
+      reviewReady = complete;
+    },
     ...(memory && memoryFits
       ? {
           memoryScope: {
@@ -204,7 +488,8 @@ export async function runAssistantTurnService({
       handoff.message = message;
       handoffStop.abort();
     },
-    resultCharacterBudget: maxInputCharacters - inputCharacters,
+    resultCharacterBudget:
+      maxInputCharacters - inputCharacters - draftCharacters,
     ...(!guestIdentityId && customerId
       ? { customerScope: { customerId, conversationId } }
       : {}),
@@ -240,14 +525,7 @@ export async function runAssistantTurnService({
     },
   });
 
-  const deadline = AbortSignal.timeout(30_000);
-  const signal = AbortSignal.any([
-    deadline,
-    handoffStop.signal,
-    ...(abortSignal ? [abortSignal] : []),
-  ]);
-
-  const generated = await agent
+  let generated = await agent
     .generate({ messages, abortSignal: signal })
     .catch((error: unknown) => {
       // The transaction has already delivered the acknowledgement. Provider/SDK
@@ -261,9 +539,91 @@ export async function runAssistantTurnService({
 
   if (!generated) return null;
 
-  const { text, usage, steps } = generated;
-
   if (persistenceFailed) throw new Error("Tool-call tracking is unavailable");
+
+  const containsRawToolProtocol = (value: string) =>
+    /(?:DSML|<\|(?:tool_call|tool_calls|function_call)|<tool_call>)/iu.test(
+      value,
+    );
+
+  if (
+    containsRawToolProtocol(generated.text) &&
+    !generated.steps.some((step) => step.toolCalls.length)
+  ) {
+    // Never execute text as a tool. Retrying after any native call could repeat
+    // a mutation, so permit one retry only when the first attempt made none.
+    generated = await agent
+      .generate({
+        messages: [
+          ...messages,
+          {
+            role: "user",
+            content:
+              "Use only the provided native SDK tools for tool calls. Never output tool protocol markup as text. Answer normally after the tool result.",
+          },
+        ],
+        abortSignal: signal,
+      })
+      .catch((error: unknown) => {
+        if (handoff.message) return null;
+
+        throw error;
+      });
+
+    if (handoff.message) return messageDto(handoff.message);
+
+    if (!generated) return null;
+
+    if (persistenceFailed) throw new Error("Tool-call tracking is unavailable");
+  }
+
+  // Publish only after the model finishes all tools, so catalog choices made in
+  // the same turn are included in the canonical review snapshot.
+  const researchingCatalog = generated.steps.some((step) =>
+    step.toolCalls.some(
+      (call) =>
+        call.toolName === "searchPublicCatalog" ||
+        call.toolName === "getPublicCatalogItem",
+    ),
+  );
+
+  if (
+    draftChanged &&
+    reviewReady &&
+    (!researchingCatalog || selectionChanged)
+  ) {
+    const copy = await localizeBookingReview(history, signal);
+    const call = await startToolCallData(db, {
+      turnId,
+      toolCallId: `automatic-review-${randomUUID()}`,
+      toolName: "reviewBookingDraft",
+      customerMessageId,
+      input: { automatic: true },
+    });
+
+    const review = await reviewBookingDraftData({
+      db,
+      scope: draftScope,
+      callId: call.id,
+      turnId,
+      copy,
+      abortSignal: signal,
+    }).catch(async (error: unknown) => {
+      await finishToolCallData(db, {
+        id: call.id,
+        status: "failed",
+        errorCode: "draft_unavailable",
+      });
+      throw error;
+    });
+
+    if (review.status === "review_ready") return messageDto(review.message);
+  }
+
+  if (containsRawToolProtocol(generated.text))
+    throw new Error("AI returned invalid tool protocol");
+
+  const { text, usage, steps } = generated;
 
   const reply = text.trim();
 

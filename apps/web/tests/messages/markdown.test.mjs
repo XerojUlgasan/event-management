@@ -8,7 +8,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-let server, cacheDir, ui, MessagesWorkspace, MessageProcessing, MessageImages;
+let server,
+  cacheDir,
+  ui,
+  MessagesWorkspace,
+  MessageProcessing,
+  MessageImages,
+  CustomerEventTimeline;
 
 before(async () => {
   cacheDir = await mkdtemp(join(tmpdir(), "clemora-message-markdown-"));
@@ -28,6 +34,9 @@ before(async () => {
   ui = await server.ssrLoadModule("@event-management/ui");
   ({ MessagesWorkspace } = await server.ssrLoadModule(
     "/src/components/messages/MessagesWorkspace.tsx",
+  ));
+  ({ CustomerEventTimeline } = await server.ssrLoadModule(
+    "/src/components/booking-requests/CustomerEventTimeline.tsx",
   ));
   ({ MessageProcessing } = await server.ssrLoadModule(
     "/src/components/messages/MessageProcessing.tsx",
@@ -377,3 +386,66 @@ for (const viewerRole of ["customer", "admin"]) {
     }
   });
 }
+
+test("booking chat uses event and requested date instead of its reference", () => {
+  const linked = {
+    ...conversation,
+    bookingRequestId: "booking-id",
+    bookingRequestReference: "BR-RANDOM-REFERENCE",
+    eventType: "Birthday",
+    eventPreferredDate: "2026-11-15",
+    eventStartsAt: null,
+  };
+
+  const html = renderToStaticMarkup(
+    createElement(
+      ui.NotificationProvider,
+      null,
+      createElement(MessagesWorkspace, {
+        title: "Messages",
+        viewerRole: "customer",
+        conversations: [linked],
+        activeId: linked.id,
+        onSelect() {},
+        messages: [],
+        loading: false,
+        error: null,
+        async onSend() {},
+        conversationOpen: true,
+        listEmpty: { title: "Empty", body: "No conversations" },
+        threadEmpty: { title: "Empty", body: "No messages" },
+      }),
+    ),
+  );
+
+  assert.match(html, /Birthday/);
+  assert.match(html, /Nov 15, 2026/);
+  assert.doesNotMatch(html, /BR-RANDOM-REFERENCE/);
+});
+
+test("event cards use human-readable accessible labels", () => {
+  const item = {
+    id: "request-id",
+    reference: "BR-RANDOM-REFERENCE",
+    eventType: "Birthday",
+    packageName: "Celebration",
+    status: "under_review",
+    timeZone: "Asia/Manila",
+    preferredDate: "2026-11-15",
+    requestedDays: [{ date: "2026-11-15", startsAt: null, endsAt: null }],
+  };
+
+  const html = renderToStaticMarkup(
+    createElement(CustomerEventTimeline, {
+      items: [item],
+      now: new Date("2026-11-14T12:00:00Z"),
+      hasMore: false,
+      onDetails() {},
+      onOpenChat() {},
+    }),
+  );
+
+  assert.match(html, /aria-label="Open chat for Birthday · Nov 15, 2026"/);
+  assert.match(html, /aria-label="View details for Birthday · Nov 15, 2026"/);
+  assert.doesNotMatch(html, /BR-RANDOM-REFERENCE/);
+});

@@ -2,6 +2,7 @@ import { z } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import type { Context } from "hono";
 import type { HonoEnv } from "../../types/hono.js";
+import { customerMessageBodySchema } from "./schemas.js";
 import { checkMessageImages } from "../../services/messages/prepare-message-images.js";
 import {
   MAX_MESSAGE_BODY_LENGTH,
@@ -34,7 +35,10 @@ export function messageRequestBody<T extends z.ZodType>(schema: T) {
   };
 }
 
-export async function parseMessageInput(c: Context<HonoEnv>, guest = false) {
+export async function parseMessageInput(
+  c: Context<HonoEnv>,
+  audience: "admin" | "customer" | "guest" = "admin",
+) {
   const multipart = c.req
     .header("content-type")
     ?.toLowerCase()
@@ -80,12 +84,30 @@ export async function parseMessageInput(c: Context<HonoEnv>, guest = false) {
     }
   }
 
-  const parsed = multipartMessageSchema.omit({ images: true }).safeParse(raw);
+  const customerJson = audience === "customer" && !multipart;
+
+  if (
+    !customerJson &&
+    raw &&
+    typeof raw === "object" &&
+    "reviewMessageId" in raw
+  )
+    throw new HTTPException(400, {
+      message: "Review replies require signed-in text chat",
+    });
+
+  const parsed = customerJson
+    ? customerMessageBodySchema.safeParse(raw)
+    : multipartMessageSchema.omit({ images: true }).safeParse(raw);
 
   if (!parsed.success)
     throw new HTTPException(400, { message: "Invalid message fields" });
 
   const input = parsed.data;
+  const reviewMessageId =
+    "reviewMessageId" in input && typeof input.reviewMessageId === "string"
+      ? input.reviewMessageId.toLowerCase()
+      : undefined;
   const body = input.body ?? "";
 
   if (!body && !files.length)
@@ -93,8 +115,13 @@ export async function parseMessageInput(c: Context<HonoEnv>, guest = false) {
       message: "Write a message or attach an image before sending",
     });
 
-  if (guest && !input.requestId)
+  if (audience === "guest" && !input.requestId)
     throw new HTTPException(400, { message: "A request ID is required" });
 
-  return { ...input, body, images: await checkMessageImages(files) };
+  return {
+    ...input,
+    body,
+    reviewMessageId,
+    images: await checkMessageImages(files),
+  };
 }

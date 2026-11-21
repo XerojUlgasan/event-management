@@ -1,3 +1,4 @@
+import { nextBookingRevision } from "../booking-requests/booking-revision.js";
 import { withConversationActivity } from "./activity.js";
 import { hashSessionToken } from "../../utils/session.js";
 import {
@@ -57,6 +58,16 @@ export function claimGuestConversationData(
       })
       .where("id", "=", id)
       .execute();
+
+    if (conversation.booking_request_id)
+      await trx
+        .updateTable("booking_requests")
+        .set({ customer_id: customerId, updated_at: nextBookingRevision })
+        .where("id", "=", conversation.booking_request_id)
+        .where("submitted_at", "is", null)
+        .where("customer_id", "is", null)
+        .returning("id")
+        .executeTakeFirstOrThrow();
 
     // Guest human messages retain their original provenance and NULL sender IDs.
     return { conversationId: id };

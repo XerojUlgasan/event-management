@@ -1,3 +1,4 @@
+import { BookingIntake } from "../../../booking-requests/BookingIntake";
 import { BookingStatusHistory } from "../../../booking-requests/BookingStatusHistory";
 import {
   useCallback,
@@ -363,8 +364,8 @@ export function BookingRequestPage({
         <>
           <div className="booking-request-heading">
             <PageHeader
-              title={`Booking request ${item.reference}`}
-              description={`${item.eventType} · ${item.packageName ?? "No catalog package selected"}`}
+              title={`${item.eventType} booking request`}
+              description={item.packageName ?? "No catalog package selected"}
             />
             <BookingStatusBadge status={item.status} />
           </div>
@@ -516,10 +517,14 @@ export function BookingRequestPage({
                     </div>
                     <div>
                       <dt>Requested</dt>
-                      <dd>{bookingDateTime(item.createdAt, item.timeZone)}</dd>
+                      <dd>{bookingDateTime(item.submittedAt, item.timeZone)}</dd>
                     </div>
                   </dl>
                 </div>
+                <BookingIntake
+                  requestedServices={item.requestedServices}
+                  budget={item.budget}
+                />
                 <div className="booking-request-overview-footer">
                   <p>
                     Dates are not reserved. Processing does not confirm the

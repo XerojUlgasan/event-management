@@ -1,4 +1,4 @@
-import { bookingRevision } from "./booking-revision.js";
+import { selectSubmittedBookings } from "./select-submitted-bookings.js";
 import type { Kysely, Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 
@@ -9,11 +9,7 @@ export const findBookingRequestData = (
   id: string,
   customerId?: string,
 ) => {
-  let query = db
-    .selectFrom("booking_requests")
-    .selectAll()
-    .select(bookingRevision.as("revision"))
-    .where("id", "=", id);
+  let query = selectSubmittedBookings(db).where("id", "=", id);
 
   if (customerId) query = query.where("customer_id", "=", customerId);
 

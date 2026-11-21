@@ -9,7 +9,11 @@ export function selectConversationColumnsData(db: Database) {
   return db
     .selectFrom("conversations as c")
     .leftJoin("users as customer", "customer.id", "c.customer_id")
-    .leftJoin("booking_requests as br", "br.id", "c.booking_request_id")
+    .leftJoin("booking_requests as br", (join) =>
+      join
+        .onRef("br.id", "=", "c.booking_request_id")
+        .on("br.submitted_at", "is not", null),
+    )
     .leftJoin("packages as p", "p.id", "br.package_id")
     .select((eb) => [
       "c.id",
@@ -22,7 +26,7 @@ export function selectConversationColumnsData(db: Database) {
       "c.ai_version",
       conversationAiReplyPendingSelection(),
       "c.ai_handoff",
-      "c.booking_request_id",
+      eb.ref("br.id").as("booking_request_id"),
       "c.created_at",
       "c.updated_at",
       eb.ref("customer.display_name").as("customer_display_name"),
@@ -31,6 +35,7 @@ export function selectConversationColumnsData(db: Database) {
       eb.ref("p.name").as("package_name"),
       eb.ref("br.reference").as("booking_request_reference"),
       eb.ref("br.event_type").as("event_type"),
+      eb.ref("br.preferred_date").as("event_preferred_date"),
       eb.ref("br.starts_at").as("event_starts_at"),
       eb.ref("br.ends_at").as("event_ends_at"),
       eb.ref("br.guest_count").as("guest_count"),

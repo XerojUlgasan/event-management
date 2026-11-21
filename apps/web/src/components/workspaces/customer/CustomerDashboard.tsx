@@ -1,3 +1,7 @@
+import {
+  reconcileSubmissionRetries,
+  retryableSubmissionError,
+} from "../../../lib/services/messages/booking-review";
 import { ApiError } from "../../../lib/http/request";
 import { navigateWorkspace } from "../../../lib/navigation/workspace-navigation";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
@@ -325,12 +329,7 @@ export function CustomerDashboard({
             ])
           : current,
       );
-      setOutbox((current) => {
-        const next = { ...current };
-        delete next[message.id];
-
-        return next;
-      });
+      setOutbox((current) => reconcileSubmissionRetries(current, [message]));
     },
   });
 
@@ -382,12 +381,9 @@ export function CustomerDashboard({
           ),
         );
         const unacknowledged = new Set(localMessages.current);
-        setOutbox((current) => {
-          const next = { ...current };
-          thread.messages.forEach((message) => delete next[message.id]);
-
-          return next;
-        });
+        setOutbox((current) =>
+          reconcileSubmissionRetries(current, thread.messages),
+        );
         thread.messages.forEach((message) =>
           localMessages.current.delete(message.id),
         );
@@ -535,7 +531,11 @@ export function CustomerDashboard({
 
     setOutbox((current) => ({
       ...current,
-      [message.id]: { conversationId: conversation.id, message, failed: false },
+      [message.id]: {
+        conversationId: conversation.id,
+        message,
+        failed: false,
+      },
     }));
     localMessages.current.add(message.id);
 
@@ -545,6 +545,7 @@ export function CustomerDashboard({
         conversation.id,
         message.id,
         message.pendingFiles ?? [],
+        message.reviewMessageId,
       );
       replyRevision.current++;
 
@@ -573,19 +574,43 @@ export function CustomerDashboard({
         : [result.message];
       sent.forEach((item) => localMessages.current.add(item.id));
       appendMessages(sent, conversation.id);
-      setOutbox((current) =>
-        current[message.id]
-          ? {
-              ...current,
-              [message.id]: { ...current[message.id], message: result.message },
-            }
-          : current,
-      );
+      setOutbox((current) => {
+        if (!current[message.id]) return current;
+
+        if (retryableSubmissionError(message, result.assistantError))
+          return {
+            ...current,
+            [message.id]: {
+              conversationId: conversation.id,
+              message,
+              failed: true,
+              error:
+                "Your message was saved, but the AI reply could not be completed.",
+            },
+          };
+
+        if (message.reviewMessageId) {
+          const next = { ...current };
+          delete next[message.id];
+
+          return next;
+        }
+
+        return {
+          ...current,
+          [message.id]: { ...current[message.id], message: result.message },
+        };
+      });
       showSentInList(
         conversation,
         result.assistantMessage ?? result.message,
         sent,
       );
+
+      if (message.reviewMessageId) {
+        setThreadRevision((value) => value + 1);
+        void inbox.refresh();
+      }
 
       if (result.assistantError) notifyError(new Error(result.assistantError));
     } catch (cause) {
@@ -617,6 +642,7 @@ export function CustomerDashboard({
     body: string,
     files: File[] = [],
     requestId: string = crypto.randomUUID(),
+    reviewMessageId?: string,
     thread = messageThread,
   ) => {
     const conversation = thread?.conversation;
@@ -627,6 +653,7 @@ export function CustomerDashboard({
       id: requestId,
       body,
       pendingFiles: files,
+      reviewMessageId,
       quotationId: null,
       senderId: conversation.customerId,
       senderRole: "customer",
@@ -695,7 +722,7 @@ export function CustomerDashboard({
       setMessageOpen(false);
       setConversationOpen(true);
       go("Messages");
-      void sendMessage(body, [], crypto.randomUUID(), thread);
+      void sendMessage(body, [], crypto.randomUUID(), undefined, thread);
     } catch (cause) {
       setDialogError(notifyError(cause, "Unable to open your conversation."));
     } finally {
@@ -969,10 +996,6 @@ export function CustomerDashboard({
                     : current,
                 );
               }}
-              resumeBooking={
-                new URLSearchParams(search).get("createRequest") === "1" &&
-                selectedConversationId === requestedConversation
-              }
               onBookingSubmitted={() => setThreadRevision((value) => value + 1)}
               onBookingClosed={() => {
                 const url = new URL(window.location.href);
@@ -1049,9 +1072,10 @@ export function CustomerDashboard({
                   (item) =>
                     item.conversationId === selectedConversationId &&
                     item.failed &&
-                    !messageThread?.messages.some(
-                      (message) => message.id === item.message.id,
-                    ),
+                    (item.message.reviewMessageId ||
+                      !messageThread?.messages.some(
+                        (message) => message.id === item.message.id,
+                      )),
                 )
                 .map((item) => item.message.id)}
               failedMessageErrors={Object.fromEntries(

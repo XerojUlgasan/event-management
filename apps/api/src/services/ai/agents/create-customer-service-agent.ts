@@ -3,6 +3,7 @@ import { createRequestHumanHandoffTool } from "../tools/request-human-handoff.js
 import { getTextModel } from "../models.js";
 import { customerServicePrompt } from "../prompts/customer-service-prompt.js";
 import { createSearchPublicCatalogTool } from "../tools/search-public-catalog.js";
+import { createGetBusinessInformationTool } from "../tools/get-business-information.js";
 import { createGetPublicCatalogItemTool } from "../tools/get-public-catalog-item.js";
 import { createGetMyProposalTool } from "../tools/get-my-proposal.js";
 import {
@@ -11,6 +12,7 @@ import {
 } from "../tools/get-my-booking-facts.js";
 import { createUpdateConversationMemoryTool } from "../tools/update-conversation-memory.js";
 import type { AssistantToolContext } from "../tools/assistant-tool-context.js";
+import { createBookingDraftTools } from "../tools/booking-draft.js";
 
 export function createCustomerServiceAgent(options: AssistantToolContext) {
   let proposedCalls = 0;
@@ -50,8 +52,15 @@ export function createCustomerServiceAgent(options: AssistantToolContext) {
             }),
           }
         : {}),
+      getBusinessInformation: createGetBusinessInformationTool(toolContext),
       searchPublicCatalog: createSearchPublicCatalogTool(toolContext),
       getPublicCatalogItem: createGetPublicCatalogItemTool(toolContext),
+      ...(options.draftScope
+        ? createBookingDraftTools({
+            ...toolContext,
+            draftScope: options.draftScope,
+          })
+        : {}),
       ...(options.customerScope
         ? {
             getMyProposal: createGetMyProposalTool({

@@ -25,6 +25,7 @@ import { PackagesPage } from "./catalog/PackagesPage";
 import { ServicesPage } from "./catalog/ServicesPage";
 import { ReportsPage } from "./reports/ReportsPage";
 import { CustomersPage } from "./users/CustomersPage";
+import { BusinessInformationPage } from "./business-information/BusinessInformationPage";
 import { AdminSidebar } from "./AdminSidebar";
 import { SignInMethods } from "../../auth/SignInMethods";
 import { NotificationBell } from "../../notifications/NotificationBell";
@@ -128,6 +129,13 @@ export function AdminShell({
 }) {
   const name = profile.displayName ?? profile.email;
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [businessInformationVisited, setBusinessInformationVisited] = useState(
+    active === "BusinessInformation",
+  );
+
+  useEffect(() => {
+    if (active === "BusinessInformation") setBusinessInformationVisited(true);
+  }, [active]);
 
   const go = (key: NavKey) => {
     navigateWorkspace(adminPaths[key]);
@@ -158,6 +166,8 @@ export function AdminShell({
     if (active === "Packages") return <PackagesPage />;
 
     if (active === "Services") return <ServicesPage />;
+
+    if (active === "BusinessInformation") return null;
 
     if (active === "Inventory") return <InventoryPage />;
 
@@ -245,6 +255,7 @@ export function AdminShell({
         active !== "Bookings" &&
         active !== "Packages" &&
         active !== "Services" &&
+        active !== "BusinessInformation" &&
         active !== "Administration" &&
         active !== "Messages" && (
           <p className="demo-note" role="note">
@@ -252,6 +263,9 @@ export function AdminShell({
           </p>
         )}
       {body}
+      <div hidden={active !== "BusinessInformation"}>
+        {businessInformationVisited && <BusinessInformationPage />}
+      </div>
     </WorkspaceLayout>
   );
 }

@@ -1,5 +1,8 @@
 import { Badge } from "@event-management/ui";
-import { formatEnPhDate, formatEnPhDateTime } from "../../lib/utils/formatting/dates";
+import {
+  formatEnPhDate,
+  formatEnPhDateTime,
+} from "../../lib/utils/formatting/dates";
 import type { BookingStatus } from "../../lib/data/booking-requests/requests";
 
 export const bookingStatusLabels: Record<BookingStatus, string> = {
@@ -28,6 +31,15 @@ export function bookingDate(value: string | null) {
   return Number.isNaN(date.getTime())
     ? "To be confirmed"
     : formatEnPhDate(date, "UTC");
+}
+
+export function bookingRequestLabel(
+  eventType: string | null,
+  date: string | null,
+) {
+  const name = eventType?.trim() || "Event inquiry";
+
+  return date ? `${name} · ${bookingDate(date)}` : name;
 }
 
 export function BookingStatusBadge({ status }: { status: BookingStatus }) {

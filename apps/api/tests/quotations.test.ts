@@ -976,7 +976,8 @@ test("a send commits one offer, exact conversation message and audit across conc
   assert.equal(after.messages[0].quotation_id, quotation.id);
   assert.equal(after.messages[0].sender_id, adminId);
   assert.equal(after.messages[0].conversation_id, after.conversations[0].id);
-  assert.equal(after.conversations[0].ai_enabled, false);
+  assert.equal(after.conversations[0].ai_enabled, true);
+  assert.equal(after.conversations[0].ai_version, 0);
 
   const events = after.audits.filter(
     (row: { entity_id: string }) => row.entity_id === quotation.id,
@@ -1022,6 +1023,8 @@ test("a send commits one offer, exact conversation message and audit across conc
     201,
   );
   const feedback = await matrixSnapshot(b.id);
+  assert.equal(feedback.conversations[0].ai_enabled, true);
+  assert.equal(feedback.conversations[0].ai_version, 0);
   assert.deepEqual(feedback.quotations, after.quotations);
   assert.equal(feedback.messages.length, 2);
   assert.deepEqual(feedback.audits, after.audits);
@@ -1285,11 +1288,9 @@ test("missing conversation and a message insertion failure roll back the entire 
   const sent = await send(b.id, replacement);
   assert.equal(sent.previousQuotationId, first.id);
   const current = await matrixSnapshot(b.id);
-  assert.deepEqual(current.conversations[0].ai_handoff, {
-    ...pending,
-    pending: false,
-  });
-  assert.equal(current.conversations[0].ai_version, 2);
+  assert.equal(current.conversations[0].ai_enabled, false);
+  assert.equal(current.conversations[0].ai_version, 1);
+  assert.deepEqual(current.conversations[0].ai_handoff, pending);
   assert.equal(current.messages.length, 2);
 });
 

@@ -1,0 +1,222 @@
+.public-site .public-footer.business-information-footer {
+  --bi-footer-gap: clamp(1.25rem, 2.5vw, 2rem);
+  display: block;
+  padding: 3rem clamp(1.375rem, 4vw, 4.5rem);
+  background: var(--brand-paper);
+  border-top: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+:where(.business-information-footer) :where(section, nav, address, p, small) {
+  min-width: 0;
+  margin: 0;
+  color: inherit;
+}
+
+.business-information-footer-details,
+.business-information-footer-bottom {
+  max-width: 72.5rem;
+  margin-inline: auto;
+}
+
+.business-information-footer-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  align-items: start;
+  gap: var(--bi-footer-gap);
+}
+
+.business-information-footer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-default);
+}
+
+.public-site .public-footer.business-information-footer a {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  overflow-wrap: anywhere;
+}
+
+.public-site .public-footer.business-information-footer a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+#business-information {
+  scroll-margin-top: 5rem;
+}
+
+.business-information-footer-brand .brand {
+  --brand-width: 220px;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.business-information-footer-name {
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.business-information-footer-tagline,
+.business-information-footer-intro {
+  max-width: 36ch;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.business-information-footer-group h2 {
+  margin: 0 0 0.65rem;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.public-site .business-information-footer-group p + p,
+.business-information-footer-contact > * + *,
+.business-information-footer-contact + p {
+  margin-top: 0.5rem;
+}
+
+.business-information-footer-contact {
+  font-style: normal;
+}
+
+.business-information-footer-contact > a {
+  display: block;
+}
+
+.business-information-footer-address,
+.business-information-footer-areas,
+.business-information-footer-hours {
+  white-space: pre-wrap;
+}
+
+.business-information-footer-social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  margin-top: 0.5rem;
+}
+
+.business-information-footer-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 0.65rem 1.25rem;
+  color: var(--text-primary);
+}
+
+.business-information-footer-copy {
+  align-self: end;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 40rem) {
+  .public-site .public-footer.business-information-footer {
+    padding: 2.25rem 1.375rem;
+    gap: 1.25rem;
+  }
+
+  .business-information-footer-details {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .public-site .public-footer.business-information-footer .brand {
+    --brand-width: 174px;
+  }
+}
+
+.business-information-admin {
+  max-width: 56rem;
+}
+
+.business-information-admin .page-head {
+  margin-bottom: 2rem;
+}
+
+.business-information-form {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.business-information-sections {
+  display: grid;
+  gap: 2rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.business-information-section {
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.business-information-section + .business-information-section {
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-default);
+}
+
+.business-information-section-heading h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.business-information-section-heading p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.business-information-fields {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.business-information-fields .full {
+  grid-column: 1 / -1;
+}
+
+.business-information-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.business-information-status {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.business-information-conflict {
+  border-color: var(--status-danger-border);
+}
+
+@media (max-width: 40rem) {
+  .business-information-fields {
+    grid-template-columns: 1fr;
+  }
+}

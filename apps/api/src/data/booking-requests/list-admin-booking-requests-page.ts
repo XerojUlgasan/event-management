@@ -1,4 +1,4 @@
-import { bookingRevision } from "./booking-revision.js";
+import { selectSubmittedBookings } from "./select-submitted-bookings.js";
 import { sql, type Kysely, type Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 import { keysetPredicate, utcTimestampSql } from "../../utils/sql-page.js";
@@ -11,17 +11,13 @@ export const listAdminBookingRequestsPageData = (
     status?: string;
     preferredDate?: string;
     customerId?: string;
-    position?: { createdAt: string; id: string };
+    position?: { submittedAt: string; id: string };
     limit: number;
   },
 ) => {
-  let query = db
-    .selectFrom("booking_requests")
-    .selectAll()
-    .select(bookingRevision.as("revision"))
-    .select(
-      utcTimestampSql("created_at").as("cursor_created_at"),
-    );
+  let query = selectSubmittedBookings(db).select(
+    utcTimestampSql("submitted_at").as("cursor_submitted_at"),
+  );
 
   if (input.status) query = query.where("status", "=", input.status);
 
@@ -37,16 +33,16 @@ export const listAdminBookingRequestsPageData = (
   if (input.position)
     query = query.where(
       keysetPredicate(
-        "created_at",
+        "submitted_at",
         "id",
-        input.position.createdAt,
+        input.position.submittedAt,
         input.position.id,
         "<",
       ),
     );
 
   return query
-    .orderBy("created_at", "desc")
+    .orderBy("submitted_at", "desc")
     .orderBy("id", "desc")
     .limit(input.limit + 1)
     .execute();

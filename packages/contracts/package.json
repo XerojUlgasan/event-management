@@ -3,9 +3,11 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./business-information": "./src/business-information.ts",
     "./messages": "./src/messages.ts",
     "./realtime-events": "./src/realtime-events.ts",
     "./notifications": "./src/notifications.ts",
+    "./booking-draft": "./src/booking-draft.ts",
     "./booking-requests": "./src/booking-requests.ts",
     "./message-images": "./src/message-images.ts",
     "./ai-handoff": "./src/ai-handoff.ts",

@@ -105,6 +105,12 @@ export function createGetPublicCatalogItemTool({
         );
       }
     },
-    toModelOutput: ({ output }) => ({ type: "text", value: output.markdown }),
+    toModelOutput: ({ output }) => ({
+      type: "text",
+      value: output.markdown.replace(
+        /^Capacity: (\d+) guests$/m,
+        "Maximum guest capacity: $1 guests",
+      ),
+    }),
   });
 }

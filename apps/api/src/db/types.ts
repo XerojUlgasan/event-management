@@ -66,26 +66,30 @@ export interface BackgroundJobs {
 }
 
 export interface BookingRequests {
-  contact_name: string;
+  budget: string | null;
+  contact_name: string | null;
   created_at: Generated<Timestamp>;
-  customer_id: string;
+  customer_id: string | null;
+  duration_mode: string | null;
   ends_at: Timestamp | null;
   estimated_duration: Generated<string>;
   estimated_duration_days: number | null;
-  event_type: string;
+  event_type: string | null;
   guest_count: number | null;
   id: Generated<string>;
   out_of_range: boolean;
   package_id: string | null;
-  phone_number: string;
-  preferred_date: string;
+  phone_number: string | null;
+  preferred_date: string | null;
   preferred_venue_location: string | null;
   reference: string;
   requested_days: Json | null;
+  requested_services: Json | null;
   special_requests: string | null;
   starts_at: Timestamp | null;
   status: Generated<string>;
-  time_zone: string;
+  submitted_at: Generated<Timestamp | null>;
+  time_zone: string | null;
   updated_at: Generated<Timestamp>;
 }
 
@@ -96,6 +100,12 @@ export interface BookingRequestStatusHistory {
   id: Generated<string>;
   reason: string | null;
   status: string;
+}
+
+export interface BusinessInformation {
+  id: number;
+  information: Generated<Json>;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface CatalogKnowledge {
@@ -278,6 +288,7 @@ export interface DB {
   background_jobs: BackgroundJobs;
   booking_request_status_history: BookingRequestStatusHistory;
   booking_requests: BookingRequests;
+  business_information: BusinessInformation;
   catalog_knowledge: CatalogKnowledge;
   conversations: Conversations;
   events_day: EventsDay;

@@ -9,7 +9,8 @@
 | `@event-management/contracts/limits/videos` | `MAX_VIDEO_SIZE_BYTES` | 25 MiB (`25 * 1024 * 1024`) per uploaded catalog-canvas video. |
 | `@event-management/contracts/limits/messages` | `MAX_MESSAGE_BODY_LENGTH` | 4,000 characters per message body. |
 | `@event-management/contracts/limits/messages` | `MAX_MESSAGE_IMAGES`, `MAX_MESSAGE_IMAGE_PIXELS` | Four images per conversation message, each limited to 16 megapixels; the shared 10 MiB image limit also applies to each file. |
-| `@event-management/contracts/limits/booking-requests` | `MAX_EVENT_TYPE_LENGTH`, `MAX_TIME_ZONE_LENGTH`, `MAX_CONTACT_NAME_LENGTH`, `MAX_PHONE_NUMBER_LENGTH`, `MAX_PREFERRED_VENUE_LOCATION_LENGTH`, `MAX_SPECIAL_REQUESTS_LENGTH`, `MAX_BOOKING_REASON_LENGTH`, `BOOKING_ESTIMATED_DURATIONS` | Text limits are 200, 100, 200, 100, 1,000, 4,000, and 1,000 characters respectively. The booking reason limit is used for cancellation and status-change reasons. `BOOKING_ESTIMATED_DURATIONS` remains the response vocabulary for historical estimate fields; new booking requests use `durationMode` and `requestedDays`. `one_day` requires one date and `multi_day` requires at least two distinct dates. Dates may be nonconsecutive; the API sorts them. No shared requested-day count constant is defined; the booking-request API's 16 KiB body cap still applies. |
+| `@event-management/contracts/limits/booking-requests` | `MAX_EVENT_TYPE_LENGTH`, `MAX_TIME_ZONE_LENGTH`, `MAX_CONTACT_NAME_LENGTH`, `MAX_PHONE_NUMBER_LENGTH`, `MAX_PREFERRED_VENUE_LOCATION_LENGTH`, `MAX_SPECIAL_REQUESTS_LENGTH`, `MAX_BOOKING_REASON_LENGTH`, `MAX_BOOKING_ADDON_HOURS`, `BOOKING_ESTIMATED_DURATIONS` | Text limits are 200, 100, 200, 100, 1,000, 4,000, and 1,000 characters respectively. Requested add-on coverage is limited to 2,147,483,647 whole hours. Historical estimate fields retain `BOOKING_ESTIMATED_DURATIONS`. New requests use `durationMode` and `requestedDays`. `one_day` requires one date and `multi_day` requires at least two distinct dates. Dates may be nonconsecutive. The API sorts them within the create-route body limit. |
+| `@event-management/contracts/booking-draft` | `bookingDraftFieldsSchema`, `bookingDraftPatchSchema` | Conversational intake accepts up to 366 distinct dates and 100 requested services. It reuses the booking text limits, including 200 characters for budget and 4,000 for special requests and per-service notes. |
 | `@event-management/contracts/limits/auth` | `MAX_EMAIL_LENGTH`, `MIN_PASSWORD_LENGTH`, `MAX_PASSWORD_LENGTH`, `MAX_DISPLAY_NAME_LENGTH` | 254 characters, 8 characters, 128 characters, and 120 characters respectively. |
 | `@event-management/contracts/limits/catalog` | `MAX_CATALOG_TEXT_LENGTH`, `MAX_CATALOG_WIDGET_ROWS`, `MAX_CATALOG_WIDGET_Y` | 4,000 characters for catalog text; 100 rows per widget; maximum zero-based starting row of 100,000. API validation and editor controls consume the same limits. These do not define a fixed section row count. |
 
@@ -17,11 +18,15 @@ The reusable catalog contract in `@event-management/contracts/catalog` also limi
 
 ## API request-body caps
 
+The business-profile schema and its constants are exported from `@event-management/contracts/business-information`: `MAX_BUSINESS_SHORT_TEXT` (200), `MAX_BUSINESS_TEXT` (4,000), `MAX_BUSINESS_URL` (2,048), `MAX_BUSINESS_LINKS` (20), and `MAX_BUSINESS_FAQS` (30). Email reuses `MAX_EMAIL_LENGTH` (254). Text is trimmed; URLs require HTTP or HTTPS without embedded credentials. The same schema validates API input, stored JSON, and browser data. These bounds describe the complete stored profile even when a view displays a smaller selection of fields.
+
 These are transport limits enforced only by the API in `apps/api/src/constants/http.ts` and `apps/api/src/app.ts`. They are not domain validation values.
 
 | API constant | Current cap | Applied to |
 | --- | --- | --- |
-| `SMALL_JSON_BODY_LIMIT_BYTES` | 16 KiB | Auth, customer/admin conversations, ordinary booking requests and customer quotation actions. |
+| `BUSINESS_INFORMATION_JSON_BODY_LIMIT_BYTES` | 2 MiB | Admin business-information saves at `/v1/admin/business-information`, in both Node and Edge. The cap accommodates bounded profile text and FAQs after UTF-8 encoding and JSON escaping. |
+| `SMALL_JSON_BODY_LIMIT_BYTES` | 16 KiB | Auth, customer/admin conversations, booking request updates, and customer quotation actions. |
+| `BOOKING_CREATE_JSON_BODY_LIMIT_BYTES` | 64 KiB | Submitting a booking request with service selections and UTF-8 request notes. Applies to Node and Edge. |
 | `CATALOG_JSON_BODY_LIMIT_BYTES` | 3 MiB | Admin package/service catalog JSON and booking custom-package JSON. |
 | `QUOTATION_JSON_BODY_LIMIT_BYTES` | 2 MiB | Admin quotation JSON, including full ordered item lists. |
 | `MAX_VIDEO_SIZE_BYTES` + `MEDIA_UPLOAD_BODY_OVERHEAD_BYTES` | 25 MiB + 64 KiB | Multipart package-catalog media upload path (`/v1/admin/catalog-media`). Per-file image uploads remain limited to 10 MiB. |

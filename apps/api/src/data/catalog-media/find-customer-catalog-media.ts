@@ -17,7 +17,7 @@ export const findCustomerCatalogMediaData = (
     .where("m.source", "=", "upload")
     .where(
       sql<boolean>`EXISTS (
- SELECT 1 FROM packages p JOIN booking_requests br ON br.id=p.custom_for_booking_request_id
+ SELECT 1 FROM packages p JOIN booking_requests br ON br.id=p.custom_for_booking_request_id AND br.submitted_at IS NOT NULL
  WHERE ${catalogOwnerContainsMedia("p", sql.ref("m.id"))}
  AND p.package_type='custom' AND br.customer_id=${customerId}::uuid
 )`,

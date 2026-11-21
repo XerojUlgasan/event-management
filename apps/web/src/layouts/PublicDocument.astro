@@ -1,6 +1,9 @@
 ---
 import "../styles/app.css";
 import { Brand, Icon } from "@event-management/ui";
+import { BusinessInformationFooter } from "../components/public/site/BusinessInformationFooter";
+import { loadBusinessInformation } from "../lib/server/business-information/load-business-information";
+import type { BusinessInformation } from "@event-management/contracts/business-information";
 
 interface Props {
   title: string;
@@ -8,6 +11,16 @@ interface Props {
 }
 
 const { title, description } = Astro.props;
+
+Astro.response.headers.set("Cache-Control", "no-store");
+
+let businessInformation: BusinessInformation | null = null;
+
+try {
+  businessInformation = (await loadBusinessInformation()).information;
+} catch {
+  // Optional footer details must not prevent visitors from browsing the catalog.
+}
 ---
 
 <!doctype html>
@@ -51,7 +64,6 @@ const { title, description } = Astro.props;
         <nav class="public-nav" aria-label="Primary">
           <a href="/packages">Packages</a>
           <a href="/services">Services</a>
-          <a href="/about">About us</a>
         </nav>
         <div class="header-actions">
           <a class="button button-link" href="/login">
@@ -64,7 +76,6 @@ const { title, description } = Astro.props;
             <nav aria-label="Mobile navigation">
               <a href="/packages">Packages</a>
               <a href="/services">Services</a>
-              <a href="/about">About us</a>
             </nav>
           </details>
         </div>
@@ -72,19 +83,7 @@ const { title, description } = Astro.props;
       <main>
         <slot />
       </main>
-      <footer class="public-footer">
-        <Brand light />
-        <p>
-          Thoughtful event planning and calm coordination, from first idea to
-          final update.
-        </p>
-        <div>
-          <a href="/packages">Packages</a>
-          <a href="/services">Services</a>
-          <a href="/about">About us</a>
-        </div>
-        <span>© {new Date().getFullYear()} Styled by AMAC</span>
-      </footer>
+      <BusinessInformationFooter information={businessInformation} />
     </div>
   </body>
 </html>

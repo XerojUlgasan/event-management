@@ -1006,6 +1006,7 @@ test("old booking conversations remain available", async () => {
     ).conversations.find((item: any) => item.bookingRequestId === booking.id);
 
     assert.ok(linked);
+    assert.equal(linked.eventPreferredDate, "2099-01-02");
     const byReference = await read(
       await call(
         `/messages/conversations?reference=${encodeURIComponent(booking.reference)}`,

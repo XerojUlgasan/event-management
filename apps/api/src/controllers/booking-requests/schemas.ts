@@ -1,10 +1,14 @@
+import { reviewedServiceSchema } from "@event-management/contracts/booking-draft";
+import { MAX_PACKAGE_ADDON_SERVICES } from "@event-management/contracts/catalog";
 import { bookingStatusSchema } from "@event-management/contracts/booking-requests";
 import {
   BOOKING_ESTIMATED_DURATIONS,
+  MAX_BOOKING_ADDON_HOURS,
   MAX_EVENT_TYPE_LENGTH,
   MAX_TIME_ZONE_LENGTH,
   MAX_CONTACT_NAME_LENGTH,
   MAX_PHONE_NUMBER_LENGTH,
+  MAX_PREFERRED_VENUE_LOCATION_LENGTH,
   MAX_SPECIAL_REQUESTS_LENGTH,
   MAX_BOOKING_REASON_LENGTH,
 } from "@event-management/contracts/limits/booking-requests";
@@ -56,6 +60,18 @@ export const createSchema = z
     packageId: z.string().uuid().nullable().optional(),
     conversationId: z.string().uuid().optional(),
     packageUpdatedAt: z.string().datetime().optional(),
+    requestedAddons: z
+      .array(
+        z
+          .object({
+            serviceId: z.string().uuid().toLowerCase(),
+            serviceUpdatedAt: z.string().datetime(),
+            hours: z.number().int().min(0).max(MAX_BOOKING_ADDON_HOURS),
+          })
+          .strict(),
+      )
+      .max(MAX_PACKAGE_ADDON_SERVICES)
+      .optional(),
     eventType: text(MAX_EVENT_TYPE_LENGTH),
     durationMode: durationModeSchema,
     requestedDays: z
@@ -79,6 +95,9 @@ export const createSchema = z
       .optional(),
     contactName: text(MAX_CONTACT_NAME_LENGTH),
     phoneNumber: text(MAX_PHONE_NUMBER_LENGTH),
+    preferredVenueLocation: text(MAX_PREFERRED_VENUE_LOCATION_LENGTH)
+      .nullable()
+      .optional(),
     specialRequests: z
       .string()
       .trim()
@@ -88,6 +107,16 @@ export const createSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
+    const serviceIds = new Set<string>();
+    value.requestedAddons?.forEach((addon, index) => {
+      if (serviceIds.has(addon.serviceId))
+        ctx.addIssue({
+          code: "custom",
+          message: "Choose each service only once",
+          path: ["requestedAddons", index, "serviceId"],
+        });
+      serviceIds.add(addon.serviceId);
+    });
     if (
       (value.durationMode === "one_day" && value.requestedDays.length !== 1) ||
       (value.durationMode === "multi_day" && value.requestedDays.length < 2)
@@ -182,8 +211,11 @@ export const bookingSchema = z.object({
   phoneNumber: z.string(),
   preferredVenueLocation: z.string().nullable(),
   specialRequests: z.string().nullable(),
+  requestedServices: z.array(reviewedServiceSchema),
+  budget: z.string().nullable(),
   status: statusSchema,
   outOfRange: z.boolean(),
+  submittedAt: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

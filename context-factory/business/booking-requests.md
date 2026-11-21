@@ -18,8 +18,13 @@ The [identity reference](identity.md) defines these responsibilities. Admin mean
 3. After accepting the request for processing, the admin schedules requested days that have customer-supplied start and end times. The `POST /admin/event-days/schedule-requested-days` operation takes `bookingRequestId` and `expectedUpdatedAt`; the request revision prevents scheduling from stale details.
 4. The admin can create, move, or cancel operational event days and continues customer communication in the linked conversation.
 
+## Booking through AMAC AI
+
+A guest or customer can give event details over several messages, select a public package or request a custom arrangement. AMAC saves the draft as a booking request with an empty `submitted_at`, linked to that chat. Lists, calendars and administrative booking actions show submitted requests. The signed-in customer reviews the exact contact details, dates, package and requested services, then confirms submission in the same chat. The team receives an inquiry under review. Changing the draft or handing the chat to a human invalidates the pending confirmation. Requested services reach the admin as customer preferences. The admin owns private-package add-ons and quotation prices. See the [workflow and acceptance cases](../../docs/specs/amac-conversational-booking.md).
+
 ## Rules and boundaries
 
+- The manual form accepts optional public catalog services. Customers request whole excess hours for fixed-price services or positive whole requested hours for hourly-only services. Each service appears once and its hours apply to the whole inquiry. Customers can describe extensions for package inclusions or unlisted services in Special requests. The admin reviews the saved hours and catalog terms and decides what to offer through the private package and quotation.
 - A request may have no initial catalog `package_id`. In that state, its package and price are not yet known; views show "Package to be prepared" and "To be discussed" rather than inventing a zero price.
 - Only a System Administrator assigns an available catalog package to a request without a package, or prepares a booking-owned private package from scratch. Existing catalog choices and private proposals retain their history. A private proposal may also start as a copy of a catalog package.
 - Admin package preparation, catalog assignment, and quotation work are eligible while a request is `under_review`, `needs_details`, or `accepted`; accepting it first is unnecessary. Declined and cancelled requests retain readable packages and quotation history but cannot receive those changes. Package, revision, and conversation prerequisites still apply; see [quotations](quotations.md).

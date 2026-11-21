@@ -346,3 +346,96 @@ test("detail exposes withdrawn chunks without counting or serving removed media"
     before,
   );
 });
+
+test("package detail labels included services in prepared and saved chunks", async () => {
+  const serviceId = randomUUID();
+  const unavailableId = randomUUID();
+  await db!
+    .insertInto("services")
+    .values({
+      id: serviceId,
+      name: "Music *Live*",
+      slug: "music-live",
+      description: "",
+      hourly_rate_pesos: 1,
+    })
+    .execute();
+
+  const { id } = await db!
+    .insertInto("packages")
+    .values({
+      name: "Music package",
+      slug: "music-package",
+      price: 100,
+      max_guests: 20,
+      canvas: JSON.stringify([
+        {
+          id: randomUUID(),
+          title: "Included services",
+          widgets: [serviceId, unavailableId].map((linkedId, index) => ({
+            id: randomUUID(),
+            type: "service",
+            x: index,
+            y: 0,
+            w: 1,
+            h: 1,
+            markdown: "",
+            mediaId: null,
+            alt: "",
+            caption: "",
+            autoplay: false,
+            serviceId: linkedId,
+          })),
+        },
+      ]),
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+
+  const load = async () => {
+    const response = await app.request(`/v1/admin/ai/knowledge/package/${id}`, {
+      headers: { cookie: adminCookie },
+    });
+    assert.equal(response.status, 200);
+
+    return response.json();
+  };
+
+  const prepared = await load();
+  assert.equal(prepared.chunks[0].status, "pending");
+  assert.ok(
+    prepared.chunks[0].contentMarkdown.includes(
+      "Included service: Music \\*Live\\*",
+    ),
+  );
+  assert.ok(
+    prepared.chunks[0].contentMarkdown.includes(
+      "Included service: Service details unavailable",
+    ),
+  );
+  assert.ok(!prepared.chunks[0].contentMarkdown.includes(serviceId));
+  assert.ok(!prepared.chunks[0].contentMarkdown.includes(unavailableId));
+
+  const savedMarkdown = `# Saved text\nIncluded service ID: ${serviceId}\nIncluded service ID: ${unavailableId}`;
+  await db!
+    .insertInto("catalog_knowledge")
+    .values({
+      package_id: id,
+      chunk_key: "text",
+      content_markdown: savedMarkdown,
+      content_hash: "older",
+    })
+    .execute();
+  const saved = await load();
+  assert.equal(saved.chunks[0].status, "needs-refresh");
+  assert.equal(
+    saved.chunks[0].contentMarkdown,
+    "# Saved text\nIncluded service: Music \\*Live\\*\nIncluded service: Service details unavailable",
+  );
+  const stored = await db!
+    .selectFrom("catalog_knowledge")
+    .select("content_markdown")
+    .where("package_id", "=", id)
+    .executeTakeFirstOrThrow();
+  assert.equal(stored.content_markdown, savedMarkdown);
+});

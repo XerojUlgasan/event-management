@@ -22,6 +22,46 @@ export async function sendCustomerMessageService(
   abortSignal?: AbortSignal,
   requestId?: string,
   imageFiles: CheckedMessageImage[] = [],
+  reviewMessageId?: string,
+) {
+  // Serialize replies to a pinned assistant message within this worker.
+  // The database guard and unique reply protect the commit across workers.
+  if (requestId && reviewMessageId && !imageFiles.length) {
+    return serializeMessageRequest(`confirmation:${requestId}`, () =>
+      sendCustomerMessageUnlocked(
+        db,
+        customerId,
+        body,
+        conversationId,
+        abortSignal,
+        requestId,
+        imageFiles,
+        reviewMessageId,
+      ),
+    );
+  }
+
+  return sendCustomerMessageUnlocked(
+    db,
+    customerId,
+    body,
+    conversationId,
+    abortSignal,
+    requestId,
+    imageFiles,
+    reviewMessageId,
+  );
+}
+
+async function sendCustomerMessageUnlocked(
+  db: Kysely<DB>,
+  customerId: string,
+  body: string,
+  conversationId?: string,
+  abortSignal?: AbortSignal,
+  requestId?: string,
+  imageFiles: CheckedMessageImage[] = [],
+  reviewMessageId?: string,
 ) {
   const conversation = conversationId
     ? await findConversationData(db, conversationId)
@@ -62,6 +102,8 @@ export async function sendCustomerMessageService(
           body,
           requestId,
           images,
+          undefined,
+          false,
         ));
 
       if (!saved) throw new Error("Message persistence failed");
@@ -77,7 +119,32 @@ export async function sendCustomerMessageService(
 
   const message = messageDto(saved.message);
 
-  if (saved.replayed || !saved.aiEnabled || imageFiles.length)
+  if (saved.replayed && reviewMessageId) {
+    const reply = await db
+      .selectFrom("messages")
+      .selectAll()
+      .where("conversation_id", "=", conversation.id)
+      .where("reply_to_message_id", "=", message.id)
+      .where("sender_role", "=", "assistant")
+      .executeTakeFirst();
+
+    if (reply)
+      return {
+        message,
+        assistantMessage: messageDto({
+          ...reply,
+          sender_display_name: null,
+          sender_email: null,
+        }),
+        assistantError: null,
+      };
+  }
+
+  if (
+    (saved.replayed && !reviewMessageId) ||
+    !saved.aiEnabled ||
+    imageFiles.length
+  )
     return { message, assistantMessage: null, assistantError: null };
 
   try {
@@ -88,11 +155,36 @@ export async function sendCustomerMessageService(
       conversationId: conversation.id,
       customerMessageId: message.id,
       aiVersion: saved.aiVersion,
+      reviewMessageId,
+      replayed: saved.replayed,
       abortSignal,
     });
 
     return { message, assistantMessage, assistantError: null };
   } catch {
+    // A competing worker may have committed the same receipt while this turn
+    // was running. Return it even if this execution lost the guarded race.
+    if (reviewMessageId) {
+      const reply = await db
+        .selectFrom("messages")
+        .selectAll()
+        .where("conversation_id", "=", conversation.id)
+        .where("reply_to_message_id", "=", message.id)
+        .where("sender_role", "=", "assistant")
+        .executeTakeFirst();
+
+      if (reply)
+        return {
+          message,
+          assistantMessage: messageDto({
+            ...reply,
+            sender_display_name: null,
+            sender_email: null,
+          }),
+          assistantError: null,
+        };
+    }
+
     const current = await findConversationData(db, conversation.id).catch(
       () => undefined,
     );

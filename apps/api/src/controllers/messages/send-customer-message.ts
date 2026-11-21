@@ -35,7 +35,7 @@ export const sendCustomerMessageRoute = createRoute({
 export const sendCustomerMessageRouteHandler: AppRouteHandler<
   typeof sendCustomerMessageRoute
 > = async (c) => {
-  const input = await parseMessageInput(c);
+  const input = await parseMessageInput(c, "customer");
 
   try {
     const result = await sendCustomerMessageService(
@@ -46,6 +46,7 @@ export const sendCustomerMessageRouteHandler: AppRouteHandler<
       c.req.raw.signal,
       input.requestId,
       input.images,
+      input.reviewMessageId,
     );
 
     return c.json(result, 201);

@@ -1,3 +1,4 @@
+import type { ReviewedBookingService } from "@event-management/contracts/booking-draft";
 import type { BookingStatus } from "@event-management/contracts/booking-requests";
 import type { PackagePrice } from "@event-management/contracts/catalog";
 import type { BookingEstimatedDuration } from "@event-management/contracts/limits/booking-requests";
@@ -6,6 +7,11 @@ import { request } from "../../http/request";
 export type { BookingStatus } from "@event-management/contracts/booking-requests";
 
 export type BookingRequestInput = {
+  requestedAddons?: {
+    serviceId: string;
+    serviceUpdatedAt: string;
+    hours: number;
+  }[];
   packageId?: string | null;
   packageUpdatedAt?: string;
   conversationId?: string;
@@ -56,6 +62,8 @@ export type BookingRequest = Omit<
   endsAt: string | null;
   preferredVenueLocation: string | null;
   specialRequests: string | null;
+  requestedServices: ReviewedBookingService[];
+  budget: string | null;
   id: string;
   reference: string;
   customerId: string;
@@ -65,6 +73,7 @@ export type BookingRequest = Omit<
   packageMaxGuests: number | null;
   status: BookingStatus;
   outOfRange: boolean;
+  submittedAt: string;
   createdAt: string;
   updatedAt: string;
 };

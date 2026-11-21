@@ -8,7 +8,7 @@ type Database = Kysely<DB>;
 export async function ensureConversationData(db: Database, customerId: string) {
   const existing = await selectConversationColumnsData(db)
     .where("c.customer_id", "=", customerId)
-    .where("c.booking_request_id", "is", null)
+    .where("br.id", "is", null)
     .orderBy("c.created_at", "desc")
     .limit(1)
     .executeTakeFirst();
@@ -22,7 +22,7 @@ export async function ensureConversationData(db: Database, customerId: string) {
 
   return selectConversationColumnsData(db)
     .where("c.customer_id", "=", customerId)
-    .where("c.booking_request_id", "is", null)
+    .where("br.id", "is", null)
     .orderBy("c.created_at", "desc")
     .executeTakeFirstOrThrow();
 }

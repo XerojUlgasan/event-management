@@ -3,6 +3,10 @@ export const routeFamilies = [
   { id: "ai", prefixes: ["/v1/admin/ai/knowledge"] },
   { id: "health", prefixes: ["/v1/health"] },
   {
+    id: "business-information",
+    prefixes: ["/v1/business-information", "/v1/admin/business-information"],
+  },
+  {
     id: "catalog-media",
     prefixes: ["/v1/admin/catalog-media", "/v1/catalog-media"],
   },

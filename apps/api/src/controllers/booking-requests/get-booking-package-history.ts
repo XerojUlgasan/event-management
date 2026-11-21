@@ -20,6 +20,7 @@ export const getAdminBookingPackageHistoryRoute = createRoute({
             z.object({
               id: z.string().uuid(),
               actorId: z.string().uuid().nullable(),
+              actorName: z.string().nullable(),
               action: z.string(),
               before: publicSchema.nullable(),
               after: publicSchema,

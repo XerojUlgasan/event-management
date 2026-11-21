@@ -7,7 +7,10 @@ import {
   MAX_CURSOR_LENGTH,
 } from "@event-management/contracts/pagination";
 import { createRoute, z } from "@hono/zod-openapi";
-import { listNotificationsData } from "../../data/notifications/list-notifications.js";
+import {
+  listNotificationBookingsData,
+  listNotificationsData,
+} from "../../data/notifications/list-notifications.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import {
   encodePageCursor,
@@ -31,6 +34,7 @@ export const listNotificationsRoute = createRoute({
   request: {
     query: z.object({
       cursor: z.string().min(1).max(MAX_CURSOR_LENGTH).optional(),
+      includeBookingDetails: z.literal("1").optional(),
     }),
   },
   responses: {
@@ -46,16 +50,14 @@ export const listNotificationsRoute = createRoute({
 export const listNotificationsRouteHandler: AppRouteHandler<
   typeof listNotificationsRoute
 > = async (c) => {
-  const userId = c.get("session").user.id;
-  const scope = `notifications:${userId}`;
-  const cursor = parsePageCursor(
-    c.req.valid("query").cursor,
-    cursorPosition,
-    scope,
-  );
+  const viewer = c.get("session").user;
+  const db = c.get("db");
+  const scope = `notifications:${viewer.id}`;
+  const query = c.req.valid("query");
+  const cursor = parsePageCursor(query.cursor, cursorPosition, scope);
   const { rows, unread_count } = await listNotificationsData(
-    c.get("db"),
-    userId,
+    db,
+    viewer.id,
     PAGE_SIZE,
     cursor,
   );
@@ -64,16 +66,49 @@ export const listNotificationsRouteHandler: AppRouteHandler<
     encodePageCursor(scope, { createdAt: cursor_created_at, id }),
   );
 
+  const notifications = page.items.map(
+    ({ id, type, payload, cursor_created_at, read_at }) => ({
+      ...notificationContentSchema.parse({ type, payload }),
+      id,
+      createdAt: cursor_created_at,
+      readAt: read_at,
+    }),
+  );
+
+  const bookingIdFor = (item: (typeof notifications)[number]) => {
+    if (
+      query.includeBookingDetails &&
+      (item.type === "booking_status_updated" ||
+        (item.type === "booking_request_created" && viewer.role === "admin"))
+    )
+      return item.payload.bookingRequestId.toLowerCase();
+  };
+
+  const items = notifications.map((notification) => ({
+    notification,
+    bookingId: bookingIdFor(notification),
+  }));
+
+  const bookingIds = [
+    ...new Set(items.flatMap(({ bookingId }) => (bookingId ? [bookingId] : []))),
+  ];
+
+  const bookings = new Map(
+    (await listNotificationBookingsData(db, bookingIds, viewer)).map(
+      ({ id, event_type, preferred_date }) => [
+        id,
+        { eventType: event_type, preferredDate: preferred_date },
+      ],
+    ),
+  );
+
   return c.json(
     {
-      notifications: page.items.map(
-        ({ id, type, payload, cursor_created_at, read_at }) => ({
-          ...notificationContentSchema.parse({ type, payload }),
-          id,
-          createdAt: cursor_created_at,
-          readAt: read_at,
-        }),
-      ),
+      notifications: items.map(({ notification, bookingId }) => {
+        const booking = bookingId ? bookings.get(bookingId) : undefined;
+
+        return booking ? { ...notification, booking } : notification;
+      }),
       unreadCount: Number(unread_count),
       nextCursor: page.nextCursor,
     },

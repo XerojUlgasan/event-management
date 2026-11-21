@@ -1,3 +1,4 @@
+import { BookingIntake } from "./BookingIntake";
 import { BookingStatusHistory } from "./BookingStatusHistory";
 import { usePagination } from "../../lib/pagination/use-pagination";
 import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
@@ -52,6 +53,7 @@ import {
   bookingStatusLabels as labels,
   bookingDateTime as dateLabel,
   bookingDate as preferredDateLabel,
+  bookingRequestLabel,
   BookingStatusBadge,
 } from "./BookingRequestDisplay";
 import { CustomerEventTimeline } from "./CustomerEventTimeline";
@@ -659,7 +661,6 @@ function AdminBookingList() {
                 <tr>
                   <th>Requested ↓</th>
                   <th>Requested dates</th>
-                  <th>Reference</th>
                   <th>Event / package</th>
                   <th>Contact person</th>
                   <th>Status</th>
@@ -682,14 +683,13 @@ function AdminBookingList() {
                           event.stopPropagation();
                           navigateWorkspace(adminBookingRequestPath(item.id));
                         }}
-                        aria-label={`View request ${item.reference}`}
+                        aria-label={`View request for ${bookingRequestLabel(item.eventType, item.preferredDate)} · ${item.contactName}`}
                       >
-                        {shortDate(item.createdAt)}{" "}
+                        {shortDate(item.submittedAt)}{" "}
                         <span aria-hidden="true">↗</span>
                       </Button>
                     </td>
                     <td>{requestedSummary(item)}</td>
-                    <td>{item.reference}</td>
                     <td>
                       {item.eventType}
                       <small>
@@ -785,7 +785,9 @@ export function BookingDetails({
         >
           ×
         </Button>
-        <h2 id="booking-details-title">Booking request {item.reference}</h2>
+        <h2 id="booking-details-title">
+          {bookingRequestLabel(item.eventType, item.preferredDate)}
+        </h2>
         <BookingStatusBadge status={item.status} />
         <Tabs
           role="tablist"
@@ -915,11 +917,15 @@ export function BookingDetails({
                   </div>
                   <div>
                     <dt>Requested</dt>
-                    <dd>{dateLabel(item.createdAt, item.timeZone)}</dd>
+                    <dd>{dateLabel(item.submittedAt, item.timeZone)}</dd>
                   </div>
                 </dl>
               </section>
             </div>
+            <BookingIntake
+              requestedServices={item.requestedServices}
+              budget={item.budget}
+            />
             {item.requestedDays && (
               <section>
                 <h3>Requested days</h3>

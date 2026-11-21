@@ -1128,7 +1128,7 @@ test("admin request filters, cursor pages and calendar counts use preferred date
 
   for (const [id, date, status] of rows) {
     await pool.query(
-      `INSERT INTO booking_requests (id, reference, customer_id, package_id, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, created_at)
+      `INSERT INTO booking_requests (id, reference, customer_id, package_id, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, submitted_at)
       VALUES ($1, $2, $3, $4, 'Wedding', $5, 'undecided', 'Asia/Manila', 20, 'Customer', '123', $6, false, '2098-01-01T00:00:00.123456Z')`,
       [id, `TEST-${id}`, customerId, packageId, date, status],
     );
@@ -1210,7 +1210,7 @@ test("booking request pagination crosses the 50-item boundary without duplicates
     )
   ).rows[0].id;
   await pool.query(
-    `INSERT INTO booking_requests (reference, customer_id, package_id, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, created_at)
+    `INSERT INTO booking_requests (reference, customer_id, package_id, event_type, preferred_date, estimated_duration, time_zone, guest_count, contact_name, phone_number, status, out_of_range, submitted_at)
     SELECT 'PAGE-' || n, $1, $2, 'Wedding', '2097-05-10', 'undecided', 'Asia/Manila', 20, 'Customer', '123', 'under_review', false,
       '2097-01-01T00:00:00.123000Z'::timestamptz + (n / 4) * interval '1 microsecond'
     FROM generate_series(1, 53) AS n`,
@@ -1219,7 +1219,7 @@ test("booking request pagination crosses the 50-item boundary without duplicates
 
   const expected = (
     await pool.query(
-      "SELECT id FROM booking_requests WHERE preferred_date = '2097-05-10' AND status = 'under_review' ORDER BY created_at DESC, id DESC",
+      "SELECT id FROM booking_requests WHERE preferred_date = '2097-05-10' AND status = 'under_review' ORDER BY submitted_at DESC, id DESC",
     )
   ).rows.map((row) => row.id);
 
@@ -2282,4 +2282,469 @@ test("general conversation can become one package-less request atomically", asyn
     ).status,
     409,
   );
+});
+
+test("manual add-ons validate current catalog terms and persist an atomic snapshot", async () => {
+  const fixed = await db
+    .insertInto("services")
+    .values({
+      slug: "manual-addon-fixed",
+      name: "Manual fixed",
+      description: "Fixture",
+      hourly_rate_pesos: 200,
+      fixed_price_pesos: 1000,
+      included_hours: 3,
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  const hourly = await db
+    .insertInto("services")
+    .values({
+      slug: "manual-addon-hourly",
+      name: "Manual hourly",
+      description: "Fixture",
+      hourly_rate_pesos: 300,
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  const legacy = await db
+    .insertInto("services")
+    .values({
+      slug: "manual-addon-legacy",
+      name: "Manual legacy",
+      description: "Fixture",
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  const pkg = await db
+    .insertInto("packages")
+    .values({
+      slug: "manual-addon-package",
+      name: "Manual package",
+      max_guests: 20,
+      price: 1000,
+      canvas: JSON.stringify([
+        {
+          id: randomUUID(),
+          title: "Included",
+          widgets: [
+            {
+              id: randomUUID(),
+              type: "service",
+              x: 0,
+              y: 0,
+              w: 6,
+              h: 4,
+              markdown: "",
+              mediaId: null,
+              alt: "",
+              caption: "",
+              autoplay: false,
+              serviceId: fixed.id,
+            },
+          ],
+        },
+      ]),
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  const base = {
+    eventType: "Wedding",
+    durationMode: "one_day",
+    requestedDays: [{ date: "2099-04-01" }],
+    timeZone: "Asia/Manila",
+    contactName: "Customer",
+    phoneNumber: "123",
+  };
+  const selection = (service: typeof fixed, hours: number) => ({
+    serviceId: service.id,
+    serviceUpdatedAt: service.updated_at.toISOString(),
+    hours,
+  });
+  const post = (body: unknown) =>
+    call("/booking-requests", "POST", body, customerCookie);
+  const beforeCount = Number(
+    (await pool.query("SELECT count(*) AS n FROM booking_requests")).rows[0].n,
+  );
+  for (const [addons, status, extra] of [
+    [[selection(fixed, -1)], 400, {}],
+    [
+      [
+        selection(fixed, 0),
+        { ...selection(fixed, 1), serviceId: fixed.id.toUpperCase() },
+      ],
+      400,
+      {},
+    ],
+    [[selection(hourly, 0)], 400, {}],
+    [[selection(legacy, 1)], 409, {}],
+    [
+      [
+        {
+          ...selection(fixed, 0),
+          serviceUpdatedAt: "2000-01-01T00:00:00.000Z",
+        },
+      ],
+      409,
+      {},
+    ],
+    [[{ ...selection(fixed, 0), serviceId: randomUUID() }], 409, {}],
+    [
+      [selection(fixed, 0)],
+      409,
+      { packageId: pkg.id, packageUpdatedAt: pkg.updated_at.toISOString() },
+    ],
+  ] as const) {
+    const result = await read(
+      await post({ ...base, ...extra, requestedAddons: addons }),
+      status,
+    );
+    if (status === 409) {
+      assert.equal(result.code, "requested_addon_conflict");
+      assert.equal(result.resourceId, addons[0].serviceId);
+    }
+  }
+  assert.equal(
+    Number(
+      (await pool.query("SELECT count(*) AS n FROM booking_requests")).rows[0]
+        .n,
+    ),
+    beforeCount,
+  );
+  const archived = await db
+    .updateTable("services")
+    .set({ archived_at: new Date() })
+    .where("id", "=", legacy.id)
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  await read(
+    await post({ ...base, requestedAddons: [selection(archived, 1)] }),
+    409,
+  );
+
+  const created = (
+    await read(
+      await post({
+        ...base,
+        requestedAddons: [selection(fixed, 0), selection(hourly, 2)],
+      }),
+      201,
+    )
+  ).bookingRequest;
+  assert.deepEqual(
+    created.requestedServices.map((item: { hours: number }) => item.hours),
+    [3, 2],
+  );
+  assert.deepEqual(created.requestedServices[0].catalogPricing, {
+    fixedPricePesos: 1000,
+    includedHours: 3,
+    hourlyRatePesos: 200,
+  });
+  assert.deepEqual(created.requestedServices[1].catalogPricing, {
+    fixedPricePesos: null,
+    includedHours: null,
+    hourlyRatePesos: 300,
+  });
+  assert.equal(created.requestedServices[0].included, false);
+  assert.equal(created.requestedServices[0].notes, null);
+  const moreServices = await db
+    .insertInto("services")
+    .values(
+      Array.from({ length: 50 }, (_, index) => ({
+        slug: `manual-addon-body-${index}`,
+        name: `Manual add-on ${index + 1}`,
+        description: "Fixture",
+        hourly_rate_pesos: 200,
+      })),
+    )
+    .returningAll()
+    .execute();
+  const largeRequest = {
+    ...base,
+    specialRequests: "あ".repeat(4000),
+    requestedAddons: moreServices.map((service) => selection(service, 1)),
+  };
+  assert.ok(Buffer.byteLength(JSON.stringify(largeRequest)) > 16 * 1024);
+  const largeBooking = (await read(await post(largeRequest), 201))
+    .bookingRequest;
+  assert.equal(largeBooking.requestedServices.length, moreServices.length);
+  const second = (
+    await read(
+      await post({ ...base, requestedAddons: [selection(fixed, 2)] }),
+      201,
+    )
+  ).bookingRequest;
+  assert.equal(second.requestedServices[0].hours, 5);
+  const stored = await db
+    .selectFrom("booking_requests")
+    .select("requested_services")
+    .where("id", "=", created.id)
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(stored.requested_services, created.requestedServices);
+  const adminView = (
+    await read(
+      await call(
+        `/admin/booking-requests/${created.id}`,
+        "GET",
+        undefined,
+        adminCookie,
+      ),
+      200,
+    )
+  ).bookingRequest;
+  assert.deepEqual(adminView.requestedServices, created.requestedServices);
+  const customerView = (
+    await read(
+      await call(
+        `/booking-requests/${created.id}`,
+        "GET",
+        undefined,
+        customerCookie,
+      ),
+      200,
+    )
+  ).bookingRequest;
+  assert.deepEqual(customerView.requestedServices, created.requestedServices);
+});
+
+test("conversational intake preserves partial corrections, distinguishes package inclusions and rechecks public catalog rows", async () => {
+  const { applyBookingDraftPatch, bookingDraftPatchSchema } =
+    await import("@event-management/contracts/booking-draft");
+  const { resolveBookingDraft } =
+    await import("../src/services/booking-requests/resolve-booking-draft.js");
+  const service = await db
+    .insertInto("services")
+    .values({
+      slug: "draft-included",
+      name: "Draft fixture service",
+      description: "Fixture",
+      hourly_rate_pesos: 100,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const pkg = await db
+    .insertInto("packages")
+    .values({
+      slug: "draft-selection",
+      name: "Draft fixture package",
+      max_guests: 10,
+      price: 2345,
+      canvas: JSON.stringify([
+        {
+          id: randomUUID(),
+          title: "Included services",
+          widgets: [
+            {
+              id: randomUUID(),
+              type: "service",
+              x: 0,
+              y: 0,
+              w: 6,
+              h: 4,
+              markdown: "",
+              mediaId: null,
+              alt: "",
+              caption: "",
+              autoplay: false,
+              serviceId: service.id,
+            },
+          ],
+        },
+      ]),
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const initial = applyBookingDraftPatch(
+    {},
+    {
+      eventType: "Birthday",
+      durationMode: "multi_day",
+      requestedDates: ["2099-09-06", "2099-09-04"],
+      packageId: pkg.id,
+      upsertServices: [
+        { serviceId: service.id, hours: 3, notes: "Set up early" },
+        { customName: "Bilingual host" },
+      ],
+      budget: "PHP 5000 including extras",
+      specialRequests: "Evening, accessible entrance",
+    },
+  );
+
+  const incomplete = await db
+    .transaction()
+    .execute((trx) => resolveBookingDraft(trx, initial));
+
+  assert.deepEqual(incomplete.missingFields.sort(), [
+    "contactName",
+    "phoneNumber",
+    "timeZone",
+  ]);
+  assert.equal(incomplete.createInput, null);
+  const fields = applyBookingDraftPatch(initial, {
+    timeZone: "Asia/Manila",
+    contactName: "Fixture Contact",
+    phoneNumber: "00000000000",
+    guestCount: 20,
+    preferredVenueLocation: "Venue undecided",
+    upsertServices: [{ serviceId: service.id, hours: 4, notes: null }],
+  });
+
+  const result = await db
+    .transaction()
+    .execute((trx) => resolveBookingDraft(trx, fields, true));
+
+  assert.deepEqual(result.missingFields, []);
+  assert.deepEqual(result.createInput?.requestedDays, [
+    { date: "2099-09-04" },
+    { date: "2099-09-06" },
+  ]);
+  assert.equal(result.selectedPackage?.price, 2345);
+  assert.equal(result.requestedServices.length, 2);
+  assert.deepEqual(
+    result.requestedServices.map((s) => [s.name, s.included, s.hours, s.notes]),
+    [
+      ["Draft fixture service", true, 4, null],
+      ["Bilingual host", false, null, null],
+    ],
+  );
+  assert.match(result.warnings.join(" "), /capacity/);
+  await db
+    .updateTable("packages")
+    .set({ archived_at: new Date() })
+    .where("id", "=", pkg.id)
+    .execute();
+  await db
+    .updateTable("services")
+    .set({ archived_at: new Date() })
+    .where("id", "=", service.id)
+    .execute();
+
+  const stale = await db
+    .transaction()
+    .execute((trx) => resolveBookingDraft(trx, fields, true));
+
+  assert.equal(stale.createInput, null);
+  assert.deepEqual(stale.missingFields.sort(), [
+    "packageId",
+    "requestedServices",
+  ]);
+  const optional = applyBookingDraftPatch(fields, {
+    packageId: null,
+    removeServices: [service.id, "bilingual host"],
+    budget: null,
+  });
+
+  const noPackage = await db
+    .transaction()
+    .execute((trx) => resolveBookingDraft(trx, optional));
+
+  assert.deepEqual(noPackage.missingFields, []);
+  assert.equal(noPackage.selectedPackage, null);
+  assert.equal(optional.budget, undefined);
+  assert.deepEqual(noPackage.requestedServices, []);
+
+  for (const patch of [
+    { requestedDates: ["2099-01-01", "2099-01-01"] },
+    { requestedDates: ["2099-02-31"] },
+    { timeZone: "invalid/zone" },
+  ])
+    assert.equal(bookingDraftPatchSchema.safeParse(patch).success, false);
+
+  for (const patch of [
+    { requestedDates: ["2000-01-01", "2099-01-01"] },
+    { requestedDates: ["2099-01-01"] },
+  ]) {
+    const invalid = await db
+      .transaction()
+      .execute((trx) =>
+        resolveBookingDraft(trx, applyBookingDraftPatch(optional, patch)),
+      );
+
+    assert.equal(invalid.createInput, null);
+    assert.ok(invalid.missingFields.includes("requestedDates"));
+  }
+
+  const {
+    rows: [schema],
+  } = await pool.query(
+    "select to_regclass('public.conversation_booking_drafts') is null as single_table, relrowsecurity from pg_class where oid = 'public.booking_requests'::regclass",
+  );
+  assert.deepEqual(schema, { single_table: true, relrowsecurity: true });
+});
+
+test("an unsubmitted request stays out of booking detail, management and calendar views", async () => {
+  const draft = await db
+    .insertInto("booking_requests")
+    .values({
+      reference: "BR-HIDDEN-DRAFT",
+      customer_id: customerId,
+      preferred_date: "2096-03-06",
+      out_of_range: false,
+      submitted_at: null,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const chat = await db
+    .insertInto("conversations")
+    .values({
+      customer_id: customerId,
+      booking_request_id: draft.id,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const { findConversationData } =
+    await import("../src/data/messages/find-conversation.js");
+  const displayed = await findConversationData(db, chat.id);
+  assert.equal(displayed?.booking_request_id, null);
+  assert.equal(displayed?.booking_request_reference, null);
+  const { ensureConversationData } =
+    await import("../src/data/messages/ensure-conversation.js");
+  assert.equal((await ensureConversationData(db, customerId)).id, chat.id);
+  await read(
+    await call(
+      `/booking-requests/${draft.id}`,
+      "GET",
+      undefined,
+      customerCookie,
+    ),
+    404,
+  );
+  await read(
+    await call(
+      `/admin/booking-requests/${draft.id}`,
+      "GET",
+      undefined,
+      adminCookie,
+    ),
+    404,
+  );
+  await read(
+    await call(
+      `/admin/booking-requests/${draft.id}/status`,
+      "PATCH",
+      { status: "accepted" },
+      adminCookie,
+    ),
+    404,
+  );
+  const list = await read(
+    await call(
+      "/admin/booking-requests?preferredDate=2096-03-06",
+      "GET",
+      undefined,
+      adminCookie,
+    ),
+    200,
+  );
+  assert.deepEqual(list.bookingRequests, []);
+  const counts = await read(
+    await call(
+      "/admin/booking-requests/calendar?month=2096-03",
+      "GET",
+      undefined,
+      adminCookie,
+    ),
+    200,
+  );
+  assert.deepEqual(counts.dailyCounts, []);
 });

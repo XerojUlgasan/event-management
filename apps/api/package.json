@@ -32,11 +32,13 @@
     "test:messages": "tsx --test tests/messages.test.ts tests/chat-images.test.ts tests/image-message-jobs-migration.test.ts tests/conversation-activity-migration.test.ts",
     "test:notifications": "tsx --test tests/notifications.test.ts",
     "test:booking-requests": "tsx --test tests/booking-requests.test.ts",
+    "test:conversational-booking": "tsx --test tests/conversational-booking.test.ts tests/booking-request-drafts-migration.test.ts",
     "test:event-days": "tsx --test tests/event-days.test.ts",
     "test:catalog-staff-removal": "tsx --test tests/catalog-staff-removal-migration.test.ts",
     "test:checklist-removal": "tsx --test tests/checklist-removal-migration.test.ts",
     "worker:background-jobs": "tsx src/workers/background-jobs.ts",
-    "test:background-jobs": "tsx --test tests/background-jobs.test.ts tests/background-jobs-worker.test.ts"
+    "test:background-jobs": "tsx --test tests/background-jobs.test.ts tests/background-jobs-worker.test.ts",
+    "test:business-information": "tsx --test tests/business-information.test.ts"
   },
   "dependencies": {
     "@event-management/contracts": "workspace:*",

@@ -46,9 +46,19 @@ const notificationFields = {
   readAt: z.iso.datetime().nullable(),
 };
 
+const bookingNotificationFields = {
+  ...notificationFields,
+  booking: z
+    .strictObject({
+      eventType: z.string(),
+      preferredDate: z.iso.date().nullable(),
+    })
+    .optional(),
+};
+
 export const notificationSchema = z.discriminatedUnion("type", [
-  bookingRequestCreated.extend(notificationFields),
-  bookingStatusUpdated.extend(notificationFields),
+  bookingRequestCreated.extend(bookingNotificationFields),
+  bookingStatusUpdated.extend(bookingNotificationFields),
   quotationSent.extend(notificationFields),
   humanReviewRequested.extend(notificationFields),
 ]);

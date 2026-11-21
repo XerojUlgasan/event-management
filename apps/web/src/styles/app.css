@@ -2,11 +2,13 @@
 @import "@event-management/theme/theme.css";
 @import "@event-management/ui/styles.css";
 @import "./catalog/public-preview.css";
+@import "./catalog/package-addons.css";
 @import "./catalog/public-catalog.css";
 @import "./booking-requests/booking-request.css";
 @import "./booking-requests/customer-events.css";
 @import "./event-days/admin-event-days.css";
 @import "./public/site.css";
+@import "./business-information/business-information.css";
 @import "./notifications/notifications.css";
 
 html:has(.public-site) {

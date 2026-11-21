@@ -29,7 +29,7 @@ export function createSearchPublicCatalogTool({
   return tool({
     description:
       "Search customer-visible catalog packages or services. Choose catalogType. " +
-      "Use package pax for required capacity, and minPricePesos/maxPricePesos for package prices. " +
+      "Use package pax for the customer's guest count; each result's maximumGuestCapacity is its maximum, not a minimum number of guests. Use minPricePesos/maxPricePesos for package prices only when the customer explicitly says the budget is for the package. An event budget or 'my budget is PHP 80,000' is not necessarily a package budget: omit both price filters and ask which scope applies. " +
       "For service price filters choose pricingType: fixed (price for includedHours, with possible excess-hour rate) " +
       "or hourly (hourly-only services). Pax does not apply to services. " +
       "Optional query ranks fresh indexed evidence semantically; omit query to browse by exact filters without embeddings. " +
@@ -93,5 +93,15 @@ export function createSearchPublicCatalogTool({
         );
       }
     },
+    toModelOutput: ({ output }) => ({
+      type: "json",
+      value: {
+        ...output,
+        results: output.results.map(({ capacity, ...result }) => ({
+          ...result,
+          maximumGuestCapacity: capacity,
+        })),
+      },
+    }),
   });
 }

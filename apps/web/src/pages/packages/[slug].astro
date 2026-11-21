@@ -1,6 +1,7 @@
 ---
 import { Toast } from "@event-management/ui";
 import PublicDocument from "../../layouts/PublicDocument.astro";
+import { PublicPackageBooking } from "../../components/public/catalog/PublicPackageBooking";
 import { PublicPackageDetail } from "../../components/public/catalog/PublicPackageDetail";
 import type { PublicPackage } from "../../lib/data/catalog/packages";
 import { loadPackage } from "../../lib/server/catalog/load-catalog";
@@ -37,5 +38,9 @@ const description = item?.description || "This package is not available.";
   {!unavailable && !item && (
     <p class="catalog-status">This package is not available.</p>
   )}
-  {item && <PublicPackageDetail item={item} />}
+  {item && (
+    <PublicPackageDetail item={item}>
+      <PublicPackageBooking item={item} client:load />
+    </PublicPackageDetail>
+  )}
 </PublicDocument>

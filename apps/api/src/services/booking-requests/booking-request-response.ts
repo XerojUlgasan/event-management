@@ -1,3 +1,4 @@
+import { reviewedServiceSchema } from "@event-management/contracts/booking-draft";
 import { pesosToCentavos } from "@event-management/contracts/money";
 import type { Kysely, Selectable, Transaction } from "kysely";
 import type { DB, BookingRequests } from "../../db/types.js";
@@ -31,6 +32,18 @@ export async function bookingRequestDtos(
   );
 
   return rows.map((r) => {
+    if (
+      !r.submitted_at ||
+      r.event_type == null ||
+      r.preferred_date == null ||
+      r.time_zone == null ||
+      r.customer_id == null ||
+      r.contact_name == null ||
+      r.phone_number == null
+    )
+      throw new Error("Expected a submitted booking request");
+
+    const timeZone = r.time_zone;
     const pkg = r.package_id ? packages.get(r.package_id) : undefined;
 
     if (r.package_id && !pkg)
@@ -87,7 +100,7 @@ export async function bookingRequestDtos(
                     day: schedule.day,
                     startsAt: schedule.starts_at.toISOString(),
                     endsAt: schedule.ends_at.toISOString(),
-                    timeZone: r.time_zone,
+                    timeZone,
                     status: schedule.status,
                   }
                 : null,
@@ -104,14 +117,19 @@ export async function bookingRequestDtos(
       estimatedDurationDays: r.estimated_duration_days,
       startsAt: r.starts_at?.toISOString() ?? null,
       endsAt: r.ends_at?.toISOString() ?? null,
-      timeZone: r.time_zone,
+      timeZone,
       guestCount: r.guest_count,
       contactName: r.contact_name,
       phoneNumber: r.phone_number,
       preferredVenueLocation: r.preferred_venue_location,
       specialRequests: r.special_requests,
+      requestedServices: reviewedServiceSchema
+        .array()
+        .parse(r.requested_services ?? []),
+      budget: r.budget,
       status: r.status as Status,
       outOfRange: r.out_of_range,
+      submittedAt: r.submitted_at.toISOString(),
       createdAt: r.created_at.toISOString(),
       updatedAt: r.revision,
     };

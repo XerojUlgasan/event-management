@@ -17,7 +17,9 @@ let server,
   createRoot,
   NotificationProvider,
   Quotations,
-  BookingPackage;
+  BookingPackage,
+  CalendarPage,
+  BookingRequestPage;
 let root, container, requests, scenario;
 
 const openStatuses = ["under_review", "needs_details", "accepted"];
@@ -200,7 +202,9 @@ function fakeFetch(url, options = {}) {
     return Promise.resolve(json({ quotation: scenario.quote }));
 
   if (path.endsWith("/package-history"))
-    return Promise.resolve(json({ history: [], nextCursor: null }));
+    return Promise.resolve(
+      json({ history: scenario.packageHistory ?? [], nextCursor: null }),
+    );
 
   if (path.endsWith("/package"))
     return Promise.resolve(
@@ -219,6 +223,9 @@ function fakeFetch(url, options = {}) {
         nextCursor: null,
       }),
     );
+
+  if (path === "/v1/admin/event-days")
+    return Promise.resolve(json({ eventDays: [] }));
 
   if (path.includes("/admin/booking-requests/"))
     return Promise.resolve(
@@ -288,6 +295,12 @@ before(async () => {
   ));
   ({ BookingPackage } = await server.ssrLoadModule(
     "/src/components/booking-requests/BookingPackage.tsx",
+  ));
+  ({ CalendarPage } = await server.ssrLoadModule(
+    "/src/components/workspaces/admin/calendar/CalendarPage.tsx",
+  ));
+  ({ BookingRequestPage } = await server.ssrLoadModule(
+    "/src/components/workspaces/admin/booking-requests/BookingRequestPage.tsx",
   ));
   ({ NotificationProvider } = await server.ssrLoadModule(
     "/@fs" +
@@ -363,6 +376,94 @@ async function click(label) {
 function writes() {
   return requests.filter((request) => request.method !== "GET");
 }
+
+test("package history shows names and falls back without exposing actor IDs", async () => {
+  const after = {
+    name: "Package",
+    maxGuests: 50,
+    price: { amountMinor: 10000 },
+    sections: [],
+    addonServices: [],
+  };
+  scenario = {
+    packageHistory: [
+      {
+        id: "one",
+        actorId: "private-actor-one",
+        actorName: "Ada Santos",
+        action: "booking.custom_package_created",
+        before: null,
+        after,
+        createdAt: time,
+      },
+      {
+        id: "two",
+        actorId: "private-actor-two",
+        actorName: "  ",
+        action: "booking.custom_package_updated",
+        before: null,
+        after,
+        createdAt: time,
+      },
+      {
+        id: "three",
+        actorId: "private-actor-three",
+        action: "booking.custom_package_updated",
+        before: null,
+        after,
+        createdAt: time,
+      },
+    ],
+  };
+  await render(BookingPackage, { id: "booking-1", admin: true });
+  assert.match(container.textContent, /Ada Santos/);
+  assert.equal(
+    (container.textContent.match(/Unknown administrator/g) ?? []).length,
+    2,
+  );
+  assert.doesNotMatch(container.textContent, /private-actor/);
+});
+
+test("calendar drawer uses the example event name", async () => {
+  scenario = {};
+  await render(CalendarPage, {});
+  await click("Tasting · Mendoza");
+  assert.match(document.body.textContent, /Related eventMendoza–Reyes Wedding/);
+  assert.doesNotMatch(document.body.textContent, /CLM-2048/);
+});
+
+test("admin booking heading identifies the event", async () => {
+  scenario = {
+    intercept: (path) =>
+      path === "/v1/admin/booking-requests/booking-1"
+        ? Promise.resolve(
+            json({
+              bookingRequest: {
+                id: "booking-1",
+                reference: "BR-private-uuid",
+                eventType: "Wedding",
+                packageName: "Garden package",
+                contactName: "Ada Santos",
+                phoneNumber: "123",
+                requestedDays: [],
+                preferredDate: null,
+                status: "under_review",
+                timeZone: "Asia/Manila",
+                createdAt: time,
+                updatedAt: time,
+              },
+            }),
+          )
+        : null,
+  };
+  await render(BookingRequestPage, { bookingRequestId: "booking-1" });
+  assert.equal(
+    container.querySelector("h1")?.textContent,
+    "Wedding booking request",
+  );
+  assert.match(container.textContent, /Garden package/);
+  assert.doesNotMatch(container.textContent, /BR-private-uuid/);
+});
 
 test("open package selector and editor disappear when eligibility changes", async () => {
   scenario = {};

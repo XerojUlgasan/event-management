@@ -1,0 +1,15 @@
+.booking-review,
+.booking-intake {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.booking-review dl {
+  display: grid;
+  gap: 0.5rem;
+}
+.booking-review dt {
+  font-weight: 600;
+}
+.booking-review dd {
+  margin: 0;
+}

@@ -1,7 +1,3 @@
-import {
-  clearPendingAiHandoff,
-  parseAiHandoff,
-} from "../../utils/ai-handoff.js";
 import type { Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 import { publishConversationMessageData } from "./publish-conversation-message.js";
@@ -15,7 +11,7 @@ export async function createQuotationMessageData(
 ) {
   const conversation = await trx
     .selectFrom("conversations")
-    .selectAll()
+    .select(["id", "customer_id"])
     .where("booking_request_id", "=", bookingId)
     .forUpdate()
     .executeTakeFirst();
@@ -36,17 +32,7 @@ export async function createQuotationMessageData(
     .executeTakeFirstOrThrow();
   await trx
     .updateTable("conversations")
-    .set({
-      updated_at: message.created_at,
-      ai_enabled: false,
-      ai_version:
-        conversation.ai_version +
-        (conversation.ai_enabled ||
-        parseAiHandoff(conversation.ai_handoff)?.pending
-          ? 1
-          : 0),
-      ai_handoff: clearPendingAiHandoff(conversation.ai_handoff),
-    })
+    .set({ updated_at: message.created_at })
     .where("id", "=", conversation.id)
     .execute();
 

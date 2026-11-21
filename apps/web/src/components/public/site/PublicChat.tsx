@@ -579,9 +579,9 @@ export default function PublicChat() {
                 {!expired && (
                   <p>
                     <ActionLink
-                      href={`/login?guest=${encodeURIComponent(thread.conversation.id)}&createRequest=1`}
+                      href={`/login?guest=${encodeURIComponent(thread.conversation.id)}`}
                     >
-                      Create booking request
+                      Sign in to continue your request
                     </ActionLink>
                   </p>
                 )}

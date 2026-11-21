@@ -8,6 +8,8 @@ Preserve historical reasoning. When a decision changes, link a successor and mar
 
 | Record | Status / purpose |
 | --- | --- |
+| [Single-row booking drafts](2026-11-22_single-row-booking-drafts.md) | Accepted one booking row from first detail through confirmed submission |
+| [Conversational booking drafts](2026-11-21_conversational-booking-drafts.md) | Superseded storage and message review design |
 | [Markdown conversation memory](2026-11-21_conversation-memory.md) | Accepted single note on the conversation, updated during normal replies |
 | [Package-owned add-ons and direct quotation sending](2026-11-21_direct-quotation-send.md) | Accepted mandatory package add-ons and Send or Cancel for every version |
 | [Quotation package add-ons](2026-11-21_quotation-package-addons.md) | Superseded draft, override, and removal rules |

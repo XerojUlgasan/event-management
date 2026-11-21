@@ -16,9 +16,14 @@ export const messageBodySchema = z.object({
     ),
 });
 
-export const customerMessageBodySchema = messageBodySchema.extend({
-  requestId: z.string().uuid().optional(),
-});
+export const customerMessageBodySchema = messageBodySchema
+  .extend({ reviewMessageId: z.string().uuid().optional() })
+  .refine(
+    (input) =>
+      !input.reviewMessageId ||
+      Boolean(input.conversationId && input.requestId),
+    "A conversation ID and request ID are required for a review reply",
+  );
 
 export const messageSchema = chatMessageSchema;
 
@@ -32,6 +37,7 @@ export const conversationSchema = z.object({
   bookingRequestId: z.string().uuid().nullable(),
   bookingRequestReference: z.string().nullable(),
   eventType: z.string().nullable(),
+  eventPreferredDate: z.string().nullable(),
   eventStartsAt: z.string().nullable(),
   eventEndsAt: z.string().nullable(),
   guestCount: z.number().int().positive().nullable(),

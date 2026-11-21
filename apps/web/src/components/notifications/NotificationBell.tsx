@@ -5,7 +5,6 @@ import {
   NOTIFICATIONS_CHANGED,
   notificationsChangedSchema,
   type Notification,
-  type NotificationContent,
 } from "@event-management/contracts/notifications";
 import {
   getNotifications,
@@ -21,21 +20,30 @@ import {
   realtimeRefreshDelay,
 } from "../../lib/services/messages/realtime-event";
 import { adminBookingRequestPath } from "../app/routes";
-import { bookingStatusLabels } from "../booking-requests/BookingRequestDisplay";
+import {
+  bookingDate,
+  bookingStatusLabels,
+} from "../booking-requests/BookingRequestDisplay";
 
-function presentation(content: NotificationContent): {
+function presentation(content: Notification): {
   label: string;
   path: string;
 } {
+  const booking = "booking" in content ? content.booking : undefined;
+  const eventType = booking?.eventType.trim();
+  const requestedDate = booking?.preferredDate
+    ? ` · Requested ${bookingDate(booking.preferredDate)}`
+    : "";
+
   switch (content.type) {
     case "booking_request_created":
       return {
-        label: `New booking request ${content.payload.bookingReference}`,
+        label: `${eventType ? `New ${eventType} request` : "New booking request"}${requestedDate}`,
         path: adminBookingRequestPath(content.payload.bookingRequestId),
       };
     case "booking_status_updated":
       return {
-        label: `Booking request ${content.payload.bookingReference}: ${bookingStatusLabels[content.payload.status]}`,
+        label: `${eventType ? `${eventType} request` : "Booking request"} · ${bookingStatusLabels[content.payload.status]}${requestedDate}`,
         path: `/app/events?bookingRequest=${encodeURIComponent(content.payload.bookingRequestId)}`,
       };
     case "quotation_sent":

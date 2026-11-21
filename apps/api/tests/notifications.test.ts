@@ -117,9 +117,12 @@ async function expectStatus(response: Response, status: number) {
 }
 
 async function notifications(viewer: Account, cursor?: string, runtime = app) {
-  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  const query = new URLSearchParams({ includeBookingDetails: "1" });
+
+  if (cursor) query.set("cursor", cursor);
+
   const response = await expectStatus(
-    await call(`/notifications${query}`, viewer, "GET", undefined, runtime),
+    await call(`/notifications?${query}`, viewer, "GET", undefined, runtime),
     200,
   );
   assert.equal(response.headers.get("cache-control"), "no-store");
@@ -166,6 +169,18 @@ test("booking creation fans out private notifications and status changes notify 
   const firstNotice = firstPage.notifications[0];
   const secondNotice = secondPage.notifications[0];
   assert.equal(firstNotice.type, "booking_request_created");
+  assert.equal(secondNotice.type, "booking_request_created");
+  assert.deepEqual(firstNotice.booking, {
+    eventType: bookingInput.eventType,
+    preferredDate: bookingInput.requestedDays[0].date,
+  });
+  assert.deepEqual(secondNotice.booking, firstNotice.booking);
+  const legacyResponse = await expectStatus(
+    await call("/notifications", first),
+    200,
+  );
+  const legacyPage = notificationPageSchema.parse(await legacyResponse.json());
+  assert.equal("booking" in legacyPage.notifications[0], false);
   assert.deepEqual(firstNotice.payload, {
     bookingRequestId: booking.id,
     bookingReference: booking.reference,
@@ -212,8 +227,10 @@ test("booking creation fans out private notifications and status changes notify 
 
   const customerPage = await notifications(customer);
   assert.equal(customerPage.unreadCount, 1);
-  assert.equal(customerPage.notifications[0].type, "booking_status_updated");
-  assert.deepEqual(customerPage.notifications[0].payload, {
+  const statusNotice = customerPage.notifications[0];
+  assert.equal(statusNotice.type, "booking_status_updated");
+  assert.deepEqual(statusNotice.booking, firstNotice.booking);
+  assert.deepEqual(statusNotice.payload, {
     ...firstNotice.payload,
     status: patch.status,
   });
@@ -242,6 +259,40 @@ test("booking creation fans out private notifications and status changes notify 
   );
   assert.deepEqual(await notifications(customer), customerPage);
   assert.deepEqual(await notifications(second), secondPage);
+});
+
+test("older booking notifications without an accessible booking still load", async () => {
+  const admin = await account("admin");
+  const owner = await account("customer");
+  const viewer = await account("customer");
+  const booking = await createBooking(owner);
+  const references = [
+    { bookingRequestId: booking.id, bookingReference: booking.reference },
+    { bookingRequestId: randomUUID(), bookingReference: "Legacy reference" },
+  ];
+
+  await db.transaction().execute(async (trx) => {
+    for (const reference of references)
+      await createNotificationData(trx, { userId: viewer.id }, randomUUID(), {
+        type: "booking_status_updated",
+        payload: { ...reference, status: "needs_details" },
+      });
+  });
+
+  const page = await notifications(viewer, undefined, edge);
+  assert.equal(page.unreadCount, references.length);
+
+  for (const item of page.notifications) {
+    assert.equal(item.type, "booking_status_updated");
+    assert.equal(item.booking, undefined);
+  }
+
+  const persisted = await db
+    .selectFrom("notifications")
+    .select("payload")
+    .where("recipient_user_id", "=", admin.id)
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(persisted.payload, references[0]);
 });
 
 test("Node and Edge paginate an account's own notifications and keep exact ordering for timestamp ties", async () => {
