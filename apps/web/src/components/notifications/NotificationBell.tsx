@@ -15,6 +15,7 @@ import {
 import { ApiError } from "../../lib/http/request";
 import { env } from "../../lib/env/env";
 import { navigateWorkspace } from "../../lib/navigation/workspace-navigation";
+import { createArrivalTracker } from "../../lib/services/notifications/arrivals";
 import {
   isPermanentTokenFailure,
   realtimeRefreshDelay,
@@ -62,8 +63,17 @@ export function NotificationBell({ profileId }: { profileId: string }) {
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [actionError, setActionError] = useState("");
+  const [actionError, setActionError] = useState<{
+    id: string;
+    message: string;
+  } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [arrival, setArrival] = useState<Notification | null>(null);
+  const [announcement, setAnnouncement] = useState<Notification | null>(null);
+  const arrivalRef = useRef<Notification | null>(null);
+  const tracker = useRef(createArrivalTracker());
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const drawerOpen = useRef(false);
   const pagesLoaded = useRef(1);
   const fetching = useRef(false);
@@ -89,6 +99,20 @@ export function NotificationBell({ profileId }: { profileId: string }) {
         try {
           const updateList = !!start || drawerOpen.current;
           let page = await getNotifications(start);
+
+          if (!mounted.current) return;
+
+          const newArrival = tracker.current.observe(
+            page.notifications,
+            !start,
+          );
+
+          if (newArrival) {
+            arrivalRef.current = newArrival;
+            setArrival(newArrival);
+            setAnnouncement(newArrival);
+          }
+
           const rows = updateList ? [...page.notifications] : [];
 
           // Re-read the visible window so new first-page entries cannot create
@@ -104,6 +128,10 @@ export function NotificationBell({ profileId }: { profileId: string }) {
             index++
           ) {
             page = await getNotifications(page.nextCursor);
+
+            if (!mounted.current) return;
+
+            tracker.current.observe(page.notifications, false);
             rows.push(...page.notifications);
           }
 
@@ -279,34 +307,47 @@ export function NotificationBell({ profileId }: { profileId: string }) {
 
   const select = async (item: Notification) => {
     setBusy(item.id);
-    setActionError("");
+    setActionError(null);
 
     try {
       if (!item.readAt) await markNotificationRead(item.id);
 
       if (!mounted.current) return;
 
+      if (arrivalRef.current?.id === item.id) {
+        if (cardRef.current?.contains(document.activeElement))
+          triggerRef.current?.focus();
+
+        arrivalRef.current = null;
+        setArrival(null);
+      }
+
       setDrawerOpen(false);
       navigateWorkspace(presentation(item).path);
       void load();
     } catch {
       if (mounted.current)
-        setActionError(
-          "Unable to mark this notification as read. Select it again to retry.",
-        );
+        setActionError({
+          id: item.id,
+          message:
+            "Unable to mark this notification as read. Select it again to retry.",
+        });
     } finally {
       if (mounted.current) setBusy(null);
     }
   };
 
   return (
-    <>
+    <div className="notification-bell">
       <Button
+        ref={triggerRef}
         variant="plain"
         className="notification-trigger"
         aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}
         onClick={() => {
-          setActionError("");
+          setActionError(null);
+          arrivalRef.current = null;
+          setArrival(null);
           setDrawerOpen(true);
           void load();
         }}
@@ -318,6 +359,51 @@ export function NotificationBell({ profileId }: { profileId: string }) {
           </Badge>
         )}
       </Button>
+      <span
+        className="notification-announcement"
+        role="status"
+        aria-atomic="true"
+      >
+        {announcement && (
+          <span key={announcement.id}>
+            New notification: {presentation(announcement).label}
+          </span>
+        )}
+      </span>
+      {arrival && !open && (
+        <div className="notification-arrival" ref={cardRef}>
+          <div className="notification-arrival-heading">
+            <strong>New notification</strong>
+            <Button
+              variant="plain"
+              className="notification-arrival-dismiss"
+              aria-label="Dismiss notification"
+              onClick={() => {
+                if (cardRef.current?.contains(document.activeElement))
+                  triggerRef.current?.focus();
+
+                arrivalRef.current = null;
+                setArrival(null);
+                setActionError(null);
+              }}
+            >
+              <Icon name="close" />
+            </Button>
+          </div>
+          <p>{presentation(arrival).label}</p>
+          {actionError?.id === arrival.id && (
+            <p role="alert">{actionError.message}</p>
+          )}
+          <Button
+            variant="secondary"
+            size="small"
+            disabled={!!busy}
+            onClick={() => void select(arrival)}
+          >
+            Open notification
+          </Button>
+        </div>
+      )}
       {open && (
         <Drawer title="Notifications" onClose={() => setDrawerOpen(false)}>
           {error && (
@@ -328,7 +414,7 @@ export function NotificationBell({ profileId }: { profileId: string }) {
               </Button>
             </p>
           )}
-          {actionError && <p role="alert">{actionError}</p>}
+          {actionError && <p role="alert">{actionError.message}</p>}
           {loading && !items.length && (
             <p role="status">Loading notifications…</p>
           )}
@@ -364,6 +450,6 @@ export function NotificationBell({ profileId }: { profileId: string }) {
           )}
         </Drawer>
       )}
-    </>
+    </div>
   );
 }
