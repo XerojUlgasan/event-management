@@ -8,6 +8,7 @@ Preserve historical reasoning. When a decision changes, link a successor and mar
 
 | Record | Status / purpose |
 | --- | --- |
+| [Markdown conversation memory](2026-11-21_conversation-memory.md) | Accepted single note on the conversation, updated during normal replies |
 | [Package-owned add-ons and direct quotation sending](2026-11-21_direct-quotation-send.md) | Accepted mandatory package add-ons and Send or Cancel for every version |
 | [Quotation package add-ons](2026-11-21_quotation-package-addons.md) | Superseded draft, override, and removal rules |
 | [Package service terms](2026-11-20_package-service-terms.md) | Accepted package-owned inclusion terms and custom-only JSONB add-ons; quotations deferred |

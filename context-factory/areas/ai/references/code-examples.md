@@ -54,6 +54,10 @@ The customer-only [getMyProposal adapter](../../../../apps/api/src/services/ai/t
 
 Read [execution-record rules](standards-and-verification.md#tool-call-persistence) before adding another tool. The [accepted search decision](../../../history/decisions/2026-11-18_catalog-search-and-tool-calls.md) records why pagination, public visibility, and execution tracking have these boundaries.
 
+## Conversation memory
+
+[Conversation memory data](../../../../apps/api/src/data/messages/conversation-memory.ts) loads the private Markdown note and checks the latest customer trigger in the same database snapshot. The turn supplies the note as fallible context alongside saved messages. [updateConversationMemory](../../../../apps/api/src/services/ai/tools/update-conversation-memory.ts) proposes a complete bounded replacement during the normal tool loop. The write uses the conversation lock and rechecks the trigger, owner, AI version and previously read note. It records a compact audit result. An older turn can still answer from its own saved history. Guest claim preserves the note through the existing conversation row.
+
 ## Human handoff mutation
 
 The [requestHumanHandoff adapter](../../../../apps/api/src/services/ai/tools/request-human-handoff.ts) accepts the shared reason/summary schema and binds the current turn's conversation, customer/guest identity, triggering message, and AI version. Its [service](../../../../apps/api/src/services/ai/request-human-handoff.ts) validates input; the [transaction owner](../../../../apps/api/src/data/messages/request-human-handoff.ts) locks and revalidates the conversation, saves the latest JSONB metadata, disables AI, saves the fixed acknowledgement, and completes/links the execution record atomically. Repeated invocations for the same trigger reuse the acknowledgement. Tracking failure rolls back the mutation.

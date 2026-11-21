@@ -16,6 +16,7 @@ import { startToolCallData } from "../../src/data/ai/start-tool-call.js";
 import { requestHumanHandoffService } from "../../src/services/ai/request-human-handoff.js";
 import { humanHandoffAcknowledgement } from "../../src/data/messages/request-human-handoff.js";
 import { runAssistantTurnService } from "../../src/services/ai/run-assistant-turn.js";
+import { getMyProposalService } from "../../src/services/ai/get-my-proposal.js";
 
 const database = `em_ai_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -68,7 +69,8 @@ function useToolCalls(
       | "searchPublicCatalog"
       | "getPublicCatalogItem"
       | "getMyProposal"
-      | "requestHumanHandoff";
+      | "requestHumanHandoff"
+      | "updateConversationMemory";
     input: Record<string, unknown>;
   }[],
   beforeAnswer?: () => Promise<void>,
@@ -1641,6 +1643,123 @@ test("customer proposal tool returns scoped JSON and records only bounded audit 
   }
 });
 
+test("a near-budget proposal remains available when conversation memory is present", async () => {
+  const bookingId = await booking(customer.id, `BUDGET-${randomUUID()}`);
+  const id = (
+    await db
+      .insertInto("conversations")
+      .values({ customer_id: customer.id, booking_request_id: bookingId })
+      .returning("id")
+      .executeTakeFirstOrThrow()
+  ).id;
+
+  const sections = [
+    {
+      id: randomUUID(),
+      title: "Large proposal",
+      widgets: Array.from({ length: 10 }, (_, index) => ({
+        id: randomUUID(),
+        type: "markdown",
+        x: 0,
+        y: index * 4,
+        w: 12,
+        h: 4,
+        markdown: `${index}:` + "x".repeat(19_648),
+        mediaId: null,
+        alt: "",
+        caption: "",
+        autoplay: false,
+      })),
+    },
+  ];
+
+  await db
+    .insertInto("packages")
+    .values({
+      name: "Budget proposal",
+      slug: `budget-${randomUUID()}`,
+      description: "",
+      price: 1200,
+      max_guests: 60,
+      package_type: "custom",
+      custom_for_booking_request_id: bookingId,
+      published_at: null,
+      canvas: sql`${JSON.stringify(sections)}::jsonb`,
+    })
+    .execute();
+  const proposal = await getMyProposalService({
+    db,
+    customerId: customer.id,
+    conversationId: id,
+  });
+  assert.equal(proposal.status, "found");
+  const proposalCharacters = JSON.stringify(proposal).length;
+
+  // Measure the same booking context without a note, then leave 1,000 characters
+  // of the original budget. The 2,000-character note would exceed that margin.
+  useReply("Probe");
+  const probe = await send(id, "x");
+  assert.ok(probe.assistantMessage);
+
+  const contextPart = model.doGenerateCalls[0].prompt
+    .flatMap((message) => (message.role === "user" ? message.content : []))
+    .find(
+      (part) =>
+        part.type === "text" &&
+        part.text.includes("Current server-built context snapshot"),
+    );
+
+  assert.ok(contextPart && contextPart.type === "text");
+  await db
+    .deleteFrom("messages")
+    .where("id", "=", probe.assistantMessage.id)
+    .execute();
+  await db.deleteFrom("messages").where("id", "=", probe.message.id).execute();
+  const bodyLength =
+    200_000 - proposalCharacters - contextPart.text.length - 1_000;
+  assert.ok(
+    bodyLength > 0 && bodyLength <= 4_000,
+    `Unexpected fixture headroom: ${bodyLength}`,
+  );
+  const note = `Memory marker ${'\\"'.repeat(993)}`;
+  await pool.query(
+    "UPDATE conversations SET conversation_memory = $1 WHERE id = $2",
+    [note, id],
+  );
+  useToolCalls([{ toolName: "getMyProposal", input: {} }]);
+  const result = await send(id, "q".repeat(bodyLength));
+  assert.ok(result.assistantMessage);
+  const context = turnContext(0).context;
+  assert.ok("conversationMemory" in context);
+  assert.equal(context.conversationMemory, note);
+
+  const toolMessage = model.doGenerateCalls[1].prompt.find(
+    (message) =>
+      message.role === "tool" &&
+      message.content.some(
+        (part) =>
+          part.type === "tool-result" && part.toolName === "getMyProposal",
+      ),
+  );
+
+  assert.ok(toolMessage?.role === "tool");
+
+  const part = toolMessage.content.find(
+    (item) => item.type === "tool-result" && item.toolName === "getMyProposal",
+  );
+
+  assert.ok(part && part.type === "tool-result" && part.output.type === "json");
+  assert.deepEqual(part.output.value, JSON.parse(JSON.stringify(proposal)));
+  const audit = await db
+    .selectFrom("ai_tool_calls")
+    .select(["status", "error_code"])
+    .where("customer_message_id", "=", result.message.id)
+    .where("tool_name", "=", "getMyProposal")
+    .executeTakeFirstOrThrow();
+  assert.equal(audit.status, "succeeded");
+  assert.equal(audit.error_code, null);
+});
+
 test("proposal tool input cannot redirect to another conversation", async () => {
   const ownId = await conversation();
   const otherBooking = await booking(other.id, `SECRET-${randomUUID()}`);
@@ -1818,6 +1937,7 @@ test("the assistant can answer directly without calling a tool", async () => {
       "getPublicCatalogItem",
       "requestHumanHandoff",
       "searchPublicCatalog",
+      "updateConversationMemory",
     ],
   );
   const calls = await db
@@ -1826,6 +1946,325 @@ test("the assistant can answer directly without calling a tool", async () => {
     .where("customer_message_id", "=", result.message.id)
     .execute();
   assert.equal(calls.length, 0);
+});
+
+test("conversation memory is optional, scoped, private, and can be corrected on a later turn", async () => {
+  const id = await conversation();
+  const otherId = await conversation();
+  const original = `Private memory ${randomUUID()}: prefers a garden`;
+  const corrected = `Private memory ${randomUUID()}: prefers indoors`;
+
+  const memory = async (conversationId: string) =>
+    (
+      await pool.query<{ conversation_memory: string | null }>(
+        "SELECT conversation_memory FROM conversations WHERE id = $1",
+        [conversationId],
+      )
+    ).rows[0].conversation_memory;
+
+  useReply("Hello");
+  await send(id, "Hello");
+  assert.equal(await memory(id), null);
+
+  useToolCalls([
+    {
+      toolName: "updateConversationMemory",
+      input: { markdown: `  ${original}  ` },
+    },
+  ]);
+  const first = await send(id, "I prefer a garden");
+  assert.equal(await memory(id), original);
+  assert.equal(await memory(otherId), null);
+  const audit = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", first.message.id)
+    .where("tool_name", "=", "updateConversationMemory")
+    .executeTakeFirstOrThrow();
+  assert.equal(audit.status, "succeeded");
+  assert.equal(audit.assistant_message_id, first.assistantMessage?.id);
+  assert.doesNotMatch(JSON.stringify(audit.input), new RegExp(original));
+  assert.doesNotMatch(JSON.stringify(audit.output), new RegExp(original));
+  assert.ok(JSON.stringify(audit.output).length < 2000);
+
+  useToolCalls([
+    { toolName: "updateConversationMemory", input: { markdown: corrected } },
+  ]);
+  await send(id, "Actually, I prefer indoors");
+  const correctionContext = turnContext(0).context;
+  assert.ok("conversationMemory" in correctionContext);
+  assert.equal(correctionContext.conversationMemory, original);
+  assert.equal(await memory(id), corrected);
+
+  useReply("Understood");
+  const result = await send(id, "Thanks");
+  const nextContext = turnContext(0).context;
+  assert.ok("conversationMemory" in nextContext);
+  assert.equal(nextContext.conversationMemory, corrected);
+
+  for (const payload of [
+    result,
+    await (await call(`/messages/conversations/${id}`, customer.cookie)).json(),
+    await (await call("/messages/conversations", customer.cookie)).json(),
+    await (await call(`/admin/conversations/${id}`, team.cookie)).json(),
+    await (await call("/admin/conversations", team.cookie)).json(),
+  ]) {
+    assert.doesNotMatch(JSON.stringify(payload), new RegExp(corrected));
+    assert.doesNotMatch(
+      JSON.stringify(payload),
+      /conversationMemory|conversation_memory/,
+    );
+  }
+});
+
+test("memory incorporates a saved admin message after AI is re-enabled", async () => {
+  const id = await conversation();
+  const initial = "Customer prefers a garden";
+  const teamMessage = "We can set up a covered garden area";
+  const updated = "Customer prefers a garden; team can provide a covered area";
+  useToolCalls([
+    { toolName: "updateConversationMemory", input: { markdown: initial } },
+  ]);
+  await send(id, "I prefer a garden");
+  const adminReply = await call(
+    `/admin/conversations/${id}/messages`,
+    team.cookie,
+    {
+      body: teamMessage,
+    },
+  );
+  assert.equal(adminReply.status, 201);
+  const takeover = await adminReply.json();
+  assert.equal(takeover.aiEnabled, false);
+  assert.equal((await setAi(id, true, takeover.aiVersion)).status, 200);
+
+  useToolCalls([
+    { toolName: "updateConversationMemory", input: { markdown: updated } },
+  ]);
+  const result = await send(id, "Please remember the setup we discussed");
+  assert.ok(result.assistantMessage);
+  const context = turnContext(0).context;
+  assert.ok("conversationMemory" in context);
+  assert.equal(context.conversationMemory, initial);
+  assert.match(
+    JSON.stringify(model.doGenerateCalls[0].prompt),
+    /AMAC team: We can set up a covered garden area/,
+  );
+  const row = await pool.query<{ conversation_memory: string | null }>(
+    "SELECT conversation_memory FROM conversations WHERE id = $1",
+    [id],
+  );
+  assert.equal(row.rows[0].conversation_memory, updated);
+});
+
+test("memory update rejects identifiers, empty, oversized and NUL text", async () => {
+  const id = await conversation();
+  const otherId = await conversation();
+
+  for (const input of [
+    { markdown: "redirected", conversationId: otherId },
+    { markdown: " " },
+    { markdown: "x".repeat(2001) },
+    { markdown: "invalid\0memory" },
+  ]) {
+    useToolCalls([{ toolName: "updateConversationMemory", input }]);
+    await send(id, "Remember this");
+  }
+
+  const rows = await pool.query<{ conversation_memory: string | null }>(
+    "SELECT conversation_memory FROM conversations WHERE id = ANY($1::uuid[])",
+    [[id, otherId]],
+  );
+  assert.deepEqual(
+    rows.rows.map((row) => row.conversation_memory),
+    [null, null],
+  );
+});
+
+test("an older customer trigger cannot see or overwrite a newer conversation memory", async () => {
+  const id = await conversation();
+  const old = await db
+    .insertInto("messages")
+    .values({
+      conversation_id: id,
+      sender_id: customer.id,
+      sender_role: "customer",
+      body: "Old question",
+      created_at: new Date("2026-01-01T00:00:00Z"),
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  await db
+    .insertInto("messages")
+    .values({
+      conversation_id: id,
+      sender_id: customer.id,
+      sender_role: "customer",
+      body: "New correction",
+      created_at: new Date("2026-01-01T00:00:01Z"),
+    })
+    .execute();
+  const newer = `newer-memory-${randomUUID()}`;
+  await pool.query(
+    "UPDATE conversations SET conversation_memory = $1 WHERE id = $2",
+    [newer, id],
+  );
+  useToolCalls([
+    {
+      toolName: "updateConversationMemory",
+      input: { markdown: "stale overwrite" },
+    },
+  ]);
+  await runAssistantTurnService({
+    db,
+    conversationId: id,
+    customerId: customer.id,
+    customerMessageId: old.id,
+    aiVersion: 0,
+  });
+  assert.doesNotMatch(
+    JSON.stringify(model.doGenerateCalls[0].prompt),
+    new RegExp(newer),
+  );
+  const row = await pool.query<{ conversation_memory: string }>(
+    "SELECT conversation_memory FROM conversations WHERE id = $1",
+    [id],
+  );
+  assert.equal(row.rows[0].conversation_memory, newer);
+});
+
+test("a newer customer message fences an in-flight memory update without suppressing the reply", async () => {
+  const id = await conversation();
+  const initial = "Existing memory";
+  await pool.query(
+    "UPDATE conversations SET conversation_memory = $1 WHERE id = $2",
+    [initial, id],
+  );
+  useToolCalls([
+    {
+      toolName: "updateConversationMemory",
+      input: { markdown: "Stale update" },
+    },
+  ]);
+  let started!: () => void;
+  let release!: () => void;
+
+  const generating = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+
+  const resume = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    started();
+    await resume;
+
+    return generate(...args);
+  };
+  const pending = send(id, "Earlier customer message");
+  await Promise.race([
+    generating,
+    pending.then(() => {
+      throw new Error("Generation did not start");
+    }),
+  ]);
+
+  try {
+    await db
+      .insertInto("messages")
+      .values({
+        conversation_id: id,
+        sender_id: customer.id,
+        sender_role: "customer",
+        body: "Newer customer message",
+        created_at: new Date(Date.now() + 1000),
+      })
+      .execute();
+  } finally {
+    release();
+  }
+
+  const result = await pending;
+  assert.ok(result.assistantMessage);
+  assert.equal(result.assistantMessage?.body, "Catalog results are ready");
+  assert.equal(result.assistantError, null);
+  assert.ok(
+    model.doGenerateCalls[0].tools?.some(
+      (tool) => tool.name === "updateConversationMemory",
+    ),
+  );
+  const audit = await db
+    .selectFrom("ai_tool_calls")
+    .select(["status", "output"])
+    .where("customer_message_id", "=", result.message.id)
+    .where("tool_name", "=", "updateConversationMemory")
+    .executeTakeFirstOrThrow();
+  assert.equal(audit.status, "succeeded");
+  assert.deepEqual(audit.output, { status: "skipped" });
+  const savedReply = await db
+    .selectFrom("messages")
+    .select("body")
+    .where("id", "=", result.assistantMessage.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(savedReply.body, "Catalog results are ready");
+  const row = await pool.query<{ conversation_memory: string | null }>(
+    "SELECT conversation_memory FROM conversations WHERE id = $1",
+    [id],
+  );
+  assert.equal(row.rows[0].conversation_memory, initial);
+});
+
+test("admin takeover prevents an in-flight memory update", async () => {
+  const id = await conversation();
+  useToolCalls([
+    {
+      toolName: "updateConversationMemory",
+      input: { markdown: "stale memory" },
+    },
+  ]);
+  let started!: () => void;
+  let release!: () => void;
+
+  const generating = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+
+  const resume = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    started();
+    await resume;
+
+    return generate(...args);
+  };
+  const pending = send(id, "Before takeover");
+  await Promise.race([
+    generating,
+    pending.then(() => {
+      throw new Error("Generation did not start");
+    }),
+  ]);
+
+  try {
+    assert.equal((await setAi(id, false, 0)).status, 200);
+    assert.equal((await setAi(id, true, 1)).status, 200);
+  } finally {
+    release();
+  }
+
+  const result = await pending;
+  assert.equal(result.assistantMessage, null);
+  const row = await pool.query<{ conversation_memory: string | null }>(
+    "SELECT conversation_memory FROM conversations WHERE id = $1",
+    [id],
+  );
+  assert.equal(row.rows[0].conversation_memory, null);
 });
 
 const handoffInput = {

@@ -30,6 +30,7 @@ model Conversation {
   aiEnabled       Boolean   @default(true) @map("ai_enabled")
   aiVersion       Int       @default(0) @map("ai_version")
   aiHandoff       Json?     @map("ai_handoff") @db.JsonB
+  conversationMemory String? @map("conversation_memory") @db.Text
   bookingRequestId String?  @unique @map("booking_request_id") @db.Uuid
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)

@@ -1,7 +1,7 @@
 import type { Selectable } from "kysely";
 import type { Conversations, Messages } from "../../db/types.js";
 
-type ConversationRow = Selectable<Conversations>;
+type ConversationRow = Omit<Selectable<Conversations>, "conversation_memory">;
 
 export type ConversationWithCustomer = ConversationRow & {
   last_activity_at: Date;

@@ -14,7 +14,7 @@ import { hashSessionToken } from "../../utils/session.js";
 
 export type GuestDatabase = Kysely<DB>;
 
-export type GuestConversation = Selectable<Conversations> & {
+type GuestConversationActivity = {
   last_activity_at: Date;
 };
 
@@ -28,7 +28,10 @@ export class GuestChatError extends Error {
   }
 }
 
-export function guestStatus(conversation: GuestConversation): GuestChatStatus {
+export function guestStatus(
+  conversation: GuestConversationActivity &
+    Pick<Selectable<Conversations>, "guest_customer_message_count">,
+): GuestChatStatus {
   return {
     customerMessageCount: conversation.guest_customer_message_count,
     remainingMessages: Math.max(
@@ -45,7 +48,7 @@ export function guestExpiry(now = new Date()) {
   return new Date(now.getTime() + GUEST_INACTIVITY_TTL_MS);
 }
 
-export function assertGuestActive(conversation: GuestConversation) {
+export function assertGuestActive(conversation: GuestConversationActivity) {
   if (guestExpiry(conversation.last_activity_at).getTime() <= Date.now())
     throw new GuestChatError(
       410,

@@ -117,6 +117,7 @@ export interface Conversations {
   ai_version: Generated<number>;
   booking_request_id: string | null;
   claimed_guest_identity_id: string | null;
+  conversation_memory: string | null;
   created_at: Generated<Timestamp>;
   customer_id: string | null;
   guest_customer_message_count: Generated<number>;

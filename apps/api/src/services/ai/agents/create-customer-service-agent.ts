@@ -5,6 +5,7 @@ import { customerServicePrompt } from "../prompts/customer-service-prompt.js";
 import { createSearchPublicCatalogTool } from "../tools/search-public-catalog.js";
 import { createGetPublicCatalogItemTool } from "../tools/get-public-catalog-item.js";
 import { createGetMyProposalTool } from "../tools/get-my-proposal.js";
+import { createUpdateConversationMemoryTool } from "../tools/update-conversation-memory.js";
 import type { AssistantToolContext } from "../tools/assistant-tool-context.js";
 
 export function createCustomerServiceAgent(options: AssistantToolContext) {
@@ -52,6 +53,14 @@ export function createCustomerServiceAgent(options: AssistantToolContext) {
             getMyProposal: createGetMyProposalTool({
               ...toolContext,
               proposalScope: options.proposalScope,
+            }),
+          }
+        : {}),
+      ...(options.memoryScope
+        ? {
+            updateConversationMemory: createUpdateConversationMemoryTool({
+              ...toolContext,
+              memoryScope: options.memoryScope,
             }),
           }
         : {}),

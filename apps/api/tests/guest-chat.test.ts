@@ -376,7 +376,12 @@ test("guests can answer directly and receive public catalog and handoff tools", 
   assert.deepEqual(model.doGenerateCalls[0].toolChoice, { type: "auto" });
   assert.deepEqual(
     model.doGenerateCalls[0].tools?.map((entry) => entry.name).sort(),
-    ["getPublicCatalogItem", "requestHumanHandoff", "searchPublicCatalog"],
+    [
+      "getPublicCatalogItem",
+      "requestHumanHandoff",
+      "searchPublicCatalog",
+      "updateConversationMemory",
+    ],
   );
   const calls = await db
     .selectFrom("ai_tool_calls")
@@ -384,6 +389,65 @@ test("guests can answer directly and receive public catalog and handoff tools", 
     .where("customer_message_id", "=", response.message.id)
     .execute();
   assert.equal(calls.length, 0);
+});
+
+test("guest conversation memory follows the conversation through claim", async () => {
+  const marker = `guest-memory-${randomUUID()}`;
+  useReply("Remembered");
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+
+    if (model.doGenerateCalls.length !== 1) return result;
+
+    return {
+      ...result,
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "guest-memory",
+          toolName: "updateConversationMemory",
+          input: JSON.stringify({ markdown: marker }),
+        },
+      ],
+      finishReason: { unified: "tool-calls", raw: undefined },
+    };
+  };
+  const thread = await guest();
+  const id = thread.conversation.id;
+  const sent = await read(
+    await send(thread, "Please remember my preference"),
+    201,
+  );
+  assert.ok(sent.assistantMessage);
+  const row = await pool.query<{ conversation_memory: string | null }>(
+    "SELECT conversation_memory FROM conversations WHERE id = $1",
+    [id],
+  );
+  assert.equal(row.rows[0].conversation_memory, marker);
+  assert.doesNotMatch(JSON.stringify(sent), new RegExp(marker));
+  await read(
+    await call(
+      `/guest/conversations/${id}/claim`,
+      `${customer.cookie}; ${thread.cookie}`,
+      {},
+    ),
+    200,
+  );
+  useReply("Continuing");
+  const response = await read(
+    await call("/messages/conversation/messages", customer.cookie, {
+      conversationId: id,
+      body: "Continue",
+    }),
+    201,
+  );
+  assert.ok(response.assistantMessage);
+  assert.match(
+    JSON.stringify(model.doGenerateCalls[0].prompt),
+    new RegExp(marker),
+  );
+  assert.doesNotMatch(JSON.stringify(response), new RegExp(marker));
 });
 
 test("five customer writes and five AI replies are allowed; sixth is readable login_required; replay never calls provider again", async () => {
