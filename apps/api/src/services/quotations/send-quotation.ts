@@ -9,6 +9,7 @@ import { lockAnyPackageData } from "../../data/booking-requests/lock-any-package
 import { lockBookingRequestData } from "../../data/booking-requests/lock-booking-request.js";
 import { resolveBookingPackageData } from "../../data/booking-requests/resolve-booking-package.js";
 import { createQuotationMessageData } from "../../data/messages/create-quotation-message.js";
+import { createNotificationData } from "../../data/notifications/create-notification.js";
 import { createQuotationData } from "../../data/quotations/create-quotation.js";
 import {
   findQuoteData,
@@ -190,8 +191,14 @@ export async function sendQuotationService(
         revision_reason: input.revisionReason,
       });
 
-      if (!(await createQuotationMessageData(trx, booking.id, actor, row.id)))
-        throw new MissingBookingConversation();
+      const conversationId = await createQuotationMessageData(
+        trx,
+        booking.id,
+        actor,
+        row.id,
+      );
+
+      if (!conversationId) throw new MissingBookingConversation();
 
       await createAuditEventData(trx, {
         actor_id: actor,
@@ -206,6 +213,20 @@ export async function sendQuotationService(
           requestDigest,
         }),
       });
+
+      await createNotificationData(
+        trx,
+        { userId: booking.customer_id },
+        row.id,
+        {
+          type: "quotation_sent",
+          payload: {
+            conversationId,
+            quotationId: row.id,
+            version: row.version,
+          },
+        },
+      );
 
       return dto(row);
     });

@@ -7,6 +7,7 @@ import { findAvailablePackageData } from "../../data/booking-requests/find-avail
 import { createBookingRequestData } from "../../data/booking-requests/create-booking-request.js";
 import { createBookingConversationData } from "../../data/booking-requests/create-booking-conversation.js";
 import { addStatusHistoryData } from "../../data/booking-requests/add-status-history.js";
+import { createNotificationData } from "../../data/notifications/create-notification.js";
 import { error } from "./booking-request-rules.js";
 import { bookingRequestDtos } from "./booking-request-response.js";
 
@@ -95,6 +96,11 @@ export async function createBookingRequestService(
         booking_request_id: row.id,
       });
     }
+
+    await createNotificationData(trx, { role: "admin" }, row.id, {
+      type: "booking_request_created",
+      payload: { bookingRequestId: row.id, bookingReference: row.reference },
+    });
 
     return (await bookingRequestDtos(trx, [row]))[0]!;
   });

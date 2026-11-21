@@ -27,6 +27,7 @@ import { ReportsPage } from "./reports/ReportsPage";
 import { CustomersPage } from "./users/CustomersPage";
 import { AdminSidebar } from "./AdminSidebar";
 import { SignInMethods } from "../../auth/SignInMethods";
+import { NotificationBell } from "../../notifications/NotificationBell";
 import { adminPaths } from "../../app/routes";
 
 function AccountMenu({
@@ -117,11 +118,13 @@ export function AdminShell({
   onSignOut,
   active,
   bookingRequestId,
+  search,
 }: {
-  profile: { displayName: string | null; email: string };
+  profile: { id: string; displayName: string | null; email: string };
   onSignOut: () => void;
   active: NavKey;
   bookingRequestId?: string;
+  search: string;
 }) {
   const name = profile.displayName ?? profile.email;
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -139,7 +142,14 @@ export function AdminShell({
     if (active === "Bookings")
       return <BookingsPage bookingRequestId={bookingRequestId} />;
 
-    if (active === "Messages") return <MessagesPage />;
+    if (active === "Messages")
+      return (
+        <MessagesPage
+          requestedConversation={new URLSearchParams(search).get(
+            "conversation",
+          )}
+        />
+      );
 
     if (active === "Customers") return <CustomersPage />;
 
@@ -177,7 +187,7 @@ export function AdminShell({
       );
 
     return <GenericPage page={active} />;
-  }, [active, name, profile.email, bookingRequestId]);
+  }, [active, name, profile.email, bookingRequestId, search]);
 
   return (
     <WorkspaceLayout
@@ -221,6 +231,7 @@ export function AdminShell({
             <Icon name="menu" />
           </Button>
           <div className="app-header-actions">
+            <NotificationBell key={profile.id} profileId={profile.id} />
             <AccountMenu
               name={name}
               onSettings={() => go("Administration")}

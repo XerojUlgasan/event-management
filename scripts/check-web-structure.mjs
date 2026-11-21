@@ -38,6 +38,7 @@ const domains = new Set([
   "booking-requests",
   "quotations",
   "messages",
+  "notifications",
   "event-days",
 ]);
 

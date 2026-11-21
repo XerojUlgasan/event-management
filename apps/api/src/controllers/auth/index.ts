@@ -18,9 +18,9 @@ import {
   linkFirebaseRouteHandler,
 } from "./link-firebase.js";
 import {
-  issueConversationRealtimeTokenRoute,
-  issueConversationRealtimeTokenRouteHandler,
-} from "./issue-conversation-realtime-token.js";
+  issueRealtimeTokenRoute,
+  issueRealtimeTokenRouteHandler,
+} from "./issue-realtime-token.js";
 
 const authRoutes = new OpenAPIHono<HonoEnv>();
 
@@ -38,11 +38,11 @@ authRoutes.openapi(loginUserRoute, loginUserRouteHandler);
 authRoutes.openapi(linkFirebaseRoute, linkFirebaseRouteHandler);
 authRoutes.openapi(addPasswordRoute, addPasswordRouteHandler);
 authRoutes.openapi(
-  issueConversationRealtimeTokenRoute,
-  issueConversationRealtimeTokenRouteHandler,
+  issueRealtimeTokenRoute,
+  issueRealtimeTokenRouteHandler,
   (result, c) => {
     if (!result.success)
-      return c.json({ error: "Invalid conversation ID" }, 400);
+      return c.json({ error: "Invalid Realtime token request" }, 400);
   },
 );
 

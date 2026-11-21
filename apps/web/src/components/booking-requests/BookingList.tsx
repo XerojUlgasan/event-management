@@ -63,6 +63,7 @@ export function BookingList(props: {
   readOnly?: boolean;
   onExplore?: () => void;
   onOpenChat?: (reference: string) => void;
+  requestedId?: string | null;
 }) {
   return props.admin ? <AdminBookingList /> : <BookingCards {...props} />;
 }
@@ -107,15 +108,32 @@ function OperationalSchedule({
 function BookingCards({
   onExplore,
   onOpenChat,
+  requestedId,
 }: {
   onExplore?: () => void;
   onOpenChat?: (reference: string) => void;
+  requestedId?: string | null;
 }) {
   const { notify, notifyError } = useNotifications();
   const mounted = useRef(true);
   const generation = useRequestGeneration();
   const [items, setItems] = useState<BookingRequest[]>([]);
-  const [selected, setSelected] = useState<BookingRequest | null>(null);
+  const [manualBooking, setManualBooking] = useState<BookingRequest | null>(
+    null,
+  );
+  const [linkedBooking, setLinkedBooking] = useState<BookingRequest | null>(
+    null,
+  );
+  const [linkError, setLinkError] = useState<{
+    id: string;
+    message: string;
+  } | null>(null);
+  const [linkAttempt, setLinkAttempt] = useState(0);
+  const selected = requestedId
+    ? linkedBooking?.id === requestedId
+      ? linkedBooking
+      : null
+    : manualBooking;
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
@@ -179,12 +197,45 @@ function BookingCards({
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!requestedId) return;
+
+    let active = true;
+    setLinkedBooking(null);
+    setLinkError(null);
+    setManualBooking(null);
+    setCancelError("");
+    getMyBookingRequest(requestedId)
+      .then((result) => {
+        if (active) setLinkedBooking(result.bookingRequest);
+      })
+      .catch((cause) => {
+        if (active)
+          setLinkError({
+            id: requestedId,
+            message: notifyError(cause, "Unable to load this event request."),
+          });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [requestedId, notifyError, linkAttempt]);
+
+  function dismissLink() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("bookingRequest");
+    navigateWorkspace(`${url.pathname}${url.search}${url.hash}`, true);
+  }
+
   const saveItem = (updated: BookingRequest) => {
-    setSelected((current) =>
+    const apply = (current: BookingRequest | null) =>
       current?.id === updated.id
         ? latestCustomerEvent(current, updated)
-        : current,
-    );
+        : current;
+
+    setManualBooking(apply);
+    setLinkedBooking(apply);
     setItems((rows) =>
       rows.map((row) =>
         row.id === updated.id ? latestCustomerEvent(row, updated) : row,
@@ -275,11 +326,25 @@ function BookingCards({
             hasMore={!!nextCursor}
             onDetails={(item) => {
               setCancelError("");
-              setSelected(item);
+
+              if (requestedId) dismissLink();
+
+              setManualBooking(item);
             }}
             onOpenChat={onOpenChat}
           />
         </>
+      )}
+      {requestedId && linkError?.id === requestedId && (
+        <div className="customer-events-error" role="alert">
+          <p>{linkError.message}</p>
+          <Button
+            variant="secondary"
+            onClick={() => setLinkAttempt((current) => current + 1)}
+          >
+            Retry booking details
+          </Button>
+        </div>
       )}
       {error && (
         <div className="customer-events-error" role="alert">
@@ -315,10 +380,16 @@ function BookingCards({
       </p>
       {selected && (
         <BookingDetails
+          key={selected.id}
           item={selected}
           customerCanEditTimes
           onClose={() => {
-            if (!busy) setSelected(null);
+            if (!busy) {
+              setManualBooking(null);
+              setLinkedBooking(null);
+
+              if (requestedId) dismissLink();
+            }
           }}
           onSaved={saveItem}
           requestActions={

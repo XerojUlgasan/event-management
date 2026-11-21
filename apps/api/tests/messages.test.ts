@@ -201,7 +201,7 @@ async function read(response: Response, status: number): Promise<any> {
   return response.status === 204 ? null : response.json();
 }
 
-test("Realtime token is limited to the live session and one signed-in conversation", async (t) => {
+test("Realtime tokens are limited to the live session and requested receive scope", async (t) => {
   const existingKey = process.env.REALTIME_JWT_SIGNING_JWK;
   const existingSecret = process.env.REALTIME_JWT_SECRET;
   t.after(() => {
@@ -242,11 +242,28 @@ test("Realtime token is limited to the live session and one signed-in conversati
   const issue = (conversationId: string, cookie?: string) =>
     call("/auth/realtime-token", "POST", { conversationId }, cookie);
 
+  const issueNotifications = (cookie?: string) =>
+    call("/auth/realtime-token", "POST", { scope: "notifications" }, cookie);
+
   await read(await issue(id), 401);
+  await read(await issueNotifications(), 401);
   await read(await issue("invalid", customerCookie), 400);
+
+  for (const scope of [
+    { scope: "unknown" },
+    { scope: "notifications", conversationId: id },
+    { scope: "notifications", userId: otherCustomerId },
+  ]) {
+    await read(
+      await call("/auth/realtime-token", "POST", scope, customerCookie),
+      400,
+    );
+  }
+
   await read(await issue(id, otherCustomerCookie), 404);
   await read(await issue(guestConversationId, adminCookie), 404);
   await read(await issue(id, customerCookie), 503);
+  await read(await issueNotifications(customerCookie), 503);
 
   const kid = randomUUID();
   const pair = await generateKeyPair("ES256", { extractable: true });
@@ -286,7 +303,53 @@ test("Realtime token is limited to the live session and one signed-in conversati
     assert.ok(payload.exp && payload.iat);
     assert.equal(payload.exp - payload.iat, 300);
     assert.equal(new Date(result.expiresAt).getTime(), payload.exp * 1000);
+
+    const notificationResponse = await issueNotifications(cookie);
+    assert.equal(notificationResponse.headers.get("cache-control"), "no-store");
+    const notificationResult = await read(notificationResponse, 200);
+    const { payload: notificationPayload } = await jwtVerify(
+      notificationResult.token,
+      pair.publicKey,
+      { algorithms: ["ES256"], audience: "authenticated" },
+    );
+    assert.equal(notificationPayload.sub, session.user_id);
+    assert.equal(notificationPayload.role, "authenticated");
+    assert.equal(notificationPayload.clemora_scope, "user_notifications");
+    assert.equal(notificationPayload.clemora_session_id, session.id);
+    assert.equal(notificationPayload.conversation_id, undefined);
+    assert.ok(notificationPayload.exp && notificationPayload.iat);
+    assert.equal(notificationPayload.exp - notificationPayload.iat, 300);
+    assert.equal(
+      new Date(notificationResult.expiresAt).getTime(),
+      notificationPayload.exp * 1000,
+    );
   }
+
+  const shortSessionToken = randomUUID();
+  const shortSessionCookie = `em_session=${shortSessionToken}`;
+  const expiration = Math.floor(Date.now() / 1000) + 90;
+  const shortSession = await db
+    .insertInto("sessions")
+    .values({
+      user_id: customerId,
+      token_hash: hashSessionToken(shortSessionToken),
+      expires_at: new Date(expiration * 1000),
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+
+  const shortResult = await read(
+    await issueNotifications(shortSessionCookie),
+    200,
+  );
+  const { payload: shortPayload } = await jwtVerify(
+    shortResult.token,
+    pair.publicKey,
+  );
+  assert.equal(shortPayload.exp, expiration);
+
+  await db.deleteFrom("sessions").where("id", "=", shortSession.id).execute();
+  await read(await issueNotifications(shortSessionCookie), 401);
 });
 
 test("read receipts mark only incoming messages through a saved keyset boundary", async (t) => {
@@ -1066,7 +1129,16 @@ test("message routes appear in the OpenAPI document", async () => {
   assert.ok(
     spec.paths["/v1/admin/conversations/{id}/read"].post.responses["204"],
   );
-  assert.ok(spec.paths["/v1/auth/realtime-token"].post.responses["200"]);
+  const realtimeToken = spec.paths["/v1/auth/realtime-token"].post;
+  assert.ok(realtimeToken.responses["200"]);
+  const scopes =
+    realtimeToken.requestBody.content["application/json"].schema.anyOf;
+  assert.deepEqual(
+    scopes.map(({ required }: { required: string[] }) => required),
+    [["conversationId"], ["scope"]],
+  );
+  assert.equal(scopes[1].additionalProperties, false);
+  assert.deepEqual(scopes[1].properties.scope.enum, ["notifications"]);
 
   assert.equal(spec.paths["/v1/messages/conversation/context"], undefined);
 

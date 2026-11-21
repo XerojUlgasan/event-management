@@ -15,7 +15,7 @@ src/
     auth/                        sign-in composition
     booking-requests/            cross-workspace booking compositions
     catalog/                     catalog compositions shared by public and workspace
-    messages/ quotations/
+    messages/ notifications/ quotations/
     public/catalog/ public/site/ public-only composition
     workspaces/admin/            admin shell and sidebar
       booking-requests/ catalog/ event-days/ ... role-specific screens

@@ -1,9 +1,9 @@
+import type { BookingStatus } from "@event-management/contracts/booking-requests";
 import type { PackagePrice } from "@event-management/contracts/catalog";
 import type { BookingEstimatedDuration } from "@event-management/contracts/limits/booking-requests";
 import { request } from "../../http/request";
 
-export type BookingStatus =
-  "under_review" | "needs_details" | "accepted" | "declined" | "cancelled";
+export type { BookingStatus } from "@event-management/contracts/booking-requests";
 
 export type BookingRequestInput = {
   packageId?: string | null;

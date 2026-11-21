@@ -30,6 +30,7 @@ const loaders = {
   "booking-requests": () => import("../controllers/booking-requests/index.js"),
   "event-days": () => import("../controllers/event-days/index.js"),
   messages: () => import("../controllers/messages/index.js"),
+  notifications: () => import("../controllers/notifications/index.js"),
   auth: () => import("../controllers/auth/index.js"),
   users: () => import("../controllers/users/index.js"),
 } satisfies Record<
@@ -59,6 +60,9 @@ const bodyLimits: Partial<
   messages: [
     { path: "/messages/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
     { path: "/admin/conversations/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
+  ],
+  notifications: [
+    { path: "/notifications/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
   ],
   packages: [
     { path: "/admin/packages", maxSize: CATALOG_JSON_BODY_LIMIT_BYTES },

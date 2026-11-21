@@ -16,6 +16,7 @@ import {
   useNotifications,
 } from "@event-management/ui";
 
+import { NotificationBell } from "../../notifications/NotificationBell";
 import { photos } from "../../../demo/catalog/photos";
 import { BookingList } from "../../booking-requests/BookingList";
 import { CustomerCatalogPage } from "./catalog/CustomerCatalogPage";
@@ -60,12 +61,18 @@ import {
   type ChatThread,
 } from "../../../lib/data/messages/conversations";
 
-import { customerPaths, customerTab, type CustomerTab } from "../../app/routes";
+import {
+  customerPaths,
+  customerTab,
+  normalizePath,
+  type CustomerTab,
+} from "../../app/routes";
 
 export function CustomerDashboard({
   path,
   search,
   onPublic,
+  profileId,
   userName,
   userEmail,
   onSignOut,
@@ -73,6 +80,7 @@ export function CustomerDashboard({
   path: string;
   search: string;
   onPublic: () => void;
+  profileId: string;
   userName: string;
   userEmail: string;
   onSignOut: () => void;
@@ -144,12 +152,22 @@ export function CustomerDashboard({
   selectedConversationRef.current = selectedConversationId;
   const pendingBookingReference = new URLSearchParams(search).get("request");
   const requestedConversation = new URLSearchParams(search).get("conversation");
+  const requestedQuotation = new URLSearchParams(search).get("quotation");
+  const routeConversation = useRef<string | null>(null);
   useEffect(() => {
-    if (tab === "Messages" && requestedConversation) {
-      setSelectedConversationId(requestedConversation);
-      setConversationOpen(true);
+    if (tab !== "Messages") {
+      routeConversation.current = null;
+
+      return;
     }
-  }, [tab, requestedConversation]);
+
+    if (!requestedConversation && !routeConversation.current) return;
+
+    routeConversation.current = requestedConversation;
+    referenceSelection.current++;
+    setSelectedConversationId(requestedConversation);
+    setConversationOpen(!!requestedConversation);
+  }, [tab, requestedConversation, requestedQuotation]);
 
   const [bookingItem, setBookingItem] = useState<PublicPackage | null>(() =>
     new URLSearchParams(search).get("booking") === "resume"
@@ -622,15 +640,27 @@ export function CustomerDashboard({
   const startNewChat = async () => {
     if (newChatBusy) return;
 
-    referenceSelection.current++;
+    const selection = ++referenceSelection.current;
     handledReference.current = pendingBookingReference;
     setNewChatBusy(true);
 
     try {
       const thread = await createMyConversation();
+      void inbox.refresh();
+
+      if (
+        selection !== referenceSelection.current ||
+        normalizePath(window.location.pathname) !== customerPaths.Messages
+      )
+        return;
+
+      if (routeConversation.current) {
+        routeConversation.current = null;
+        navigateWorkspace(customerPaths.Messages, true);
+      }
+
       setSelectedConversationId(thread.conversation.id);
       setMessageThread(thread);
-      void inbox.refresh();
       setConversationOpen(true);
       notify("New chat started.");
     } catch (cause) {
@@ -728,6 +758,7 @@ export function CustomerDashboard({
           ))}
         </nav>
         <div className="customer-header-actions">
+          <NotificationBell key={profileId} profileId={profileId} />
           <div className="customer-account-menu" ref={accountMenuRef}>
             <Button
               variant="plain"
@@ -835,6 +866,7 @@ export function CustomerDashboard({
         {tab === "My events" && (
           <div className="customer-content">
             <BookingList
+              requestedId={new URLSearchParams(search).get("bookingRequest")}
               onExplore={() => go("Catalogs")}
               onOpenChat={(reference: string) => {
                 navigateWorkspace(
@@ -873,6 +905,11 @@ export function CustomerDashboard({
         {tab === "Messages" && (
           <div className="customer-messages-view">
             <MessagesWorkspace
+              requestedQuotationId={
+                requestedConversation === selectedConversationId
+                  ? requestedQuotation
+                  : null
+              }
               title="Messages"
               viewerRole="customer"
               localAiReplyPending={
@@ -955,7 +992,14 @@ export function CustomerDashboard({
                   : null
               }
               activeId={selectedConversationId}
-              onSelect={(id) => void selectConversation(id)}
+              onSelect={(id) => {
+                if (requestedConversation) {
+                  routeConversation.current = null;
+                  navigateWorkspace(customerPaths.Messages, true);
+                }
+
+                void selectConversation(id);
+              }}
               messages={
                 messageThread?.conversation.id === selectedConversationId
                   ? addSentMessages(
@@ -1026,7 +1070,12 @@ export function CustomerDashboard({
                 if (item && conversation?.id === item.conversationId)
                   void deliverMessage(conversation, item.message);
               }}
-              onBack={() => setConversationOpen(false)}
+              onBack={() => {
+                if (requestedConversation)
+                  navigateWorkspace("/app/messages", true);
+
+                setConversationOpen(false);
+              }}
               conversationOpen={conversationOpen}
               onNewChat={startNewChat}
               newChatBusy={newChatBusy}

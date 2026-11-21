@@ -17,6 +17,7 @@ import bookingRequestRoutes from "./controllers/booking-requests/index.js";
 import authRoutes from "./controllers/auth/index.js";
 import guestChatRoutes from "./controllers/guest-chat/index.js";
 import messageRoutes from "./controllers/messages/index.js";
+import notificationRoutes from "./controllers/notifications/index.js";
 import serviceRoutes from "./controllers/services/index.js";
 import packageRoutes from "./controllers/packages/index.js";
 import healthRoutes from "./controllers/health/index.js";
@@ -135,6 +136,11 @@ app.use(
 app.route("/v1", eventDayRoutes);
 app.route("/v1", messageRoutes);
 app.route("/v1", messageImageRoutes);
+app.use(
+  "/v1/notifications/*",
+  bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
+);
+app.route("/v1", notificationRoutes);
 app.route("/v1", guestChatRoutes);
 app.route("/v1", authRoutes);
 app.route("/v1", userRoutes);

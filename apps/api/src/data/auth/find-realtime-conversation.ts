@@ -13,7 +13,7 @@ export function findRealtimeConversationData(
       join.on("sessions.id", "=", session.sessionId),
     )
     .innerJoin("users", "users.id", "sessions.user_id")
-    .select("conversations.id")
+    .select("conversations.id as conversationId")
     .where("conversations.id", "=", conversationId)
     .where("conversations.customer_id", "is not", null)
     .where("conversations.guest_identity_id", "is", null)

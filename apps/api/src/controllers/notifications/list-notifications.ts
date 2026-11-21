@@ -1,0 +1,82 @@
+import {
+  notificationContentSchema,
+  notificationPageSchema,
+} from "@event-management/contracts/notifications";
+import {
+  createPage,
+  MAX_CURSOR_LENGTH,
+} from "@event-management/contracts/pagination";
+import { createRoute, z } from "@hono/zod-openapi";
+import { listNotificationsData } from "../../data/notifications/list-notifications.js";
+import type { AppRouteHandler } from "../../types/hono.js";
+import {
+  encodePageCursor,
+  parsePageCursor,
+  postgresTimestampSchema,
+} from "../../utils/pagination.js";
+import { errors, json } from "./http.js";
+
+const PAGE_SIZE = 20;
+
+const cursorPosition = z.strictObject({
+  createdAt: postgresTimestampSchema,
+  id: z.uuid(),
+});
+
+export const listNotificationsRoute = createRoute({
+  method: "get",
+  path: "/notifications",
+  tags: ["Notifications"],
+  summary: "List notifications for the signed-in account",
+  request: {
+    query: z.object({
+      cursor: z.string().min(1).max(MAX_CURSOR_LENGTH).optional(),
+    }),
+  },
+  responses: {
+    200: {
+      content: json(notificationPageSchema),
+      description: "Notification page and unread count",
+    },
+    400: errors[400],
+    401: errors[401],
+  },
+});
+
+export const listNotificationsRouteHandler: AppRouteHandler<
+  typeof listNotificationsRoute
+> = async (c) => {
+  const userId = c.get("session").user.id;
+  const scope = `notifications:${userId}`;
+  const cursor = parsePageCursor(
+    c.req.valid("query").cursor,
+    cursorPosition,
+    scope,
+  );
+  const { rows, unread_count } = await listNotificationsData(
+    c.get("db"),
+    userId,
+    PAGE_SIZE,
+    cursor,
+  );
+
+  const page = createPage(rows, PAGE_SIZE, ({ cursor_created_at, id }) =>
+    encodePageCursor(scope, { createdAt: cursor_created_at, id }),
+  );
+
+  return c.json(
+    {
+      notifications: page.items.map(
+        ({ id, type, payload, cursor_created_at, read_at }) => ({
+          ...notificationContentSchema.parse({ type, payload }),
+          id,
+          createdAt: cursor_created_at,
+          readAt: read_at,
+        }),
+      ),
+      unreadCount: Number(unread_count),
+      nextCursor: page.nextCursor,
+    },
+    200,
+  );
+};

@@ -2,18 +2,23 @@ import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { openapiJson } from "../../utils/openapi.js";
 import { jsonError } from "../../utils/service-result.js";
-import { issueConversationRealtimeTokenService } from "../../services/auth/issue-conversation-realtime-token.js";
+import { issueRealtimeTokenService } from "../../services/auth/issue-realtime-token.js";
 import { errorSchema } from "./profile.js";
 
-export const issueConversationRealtimeTokenRoute = createRoute({
+export const issueRealtimeTokenRoute = createRoute({
   method: "post",
   path: "/auth/realtime-token",
   tags: ["Auth"],
-  summary: "Issue a short-lived receive-only token for a conversation",
+  summary: "Issue a short-lived receive-only Realtime token",
   request: {
     body: {
       required: true,
-      content: openapiJson(z.object({ conversationId: z.string().uuid() })),
+      content: openapiJson(
+        z.union([
+          z.strictObject({ conversationId: z.string().uuid() }),
+          z.strictObject({ scope: z.literal("notifications") }),
+        ]),
+      ),
     },
   },
   responses: {
@@ -24,11 +29,12 @@ export const issueConversationRealtimeTokenRoute = createRoute({
           expiresAt: z.iso.datetime(),
         }),
       ),
-      description: "Conversation Realtime token",
+      description:
+        "A token scoped to one conversation or the signed-in user's notifications",
     },
     400: {
       content: openapiJson(errorSchema),
-      description: "Invalid conversation ID",
+      description: "Invalid Realtime token request",
     },
     401: {
       content: openapiJson(errorSchema),
@@ -45,13 +51,13 @@ export const issueConversationRealtimeTokenRoute = createRoute({
   },
 });
 
-export const issueConversationRealtimeTokenRouteHandler: AppRouteHandler<
-  typeof issueConversationRealtimeTokenRoute
+export const issueRealtimeTokenRouteHandler: AppRouteHandler<
+  typeof issueRealtimeTokenRoute
 > = async (c) => {
-  const result = await issueConversationRealtimeTokenService(
+  const result = await issueRealtimeTokenService(
     c.get("db"),
     c.get("session"),
-    c.req.valid("json").conversationId,
+    c.req.valid("json"),
   );
 
   if (result.kind === "not-found")

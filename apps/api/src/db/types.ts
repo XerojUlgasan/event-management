@@ -188,6 +188,16 @@ export interface Messages {
   sender_role: Generated<string>;
 }
 
+export interface Notifications {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  payload: Json;
+  read_at: Timestamp | null;
+  recipient_user_id: string;
+  source_event_id: string;
+  type: string;
+}
+
 export interface Packages {
   addon_services: Generated<Json>;
   archived_at: Timestamp | null;
@@ -275,6 +285,7 @@ export interface DB {
   media_assets: MediaAssets;
   message_images: MessageImages;
   messages: Messages;
+  notifications: Notifications;
   packages: Packages;
   quotations: Quotations;
   services: Services;

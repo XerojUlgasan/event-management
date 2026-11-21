@@ -7,6 +7,7 @@
 @import "./booking-requests/customer-events.css";
 @import "./event-days/admin-event-days.css";
 @import "./public/site.css";
+@import "./notifications/notifications.css";
 
 html:has(.public-site) {
   scrollbar-gutter: stable;

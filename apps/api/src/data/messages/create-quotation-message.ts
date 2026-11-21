@@ -20,7 +20,7 @@ export async function createQuotationMessageData(
     .forUpdate()
     .executeTakeFirst();
 
-  if (!conversation) return false;
+  if (!conversation) return undefined;
 
   const message = await trx
     .insertInto("messages")
@@ -53,5 +53,5 @@ export async function createQuotationMessageData(
   if (conversation.customer_id)
     await publishConversationMessageData(trx, conversation.id, message.id);
 
-  return true;
+  return conversation.id;
 }

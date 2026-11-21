@@ -1,3 +1,4 @@
+import { navigateWorkspace } from "../../lib/navigation/workspace-navigation";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import {
   Fragment,
@@ -108,10 +109,12 @@ export function MessagesWorkspace({
   historyNotice = "",
   localAiReplyPending = false,
   localImageFiles,
+  requestedQuotationId,
   resumeBooking = false,
   onBookingSubmitted,
   onBookingClosed,
 }: {
+  requestedQuotationId?: string | null;
   resumeBooking?: boolean;
   onBookingSubmitted?: () => void;
   onBookingClosed?: () => void;
@@ -159,6 +162,7 @@ export function MessagesWorkspace({
 }) {
   const { notify, notifyError } = useNotifications();
   const [quotationId, setQuotationId] = useState<string | null>(null);
+  const visibleQuotationId = requestedQuotationId ?? quotationId;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draft = activeId ? (drafts[activeId] ?? "") : "";
 
@@ -922,11 +926,25 @@ export function MessagesWorkspace({
           </div>
         </form>
       </section>
-      {quotationId && (
-        <Dialog title="Quotation" onClose={() => setQuotationId(null)}>
+      {visibleQuotationId && (
+        <Dialog
+          title="Quotation"
+          onClose={() => {
+            setQuotationId(null);
+
+            if (requestedQuotationId) {
+              const url = new URL(window.location.href);
+              url.searchParams.delete("quotation");
+              navigateWorkspace(
+                `${url.pathname}${url.search}${url.hash}`,
+                true,
+              );
+            }
+          }}
+        >
           <Quotations
-            key={quotationId}
-            quotationId={quotationId}
+            key={visibleQuotationId}
+            quotationId={visibleQuotationId}
             bookingId={active?.bookingRequestId ?? undefined}
             admin={!isTeam}
           />

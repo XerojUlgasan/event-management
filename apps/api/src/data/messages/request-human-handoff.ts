@@ -10,6 +10,7 @@ import { assertGuestActive } from "../guest-chat/guest-conversation.js";
 import { finishToolCallData } from "../ai/finish-tool-call.js";
 import { linkToolCallsToReplyData } from "../ai/link-tool-calls-to-reply.js";
 import { publishConversationMessageData } from "./publish-conversation-message.js";
+import { createNotificationData } from "../notifications/create-notification.js";
 
 export type HumanHandoffScope = {
   conversationId: string;
@@ -168,8 +169,15 @@ export function requestHumanHandoffData({
       assistantMessageId: message.id,
     });
 
-    if (!previous && conversation.customer_id)
-      await publishConversationMessageData(trx, conversation.id, message.id);
+    if (!previous) {
+      if (conversation.customer_id)
+        await publishConversationMessageData(trx, conversation.id, message.id);
+
+      await createNotificationData(trx, { role: "admin" }, trigger.id, {
+        type: "human_review_requested",
+        payload: { conversationId: conversation.id },
+      });
+    }
 
     return { ...message, sender_display_name: null, sender_email: null };
   });

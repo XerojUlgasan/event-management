@@ -14,17 +14,26 @@ const signingKeySchema = z.object({
   d: z.string().min(1),
 });
 
-export async function signConversationRealtimeToken(
-  conversationId: string,
+export type RealtimeTokenTarget =
+  { conversationId: string } | { scope: "notifications" };
+
+export async function signRealtimeToken(
+  target: RealtimeTokenTarget,
   session: SessionContext,
   { issuedAt, expiresAt }: { issuedAt: number; expiresAt: number },
 ) {
   const { jwk, localSecret } = env.REALTIME_SIGNING;
+  const scopeClaims =
+    "conversationId" in target
+      ? {
+          clemora_scope: "conversation_messages",
+          conversation_id: target.conversationId,
+        }
+      : { clemora_scope: "user_notifications" };
   const payload = new SignJWT({
     role: "authenticated",
-    clemora_scope: "conversation_messages",
     clemora_session_id: session.sessionId,
-    conversation_id: conversationId,
+    ...scopeClaims,
   })
     .setSubject(session.user.id)
     .setAudience("authenticated")
@@ -50,7 +59,7 @@ export async function signConversationRealtimeToken(
   throw new Error("Realtime token signer is unavailable");
 }
 
-export function getConversationRealtimeTokenLifetime(
+export function getRealtimeTokenLifetime(
   sessionExpiresAt: Date,
   now = Date.now(),
 ) {

@@ -1,3 +1,4 @@
+import { bookingStatusSchema } from "@event-management/contracts/booking-requests";
 import {
   BOOKING_ESTIMATED_DURATIONS,
   MAX_EVENT_TYPE_LENGTH,
@@ -12,13 +13,7 @@ import { priceSchema } from "../packages/schemas.js";
 
 const text = (max: number) => z.string().trim().min(1).max(max);
 
-export const statusSchema = z.enum([
-  "under_review",
-  "needs_details",
-  "accepted",
-  "declined",
-  "cancelled",
-]);
+export const statusSchema = bookingStatusSchema;
 
 export const estimatedDurationSchema = z.enum(BOOKING_ESTIMATED_DURATIONS);
 

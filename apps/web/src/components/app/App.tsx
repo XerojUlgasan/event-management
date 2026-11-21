@@ -260,6 +260,7 @@ function Workspace({
       >
         <AdminShell
           profile={profile}
+          search={search}
           active={active}
           bookingRequestId={adminBookingRequestId(path) ?? undefined}
           onSignOut={handleSignOut}
@@ -279,6 +280,7 @@ function Workspace({
         onPublic={() => {
           window.location.assign("/");
         }}
+        profileId={profile.id}
         userName={profile.displayName ?? profile.email}
         userEmail={profile.email}
         onSignOut={handleSignOut}

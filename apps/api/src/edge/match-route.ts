@@ -22,6 +22,7 @@ export const routeFamilies = [
   },
   { id: "message-images", prefixes: ["/v1/message-images"] },
   { id: "messages", prefixes: ["/v1/admin/conversations", "/v1/messages"] },
+  { id: "notifications", prefixes: ["/v1/notifications"] },
   { id: "auth", prefixes: ["/v1/auth", "/v1/me"] },
   { id: "users", prefixes: ["/v1/admin/users"] },
 ] as const;

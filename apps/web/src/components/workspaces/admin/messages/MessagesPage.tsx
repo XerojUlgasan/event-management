@@ -1,3 +1,4 @@
+import { navigateWorkspace } from "../../../../lib/navigation/workspace-navigation";
 import { hasObservedReply } from "../../../../lib/services/messages/pending-replies";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNotifications } from "@event-management/ui";
@@ -34,7 +35,11 @@ type ConversationAiState = Pick<
   "aiEnabled" | "aiVersion" | "aiHandoff"
 >;
 
-export function MessagesPage() {
+export function MessagesPage({
+  requestedConversation,
+}: {
+  requestedConversation: string | null;
+}) {
   const { notifyError } = useNotifications();
   const mounted = useRef(true);
   useEffect(() => {
@@ -95,12 +100,24 @@ export function MessagesPage() {
 
   const inbox = useConversationList(loadConversations);
   const { conversations, setConversations } = inbox;
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(
+    requestedConversation,
+  );
+  const routeConversation = useRef(requestedConversation);
   activeIdRef.current = activeId;
   const [thread, setThread] = useState<ChatThread | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
   const [threadError, setThreadError] = useState("");
-  const [conversationOpen, setConversationOpen] = useState(false);
+  const [conversationOpen, setConversationOpen] = useState(
+    !!requestedConversation,
+  );
+  useEffect(() => {
+    if (!requestedConversation && !routeConversation.current) return;
+
+    routeConversation.current = requestedConversation;
+    setActiveId(requestedConversation);
+    setConversationOpen(!!requestedConversation);
+  }, [requestedConversation]);
   const [historyNotice, setHistoryNotice] = useState("");
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [olderError, setOlderError] = useState("");
@@ -527,6 +544,11 @@ export function MessagesPage() {
         }}
         activeId={activeId}
         onSelect={(id) => {
+          if (requestedConversation) {
+            routeConversation.current = null;
+            navigateWorkspace("/app/messages", true);
+          }
+
           setHistoryNotice("");
           setActiveId(id);
           setConversationOpen(true);
@@ -553,6 +575,8 @@ export function MessagesPage() {
         onToggleAi={toggleAi}
         pendingAiToggle={!!aiPending[activeId ?? ""]}
         onBack={() => {
+          if (requestedConversation) navigateWorkspace("/app/messages", true);
+
           setConversationOpen(false);
           setActiveId(null);
           setThread(null);
