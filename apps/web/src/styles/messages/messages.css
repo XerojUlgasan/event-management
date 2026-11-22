@@ -85,9 +85,50 @@
 }
 .messages-workspace .message-head-actions .button {
   min-height: 44px;
-  padding: 0 12px;
-  gap: 7px;
-  font-size: 12px;
+  min-width: 44px;
+  flex: none;
+}
+.messages-workspace .message-head-actions .button-size-icon {
+  width: 44px;
+  padding: 0;
+}
+.message-ai-switch {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--transparent);
+}
+.message-ai-switch-track {
+  display: flex;
+  align-items: center;
+  width: 50px;
+  height: 28px;
+  padding: 3px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+.message-ai-switch[aria-checked="true"] .message-ai-switch-track {
+  justify-content: flex-end;
+  border-color: var(--brand-charcoal);
+  background: var(--brand-charcoal);
+}
+.message-ai-switch-thumb {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--text-primary);
+  background: var(--surface-base);
+}
+.messages-workspace .message-handoff[data-pending="true"] .button {
+  color: var(--status-warning-dark);
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-surface);
 }
 .message-event-context {
   display: flex;
@@ -163,24 +204,28 @@
 }
 .messages-workspace .message-composer {
   margin: 0;
-  padding: 16px 24px 20px;
+  padding: 12px 24px;
   border-top: 1px solid var(--line);
   background: var(--surface-base);
-  display: flex;
-  flex-direction: column;
+}
+.message-composer .message-attachments {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: end;
   gap: 8px;
 }
-.message-composer > label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
+.message-composer
+  .message-attachments
+  > :is(.message-image-list, .message-image-error) {
+  grid-column: 1 / -1;
 }
 .message-composer textarea {
   width: 100%;
-  min-height: 70px;
-  max-height: 180px;
+  min-height: 44px;
+  max-height: 120px;
   padding: 10px 12px;
-  resize: vertical;
+  resize: none;
+  field-sizing: content;
   border: 1px solid var(--border-default);
   border-radius: 10px;
   background: var(--surface-base);
@@ -197,19 +242,9 @@
   border-color: var(--wine);
   outline-offset: 1px;
 }
-.message-composer-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.message-composer-actions > small {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.messages-workspace .message-composer .button {
+.messages-workspace .message-composer .message-attachments > .button {
+  width: 44px;
   min-height: 44px;
-  font-size: 12px;
 }
 .conversation-context-drawer {
   max-width: 480px;
@@ -318,6 +353,15 @@
     width: 100%;
     justify-content: flex-start;
   }
+  .messages-workspace .message-handoff .ui-info-disclosure {
+    position: static;
+  }
+  .messages-workspace
+    .message-handoff
+    :is(.ui-info-disclosure-hint, .ui-info-disclosure-panel) {
+    right: auto;
+    left: 14px;
+  }
 }
 @media (max-width: 760px) {
   .messages-workspace {
@@ -359,12 +403,6 @@
   .messages-workspace .message-head-actions {
     gap: 7px;
   }
-  .messages-workspace .message-head-actions .button {
-    flex: 1;
-    min-width: 0;
-    font-size: 11px;
-    padding: 0 9px;
-  }
   .messages-workspace .message-thread-name strong {
     font-size: 14px;
   }
@@ -389,20 +427,6 @@
   }
   .message-composer textarea {
     font-size: 16px;
-    min-height: 60px;
-  }
-  .message-composer-actions > small {
-    max-width: 115px;
-    line-height: 1.5;
-  }
-}
-@media (max-width: 420px) {
-  .messages-workspace .message-head-actions .button {
-    flex-direction: column;
-    white-space: normal;
-    min-height: 54px;
-    gap: 3px;
-    padding: 5px;
   }
 }
 
@@ -435,28 +459,6 @@
   overflow-anchor: none;
 }
 
-.messages-workspace .customer-composer {
-  flex-direction: row;
-  align-items: end;
-  gap: 10px;
-}
-.customer-composer > label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-.customer-composer textarea {
-  min-height: 44px;
-  max-height: 120px;
-  resize: none;
-}
-.messages-workspace .customer-composer .button {
-  width: 44px;
-  padding: 0;
-  flex: none;
-}
 .message-delivery-error {
   margin-top: 6px;
   font-size: 12px;

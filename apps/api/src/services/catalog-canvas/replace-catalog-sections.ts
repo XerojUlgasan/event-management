@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { CATALOG_COLUMNS } from "@event-management/contracts/catalog";
 import {
   sectionsSchema,
   storedSectionsSchema,
@@ -214,6 +215,9 @@ export async function replaceCatalogSectionsService(
       id: section.id.toLowerCase(),
       title: section.title,
       widgets,
+      ...(section.columns === CATALOG_COLUMNS
+        ? { columns: CATALOG_COLUMNS }
+        : {}),
     });
   }
 

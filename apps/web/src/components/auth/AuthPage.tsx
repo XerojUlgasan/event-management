@@ -329,11 +329,6 @@ export function AuthPage({
               </Button>
             </>
           )}
-
-          <p className="login-disclaimer">
-            Customer sign-up is open. Administrator access is managed
-            separately.
-          </p>
         </div>
       </main>
     </div>

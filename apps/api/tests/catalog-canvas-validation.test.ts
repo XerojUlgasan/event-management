@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { OpenAPIHono, createRoute } from "@hono/zod-openapi";
 import {
+  CATALOG_COLUMNS,
+  LEGACY_CATALOG_COLUMNS,
+} from "@event-management/contracts/catalog";
+import {
   draftSectionsSchema,
   sectionsSchema,
   storedSectionsSchema,
@@ -316,6 +320,64 @@ test("shared schema can generate an OpenAPI document", () => {
     info: { title: "test", version: "1" },
   });
   assert.ok(document.paths?.["/package"]?.post?.requestBody);
+});
+
+test("section column markers distinguish legacy and current layout bounds", () => {
+  assert.equal(CATALOG_COLUMNS, 24);
+  assert.equal(LEGACY_CATALOG_COLUMNS, 12);
+
+  const legacyWide = section([{ ...markdown(), x: 11, w: 2 }]);
+  assert.equal(sectionsSchema.safeParse([legacyWide]).success, false);
+
+  const currentWide = {
+    ...section([{ ...markdown(), x: 11, w: 2 }]),
+    columns: CATALOG_COLUMNS,
+  };
+  assert.equal(sectionsSchema.safeParse([currentWide]).success, true);
+
+  const mixed = [
+    section([markdown()]),
+    currentWide,
+    {
+      ...section([{ ...markdown(), x: 0, w: CATALOG_COLUMNS }]),
+      columns: CATALOG_COLUMNS,
+    },
+  ];
+  assert.equal(sectionsSchema.safeParse(mixed).success, true);
+  assert.equal("columns" in mixed[0], false);
+
+  assert.equal(
+    sectionsSchema.safeParse([
+      { ...section(), columns: LEGACY_CATALOG_COLUMNS },
+    ]).success,
+    false,
+  );
+
+  const { media: _media, ...storedWidget } = markdown();
+  const storedLegacy = storedSectionsSchema.parse([
+    section([{ ...storedWidget, mediaId: null }]),
+  ]);
+  assert.equal("columns" in storedLegacy[0], false);
+
+  const storedCurrent = storedSectionsSchema.parse([
+    {
+      ...section([{ ...storedWidget, mediaId: null }]),
+      columns: CATALOG_COLUMNS,
+    },
+  ]);
+  assert.equal(storedCurrent[0].columns, CATALOG_COLUMNS);
+
+  const roundtrip = sectionsSchema.parse(
+    storedCurrent.map((item) => ({
+      ...item,
+      widgets: item.widgets.map(({ mediaId, ...widget }) => ({
+        ...widget,
+        media: null,
+      })),
+    })),
+  );
+
+  assert.equal(roundtrip[0].columns, CATALOG_COLUMNS);
 });
 
 test("included service terms remain optional and require positive whole values", () => {

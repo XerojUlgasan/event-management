@@ -3,7 +3,8 @@ export const MAX_PACKAGE_ADDON_SERVICES = 100;
 export const MAX_CATALOG_SECTIONS = 20;
 export const MAX_CATALOG_WIDGETS = 100;
 export const MAX_WIDGET_MARKDOWN_LENGTH = 20000;
-export const CATALOG_COLUMNS = 12;
+export const CATALOG_COLUMNS = 24;
+export const LEGACY_CATALOG_COLUMNS = 12;
 
 export type CatalogMedia = {
   id?: string;
@@ -46,6 +47,8 @@ export type CatalogWidget = {
 export type CatalogSection = {
   id: string;
   title: string;
+  /** Omitted means legacy 12-column layout; only the current width is stored. */
+  columns?: typeof CATALOG_COLUMNS;
   widgets: CatalogWidget[];
 };
 

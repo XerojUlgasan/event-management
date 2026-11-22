@@ -49,6 +49,6 @@ Customers, guests, and administrators may attach images with an optional caption
 
 - An active guest or customer conversation can be handed to the team when the customer requests a person, an administrator must make a decision, or AI cannot answer with available information.
 - The latest handoff stores only its reason, short AI summary, and whether it is pending in `conversations.ai_handoff`. It does not create a separate history table or record takeover times or identities.
-- A successful handoff pauses AI and saves a customer acknowledgement. The admin inbox and header show **Needs attention**; the information control explains why. The metadata is admin-only.
+- A successful handoff pauses AI and saves a customer acknowledgement. The admin inbox shows **Needs attention**, and the thread header shows a warning icon that opens the reason and summary. The metadata is admin-only.
 - The first successfully saved admin chat reply clears the pending indicator and retains the reason. The indicator stays pending through reads, failed replies, quotation delivery, and re-enabling AI.
 - Handoff success means the conversation is available for admin review. It does not establish assignment, an external notification, a response deadline, or resolution of the customer's request.

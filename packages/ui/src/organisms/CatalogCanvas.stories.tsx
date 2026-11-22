@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { CATALOG_COLUMNS } from "@event-management/contracts/catalog";
 import type {
   CatalogSection,
   CatalogWidget,
@@ -83,6 +84,39 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const AllWidgets: Story = {};
+
+export const FinerGrid: Story = {
+  args: {
+    sections: [
+      ...sections,
+      {
+        id: "finer-grid",
+        title: "24-column layout",
+        columns: CATALOG_COLUMNS,
+        widgets: [
+          widget("finer-text", "markdown", {
+            x: 1,
+            w: 13,
+            markdown:
+              "## An offset text block\n\nThis one starts in column two.",
+          }),
+          widget("finer-service", "service", {
+            x: 15,
+            w: 9,
+            serviceId: "styling",
+            service: {
+              id: "styling",
+              slug: "floral-styling",
+              name: "Floral styling",
+              description: "Arrangements for the ceremony and reception.",
+              imageUrl: null,
+            },
+          }),
+        ],
+      },
+    ],
+  },
+};
 
 export const Narrow: Story = {
   render: (args) => (
@@ -343,37 +377,39 @@ export const OverflowClipped: Story = {
 
 export const GridGuides: Story = {
   render: () => (
-    <div>
-      <p>12 columns · 9 rows with a gap</p>
+    <CatalogCanvas>
+      <p>{CATALOG_COLUMNS} columns · 9 rows with a gap</p>
       <CatalogGridRuler />
       <div style={{ ...catalogGridStyle, position: "relative", height: 600 }}>
         <CatalogGridGuides rows={9} />
       </div>
-    </div>
+    </CatalogCanvas>
   ),
 };
 
 export const StackedGuides: Story = {
   render: () => (
     <div style={{ width: 380 }}>
-      <p>Stacked view · 5 rows</p>
-      <CatalogGridRuler stacked />
-      <div style={{ ...catalogGridStyle, position: "relative", height: 344 }}>
-        <CatalogGridGuides rows={5} stacked />
-      </div>
+      <CatalogCanvas>
+        <p>Stacked view · 5 rows</p>
+        <CatalogGridRuler stacked />
+        <div style={{ ...catalogGridStyle, position: "relative", height: 344 }}>
+          <CatalogGridGuides rows={5} stacked />
+        </div>
+      </CatalogCanvas>
     </div>
   ),
 };
 
 export const EmptyGuides: Story = {
   render: () => (
-    <div>
+    <CatalogCanvas>
       <p>0 rows</p>
       <CatalogGridRuler />
       <div style={{ ...catalogGridStyle, position: "relative", height: 24 }}>
         <CatalogGridGuides rows={0} />
       </div>
-    </div>
+    </CatalogCanvas>
   ),
 };
 

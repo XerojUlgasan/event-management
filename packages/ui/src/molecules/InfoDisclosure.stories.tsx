@@ -24,6 +24,14 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const Attention: Story = {
+  args: {
+    icon: "alert",
+    label: "Needs attention",
+    hint: "Review the conversation before responding",
+  },
+};
+
 export const LongContent: Story = {
   args: {
     hint: "Longer details",

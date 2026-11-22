@@ -1,14 +1,17 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Button } from "../atoms/Button";
+import type { IconName } from "../atoms/Icon";
 
 /** An information control with a short hint and a persistent detail panel. */
 export function InfoDisclosure({
   label,
   hint,
+  icon = "info",
   children,
 }: {
   label: string;
   hint: string;
+  icon?: IconName;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -59,7 +62,7 @@ export function InfoDisclosure({
         ref={trigger}
         variant="secondary"
         size="icon"
-        icon="info"
+        icon={icon}
         aria-label={label}
         aria-expanded={open}
         aria-controls={panelId}

@@ -81,12 +81,6 @@
 .message-processing .button-link {
   margin-left: 4px;
 }
-.customer-composer {
-  flex-wrap: wrap;
-}
-.customer-composer .message-attachments {
-  flex-basis: 100%;
-}
 .public-chat-panel .chat-input {
   flex-wrap: wrap;
 }

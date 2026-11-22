@@ -4,7 +4,7 @@ import {
   MAX_MESSAGE_IMAGE_PIXELS,
 } from "@event-management/contracts/limits/messages";
 import { Button, Dialog, Input } from "@event-management/ui";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { apiBase } from "../../lib/http/request";
 import { messageImageUrl } from "../../lib/utils/messages/image-url";
 import type { ChatMessage } from "../../lib/data/messages/conversations";
@@ -26,10 +26,12 @@ export function MessageAttachments({
   files,
   onChange,
   disabled,
+  children,
 }: {
   files: File[];
   onChange: (files: File[]) => void;
   disabled?: boolean;
+  children?: ReactNode;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
@@ -83,6 +85,7 @@ export function MessageAttachments({
         disabled={disabled || files.length >= MAX_MESSAGE_IMAGES}
         onClick={() => input.current?.click()}
       />
+      {children}
       {files.length > 0 && (
         <div className="message-image-list">
           {files.map((file, index) => (

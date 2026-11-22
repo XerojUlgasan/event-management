@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   CATALOG_COLUMNS,
+  LEGACY_CATALOG_COLUMNS,
   MAX_CATALOG_SECTIONS,
   MAX_CATALOG_WIDGETS,
   MAX_WIDGET_MARKDOWN_LENGTH,
@@ -61,6 +62,27 @@ function createMediaSchema(allowMissingUploadId: boolean) {
 }
 
 export const mediaSchema = createMediaSchema(false);
+
+const sectionColumnsSchema = z.literal(CATALOG_COLUMNS).optional();
+
+function validateSectionLayout(
+  section: {
+    columns?: typeof CATALOG_COLUMNS;
+    widgets: Array<{ x: number; w: number }>;
+  },
+  ctx: z.RefinementCtx,
+) {
+  const columnCount = section.columns ?? LEGACY_CATALOG_COLUMNS;
+
+  section.widgets.forEach((widget, index) => {
+    if (widget.x + widget.w > columnCount)
+      ctx.addIssue({
+        code: "custom",
+        message: "Widget exceeds the page width",
+        path: ["widgets", index, "w"],
+      });
+  });
+}
 
 function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
   return z
@@ -132,13 +154,6 @@ function createWidgetSchema(pendingWidgetIds?: ReadonlySet<string>) {
           code: "custom",
           message: "Autoplay is only available for video widgets",
           path: ["autoplay"],
-        });
-
-      if (widget.x + widget.w > CATALOG_COLUMNS)
-        ctx.addIssue({
-          code: "custom",
-          message: "Widget exceeds the page width",
-          path: ["w"],
         });
 
       if (
@@ -214,11 +229,13 @@ function createSectionSchema(pendingWidgetIds?: ReadonlySet<string>) {
     .object({
       id: z.string().uuid(),
       title: text,
+      columns: sectionColumnsSchema,
       widgets: z
         .array(createWidgetSchema(pendingWidgetIds))
         .max(MAX_CATALOG_WIDGETS),
     })
-    .strict();
+    .strict()
+    .superRefine(validateSectionLayout);
 }
 
 export const sectionSchema = createSectionSchema();
@@ -295,6 +312,7 @@ export const storedSectionsSchema = z
       .object({
         id: sectionSchema.shape.id,
         title: sectionSchema.shape.title,
+        columns: sectionColumnsSchema,
         widgets: z.array(storedWidgetSchema),
       })
       .strict(),

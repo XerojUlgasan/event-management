@@ -1,0 +1,91 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net">
+  <diagram id="amac-public-demo" name="Public demo">
+    <mxGraphModel grid="1" gridSize="10" page="1" pageWidth="968" pageHeight="420" background="#FFFFFF">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="AMAC Network Diagram" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=30;fontStyle=1;fontColor=#223B61;spacing=0;" vertex="1" parent="1" connectable="0">
+          <mxGeometry as="geometry" x="26" y="18" width="900" height="38" />
+        </mxCell>
+        <mxCell id="host" value="AMAC Demo Host" style="rounded=1;arcSize=5;container=1;collapsible=0;recursiveResize=0;html=1;align=left;verticalAlign=top;fontFamily=Arial;fontSize=15;fontStyle=1;fontColor=#526A86;spacingTop=10;spacingLeft=14;fillColor=#F7FAFF;strokeColor=#B2C3D9;dashed=1;dashPattern=5 4;strokeWidth=1.2;" vertex="1" parent="1" connectable="0">
+          <mxGeometry as="geometry" x="389" y="84" width="369" height="314" />
+        </mxCell>
+        <mxCell id="client" value="" style="shape=image;imageAspect=0;aspect=fixed;html=1;image=data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2084%2062%22%3E%3Cg%20stroke%3D%22%23223B61%22%20stroke-width%3D%222.7%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%3E%3Crect%20x%3D%2215%22%20y%3D%227%22%20width%3D%2254%22%20height%3D%2239%22%20rx%3D%224%22%20fill%3D%22%23DCEBFC%22%2F%3E%3Cpath%20d%3D%22M20%2013h44v27H20z%22%20fill%3D%22%23fff%22%2F%3E%3Cpath%20d%3D%22M15%2046h54l9%209a2%202%200%200%201-2%203H8a2%202%200%200%201-2-3z%22%20fill%3D%22%23DCEBFC%22%2F%3E%3Cpath%20d%3D%22M36%2052h12%22%20fill%3D%22none%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="38" y="103" width="84" height="62" />
+        </mxCell>
+        <mxCell id="client-label" value="Client Device" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=16;fontStyle=1;fontColor=#223B61;spacing=0;" vertex="1" parent="client" connectable="0">
+          <mxGeometry as="geometry" x="-34" y="63" width="152" height="39" />
+        </mxCell>
+        <mxCell id="admin" value="" style="shape=image;imageAspect=0;aspect=fixed;html=1;image=data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2084%2062%22%3E%3Cg%20stroke%3D%22%23223B61%22%20stroke-width%3D%222.7%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%3E%3Crect%20x%3D%2210%22%20y%3D%225%22%20width%3D%2264%22%20height%3D%2238%22%20rx%3D%224%22%20fill%3D%22%23DCEBFC%22%2F%3E%3Cpath%20d%3D%22M16%2011h52v26H16z%22%20fill%3D%22%23fff%22%2F%3E%3Cpath%20d%3D%22M37%2043h10v10l10%203H27l10-3z%22%20fill%3D%22%23DCEBFC%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="38" y="235" width="84" height="62" />
+        </mxCell>
+        <mxCell id="admin-label" value="Admin Device" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=16;fontStyle=1;fontColor=#223B61;spacing=0;" vertex="1" parent="admin" connectable="0">
+          <mxGeometry as="geometry" x="-34" y="63" width="152" height="39" />
+        </mxCell>
+        <mxCell id="cloudflare" value="" style="shape=image;imageAspect=0;aspect=fixed;html=1;image=data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2084%2062%22%3E%3Cg%20stroke%3D%22%23A95A19%22%20stroke-width%3D%222.7%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M21%2051a14%2014%200%201%201%201-28%2020%2020%200%200%201%2037-5%2016%2016%200%201%201%206%2033z%22%20fill%3D%22%23FBE5D0%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="234" y="169" width="84" height="62" />
+        </mxCell>
+        <mxCell id="cloudflare-label" value="Cloudflare" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=16;fontStyle=1;fontColor=#223B61;spacing=0;" vertex="1" parent="cloudflare" connectable="0">
+          <mxGeometry as="geometry" x="-34" y="63" width="152" height="39" />
+        </mxCell>
+        <mxCell id="web" value="" style="shape=image;imageAspect=0;aspect=fixed;html=1;image=data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2084%2062%22%3E%3Cg%20stroke%3D%22%23223B61%22%20stroke-width%3D%222.7%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%3E%3Crect%20x%3D%229%22%20y%3D%228%22%20width%3D%2266%22%20height%3D%2246%22%20rx%3D%225%22%20fill%3D%22%23fff%22%2F%3E%3Cpath%20d%3D%22M9%2020V13a5%205%200%200%201%205-5h56a5%205%200%200%201%205%205v7z%22%20fill%3D%22%23DCEBFC%22%2F%3E%3Cpath%20d%3D%22M27%2028l-8%208%208%208m30-16%208%208-8%208m-12-17-7%2019m-21-32h1m5%200h1m5%200h1%22%20fill%3D%22none%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E;" vertex="1" parent="host">
+          <mxGeometry as="geometry" x="47" y="85" width="84" height="62" />
+        </mxCell>
+        <mxCell id="web-label" value="AMAC Web App" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=16;fontStyle=1;fontColor=#223B61;spacing=0;" vertex="1" parent="web" connectable="0">
+          <mxGeometry as="geometry" x="-34" y="63" width="152" height="39" />
+        </mxCell>
+        <mxCell id="functions" value="" style="shape=image;imageAspect=0;aspect=fixed;html=1;image=data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2084%2062%22%3E%3Cg%20stroke%3D%22%23237455%22%20stroke-width%3D%222.7%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%3E%3Crect%20x%3D%2212%22%20y%3D%223%22%20width%3D%2260%22%20height%3D%2256%22%20rx%3D%2214%22%20fill%3D%22%23DFF4E9%22%2F%3E%3Cpath%20d%3D%22M47%2011%2028%2034h14l-4%2017%2018-24H43z%22%20fill%3D%22%2354B989%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E;" vertex="1" parent="host">
+          <mxGeometry as="geometry" x="224" y="85" width="84" height="62" />
+        </mxCell>
+        <mxCell id="functions-label" value="Supabase&lt;br&gt;Edge Functions" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=16;fontStyle=1;fontColor=#223B61;spacing=0;" vertex="1" parent="functions" connectable="0">
+          <mxGeometry as="geometry" x="-34" y="-43" width="152" height="39" />
+        </mxCell>
+        <mxCell id="data" value="" style="shape=image;imageAspect=0;aspect=fixed;html=1;image=data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2084%2062%22%3E%3Cg%20stroke%3D%22%23237455%22%20stroke-width%3D%222.7%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M16%2014h52v36c0%206-12%2010-26%2010s-26-4-26-10z%22%20fill%3D%22%23DFF4E9%22%2F%3E%3Cpath%20d%3D%22M16%2027c0%206%2012%2010%2026%2010s26-4%2026-10m-52%2012c0%206%2012%2010%2026%2010s26-4%2026-10%22%20fill%3D%22none%22%2F%3E%3Cellipse%20cx%3D%2242%22%20cy%3D%2214%22%20rx%3D%2226%22%20ry%3D%2210%22%20fill%3D%22%23F2FBF6%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E;" vertex="1" parent="host">
+          <mxGeometry as="geometry" x="224" y="201" width="84" height="62" />
+        </mxCell>
+        <mxCell id="data-label" value="Supabase Database&lt;br&gt;&amp;amp; Storage" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=16;fontStyle=1;fontColor=#223B61;spacing=0;" vertex="1" parent="data" connectable="0">
+          <mxGeometry as="geometry" x="-34" y="63" width="152" height="39" />
+        </mxCell>
+        <mxCell id="ai" value="" style="shape=image;imageAspect=0;aspect=fixed;html=1;image=data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2084%2062%22%3E%3Cg%20stroke%3D%22%23654492%22%20stroke-width%3D%222.7%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%3E%3Crect%20x%3D%2222%22%20y%3D%2211%22%20width%3D%2240%22%20height%3D%2240%22%20rx%3D%226%22%20fill%3D%22%23EDE4FB%22%2F%3E%3Cpath%20d%3D%22M30%2011V4m12%207V4m12%207V4M30%2051v7m12-7v7m12-7v7M22%2019h-7m7%2012h-7m7%2012h-7m47-24h7m-7%2012h7m-7%2012h7%22%20fill%3D%22none%22%2F%3E%3Cpath%20d%3D%22M42%2020l3.2%207.8L53%2031l-7.8%203.2L42%2042l-3.2-7.8L31%2031l7.8-3.2z%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="832" y="169" width="84" height="62" />
+        </mxCell>
+        <mxCell id="ai-label" value="Vercel AI Gateway" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=16;fontStyle=1;fontColor=#223B61;spacing=0;" vertex="1" parent="ai" connectable="0">
+          <mxGeometry as="geometry" x="-34" y="63" width="152" height="39" />
+        </mxCell>
+        <mxCell id="junction" value="" style="ellipse;perimeter=ellipsePerimeter;fillColor=#527096;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="169" y="197" width="6" height="6" />
+        </mxCell>
+        <mxCell id="client-line" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=12;orthogonalLoop=1;html=1;fontFamily=Arial;fontSize=13;fontColor=#4C607D;strokeColor=#527096;strokeWidth=1.65;endArrow=none;exitX=1;exitY=0.5;entryX=0.5;entryY=0;" edge="1" parent="1" source="client" target="junction">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="admin-line" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=12;orthogonalLoop=1;html=1;fontFamily=Arial;fontSize=13;fontColor=#4C607D;strokeColor=#527096;strokeWidth=1.65;endArrow=none;exitX=1;exitY=0.5;entryX=0.5;entryY=1;" edge="1" parent="1" source="admin" target="junction">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="public-https" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=12;orthogonalLoop=1;html=1;fontFamily=Arial;fontSize=13;fontColor=#4C607D;strokeColor=#527096;strokeWidth=1.65;endArrow=block;endFill=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="junction" target="cloudflare">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="offset" x="0" y="-12" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tunnel" value="Tunnel" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=12;orthogonalLoop=1;html=1;fontFamily=Arial;fontSize=13;fontColor=#4C607D;strokeColor=#527096;strokeWidth=1.65;endArrow=block;endFill=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="cloudflare" target="web">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="offset" x="0" y="-12" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="web-api" value="API requests" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=12;orthogonalLoop=1;html=1;fontFamily=Arial;fontSize=13;fontColor=#4C607D;strokeColor=#527096;strokeWidth=1.65;endArrow=block;endFill=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="web" target="functions">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="offset" x="0" y="-12" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="app-data" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=12;orthogonalLoop=1;html=1;fontFamily=Arial;fontSize=13;fontColor=#4C607D;strokeColor=#527096;strokeWidth=1.65;endArrow=block;endFill=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="functions" target="data">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="ai-requests" value="AI requests" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=12;orthogonalLoop=1;html=1;fontFamily=Arial;fontSize=13;fontColor=#4C607D;strokeColor=#527096;strokeWidth=1.65;endArrow=block;endFill=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="functions" target="ai">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="offset" x="0" y="-12" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

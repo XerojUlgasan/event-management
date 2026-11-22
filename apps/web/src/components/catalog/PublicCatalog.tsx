@@ -9,7 +9,6 @@ import { usePagination } from "../../lib/pagination/use-pagination";
 import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
 import {
   Button,
-  CatalogThumbnail,
   Pagination,
   NativeDialog,
   useNotifications,
@@ -19,7 +18,6 @@ import { createPortal } from "react-dom";
 import {
   getPackage,
   getPackages,
-  packageImageSrc,
   type PublicPackage,
 } from "../../lib/data/catalog/packages";
 import {
@@ -28,85 +26,14 @@ import {
   type PublicService,
 } from "../../lib/data/catalog/services";
 import { PackagePreview } from "./PackagePreview";
-import {
-  priceLabel,
-  servicePricingLabels,
-} from "../../lib/utils/formatting/money";
 import { CatalogDetailPreview } from "./CatalogDetailPreview";
 import { ServiceCanvas } from "./CatalogContent";
 import { CatalogFiltersForm } from "./CatalogFiltersForm";
+import { PackageCard, ServiceCard } from "./CatalogListingCards";
 
 type Kind = CatalogKind;
 
 type Preview = { kind: Kind; id: string } | null;
-
-function PackageCard({
-  item,
-  onPreview,
-}: {
-  item: PublicPackage;
-  onPreview: () => void;
-}) {
-  return (
-    <article className="catalog-card">
-      <div className="catalog-card-image">
-        <CatalogThumbnail src={packageImageSrc(item.imageUrl)} />
-      </div>
-      <div className="catalog-card-body">
-        <span className="catalog-card-kicker">Event package</span>
-        <h3>{item.name}</h3>
-        <p>{item.description}</p>
-        <div className="catalog-card-meta">
-          <span>{priceLabel(item.price)}</span>
-          <span>Up to {item.maxGuests} guests</span>
-        </div>
-        <Button
-          variant="secondary"
-          type="button"
-          className="catalog-card-action"
-          onClick={onPreview}
-        >
-          View package <span aria-hidden="true">↗</span>
-        </Button>
-      </div>
-    </article>
-  );
-}
-
-function ServiceCard({
-  item,
-  onPreview,
-}: {
-  item: PublicService;
-  onPreview: () => void;
-}) {
-  const pricing = servicePricingLabels(item);
-
-  return (
-    <article className="catalog-card">
-      <div className="catalog-card-image">
-        <CatalogThumbnail src={packageImageSrc(item.imageUrl)} />
-      </div>
-      <div className="catalog-card-body">
-        <span className="catalog-card-kicker">Event service</span>
-        <h3>{item.name}</h3>
-        <p>{item.description}</p>
-        <div className="catalog-card-meta">
-          <span>{pricing.price}</span>
-          {pricing.excess && <span>{pricing.excess}</span>}
-        </div>
-        <Button
-          variant="secondary"
-          type="button"
-          className="catalog-card-action"
-          onClick={onPreview}
-        >
-          View service <span aria-hidden="true">↗</span>
-        </Button>
-      </div>
-    </article>
-  );
-}
 
 function ServicePreview({ id, onClose }: { id: string; onClose: () => void }) {
   const { notifyError } = useNotifications();

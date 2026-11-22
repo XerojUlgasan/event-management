@@ -410,6 +410,62 @@ test("catalog editor does not show private add-on controls", async () => {
   assert.doesNotMatch(document.body.textContent, /Add-on services/);
 });
 
+test("Markdown widgets edit in place, render on blur, and save the source", async () => {
+  let saved;
+  await render(PackageEditor, {
+    initial: packageItem,
+    onClose: () => {},
+    onSaved: () => {},
+    saveCustom: async (content) => {
+      saved = structuredClone(content);
+    },
+  });
+  await click("Add Markdown");
+  const widgetBody = button("Edit Markdown widget").closest(".pe-widget-body");
+  assert.equal(widgetBody.querySelector("h2")?.textContent, "Your heading");
+
+  await click("Edit Markdown widget");
+  const source = widgetBody.querySelector(
+    'textarea[aria-label="Markdown content"]',
+  );
+  const markdown = "## New heading\n\nSome **bold text**.";
+  assert.equal(document.activeElement, source);
+  assert.match(source.value, /^## Your heading/);
+  assert.equal(widgetBody.querySelector("h2"), null);
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype,
+      "value",
+    ).set;
+    setter.call(source, markdown);
+    source.dispatchEvent(new window.Event("input", { bubbles: true }));
+  });
+  const name = document.querySelector('[aria-label="Private package name"]');
+  await act(async () => name.focus());
+  assert.equal(document.activeElement, name);
+  assert.equal(widgetBody.querySelector("textarea"), null);
+  assert.equal(widgetBody.querySelector("h2")?.textContent, "New heading");
+  assert.equal(widgetBody.querySelector("strong")?.textContent, "bold text");
+
+  await click("Edit Markdown");
+  const reopened = widgetBody.querySelector("textarea");
+  assert.equal(reopened.value, markdown);
+  const escape = new window.KeyboardEvent("keydown", {
+    key: "Escape",
+    bubbles: true,
+    cancelable: true,
+  });
+  await act(async () => reopened.dispatchEvent(escape));
+  assert.ok(escape.defaultPrevented);
+  assert.equal(document.activeElement, button("Edit Markdown widget"));
+
+  await click("Undo");
+  assert.equal(widgetBody.querySelector("h2")?.textContent, "Your heading");
+  await click("Redo");
+  await click("Save private package");
+  assert.equal(saved.sections[0].widgets[1].markdown, markdown);
+});
+
 test("private editor keeps changes after a failed save and can retry", async () => {
   let attempts = 0;
   let saved;
@@ -432,5 +488,7 @@ test("private editor keeps changes after a failed save and can retry", async () 
   assert.match(document.body.textContent, /Synthetic save failure/);
   assert.equal(saved, undefined);
   await click("Save private package");
+  assert.equal(saved.sections[0].columns, 24);
+  assert.equal(saved.sections[0].widgets[0].w, 12);
   assert.equal(saved.sections[0].widgets[0].serviceTerms.includedHours, 6);
 });

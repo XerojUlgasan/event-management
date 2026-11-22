@@ -857,13 +857,6 @@ html:has(.public-site) {
   background: var(--surface-base);
   font-size: 11px;
 }
-.login-disclaimer {
-  margin: 14px 0 0;
-  color: var(--text-subtle);
-  text-align: center;
-  font-size: 7px;
-  line-height: 1.45;
-}
 
 /* App shell */
 .sidebar {

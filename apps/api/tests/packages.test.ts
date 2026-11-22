@@ -5,6 +5,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { Pool } from "pg";
+import { CATALOG_COLUMNS } from "@event-management/contracts/catalog";
 import { hashSessionToken } from "../src/utils/session.js";
 
 const database = `em_packages_test_${randomUUID().replaceAll("-", "")}`;
@@ -814,9 +815,40 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
     geometry(await read(await call(`/packages/${created.id}`), 200)),
     expectedGeometry,
   );
+  const [section] = gridContent.sections;
+  const finerGrid = {
+    ...gridContent,
+    name: current.name,
+    sections: [
+      {
+        ...section,
+        columns: CATALOG_COLUMNS,
+        widgets: [
+          { ...section.widgets[0], x: 0, w: 8 },
+          { ...section.widgets[1], x: 15, w: 9 },
+        ],
+      },
+    ],
+  };
+  const savedGrid = await read(
+    await call(
+      `/admin/packages/${created.id}`,
+      "PATCH",
+      { ...finerGrid, expectedUpdatedAt: current.updatedAt },
+      adminCookie,
+    ),
+    200,
+  );
+  const publicGrid = await read(await call(`/packages/${created.id}`), 200);
+  assert.equal(publicGrid.sections[0].columns, CATALOG_COLUMNS);
+  assert.deepEqual(geometry(publicGrid), [
+    [0, 2, 8, 8],
+    [15, 14, 9, 3],
+  ]);
   const before = (
     await pool.query("SELECT canvas FROM packages WHERE id=$1", [created.id])
   ).rows[0].canvas;
+  assert.equal(before[0].columns, CATALOG_COLUMNS);
   const bad = structuredClone(data);
   bad.sections[0].widgets[0].media = {
     kind: "image",
@@ -828,7 +860,11 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
     await call(
       `/admin/packages/${created.id}`,
       "PATCH",
-      { ...bad, name: "Must roll back", expectedUpdatedAt: current.updatedAt },
+      {
+        ...bad,
+        name: "Must roll back",
+        expectedUpdatedAt: savedGrid.updatedAt,
+      },
       adminCookie,
     ),
     400,

@@ -51,6 +51,7 @@ export {
   CatalogGridGuides,
   CatalogGridRuler,
   CATALOG_GRID,
+  catalogGridMetrics,
   catalogGridStyle,
 } from "./organisms/CatalogCanvas";
 export { DataTable } from "./organisms/DataTable";

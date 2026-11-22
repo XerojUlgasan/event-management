@@ -8,6 +8,7 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -169,6 +170,7 @@ export function MessagesWorkspace({
   localImageFiles?: ReadonlyMap<string, File[]>;
 }) {
   const { notify, notifyError } = useNotifications();
+  const composerShortcutId = useId();
   const [quotationId, setQuotationId] = useState<string | null>(null);
   const visibleQuotationId = requestedQuotationId ?? quotationId;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -221,6 +223,7 @@ export function MessagesWorkspace({
     !!active?.aiEnabled &&
     (localAiReplyPending || !!active.aiReplyPending);
   const isTeam = viewerRole === "customer";
+  const composerDisabled = !activeId || (!isTeam && sending) || sendDisabled;
   const singleConversation =
     isTeam &&
     conversations.length === 1 &&
@@ -623,48 +626,6 @@ export function MessagesWorkspace({
             </span>
             <small>{activeDetail}</small>
           </div>
-          {viewerRole === "admin" && active && onToggleAi && (
-            <div className="message-head-actions" aria-label="AI reply setting">
-              <Button
-                variant="secondary"
-                size="small"
-                aria-label="AI replies"
-                aria-pressed={active.aiEnabled}
-                title="Automatically reply to customer messages with AI"
-                pending={pendingAiToggle}
-                onClick={() =>
-                  onToggleAi(active.id, !active.aiEnabled, active.aiVersion)
-                }
-              >
-                {active.aiEnabled ? "AI on" : "AI off (Human)"}
-              </Button>
-              {active.aiHandoff?.pending && (
-                <Badge tone="warning">Needs attention</Badge>
-              )}
-              {active.aiHandoff && (
-                <InfoDisclosure
-                  key={active.id}
-                  label="View AI handoff details"
-                  hint={handoffReason[active.aiHandoff.reason]}
-                >
-                  <div className="message-handoff-details">
-                    <strong>{handoffReason[active.aiHandoff.reason]}</strong>
-                    <div className="message-handoff-summary-label">
-                      AI summary
-                    </div>
-                    <p>{active.aiHandoff.summary}</p>
-                    <Badge
-                      tone={active.aiHandoff.pending ? "warning" : "neutral"}
-                    >
-                      {active.aiHandoff.pending
-                        ? "Needs attention"
-                        : "Taken over"}
-                    </Badge>
-                  </div>
-                </InfoDisclosure>
-              )}
-            </div>
-          )}
           {viewerRole === "customer" && active && !active.bookingRequestId && (
             <Button
               variant="secondary"
@@ -673,36 +634,96 @@ export function MessagesWorkspace({
               Create booking request
             </Button>
           )}
-          {active?.bookingRequestId && (
+          {active && (active.bookingRequestId || onToggleAi) && (
             <div
               className="message-head-actions"
-              aria-label="Conversation information"
+              role="group"
+              aria-label="Conversation controls"
             >
-              {(
-                [
-                  ["details", "info", "Details"],
-                  ["package", "box", "Current package"],
-                  ["quotation", "clipboard", "Quotation"],
-                ] as const
-              ).map(([view, icon, label]) => (
-                <Button
-                  variant="secondary"
-                  key={view}
-                  icon={icon}
-                  aria-label={
-                    view === "details"
-                      ? "View event details"
-                      : view === "package"
-                        ? "View current package"
-                        : "View latest sent quotation"
-                  }
-                  onClick={() =>
-                    setContext({ conversationId: active.id, view })
-                  }
-                >
-                  {label}
-                </Button>
-              ))}
+              {viewerRole === "admin" && onToggleAi && (
+                <>
+                  <Button
+                    variant="plain"
+                    className="message-ai-switch"
+                    role="switch"
+                    aria-label="AI replies"
+                    aria-checked={active.aiEnabled}
+                    aria-busy={pendingAiToggle}
+                    title={
+                      active.aiEnabled ? "AI replies on" : "AI replies off"
+                    }
+                    disabled={pendingAiToggle}
+                    onClick={() =>
+                      onToggleAi(active.id, !active.aiEnabled, active.aiVersion)
+                    }
+                  >
+                    <span className="message-ai-switch-track">
+                      <span className="message-ai-switch-thumb">
+                        <Icon
+                          name={pendingAiToggle ? "spinner" : "spark"}
+                          size={14}
+                        />
+                      </span>
+                    </span>
+                  </Button>
+                  {active.aiHandoff && (
+                    <div
+                      className="message-handoff"
+                      data-pending={active.aiHandoff.pending}
+                    >
+                      <InfoDisclosure
+                        key={active.id}
+                        icon={active.aiHandoff.pending ? "alert" : "users"}
+                        label={
+                          active.aiHandoff.pending
+                            ? "Needs attention: View AI handoff details"
+                            : "View AI handoff details"
+                        }
+                        hint={handoffReason[active.aiHandoff.reason]}
+                      >
+                        <div className="message-handoff-details">
+                          <strong>
+                            {handoffReason[active.aiHandoff.reason]}
+                          </strong>
+                          <div className="message-handoff-summary-label">
+                            AI summary
+                          </div>
+                          <p>{active.aiHandoff.summary}</p>
+                          <Badge
+                            tone={
+                              active.aiHandoff.pending ? "warning" : "neutral"
+                            }
+                          >
+                            {active.aiHandoff.pending
+                              ? "Needs attention"
+                              : "Taken over"}
+                          </Badge>
+                        </div>
+                      </InfoDisclosure>
+                    </div>
+                  )}
+                </>
+              )}
+              {active.bookingRequestId &&
+                (
+                  [
+                    ["details", "info", "View event details"],
+                    ["package", "box", "View current package"],
+                    ["quotation", "clipboard", "View latest sent quotation"],
+                  ] as const
+                ).map(([view, icon, label]) => (
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    key={view}
+                    icon={icon}
+                    aria-label={label}
+                    title={label}
+                    onClick={() =>
+                      setContext({ conversationId: active.id, view })
+                    }
+                  />
+                ))}
             </div>
           )}
         </div>
@@ -885,60 +906,50 @@ export function MessagesWorkspace({
           </p>
         )}
 
-        <form
-          className={`thread-input message-composer ${isTeam ? "customer-composer" : ""}`}
-          onSubmit={submit}
-        >
-          <label htmlFor="conversation-message">
-            {isTeam ? "Message the Styled by AMAC team" : "Reply to customer"}
-          </label>
+        <form className="message-composer" onSubmit={submit}>
+          <span id={composerShortcutId} className="sr-only">
+            Enter to send. Shift plus Enter for a new line.
+          </span>
           <MessageAttachments
             files={files}
             onChange={(next) =>
               activeId &&
               setFileDrafts((previous) => ({ ...previous, [activeId]: next }))
             }
-            disabled={!activeId || (!isTeam && sending) || sendDisabled}
-          />
-          <Textarea
-            variant="plain"
-            ref={composer}
-            rows={2}
-            id="conversation-message"
-            aria-label="Write a message"
-            placeholder="Write a message…"
-            value={draft}
-            disabled={!activeId || (!isTeam && sending) || sendDisabled}
-            maxLength={MAX_MESSAGE_BODY_LENGTH}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (
-                event.key === "Enter" &&
-                (isTeam ? !event.shiftKey : event.ctrlKey || event.metaKey) &&
-                !event.nativeEvent.isComposing
-              ) {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }
-            }}
-          />
-          <div className="message-composer-actions">
-            {!isTeam && <small>Ctrl/⌘ + Enter to send</small>}
+            disabled={composerDisabled}
+          >
+            <Textarea
+              variant="plain"
+              ref={composer}
+              rows={1}
+              aria-label="Write a message"
+              aria-describedby={composerShortcutId}
+              placeholder="Message…"
+              value={draft}
+              disabled={composerDisabled}
+              maxLength={MAX_MESSAGE_BODY_LENGTH}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+            />
             <Button
               type="submit"
+              size="icon"
               icon="arrow"
               pending={!isTeam && sending}
-              aria-label={isTeam ? "Send message" : undefined}
-              disabled={
-                (!draft.trim() && !files.length) ||
-                !activeId ||
-                (!isTeam && sending) ||
-                sendDisabled
-              }
-            >
-              {!isTeam && (sending ? "Sending…" : "Send message")}
-            </Button>
-          </div>
+              aria-label="Send message"
+              title="Send message"
+              disabled={composerDisabled || (!draft.trim() && !files.length)}
+            />
+          </MessageAttachments>
         </form>
       </section>
       {visibleQuotationId && (

@@ -1,5 +1,6 @@
 import {
   CATALOG_COLUMNS,
+  LEGACY_CATALOG_COLUMNS,
   type CatalogSection,
   type CatalogWidget,
 } from "@event-management/contracts/catalog";
@@ -13,14 +14,36 @@ export const CATALOG_GRID = {
   columns: CATALOG_COLUMNS,
   rowHeight: 52,
   gap: 12,
-  padding: 12,
+  padding: 20,
+  referenceWidth: 1000,
+  stackedReferenceWidth: 460,
+  stackedBelow: 580,
 } as const;
+
+export function catalogGridMetrics(width: number, stacked: boolean) {
+  const scale =
+    width /
+    (stacked
+      ? CATALOG_GRID.stackedReferenceWidth
+      : CATALOG_GRID.referenceWidth);
+
+  return {
+    rowHeight: CATALOG_GRID.rowHeight * scale,
+    gap: CATALOG_GRID.gap * scale,
+    padding: CATALOG_GRID.padding * scale,
+  };
+}
+
+// Scale both axes from the same canvas width to keep widget proportions.
+const scaled = (pixels: number) =>
+  `calc(${pixels} * 100cqi / var(--catalog-grid-reference, ${CATALOG_GRID.referenceWidth}))`;
 
 export const catalogGridStyle = {
   "--catalog-columns": CATALOG_GRID.columns,
-  "--catalog-row-height": `${CATALOG_GRID.rowHeight}px`,
-  "--catalog-gap": `${CATALOG_GRID.gap}px`,
-  "--catalog-padding": `${CATALOG_GRID.padding}px`,
+  "--catalog-stacked-reference": CATALOG_GRID.stackedReferenceWidth,
+  "--catalog-row-height": scaled(CATALOG_GRID.rowHeight),
+  "--catalog-gap": scaled(CATALOG_GRID.gap),
+  "--catalog-padding": scaled(CATALOG_GRID.padding),
 } as CSSProperties;
 
 /** Decorative guides use a constant-size pattern, even for large saved row gaps. */
@@ -66,10 +89,7 @@ export function CatalogCanvas({
   className?: string;
 }) {
   return (
-    <div
-      className={`ui-catalog-canvas${className ? ` ${className}` : ""}`}
-      style={catalogGridStyle}
-    >
+    <div className={`ui-catalog-canvas${className ? ` ${className}` : ""}`}>
       <div className="ui-catalog-frame">{children}</div>
     </div>
   );
@@ -123,9 +143,12 @@ export function CatalogWidgetContent({
               {reference.description}
             </span>
           )}
-          {!editor && (
-            <span className="ui-catalog-reference-link">View {entity}</span>
-          )}
+          <span
+            className="ui-catalog-reference-link"
+            aria-hidden={editor || undefined}
+          >
+            View {entity}
+          </span>
         </span>
         {widget.caption && (
           <span className="ui-catalog-caption">{widget.caption}</span>
@@ -134,7 +157,9 @@ export function CatalogWidgetContent({
     );
 
     return (
-      <div className="ui-catalog-widget-content ui-catalog-reference">
+      <div
+        className={`ui-catalog-widget-content ui-catalog-reference ui-catalog-reference-${entity}`}
+      >
         {editor ? (
           <div className="ui-catalog-reference-card">{content}</div>
         ) : onOpen ? (
@@ -168,7 +193,11 @@ export function CatalogWidgetContent({
       )}
       {widget.type === "photo" &&
         (url ? (
-          <img src={url} alt={widget.alt} />
+          <img
+            src={url}
+            alt={widget.alt}
+            draggable={editor ? false : undefined}
+          />
         ) : (
           (mediaPlaceholder ?? (
             <div className="ui-catalog-empty">Add a photo</div>
@@ -225,7 +254,15 @@ export function CatalogSections({
       {sections.map((section) => (
         <section className="ui-catalog-section" key={section.id}>
           {section.title && <h2>{section.title}</h2>}
-          <div className="ui-catalog-grid">
+          <div
+            className="ui-catalog-grid"
+            style={
+              {
+                ...catalogGridStyle,
+                "--catalog-columns": section.columns ?? LEGACY_CATALOG_COLUMNS,
+              } as CSSProperties
+            }
+          >
             {[...section.widgets]
               .sort((a, b) => a.y - b.y || a.x - b.x)
               .map((widget) => {
