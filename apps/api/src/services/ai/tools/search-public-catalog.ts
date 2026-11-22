@@ -16,7 +16,6 @@ export function createSearchPublicCatalogTool({
   canRecord = () => true,
   canExecute = () => true,
 }: AssistantToolContext) {
-  let calls = 0;
   async function persist<T>(operation: Promise<T>): Promise<T> {
     try {
       return await operation;
@@ -55,7 +54,7 @@ export function createSearchPublicCatalogTool({
       let errorCode = "search_unavailable";
 
       try {
-        if (++calls > 6 || !canExecute()) {
+        if (!canExecute()) {
           errorCode = "call_limit";
           throw new Error("Search call limit reached");
         }

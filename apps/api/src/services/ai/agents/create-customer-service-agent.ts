@@ -1,9 +1,10 @@
-import { isStepCount, ToolLoopAgent } from "ai";
+import { ToolLoopAgent } from "ai";
 import type { AgentSettings } from "@event-management/contracts/ai-agent-settings";
 import { createRequestHumanHandoffTool } from "../tools/request-human-handoff.js";
 import { getTextModel } from "../models.js";
 import { buildCustomerServicePrompt } from "../prompts/customer-service-prompt.js";
 import { createSearchPublicCatalogTool } from "../tools/search-public-catalog.js";
+import { createSearchSupportingDocumentsTool } from "../tools/search-supporting-documents.js";
 import { createGetBusinessInformationTool } from "../tools/get-business-information.js";
 import { createGetPublicCatalogItemTool } from "../tools/get-public-catalog-item.js";
 import { createGetMyPackageTool } from "../tools/get-my-package.js";
@@ -15,13 +16,21 @@ import { createUpdateConversationMemoryTool } from "../tools/update-conversation
 import type { AssistantToolContext } from "../tools/assistant-tool-context.js";
 import { createBookingDraftTools } from "../tools/booking-draft.js";
 
+const maxStepTokens = 800;
+
 export function createCustomerServiceAgent({
   settings,
+  answerOnlyAfter,
   ...options
-}: AssistantToolContext & { settings: AgentSettings }) {
-  let proposedCalls = 0;
-  let executedCalls = 0;
+}: AssistantToolContext & {
+  settings: AgentSettings;
+  answerOnlyAfter: number;
+}) {
+  let proposedBatchSize = 0;
   let trackingUnavailable = false;
+  let remainingOutputTokens = 3_200;
+  let stepTokenLimit = maxStepTokens;
+  let answerOnly = false;
   let resultCharactersRemaining = options.resultCharacterBudget ?? 200_000;
 
   const toolContext = {
@@ -30,11 +39,9 @@ export function createCustomerServiceAgent({
       trackingUnavailable = true;
       options.onPersistenceFailure();
     },
-    canRecord: () => proposedCalls <= 12,
+    canRecord: () => proposedBatchSize <= 12,
     canExecute: () =>
-      !trackingUnavailable &&
-      !options.isHandoffCommitted?.() &&
-      ++executedCalls <= 6,
+      !answerOnly && !trackingUnavailable && !options.isHandoffCommitted?.(),
     consumeResultCharacters: (characters: number) => {
       if (characters > resultCharactersRemaining) return false;
 
@@ -48,6 +55,8 @@ export function createCustomerServiceAgent({
     model: getTextModel(),
     instructions: buildCustomerServicePrompt(settings),
     tools: {
+      searchSupportingDocuments:
+        createSearchSupportingDocumentsTool(toolContext),
       ...(options.handoffScope
         ? {
             requestHumanHandoff: createRequestHumanHandoffTool({
@@ -99,20 +108,32 @@ export function createCustomerServiceAgent({
           }
         : {}),
     },
-    stopWhen: [isStepCount(4), () => options.isHandoffCommitted?.() ?? false],
-    // Reserve the fourth generation for an answer using the available evidence.
-    prepareStep: ({ stepNumber }) =>
-      stepNumber >= 3 ? { toolChoice: "none" } : {},
+    stopWhen: () =>
+      answerOnly || trackingUnavailable || !!options.isHandoffCommitted?.(),
+    prepareStep: () => {
+      if (remainingOutputTokens <= 0)
+        throw new Error("Assistant output budget exhausted");
+
+      stepTokenLimit = Math.min(maxStepTokens, remainingOutputTokens);
+      // Start another tool round only while a full answer can still fit.
+      answerOnly =
+        Date.now() >= answerOnlyAfter ||
+        remainingOutputTokens < 2 * maxStepTokens;
+
+      return {
+        maxOutputTokens: stepTokenLimit,
+        ...(answerOnly && { toolChoice: "none" as const }),
+      };
+    },
     toolCallConcurrency: 1,
-    onLanguageModelCallEnd: ({ content }) => {
-      proposedCalls += content.filter(
+    onLanguageModelCallEnd: ({ content, usage }) => {
+      remainingOutputTokens -= usage.outputTokens ?? stepTokenLimit;
+      // Reject an oversized provider batch before its tools can execute.
+      proposedBatchSize = content.filter(
         (part) => part.type === "tool-call",
       ).length;
-      // Reject an oversized provider response before any tools from it execute.
-      // At most six operations execute across all tools.
     },
     maxRetries: 0,
-    maxOutputTokens: 800,
     reasoning: "none",
   });
 }

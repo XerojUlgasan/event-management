@@ -450,6 +450,60 @@ test("guests can use current public business information in a reply", async () =
   assert.equal(audit.assistant_message_id, sent.assistantMessage.id);
 });
 
+test("guest turns can select supporting document search and audit the result", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json({
+      embeddings: [[1, ...Array<number>(767).fill(0)]],
+      warnings: [],
+    });
+  try {
+    useReply("I checked the supporting documents.");
+    const generate = model.doGenerate.bind(model);
+    model.doGenerate = async (...args) => {
+      const result = await generate(...args);
+      if (model.doGenerateCalls.length !== 1) return result;
+      return {
+        ...result,
+        content: [
+          {
+            type: "tool-call",
+            toolCallId: "guest-document-call",
+            toolName: "searchSupportingDocuments",
+            input: JSON.stringify({ query: "venue access" }),
+          },
+        ],
+        finishReason: { unified: "tool-calls", raw: undefined },
+      };
+    };
+    const response = await read(
+      await send(await guest(), "Search the venue handbook"),
+      201,
+    );
+    assert.ok(response.assistantMessage);
+    assert.ok(
+      model.doGenerateCalls[0].tools?.some(
+        ({ name }) => name === "searchSupportingDocuments",
+      ),
+    );
+    assert.match(
+      JSON.stringify(model.doGenerateCalls[1].prompt),
+      /"results":\[\]/,
+    );
+    const row = await db
+      .selectFrom("ai_tool_calls")
+      .selectAll()
+      .where("customer_message_id", "=", response.message.id)
+      .executeTakeFirstOrThrow();
+    assert.equal(row.tool_name, "searchSupportingDocuments");
+    assert.equal(row.status, "succeeded");
+    assert.equal(row.assistant_message_id, response.assistantMessage.id);
+    assert.deepEqual((row.output as { matches: unknown[] }).matches, []);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("guests can answer directly and receive public catalog and handoff tools", async () => {
   useReply("Hello from AMAC AI");
   const thread = await guest();
@@ -465,6 +519,7 @@ test("guests can answer directly and receive public catalog and handoff tools", 
       "getPublicCatalogItem",
       "requestHumanHandoff",
       "searchPublicCatalog",
+      "searchSupportingDocuments",
       "updateBookingDraft",
       "updateConversationMemory",
     ].sort(),

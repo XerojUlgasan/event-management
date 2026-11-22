@@ -469,6 +469,7 @@ export async function runAssistantTurnService({
 
   const agent = createCustomerServiceAgent({
     settings,
+    answerOnlyAfter: started + 20_000,
     db,
     customerMessageId,
     turnId,

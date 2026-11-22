@@ -104,6 +104,7 @@ function useToolCalls(
   calls: {
     toolName:
       | "getBusinessInformation"
+      | "searchSupportingDocuments"
       | "searchPublicCatalog"
       | "getPublicCatalogItem"
       | "getMyPackage"
@@ -2973,7 +2974,7 @@ test("catalog detail failures hide private records and sanitize errors", async (
   assert.doesNotMatch(prompt, /HTTPException|postgres|password|stack/i);
 });
 
-test("catalog and proposal tools share the existing six-operation turn budget", async () => {
+test("catalog and proposal lookups can exceed six operations in one turn", async () => {
   const id = await detailPackage();
   useToolCalls(
     Array.from({ length: 7 }, (_, index) =>
@@ -3000,11 +3001,8 @@ test("catalog and proposal tools share the existing six-operation turn budget", 
     .selectAll()
     .where("customer_message_id", "=", result.message.id)
     .execute();
-  assert.equal(calls.filter((item) => item.status === "succeeded").length, 6);
-  assert.equal(
-    calls.filter((item) => item.error_code === "call_limit").length,
-    1,
-  );
+  assert.equal(calls.length, 7);
+  assert.ok(calls.every((call) => call.status === "succeeded"));
   assert.equal(new Set(calls.map((item) => item.tool_name)).size, 3);
 });
 
@@ -3123,65 +3121,84 @@ test("human takeover after a search preserves its audit record and suppresses th
   assert.equal(record.assistant_message_id, null);
 });
 
-test("turn tool budget bounds execution and records rejected calls", async () => {
-  useCatalogCalls(
-    Array.from({ length: 7 }, () => ({ catalogType: "package" })),
-  );
-  const result = await send(await conversation(), "Compare several searches");
-  assert.ok(result.assistantMessage);
-  const calls = await db
-    .selectFrom("ai_tool_calls")
-    .selectAll()
-    .where("customer_message_id", "=", result.message.id)
-    .execute();
-  assert.equal(calls.filter((item) => item.status === "succeeded").length, 6);
-  assert.equal(
-    calls.filter(
-      (item) => item.status === "failed" && item.error_code === "call_limit",
-    ).length,
-    1,
-  );
-  assert.ok(
-    calls.every(
-      (item) => item.assistant_message_id === result.assistantMessage?.id,
-    ),
-  );
-});
+for (const { name, outputTokens, expectedCalls } of [
+  {
+    name: "short tool calls can continue past six rounds",
+    outputTokens: 1,
+    expectedCalls: 7,
+  },
+  {
+    name: "long generations reserve output tokens for the answer",
+    outputTokens: 800,
+    expectedCalls: 3,
+  },
+]) {
+  test(name, async () => {
+    useReply("Here are the available catalog choices");
+    const generate = model.doGenerate.bind(model);
+    model.doGenerate = async (...args) => {
+      const result = await generate(...args);
+      const round = model.doGenerateCalls.length;
+      if (round > 7 || args[0].toolChoice?.type === "none") return result;
 
-test("the agent reserves a final answer step after repeated searches", async () => {
-  useReply("Here are the available catalog choices");
+      return {
+        ...result,
+        usage: {
+          ...result.usage,
+          outputTokens: { ...result.usage.outputTokens, total: outputTokens },
+        },
+        content: [
+          {
+            type: "tool-call",
+            toolCallId: `step-${round}`,
+            toolName: "searchPublicCatalog",
+            input: JSON.stringify({
+              catalogType: "package",
+              minPricePesos: round,
+            }),
+          },
+        ],
+        finishReason: { unified: "tool-calls", raw: undefined },
+      };
+    };
+    const result = await send(await conversation(), "Compare several searches");
+    assert.equal(
+      result.assistantMessage?.body,
+      "Here are the available catalog choices",
+    );
+    const calls = await db
+      .selectFrom("ai_tool_calls")
+      .selectAll()
+      .where("customer_message_id", "=", result.message.id)
+      .execute();
+    assert.equal(calls.length, expectedCalls);
+    assert.equal(model.doGenerateCalls.length, expectedCalls + 1);
+    assert.ok(
+      calls.every(
+        (call) =>
+          call.status === "succeeded" &&
+          call.assistant_message_id === result.assistantMessage?.id,
+      ),
+    );
+  });
+}
+
+test("the agent reserves time for a final answer after a slow lookup", async (t) => {
+  let elapsed = 0;
+  const now = Date.now.bind(Date);
+  t.mock.method(Date, "now", () => now() + elapsed);
+  useCatalogCalls([{ catalogType: "package" }]);
   const generate = model.doGenerate.bind(model);
   model.doGenerate = async (...args) => {
     const result = await generate(...args);
-
-    if (args[0].toolChoice?.type === "none") return result;
-
-    return {
-      ...result,
-      content: [
-        {
-          type: "tool-call",
-          toolCallId: `step-${model.doGenerateCalls.length}`,
-          toolName: "searchPublicCatalog",
-          input: JSON.stringify({ catalogType: "package" }),
-        },
-      ],
-      finishReason: { unified: "tool-calls", raw: undefined },
-    };
+    elapsed = 21_000;
+    return result;
   };
-  const result = await send(await conversation(), "Keep looking for packages");
+  const result = await send(await conversation(), "Find packages");
   assert.equal(result.assistantError, null);
-  assert.equal(
-    result.assistantMessage?.body,
-    "Here are the available catalog choices",
-  );
-  assert.equal(model.doGenerateCalls.length, 4);
-  const calls = await db
-    .selectFrom("ai_tool_calls")
-    .select("id")
-    .where("customer_message_id", "=", result.message.id)
-    .execute();
-  assert.equal(calls.length, 3);
+  assert.equal(result.assistantMessage?.body, "Catalog results are ready");
+  assert.equal(model.doGenerateCalls.length, 2);
+  assert.equal(model.doGenerateCalls[1].toolChoice?.type, "none");
 });
 
 test("invalid tool arguments cannot execute a search", async () => {
@@ -3864,7 +3881,7 @@ test("business information reads current public fields and records only field na
   const id = await conversation();
   useToolCalls([{ toolName: "getBusinessInformation", input: {} }]);
   const first = await send(id, "How can I contact you?");
-  assert.deepEqual(businessInformationToolOutput(), {
+  assert.deepEqual(publicLookupOutput("getBusinessInformation"), {
     type: "json",
     value: { status: "found", information },
   });
@@ -3887,7 +3904,7 @@ test("business information reads current public fields and records only field na
   assert.equal(updatedResponse.status, 200);
   useToolCalls([{ toolName: "getBusinessInformation", input: {} }]);
   await send(id, "Has your contact changed?");
-  assert.deepEqual(businessInformationToolOutput(), {
+  assert.deepEqual(publicLookupOutput("getBusinessInformation"), {
     type: "json",
     value: {
       status: "found",
@@ -3896,22 +3913,18 @@ test("business information reads current public fields and records only field na
   });
 });
 
-function businessInformationToolOutput() {
+function publicLookupOutput(toolName: "getBusinessInformation" | "searchSupportingDocuments") {
   for (const message of model.doGenerateCalls[1].prompt) {
     if (message.role !== "tool") continue;
 
     for (const part of message.content) {
-      if (
-        part.type !== "tool-result" ||
-        part.toolName !== "getBusinessInformation"
-      )
-        continue;
+      if (part.type !== "tool-result" || part.toolName !== toolName) continue;
 
       return part.output;
     }
   }
 
-  assert.fail("Missing business information tool result");
+  assert.fail(`Missing tool result for ${toolName}`);
 }
 
 test("business information distinguishes absent and blank data from failures and rejects extra input", async () => {
@@ -3933,7 +3946,7 @@ test("business information distinguishes absent and blank data from failures and
 
     useToolCalls([{ toolName: "getBusinessInformation", input: {} }]);
     const result = await send(id, "What is your business information?");
-    assert.deepEqual(businessInformationToolOutput(), {
+    assert.deepEqual(publicLookupOutput("getBusinessInformation"), {
       type: "json",
       value: { status: "not_configured", information: {} },
     });
@@ -3975,7 +3988,7 @@ test("business information distinguishes absent and blank data from failures and
   try {
     useToolCalls([{ toolName: "getBusinessInformation", input: {} }]);
     const failed = await send(id, "Read business information again");
-    const output = businessInformationToolOutput();
+    const output = publicLookupOutput("getBusinessInformation");
     assert.match(
       JSON.stringify(output),
       /could not verify|failed|unavailable/i,
@@ -4016,6 +4029,7 @@ test("the assistant can answer directly without calling a tool", async () => {
       "getPublicCatalogItem",
       "requestHumanHandoff",
       "searchPublicCatalog",
+      "searchSupportingDocuments",
       "updateBookingDraft",
       "updateConversationMemory",
     ].sort(),
@@ -4763,3 +4777,277 @@ test(
     }
   },
 );
+
+test("supporting document and business lookups reach the customer model and retain bounded audit evidence", async () => {
+  const originalFetch = globalThis.fetch;
+  const document = await db
+    .insertInto("supporting_documents")
+    .values({
+      original_filename: "Venue handbook.pdf",
+      storage_key: `${randomUUID()}.pdf`,
+      mime_type: "application/pdf",
+      byte_size: 500,
+      file_sha256: "a".repeat(64),
+      pipeline_version: "fixture",
+      extraction_status: "complete",
+      page_count: 6,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const vector = JSON.stringify([1, ...Array<number>(767).fill(0)]);
+  await db
+    .insertInto("supporting_document_chunks")
+    .values(
+      Array.from({ length: 6 }, (_, index) => ({
+        document_id: document.id,
+        ordinal: index + 1,
+        page_start: index + 1,
+        page_end: index + 1,
+        heading_path: ["Venue", `Section ${index + 1}`],
+        content_text: `Passage ${index + 1}`,
+        content_hash: "b".repeat(64),
+        embedding: sql<string>`${vector}`,
+        embedding_model: "google/gemini-embedding-2",
+        embedded_at: new Date(),
+      })),
+    )
+    .execute();
+  globalThis.fetch = async () =>
+    Response.json({ embeddings: [JSON.parse(vector)], warnings: [] });
+  try {
+    useToolCalls([
+      {
+        toolName: "searchSupportingDocuments",
+        input: { query: "venue access" },
+      },
+      { toolName: "getBusinessInformation", input: {} },
+    ]);
+    const result = await send(
+      await conversation(),
+      "What does the handbook say about access and what are your business details?",
+    );
+    assert.ok(result.assistantMessage);
+    assert.ok(
+      model.doGenerateCalls[0].tools?.some(
+        ({ name }) => name === "searchSupportingDocuments",
+      ),
+    );
+    const parts = model.doGenerateCalls[1].prompt.flatMap((message) =>
+      message.role === "tool" ? message.content : [],
+    );
+    const documentPart = parts.find(
+      (part) =>
+        part.type === "tool-result" &&
+        part.toolName === "searchSupportingDocuments",
+    );
+    assert.ok(
+      documentPart &&
+        documentPart.type === "tool-result" &&
+        documentPart.output.type === "json",
+    );
+    const output = documentPart.output.value as {
+      results: {
+        filename: string;
+        pageStart: number;
+        pageEnd: number;
+        headingPath: string[];
+        text: string;
+      }[];
+    };
+    assert.equal(output.results.length, 5);
+    for (const passage of output.results) {
+      assert.deepEqual(Object.keys(passage).sort(), [
+        "filename", "headingPath", "pageEnd", "pageStart", "text",
+      ]);
+      assert.equal(passage.filename, "Venue handbook.pdf");
+      assert.equal(passage.pageStart, passage.pageEnd);
+      assert.deepEqual(passage.headingPath, [
+        "Venue",
+        `Section ${passage.pageStart}`,
+      ]);
+      assert.equal(passage.text, `Passage ${passage.pageStart}`);
+    }
+    assert.ok(
+      parts.some(
+        (part) =>
+          part.type === "tool-result" &&
+          part.toolName === "getBusinessInformation",
+      ),
+    );
+    const calls = await db
+      .selectFrom("ai_tool_calls")
+      .selectAll()
+      .where("customer_message_id", "=", result.message.id)
+      .execute();
+    assert.deepEqual(calls.map((call) => call.tool_name).sort(), [
+      "getBusinessInformation",
+      "searchSupportingDocuments",
+    ]);
+    assert.ok(
+      calls.every(
+        (call) =>
+          call.status === "succeeded" &&
+          call.assistant_message_id === result.assistantMessage?.id,
+      ),
+    );
+    const audit = calls.find(
+      (call) => call.tool_name === "searchSupportingDocuments",
+    )!;
+    assert.deepEqual(audit.input, { query: "venue access" });
+    assert.equal((audit.output as { matches: unknown[] }).matches.length, 5);
+    assert.doesNotMatch(JSON.stringify(audit.output), /Passage|Venue handbook/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await db
+      .deleteFrom("supporting_documents")
+      .where("id", "=", document.id)
+      .execute();
+  }
+});
+
+test("supporting document lookup distinguishes no matches from an unavailable provider", async () => {
+  const originalFetch = globalThis.fetch;
+  const vector = [1, ...Array<number>(767).fill(0)];
+  try {
+    globalThis.fetch = async () =>
+      Response.json({ embeddings: [vector], warnings: [] });
+    useToolCalls([
+      {
+        toolName: "searchSupportingDocuments",
+        input: { query: "no matching document" },
+      },
+    ]);
+    const empty = await send(await conversation(), "Search the handbook");
+    assert.deepEqual(publicLookupOutput("searchSupportingDocuments"), {
+      type: "json",
+      value: { results: [] },
+    });
+    const emptyAudit = await db
+      .selectFrom("ai_tool_calls")
+      .selectAll()
+      .where("customer_message_id", "=", empty.message.id)
+      .executeTakeFirstOrThrow();
+    assert.equal(emptyAudit.status, "succeeded");
+    assert.deepEqual((emptyAudit.output as { matches: unknown[] }).matches, []);
+    globalThis.fetch = async () =>
+      new Response("private provider failure", { status: 503 });
+    useToolCalls([
+      {
+        toolName: "searchSupportingDocuments",
+        input: { query: "venue access" },
+      },
+    ]);
+    const failed = await send(await conversation(), "Search again");
+    const failureOutput = JSON.stringify(publicLookupOutput("searchSupportingDocuments"));
+    assert.match(failureOutput, /failed|unavailable|could not/i);
+    assert.doesNotMatch(failureOutput, /private provider failure/);
+    const failedAudit = await db
+      .selectFrom("ai_tool_calls")
+      .selectAll()
+      .where("customer_message_id", "=", failed.message.id)
+      .executeTakeFirstOrThrow();
+    assert.equal(failedAudit.status, "failed");
+    assert.equal(
+      failedAudit.error_code,
+      "supporting_document_search_unavailable",
+    );
+    assert.equal(failedAudit.assistant_message_id, failed.assistantMessage?.id);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a completed booking draft uses the standard review after a supporting document lookup", async () => {
+  const originalFetch = globalThis.fetch;
+  const vector = JSON.stringify([1, ...Array<number>(767).fill(0)]);
+  const document = await db
+    .insertInto("supporting_documents")
+    .values({
+      original_filename: "Access handbook.pdf",
+      storage_key: `${randomUUID()}.pdf`,
+      mime_type: "application/pdf",
+      byte_size: 500,
+      file_sha256: "a".repeat(64),
+      pipeline_version: "fixture",
+      extraction_status: "complete",
+      page_count: 1,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  await db
+    .insertInto("supporting_document_chunks")
+    .values({
+      document_id: document.id,
+      ordinal: 1,
+      page_start: 1,
+      page_end: 1,
+      heading_path: ["Access"],
+      content_text: "Use the east entrance.",
+      content_hash: "b".repeat(64),
+      embedding: sql<string>`${vector}`,
+      embedding_model: "google/gemini-embedding-2",
+      embedded_at: new Date(),
+    })
+    .execute();
+  globalThis.fetch = async () =>
+    Response.json({ embeddings: [JSON.parse(vector)], warnings: [] });
+  try {
+    useToolCalls(
+      [
+        { toolName: "searchSupportingDocuments", input: { query: "entrance" } },
+        {
+          toolName: "updateBookingDraft",
+          input: {
+            eventType: "Birthday",
+            durationMode: "one_day",
+            requestedDates: ["2099-12-12"],
+            timeZone: "Asia/Manila",
+            contactName: "Test Customer",
+            phoneNumber: "09123456789",
+            guestCount: 50,
+          },
+        },
+      ],
+      undefined,
+      undefined,
+      "The handbook says to use the east entrance.",
+    );
+    const result = await send(
+      await conversation(),
+      "What entrance should I use? Also review my birthday request.",
+    );
+    assert.ok(result.assistantMessage);
+    assert.doesNotMatch(
+      result.assistantMessage.body,
+      /The handbook says to use the east entrance\./,
+    );
+    assert.match(result.assistantMessage.body, /Birthday/);
+    assert.match(
+      result.assistantMessage.body,
+      /Should I send this request to AMAC for review\?/,
+    );
+    const calls = await db
+      .selectFrom("ai_tool_calls")
+      .selectAll()
+      .where("customer_message_id", "=", result.message.id)
+      .execute();
+    assert.deepEqual(calls.map((call) => call.tool_name).sort(), [
+      "reviewBookingDraft",
+      "searchSupportingDocuments",
+      "updateBookingDraft",
+    ]);
+    assert.ok(
+      calls.every(
+        (call) =>
+          call.status === "succeeded" &&
+          call.assistant_message_id === result.assistantMessage?.id,
+      ),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    await db
+      .deleteFrom("supporting_documents")
+      .where("id", "=", document.id)
+      .execute();
+  }
+});
