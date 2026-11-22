@@ -272,6 +272,66 @@ async function send(
   return customerMessageResultSchema.parse(await response.json());
 }
 
+test("published agent personality and switches shape the next assistant turn", async () => {
+  const id = await conversation();
+  const original = await db
+    .selectFrom("ai_agent_settings")
+    .selectAll()
+    .where("id", "=", 1)
+    .executeTakeFirstOrThrow();
+
+  try {
+    await db
+      .updateTable("ai_agent_settings")
+      .set({
+        display_name: "Room Assistant",
+        personality: "professional",
+        additional_instructions: "Ask about the venue after the date.",
+        allow_business_information: false,
+        allow_public_catalog: false,
+      })
+      .where("id", "=", 1)
+      .execute();
+    useReply("How can I help you plan your event?");
+    const result = await send(id, "How can you help?");
+    assert.ok(result.assistantMessage);
+
+    const call = model.doGenerateCalls[0];
+    assert.ok(call);
+
+    const toolNames = call.tools?.map(({ name }) => name) ?? [];
+
+    for (const name of [
+      "getBusinessInformation",
+      "searchPublicCatalog",
+      "getPublicCatalogItem",
+    ])
+      assert.ok(!toolNames.includes(name), name);
+
+    assert.ok(toolNames.includes("requestHumanHandoff"));
+    assert.ok(toolNames.includes("updateBookingDraft"));
+    assert.ok(toolNames.includes("getLatestQuotation"));
+
+    const system = call.prompt.find(
+      (message) => message.role === "system",
+    )?.content;
+
+    assert.match(system ?? "", /Room Assistant/);
+    assert.match(system ?? "", /polished, courteous/);
+    assert.doesNotMatch(
+      system ?? "",
+      /natural contractions|Keep replies casual/,
+    );
+    assert.match(system ?? "", /Ask about the venue after the date/);
+  } finally {
+    await db
+      .updateTable("ai_agent_settings")
+      .set(original)
+      .where("id", "=", 1)
+      .execute();
+  }
+});
+
 test("service clarification defers review while saving other draft changes", async () => {
   const id = await conversation();
   useToolCalls([

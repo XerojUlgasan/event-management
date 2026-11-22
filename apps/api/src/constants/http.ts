@@ -2,6 +2,7 @@ import { MAX_MESSAGE_IMAGES } from "@event-management/contracts/limits/messages"
 import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images";
 import { SUPPORTING_DOCUMENT_MAX_BYTES } from "@event-management/contracts/supporting-documents";
 
+export const AGENT_PREVIEW_JSON_BODY_LIMIT_BYTES = 80 * 1024;
 export const SMALL_JSON_BODY_LIMIT_BYTES = 16 * 1024;
 export const BOOKING_CREATE_JSON_BODY_LIMIT_BYTES = 64 * 1024;
 export const CATALOG_JSON_BODY_LIMIT_BYTES = 3 * 1024 * 1024;

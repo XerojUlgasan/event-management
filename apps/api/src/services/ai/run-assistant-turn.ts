@@ -20,6 +20,7 @@ import {
   buildPreviousCatalogItemContext,
   previousPackageBudget,
 } from "./assistant-context.js";
+import { getAgentSettingsService } from "../ai-agent-settings/get-agent-settings.js";
 import { createCustomerServiceAgent } from "./agents/create-customer-service-agent.js";
 import { maxConversationMemoryCharacters } from "./tools/update-conversation-memory.js";
 import { readBookingDraftData } from "../../data/messages/booking-draft-guard.js";
@@ -129,16 +130,22 @@ export async function runAssistantTurnService({
   if (history.at(-1)?.id !== customerMessageId)
     throw new Error("Customer message not found");
 
-  const previousCatalogSearch = await buildPreviousCatalogSearchContext({
-    db,
-    conversationId,
-    customerMessageId,
-  });
-  const previousCatalogItem = await buildPreviousCatalogItemContext({
-    db,
-    conversationId,
-    customerMessageId,
-  });
+  const { settings } = await getAgentSettingsService(db);
+  const [previousCatalogSearch, previousCatalogItem] =
+    settings.allowPublicCatalog
+      ? await Promise.all([
+          buildPreviousCatalogSearchContext({
+            db,
+            conversationId,
+            customerMessageId,
+          }),
+          buildPreviousCatalogItemContext({
+            db,
+            conversationId,
+            customerMessageId,
+          }),
+        ])
+      : [];
   const context = {
     ...(guestIdentityId
       ? {
@@ -461,6 +468,7 @@ export async function runAssistantTurnService({
     : previousPackageBudget(previousCatalogSearch, history);
 
   const agent = createCustomerServiceAgent({
+    settings,
     db,
     customerMessageId,
     turnId,

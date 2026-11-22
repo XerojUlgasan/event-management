@@ -1,11 +1,13 @@
 import { Tabs } from "@event-management/ui";
 import { navigateWorkspace } from "../../../../lib/navigation/workspace-navigation";
 import { adminAiPaths, type AdminAiSection } from "../../../app/routes";
+import { AgentSettingsPage } from "./AgentSettingsPage";
 import { KnowledgePage } from "./KnowledgePage";
 import { SupportingDocumentsPage } from "./SupportingDocumentsPage";
 import "../../../../styles/ai/ai-workspace.css";
 
 const sections: { value: AdminAiSection; label: string }[] = [
+  { value: "agent", label: "Agent" },
   { value: "knowledge", label: "Knowledge Catalog" },
   { value: "documents", label: "Supporting Documents" },
 ];
@@ -18,7 +20,11 @@ export function AiPage({ section }: { section: AdminAiSection }) {
         aria-label="AI"
         active={section}
         onChange={(value) => {
-          if (value === "knowledge" || value === "documents")
+          if (
+            value === "agent" ||
+            value === "knowledge" ||
+            value === "documents"
+          )
             navigateWorkspace(adminAiPaths[value]);
         }}
         items={sections.map((item) => ({
@@ -29,15 +35,25 @@ export function AiPage({ section }: { section: AdminAiSection }) {
       />
       <div
         role="tabpanel"
-        id={`ai-panel-${section}`}
-        aria-labelledby={`ai-tab-${section}`}
+        id="ai-panel-agent"
+        aria-labelledby="ai-tab-agent"
+        hidden={section !== "agent"}
       >
-        {section === "knowledge" ? (
-          <KnowledgePage />
-        ) : (
-          <SupportingDocumentsPage />
-        )}
+        <AgentSettingsPage />
       </div>
+      {section !== "agent" && (
+        <div
+          role="tabpanel"
+          id={`ai-panel-${section}`}
+          aria-labelledby={`ai-tab-${section}`}
+        >
+          {section === "knowledge" ? (
+            <KnowledgePage />
+          ) : (
+            <SupportingDocumentsPage />
+          )}
+        </div>
+      )}
     </div>
   );
 }

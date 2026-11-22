@@ -41,6 +41,19 @@ test("knowledge catalog is an admin workspace with a role-scoped return path", (
   }
 });
 
+test("agent settings are available only in the admin AI workspace", () => {
+  const path = "/app/ai/agent";
+  assert.equal(adminAiSection(path), "agent");
+  assert.equal(adminKey(path), "AI");
+  assert.equal(allowedWorkspacePath(admin, path), true);
+  assert.equal(workspaceReturnPath(admin, path), path);
+
+  for (const profile of [customer, staff]) {
+    assert.equal(allowedWorkspacePath(profile, path), false);
+    assert.equal(workspaceReturnPath(profile, path), null);
+  }
+});
+
 test("supporting documents stay beside knowledge on the admin AI workspace", () => {
   const path = "/app/ai/documents";
   assert.equal(adminAiSection("/app/ai/knowledge"), "knowledge");

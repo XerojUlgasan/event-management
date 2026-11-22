@@ -407,6 +407,20 @@ model EventDay {
   @@map("events_day")
 }
 
+model AiAgentSettings {
+  id                       Int      @id
+  displayName              String   @default("AMAC AI") @map("display_name")
+  greeting                 String?
+  personality              String   @default("warm_concise")
+  additionalInstructions   String   @default("") @map("additional_instructions")
+  allowBusinessInformation Boolean  @default(true) @map("allow_business_information")
+  allowPublicCatalog        Boolean  @default(true) @map("allow_public_catalog")
+  revision                 Int      @default(1)
+  updatedAt                DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("ai_agent_settings")
+}
+
 model BusinessInformation {
   id          Int      @id
   information Json     @default("{}") @db.JsonB

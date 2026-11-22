@@ -40,10 +40,12 @@ import {
   hasObservedReply,
   reconcilePendingReplies,
 } from "../../../lib/services/messages/pending-replies";
+import { useAgentProfile } from "../../messages/use-agent-profile";
 import { assertCursorMoved } from "../../../lib/services/messages/older-page";
 
 export default function PublicChat() {
   const [open, setOpen] = useState(false);
+  const agentProfile = useAgentProfile(open);
   const [thread, setThread] = useState<GuestThread | null>(null);
   const [loading, setLoading] = useState(false);
   const [outbox, setOutbox] = useState<
@@ -595,7 +597,10 @@ export default function PublicChat() {
                   </Button>
                 )}
                 {!thread.messages.length && !Object.keys(outbox).length && (
-                  <p>Say hello. Ask us about your event or a package.</p>
+                  <p>
+                    {agentProfile.greeting ||
+                      "Say hello. Ask us about your event or a package."}
+                  </p>
                 )}
                 {addGuestSentMessages(
                   thread.messages,
@@ -622,7 +627,9 @@ export default function PublicChat() {
                       <strong>
                         {message.senderRole === "customer"
                           ? "You"
-                          : message.senderName}
+                          : message.senderRole === "assistant"
+                            ? agentProfile.senderLabel
+                            : message.senderName}
                       </strong>
                       <div className="public-chat-message-body">
                         <Markdown source={message.body} variant="message" />

@@ -1,6 +1,10 @@
 export const routeFamilies = [
   { id: "guest-chat", prefixes: ["/v1/guest"] },
   { id: "ai", prefixes: ["/v1/admin/ai/knowledge", "/v1/admin/ai/documents"] },
+  {
+    id: "ai-agent-settings",
+    prefixes: ["/v1/admin/ai/agent-settings", "/v1/ai/agent-profile"],
+  },
   { id: "health", prefixes: ["/v1/health"] },
   {
     id: "business-information",

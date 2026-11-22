@@ -1,7 +1,8 @@
 import { isStepCount, ToolLoopAgent } from "ai";
+import type { AgentSettings } from "@event-management/contracts/ai-agent-settings";
 import { createRequestHumanHandoffTool } from "../tools/request-human-handoff.js";
 import { getTextModel } from "../models.js";
-import { customerServicePrompt } from "../prompts/customer-service-prompt.js";
+import { buildCustomerServicePrompt } from "../prompts/customer-service-prompt.js";
 import { createSearchPublicCatalogTool } from "../tools/search-public-catalog.js";
 import { createGetBusinessInformationTool } from "../tools/get-business-information.js";
 import { createGetPublicCatalogItemTool } from "../tools/get-public-catalog-item.js";
@@ -14,7 +15,10 @@ import { createUpdateConversationMemoryTool } from "../tools/update-conversation
 import type { AssistantToolContext } from "../tools/assistant-tool-context.js";
 import { createBookingDraftTools } from "../tools/booking-draft.js";
 
-export function createCustomerServiceAgent(options: AssistantToolContext) {
+export function createCustomerServiceAgent({
+  settings,
+  ...options
+}: AssistantToolContext & { settings: AgentSettings }) {
   let proposedCalls = 0;
   let executedCalls = 0;
   let trackingUnavailable = false;
@@ -42,7 +46,7 @@ export function createCustomerServiceAgent(options: AssistantToolContext) {
 
   return new ToolLoopAgent({
     model: getTextModel(),
-    instructions: customerServicePrompt,
+    instructions: buildCustomerServicePrompt(settings),
     tools: {
       ...(options.handoffScope
         ? {
@@ -52,9 +56,18 @@ export function createCustomerServiceAgent(options: AssistantToolContext) {
             }),
           }
         : {}),
-      getBusinessInformation: createGetBusinessInformationTool(toolContext),
-      searchPublicCatalog: createSearchPublicCatalogTool(toolContext),
-      getPublicCatalogItem: createGetPublicCatalogItemTool(toolContext),
+      ...(settings.allowBusinessInformation
+        ? {
+            getBusinessInformation:
+              createGetBusinessInformationTool(toolContext),
+          }
+        : {}),
+      ...(settings.allowPublicCatalog
+        ? {
+            searchPublicCatalog: createSearchPublicCatalogTool(toolContext),
+            getPublicCatalogItem: createGetPublicCatalogItemTool(toolContext),
+          }
+        : {}),
       ...(options.draftScope
         ? createBookingDraftTools({
             ...toolContext,

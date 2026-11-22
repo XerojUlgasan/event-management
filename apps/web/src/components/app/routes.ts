@@ -1,6 +1,7 @@
 import type { NavKey } from "./navigation-types";
 
 export const adminAiPaths = {
+  agent: "/app/ai/agent",
   knowledge: "/app/ai/knowledge",
   documents: "/app/ai/documents",
 } as const;

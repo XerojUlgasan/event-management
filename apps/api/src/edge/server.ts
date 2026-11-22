@@ -8,6 +8,7 @@ import {
   CATALOG_JSON_BODY_LIMIT_BYTES,
   MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
   SMALL_JSON_BODY_LIMIT_BYTES,
+  AGENT_PREVIEW_JSON_BODY_LIMIT_BYTES,
   BUSINESS_INFORMATION_JSON_BODY_LIMIT_BYTES,
   bookingBodyLimit,
 } from "../constants/http.js";
@@ -24,6 +25,8 @@ const loaders = {
   "message-images": () => import("../controllers/message-images/index.js"),
   "guest-chat": () => import("../controllers/guest-chat/index.js"),
   ai: () => import("../controllers/ai/index.js"),
+  "ai-agent-settings": () =>
+    import("../controllers/ai-agent-settings/index.js"),
   health: () => import("../controllers/health/index.js"),
   "business-information": () =>
     import("../controllers/business-information/index.js"),
@@ -44,6 +47,13 @@ const loaders = {
 const bodyLimits: Partial<
   Record<RouteFamilyId, ReadonlyArray<{ path: string; maxSize: number }>>
 > = {
+  "ai-agent-settings": [
+    { path: "/admin/ai/agent-settings", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
+    {
+      path: "/admin/ai/agent-settings/preview",
+      maxSize: AGENT_PREVIEW_JSON_BODY_LIMIT_BYTES,
+    },
+  ],
   "guest-chat": [{ path: "/guest/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES }],
   ai: [
     {

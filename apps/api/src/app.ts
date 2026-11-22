@@ -3,6 +3,7 @@ import { messageBodyLimit } from "./constants/http.js";
 import { env } from "./utils/env.js";
 import {
   SMALL_JSON_BODY_LIMIT_BYTES,
+  AGENT_PREVIEW_JSON_BODY_LIMIT_BYTES,
   CATALOG_JSON_BODY_LIMIT_BYTES,
   MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
   BUSINESS_INFORMATION_JSON_BODY_LIMIT_BYTES,
@@ -12,6 +13,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { db } from "./db/client.js";
+import agentSettingsRoutes from "./controllers/ai-agent-settings/index.js";
 import aiRoutes from "./controllers/ai/index.js";
 import eventDayRoutes from "./controllers/event-days/index.js";
 import bookingRequestRoutes from "./controllers/booking-requests/index.js";
@@ -94,6 +96,15 @@ app.use(
 );
 app.route("/v1", healthRoutes);
 app.route("/v1", aiRoutes);
+app.use(
+  "/v1/admin/ai/agent-settings",
+  bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
+);
+app.use(
+  "/v1/admin/ai/agent-settings/preview",
+  bodyLimit({ maxSize: AGENT_PREVIEW_JSON_BODY_LIMIT_BYTES }),
+);
+app.route("/v1", agentSettingsRoutes);
 app.use(
   "/v1/admin/catalog-media",
   bodyLimit({

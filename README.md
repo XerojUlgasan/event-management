@@ -52,6 +52,12 @@ Existing overview, per-widget Markdown, and linked-caption rows become withdrawn
 
 Customers browse **Catalogs** at `/app/catalogs`, with Packages and Services tabs. Older customer `/app/packages` links open the same catalog. Filters start collapsed and open from the filter icon beside the results count; closing the panel preserves entered values and active filters. Package filters use inclusive total-price ranges in whole PHP pesos and a guest count. Service filters select fixed-price or hourly-only listings, then apply inclusive ranges to the fixed base price or hourly rate, respectively; excess-hour charges are not part of the fixed-price range. An hourly-only price range excludes services without a known rate. Package guest counts match listings with enough capacity. Applying or clearing filters starts at page 1, and Next/Previous returns focus and scroll to the catalog top. Browsing and package inquiries do not confirm a booking or final price.
 
+### Admin agent settings
+
+System Administrators open **AI → Agent** at `/app/ai/agent` to edit the assistant name, public chat greeting, personality, and additional guidance. The business information and public catalog switches control those lookups. Publishing saves the single `ai_agent_settings` row and applies the settings to subsequent assistant turns. The three personalities share the same booking consent and handoff rules. A publish from an older revision requires reviewing the latest settings before trying again.
+
+**Test chat** uses the editor's current values and sample facts. It has no access to customer conversations or actions. Rooms without a configured text model show simulated replies. Migration `20261122153000_ai_agent_settings` creates the default profile with both lookups enabled.
+
 ### Admin knowledge catalog
 
 System Administrators open **AI → Knowledge Catalog** at `/app/ai/knowledge`. The dashboard shows separate package and service indexing coverage, listings needing attention, and searchable, cursor-paged listings. Coverage uses all eligible non-archived catalog packages and services, including unpublished listings and owners with no knowledge rows. A listing counts as indexed only when every expected chunk matches its current source identity, pipeline, model, and recorded input digest, with no withdrawn rows remaining. Empty eligibility shows no percentage. Table filters do not change the global coverage totals.

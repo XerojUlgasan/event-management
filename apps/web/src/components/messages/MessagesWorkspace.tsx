@@ -41,6 +41,7 @@ import {
 import "../../styles/messages/messages.css";
 import { MessageAttachments, MessageImages } from "./MessageImages";
 import { MessageProcessing } from "./MessageProcessing";
+import { useAgentProfile } from "./use-agent-profile";
 import { initialsFromName } from "../../lib/utils/formatting/name";
 import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
 import {
@@ -171,6 +172,7 @@ export function MessagesWorkspace({
 }) {
   const { notify, notifyError } = useNotifications();
   const composerShortcutId = useId();
+  const agentProfile = useAgentProfile();
   const [quotationId, setQuotationId] = useState<string | null>(null);
   const visibleQuotationId = requestedQuotationId ?? quotationId;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -886,7 +888,8 @@ export function MessagesWorkspace({
                     </div>
                   )}
                   <small className="message-meta">
-                    {!mine && `${message.senderName} · `}
+                    {!mine &&
+                      `${message.senderRole === "assistant" ? agentProfile.senderLabel : message.senderName} · `}
                     {enPhTimeFormatter.format(new Date(message.createdAt))}
                   </small>
                 </div>
