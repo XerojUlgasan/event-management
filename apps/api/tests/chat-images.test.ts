@@ -1,6 +1,6 @@
 import { assertImageMessageJobLeaseData } from "../src/data/messages/message-processing.js";
-import { runOneBackgroundJob } from "../src/services/background-jobs/run-worker.js";
-import { claimJobData } from "../src/data/background-jobs/queue.js";
+import { runOneBackgroundJob } from "../src/services/background-jobs/run-one-background-job.js";
+import { claimJobData } from "../src/data/background-jobs/claim-job.js";
 import { backgroundJobPolicies } from "../src/services/background-jobs/job-definitions.js";
 import "dotenv/config";
 import assert from "node:assert/strict";

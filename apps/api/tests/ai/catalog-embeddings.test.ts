@@ -24,11 +24,9 @@ import { updateServiceService } from "../../src/services/services/update-service
 import { archiveServiceService } from "../../src/services/services/archive-service.js";
 import { deleteServiceService } from "../../src/services/services/delete-service.js";
 import { refreshCatalogEmbeddingsService } from "../../src/services/ai/workflows/refresh-catalog-embeddings.js";
-import { runOneBackgroundJob } from "../../src/services/background-jobs/run-worker.js";
-import {
-  claimJobData,
-  finishJobData,
-} from "../../src/data/background-jobs/queue.js";
+import { runOneBackgroundJob } from "../../src/services/background-jobs/run-one-background-job.js";
+import { claimJobData } from "../../src/data/background-jobs/claim-job.js";
+import { finishJobData } from "../../src/data/background-jobs/finish-job.js";
 import { readCatalogEmbeddingImage } from "../../src/services/ai/retrieval/read-catalog-embedding-image.js";
 import { loadCatalogKnowledge } from "../../src/services/ai/load-catalog-knowledge.js";
 import { syncCatalogKnowledge } from "../../src/services/ai/workflows/sync-catalog-knowledge.js";

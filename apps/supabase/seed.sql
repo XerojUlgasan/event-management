@@ -9,5 +9,11 @@ VALUES (
   false,
   26214400,
   ARRAY['image/jpeg','image/png','image/webp','video/mp4','video/webm']
+), (
+  'supporting-documents',
+  'supporting-documents',
+  false,
+  26214400,
+  ARRAY['application/pdf']
 )
 ON CONFLICT (id) DO NOTHING;

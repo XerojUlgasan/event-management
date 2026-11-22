@@ -9,11 +9,12 @@ import {
 } from "@event-management/ui";
 
 import type { NavKey } from "../../app/navigation-types";
+import type { AdminAiSection } from "../../app/routes";
 import {
   firstName,
   initialsFromName,
 } from "../../../lib/utils/formatting/name";
-import { KnowledgePage } from "./ai/KnowledgePage";
+import { AiPage } from "./ai/AiPage";
 import { BookingsPage } from "./booking-requests/BookingsPage";
 import { CalendarPage } from "./calendar/CalendarPage";
 import { GenericPage } from "./navigation/GenericPage";
@@ -118,12 +119,14 @@ export function AdminShell({
   profile,
   onSignOut,
   active,
+  aiSection = "knowledge",
   bookingRequestId,
   search,
 }: {
   profile: { id: string; displayName: string | null; email: string };
   onSignOut: () => void;
   active: NavKey;
+  aiSection?: AdminAiSection;
   bookingRequestId?: string;
   search: string;
 }) {
@@ -142,7 +145,7 @@ export function AdminShell({
   };
 
   const body = useMemo(() => {
-    if (active === "AI") return <KnowledgePage />;
+    if (active === "AI") return <AiPage section={aiSection} />;
 
     if (active === "Overview")
       return <OverviewPage firstName={firstName(name)} onNavigate={go} />;
@@ -197,7 +200,7 @@ export function AdminShell({
       );
 
     return <GenericPage page={active} />;
-  }, [active, name, profile.email, bookingRequestId, search]);
+  }, [active, aiSection, name, profile.email, bookingRequestId, search]);
 
   return (
     <WorkspaceLayout

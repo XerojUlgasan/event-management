@@ -30,6 +30,8 @@ test("route families follow the longest owned prefix", () => {
   assert.equal(matchRouteFamily("/v1/admin/ai/knowledge"), "ai");
   assert.equal(matchRouteFamily("/v1/admin/ai/knowledge/search"), "ai");
   assert.equal(matchRouteFamily("/v1/admin/ai/knowledge/package/id"), "ai");
+  assert.equal(matchRouteFamily("/v1/admin/ai/documents"), "ai");
+  assert.equal(matchRouteFamily("/v1/admin/ai/documents/id/retry"), "ai");
   assert.equal(matchRouteFamily("/v1/health"), "health");
   assert.equal(matchRouteFamily("/v1/me"), "auth");
   assert.equal(matchRouteFamily("/v1/auth/login"), "auth");

@@ -1,7 +1,24 @@
 import type { NavKey } from "./navigation-types";
 
+export const adminAiPaths = {
+  knowledge: "/app/ai/knowledge",
+  documents: "/app/ai/documents",
+} as const;
+
+export type AdminAiSection = keyof typeof adminAiPaths;
+
+export function adminAiSection(path: string): AdminAiSection | null {
+  const normalized = normalizePath(path);
+
+  const found = (
+    Object.entries(adminAiPaths) as [AdminAiSection, string][]
+  ).find(([, href]) => href === normalized);
+
+  return found?.[0] ?? null;
+}
+
 export const adminPaths: Record<NavKey, string> = {
-  AI: "/app/ai/knowledge",
+  AI: adminAiPaths.knowledge,
   Overview: "/app/overview",
   Bookings: "/app/bookings",
   Messages: "/app/messages",
@@ -29,6 +46,8 @@ export const customerPaths: Record<CustomerTab, string> = {
 
 export function adminKey(path: string) {
   if (adminBookingRequestId(path)) return "Bookings";
+
+  if (adminAiSection(path)) return "AI";
 
   const found = (Object.entries(adminPaths) as [NavKey, string][]).find(
     ([, href]) => href === path,

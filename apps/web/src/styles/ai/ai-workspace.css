@@ -1,0 +1,9 @@
+.ai-workspace {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.ai-workspace > * {
+  min-width: 0;
+}

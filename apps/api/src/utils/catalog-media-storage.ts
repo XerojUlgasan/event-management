@@ -67,9 +67,14 @@ export async function putCatalogMedia(
   key: string,
   bytes: Uint8Array,
   contentType: string,
-  options: { upsert?: boolean; abortSignal?: AbortSignal } = {},
+  options: {
+    upsert?: boolean;
+    abortSignal?: AbortSignal;
+    bucket?: string;
+  } = {},
 ) {
-  const { url, apiKey, bucket } = env.STORAGE;
+  const { url, apiKey, bucket: defaultBucket } = env.STORAGE;
+  const bucket = options.bucket ?? defaultBucket;
   const response = await fetch(
     `${url}/storage/v1/object/${objectPath(bucket, key)}`,
     {
@@ -89,8 +94,9 @@ export async function putCatalogMedia(
   if (!response.ok) throw new Error("Media storage write failed");
 }
 
-export async function deleteCatalogMedia(key: string) {
-  const { url, apiKey, bucket } = env.STORAGE;
+export async function deleteCatalogMedia(key: string, bucketOverride?: string) {
+  const { url, apiKey, bucket: defaultBucket } = env.STORAGE;
+  const bucket = bucketOverride ?? defaultBucket;
   const response = await fetch(`${url}/storage/v1/object/${bucket}`, {
     method: "DELETE",
     headers: authHeaders(apiKey, { "Content-Type": "application/json" }),
@@ -107,8 +113,10 @@ export async function getCatalogMedia(
   key: string,
   range?: string,
   abortSignal?: AbortSignal,
+  bucketOverride?: string,
 ) {
-  const { url, apiKey, bucket } = env.STORAGE;
+  const { url, apiKey, bucket: defaultBucket } = env.STORAGE;
+  const bucket = bucketOverride ?? defaultBucket;
   const response = await fetch(
     `${url}/storage/v1/object/${objectPath(bucket, key)}`,
     {

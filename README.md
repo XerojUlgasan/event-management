@@ -66,6 +66,12 @@ The detail drawer resolves included-service names for saved and pending package 
 
 See the [background indexing specification](docs/specs/knowledge-catalog-background-indexing.md) for the submission contract, recovery behavior, and verification boundaries.
 
+### Admin supporting documents
+
+System Administrators open **AI → Supporting Documents** at `/app/ai/documents` to upload a PDF with selectable text, up to 25 MiB and 200 pages. The admin view shows the filename, page count, processing progress, and any unreadable page numbers. A document is ready after all its chunks have saved embeddings. When a temporary failure exhausts its retries, **Retry** resubmits the failed work for that file.
+
+Original PDFs are stored in the private `supporting-documents` bucket. The Node worker extracts text in page order, saves page and heading information with each chunk, and queues one `embed_document_chunk` job per chunk in the same transaction. Chunk embeddings start empty and are populated by their jobs. Configure the worker's existing Storage and embedding settings. For hosted deployments, provision a private `supporting-documents` bucket that accepts `application/pdf` up to 25 MiB. The local Supabase config and seed define this bucket. This workflow ends at stored vectors, with document retrieval and assistant integration planned separately.
+
 ### Booking requests and messages
 
 Customers can ask AMAC AI to prepare a booking in chat. Each conversation keeps one booking request with an empty `submitted_at` while the customer supplies the event type, duration, dates, timezone, contact and phone. Guest count, venue, budget, package, service hours and other preferences are optional. Guests can claim the same draft after signing in. AMAC follows the customer’s language and tone, saves every detail they volunteer, and asks for one missing detail at a time. Once the draft is complete, AMAC shows the saved details and asks whether to send them to the team. A signed-in customer can approve in their own words. A correction produces a fresh summary for approval. AMAC AI saves package choices and requested extras while its draft is open. The submission receipt shows the reference and directs the customer to message staff in the same chat for changes. If the customer asks for a change after submission, AMAC AI hands the chat to staff for review. The admin sees the requested extras and decides pricing and scheduling. [Conversational booking specification](docs/specs/amac-conversational-booking.md)

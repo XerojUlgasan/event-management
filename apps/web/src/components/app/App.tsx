@@ -13,6 +13,7 @@ import { AuthPage } from "../auth/AuthPage";
 import { CustomerDashboard } from "../workspaces/customer/CustomerDashboard";
 import { CatalogNavigationProvider } from "../catalog/CatalogNavigationProvider";
 import {
+  adminAiSection,
   adminBookingRequestId,
   adminKey,
   allowedWorkspacePath,
@@ -262,6 +263,7 @@ function Workspace({
           profile={profile}
           search={search}
           active={active}
+          aiSection={adminAiSection(path) ?? "knowledge"}
           bookingRequestId={adminBookingRequestId(path) ?? undefined}
           onSignOut={handleSignOut}
         />

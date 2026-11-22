@@ -124,6 +124,11 @@ public = false
 file_size_limit = "25MiB"
 allowed_mime_types = ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm"]
 
+[storage.buckets.supporting-documents]
+public = false
+file_size_limit = "25MiB"
+allowed_mime_types = ["application/pdf"]
+
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]
 enabled = true

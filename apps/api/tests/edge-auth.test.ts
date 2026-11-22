@@ -32,6 +32,9 @@ test("Edge OpenAPI loads every router including auth", async () => {
   assert.equal(response.status, 200, await response.clone().text());
   const document = await response.json();
   assert.ok(document.paths["/v1/auth/login"]);
+  assert.ok(document.paths["/v1/admin/ai/documents"].get);
+  assert.ok(document.paths["/v1/admin/ai/documents"].post);
+  assert.ok(document.paths["/v1/admin/ai/documents/{id}/retry"].post);
   const adminBooking = "/v1/admin/booking-requests/{id}";
   assert.ok(document.paths[`${adminBooking}/quotations`].get);
   assert.equal(document.paths[`${adminBooking}/quotations`].post, undefined);

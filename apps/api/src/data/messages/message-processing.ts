@@ -8,8 +8,12 @@ import type {
   MessageImageInterpretation,
 } from "@event-management/contracts/message-images";
 import { enqueueBackgroundJobService } from "../../services/background-jobs/enqueue-job.js";
+import {
+  assertBackgroundJobLeaseData,
+  type BackgroundJobLease,
+} from "../background-jobs/assert-job-lease.js";
 
-export type ImageMessageJobLease = { jobId: string; leaseToken: string };
+export type ImageMessageJobLease = BackgroundJobLease;
 
 export type ImageMessageJobPayload = {
   messageId: string;
@@ -54,22 +58,7 @@ export const conversationAiReplyPendingSelection = () =>
   );
 
 // Domain commits and recovery share this row lock; provider work stays outside.
-export async function assertImageMessageJobLeaseData(
-  trx: Transaction<DB>,
-  lease: ImageMessageJobLease,
-  signal?: AbortSignal,
-) {
-  signal?.throwIfAborted();
-  const current = await sql<{ id: string }>`select id from background_jobs
-    where id = ${lease.jobId}::uuid and status = 'running'
-      and lease_token = ${lease.leaseToken}::uuid and lease_expires_at > clock_timestamp() for update`.execute(
-    trx,
-  );
-
-  if (!current.rows.length) throw new Error("Message job lease lost");
-
-  signal?.throwIfAborted();
-}
+export const assertImageMessageJobLeaseData = assertBackgroundJobLeaseData;
 
 export const messageProcessingSelection = (alias = "m") =>
   sql<MessageProcessing | null>`(

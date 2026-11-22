@@ -1,7 +1,8 @@
-import type { ImageMessageJobLease } from "../../data/messages/message-processing.js";
+import type { BackgroundJobLease } from "../../data/background-jobs/assert-job-lease.js";
 import { z } from "zod";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
+import { imageMessageJobPayloadSchema } from "../../types/image-message-job.js";
 
 export const backgroundJobSettings = {
   pollIntervalMs: 3_000,
@@ -17,7 +18,7 @@ function defineJob<S extends z.ZodType>(definition: {
     db: Kysely<DB>,
     payload: z.output<S>,
     signal: AbortSignal,
-    lease?: ImageMessageJobLease,
+    lease?: BackgroundJobLease,
   ) => Promise<void>;
   retryDelaysMs: readonly number[];
   timeoutMs: number;
@@ -33,7 +34,7 @@ function defineJob<S extends z.ZodType>(definition: {
       db: Kysely<DB>,
       payload: unknown,
       signal: AbortSignal,
-      lease?: ImageMessageJobLease,
+      lease?: BackgroundJobLease,
     ) =>
       definition.handler(
         db,
@@ -46,22 +47,17 @@ function defineJob<S extends z.ZodType>(definition: {
 
 const uuid = z.uuid().transform((id) => id.toLowerCase());
 
+const retryDelaysMs = [10_000, 60_000, 300_000] as const;
+
 export const jobDefinitions = {
   process_image_message: defineJob({
-    payloadSchema: z
-      .object({
-        messageId: uuid,
-        conversationId: uuid,
-        aiVersion: z.number().int().nonnegative().nullable(),
-        suppressReply: z.literal(true).optional(),
-      })
-      .strict(),
+    payloadSchema: imageMessageJobPayloadSchema,
     dedupeKey: (payload) => payload.messageId,
     handler: async (db, payload, signal, lease) =>
       (
         await import("./handlers/process-image-message.js")
       ).processImageMessageJob(db, payload, signal, lease),
-    retryDelaysMs: [10_000, 60_000, 300_000],
+    retryDelaysMs,
     timeoutMs: 240_000,
   }),
   embed_package: defineJob({
@@ -73,7 +69,7 @@ export const jobDefinitions = {
         payload,
         signal,
       ),
-    retryDelaysMs: [10_000, 60_000, 300_000],
+    retryDelaysMs,
     timeoutMs: 120_000,
   }),
   embed_service: defineJob({
@@ -85,8 +81,28 @@ export const jobDefinitions = {
         payload,
         signal,
       ),
-    retryDelaysMs: [10_000, 60_000, 300_000],
+    retryDelaysMs,
     timeoutMs: 120_000,
+  }),
+  extract_supporting_document: defineJob({
+    payloadSchema: z.object({ documentId: uuid }).strict(),
+    dedupeKey: (payload) => payload.documentId,
+    handler: async (db, payload, signal, lease) =>
+      (
+        await import("./handlers/extract-supporting-document.js")
+      ).extractSupportingDocumentJob(db, payload, signal, lease),
+    retryDelaysMs,
+    timeoutMs: 120_000,
+  }),
+  embed_document_chunk: defineJob({
+    payloadSchema: z.object({ chunkId: uuid }).strict(),
+    dedupeKey: (payload) => payload.chunkId,
+    handler: async (db, payload, signal, lease) =>
+      (
+        await import("./handlers/embed-document-chunk.js")
+      ).embedDocumentChunkJob(db, payload, signal, lease),
+    retryDelaysMs,
+    timeoutMs: 60_000,
   }),
 } as const;
 
@@ -112,7 +128,7 @@ export async function executeJob(
   payload: unknown,
   db: Kysely<DB>,
   signal: AbortSignal,
-  lease?: ImageMessageJobLease,
+  lease?: BackgroundJobLease,
 ) {
   return jobDefinitions[type].run(db, payload, signal, lease);
 }

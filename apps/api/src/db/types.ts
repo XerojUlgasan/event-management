@@ -270,6 +270,36 @@ export interface Sessions {
   user_id: string;
 }
 
+export interface SupportingDocumentChunks {
+  content_hash: string;
+  content_text: string;
+  document_id: string;
+  embedded_at: Timestamp | null;
+  embedding: string | null;
+  embedding_model: string | null;
+  heading_path: Generated<string[]>;
+  id: Generated<string>;
+  ordinal: number;
+  page_end: number;
+  page_start: number;
+}
+
+export interface SupportingDocuments {
+  byte_size: number;
+  created_at: Generated<Timestamp>;
+  extraction_error_code: string | null;
+  extraction_status: Generated<string>;
+  file_sha256: string;
+  id: Generated<string>;
+  mime_type: string;
+  original_filename: string;
+  page_count: number | null;
+  pipeline_version: string;
+  storage_key: string;
+  unreadable_pages: Generated<number[]>;
+  uploaded_by: string | null;
+}
+
 export interface Users {
   created_at: Generated<Timestamp>;
   display_name: string | null;
@@ -301,5 +331,7 @@ export interface DB {
   quotations: Quotations;
   services: Services;
   sessions: Sessions;
+  supporting_document_chunks: SupportingDocumentChunks;
+  supporting_documents: SupportingDocuments;
   users: Users;
 }

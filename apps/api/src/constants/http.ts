@@ -1,5 +1,6 @@
 import { MAX_MESSAGE_IMAGES } from "@event-management/contracts/limits/messages";
 import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images";
+import { SUPPORTING_DOCUMENT_MAX_BYTES } from "@event-management/contracts/supporting-documents";
 
 export const SMALL_JSON_BODY_LIMIT_BYTES = 16 * 1024;
 export const BOOKING_CREATE_JSON_BODY_LIMIT_BYTES = 64 * 1024;
@@ -27,6 +28,9 @@ export function bookingBodyLimit(path: string) {
 }
 
 export const MEDIA_UPLOAD_BODY_OVERHEAD_BYTES = 64 * 1024;
+
+export const SUPPORTING_DOCUMENT_UPLOAD_BODY_LIMIT_BYTES =
+  SUPPORTING_DOCUMENT_MAX_BYTES + MEDIA_UPLOAD_BODY_OVERHEAD_BYTES;
 
 export const MESSAGE_UPLOAD_BODY_LIMIT_BYTES =
   MAX_MESSAGE_IMAGES * MAX_IMAGE_SIZE_BYTES + MEDIA_UPLOAD_BODY_OVERHEAD_BYTES;

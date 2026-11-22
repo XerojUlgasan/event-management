@@ -38,7 +38,8 @@
     "test:checklist-removal": "tsx --test tests/checklist-removal-migration.test.ts",
     "worker:background-jobs": "tsx src/workers/background-jobs.ts",
     "test:background-jobs": "tsx --test tests/background-jobs.test.ts tests/background-jobs-worker.test.ts",
-    "test:business-information": "tsx --test tests/business-information.test.ts"
+    "test:business-information": "tsx --test tests/business-information.test.ts",
+    "test:supporting-documents": "tsx --test tests/supporting-document-preparation.test.ts tests/supporting-documents.test.ts"
   },
   "dependencies": {
     "@event-management/contracts": "workspace:*",
@@ -53,6 +54,7 @@
     "jose": "6.2.18",
     "kysely": "^0.29.7",
     "pg": "^8.23.1",
+    "unpdf": "1.9.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {

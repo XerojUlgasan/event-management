@@ -14,6 +14,8 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Supporting Documents API structure](2026-11-22_22-47-07_supporting-documents-api-structure.md) | Document operations and background queue modules / main | complete | Review the document router and worker entry points. |
+| [Admin supporting documents](2026-11-22_22-05-27_supporting-documents.md) | Private PDF uploads and per-chunk embedding / main | complete | Review the local diff and storage setup before rollout. |
 | [Service summary cleanup](2026-11-22_10-16-51_service-summary-cleanup.md) | One compact service row in details, sidebar, and quotation / main | complete | Review the working-tree diff. |
 | [Booking-owned add-ons](2026-11-22_05-12-21_booking-owned-add-ons.md) | Booking-owned pricing, migration and quotation send / main | complete | Review the diff, then deploy the coordinated release. |
 | [Manual booking add-ons](2026-11-22_01-16-37_manual-booking-add-ons.md) | Service selection, hours, and admin review / main | complete | Review the local changes before rollout with the existing booking-draft migration. |

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  adminAiSection,
   adminBookingRequestId,
   adminBookingRequestPath,
   adminKey,
@@ -31,6 +32,24 @@ test("business information is an admin workspace route", () => {
 test("knowledge catalog is an admin workspace with a role-scoped return path", () => {
   const path = "/app/ai/knowledge";
   assert.equal(adminKey(path), "AI");
+  assert.equal(allowedWorkspacePath(admin, path), true);
+  assert.equal(workspaceReturnPath(admin, path), path);
+
+  for (const profile of [customer, staff]) {
+    assert.equal(allowedWorkspacePath(profile, path), false);
+    assert.equal(workspaceReturnPath(profile, path), null);
+  }
+});
+
+test("supporting documents stay beside knowledge on the admin AI workspace", () => {
+  const path = "/app/ai/documents";
+  assert.equal(adminAiSection("/app/ai/knowledge"), "knowledge");
+  assert.equal(adminAiSection(path), "documents");
+  assert.equal(adminAiSection(`${path}/`), "documents");
+  assert.equal(adminKey(path), "AI");
+  assert.equal(adminKey("/app/ai/knowledge"), "AI");
+  assert.equal(adminKey("/app/ai"), null);
+  assert.equal(adminKey(`${path}/extra`), null);
   assert.equal(allowedWorkspacePath(admin, path), true);
   assert.equal(workspaceReturnPath(admin, path), path);
 

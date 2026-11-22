@@ -5,9 +5,9 @@ import {
   assertGuestActive,
   lockGuestConversation,
 } from "../guest-chat/guest-conversation.js";
-import { lockBackgroundJobsData } from "../background-jobs/queue.js";
+import { lockBackgroundJobsData } from "../background-jobs/lock-background-jobs.js";
 import { selectMessageColumnsData } from "./select-message-columns.js";
-import { jobDefinitions } from "../../services/background-jobs/job-definitions.js";
+import { imageMessageJobPayloadSchema } from "../../types/image-message-job.js";
 
 export class RetryMessageProcessingError extends Error {
   constructor(
@@ -90,9 +90,7 @@ export async function retryMessageProcessingData(
         "This message cannot be retried",
       );
 
-    const parsed = jobDefinitions.process_image_message.payloadSchema.safeParse(
-      job.payload,
-    );
+    const parsed = imageMessageJobPayloadSchema.safeParse(job.payload);
 
     if (
       !parsed.success ||

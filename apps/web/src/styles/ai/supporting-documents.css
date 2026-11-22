@@ -1,0 +1,56 @@
+.supporting-documents {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.supporting-documents > * {
+  min-width: 0;
+}
+
+.supporting-documents-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.supporting-documents-table thead th:first-child,
+.supporting-documents-table tbody th:first-child {
+  width: 58%;
+}
+
+.supporting-documents-file-name,
+.supporting-documents-row-status {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.supporting-documents-outcome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.supporting-documents-file-name strong {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.supporting-documents-file-name span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.supporting-documents-error {
+  padding: 12px 16px;
+  border: 1px solid var(--status-danger-border);
+  border-radius: 8px;
+  background: var(--status-danger-surface);
+  color: var(--status-danger-text);
+}

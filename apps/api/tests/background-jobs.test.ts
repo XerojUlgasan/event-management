@@ -6,11 +6,9 @@ import { after, before, test } from "node:test";
 import { Kysely, PostgresDialect, sql } from "kysely";
 import { Pool } from "pg";
 import type { DB } from "../src/db/types.js";
-import {
-  claimJobData,
-  finishJobData,
-  heartbeatJobData,
-} from "../src/data/background-jobs/queue.js";
+import { claimJobData } from "../src/data/background-jobs/claim-job.js";
+import { finishJobData } from "../src/data/background-jobs/finish-job.js";
+import { heartbeatJobData } from "../src/data/background-jobs/heartbeat-job.js";
 import {
   enqueueBackgroundJobService,
   ensureBackgroundJobScheduledService,
@@ -20,10 +18,8 @@ import {
   backgroundJobSettings,
   jobDefinitions,
 } from "../src/services/background-jobs/job-definitions.js";
-import {
-  runBackgroundJobsWorker,
-  runOneBackgroundJob,
-} from "../src/services/background-jobs/run-worker.js";
+import { runOneBackgroundJob } from "../src/services/background-jobs/run-one-background-job.js";
+import { runBackgroundJobsWorker } from "../src/services/background-jobs/run-worker.js";
 
 const database = `em_jobs_${randomUUID().replaceAll("-", "")}`;
 

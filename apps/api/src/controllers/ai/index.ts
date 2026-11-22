@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import supportingDocumentRoutes from "../supporting-documents/index.js";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import { listRoute, listRouteHandler } from "./list-catalog-knowledge.js";
@@ -17,5 +18,6 @@ routes.openapi(listRoute, listRouteHandler);
 routes.openapi(searchRoute, searchRouteHandler);
 routes.openapi(indexPendingRoute, indexPendingRouteHandler);
 routes.openapi(detailRoute, detailRouteHandler);
+routes.route("/", supportingDocumentRoutes);
 
 export default routes;

@@ -17,6 +17,7 @@ model User {
   conversations Conversation[] @relation("CustomerConversations")
   sentMessages Message[]     @relation("MessageSender")
   mediaAssets MediaAsset[]
+  supportingDocuments SupportingDocument[]
   quotations Quotation[]
   auditEvents AuditEvent[]
   notifications Notification[]
@@ -247,6 +248,45 @@ model CatalogKnowledge {
   @@unique([serviceId, chunkKey])
   @@index([mediaId])
   @@map("catalog_knowledge")
+}
+
+model SupportingDocument {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  originalFilename    String   @map("original_filename")
+  storageKey          String   @unique @map("storage_key")
+  mimeType            String   @map("mime_type")
+  byteSize            Int      @map("byte_size")
+  fileSha256          String   @map("file_sha256")
+  uploadedBy          String?  @map("uploaded_by") @db.Uuid
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  pipelineVersion     String   @map("pipeline_version")
+  extractionStatus    String   @default("pending") @map("extraction_status")
+  pageCount           Int?     @map("page_count")
+  unreadablePages     Int[]    @default([]) @map("unreadable_pages")
+  extractionErrorCode String?  @map("extraction_error_code")
+  uploader            User?    @relation(fields: [uploadedBy], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  chunks              SupportingDocumentChunk[]
+
+  @@index([uploadedBy])
+  @@map("supporting_documents")
+}
+
+model SupportingDocumentChunk {
+  id             String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId     String                  @map("document_id") @db.Uuid
+  ordinal        Int
+  pageStart      Int                     @map("page_start")
+  pageEnd        Int                     @map("page_end")
+  headingPath    String[]                @default([]) @map("heading_path")
+  contentText    String                  @map("content_text")
+  contentHash    String                  @map("content_hash")
+  embedding      Unsupported("vector(768)")?
+  embeddingModel String?                 @map("embedding_model")
+  embeddedAt     DateTime?               @map("embedded_at") @db.Timestamptz(6)
+  document       SupportingDocument      @relation(fields: [documentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([documentId, ordinal])
+  @@map("supporting_document_chunks")
 }
 
 model Quotation {
