@@ -20,7 +20,7 @@ import { startToolCallData } from "../../src/data/ai/start-tool-call.js";
 import { requestHumanHandoffService } from "../../src/services/ai/request-human-handoff.js";
 import { humanHandoffAcknowledgement } from "../../src/data/messages/request-human-handoff.js";
 import { runAssistantTurnService } from "../../src/services/ai/run-assistant-turn.js";
-import { getMyProposalService } from "../../src/services/ai/get-my-proposal.js";
+import { getMyPackageService } from "../../src/services/ai/get-my-package.js";
 
 const database = `em_ai_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -106,9 +106,9 @@ function useToolCalls(
       | "getBusinessInformation"
       | "searchPublicCatalog"
       | "getPublicCatalogItem"
-      | "getMyProposal"
-      | "getMySentQuotation"
-      | "getMyRequestHistory"
+      | "getMyPackage"
+      | "getLatestQuotation"
+      | "getBookingDetails"
       | "requestHumanHandoff"
       | "updateConversationMemory"
       | "updateBookingDraft";
@@ -116,8 +116,9 @@ function useToolCalls(
   }[],
   beforeAnswer?: () => Promise<void>,
   consent?: "continue",
+  reply = "Catalog results are ready",
 ) {
-  useReply("Catalog results are ready");
+  useReply(reply);
   const generate = model.doGenerate.bind(model);
   model.doGenerate = async (...args) => {
     const result = await generate(...args);
@@ -132,7 +133,7 @@ function useToolCalls(
       ? model.doGenerateCalls.filter(({ prompt }) => !isConsentPrompt(prompt))
       : model.doGenerateCalls;
 
-    if (dialogueCalls.length === 1)
+    if (calls.length && dialogueCalls.length === 1)
       return {
         ...result,
         content: calls.map(({ toolName, input }, index) => ({
@@ -271,20 +272,153 @@ async function send(
   return customerMessageResultSchema.parse(await response.json());
 }
 
-test("native tools collect, review and submit the same draft once", async () => {
+test("service clarification defers review while saving other draft changes", async () => {
   const id = await conversation();
   useToolCalls([
     {
       toolName: "updateBookingDraft",
-      input: { eventType: "Birthday", guestCount: 80 },
+      input: {
+        eventType: "Birthday",
+        durationMode: "one_day",
+        requestedDates: ["2099-12-12"],
+        timeZone: "Asia/Manila",
+        contactName: "Test Customer",
+        phoneNumber: "09123456789",
+        guestCount: 50,
+        specialRequests: "Blue decor",
+      },
     },
   ]);
-  await send(id, "Please plan a birthday for 80 guests.");
+  const initial = await send(id, "Please review my birthday request.");
+  assert.ok(initial.assistantMessage);
+  assert.match(initial.assistantMessage.body, /Should I send this request/);
+
+  async function draft() {
+    return db
+      .selectFrom("conversations as c")
+      .innerJoin("booking_requests as b", "b.id", "c.booking_request_id")
+      .select([
+        "b.id",
+        "b.guest_count",
+        "b.special_requests",
+        "b.requested_services",
+        "b.submitted_at",
+      ])
+      .where("c.id", "=", id)
+      .executeTakeFirstOrThrow();
+  }
+
+  const original = await draft();
+  const question = "Anong service po ang gusto ninyong idagdag?";
+  useToolCalls([], undefined, "continue", question);
+  const generic = await send(
+    id,
+    "pwede po mag pa addon ng services?",
+    initial.assistantMessage.id,
+  );
+  assert.equal(generic.assistantMessage?.body, question);
+  assert.deepEqual(await draft(), original);
+  assert.deepEqual(
+    await db
+      .selectFrom("ai_tool_calls")
+      .select(["tool_name", "output"])
+      .where("customer_message_id", "=", generic.message.id)
+      .execute(),
+    [{ tool_name: "assessBookingConsent", output: { intent: "continue" } }],
+  );
+
+  useToolCalls(
+    [
+      {
+        toolName: "updateBookingDraft",
+        input: { guestCount: 60, waitForServiceChoice: true },
+      },
+    ],
+    undefined,
+    undefined,
+    question,
+  );
+  const mixed = await send(
+    id,
+    "Gawing 60 guests, at pwede po magpa-addon ng services?",
+  );
+  assert.equal(mixed.assistantMessage?.body, question);
+  const updated = await draft();
+  assert.equal(updated.id, original.id);
+  assert.equal(updated.guest_count, 60);
+  assert.equal(updated.special_requests, "Blue decor");
+  assert.deepEqual(updated.requested_services, original.requested_services);
+  assert.equal(updated.submitted_at, null);
+
+  useToolCalls([
+    {
+      toolName: "updateBookingDraft",
+      input: { upsertServices: [{ customName: "Photo booth" }] },
+    },
+  ]);
+  const named = await send(id, "Photo booth po.");
+  assert.match(named.assistantMessage?.body ?? "", /Photo booth/);
+  assert.match(named.assistantMessage?.body ?? "", /Requested services/i);
+  assert.match(named.assistantMessage?.body ?? "", /Should I send this request/);
+  const selected = await draft();
+  assert.equal(selected.id, original.id);
+  assert.equal(selected.guest_count, 60);
+  assert.equal(selected.special_requests, "Blue decor");
+  assert.deepEqual(selected.requested_services, [{ customName: "Photo booth" }]);
+  assert.equal(selected.submitted_at, null);
+
+  useToolCalls([{ toolName: "updateBookingDraft", input: {} }]);
+  const refreshed = await send(id, "Please show my request again.");
+  assert.match(refreshed.assistantMessage?.body ?? "", /Photo booth/);
+  assert.match(
+    refreshed.assistantMessage?.body ?? "",
+    /Should I send this request/,
+  );
+});
+
+test("native tools collect, review and submit the same draft once", async () => {
+  const id = await conversation();
+  const originalPackage = await db
+    .insertInto("packages")
+    .values({
+      name: "Garden Starter",
+      slug: `draft-package-${randomUUID()}`,
+      max_guests: 100,
+      price: 2000,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  useToolCalls([
+    {
+      toolName: "updateBookingDraft",
+      input: {
+        eventType: "Birthday",
+        guestCount: 80,
+        packageId: originalPackage.id,
+        upsertServices: [
+          { customName: "Acoustic duo", hours: 2 },
+          { customName: "Face painting" },
+        ],
+      },
+    },
+  ]);
+  await send(
+    id,
+    "Please plan a birthday for 80 guests with the Garden Starter package, an acoustic duo for two hours, and face painting.",
+  );
   const intake = modelToolOutput("updateBookingDraft");
   assert.ok(intake && typeof intake === "object");
   assert.ok("nextMissingField" in intake);
   assert.equal(intake.nextMissingField, "durationMode");
   assert.equal("missingFields" in intake, false);
+  const initial = await db
+    .selectFrom("conversations as c")
+    .innerJoin("booking_requests as b", "b.id", "c.booking_request_id")
+    .select(["b.id", "b.package_id", "b.requested_services"])
+    .where("c.id", "=", id)
+    .executeTakeFirstOrThrow();
+  assert.equal(initial.package_id, originalPackage.id);
+  assert.match(JSON.stringify(initial.requested_services), /Face painting/u);
   useToolCalls([
     {
       toolName: "updateBookingDraft",
@@ -295,12 +429,15 @@ test("native tools collect, review and submit the same draft once", async () => 
         timeZone: "Asia/Manila",
         contactName: "Test Person",
         phoneNumber: "09123456789",
+        packageId,
+        upsertServices: [{ customName: "Acoustic duo", hours: 3 }],
+        removeServices: ["Face painting"],
       },
     },
   ]);
   const review = await send(
     id,
-    "Make it 90, on December 12, 2099, Manila time. Contact Test Person at 09123456789.",
+    "Make it 90, on December 12, 2099, Manila time. Contact Test Person at 09123456789. Switch to the Private package marker, make the acoustic duo three hours, and remove face painting.",
   );
   assert.match(
     review.assistantMessage?.body ?? "",
@@ -313,8 +450,12 @@ test("native tools collect, review and submit the same draft once", async () => 
     .where("c.id", "=", id)
     .executeTakeFirstOrThrow();
   assert.equal(row.event_type, "Birthday");
+  assert.equal(row.id, initial.id);
   assert.equal(row.guest_count, 90);
   assert.equal(row.submitted_at, null);
+  assert.match(review.assistantMessage?.body ?? "", /Private package marker/u);
+  assert.match(review.assistantMessage?.body ?? "", /Acoustic duo · 3 hours/u);
+  assert.doesNotMatch(review.assistantMessage?.body ?? "", /Face painting/u);
   const requestId = randomUUID();
   const request = {
     conversationId: id,
@@ -331,12 +472,22 @@ test("native tools collect, review and submit the same draft once", async () => 
   assert.equal(response.status, 201);
   const submitted = customerMessageResultSchema.parse(await response.json());
   assert.match(submitted.assistantMessage?.body ?? "", /submitted/i);
-  const saved = await db
-    .selectFrom("booking_requests")
-    .select("submitted_at")
-    .where("id", "=", row.id)
-    .executeTakeFirstOrThrow();
+  assert.match(
+    submitted.assistantMessage?.body ?? "",
+    /message AMAC staff here in this chat/u,
+  );
+
+  const savedBooking = () =>
+    db
+      .selectFrom("booking_requests")
+      .selectAll()
+      .where("id", "=", row.id)
+      .executeTakeFirstOrThrow();
+
+  const saved = await savedBooking();
   assert.ok(saved.submitted_at);
+  assert.equal(saved.package_id, packageId);
+  assert.doesNotMatch(JSON.stringify(saved.requested_services), /Face painting/u);
   const audit = await db
     .selectFrom("ai_tool_calls")
     .select(["tool_name", "status"])
@@ -358,6 +509,34 @@ test("native tools collect, review and submit the same draft once", async () => 
   const replayed = customerMessageResultSchema.parse(await replay.json());
   assert.equal(replayed.assistantMessage?.id, submitted.assistantMessage?.id);
   assert.equal(model.doGenerateCalls.length, modelCalls);
+
+  const change =
+    "Please choose a different package and remove the acoustic duo.";
+  useToolCalls([
+    {
+      toolName: "requestHumanHandoff",
+      input: { reason: "needs_admin_review", summary: change },
+    },
+  ]);
+  const handoff = await send(id, change);
+  assert.equal(handoff.assistantError, null);
+  assert.equal(handoff.assistantMessage?.body, humanHandoffAcknowledgement);
+
+  const tools = model.doGenerateCalls[0].tools?.map(({ name }) => name) ?? [];
+
+  assert.ok(tools.includes("requestHumanHandoff"));
+  assert.ok(!tools.includes("updateBookingDraft"));
+  const staffThread = threadSchema.parse(
+    await (await call(`/admin/conversations/${id}`, team.cookie)).json(),
+  );
+  assert.equal(staffThread.conversation.bookingRequestId, row.id);
+  assert.equal(staffThread.conversation.aiEnabled, false);
+  assert.deepEqual(staffThread.conversation.aiHandoff, {
+    reason: "needs_admin_review",
+    summary: change,
+    pending: true,
+  });
+  assert.deepEqual(await savedBooking(), saved);
 });
 
 test("confirmation retries after provider failure once and replays its receipt after takeover", async () => {
@@ -1488,7 +1667,7 @@ async function updateBookingFactStatus(
 async function assertReadToolAudit(
   result: Awaited<ReturnType<typeof send>>,
   toolName:
-    "getMySentQuotation" | "getMyRequestHistory" | "getBusinessInformation",
+    "getLatestQuotation" | "getBookingDetails" | "getBusinessInformation",
   expectedOutput: Record<string, unknown>,
 ) {
   assert.equal(result.assistantError, null);
@@ -1539,7 +1718,7 @@ async function latestBookingStatusTimestamp(bookingId: string) {
 }
 
 function modelToolOutput(
-  toolName: "getMySentQuotation" | "getMyRequestHistory" | "updateBookingDraft",
+  toolName: "getLatestQuotation" | "getBookingDetails" | "updateBookingDraft",
 ) {
   const answerStep = model.doGenerateCalls[1];
 
@@ -1560,7 +1739,7 @@ function modelToolOutput(
 
 test("sending a quotation while AI is generating lets the reply finish", async () => {
   const { id, bookingId } = await bookingFactsConversation();
-  useToolCalls([{ toolName: "getMySentQuotation", input: {} }], async () => {
+  useToolCalls([{ toolName: "getLatestQuotation", input: {} }], async () => {
     await deliverBookingFactQuotation(bookingId, "Transport", 27500);
   });
 
@@ -1580,7 +1759,7 @@ test("sending a quotation while AI is generating lets the reply finish", async (
 
 test("quotation follow-up gets the latest delivered version only and audits the read", async () => {
   const { id, bookingId } = await bookingFactsConversation();
-  const toolName = "getMySentQuotation";
+  const toolName = "getLatestQuotation";
   const first = await deliverBookingFactQuotation(
     bookingId,
     "Old transport fee",
@@ -1645,24 +1824,96 @@ test("quotation follow-up gets the latest delivered version only and audits the 
 
 test("status follow-up gets only the latest change and audits it without the reason", async () => {
   const { id, bookingId } = await bookingFactsConversation();
-  const toolName = "getMyRequestHistory";
+  const toolName = "getBookingDetails";
   const reason = "Please send your reception start time.";
   await updateBookingFactStatus(bookingId, "needs_details", reason);
   useToolCalls([{ toolName, input: {} }]);
   const original = await send(id, "Why does it say Needs details?");
   const firstChange = await latestBookingStatusTimestamp(bookingId);
-  assert.deepEqual(modelToolOutput(toolName), {
-    status: "found",
-    requestedServices: [],
-    latestChange: { status: "needs_details", reason, createdAt: firstChange },
+  const firstOutput = modelToolOutput(toolName) as {
+    status: string;
+    bookingRequest: {
+      status: string;
+      eventType: string;
+      guestCount: number;
+      timeZone: string;
+      requestedDays: unknown[];
+      selectedCatalogPackage: unknown;
+      requestedServices: unknown[];
+    };
+    latestChange: unknown;
+  };
+  assert.equal(firstOutput.status, "found");
+  assert.equal(firstOutput.bookingRequest.status, "needs_details");
+  assert.equal(firstOutput.bookingRequest.eventType, "Wedding");
+  assert.equal(firstOutput.bookingRequest.guestCount, 75);
+  assert.equal(firstOutput.bookingRequest.timeZone, "Asia/Tokyo");
+  assert.deepEqual(firstOutput.bookingRequest.requestedDays, [
+    {
+      date: "2099-01-01",
+      startsAt: null,
+      endsAt: null,
+      operationalSchedule: null,
+    },
+    {
+      date: "2099-01-03",
+      startsAt: null,
+      endsAt: null,
+      operationalSchedule: null,
+    },
+  ]);
+  assert.deepEqual(firstOutput.bookingRequest.selectedCatalogPackage, {
+    name: "Private package marker",
+    maxGuests: 100,
+    pricePesos: 1000,
+  });
+  assert.deepEqual(firstOutput.bookingRequest.requestedServices, []);
+  assert.deepEqual(firstOutput.latestChange, {
+    status: "needs_details",
+    reason,
+    createdAt: firstChange,
   });
   await assertReadToolAudit(original, toolName, {
     status: "found",
     requestStatus: "needs_details",
+    latestChangeStatus: "needs_details",
     changedAt: firstChange,
   });
 
   const latestReason = "The venue layout was reviewed.";
+  await db
+    .updateTable("booking_requests")
+    .set({
+      guest_count: 92,
+      preferred_venue_location: "Updated garden",
+      requested_services: JSON.stringify([
+        {
+          name: "Lighting",
+          id: randomUUID(),
+          serviceId: randomUUID(),
+          hours: null,
+          notes: null,
+          included: false,
+          updatedAt: null,
+          offer: {
+            totalHours: 4,
+            fixedPricePesos: 2200,
+            includedHours: 3,
+            hourlyRatePesos: 500,
+          },
+        },
+        {
+          name: "Host",
+          serviceId: null,
+          hours: null,
+          notes: null,
+          included: false,
+          updatedAt: null,
+        },
+      ]),
+    })
+    .where("id", "=", bookingId)
+    .execute();
   useToolCalls([{ toolName, input: {} }]);
   const generate = model.doGenerate.bind(model);
   model.doGenerate = async (options) => {
@@ -1677,18 +1928,52 @@ test("status follow-up gets only the latest change and audits it without the rea
     /"status":"needs_details"/,
   );
   const latestChange = await latestBookingStatusTimestamp(bookingId);
-  assert.deepEqual(modelToolOutput(toolName), {
-    status: "found",
-    requestedServices: [],
-    latestChange: {
-      status: "accepted",
-      reason: latestReason,
-      createdAt: latestChange,
+  const updatedOutput = modelToolOutput(toolName) as {
+    status: string;
+    bookingRequest: {
+      status: string;
+      guestCount: number;
+      preferredVenueLocation: string;
+      requestedServices: unknown[];
+    };
+    latestChange: unknown;
+  };
+  assert.equal(updatedOutput.status, "found");
+  assert.equal(updatedOutput.bookingRequest.status, "accepted");
+  assert.equal(updatedOutput.bookingRequest.guestCount, 92);
+  assert.equal(
+    updatedOutput.bookingRequest.preferredVenueLocation,
+    "Updated garden",
+  );
+  assert.deepEqual(updatedOutput.bookingRequest.requestedServices, [
+    {
+      name: "Lighting",
+      hours: null,
+      notes: null,
+      included: false,
+      offer: {
+        totalHours: 4,
+        fixedPricePesos: 2200,
+        includedHours: 3,
+        hourlyRatePesos: 500,
+        amountPesos: 2700,
+      },
     },
+    { name: "Host", hours: null, notes: null, included: false },
+  ]);
+  assert.doesNotMatch(
+    JSON.stringify(updatedOutput),
+    /private-phone-marker|Private contact marker|customerId|bookingRequestId/,
+  );
+  assert.deepEqual(updatedOutput.latestChange, {
+    status: "accepted",
+    reason: latestReason,
+    createdAt: latestChange,
   });
   await assertReadToolAudit(updated, toolName, {
     status: "found",
     requestStatus: "accepted",
+    latestChangeStatus: "accepted",
     changedAt: latestChange,
   });
 });
@@ -1697,13 +1982,13 @@ test("booking reads distinguish unlinked, unsent, and missing status history", a
   const unlinked = await conversation();
   const linked = await bookingFactsConversation();
   const calls = [
-    { toolName: "getMySentQuotation", input: {} },
-    { toolName: "getMyRequestHistory", input: {} },
+    { toolName: "getLatestQuotation", input: {} },
+    { toolName: "getBookingDetails", input: {} },
   ] as const;
 
   for (const { id, statuses } of [
     { id: unlinked, statuses: ["no_linked_request", "no_linked_request"] },
-    { id: linked.id, statuses: ["no_sent_quotation", "no_status_history"] },
+    { id: linked.id, statuses: ["no_sent_quotation", "found"] },
   ]) {
     useToolCalls([...calls]);
     const result = await send(
@@ -1713,13 +1998,30 @@ test("booking reads distinguish unlinked, unsent, and missing status history", a
 
     for (const [index, { toolName }] of calls.entries()) {
       const expected = { status: statuses[index] };
-      assert.deepEqual(
-        modelToolOutput(toolName),
-        expected.status === "no_status_history"
-          ? { ...expected, requestedServices: [] }
+      const output = modelToolOutput(toolName) as {
+        status: string;
+        bookingRequest?: { requestedServices: unknown[] };
+        latestChange?: unknown;
+      };
+      assert.equal(output.status, expected.status);
+
+      if (toolName === "getBookingDetails" && expected.status === "found") {
+        assert.deepEqual(output.bookingRequest?.requestedServices, []);
+        assert.equal(output.latestChange, null);
+      } else assert.deepEqual(output, expected);
+
+      await assertReadToolAudit(
+        result,
+        toolName,
+        toolName === "getBookingDetails" && expected.status === "found"
+          ? {
+              status: "found",
+              requestStatus: "under_review",
+              latestChangeStatus: null,
+              changedAt: null,
+            }
           : expected,
       );
-      await assertReadToolAudit(result, toolName, expected);
     }
   }
 });
@@ -1746,7 +2048,7 @@ test(
       );
       const firstReply = await assertReadToolAudit(
         await send(id, "What is the total on the quotation AMAC sent me?"),
-        "getMySentQuotation",
+        "getLatestQuotation",
         { status: "found", version: first.version, sentAt: first.sentAt },
       );
       assert.match(firstReply, /(?<![\d,])1,?275(?!\d|,\d|\.\d*[1-9])/);
@@ -1762,7 +2064,7 @@ test(
           id,
           "And what's the total now, and what is the extra charge for?",
         ),
-        "getMySentQuotation",
+        "getLatestQuotation",
         { status: "found", version: latest.version, sentAt: latest.sentAt },
       );
       const revisedTotal = /(?<![\d,])1,?875\.42(?!\d)/;
@@ -1787,6 +2089,78 @@ test(
           assert.match(paragraph, historical);
       }
 
+      await db
+        .updateTable("booking_requests")
+        .set({
+          requested_services: JSON.stringify([
+            {
+              name: "Lighting",
+              id: randomUUID(),
+              serviceId: randomUUID(),
+              hours: null,
+              notes: null,
+              included: false,
+              updatedAt: null,
+              offer: {
+                totalHours: 4,
+                fixedPricePesos: 2200,
+                includedHours: 3,
+                hourlyRatePesos: 500,
+              },
+            },
+            {
+              name: "Host",
+              serviceId: null,
+              hours: null,
+              notes: null,
+              included: false,
+              updatedAt: null,
+            },
+          ]),
+        })
+        .where("id", "=", bookingId)
+        .execute();
+      const detailsReply = await assertReadToolAudit(
+        await send(
+          id,
+          "What are the saved Lighting and Host add-ons on my booking? Is there a price for Host yet?",
+        ),
+        "getBookingDetails",
+        {
+          status: "found",
+          requestStatus: "under_review",
+          latestChangeStatus: null,
+          changedAt: null,
+        },
+      );
+      assert.match(detailsReply, /host/i);
+      assert.match(
+        detailsReply,
+        /(?:host[\s\S]{0,150}(?:no|not|without|unpriced|pending|yet)|(?:no|not|without|unpriced|pending)[\s\S]{0,100}host)/i,
+      );
+      const addonTotal = await assertReadToolAudit(
+        await send(id, "And what's the Lighting total?"),
+        "getBookingDetails",
+        {
+          status: "found",
+          requestStatus: "under_review",
+          latestChangeStatus: null,
+          changedAt: null,
+        },
+      );
+      assert.match(addonTotal, /2,?700/);
+      assert.doesNotMatch(addonTotal, /1,?875\.42/);
+
+      const quoteReply = await assertReadToolAudit(
+        await send(
+          id,
+          "Separately, what total was on my latest sent quotation?",
+        ),
+        "getLatestQuotation",
+        { status: "found", version: latest.version, sentAt: latest.sentAt },
+      );
+      assert.match(quoteReply, /1,?875\.42/);
+
       await updateBookingFactStatus(
         bookingId,
         "needs_details",
@@ -1794,10 +2168,11 @@ test(
       );
       const statusReply = await assertReadToolAudit(
         await send(id, "It says Needs details. What does AMAC need from me?"),
-        "getMyRequestHistory",
+        "getBookingDetails",
         {
           status: "found",
           requestStatus: "needs_details",
+          latestChangeStatus: "needs_details",
           changedAt: await latestBookingStatusTimestamp(bookingId),
         },
       );
@@ -1810,10 +2185,11 @@ test(
       );
       const updatedReply = await assertReadToolAudit(
         await send(id, "I see it changed again. What was the latest reason?"),
-        "getMyRequestHistory",
+        "getBookingDetails",
         {
           status: "found",
           requestStatus: "accepted",
+          latestChangeStatus: "accepted",
           changedAt: await latestBookingStatusTimestamp(bookingId),
         },
       );
@@ -2542,7 +2918,7 @@ test("catalog and proposal tools share the existing six-operation turn budget", 
   useToolCalls(
     Array.from({ length: 7 }, (_, index) =>
       index % 3 === 2
-        ? { toolName: "getMyProposal", input: {} }
+        ? { toolName: "getMyPackage", input: {} }
         : index % 3 === 1
           ? {
               toolName: "getPublicCatalogItem",
@@ -2765,8 +3141,8 @@ test("private booking reads reject model-supplied scope before execution", async
   const { id } = await bookingFactsConversation();
   const foreignBooking = await booking(other.id, `FOREIGN-${randomUUID()}`);
   useToolCalls([
-    { toolName: "getMySentQuotation", input: { bookingId: foreignBooking } },
-    { toolName: "getMyRequestHistory", input: { customerId: other.id } },
+    { toolName: "getLatestQuotation", input: { bookingId: foreignBooking } },
+    { toolName: "getBookingDetails", input: { customerId: other.id } },
   ]);
   const result = await send(id, "Read the quotation and latest status change");
   const calls = await db
@@ -3037,9 +3413,9 @@ test("customer proposal tool returns scoped JSON and records only bounded audit 
     })
     .execute();
   useToolCalls([
-    { toolName: "getMyProposal", input: {} },
-    { toolName: "getMyProposal", input: {} },
-    { toolName: "getMyProposal", input: {} },
+    { toolName: "getMyPackage", input: {} },
+    { toolName: "getMyPackage", input: {} },
+    { toolName: "getMyPackage", input: {} },
   ]);
   const result = await send(id, "What is my proposal?");
   assert.equal(result.assistantError, null);
@@ -3050,14 +3426,14 @@ test("customer proposal tool returns scoped JSON and records only bounded audit 
       item.role === "tool" &&
       item.content.some(
         (part) =>
-          part.type === "tool-result" && part.toolName === "getMyProposal",
+          part.type === "tool-result" && part.toolName === "getMyPackage",
       ),
   );
 
   assert.ok(message?.role === "tool");
 
   const part = message.content.find(
-    (item) => item.type === "tool-result" && item.toolName === "getMyProposal",
+    (item) => item.type === "tool-result" && item.toolName === "getMyPackage",
   );
 
   assert.ok(part && part.type === "tool-result");
@@ -3080,7 +3456,7 @@ test("customer proposal tool returns scoped JSON and records only bounded audit 
   const records = await db
     .selectFrom("ai_tool_calls")
     .selectAll()
-    .where("tool_name", "=", "getMyProposal")
+    .where("tool_name", "=", "getMyPackage")
     .where("customer_message_id", "=", result.message.id)
     .execute();
   assert.equal(records.length, 3);
@@ -3095,7 +3471,7 @@ test("customer proposal tool returns scoped JSON and records only bounded audit 
   );
 
   for (const record of records) {
-    assert.equal(record.tool_name, "getMyProposal");
+    assert.equal(record.tool_name, "getMyPackage");
     assert.equal(record.assistant_message_id, result.assistantMessage.id);
     assert.doesNotMatch(JSON.stringify(record.output), new RegExp(marker));
 
@@ -3148,7 +3524,7 @@ test("a near-budget proposal remains available when conversation memory is prese
       canvas: sql`${JSON.stringify(sections)}::jsonb`,
     })
     .execute();
-  const proposal = await getMyProposalService({
+  const proposal = await getMyPackageService({
     db,
     customerId: customer.id,
     conversationId: id,
@@ -3187,7 +3563,7 @@ test("a near-budget proposal remains available when conversation memory is prese
     "UPDATE conversations SET conversation_memory = $1 WHERE id = $2",
     [note, id],
   );
-  useToolCalls([{ toolName: "getMyProposal", input: {} }]);
+  useToolCalls([{ toolName: "getMyPackage", input: {} }]);
   const result = await send(id, "q".repeat(bodyLength));
   assert.ok(result.assistantMessage);
   const context = turnContext(0).context;
@@ -3199,14 +3575,14 @@ test("a near-budget proposal remains available when conversation memory is prese
       message.role === "tool" &&
       message.content.some(
         (part) =>
-          part.type === "tool-result" && part.toolName === "getMyProposal",
+          part.type === "tool-result" && part.toolName === "getMyPackage",
       ),
   );
 
   assert.ok(toolMessage?.role === "tool");
 
   const part = toolMessage.content.find(
-    (item) => item.type === "tool-result" && item.toolName === "getMyProposal",
+    (item) => item.type === "tool-result" && item.toolName === "getMyPackage",
   );
 
   assert.ok(part && part.type === "tool-result" && part.output.type === "json");
@@ -3215,7 +3591,7 @@ test("a near-budget proposal remains available when conversation memory is prese
     .selectFrom("ai_tool_calls")
     .select(["status", "error_code"])
     .where("customer_message_id", "=", result.message.id)
-    .where("tool_name", "=", "getMyProposal")
+    .where("tool_name", "=", "getMyPackage")
     .executeTakeFirstOrThrow();
   assert.equal(audit.status, "succeeded");
   assert.equal(audit.error_code, null);
@@ -3233,7 +3609,7 @@ test("proposal tool input cannot redirect to another conversation", async () => 
   ).id;
   useToolCalls([
     {
-      toolName: "getMyProposal",
+      toolName: "getMyPackage",
       input: { conversationId: otherId, customerId: other.id },
     },
   ]);
@@ -3253,7 +3629,7 @@ test("takeover suppresses a reply after a proposal tool result", async () => {
       .returning("id")
       .executeTakeFirstOrThrow()
   ).id;
-  useToolCalls([{ toolName: "getMyProposal", input: {} }], async () => {
+  useToolCalls([{ toolName: "getMyPackage", input: {} }], async () => {
     assert.equal((await setAi(id, false, 0)).status, 200);
   });
   const result = await send(id, "Read my proposal");
@@ -3261,7 +3637,7 @@ test("takeover suppresses a reply after a proposal tool result", async () => {
   const records = await db
     .selectFrom("ai_tool_calls")
     .selectAll()
-    .where("tool_name", "=", "getMyProposal")
+    .where("tool_name", "=", "getMyPackage")
     .where("customer_message_id", "=", result.message.id)
     .execute();
   assert.equal(records.length, 1);
@@ -3313,14 +3689,14 @@ test("proposal exceeding the turn input budget fails explicitly without returnin
       canvas: sql`${JSON.stringify(sections)}::jsonb`,
     })
     .execute();
-  useToolCalls([{ toolName: "getMyProposal", input: {} }]);
+  useToolCalls([{ toolName: "getMyPackage", input: {} }]);
   const result = await send(id, "Read my proposal");
   assert.ok(result.assistantMessage);
   assert.equal(result.assistantError, null);
   const record = await db
     .selectFrom("ai_tool_calls")
     .selectAll()
-    .where("tool_name", "=", "getMyProposal")
+    .where("tool_name", "=", "getMyPackage")
     .where("customer_message_id", "=", result.message.id)
     .executeTakeFirstOrThrow();
   assert.equal(record.status, "failed");
@@ -3358,7 +3734,7 @@ test("an implicit proposal follow-up can read current state after an earlier den
         {
           type: "tool-call",
           toolCallId: "current-proposal",
-          toolName: "getMyProposal",
+          toolName: "getMyPackage",
           input: "{}",
         },
       ],
@@ -3378,7 +3754,7 @@ test("an implicit proposal follow-up can read current state after an earlier den
     .selectFrom("ai_tool_calls")
     .select(["status", "assistant_message_id"])
     .where("customer_message_id", "=", second.message.id)
-    .where("tool_name", "=", "getMyProposal")
+    .where("tool_name", "=", "getMyPackage")
     .executeTakeFirstOrThrow();
   assert.equal(reader.status, "succeeded");
   assert.equal(reader.assistant_message_id, second.assistantMessage.id);
@@ -3574,9 +3950,9 @@ test("the assistant can answer directly without calling a tool", async () => {
     model.doGenerateCalls[0].tools?.map((entry) => entry.name).sort(),
     [
       "getBusinessInformation",
-      "getMyProposal",
-      "getMyRequestHistory",
-      "getMySentQuotation",
+      "getMyPackage",
+      "getBookingDetails",
+      "getLatestQuotation",
       "getPublicCatalogItem",
       "requestHumanHandoff",
       "searchPublicCatalog",
@@ -3963,7 +4339,7 @@ test("handoff commits its acknowledgement and audit, stops the loop and keeps ad
   useToolCalls(
     [
       { toolName: "requestHumanHandoff", input: handoffInput },
-      { toolName: "getMyProposal", input: {} },
+      { toolName: "getMyPackage", input: {} },
     ],
     async () => {
       throw new Error("No generation is allowed after the committed handoff");

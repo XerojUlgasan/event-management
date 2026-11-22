@@ -132,17 +132,24 @@ export const bookingReviewPresets = {
 export const bookingReceiptModelCopySchema = z.object({
   style: bookingChatStyleSchema.optional(),
   receipt: z.string().nullable().optional(),
+  changesGuidance: z.string().nullable().optional(),
 });
 
 export type BookingReceiptCopy = z.infer<typeof bookingReceiptModelCopySchema>;
 
 export const bookingReceiptTemplateSchema = template("[[reference]]");
 
+export const englishBookingReceiptTemplate =
+  "Booking request [[reference]] submitted for AMAC review. Your requested dates are preferences.";
+
+export const englishBookingChangesGuidance =
+  "For package or add-on changes, message AMAC staff here in this chat.";
+
 const receiptPresets = {
-  en: "Booking request [[reference]] submitted for AMAC review. Your requested dates are preferences.",
+  en: `${englishBookingReceiptTemplate} ${englishBookingChangesGuidance}`,
   taglish:
-    "Na-send na sa AMAC team ang booking request [[reference]] para ma-review. Preferred dates pa lang yung nilagay mo.",
-  fil: "Naipadala na sa AMAC ang request [[reference]] para matingnan ng team. Mga gusto mong petsa pa lang ang nakalagay.",
+    "Na-send na sa AMAC team ang booking request [[reference]] para ma-review. Preferred dates pa lang yung nilagay mo. Para sa changes sa package o add-ons, i-message ang AMAC staff dito sa chat na ito.",
+  fil: "Naipadala na sa AMAC ang request [[reference]] para matingnan ng team. Mga gusto mong petsa pa lang ang nakalagay. Para sa pagbabago sa package o add-ons, mag-message sa AMAC staff dito sa chat na ito.",
 };
 
 function quoteBookingChatText(value: string | number) {
@@ -156,9 +163,12 @@ export function bookingRequestReceipt(
   copy?: BookingReceiptCopy,
 ) {
   const style = copy?.style ?? "other";
+  const changesGuidance = copy?.changesGuidance
+    ? copyText.safeParse(copy.changesGuidance).data
+    : undefined;
   const receipt =
     style === "other"
-      ? bookingReceiptTemplateSchema.parse(copy?.receipt)
+      ? `${bookingReceiptTemplateSchema.parse(copy?.receipt)} ${changesGuidance ?? englishBookingChangesGuidance}`
       : receiptPresets[style];
 
   return quoteBookingChatText(receipt).replace(
@@ -166,8 +176,6 @@ export function bookingRequestReceipt(
     () => reference,
   );
 }
-
-export const englishBookingReceiptTemplate = receiptPresets.en;
 
 type ReviewedDetails = Pick<
   Awaited<ReturnType<typeof resolveBookingDraft>>,

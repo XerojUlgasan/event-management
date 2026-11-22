@@ -19,7 +19,11 @@ export type AssistantToolContext = {
   memoryScope?: ConversationMemoryScope & { expectedMemory: string | null };
   draftScope?: BookingDraftScope;
   carryForwardBudget?: string;
-  onDraftChanged?: (selection: boolean, complete: boolean) => void;
+  onDraftChanged?: (update: {
+    selection: boolean;
+    complete: boolean;
+    waitForServiceChoice: boolean;
+  }) => void;
   onHandoffCommitted?: (message: MessageWithSender) => void;
   isHandoffCommitted?: () => boolean;
 };

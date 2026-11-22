@@ -5,10 +5,10 @@ import { customerServicePrompt } from "../prompts/customer-service-prompt.js";
 import { createSearchPublicCatalogTool } from "../tools/search-public-catalog.js";
 import { createGetBusinessInformationTool } from "../tools/get-business-information.js";
 import { createGetPublicCatalogItemTool } from "../tools/get-public-catalog-item.js";
-import { createGetMyProposalTool } from "../tools/get-my-proposal.js";
+import { createGetMyPackageTool } from "../tools/get-my-package.js";
 import {
-  createGetMyRequestHistoryTool,
-  createGetMySentQuotationTool,
+  createGetBookingDetailsTool,
+  createGetLatestQuotationTool,
 } from "../tools/get-my-booking-facts.js";
 import { createUpdateConversationMemoryTool } from "../tools/update-conversation-memory.js";
 import type { AssistantToolContext } from "../tools/assistant-tool-context.js";
@@ -63,15 +63,15 @@ export function createCustomerServiceAgent(options: AssistantToolContext) {
         : {}),
       ...(options.customerScope
         ? {
-            getMyProposal: createGetMyProposalTool({
+            getMyPackage: createGetMyPackageTool({
               ...toolContext,
               proposalScope: options.customerScope,
             }),
-            getMySentQuotation: createGetMySentQuotationTool({
+            getLatestQuotation: createGetLatestQuotationTool({
               ...toolContext,
               customerScope: options.customerScope,
             }),
-            getMyRequestHistory: createGetMyRequestHistoryTool({
+            getBookingDetails: createGetBookingDetailsTool({
               ...toolContext,
               customerScope: options.customerScope,
             }),

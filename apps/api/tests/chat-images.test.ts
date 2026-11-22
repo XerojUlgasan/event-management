@@ -1017,7 +1017,7 @@ test("guest images reserve one allowance and claim revokes reads/retries while p
     404,
   );
   assert.equal(
-    JSON.stringify(textCalls.at(-1).tools).includes("getMyProposal"),
+    JSON.stringify(textCalls.at(-1).tools).includes("getMyPackage"),
     false,
   );
 });

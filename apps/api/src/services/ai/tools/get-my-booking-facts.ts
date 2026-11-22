@@ -4,10 +4,10 @@ import { startToolCallData } from "../../../data/ai/start-tool-call.js";
 import {
   BookingFactAccessDenied,
   getMyBookingFactInputSchema,
-  getMyRequestHistoryService,
-  getMySentQuotationService,
-  type MyRequestHistoryResult,
-  type MySentQuotationResult,
+  getBookingDetailsService,
+  getLatestQuotationService,
+  type BookingDetailsResult,
+  type LatestQuotationResult,
 } from "../get-my-booking-facts.js";
 import type { AssistantToolContext } from "./assistant-tool-context.js";
 
@@ -16,9 +16,9 @@ type BookingFactToolContext = AssistantToolContext & {
   consumeResultCharacters: (characters: number) => boolean;
 };
 
-type ToolName = "getMySentQuotation" | "getMyRequestHistory";
+type ToolName = "getLatestQuotation" | "getBookingDetails";
 
-type BookingFactResult = MySentQuotationResult | MyRequestHistoryResult;
+type BookingFactResult = LatestQuotationResult | BookingDetailsResult;
 
 function createGetMyBookingFactTool({
   db,
@@ -125,13 +125,13 @@ function createGetMyBookingFactTool({
   });
 }
 
-export function createGetMySentQuotationTool(context: BookingFactToolContext) {
+export function createGetLatestQuotationTool(context: BookingFactToolContext) {
   return createGetMyBookingFactTool({
     ...context,
-    toolName: "getMySentQuotation",
+    toolName: "getLatestQuotation",
     description:
       "Read the latest delivered quotation for the current conversation's booking request. Takes no arguments; the server supplies customer and conversation scope. Returns only the latest delivered offer with its saved line descriptions and amounts in pesos; do not rescale them. Drafts and revision history are not returned. no_linked_request and no_sent_quotation are explicit normal outcomes. The result is current evidence, not a booking confirmation or payment record.",
-    read: getMySentQuotationService,
+    read: getLatestQuotationService,
     audit: (result) =>
       result.status === "found" && "quotation" in result
         ? {
@@ -143,19 +143,20 @@ export function createGetMySentQuotationTool(context: BookingFactToolContext) {
   });
 }
 
-export function createGetMyRequestHistoryTool(context: BookingFactToolContext) {
+export function createGetBookingDetailsTool(context: BookingFactToolContext) {
   return createGetMyBookingFactTool({
     ...context,
-    toolName: "getMyRequestHistory",
+    toolName: "getBookingDetails",
     description:
-      "Read the latest customer-visible status change for the current conversation's booking request. Takes no arguments; the server supplies customer and conversation scope. Returns requested services and their saved offers, plus the latest status, optional reason, and time when present. A requested service without an offer is only a request; offers are not sent quotations. no_linked_request and no_status_history are explicit normal outcomes. The result is current evidence, not a booking confirmation or operational schedule.",
-    read: getMyRequestHistoryService,
+      "Read the submitted booking details and latest customer-visible status change for the current conversation. Takes no arguments; the server supplies customer and conversation scope. Returns the current request, original selectedCatalogPackage (if any), requested services and saved offers, and the latest change or null if none was recorded. The selected catalog package is not necessarily the current private package; use getMyPackage for that. A requested service without an offer is only a request; offers are not sent quotations. no_linked_request is a normal outcome. Requested days are preferences; operationalSchedule, when present, is the separate team schedule. Neither constitutes a booking confirmation.",
+    read: getBookingDetailsService,
     audit: (result) =>
       result.status === "found" && "latestChange" in result
         ? {
             status: "found",
-            requestStatus: result.latestChange.status,
-            changedAt: result.latestChange.createdAt,
+            requestStatus: result.bookingRequest.status,
+            latestChangeStatus: result.latestChange?.status ?? null,
+            changedAt: result.latestChange?.createdAt ?? null,
           }
         : { status: result.status },
   });

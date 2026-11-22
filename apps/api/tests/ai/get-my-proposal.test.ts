@@ -7,9 +7,9 @@ import { Kysely, PostgresDialect, sql } from "kysely";
 import { Pool } from "pg";
 import type { DB } from "../../src/db/types.js";
 import {
-  getMyProposalInputSchema,
-  getMyProposalService,
-} from "../../src/services/ai/get-my-proposal.js";
+  getMyPackageInputSchema,
+  getMyPackageService,
+} from "../../src/services/ai/get-my-package.js";
 import { readCatalogSectionsService } from "../../src/services/catalog-canvas/read-catalog-sections.js";
 
 const database = `em_proposal_${randomUUID().replaceAll("-", "")}`;
@@ -126,7 +126,7 @@ test("proposal is scoped to the authenticated conversation and reads current pri
     .executeTakeFirstOrThrow();
   const bookingId = await booking(customerId, catalog.id);
   const conversationId = await conversation(customerId, bookingId);
-  const original = await getMyProposalService({
+  const original = await getMyPackageService({
     db,
     customerId,
     conversationId,
@@ -194,13 +194,29 @@ test("proposal is scoped to the authenticated conversation and reads current pri
     })
     .returning("id")
     .executeTakeFirstOrThrow();
-  const result = await getMyProposalService({ db, customerId, conversationId });
+  const result = await getMyPackageService({ db, customerId, conversationId });
   assert.equal(result.status, "found");
 
   if (result.status !== "found") throw new Error("Expected proposal");
 
   assert.equal(result.proposal.packageType, "custom");
   assert.equal(result.proposal.name, "Private proposal");
+  const { getBookingDetailsService } =
+    await import("../../src/services/ai/get-my-booking-facts.js");
+  const details = await getBookingDetailsService({
+    db,
+    customerId,
+    conversationId,
+  });
+  assert.equal(details.status, "found");
+
+  if (details.status !== "found") throw new Error("Expected booking details");
+
+  assert.deepEqual(details.bookingRequest.selectedCatalogPackage, {
+    name: "Original catalog",
+    maxGuests: 100,
+    pricePesos: 1000,
+  });
   assert.equal(result.proposal.description, "Prepared details");
   assert.equal(result.proposal.maxGuests, 80);
   assert.deepEqual(result.proposal.price, {
@@ -220,7 +236,7 @@ test("proposal is scoped to the authenticated conversation and reads current pri
   );
   assert.equal(result.proposal.sections[0].widgets[0].markdown, markdown);
   assert.deepEqual(
-    await getMyProposalService({
+    await getMyPackageService({
       db,
       customerId,
       conversationId: otherConversation,
@@ -228,7 +244,7 @@ test("proposal is scoped to the authenticated conversation and reads current pri
     { status: "no_linked_request", proposal: null },
   );
   await assert.rejects(
-    getMyProposalService({
+    getMyPackageService({
       db,
       customerId,
       conversationId: foreignConversation,
@@ -240,7 +256,7 @@ test("proposal is scoped to the authenticated conversation and reads current pri
     mismatchedBooking,
   );
   await assert.rejects(
-    getMyProposalService({
+    getMyPackageService({
       db,
       customerId,
       conversationId: mismatchedConversation,
@@ -254,7 +270,7 @@ test("proposal is scoped to the authenticated conversation and reads current pri
     })
     .where("id", "=", custom.id)
     .execute();
-  const refreshed = await getMyProposalService({
+  const refreshed = await getMyPackageService({
     db,
     customerId,
     conversationId,
@@ -276,10 +292,10 @@ test("unprepared inquiries and strict empty input are explicit", async () => {
   const bookingId = await booking(customerId, null);
   const conversationId = await conversation(customerId, bookingId);
   assert.deepEqual(
-    await getMyProposalService({ db, customerId, conversationId }),
+    await getMyPackageService({ db, customerId, conversationId }),
     { status: "proposal_not_prepared", proposal: null },
   );
-  assert.equal(getMyProposalInputSchema.safeParse({}).success, true);
+  assert.equal(getMyPackageInputSchema.safeParse({}).success, true);
 
   for (const input of [
     { conversationId },
@@ -287,12 +303,12 @@ test("unprepared inquiries and strict empty input are explicit", async () => {
     { bookingId },
     { packageId: randomUUID() },
   ])
-    assert.equal(getMyProposalInputSchema.safeParse(input).success, false);
+    assert.equal(getMyPackageInputSchema.safeParse(input).success, false);
 
   const controller = new AbortController();
   controller.abort();
   await assert.rejects(
-    getMyProposalService({
+    getMyPackageService({
       db,
       customerId,
       conversationId,
@@ -301,7 +317,7 @@ test("unprepared inquiries and strict empty input are explicit", async () => {
   );
 });
 
-test("request history returns only the owned booking's current service offers", async () => {
+test("booking details return current service offers and unpriced requests for the owner", async () => {
   const customerId = await user();
   const otherId = await user();
   const bookingId = await booking(customerId, null);
@@ -323,6 +339,51 @@ test("request history returns only the owned booking's current service offers", 
       },
     },
     {
+      id: randomUUID(),
+      serviceId: randomUUID(),
+      name: "Photographer",
+      hours: null,
+      notes: null,
+      included: false,
+      updatedAt: null,
+      offer: {
+        totalHours: 4,
+        fixedPricePesos: null,
+        includedHours: null,
+        hourlyRatePesos: 750,
+      },
+    },
+    {
+      id: randomUUID(),
+      serviceId: randomUUID(),
+      name: "Sound",
+      hours: null,
+      notes: null,
+      included: false,
+      updatedAt: null,
+      offer: {
+        totalHours: null,
+        fixedPricePesos: 1200,
+        includedHours: 2,
+        hourlyRatePesos: 300,
+      },
+    },
+    {
+      id: randomUUID(),
+      serviceId: randomUUID(),
+      name: "Large offer",
+      hours: null,
+      notes: null,
+      included: false,
+      updatedAt: null,
+      offer: {
+        totalHours: 1,
+        fixedPricePesos: 2147483647,
+        includedHours: 1,
+        hourlyRatePesos: 300,
+      },
+    },
+    {
       serviceId: null,
       name: "Host",
       hours: null,
@@ -338,16 +399,67 @@ test("request history returns only the owned booking's current service offers", 
     })
     .where("id", "=", bookingId)
     .execute();
-  const { getMyRequestHistoryService } =
+  const { getBookingDetailsService } =
     await import("../../src/services/ai/get-my-booking-facts.js");
-  assert.deepEqual(
-    await getMyRequestHistoryService({ db, customerId, conversationId }),
+  const result = await getBookingDetailsService({
+    db,
+    customerId,
+    conversationId,
+  });
+  assert.equal(result.status, "found");
+
+  if (result.status !== "found") throw new Error("Expected booking details");
+
+  assert.equal(result.latestChange, null);
+  assert.deepEqual(result.bookingRequest.requestedServices, [
     {
-      status: "no_status_history",
-      requestedServices,
+      name: "Lighting",
+      hours: null,
+      notes: null,
+      included: false,
+      offer: { ...requestedServices[0].offer, amountPesos: 2500 },
     },
+    {
+      name: "Photographer",
+      hours: null,
+      notes: null,
+      included: false,
+      offer: { ...requestedServices[1].offer, amountPesos: 3000 },
+    },
+    {
+      name: "Sound",
+      hours: null,
+      notes: null,
+      included: false,
+      offer: { ...requestedServices[2].offer, amountPesos: null },
+    },
+    {
+      name: "Large offer",
+      hours: null,
+      notes: null,
+      included: false,
+      offer: { ...requestedServices[3].offer, amountPesos: null },
+    },
+    { name: "Host", hours: null, notes: null, included: false },
+  ]);
+  assert.equal(result.bookingRequest.selectedCatalogPackage, null);
+  assert.equal(result.bookingRequest.eventType, "Wedding");
+  assert.equal(result.bookingRequest.timeZone, "Asia/Manila");
+  assert.equal(result.bookingRequest.requestedDays, null);
+  assert.equal(result.bookingRequest.preferredDate, "2099-01-01");
+  assert.doesNotMatch(
+    JSON.stringify(result),
+    /contactName|phoneNumber|customerId|bookingRequestId/,
+  );
+  assert.deepEqual(
+    await getBookingDetailsService({
+      db,
+      customerId,
+      conversationId: await conversation(customerId),
+    }),
+    { status: "no_linked_request" },
   );
   await assert.rejects(
-    getMyRequestHistoryService({ db, customerId: otherId, conversationId }),
+    getBookingDetailsService({ db, customerId: otherId, conversationId }),
   );
 });

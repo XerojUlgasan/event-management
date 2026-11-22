@@ -900,7 +900,7 @@ test("explicit discard unlinks and removes the unsubmitted row, invalidating the
 });
 
 test(
-  "configured AMAC model recommends a package and submits its reviewed draft",
+  "configured AMAC model submits a reviewed draft and hands package or add-on changes to staff",
   { skip: process.env.AMAC_LIVE_TOOL_TESTS !== "1" },
   async () => {
     assert.ok(
@@ -963,11 +963,43 @@ test(
 
       const result = await send("Yes, submit", review.assistantMessage.id);
       assert.match(result.assistantMessage.body, /submitted for AMAC review/);
+      assert.match(
+        result.assistantMessage.body,
+        /message AMAC staff here in this chat/u,
+      );
       const submitted = await linkedBooking(conversation.id);
       assert.equal(submitted.id, draft.id);
       assert.ok(submitted.submitted_at);
       assert.equal(submitted.budget, draft.budget);
       assert.match(JSON.stringify(submitted.requested_services), /bilingual/i);
+
+      const facts = await send(
+        "Which package is currently selected on my request?",
+      );
+      assert.equal(facts.assistantError, null);
+      assert.match(facts.assistantMessage.body, /Celebration Garden/i);
+
+      const change = await send(
+        "Can you remove the bilingual host and switch my booking to a larger package?",
+      );
+      assert.equal(change.assistantError, null);
+      assert.match(
+        change.assistantMessage.body,
+        /passed this conversation to the AMAC team for review/u,
+      );
+      const staffThread = await read(
+        await call(`/admin/conversations/${conversation.id}`, admin),
+        200,
+      );
+      assert.equal(
+        staffThread.conversation.aiHandoff.reason,
+        "needs_admin_review",
+      );
+      assert.equal(staffThread.conversation.aiHandoff.pending, true);
+      assert.match(staffThread.conversation.aiHandoff.summary, /bilingual/i);
+      assert.match(staffThread.conversation.aiHandoff.summary, /package/i);
+      assert.equal(staffThread.conversation.bookingRequestId, submitted.id);
+      assert.deepEqual(await linkedBooking(conversation.id), submitted);
     } finally {
       delete process.env.AI_GATEWAY_API_KEY;
     }

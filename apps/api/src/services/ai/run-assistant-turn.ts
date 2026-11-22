@@ -455,6 +455,7 @@ export async function runAssistantTurnService({
   let draftChanged = false;
   let selectionChanged = false;
   let reviewReady = false;
+  let waitingForServiceChoice = false;
   const carryForwardBudget = draft
     ? undefined
     : previousPackageBudget(previousCatalogSearch, history);
@@ -470,10 +471,11 @@ export async function runAssistantTurnService({
           carryForwardBudget,
         }
       : {}),
-    onDraftChanged: (selection, complete) => {
+    onDraftChanged: ({ selection, complete, waitForServiceChoice }) => {
       draftChanged = true;
-      selectionChanged ||= Boolean(selection);
+      selectionChanged ||= selection;
       reviewReady = complete;
+      waitingForServiceChoice ||= waitForServiceChoice;
     },
     ...(memory && memoryFits
       ? {
@@ -590,6 +592,7 @@ export async function runAssistantTurnService({
   if (
     draftChanged &&
     reviewReady &&
+    !waitingForServiceChoice &&
     (!researchingCatalog || selectionChanged)
   ) {
     const copy = await localizeBookingReview(history, signal);

@@ -203,6 +203,14 @@ test("a booking review keeps customer language and renders verified details", as
 });
 
 test("a localized receipt contains the server reference", () => {
+  for (const style of ["en", "taglish", "fil"] as const) {
+    const receipt = bookingRequestReceipt("BR-ABC", { style });
+    assert.match(receipt, /AMAC/u);
+    assert.match(receipt, /package/u);
+    assert.match(receipt, /chat/u);
+    assert.match(receipt, /add\\-on/u);
+  }
+
   assert.match(
     bookingRequestReceipt("BR-ABC", { style: "taglish" }),
     /AMAC team ang booking request BR-ABC para ma\\-review/u,
@@ -212,6 +220,30 @@ test("a localized receipt contains the server reference", () => {
       receipt: "Tu solicitud [[reference]] se envió a AMAC para su revisión.",
     }),
     /solicitud BR-ABC se envió a AMAC/u,
+  );
+  assert.match(
+    bookingRequestReceipt("BR-ABC", {
+      style: "other",
+      receipt: "Tu solicitud [[reference]] se envió a AMAC para su revisión.",
+      changesGuidance:
+        "Para cambiar el paquete o los extras, escribe al equipo AMAC aquí en este chat.",
+    }),
+    /Para cambiar el paquete o los extras, escribe al equipo AMAC aquí en este chat/u,
+  );
+  assert.match(
+    bookingRequestReceipt("BR-ABC", {
+      style: "other",
+      receipt: "Tu solicitud [[reference]] se envió a AMAC para su revisión.",
+    }),
+    /message AMAC staff here in this chat/u,
+  );
+  assert.match(
+    bookingRequestReceipt("BR-ABC", {
+      style: "other",
+      receipt: "Tu solicitud [[reference]] se envió a AMAC para su revisión.",
+      changesGuidance: "¿Cambiar el paquete?",
+    }),
+    /message AMAC staff here in this chat/u,
   );
   assert.throws(() =>
     bookingRequestReceipt("BR-ABC", {

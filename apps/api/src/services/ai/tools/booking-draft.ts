@@ -61,6 +61,12 @@ export function createBookingDraftTools(options: DraftOptions) {
         "Set discard to true only when the customer clearly asks to discard their unsent draft; do not combine it with other fields. Save customer-stated booking details or explicit corrections as a private inquiry draft. When the customer seeks recommendations for their own event, save the event facts and stated budget before or alongside the catalog search, without waiting for a package choice. Preserve budget as stated, even when its scope is unclear; ask before applying a package price filter. Reconcile earlier customer-stated event facts if missing from the draft. Generic catalog questions without event-planning intent do not start a draft. Only include facts the customer supplied or confirmed. Omitted fields stay unchanged; null clears a scalar. Put each explicitly requested extra service in upsertServices, including unlisted services as {customName: customer's wording, hours: requested hours if stated}. For example, a bilingual host is upsertServices: [{customName: 'bilingual host'}], not just specialRequests. Use serviceId only for a selected catalog service. Use specialRequests for other logistics and requirements. Upsert or remove specific requested services without replacing others. A suggested package or service is not selected until the customer chooses it. Never invent IDs, prices, dates, or customer details. This does not submit a request.",
       inputSchema: bookingDraftPatchSchema.extend({
         discard: z.boolean().optional(),
+        waitForServiceChoice: z
+          .boolean()
+          .optional()
+          .describe(
+            "Set true when saving other booking details while you still need to ask which extra service the customer wants. The server will wait to show a review. Never save the question itself as specialRequests.",
+          ),
       }),
       execute: async (patch, { toolCallId, abortSignal }) => {
         const carryBudget =
@@ -78,9 +84,9 @@ export function createBookingDraftTools(options: DraftOptions) {
           if (options.canExecute && !options.canExecute())
             throw new Error("Call limit");
 
-          const { discard, ...fields } = patch;
+          const { discard, waitForServiceChoice, ...fields } = patch;
 
-          if (discard && Object.keys(fields).length)
+          if (discard && Object.keys(patch).length > 1)
             throw new Error("Discard cannot be combined with updates");
 
           if (carryBudget) fields.budget = options.carryForwardBudget;
@@ -107,11 +113,13 @@ export function createBookingDraftTools(options: DraftOptions) {
             const { missingFields, ...update } = result;
 
             if (update.invalidSelections.length === 0)
-              options.onDraftChanged?.(
-                patch.packageId != null ||
-                  Boolean(patch.upsertServices?.length),
-                missingFields.length === 0,
-              );
+              options.onDraftChanged?.({
+                selection:
+                  fields.packageId != null ||
+                  Boolean(fields.upsertServices?.length),
+                complete: missingFields.length === 0,
+                waitForServiceChoice: waitForServiceChoice === true,
+              });
 
             return { ...update, nextMissingField: missingFields[0] ?? null };
           }

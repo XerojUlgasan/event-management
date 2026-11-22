@@ -5,7 +5,7 @@ import type { DB } from "../../db/types.js";
 import { findConversationData } from "../../data/messages/find-conversation.js";
 import { getBookingPackageService } from "../booking-requests/get-booking-package.js";
 
-export const getMyProposalInputSchema = z.strictObject({});
+export const getMyPackageInputSchema = z.strictObject({});
 
 type Proposal = Pick<
   CatalogPackage,
@@ -18,7 +18,7 @@ type Proposal = Pick<
   | "sections"
 >;
 
-export type MyProposalResult =
+export type MyPackageResult =
   | { status: "found"; proposal: Proposal }
   | {
       status: "no_linked_request" | "proposal_not_prepared";
@@ -31,7 +31,7 @@ export class ProposalAccessDenied extends Error {
   }
 }
 
-export async function getMyProposalService({
+export async function getMyPackageService({
   db,
   customerId,
   conversationId,
@@ -41,7 +41,7 @@ export async function getMyProposalService({
   customerId: string;
   conversationId: string;
   abortSignal?: AbortSignal;
-}): Promise<MyProposalResult> {
+}): Promise<MyPackageResult> {
   abortSignal?.throwIfAborted();
   const conversation = await findConversationData(db, conversationId);
 
