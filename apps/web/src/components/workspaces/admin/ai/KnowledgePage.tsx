@@ -26,7 +26,7 @@ import {
   KnowledgeStatusBadge,
 } from "./KnowledgeDisplay";
 import { KnowledgeMetrics } from "./KnowledgeMetrics";
-import { KnowledgeSearch } from "./KnowledgeSearch";
+import { KnowledgeSearchDialog } from "./KnowledgeSearchDialog";
 import "../../../../styles/ai/knowledge.css";
 
 export function KnowledgePage() {
@@ -39,6 +39,7 @@ export function KnowledgePage() {
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
   const [detail, setDetail] = useState<KnowledgeListing | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [indexing, setIndexing] = useState(false);
   const [indexMessage, setIndexMessage] = useState("");
   const [indexError, setIndexError] = useState(false);
@@ -150,6 +151,18 @@ export function KnowledgePage() {
               pending={loading}
               disabled={indexing}
             />
+            <Button
+              variant="secondary"
+              size="icon"
+              icon="flask"
+              aria-label="Search knowledge"
+              aria-haspopup="dialog"
+              title="Search knowledge"
+              onClick={(event) => {
+                event.currentTarget.focus();
+                setSearchOpen(true);
+              }}
+            />
           </div>
         }
       />
@@ -161,7 +174,6 @@ export function KnowledgePage() {
           {indexMessage}
         </p>
       )}
-      <KnowledgeSearch />
       {error && (
         <div role="alert" className="knowledge-error">
           Could not load knowledge catalog.{" "}
@@ -310,6 +322,9 @@ export function KnowledgePage() {
       )}
       {detail && (
         <KnowledgeDetailDrawer item={detail} onClose={() => setDetail(null)} />
+      )}
+      {searchOpen && (
+        <KnowledgeSearchDialog onClose={() => setSearchOpen(false)} />
       )}
     </div>
   );

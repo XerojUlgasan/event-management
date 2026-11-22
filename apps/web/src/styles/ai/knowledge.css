@@ -135,26 +135,19 @@
   padding: 20px;
   min-width: 0;
 }
-.knowledge-search {
-  padding: 20px;
-  min-width: 0;
-}
-.knowledge-search h2 {
-  font-size: 18px;
-  margin: 0;
-}
-.knowledge-search p {
-  color: var(--cl-slate);
-  font-size: 13px;
-}
 .knowledge-search-form {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  margin-top: 16px;
 }
-.knowledge-search-form .search-field {
-  flex: 1 1 240px;
+.knowledge-search-form .input-group {
+  flex: 1 1 190px;
   min-width: 0;
+}
+.knowledge-search-status {
+  margin-top: 12px;
+  overflow-wrap: anywhere;
 }
 .knowledge-search-results {
   list-style: none;
