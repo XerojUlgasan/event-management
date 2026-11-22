@@ -251,10 +251,10 @@ Source: [booking package screen](../apps/web/src/components/booking-requests/Boo
 
 Only System Administrators prepare and send quotations.
 
-1. Open the booking's **Quotation** tab and prepare an offer. The editor shows the current package base price and every private package add-on.
-2. Enter whole extra hours for fixed-price add-ons or whole booked hours for hourly-only ones. Add any manual fee or discount.
-3. To add a service, add it in the private package. The quotation's Edit and Remove actions use the same private package controls. Confirmation immediately saves the package change and refreshes the numbers in the editor.
-4. Choose **Cancel** to discard the unsent quotation, or **Send** to record the exact offer and add its message to the linked conversation. A confirmed change to the package persists after cancellation.
+1. Open the booking's **Quotation** tab and prepare an offer. The editor shows the current package base price and the booking's offered add-ons.
+2. Set add-on hours on the booking, and add any manual fee or discount to the quotation.
+3. Add or change service offers on the booking request. Saved offers supply the quotation pricing.
+4. Choose **Cancel** to discard the unsent quotation, or **Send** to record the exact offer and add its message to the linked conversation. A saved booking offer persists after cancellation.
 5. The customer opens an offer through the booking details or the exact-version message and responds through chat.
 
 A package-only quotation is valid. The server requires an open request, current proposal, complete add-on pricing and hours, a nonnegative total, and a linked conversation. Quote and message creation succeed together.

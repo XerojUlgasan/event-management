@@ -8,12 +8,13 @@ Preserve historical reasoning. When a decision changes, link a successor and mar
 
 | Record | Status / purpose |
 | --- | --- |
+| [Booking-owned add-ons](2026-11-22_booking-owned-add-ons.md) | Accepted booking ownership for add-ons and historical quotation snapshots |
 | [Single-row booking drafts](2026-11-22_single-row-booking-drafts.md) | Accepted one booking row from first detail through confirmed submission |
 | [Conversational booking drafts](2026-11-21_conversational-booking-drafts.md) | Superseded storage and message review design |
 | [Markdown conversation memory](2026-11-21_conversation-memory.md) | Accepted single note on the conversation, updated during normal replies |
-| [Package-owned add-ons and direct quotation sending](2026-11-21_direct-quotation-send.md) | Accepted mandatory package add-ons and Send or Cancel for every version |
+| [Package-owned add-ons and direct quotation sending](2026-11-21_direct-quotation-send.md) | Superseded add-on ownership and accepted Send or Cancel for every version |
 | [Quotation package add-ons](2026-11-21_quotation-package-addons.md) | Superseded draft, override, and removal rules |
-| [Package service terms](2026-11-20_package-service-terms.md) | Accepted package-owned inclusion terms and custom-only JSONB add-ons; quotations deferred |
+| [Package service terms](2026-11-20_package-service-terms.md) | Accepted package-owned inclusion terms and superseded add-on storage |
 | [Derive conversation availability](2026-11-20_derive-conversation-availability.md) | Accepted removal of stored closure and guest deadlines; expiry follows saved activity and ownership |
 | [Retire quotation acceptance](2026-11-20_retire-quotation-acceptance.md) | Accepted removal of quotation acceptance state/timestamps; admin revisions and booking-request acceptance remain |
 | [Catalog indexing scheduling](2026-11-19_catalog-index-scheduling.md) | Accepted manual ensure-scheduled no-ops for active jobs; catalog saves retain refresh successors |

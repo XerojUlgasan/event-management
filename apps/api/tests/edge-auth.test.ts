@@ -37,11 +37,12 @@ test("Edge OpenAPI loads every router including auth", async () => {
   assert.equal(document.paths[`${adminBooking}/quotations`].post, undefined);
   assert.ok(document.paths[`${adminBooking}/quotations/prepare`].get);
   assert.ok(document.paths[`${adminBooking}/quotations/send`].post);
-  assert.ok(
-    document.paths[`${adminBooking}/custom-package/addons/{addonId}`].patch,
-  );
-  assert.ok(
-    document.paths[`${adminBooking}/custom-package/addons/{addonId}`].delete,
+  assert.ok(document.paths[`${adminBooking}/addons`].post);
+  assert.ok(document.paths[`${adminBooking}/addons/{addonId}`].patch);
+  assert.ok(document.paths[`${adminBooking}/addons/{addonId}`].delete);
+  assert.equal(
+    document.paths[`${adminBooking}/custom-package/addons/{addonId}`],
+    undefined,
   );
   assert.ok(document.paths["/v1/booking-requests/{id}/quotations"]);
   assert.equal(document.paths["/v1/admin/quotations/{id}/send"], undefined);
@@ -80,14 +81,15 @@ test("Edge loads nested and top-level quotation/private package routes with auth
   }
 });
 
-test("Edge protects quotation delivery and narrow package add-on changes", async () => {
+test("Edge protects quotation delivery and booking add-on changes", async () => {
   const id = randomUUID();
   const addon = randomUUID();
 
   for (const [method, path] of [
     ["POST", `/admin/booking-requests/${id}/quotations/send`],
-    ["PATCH", `/admin/booking-requests/${id}/custom-package/addons/${addon}`],
-    ["DELETE", `/admin/booking-requests/${id}/custom-package/addons/${addon}`],
+    ["POST", `/admin/booking-requests/${id}/addons`],
+    ["PATCH", `/admin/booking-requests/${id}/addons/${addon}`],
+    ["DELETE", `/admin/booking-requests/${id}/addons/${addon}`],
   ]) {
     const response = await fetch(`${api}/v1${path}`, { method });
     assert.equal(

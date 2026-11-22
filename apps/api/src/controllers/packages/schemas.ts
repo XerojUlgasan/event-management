@@ -34,7 +34,6 @@ export const contentSchema = z
     maxGuests: z.number().int().positive().max(2147483647),
     price: packagePriceSchema,
     sections: sectionsSchema,
-    addonServices: packageAddonServicesSchema.optional(),
     thumbnailMediaId: z.string().uuid().nullable().optional(),
   })
   .strict();
@@ -47,7 +46,6 @@ export const publicSchema = z.object({
   maxGuests: z.number(),
   price: priceSchema,
   sections: z.array(sectionSchema),
-  addonServices: packageAddonServicesSchema.default([]),
   id: z.string().uuid(),
   slug: z.string(),
   description: z.string(),
@@ -63,3 +61,8 @@ export const publicSchema = z.object({
 export const adminSchema = publicSchema;
 
 export const errorSchema = z.object({ error: z.string() });
+
+// Old audit records can contain package-owned add-ons; current packages cannot.
+export const packageHistorySnapshotSchema = publicSchema.extend({
+  addonServices: packageAddonServicesSchema.optional(),
+});

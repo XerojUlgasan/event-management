@@ -39,15 +39,15 @@ export type QuotationAddonItem = {
   serviceId: string;
   addon: QuotationAddonTerms & {
     source: QuotationAddonSource;
+    /** Total booked hours. Older delivered items only stored billed hours. */
+    totalHours?: number | null;
     requiresRemoval?: "included" | "archived";
   };
 };
 
 export type QuotationItem = ManualQuotationItem | QuotationAddonItem;
 
-export type QuotationItemInput =
-  | (ManualQuotationItem & { serviceId: null })
-  | { id: string; addon: { hours: number } };
+export type QuotationItemInput = ManualQuotationItem & { serviceId: null };
 
 type QuotationOfferRevision = { id: string; updatedAt: string };
 

@@ -3651,7 +3651,7 @@ test("catalog title conflicts preserve names, slugs, and unchanged-title edits",
   }
 });
 
-test("package inclusion and private add-ons round trip with local terms and guarded references", async () => {
+test("package inclusions retain local terms and legacy add-ons are absent from live packages", async () => {
   const pricing = {
     hourlyRatePesos: 500,
     fixedPricePesos: 2000,
@@ -3667,13 +3667,7 @@ test("package inclusion and private add-ons round trip with local terms and guar
 
   const included = await makeService("Included");
   const extra = await makeService("Add-on");
-  const hourly = await createServiceWithPhoto({
-    name: `Hourly add-on ${randomUUID()}`,
-    description: "Hourly only",
-    hourlyRatePesos: 700,
-    fixedPricePesos: null,
-    includedHours: null,
-  });
+  const hourly = await makeService("Offered add-on");
   const widget = {
     id: randomUUID(),
     type: "service",
@@ -3700,7 +3694,7 @@ test("package inclusion and private add-ons round trip with local terms and guar
     201,
   );
   assert.equal("serviceTerms" in legacy.sections[0].widgets[0], false);
-  assert.deepEqual(legacy.addonServices, []);
+  assert.equal("addonServices" in legacy, false);
   assert.equal(
     "serviceTerms" in
       (await read(await call(`/packages/${legacy.id}`), 200)).sections[0]
@@ -3763,37 +3757,12 @@ test("package inclusion and private add-ons round trip with local terms and guar
     hourlyRatePesos: 450,
     fixedPricePesos: 1500,
     includedHours: 5,
-    service: {
-      id: included.id,
-      name: "Forged",
-      slug: "forged",
-      description: "Forged",
-      imageUrl: null,
-    },
   };
   await read(
     await call(
       "/admin/packages",
       "POST",
-      {
-        ...content,
-        name: `Catalog add-on ${randomUUID()}`,
-        addonServices: [addon],
-      },
-      adminCookie,
-    ),
-    400,
-  );
-  await read(
-    await call(
-      `/admin/packages/${pkg.id}`,
-      "PATCH",
-      {
-        ...content,
-        sections,
-        addonServices: [addon],
-        expectedUpdatedAt: pkg.updatedAt,
-      },
+      { ...content, addonServices: [addon] },
       adminCookie,
     ),
     400,
@@ -3820,193 +3789,30 @@ test("package inclusion and private add-ons round trip with local terms and guar
     )
   ).bookingRequest;
   const endpoint = `/admin/booking-requests/${booking.id}/custom-package`;
-  // A source copy retains the same archived reference and its local terms.
-  await read(
+  const custom = await read(
     await call(
-      `/admin/services/${included.id}/archive`,
+      endpoint,
       "POST",
-      undefined,
+      {
+        ...content,
+        sections,
+        sourcePackageId: pkg.id,
+        expectedUpdatedAt: pkg.updatedAt,
+        expectedBookingUpdatedAt: booking.updatedAt,
+      },
       adminCookie,
     ),
     200,
   );
-  const customInput = {
-    ...content,
-    sections,
-    addonServices: [
-      addon,
-      {
-        id: randomUUID(),
-        serviceId: hourly.id,
-        hourlyRatePesos: 650,
-        fixedPricePesos: null,
-        includedHours: null,
-      },
-    ],
-    sourcePackageId: pkg.id,
-    expectedUpdatedAt: pkg.updatedAt,
-    expectedBookingUpdatedAt: booking.updatedAt,
-  };
-  await read(await call(endpoint, "POST", customInput, customerCookie), 403);
-  await read(
-    await call(
-      endpoint,
-      "POST",
-      { ...customInput, addonServices: [{ ...addon, serviceId: included.id }] },
-      adminCookie,
-    ),
-    400,
-  );
-
-  for (const addons of [
+  assert.equal("addonServices" in custom.package, false);
+  const oldPackage = { ...custom.package, addonServices: [addon] };
+  await pool.query(
+    "insert into audit_events(actor_id,action,entity_type,entity_id,metadata) values($1,'booking.custom_package_updated','booking_request',$2,$3::jsonb)",
     [
-      addon,
-      { ...addon, id: randomUUID(), serviceId: addon.serviceId.toUpperCase() },
+      await actorIdForCookie(adminCookie),
+      booking.id,
+      JSON.stringify({ before: oldPackage, after: oldPackage }),
     ],
-    [addon, { ...addon, serviceId: hourly.id }],
-    [{ ...addon, serviceId: randomUUID() }],
-    [{ ...addon, hourlyRatePesos: null }],
-    [{ ...addon, fixedPricePesos: null }],
-    [{ ...addon, includedHours: 0 }],
-    [{ ...addon, hourlyRatePesos: 0.5 }],
-    Array.from({ length: 101 }, () => ({
-      ...addon,
-      id: randomUUID(),
-      serviceId: randomUUID(),
-    })),
-  ])
-    await read(
-      await call(
-        endpoint,
-        "POST",
-        { ...customInput, addonServices: addons },
-        adminCookie,
-      ),
-      400,
-    );
-
-  const saved = await read(
-    await call(
-      endpoint,
-      "POST",
-      {
-        ...customInput,
-        addonServices: customInput.addonServices.map((item) => ({
-          ...item,
-          id: item.id.toUpperCase(),
-          serviceId: item.serviceId.toUpperCase(),
-        })),
-      },
-      adminCookie,
-    ),
-    200,
-  );
-
-  assert.deepEqual(saved.package.price, pkg.price);
-  assert.deepEqual(saved.package.sections[0].widgets[0].serviceTerms, terms);
-  assert.equal(saved.package.addonServices[0].service.name, extra.name);
-  assert.equal(saved.package.addonServices[0].id, addon.id);
-  assert.equal(saved.package.addonServices[0].serviceId, extra.id);
-  assert.equal(saved.package.addonServices[0].fixedPricePesos, 1500);
-  assert.equal(saved.package.addonServices[1].fixedPricePesos, null);
-  assert.equal(saved.package.addonServices[1].hourlyRatePesos, 650);
-  const stored = (
-    await pool.query("select addon_services from packages where id=$1", [
-      saved.package.id,
-    ])
-  ).rows[0].addon_services;
-  assert.equal("service" in stored[0], false);
-  await assert.rejects(
-    pool.query("update packages set addon_services=$2::jsonb where id=$1", [
-      pkg.id,
-      JSON.stringify(stored),
-    ]),
-  );
-  await assert.rejects(
-    pool.query("update packages set addon_services='{}'::jsonb where id=$1", [
-      saved.package.id,
-    ]),
-  );
-  assert.equal(stored[0].id, addon.id);
-  assert.equal(stored[0].serviceId, extra.id);
-  const global = await read(await call(`/services/${extra.id}`), 200);
-
-  for (const key of [
-    "hourlyRatePesos",
-    "fixedPricePesos",
-    "includedHours",
-  ] as const)
-    assert.equal(global[key], pricing[key]);
-
-  assert.deepEqual(
-    (await read(await call(`/packages/${pkg.id}`), 200)).price,
-    pkg.price,
-  );
-  assert.deepEqual(
-    (await read(await call(`/packages/${pkg.id}`), 200)).addonServices,
-    [],
-  );
-  const customerPackage = await read(
-    await call(
-      `/booking-requests/${booking.id}/package`,
-      "GET",
-      undefined,
-      customerCookie,
-    ),
-    200,
-  );
-  assert.equal(customerPackage.package.addonServices[0].fixedPricePesos, 1500);
-  await read(
-    await call(
-      `/booking-requests/${booking.id}/package`,
-      "GET",
-      undefined,
-      otherCustomerCookie,
-    ),
-    404,
-  );
-  await read(
-    await call(`/admin/services/${extra.id}`, "DELETE", undefined, adminCookie),
-    409,
-  );
-  await read(
-    await call(
-      `/admin/services/${extra.id}/archive`,
-      "POST",
-      undefined,
-      adminCookie,
-    ),
-    200,
-  );
-  const update = {
-    ...customInput,
-    addonServices: saved.package.addonServices,
-    expectedUpdatedAt: saved.package.updatedAt,
-    expectedBookingUpdatedAt: saved.bookingRequest.updatedAt,
-  };
-  const edited = await read(
-    await call(endpoint, "PATCH", update, adminCookie),
-    200,
-  );
-  assert.equal(edited.package.addonServices[0].service, null);
-  await read(await call(endpoint, "PATCH", update, adminCookie), 409);
-  await read(
-    await call(
-      endpoint,
-      "PATCH",
-      {
-        ...update,
-        expectedUpdatedAt: edited.package.updatedAt,
-        expectedBookingUpdatedAt: edited.bookingRequest.updatedAt,
-        addonServices: [{ ...addon, id: randomUUID() }],
-      },
-      adminCookie,
-    ),
-    400,
-  );
-  await read(
-    await call(`/admin/services/${extra.id}`, "DELETE", undefined, adminCookie),
-    409,
   );
   const history = (
     await read(
@@ -4019,75 +3825,71 @@ test("package inclusion and private add-ons round trip with local terms and guar
       200,
     )
   ).history;
-  assert.equal(history.length, 2);
-  assert.equal(history[0].after.addonServices[0].fixedPricePesos, 1500);
-  assert.deepEqual(history[0].after.sections[0].widgets[0].serviceTerms, terms);
-
-  // Old audit JSON remains readable without inventing included-service terms.
-  const { addonServices: _addons, ...oldPackage } = pkg;
-  oldPackage.sections = content.sections;
-  await pool.query(
-    "insert into audit_events(actor_id,action,entity_type,entity_id,metadata) values($1,'booking.custom_package_updated','booking_request',$2,$3::jsonb)",
-    [
-      await actorIdForCookie(adminCookie),
-      booking.id,
-      JSON.stringify({ before: oldPackage, after: oldPackage }),
-    ],
-  );
-
-  const historical = (
+  assert.deepEqual(history[0].after.addonServices, [addon]);
+  assert.equal("addonServices" in history[1].after, false);
+  const live = (
     await read(
       await call(
-        `/admin/booking-requests/${booking.id}/package-history`,
+        `/booking-requests/${booking.id}/package`,
         "GET",
         undefined,
-        adminCookie,
+        customerCookie,
       ),
       200,
     )
-  ).history.find(
-    (entry: { after: { id: string } }) => entry.after.id === pkg.id,
-  );
-
-  assert.deepEqual(historical.after.addonServices, []);
-  assert.equal(
-    "serviceTerms" in historical.after.sections[0].widgets[0],
-    false,
-  );
-  await read(
-    await call(
-      `/admin/booking-requests/${booking.id}/status`,
-      "PATCH",
-      { status: "declined", reason: "Not proceeding" },
-      adminCookie,
-    ),
-    200,
-  );
-  await read(
-    await call(
-      endpoint,
-      "PATCH",
-      {
-        ...update,
-        expectedUpdatedAt: edited.package.updatedAt,
-        expectedBookingUpdatedAt: edited.bookingRequest.updatedAt,
+  ).package;
+  assert.equal("addonServices" in live, false);
+  // Only an offer on the same requested-service row protects the service.
+  const requested = [
+    {
+      serviceId: extra.id,
+      name: extra.name,
+      hours: null,
+      notes: null,
+      included: false,
+      updatedAt: null,
+    },
+    {
+      id: randomUUID(),
+      serviceId: hourly.id,
+      name: hourly.name,
+      hours: null,
+      notes: null,
+      included: false,
+      updatedAt: null,
+      offer: {
+        totalHours: 2,
+        fixedPricePesos: null,
+        includedHours: null,
+        hourlyRatePesos: 700,
       },
-      adminCookie,
-    ),
-    409,
+    },
+  ];
+  await pool.query(
+    "update booking_requests set requested_services=$1::jsonb where id=$2",
+    [JSON.stringify(requested), booking.id],
   );
   assert.equal(
     (
-      await read(
-        await call(
-          `/booking-requests/${booking.id}/package`,
-          "GET",
-          undefined,
-          customerCookie,
-        ),
-        200,
+      await call(
+        `/admin/services/${hourly.id}`,
+        "DELETE",
+        undefined,
+        adminCookie,
       )
-    ).package.addonServices.length,
-    2,
+    ).status,
+    409,
+  );
+  // A request without an offer does not protect it.
+  assert.equal(
+    (
+      await call(
+        `/admin/services/${extra.id}`,
+        "DELETE",
+        undefined,
+        adminCookie,
+      )
+    ).status,
+    204,
   );
 });

@@ -8,21 +8,23 @@ export async function hasCatalogListingReferenceData(
   const field = listing.kind === "package" ? "packageId" : "serviceId";
   const ref = sql<boolean>`canvas @> jsonb_build_array(jsonb_build_object('widgets', jsonb_build_array(jsonb_build_object(${sql.lit(field)}, ${listing.id}::text))))`;
 
-  const [packageRef, serviceRef] = await Promise.all([
-    db
-      .selectFrom("packages")
-      .select("id")
-      .where((eb) =>
-        listing.kind === "service"
-          ? eb.or([
-              ref,
-              sql<boolean>`addon_services @> jsonb_build_array(jsonb_build_object('serviceId', ${listing.id}::text))`,
-            ])
-          : ref,
-      )
-      .executeTakeFirst(),
+  const [packageRef, serviceRef, bookingRef] = await Promise.all([
+    db.selectFrom("packages").select("id").where(ref).executeTakeFirst(),
     db.selectFrom("services").select("id").where(ref).executeTakeFirst(),
+    listing.kind === "service"
+      ? db
+          .selectFrom("booking_requests")
+          .select("id")
+          .where("submitted_at", "is not", null)
+          .where(
+            sql<boolean>`requested_services @> jsonb_build_array(jsonb_build_object('serviceId', ${listing.id.toLowerCase()}::text))`,
+          )
+          .where(
+            sql<boolean>`exists (select 1 from jsonb_array_elements(requested_services) as item where item->>'serviceId' = ${listing.id.toLowerCase()} and jsonb_typeof(item->'offer') = 'object')`,
+          )
+          .executeTakeFirst()
+      : Promise.resolve(undefined),
   ]);
 
-  return Boolean(packageRef || serviceRef);
+  return Boolean(packageRef || serviceRef || bookingRef);
 }

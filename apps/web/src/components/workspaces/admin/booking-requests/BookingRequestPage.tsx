@@ -1,4 +1,4 @@
-import { BookingIntake } from "../../../booking-requests/BookingIntake";
+import { BookingOfferAddons } from "../../../booking-requests/BookingOfferAddons";
 import { BookingStatusHistory } from "../../../booking-requests/BookingStatusHistory";
 import {
   useCallback,
@@ -515,15 +515,24 @@ export function BookingRequestPage({
                       <dt>Special requests</dt>
                       <dd>{item.specialRequests || "None"}</dd>
                     </div>
+                    {item.budget && (
+                      <div>
+                        <dt>Budget</dt>
+                        <dd>{item.budget}</dd>
+                      </div>
+                    )}
                     <div>
                       <dt>Requested</dt>
-                      <dd>{bookingDateTime(item.submittedAt, item.timeZone)}</dd>
+                      <dd>
+                        {bookingDateTime(item.submittedAt, item.timeZone)}
+                      </dd>
                     </div>
                   </dl>
                 </div>
-                <BookingIntake
-                  requestedServices={item.requestedServices}
-                  budget={item.budget}
+                <BookingOfferAddons
+                  booking={item}
+                  disabled={refreshing || savingStatus || savingDay}
+                  onChanged={setItem}
                 />
                 <div className="booking-request-overview-footer">
                   <p>

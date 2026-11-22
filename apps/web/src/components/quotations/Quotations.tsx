@@ -39,14 +39,11 @@ function addonDescription(line: AddonItem) {
   if (line.addon.requiresRemoval === "archived")
     return "Service archived · remove this add-on";
 
-  const { source, hours } = line.addon;
+  const hours = line.addon.totalHours ?? line.addon.hours;
 
-  if (source.includedHours !== null)
-    return `Package add-on · ${source.includedHours} hours covered · ${hours ?? 0} extra hours`;
+  if (hours == null) return "Hours open";
 
-  return hours === null
-    ? "Package add-on · Hours required"
-    : `Package add-on · ${hours} hours`;
+  return `${hours} ${hours === 1 ? "hour" : "hours"}`;
 }
 
 const formatWhen = (value: string) => formatEnPhDateTime(new Date(value));
@@ -446,7 +443,6 @@ function QuotationsView({
             await load();
           }}
           onOfferChanged={() => void load()}
-          onBookingChanged={onBookingChanged}
         />
       )}
 

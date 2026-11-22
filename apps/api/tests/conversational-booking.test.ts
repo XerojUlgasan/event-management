@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { after, before, test } from "node:test";
-import type { BookingDraftPatch } from "@event-management/contracts/booking-draft";
+import {
+  reviewedServiceSchema,
+  type BookingDraftPatch,
+} from "@event-management/contracts/booking-draft";
 import { sql } from "kysely";
 import { Pool } from "pg";
 import { startToolCallData } from "../src/data/ai/start-tool-call.js";
@@ -419,16 +422,23 @@ test("a partial request stays private, then an assessed chat confirmation promot
   assert.equal(submitted.budget, "PHP 45,000");
   assert.equal(submitted.special_requests, longNotes);
   assert.equal(submitted.duration_mode, "multi_day");
-  assert.deepEqual(submitted.requested_services, [
-    {
-      serviceId: null,
-      name: "Acoustic duo",
-      hours: 2,
-      notes: null,
-      included: false,
-      updatedAt: null,
-    },
-  ]);
+  const requestedServices = reviewedServiceSchema
+    .array()
+    .parse(submitted.requested_services);
+  assert.ok(requestedServices[0].id);
+  assert.deepEqual(
+    requestedServices.map(({ id: _id, ...service }) => service),
+    [
+      {
+        serviceId: null,
+        name: "Acoustic duo",
+        hours: 2,
+        notes: null,
+        included: false,
+        updatedAt: null,
+      },
+    ],
+  );
   assert.equal(result.message.reply_to_message_id, approval.customerMessageId);
   assert.match(result.message.body, new RegExp(submitted.reference));
   assert.equal(await readBookingDraftData(db, conversation.id), null);

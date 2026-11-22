@@ -8,6 +8,7 @@ import type {
   CatalogSection,
   CatalogWidget,
   PackageContent,
+  PackageAddonService,
 } from "@event-management/contracts/catalog";
 import type { ReactNode } from "react";
 import type { ServiceContent } from "../../lib/data/catalog/services";
@@ -73,10 +74,10 @@ export function WidgetContent({
 export function PackageCanvas({
   item,
   bookingAction,
-  showAddons = false,
+  historicalAddons,
 }: {
   item: PackageContent;
-  showAddons?: boolean;
+  historicalAddons?: PackageAddonService[];
   bookingAction?: ReactNode;
 }) {
   const openCatalog = useCatalogNavigation();
@@ -109,11 +110,11 @@ export function PackageCanvas({
             : undefined
         }
       />
-      {showAddons && !!item.addonServices?.length && (
+      {!!historicalAddons?.length && (
         <section className="catalog-addons">
-          <h2>Addon Services</h2>
+          <h2>Historical add-on services</h2>
           <div className="catalog-addons-grid">
-            {item.addonServices.map((addon) => {
+            {historicalAddons.map((addon) => {
               const pricing = servicePricingLabels(addon);
               const widget: CatalogWidget = {
                 id: addon.id,

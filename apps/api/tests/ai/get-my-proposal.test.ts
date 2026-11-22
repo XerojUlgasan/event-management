@@ -178,25 +178,6 @@ test("proposal is scoped to the authenticated conversation and reads current pri
     },
   ];
   const updatedAt = new Date("2098-01-01T00:00:00.000Z");
-  const addonService = await db
-    .insertInto("services")
-    .values({
-      slug: `addon-${randomUUID()}`,
-      name: "Private add-on",
-      description: "",
-      hourly_rate_pesos: 900,
-      fixed_price_pesos: 6000,
-      included_hours: 3,
-    })
-    .returning("id")
-    .executeTakeFirstOrThrow();
-  const addon = {
-    id: randomUUID(),
-    serviceId: addonService.id,
-    fixedPricePesos: 5500,
-    includedHours: 4,
-    hourlyRatePesos: 700,
-  };
   const custom = await db
     .insertInto("packages")
     .values({
@@ -210,7 +191,6 @@ test("proposal is scoped to the authenticated conversation and reads current pri
       published_at: null,
       updated_at: updatedAt,
       canvas: sql`${JSON.stringify(sections)}::jsonb`,
-      addon_services: sql`${JSON.stringify([addon])}::jsonb`,
     })
     .returning("id")
     .executeTakeFirstOrThrow();
@@ -229,14 +209,7 @@ test("proposal is scoped to the authenticated conversation and reads current pri
     amountMinor: 125000,
   });
   assert.equal(result.proposal.updatedAt, updatedAt.toISOString());
-  assert.equal(result.proposal.addonServices.length, 1);
-  assert.equal(result.proposal.addonServices[0].fixedPricePesos, 5500);
-  assert.equal(result.proposal.addonServices[0].includedHours, 4);
-  assert.equal(result.proposal.addonServices[0].hourlyRatePesos, 700);
-  assert.equal(
-    result.proposal.addonServices[0].service?.name,
-    "Private add-on",
-  );
+  assert.equal("addonServices" in result.proposal, false);
   assert.deepEqual(result.proposal.sections[0].widgets[2].serviceTerms, {
     includedHours: 4,
     hourlyRatePesos: 75,
@@ -325,5 +298,56 @@ test("unprepared inquiries and strict empty input are explicit", async () => {
       conversationId,
       abortSignal: controller.signal,
     }),
+  );
+});
+
+test("request history returns only the owned booking's current service offers", async () => {
+  const customerId = await user();
+  const otherId = await user();
+  const bookingId = await booking(customerId, null);
+  const conversationId = await conversation(customerId, bookingId);
+  const requestedServices = [
+    {
+      id: randomUUID(),
+      serviceId: randomUUID(),
+      name: "Lighting",
+      hours: null,
+      notes: null,
+      included: false,
+      updatedAt: null,
+      offer: {
+        totalHours: 4,
+        fixedPricePesos: 2000,
+        includedHours: 3,
+        hourlyRatePesos: 500,
+      },
+    },
+    {
+      serviceId: null,
+      name: "Host",
+      hours: null,
+      notes: null,
+      included: false,
+      updatedAt: null,
+    },
+  ];
+  await db
+    .updateTable("booking_requests")
+    .set({
+      requested_services: sql`${JSON.stringify(requestedServices)}::jsonb`,
+    })
+    .where("id", "=", bookingId)
+    .execute();
+  const { getMyRequestHistoryService } =
+    await import("../../src/services/ai/get-my-booking-facts.js");
+  assert.deepEqual(
+    await getMyRequestHistoryService({ db, customerId, conversationId }),
+    {
+      status: "no_status_history",
+      requestedServices,
+    },
+  );
+  await assert.rejects(
+    getMyRequestHistoryService({ db, customerId: otherId, conversationId }),
   );
 });

@@ -1,48 +1,62 @@
 import "../../styles/booking-requests/booking-intake.css";
-import type { ReviewedBookingService } from "@event-management/contracts/booking-draft";
-import { servicePricingLabels } from "../../lib/utils/formatting/money";
+import type { BookingService } from "../../lib/data/booking-requests/requests";
+import {
+  bookingHoursLabel,
+  bookingOfferAmountLabel,
+} from "../../lib/utils/formatting/money";
 
 export function BookingIntake({
   requestedServices = [],
   budget,
 }: {
-  requestedServices: ReviewedBookingService[];
+  requestedServices: BookingService[];
   budget: string | null;
 }) {
-  if (!requestedServices.length && !budget) return null;
+  const services = requestedServices.filter((service) => {
+    if (service.offer) return true;
+
+    if (service.included || service.origin === "admin") return false;
+
+    return true;
+  });
+
+  if (!services.length && !budget) return null;
 
   return (
-    <section className="booking-intake">
-      <h4>Additional requests</h4>
-      {requestedServices.length > 0 && (
-        <ul>
-          {requestedServices.map((service, index) => (
-            <li key={`${service.serviceId ?? service.name}-${index}`}>
-              {service.name}
-              {service.included ? " (included in package)" : ""}
-              {service.hours != null
-                ? ` · ${service.hours} hours requested`
-                : ""}
-              {service.catalogPricing && service.hours != null && (
-                <>
-                  {service.catalogPricing.includedHours != null &&
-                    ` · ${Math.max(0, service.hours - service.catalogPricing.includedHours)} excess hours`}
-                  {` · Indicative catalog terms: ${servicePricingLabels(service.catalogPricing).price}`}
-                  {servicePricingLabels(service.catalogPricing).excess &&
-                    `; ${servicePricingLabels(service.catalogPricing).excess}`}
-                </>
-              )}
-              {service.notes ? ` · ${service.notes}` : ""}
-            </li>
-          ))}
-        </ul>
+    <section className="service-summary">
+      {services.length > 0 && (
+        <>
+          <h4>Services</h4>
+          <ul>
+            {services.map((service, index) => {
+              const hours = service.offer?.totalHours ?? service.hours;
+              const amount = service.offer
+                ? bookingOfferAmountLabel(service.offer)
+                : null;
+
+              return (
+                <li key={service.id ?? `${service.name}-${index}`}>
+                  <div>
+                    <strong>{service.name}</strong>
+                    <span>
+                      {bookingHoursLabel(hours)}
+                      {service.offer ? "" : " · For review"}
+                    </span>
+                    {service.notes && <small>{service.notes}</small>}
+                  </div>
+                  {amount && <b>{amount}</b>}
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
       {budget && (
         <p>
-          <strong>Budget:</strong> {budget}
+          <span>Budget</span>
+          {budget}
         </p>
       )}
-      <p>Additional services are requests for team review.</p>
     </section>
   );
 }

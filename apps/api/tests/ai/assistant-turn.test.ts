@@ -1653,6 +1653,7 @@ test("status follow-up gets only the latest change and audits it without the rea
   const firstChange = await latestBookingStatusTimestamp(bookingId);
   assert.deepEqual(modelToolOutput(toolName), {
     status: "found",
+    requestedServices: [],
     latestChange: { status: "needs_details", reason, createdAt: firstChange },
   });
   await assertReadToolAudit(original, toolName, {
@@ -1678,6 +1679,7 @@ test("status follow-up gets only the latest change and audits it without the rea
   const latestChange = await latestBookingStatusTimestamp(bookingId);
   assert.deepEqual(modelToolOutput(toolName), {
     status: "found",
+    requestedServices: [],
     latestChange: {
       status: "accepted",
       reason: latestReason,
@@ -1711,7 +1713,12 @@ test("booking reads distinguish unlinked, unsent, and missing status history", a
 
     for (const [index, { toolName }] of calls.entries()) {
       const expected = { status: statuses[index] };
-      assert.deepEqual(modelToolOutput(toolName), expected);
+      assert.deepEqual(
+        modelToolOutput(toolName),
+        expected.status === "no_status_history"
+          ? { ...expected, requestedServices: [] }
+          : expected,
+      );
       await assertReadToolAudit(result, toolName, expected);
     }
   }

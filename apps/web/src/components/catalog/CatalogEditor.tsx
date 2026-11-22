@@ -212,7 +212,6 @@ function MarkdownSettings({
 type CanvasContent = {
   name: string;
   sections: CatalogSection[];
-  addonServices?: { serviceId: string }[];
 };
 
 export function CatalogEditor<T extends CanvasContent>({
@@ -1407,24 +1406,6 @@ export function CatalogEditor<T extends CanvasContent>({
               })
             }
             onSelect={(item) => {
-              if (
-                entity === "package" &&
-                editingReference.type === "service" &&
-                content.addonServices?.some(
-                  (addon) =>
-                    addon.serviceId.toLowerCase() === item.id.toLowerCase(),
-                )
-              ) {
-                setError(
-                  notifyError(
-                    "This service is already an add-on. Remove it from add-ons before including it.",
-                  ),
-                );
-                setReferenceEditing(null);
-
-                return;
-              }
-
               const { pricing, ...reference } = item;
               changeWidget(referenceEditing.sectionId, editingReference.id, {
                 ...(editingReference.type === "package"

@@ -8,10 +8,8 @@ import {
   useNotifications,
 } from "@event-management/ui";
 import {
-  calculateQuotationAddonAmount,
   MAX_QUOTATION_AMOUNT_MINOR,
   MAX_QUOTATION_DESCRIPTION_LENGTH,
-  MAX_QUOTATION_HOURS,
   MAX_QUOTATION_ITEMS,
   MAX_QUOTATION_REASON_LENGTH,
   type ManualQuotationItem,
@@ -21,10 +19,7 @@ import {
   type QuotationPreparation,
   type SendQuotationInput,
 } from "@event-management/contracts/quotations";
-import type { ServicePricing } from "@event-management/contracts/catalog";
-import { PackageAddonActions } from "../catalog/PackageAddonActions";
-import { changeBookingPackageAddon } from "../../lib/data/booking-requests/packages";
-import type { BookingRequest } from "../../lib/data/booking-requests/requests";
+import { getAdminBookingRequest } from "../../lib/data/booking-requests/requests";
 import {
   prepareQuotation,
   sendQuotation,
@@ -36,42 +31,7 @@ import {
   formatPesosFromMinor,
   formatSignedPesosFromMinor,
   pesosToCentavos,
-  servicePricingLabels,
 } from "../../lib/utils/formatting/money";
-
-function packagePricing({
-  source,
-}: QuotationAddonItem["addon"]): ServicePricing {
-  return {
-    fixedPricePesos:
-      source.fixedPriceMinor === null
-        ? null
-        : centavosToPesos(source.fixedPriceMinor),
-    includedHours: source.includedHours,
-    hourlyRatePesos:
-      source.hourlyRateMinor === null
-        ? null
-        : centavosToPesos(source.hourlyRateMinor),
-  };
-}
-
-function reprice(
-  line: QuotationAddonItem,
-  hours: number | null,
-): QuotationAddonItem {
-  const addon = {
-    ...line.addon,
-    hours,
-    fixedPriceOverrideMinor: null,
-    hourlyRateOverrideMinor: null,
-  };
-
-  return {
-    ...line,
-    addon,
-    amountMinor: calculateQuotationAddonAmount(addon).amountMinor,
-  };
-}
 
 function chargeAmount(line: QuotationItem) {
   if (line.amountMinor === null || line.addon?.requiresRemoval)
@@ -217,53 +177,6 @@ function QuotationAdjustmentFields({
   );
 }
 
-function AddonHoursField({
-  line,
-  onChange,
-}: {
-  line: QuotationAddonItem;
-  onChange: (hours: number | null) => void;
-}) {
-  const fixed = line.addon.source.includedHours !== null;
-  const label = fixed ? "Extra hours" : "Booked hours";
-  const invalid =
-    calculateQuotationAddonAmount(line.addon).status === "out_of_range" ||
-    (!fixed && line.addon.hours === 0);
-
-  return (
-    <FormField
-      className="quotation-addon-hours"
-      label={label}
-      error={
-        invalid ? "Enter whole hours within the quotation limits." : undefined
-      }
-    >
-      {(props) => (
-        <Input
-          {...props}
-          aria-label={`${label} for ${line.description}`}
-          aria-labelledby={undefined}
-          type="number"
-          inputMode="numeric"
-          min={fixed ? 0 : 1}
-          max={MAX_QUOTATION_HOURS}
-          step="1"
-          value={line.addon.hours ?? ""}
-          onChange={(event) =>
-            onChange(
-              event.target.value === ""
-                ? fixed
-                  ? 0
-                  : null
-                : Number(event.target.value),
-            )
-          }
-        />
-      )}
-    </FormField>
-  );
-}
-
 type Operation = "prepare" | "send" | "package";
 
 export function QuotationComposer({
@@ -273,7 +186,6 @@ export function QuotationComposer({
   onSent,
   onRefresh,
   onOfferChanged,
-  onBookingChanged,
   onBusyChange,
 }: {
   bookingId: string;
@@ -282,14 +194,10 @@ export function QuotationComposer({
   onSent: (quotation: Quotation) => void;
   onRefresh: () => Promise<void>;
   onOfferChanged: () => void;
-  onBookingChanged?: (booking: BookingRequest) => void;
   onBusyChange: (busy: boolean) => void;
 }) {
   const { notify, notifyError } = useNotifications();
   const [preparation, setPreparation] = useState<QuotationPreparation>();
-  const [localHours, setLocalHours] = useState<Record<string, number | null>>(
-    {},
-  );
   const [localManualItems, setLocalManualItems] =
     useState<ManualQuotationItem[]>();
   const [editing, setEditing] = useState<ManualQuotationItem | null>(null);
@@ -325,33 +233,6 @@ export function QuotationComposer({
   }
 
   function applyPreparation(next: QuotationPreparation) {
-    if (preparation) {
-      const samePackage = preparation.packageId === next.packageId;
-
-      const previousModes = new Map(
-        preparation.items.flatMap((line) =>
-          line.addon
-            ? [[line.id, line.addon.source.includedHours !== null] as const]
-            : [],
-        ),
-      );
-
-      setLocalHours((hours) =>
-        Object.fromEntries(
-          samePackage
-            ? next.items.flatMap((line) =>
-                line.addon &&
-                line.id in hours &&
-                previousModes.get(line.id) ===
-                  (line.addon.source.includedHours !== null)
-                  ? [[line.id, hours[line.id]]]
-                  : [],
-              )
-            : [],
-        ),
-      );
-    }
-
     setPreparation(next);
   }
 
@@ -367,12 +248,17 @@ export function QuotationComposer({
 
       if (!isCurrent()) return;
 
-      const { preparation: next } = await prepareQuotation(bookingId);
+      const [{ preparation: next }, { bookingRequest }] = await Promise.all([
+        prepareQuotation(bookingId),
+        getAdminBookingRequest(bookingId),
+      ]);
 
       if (!isCurrent()) return;
 
       applyPreparation(next);
-      setNeedsReview(false);
+      setNeedsReview(
+        bookingRequest.updatedAt !== next.expectedBookingUpdatedAt,
+      );
       const previousOffer = preparation
         ? preparation.currentOffer
         : currentOffer;
@@ -398,6 +284,8 @@ export function QuotationComposer({
       if (isCurrent()) {
         const message = notifyError(cause, "Unable to prepare the quotation.");
         setError(message);
+
+        if (preparation) setNeedsReview(true);
 
         if (refresh) throw new Error(message);
       }
@@ -427,108 +315,10 @@ export function QuotationComposer({
     editorOpener.current?.focus();
   }
 
-  async function mutateAddon(
-    line: QuotationAddonItem,
-    pricing: ServicePricing | null,
-  ) {
-    if (!preparation || needsReview)
-      throw new Error("Refresh the package before retrying.");
-
-    const isCurrent = begin("package");
-
-    if (!isCurrent) return;
-
-    setError("");
-    setReviewMessage("");
-
-    try {
-      const { package: updated, bookingRequest } =
-        await changeBookingPackageAddon(
-          bookingId,
-          line.id,
-          {
-            packageId: preparation.packageId,
-            expectedBookingUpdatedAt: preparation.expectedBookingUpdatedAt,
-            expectedUpdatedAt: preparation.expectedPackageUpdatedAt,
-          },
-          pricing,
-        );
-
-      onBookingChanged?.(bookingRequest);
-
-      if (!isCurrent()) return;
-
-      const saved = updated.addonServices.find(
-        (addon) => addon.id.toLowerCase() === line.id.toLowerCase(),
-      );
-
-      if (pricing && !saved) {
-        setNeedsReview(true);
-        throw new Error("Refresh the package to review the saved add-on.");
-      }
-
-      const items = preparation.items.flatMap((item) => {
-        if (item.id !== line.id) return [item];
-
-        if (!saved) return [];
-
-        const source = {
-          packageId: updated.id,
-          addonId: line.id,
-          fixedPriceMinor:
-            saved.fixedPricePesos === null
-              ? null
-              : pesosToCentavos(saved.fixedPricePesos),
-          includedHours: saved.includedHours,
-          hourlyRateMinor:
-            saved.hourlyRatePesos === null
-              ? null
-              : pesosToCentavos(saved.hourlyRatePesos),
-        };
-        const nextLine = {
-          ...line,
-          description: saved.service?.name ?? line.description,
-          addon: { ...line.addon, source },
-        };
-        const fixed = saved.includedHours !== null;
-        const sameMode = fixed === (line.addon.source.includedHours !== null);
-
-        return [
-          reprice(nextLine, sameMode ? line.addon.hours : fixed ? 0 : null),
-        ];
-      });
-
-      applyPreparation({
-        ...preparation,
-        expectedBookingUpdatedAt: bookingRequest.updatedAt,
-        expectedPackageUpdatedAt: updated.updatedAt,
-        baseAmountMinor: updated.price.amountMinor,
-        items,
-      });
-      notify(pricing ? "Package add-on updated." : "Package add-on removed.");
-    } catch (cause) {
-      if (!isCurrent()) return;
-
-      if (cause instanceof ApiError && cause.status === 409)
-        setNeedsReview(true);
-
-      throw new Error(
-        notifyError(cause, "Unable to update the package add-on."),
-      );
-    } finally {
-      if (isCurrent()) finish();
-    }
-  }
-
   const addonItems =
-    preparation?.items.flatMap((line) => {
-      if (!line.addon) return [];
-
-      const hours =
-        line.id in localHours ? localHours[line.id] : line.addon.hours;
-
-      return [reprice(line, hours)];
-    }) ?? [];
+    preparation?.items.filter(
+      (line): line is QuotationAddonItem => !!line.addon,
+    ) ?? [];
 
   const manualItems =
     localManualItems ?? preparation?.items.filter((line) => !line.addon) ?? [];
@@ -565,13 +355,7 @@ export function QuotationComposer({
       expectedPackageUpdatedAt: preparation.expectedPackageUpdatedAt,
       currentOffer: preparation.currentOffer,
       revisionReason: preparation.currentOffer ? reason.trim() : null,
-      items: [
-        ...addonItems.map(({ id, addon }) => ({
-          id,
-          addon: { hours: addon.hours ?? 0 },
-        })),
-        ...manualItems.map((line) => ({ ...line, serviceId: null })),
-      ],
+      items: manualItems.map((line) => ({ ...line, serviceId: null })),
     };
 
     const contents = JSON.stringify(body);
@@ -709,74 +493,29 @@ export function QuotationComposer({
                 {formatPesosFromMinor(preparation.baseAmountMinor)}
               </strong>
             </div>
-            {addonItems.map((line) => {
-              const pricing = packagePricing(line.addon);
-              const labels = servicePricingLabels(pricing);
-
-              return (
+            {addonItems.map((line) => (
                 <div
                   key={`${line.addon.source.packageId}:${line.id}`}
-                  className="quotation-charge-row quotation-addon-row"
+                  className="quotation-charge-row"
                 >
                   <div className="quotation-charge-label">
                     <strong>{line.description}</strong>
-                    <span>Package add-on · {labels.price}</span>
-                    {labels.excess && <span>{labels.excess}</span>}
+                    <span>
+                      {line.addon.totalHours == null
+                        ? "Hours open"
+                        : `${line.addon.totalHours} ${line.addon.totalHours === 1 ? "hour" : "hours"}`}
+                    </span>
                     {line.addon.requiresRemoval && (
                       <span>
                         {line.addon.requiresRemoval === "archived"
-                          ? "Service archived. Remove it from the package to continue."
-                          : "Now included in the package. Remove the add-on to continue."}
+                          ? "Service archived. Remove it from the booking to continue."
+                          : "Now included in the package. Remove the add-on from the booking to continue."}
                       </span>
                     )}
                   </div>
-                  <strong className="quotation-addon-amount">
-                    {chargeAmount(line)}
-                  </strong>
-                  <PackageAddonActions
-                    name={line.description}
-                    serviceId={line.serviceId}
-                    pricing={pricing}
-                    className="quotation-charge-actions"
-                    immediate
-                    removeFocus={headingRef}
-                    disabled={needsReview || !!editing || !!operation}
-                    editDisabled={!!line.addon.requiresRemoval}
-                    refresh={
-                      needsReview
-                        ? async () => {
-                            const next = await loadPreparation(true);
-
-                            if (
-                              next &&
-                              (!next.items.some(
-                                (item) => item.id === line.id,
-                              ) ||
-                                next.packageId !== line.addon.source.packageId)
-                            )
-                              window.requestAnimationFrame(() =>
-                                headingRef.current?.focus(),
-                              );
-                          }
-                        : undefined
-                    }
-                    onEdit={(terms) => mutateAddon(line, terms)}
-                    onRemove={() => mutateAddon(line, null)}
-                  />
-                  {!line.addon.requiresRemoval && (
-                    <AddonHoursField
-                      line={line}
-                      onChange={(hours) =>
-                        setLocalHours((current) => ({
-                          ...current,
-                          [line.id]: hours,
-                        }))
-                      }
-                    />
-                  )}
+                  <strong>{chargeAmount(line)}</strong>
                 </div>
-              );
-            })}
+              ))}
             {manualItems.map((line) => {
               const isEditing = editing?.id === line.id;
 
@@ -863,8 +602,7 @@ export function QuotationComposer({
           {addingManual && inlineEditor}
           {incomplete && (
             <p role="status">
-              Review the package add-ons and complete their hours before
-              sending.
+              Finish service hours on the booking before sending this offer.
             </p>
           )}
           {items.length > MAX_QUOTATION_ITEMS && (
@@ -891,7 +629,9 @@ export function QuotationComposer({
       <div className="quotation-actions">
         <Button
           variant="secondary"
-          disabled={operation === "package" || operation === "send"}
+          disabled={
+            operation === "package" || operation === "send"
+          }
           onClick={() => {
             if (inFlight.current !== "send" && inFlight.current !== "package")
               onCancel();

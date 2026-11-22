@@ -3,6 +3,7 @@ import {
   centavosToPesos,
   pesosToCentavos,
 } from "@event-management/contracts/money";
+import { calculateQuotationAddonAmount } from "@event-management/contracts/quotations";
 
 export { centavosToPesos, pesosToCentavos };
 
@@ -27,6 +28,49 @@ export function priceLabel(price: { amountMinor: number } | null) {
   return price
     ? `${new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(centavosToPesos(price.amountMinor))} total`
     : "Price on request";
+}
+
+export function bookingHoursLabel(hours: number | null) {
+  if (hours == null) return "Hours open";
+
+  return `${hours} ${hours === 1 ? "hour" : "hours"}`;
+}
+
+export function bookingOfferAmountLabel(
+  offer: ServicePricing & { totalHours: number | null },
+) {
+  if (offer.totalHours == null) return null;
+
+  const fixed = offer.includedHours != null;
+  const hours = fixed
+    ? Math.max(0, offer.totalHours - offer.includedHours)
+    : offer.totalHours;
+  const amount = calculateQuotationAddonAmount({
+    source: {
+      packageId: "booking",
+      addonId: "booking",
+      fixedPriceMinor:
+        offer.fixedPricePesos == null
+          ? null
+          : pesosToCentavos(offer.fixedPricePesos),
+      includedHours: offer.includedHours,
+      hourlyRateMinor:
+        offer.hourlyRatePesos == null
+          ? null
+          : pesosToCentavos(offer.hourlyRatePesos),
+    },
+    fixedPriceOverrideMinor: null,
+    hourlyRateOverrideMinor: null,
+    hours,
+  });
+
+  if (amount.amountMinor == null) return null;
+
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    maximumFractionDigits: 0,
+  }).format(centavosToPesos(amount.amountMinor));
 }
 
 export function servicePricingLabels(service: ServicePricing) {

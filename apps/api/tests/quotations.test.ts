@@ -3,16 +3,13 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import type {
-  CatalogSection,
-  PackageAddonService,
-} from "@event-management/contracts/catalog";
+import type { CatalogSection } from "@event-management/contracts/catalog";
+import type { ReviewedBookingService } from "@event-management/contracts/booking-draft";
 import {
   MAX_QUOTATION_AMOUNT_MINOR,
   MAX_QUOTATION_DESCRIPTION_LENGTH,
   MAX_QUOTATION_ITEMS,
   type Quotation,
-  type QuotationAddonItem,
   type QuotationPreparation,
   type SendQuotationInput,
 } from "@event-management/contracts/quotations";
@@ -843,69 +840,95 @@ function includedService(serviceId: string): CatalogSection[] {
   ];
 }
 
+const fixedPricing = {
+  fixedPricePesos: 16000,
+  hourlyRatePesos: 2200,
+  includedHours: 8,
+};
+
+const hourlyPricing = {
+  fixedPricePesos: null,
+  hourlyRatePesos: 650,
+  includedHours: null,
+};
+
+const addOnsPath = (bookingId: string) =>
+  `/admin/booking-requests/${bookingId}/addons`;
+
 async function quotationAddonsFixture() {
-  const b = await booking(null);
   const suffix = randomUUID().slice(0, 8);
 
   const [fixed, hourly, included] = await db
     .insertInto("services")
     .values(
-      ["Photo booth", "Extra lighting", "On-site support"].map((name) => ({
+      [
+        { name: "Workshop audio", pricing: fixedPricing },
+        { name: "Extra lighting", pricing: hourlyPricing },
+        { name: "Included support", pricing: hourlyPricing },
+      ].map(({ name, pricing }) => ({
         name: `${name} ${suffix}`,
         slug: `quote-addon-${randomUUID()}`,
         description: "Quotation add-on fixture",
-        fixed_price_pesos: 9000,
-        hourly_rate_pesos: 1500,
-        included_hours: 6,
+        fixed_price_pesos: pricing.fixedPricePesos,
+        hourly_rate_pesos: pricing.hourlyRatePesos,
+        included_hours: pricing.includedHours,
       })),
     )
-    .returning(["id", "name"])
+    .returning(["id", "name", "updated_at"])
     .execute();
 
-  const addonServices: PackageAddonService[] = [
-    {
-      id: randomUUID(),
-      serviceId: fixed.id,
-      fixedPricePesos: 1500,
-      hourlyRatePesos: 300,
-      includedHours: 3,
-    },
-    {
-      id: randomUUID(),
-      serviceId: hourly.id,
-      fixedPricePesos: null,
-      hourlyRatePesos: 650,
-      includedHours: null,
-    },
-  ];
-  const content = {
-    ...proposalContent,
-    addonServices,
-    sections: includedService(included.id),
-  };
-  const endpoint = `/admin/booking-requests/${b.id}/custom-package`;
-  const proposal = await read(
-    await call(endpoint, "POST", {
-      ...content,
-      expectedBookingUpdatedAt: b.updatedAt,
-    }),
-    200,
+  const catalog = await db
+    .insertInto("packages")
+    .values({
+      name: `Manual booking package ${suffix}`,
+      slug: `manual-booking-${randomUUID()}`,
+      price: 1000,
+      max_guests: 100,
+      canvas: JSON.stringify(
+        includedService(included.id).map((section) => ({
+          ...section,
+          widgets: section.widgets.map(({ media: _media, ...widget }) => ({
+            ...widget,
+            mediaId: null,
+          })),
+        })),
+      ),
+    })
+    .returning(["id", "updated_at"])
+    .executeTakeFirstOrThrow();
+
+  const { bookingRequest: b } = await read(
+    await call(
+      "/booking-requests",
+      "POST",
+      {
+        packageId: catalog.id,
+        packageUpdatedAt: catalog.updated_at.toISOString(),
+        eventType: "Birthday",
+        durationMode: "one_day",
+        requestedDays: [{ date: "2099-04-01" }],
+        timeZone: "Asia/Manila",
+        contactName: "Customer",
+        phoneNumber: "123",
+        requestedAddons: [
+          {
+            serviceId: fixed.id,
+            serviceUpdatedAt: fixed.updated_at.toISOString(),
+            hours: 5,
+          },
+          {
+            serviceId: hourly.id,
+            serviceUpdatedAt: hourly.updated_at.toISOString(),
+            hours: 3,
+          },
+        ],
+      },
+      customerCookie,
+    ),
+    201,
   );
 
-  return {
-    b,
-    proposal,
-    content,
-    included,
-    serviceNames: [fixed.name, hourly.name],
-    update: (changes: Partial<typeof content>) =>
-      call(endpoint, "PATCH", {
-        ...content,
-        ...changes,
-        expectedUpdatedAt: proposal.package.updatedAt,
-        expectedBookingUpdatedAt: proposal.bookingRequest.updatedAt,
-      }),
-  };
+  return { b, catalog, fixed, hourly, included };
 }
 
 test("preparation is admin-only, repeatable, and creates no records", async () => {
@@ -1294,355 +1317,258 @@ test("missing conversation and a message insertion failure roll back the entire 
   assert.equal(current.messages.length, 2);
 });
 
-test("prepared add-ons are mandatory and delivery derives every immutable term from the package", async () => {
-  const { b, content, included, serviceNames } = await quotationAddonsFixture();
+test("manual booking add-ons are automatically quoted using saved total hours and terms", async () => {
+  const { b, catalog, fixed, hourly } = await quotationAddonsFixture();
   const before = await matrixSnapshot(b.id);
   const prepared = await prepare(b.id);
   assert.deepEqual(await matrixSnapshot(b.id), before);
+  assert.equal(prepared.packageId, catalog.id);
+  assert.deepEqual(before.proposals, []);
   assert.deepEqual(
-    prepared.items.map((item) => item.serviceId),
-    content.addonServices.map((addon) => addon.serviceId),
+    prepared.items.map((item) => [
+      item.serviceId,
+      item.addon?.totalHours,
+      item.addon?.hours,
+      item.amountMinor,
+    ]),
+    [
+      [fixed.id, 13, 5, 2700000],
+      [hourly.id, 3, 3, 195000],
+    ],
   );
-  const [fixed, hourly] = prepared.items as [
-    QuotationAddonItem,
-    QuotationAddonItem,
-  ];
-  assert.deepEqual([fixed.description, hourly.description], serviceNames);
-  assert.equal(fixed.amountMinor, 150000);
-  assert.equal(fixed.addon.hours, 0);
-  assert.equal(hourly.addon.hours, null);
-  assert.equal(hourly.amountMinor, null);
-  const fixedCharge = { id: fixed.id, addon: { hours: 2 } };
-  const hourlyCharge = { id: hourly.id, addon: { hours: 3 } };
 
-  for (const items of [
-    [],
-    [fixedCharge],
-    [fixedCharge, { ...hourlyCharge, id: randomUUID() }],
-    [fixedCharge, hourlyCharge, { id: included.id, addon: { hours: 1 } }],
-    [fixedCharge, manual("add", 130000)],
+  for (const invalid of [
+    { id: prepared.items[0].id, addon: { hours: 1 } },
+    { ...manual("add", 200), id: prepared.items[0].id },
+    { ...manual("add", 200), serviceId: fixed.id },
   ]) {
-    await read(await sendRequest(b.id, sendInput(prepared, items)), 409);
-  }
-
-  for (const items of [
-    [fixedCharge, { ...hourlyCharge, addon: { hours: 0 } }],
-    [
-      fixedCharge,
-      { ...hourlyCharge, addon: { hours: MAX_QUOTATION_AMOUNT_MINOR } },
-    ],
-    [fixedCharge, { ...hourlyCharge, addon: { hours: null } }],
-    [
-      fixedCharge,
-      { ...hourlyCharge, addon: { hours: 2, hourlyRateOverrideMinor: 1 } },
-    ],
-    [
-      fixedCharge,
-      { ...hourlyCharge, addon: { hours: 2, source: hourly.addon.source } },
-    ],
-    [
-      fixedCharge,
-      hourlyCharge,
-      { ...hourlyCharge, id: hourly.id.toUpperCase() },
-    ],
-    [
-      fixedCharge,
-      hourlyCharge,
-      { ...manual("add", 4500), serviceId: included.id },
-    ],
-  ]) {
-    await read(await sendRequest(b.id, { ...sendInput(prepared), items }), 400);
+    await read(
+      await sendRequest(b.id, { ...sendInput(prepared), items: [invalid] }),
+      400,
+    );
   }
 
   assert.deepEqual(await matrixSnapshot(b.id), before);
-
-  const fee = manual("add", 2500);
-  const sent = await send(
-    b.id,
-    sendInput(prepared, [fixedCharge, hourlyCharge, fee]),
-  );
-  assert.deepEqual(
-    sent.items.map((item) => item.amountMinor),
-    [210000, 195000, 2500],
-  );
-  assert.deepEqual(
-    sent.items.flatMap((item) => (item.addon ? [item.addon.source] : [])),
-    [fixed.addon.source, hourly.addon.source],
-  );
-  assert.equal(sent.totalAmountMinor, 507500);
+  const sent = await send(b.id, sendInput(prepared, [manual("add", 2500)]));
+  assert.equal(sent.totalAmountMinor, 2997500);
+  assert.equal(sent.items[0].addon?.hours, 5);
+  assert.equal(sent.items[0].addon?.totalHours, 13);
   const visible = (
     await read(
       await call(`/quotations/${sent.id}`, "GET", undefined, customerCookie),
       200,
     )
   ).quotation;
-  assert.deepEqual(
-    visible.items.map((item: QuotationAddonItem) => item.amountMinor),
-    [210000, 195000, 2500],
-  );
-  assert.ok(visible.items.every((item: QuotationAddonItem) => !item.addon));
-  assert.match(visible.items[0].description, /3 included hours/);
-  assert.match(visible.items[0].description, /2 extra hours/);
-  const revision = await prepare(b.id);
-  assert.deepEqual(
-    revision.items.map((item) => item.addon?.hours),
-    [2, 3, undefined],
+  assert.equal(visible.totalAmountMinor, sent.totalAmountMinor);
+  assert.match(visible.items[0].description, /8 included hours/);
+  assert.match(visible.items[0].description, /5 extra hours/);
+  assert.equal(
+    (await call(`/quotations/${sent.id}`, "GET", undefined, otherCookie))
+      .status,
+    404,
   );
 });
 
-test("package add-on edits and deletion are isolated and version the owning proposal", async () => {
-  const { b, proposal, content } = await quotationAddonsFixture();
-  const [fixed, hourly] = content.addonServices;
-  const path = `/admin/booking-requests/${b.id}/custom-package/addons`;
-  const prepared = await prepare(b.id);
-  const sent = await send(
-    b.id,
-    sendInput(prepared, [
-      { id: fixed.id, addon: { hours: 2 } },
-      { id: hourly.id, addon: { hours: 3 } },
-    ]),
-  );
-  const pending = await prepare(b.id);
-  const privateBefore = await matrixSnapshot(b.id);
-  const servicesBefore = (
-    await pool.query("SELECT * FROM services ORDER BY id")
-  ).rows;
-  const source = {
-    packageId: proposal.package.id,
-    expectedBookingUpdatedAt: proposal.bookingRequest.updatedAt,
-    expectedUpdatedAt: proposal.package.updatedAt,
-  };
-  const pricing = {
-    fixedPricePesos: 2000,
-    includedHours: 4,
-    hourlyRatePesos: 400,
-  };
+test("booking add-on edits serialize and revise the offer without changing the original", async () => {
+  const { b, fixed, hourly, included } = await quotationAddonsFixture();
+  const [fixedRow, hourlyRow] = b.requestedServices as ReviewedBookingService[];
+  const path = addOnsPath(b.id);
+  const source = { expectedBookingUpdatedAt: b.updatedAt };
+  const first = await send(b.id);
+  const stale = sendInput(await prepare(b.id));
+  const before = await matrixSnapshot(b.id);
 
   await read(
     await call(
-      `${path}/${fixed.id}`,
+      `${path}/${fixedRow.id}`,
       "PATCH",
-      { ...source, ...pricing },
+      {
+        ...source,
+        pricing: fixedPricing,
+        totalHours: 10,
+      },
       customerCookie,
     ),
     403,
   );
   await read(
-    await call(`${path}/${fixed.id}`, "PATCH", {
+    await call(path, "POST", {
       ...source,
-      ...pricing,
-      serviceId: hourly.serviceId,
+      serviceId: included.id,
+      pricing: hourlyPricing,
+      totalHours: 3,
     }),
-    400,
-  );
-  await read(
-    await call(`${path}/${fixed.id}`, "PATCH", {
-      ...source,
-      ...pricing,
-      includedHours: null,
-    }),
-    400,
-  );
-  await read(
-    await call(`${path}/${fixed.id}`, "DELETE", { ...source, packageId }),
     409,
   );
-  await read(await call(`${path}/${randomUUID()}`, "DELETE", source), 404);
-  assert.deepEqual(await matrixSnapshot(b.id), privateBefore);
-
-  const updated = await read(
-    await call(`${path}/${fixed.id}`, "PATCH", { ...source, ...pricing }),
-    200,
-  );
-  const current = await matrixSnapshot(b.id);
-  const nextAddon = { ...fixed, ...pricing };
-  assert.deepEqual(current.proposals, [
-    {
-      ...privateBefore.proposals[0],
-      updated_at: current.proposals[0].updated_at,
-      addon_services: [nextAddon, hourly],
-    },
-  ]);
-  assert.notEqual(
-    current.proposals[0].updated_at,
-    privateBefore.proposals[0].updated_at,
-  );
-  assert.notEqual(
-    updated.bookingRequest.updatedAt,
-    source.expectedBookingUpdatedAt,
-  );
-  assert.deepEqual(current.catalog, privateBefore.catalog);
-  assert.deepEqual(current.messages, privateBefore.messages);
-  assert.deepEqual(current.quotations, privateBefore.quotations);
-  assert.deepEqual(
-    (await pool.query("SELECT * FROM services ORDER BY id")).rows,
-    servicesBefore,
-  );
-  assert.equal(updated.package.addonServices[0].service.id, fixed.serviceId);
-  assert.equal(
-    updated.package.price.amountMinor,
-    proposal.package.price.amountMinor,
-  );
-  const history = await read(
-    await call(`/admin/booking-requests/${b.id}/package-history`),
-    200,
-  );
-  assert.equal(history.history[0].after.addonServices[0].fixedPricePesos, 2000);
-  assert.equal(
-    history.history[0].before.addonServices[0].fixedPricePesos,
-    1500,
-  );
-
-  await read(await call(`${path}/${hourly.id}`, "DELETE", source), 409);
   await read(
-    await sendRequest(
-      b.id,
-      sendInput(pending, [
-        { id: fixed.id, addon: { hours: 2 } },
-        { id: hourly.id, addon: { hours: 3 } },
-      ]),
+    await call(path, "POST", {
+      ...source,
+      serviceId: fixed.id.toUpperCase(),
+      pricing: fixedPricing,
+      totalHours: 13,
+    }),
+    409,
+  );
+  assert.deepEqual(await matrixSnapshot(b.id), before);
+
+  const pricing = { ...fixedPricing, hourlyRatePesos: 2000 };
+  const results = await Promise.all([
+    call(`${path}/${fixedRow.id}`, "PATCH", {
+      ...source,
+      pricing,
+      totalHours: 10,
+    }),
+    call(
+      `${path}/${fixedRow.id}`,
+      "PATCH",
+      { ...source, pricing, totalHours: 10 },
+      secondAdminCookie,
     ),
-    409,
+  ]);
+  assert.deepEqual(
+    results.map((response) => response.status).sort(),
+    [200, 409],
   );
-  const revised = await prepare(b.id);
-  assert.deepEqual(revised.currentOffer, pending.currentOffer);
-  assert.equal(revised.items[0].amountMinor, 280000);
-  assert.equal(revised.items[0].addon?.source.includedHours, 4);
 
-  const deleted = await read(
-    await call(`${path}/${hourly.id}`, "DELETE", {
-      packageId: updated.package.id,
-      expectedBookingUpdatedAt: updated.bookingRequest.updatedAt,
-      expectedUpdatedAt: updated.package.updatedAt,
+  const { bookingRequest: edited } = await read(
+    results.find((response) => response.ok)!,
+    200,
+  );
+
+  assert.equal(edited.requestedServices[0].hours, 13);
+  assert.equal(
+    edited.requestedServices[0].catalogPricing.hourlyRatePesos,
+    2200,
+  );
+  assert.deepEqual(edited.requestedServices[0].offer, {
+    ...pricing,
+    totalHours: 10,
+  });
+  await read(await sendRequest(b.id, stale), 409);
+
+  const { bookingRequest: removed } = await read(
+    await call(`${path}/${hourlyRow.id}`, "DELETE", {
+      expectedBookingUpdatedAt: edited.updatedAt,
     }),
     200,
   );
-  assert.deepEqual(
-    deleted.package.addonServices.map((addon: PackageAddonService) => addon.id),
-    [fixed.id],
-  );
-  const afterDelete = await matrixSnapshot(b.id);
-  assert.deepEqual(afterDelete.proposals, [
-    {
-      ...current.proposals[0],
-      updated_at: afterDelete.proposals[0].updated_at,
-      addon_services: [nextAddon],
-    },
-  ]);
-  assert.deepEqual(afterDelete.quotations, current.quotations);
-  const finalPreparation = await prepare(b.id);
-  const replacement = await send(
-    b.id,
-    sendInput(finalPreparation, [{ id: fixed.id, addon: { hours: 2 } }]),
-  );
-  assert.equal(replacement.totalAmountMinor, 380000);
-  const historical = (
+  assert.equal(removed.requestedServices[1].serviceId, hourly.id);
+  assert.equal(removed.requestedServices[1].offer, undefined);
+  const afterEdit = await matrixSnapshot(b.id);
+
+  for (const key of ["catalog", "proposals", "messages", "quotations"]) {
+    assert.deepEqual(afterEdit[key], before[key]);
+  }
+
+  const visible = (
     await read(
-      await call(`/quotations/${sent.id}`, "GET", undefined, customerCookie),
+      await call(`/booking-requests/${b.id}`, "GET", undefined, customerCookie),
       200,
     )
-  ).quotation;
-  assert.equal(historical.totalAmountMinor, sent.totalAmountMinor);
-  assert.equal(historical.items.length, 2);
+  ).bookingRequest;
+  assert.deepEqual(visible.requestedServices, removed.requestedServices);
+  const second = await send(b.id);
+  assert.equal(second.totalAmountMinor, 2100000);
+  assert.equal(second.previousQuotationId, first.id);
+  assert.equal(second.items.length, 1);
+  const { quotations } = await read(
+    await call(`${quotationPath(b.id)}?quotationId=${first.id}`),
+    200,
+  );
+
+  const old = (quotations as Quotation[]).find(
+    (quote) => quote.id === first.id,
+  );
+
+  assert.ok(old);
+  assert.deepEqual(old.items, first.items);
+  assert.equal(old.totalAmountMinor, first.totalAmountMinor);
 });
 
-test("archiving an add-on blocks delivery until an admin deletes it from the package", async () => {
-  const { b, proposal, content } = await quotationAddonsFixture();
-  const [fixed, hourly] = content.addonServices;
+test("service reference protection and archive checks follow booking add-ons", async () => {
+  const { b, hourly } = await quotationAddonsFixture();
   const prepared = await prepare(b.id);
+  await read(await call(`/admin/services/${hourly.id}`, "DELETE"), 409);
   await db
     .updateTable("services")
     .set({ archived_at: new Date() })
-    .where("id", "=", hourly.serviceId)
+    .where("id", "=", hourly.id)
     .execute();
   const before = await matrixSnapshot(b.id);
-  await read(
-    await sendRequest(
-      b.id,
-      sendInput(prepared, [
-        { id: fixed.id, addon: { hours: 0 } },
-        { id: hourly.id, addon: { hours: 1 } },
-      ]),
-    ),
-    409,
-  );
+  await read(await sendRequest(b.id, sendInput(prepared)), 409);
   assert.equal(
     (await prepare(b.id)).items[1].addon?.requiresRemoval,
     "archived",
   );
   assert.deepEqual(await matrixSnapshot(b.id), before);
   await read(
-    await call(
-      `/admin/booking-requests/${b.id}/custom-package/addons/${hourly.id}`,
-      "DELETE",
-      {
-        packageId: proposal.package.id,
-        expectedBookingUpdatedAt: proposal.bookingRequest.updatedAt,
-        expectedUpdatedAt: proposal.package.updatedAt,
-      },
-    ),
-    200,
-  );
-  const fresh = await prepare(b.id);
-  assert.deepEqual(
-    fresh.items.map((item) => item.id),
-    [fixed.id],
-  );
-  const sent = await send(
-    b.id,
-    sendInput(fresh, [{ id: fixed.id, addon: { hours: 0 } }]),
-  );
-  assert.equal(sent.totalAmountMinor, 250000);
-});
-
-test("revision rates and base price follow saved package changes while delivered terms stay stable", async () => {
-  const { b, content, update, proposal } = await quotationAddonsFixture();
-  const [fixed, hourly] = content.addonServices;
-  const items = [
-    { id: fixed.id, addon: { hours: 2 } },
-    { id: hourly.id, addon: { hours: 3 } },
-  ];
-  const first = await send(b.id, sendInput(await prepare(b.id), items));
-  const customerPath = `/quotations/${first.id}`;
-  const firstVisible = (
-    await read(await call(customerPath, "GET", undefined, customerCookie), 200)
-  ).quotation;
-  const stale = sendInput(await prepare(b.id), items);
-  const edited = await read(
-    await update({
-      price: { ...content.price, amountMinor: 180000 },
-      addonServices: [{ ...fixed, hourlyRatePesos: 500 }, hourly],
+    await call(`${addOnsPath(b.id)}/${prepared.items[1].id}`, "DELETE", {
+      expectedBookingUpdatedAt: prepared.expectedBookingUpdatedAt,
     }),
     200,
   );
-  assert.equal(edited.package.id, proposal.package.id);
-  assert.equal(edited.package.price.amountMinor, 180000);
-  await db
-    .updateTable("services")
-    .set({ name: "Renamed service" })
-    .where("id", "=", fixed.serviceId)
-    .execute();
-  await db
-    .updateTable("booking_requests")
-    .set({ time_zone: "Asia/Singapore" })
-    .where("id", "=", b.id)
-    .execute();
-  const before = await matrixSnapshot(b.id);
-  await read(await sendRequest(b.id, stale), 409);
-  assert.deepEqual(await matrixSnapshot(b.id), before);
+  assert.equal(
+    (await call(`/admin/services/${hourly.id}`, "DELETE")).status,
+    204,
+  );
+  assert.equal((await send(b.id)).items.length, 1);
+});
 
+test("private proposal supplies base price and included services while the booking supplies add-ons", async () => {
+  const { b, catalog, included } = await quotationAddonsFixture();
+  const prepared = await prepare(b.id);
+  const original = await send(b.id);
+  const path = `/admin/booking-requests/${b.id}/custom-package`;
+  const { package: proposal } = await read(
+    await call(path, "POST", {
+      ...proposalContent,
+      price: { ...proposalContent.price, amountMinor: 180000 },
+      sections: includedService(included.id),
+      expectedBookingUpdatedAt: prepared.expectedBookingUpdatedAt,
+      sourcePackageId: catalog.id,
+      expectedUpdatedAt: prepared.expectedPackageUpdatedAt,
+    }),
+    200,
+  );
+  assert.equal("addonServices" in proposal, false);
   const fresh = await prepare(b.id);
+  assert.equal(fresh.packageId, proposal.id);
   assert.equal(fresh.baseAmountMinor, 180000);
-  assert.equal(fresh.items[0].description, "Renamed service");
-  assert.equal(fresh.items[0].amountMinor, 250000);
-  assert.equal(fresh.currentOffer?.id, first.id);
-  const next = await send(b.id, sendInput(fresh, items));
-  assert.equal(next.totalAmountMinor, 625000);
-  const old = (
-    await read(await call(customerPath, "GET", undefined, customerCookie), 200)
-  ).quotation;
-  assert.equal(old.totalAmountMinor, firstVisible.totalAmountMinor);
-  assert.deepEqual(old.items, firstVisible.items);
+  assert.deepEqual(
+    fresh.items.map(({ id }) => id),
+    prepared.items.map(({ id }) => id),
+  );
+
+  const id = fresh.items[0].id;
+  const edit = {
+    pricing: fixedPricing,
+    expectedBookingUpdatedAt: fresh.expectedBookingUpdatedAt,
+  };
+  const { bookingRequest: pending } = await read(
+    await call(`${addOnsPath(b.id)}/${id}`, "PATCH", {
+      ...edit,
+      totalHours: null,
+    }),
+    200,
+  );
+  const incomplete = await prepare(b.id);
+  assert.equal(incomplete.items[0].amountMinor, null);
+  assert.equal(incomplete.items[0].addon?.totalHours, null);
+  await read(await sendRequest(b.id, sendInput(incomplete)), 400);
+  assert.equal((await prepare(b.id)).currentOffer?.id, original.id);
+  await read(
+    await call(`${addOnsPath(b.id)}/${id}`, "PATCH", {
+      ...edit,
+      expectedBookingUpdatedAt: pending.updatedAt,
+      totalHours: 5,
+    }),
+    200,
+  );
+  const next = await send(b.id);
+  assert.equal(next.items[0].amountMinor, 1600000);
+  assert.equal(next.items[0].addon?.hours, 0);
+  assert.equal(next.items[0].addon?.totalHours, 5);
+  assert.equal(next.totalAmountMinor, 1975000);
 });
 
 test("delivery permits a full-sized adjustment payload above the ordinary booking limit", async () => {
@@ -1661,8 +1587,33 @@ test("delivery permits a full-sized adjustment payload above the ordinary bookin
 test("the Edge dispatcher loads protected quotation routes and delivers through the same service", async () => {
   const { app: edge } = await import("../src/edge/server.js");
   const b = await booking();
+  const service = await db
+    .insertInto("services")
+    .values({
+      slug: "edge-booking-offer-service",
+      name: "Edge booking offer service",
+      description: "Synthetic hourly service",
+      hourly_rate_pesos: 650,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
   const path = `/v1${quotationPath(b.id)}`;
+  const headers = { Cookie: adminCookie, "Content-Type": "application/json" };
   await read(await edge.request(`${path}/prepare`), 401);
+  const { bookingRequest } = await read(
+    await edge.request(`/v1${addOnsPath(b.id)}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        expectedBookingUpdatedAt: b.updatedAt,
+        serviceId: service.id,
+        pricing: hourlyPricing,
+        totalHours: 2,
+      }),
+    }),
+    200,
+  );
+  assert.equal(bookingRequest.requestedServices[0].origin, "admin");
   const { preparation } = await read(
     await edge.request(`${path}/prepare`, { headers: { Cookie: adminCookie } }),
     200,
@@ -1671,54 +1622,47 @@ test("the Edge dispatcher loads protected quotation routes and delivers through 
   const { quotation } = await read(
     await edge.request(`${path}/send`, {
       method: "POST",
-      headers: { Cookie: adminCookie, "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(input),
     }),
     200,
   );
-  assert.equal(quotation.totalAmountMinor, 100500);
+  assert.equal(quotation.totalAmountMinor, 230500);
+  assert.equal(quotation.items[0].serviceId, service.id);
   const { messages, quotations } = await matrixSnapshot(b.id);
   assert.equal(quotations.length, 1);
   assert.equal(messages[0].quotation_id, quotation.id);
 });
 
-test("closed inquiries and other private packages cannot be changed through an add-on action", async () => {
+test("closed inquiries and another booking cannot be changed through an add-on action", async () => {
   const first = await quotationAddonsFixture();
   const second = await quotationAddonsFixture();
-  const addonId = first.content.addonServices[0].id;
-  const firstSource = {
-    packageId: first.proposal.package.id,
-    expectedBookingUpdatedAt: first.proposal.bookingRequest.updatedAt,
-    expectedUpdatedAt: first.proposal.package.updatedAt,
-  };
-  const firstPath = `/admin/booking-requests/${first.b.id}/custom-package/addons/${addonId}`;
-  const secondPath = `/admin/booking-requests/${second.b.id}/custom-package/addons/${addonId}`;
+  const addonId = first.b.requestedServices[0].id;
+  const firstPath = `${addOnsPath(first.b.id)}/${addonId}`;
+  const secondPath = `${addOnsPath(second.b.id)}/${addonId}`;
+  const revision = { expectedBookingUpdatedAt: first.b.updatedAt };
   await read(
     await call(secondPath, "DELETE", {
-      ...firstSource,
-      expectedBookingUpdatedAt: second.proposal.bookingRequest.updatedAt,
+      expectedBookingUpdatedAt: second.b.updatedAt,
     }),
-    409,
+    404,
   );
 
-  const pricing = {
-    hourlyRatePesos: 230,
-    fixedPricePesos: null,
-    includedHours: null,
-  };
-
   for (const status of ["declined", "cancelled"]) {
-    // Keep the revision constant so the locked booking status is decisive.
     await pool.query("UPDATE booking_requests SET status = $1 WHERE id = $2", [
       status,
       first.b.id,
     ]);
     const before = await matrixSnapshot(first.b.id);
     await read(
-      await call(firstPath, "PATCH", { ...firstSource, ...pricing }),
+      await call(firstPath, "PATCH", {
+        ...revision,
+        pricing: hourlyPricing,
+        totalHours: 3,
+      }),
       409,
     );
-    await read(await call(firstPath, "DELETE", firstSource), 409);
+    await read(await call(firstPath, "DELETE", revision), 409);
     assert.deepEqual(await matrixSnapshot(first.b.id), before);
   }
 });

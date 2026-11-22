@@ -3,15 +3,12 @@ import {
   sectionsSchema,
   storedSectionsSchema,
 } from "@event-management/contracts/catalog-canvas";
-import { packageAddonServicesSchema } from "@event-management/contracts/catalog-service-terms";
-import type { PackageAddonService } from "@event-management/contracts/catalog";
 import type { z } from "zod";
 import type { Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 import type { CanvasOwner } from "../../data/catalog-canvas/catalog-canvas-types.js";
 import {
   readStoredCanvasData,
-  readPackageAddonServicesData,
   lockCanvasServiceData,
   lockCanvasPackageData,
   findCanvasMediaOwnersData,
@@ -19,10 +16,7 @@ import {
 } from "../../data/catalog-canvas/catalog-canvas-queries.js";
 import { lockCatalogMediaData } from "../../data/catalog-media/lock-catalog-media.js";
 import { createCatalogMediaData } from "../../data/catalog-media/create-catalog-media.js";
-import {
-  canvasServiceIds,
-  storedCanvasWidget,
-} from "../../utils/catalog-canvas.js";
+import { storedCanvasWidget } from "../../utils/catalog-canvas.js";
 import { listCatalogMediaIdsService } from "./read-catalog-sections.js";
 import { listOwnerMediaIdsData } from "../../data/catalog-media/catalog-media-ownership.js";
 
@@ -33,7 +27,6 @@ export async function replaceCatalogSectionsService(
   owner: CanvasOwner,
   content: {
     sections: z.infer<typeof sectionsSchema>;
-    addonServices?: PackageAddonService[];
   },
   actorId: string,
   sourcePackageId?: string,
@@ -42,18 +35,6 @@ export async function replaceCatalogSectionsService(
   const baseline = sourcePackageId
     ? await readStoredCanvasData(db, { kind: "package", id: sourcePackageId })
     : previous;
-  const packageRow =
-    owner.kind === "package"
-      ? await readPackageAddonServicesData(db, owner.id)
-      : undefined;
-  const addonServices = packageAddonServicesSchema.parse(
-    content.addonServices ?? [],
-  );
-
-  if (addonServices.length && packageRow?.package_type !== "custom")
-    throw new InvalidCatalogMedia(
-      "Add-on services are only allowed on private custom packages",
-    );
 
   if (
     owner.kind === "service" &&
@@ -64,25 +45,6 @@ export async function replaceCatalogSectionsService(
     throw new InvalidCatalogMedia(
       "Package service terms are not allowed on service pages",
     );
-
-  const includedServiceIds = canvasServiceIds(content.sections);
-
-  if (
-    addonServices.some((addon) =>
-      includedServiceIds.has(addon.serviceId.toLowerCase()),
-    )
-  )
-    throw new InvalidCatalogMedia(
-      "A service cannot be both included and an add-on",
-    );
-
-  const existingAddons = new Set(
-    packageAddonServicesSchema
-      .parse(packageRow?.addon_services ?? [])
-      .map(
-        (addon) => `${addon.id.toLowerCase()}:${addon.serviceId.toLowerCase()}`,
-      ),
-  );
 
   const existing = new Set(
     baseline.flatMap((s) =>
@@ -101,7 +63,6 @@ export async function replaceCatalogSectionsService(
   const serviceIds = [
     ...new Set([
       ...refs.flatMap((w) => (w.serviceId ? [w.serviceId.toLowerCase()] : [])),
-      ...addonServices.map((addon) => addon.serviceId.toLowerCase()),
     ]),
   ].sort();
 
@@ -110,16 +71,11 @@ export async function replaceCatalogSectionsService(
 
     if (
       (!service || service.archived_at) &&
-      (refs.some(
+      refs.some(
         (w) =>
           w.serviceId?.toLowerCase() === id &&
           !existing.has(`${w.id.toLowerCase()}:${id}`),
-      ) ||
-        addonServices.some(
-          (addon) =>
-            addon.serviceId.toLowerCase() === id &&
-            !existingAddons.has(`${addon.id.toLowerCase()}:${id}`),
-        ))
+      )
     )
       throw new InvalidCatalogMedia("Selected service is unavailable");
   }
@@ -262,16 +218,7 @@ export async function replaceCatalogSectionsService(
   }
 
   const validatedSections = storedSectionsSchema.parse(sections);
-  await updateStoredCanvasData(
-    db,
-    owner,
-    validatedSections,
-    addonServices.map(({ service: _preview, ...addon }) => ({
-      ...addon,
-      id: addon.id.toLowerCase(),
-      serviceId: addon.serviceId.toLowerCase(),
-    })),
-  );
+  await updateStoredCanvasData(db, owner, validatedSections);
 
   return previousMediaIds;
 }

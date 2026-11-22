@@ -576,8 +576,11 @@ test("package services display local terms while service pages stay neutral and 
     /Included · 3 hours included · ₱800 \/ additional hour/,
   );
   assert.doesNotMatch(publicHtml, /Addon Services/);
-  const privateHtml = render(canvas.PackageCanvas, { item, showAddons: true });
-  assert.match(privateHtml, /Addon Services/);
+  const privateHtml = render(canvas.PackageCanvas, {
+    item,
+    historicalAddons: [addon],
+  });
+  assert.match(privateHtml, /Historical add-on services/);
   assert.match(privateHtml, /₱1,200 \/ hour/);
   assert.ok(
     privateHtml.indexOf("catalog-addons") >

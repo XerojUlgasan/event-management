@@ -148,7 +148,7 @@ export function createGetMyRequestHistoryTool(context: BookingFactToolContext) {
     ...context,
     toolName: "getMyRequestHistory",
     description:
-      "Read the latest customer-visible status change for the current conversation's booking request. Takes no arguments; the server supplies customer and conversation scope. Returns only status, optional reason, and time. no_linked_request and no_status_history are explicit normal outcomes. The result is current evidence, not a booking confirmation or operational schedule.",
+      "Read the latest customer-visible status change for the current conversation's booking request. Takes no arguments; the server supplies customer and conversation scope. Returns requested services and their saved offers, plus the latest status, optional reason, and time when present. A requested service without an offer is only a request; offers are not sent quotations. no_linked_request and no_status_history are explicit normal outcomes. The result is current evidence, not a booking confirmation or operational schedule.",
     read: getMyRequestHistoryService,
     audit: (result) =>
       result.status === "found" && "latestChange" in result

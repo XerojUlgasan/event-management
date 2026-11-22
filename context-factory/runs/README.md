@@ -14,6 +14,8 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Service summary cleanup](2026-11-22_10-16-51_service-summary-cleanup.md) | One compact service row in details, sidebar, and quotation / main | complete | Review the working-tree diff. |
+| [Booking-owned add-ons](2026-11-22_05-12-21_booking-owned-add-ons.md) | Booking-owned pricing, migration and quotation send / main | complete | Review the diff, then deploy the coordinated release. |
 | [Manual booking add-ons](2026-11-22_01-16-37_manual-booking-add-ons.md) | Service selection, hours, and admin review / main | complete | Review the local changes before rollout with the existing booking-draft migration. |
 | [Natural booking conversations](2026-11-22_01-10-04_natural-booking-chat.md) | AMAC language, intake pacing and consent / main | complete | Live model and browser flows verified. Review before rollout. |
 | [Single-row booking drafts](2026-11-22_00-39-41_single-row-booking-drafts.md) | AMAC intake and submission / main | complete | Deploy the forward migration and matching application builds together. |

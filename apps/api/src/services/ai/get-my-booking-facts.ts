@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { reviewedServiceSchema } from "@event-management/contracts/booking-draft";
 import type { Kysely } from "kysely";
 import { centavosToPesos } from "@event-management/contracts/money";
 import type { DB } from "../../db/types.js";
@@ -32,13 +33,18 @@ export type MySentQuotationResult =
 export type MyRequestHistoryResult =
   | {
       status: "found";
+      requestedServices: z.infer<typeof reviewedServiceSchema>[];
       latestChange: {
         status: string;
         reason: string | null;
         createdAt: string;
       };
     }
-  | { status: "no_linked_request" | "no_status_history" };
+  | { status: "no_linked_request" }
+  | {
+      status: "no_status_history";
+      requestedServices: z.infer<typeof reviewedServiceSchema>[];
+    };
 
 export class BookingFactAccessDenied extends Error {
   constructor() {
@@ -76,7 +82,7 @@ async function getOwnedConversationBooking({
 
   if (!booking) throw new BookingFactAccessDenied();
 
-  return booking.id;
+  return booking;
 }
 
 export async function getMySentQuotationService({
@@ -91,15 +97,15 @@ export async function getMySentQuotationService({
   abortSignal?: AbortSignal;
 }): Promise<MySentQuotationResult> {
   abortSignal?.throwIfAborted();
-  const bookingId = await getOwnedConversationBooking({
+  const booking = await getOwnedConversationBooking({
     db,
     customerId,
     conversationId,
   });
 
-  if (!bookingId) return { status: "no_linked_request" };
+  if (!booking) return { status: "no_linked_request" };
 
-  const row = await latestDeliveredQuoteData(db, bookingId);
+  const row = await latestDeliveredQuoteData(db, booking.id);
   abortSignal?.throwIfAborted();
 
   if (!row) return { status: "no_sent_quotation" };
@@ -145,21 +151,26 @@ export async function getMyRequestHistoryService({
   abortSignal?: AbortSignal;
 }): Promise<MyRequestHistoryResult> {
   abortSignal?.throwIfAborted();
-  const bookingId = await getOwnedConversationBooking({
+  const booking = await getOwnedConversationBooking({
     db,
     customerId,
     conversationId,
   });
 
-  if (!bookingId) return { status: "no_linked_request" };
+  if (!booking) return { status: "no_linked_request" };
 
-  const latest = await latestStatusHistoryData(db, bookingId);
+  const latest = await latestStatusHistoryData(db, booking.id);
   abortSignal?.throwIfAborted();
 
-  if (!latest) return { status: "no_status_history" };
+  const requestedServices = reviewedServiceSchema
+    .array()
+    .parse(booking.requested_services ?? []);
+
+  if (!latest) return { status: "no_status_history", requestedServices };
 
   return {
     status: "found",
+    requestedServices,
     latestChange: {
       status: latest.status,
       reason: latest.reason,

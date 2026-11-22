@@ -1,7 +1,7 @@
 # Package-owned add-ons and direct quotation sending
 
 Date: 2026-11-21
-Status: accepted
+Status: add-on ownership superseded by [Booking-owned add-ons](2026-11-22_booking-owned-add-ons.md). Send or Cancel remains accepted.
 Authority: The user approved mandatory package add-ons, shared package Edit and Remove actions with confirmation, and Send or Cancel.
 Implementation: see the [direct quotation send run](../../runs/2026-11-21_00-49-10_direct-quotation-send.md).
 

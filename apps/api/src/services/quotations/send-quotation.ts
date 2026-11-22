@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import type {
-  QuotationItem,
-  SendQuotationInput,
+import {
+  MAX_QUOTATION_ITEMS,
+  type QuotationItem,
+  type SendQuotationInput,
 } from "@event-management/contracts/quotations";
 import type { Kysely } from "kysely";
 import { createAuditEventData } from "../../data/audit/create-audit-event.js";
@@ -21,10 +22,7 @@ import {
 } from "../../data/quotations/list-quotations.js";
 import { supersedeQuotationData } from "../../data/quotations/update-quotation.js";
 import type { DB } from "../../db/types.js";
-import {
-  quotationAddons,
-  withQuotationAddonHours,
-} from "./quotation-addons.js";
+import { quotationAddons } from "./quotation-addons.js";
 import {
   amount,
   basePrice,
@@ -115,50 +113,32 @@ export async function sendQuotationService(
       if (base === null)
         return failure("Package price is outside the supported range", 400);
 
-      const addons = await quotationAddons(trx, pkg, true);
+      const addons = await quotationAddons(trx, booking, pkg, true);
 
       if (addons.some((item) => item.addon.requiresRemoval))
         return failure(
-          "Remove unavailable or already included add-ons from the private package",
+          "Remove unavailable or already included booking add-ons before sending",
           409,
         );
 
-      const remainingAddons = new Map(addons.map((item) => [item.id, item]));
-
-      const items: QuotationItem[] = [];
-
-      for (const item of input.items) {
-        const id = item.id.toLowerCase();
-
-        if (!item.addon) {
-          items.push({ ...item, id });
-          continue;
-        }
-
-        const addon = remainingAddons.get(id);
-
-        if (!addon)
-          return failure(
-            "Quotation add-ons must match the current private package",
-            409,
-          );
-
-        const priced = withQuotationAddonHours(addon, item.addon.hours);
-
-        if (priced.amountMinor === null)
-          return failure(
-            "Complete package add-on hours within the supported price range",
-            400,
-          );
-
-        items.push(priced);
-        remainingAddons.delete(id);
-      }
-
-      if (remainingAddons.size)
+      if (addons.some((item) => item.amountMinor === null))
         return failure(
-          "Quotation add-ons must match the current private package",
-          409,
+          "Complete booking add-on hours and pricing before sending",
+          400,
+        );
+
+      const items: QuotationItem[] = [
+        ...addons,
+        ...input.items.map((item) => ({ ...item, id: item.id.toLowerCase() })),
+      ];
+
+      if (
+        items.length > MAX_QUOTATION_ITEMS ||
+        new Set(items.map((item) => item.id)).size !== items.length
+      )
+        return failure(
+          "Quotation items exceed the limit or contain duplicate IDs",
+          400,
         );
 
       const total = amount(base, items);

@@ -20,7 +20,7 @@ The [identity reference](identity.md) defines these responsibilities. Admin mean
 
 ## Booking through AMAC AI
 
-A guest or customer can give event details over several messages, select a public package or request a custom arrangement. AMAC saves the draft as a booking request with an empty `submitted_at`, linked to that chat. Lists, calendars and administrative booking actions show submitted requests. The signed-in customer reviews the exact contact details, dates, package and requested services, then confirms submission in the same chat. The team receives an inquiry under review. Changing the draft or handing the chat to a human invalidates the pending confirmation. Requested services reach the admin as customer preferences. The admin owns private-package add-ons and quotation prices. See the [workflow and acceptance cases](../../docs/specs/amac-conversational-booking.md).
+A guest or customer can give event details over several messages, select a public package or request a custom arrangement. AMAC saves the draft as a booking request with an empty `submitted_at`, linked to that chat. Lists, calendars and administrative booking actions show submitted requests. The signed-in customer reviews the exact contact details, dates, package and requested services, then confirms submission in the same chat. The team receives an inquiry under review. Changing the draft or handing the chat to a human invalidates the pending confirmation. Requested services reach the admin as customer preferences. The admin owns booking add-on offers and quotation prices. See the [workflow and acceptance cases](../../docs/specs/amac-conversational-booking.md).
 
 ## Rules and boundaries
 

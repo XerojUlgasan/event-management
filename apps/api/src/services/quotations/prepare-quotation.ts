@@ -51,7 +51,7 @@ export async function prepareQuotationService(
 
       const offer = await latestDeliveredQuoteData(trx, booking.id);
       const previousItems = offer ? quotationItems(offer.items) : [];
-      const addons = await quotationAddons(trx, pkg, false, previousItems);
+      const addons = await quotationAddons(trx, booking, pkg, false);
 
       const addonIds = new Set(addons.map((item) => item.id));
 

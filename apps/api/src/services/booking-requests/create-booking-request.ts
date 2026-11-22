@@ -91,28 +91,34 @@ export async function createBookingRequestInTransaction(
 
   const addons = input.requestedAddons ?? [];
   const requestedServices: ReviewedBookingService[] = [];
+
   if (addons.length) {
     const rows = await lockRequestedAddonServices(
       trx,
       addons.map((item) => item.serviceId),
     );
+
     const services = new Map(rows.map((row) => [row.id, row]));
+
     const included = pkg
       ? canvasServiceIds(storedSectionsSchema.parse(pkg.canvas))
       : new Set<string>();
 
     for (const item of addons) {
       const service = services.get(item.serviceId);
+
       if (!service)
         return addonConflict(
           item.serviceId,
           "A selected service is no longer available. Remove it or try again.",
         );
+
       if (service.updated_at.toISOString() !== item.serviceUpdatedAt)
         return addonConflict(
           service.id,
           `${service.name} changed. Refresh and review its terms.`,
         );
+
       if (included.has(service.id))
         return addonConflict(
           service.id,
@@ -124,16 +130,20 @@ export async function createBookingRequestInTransaction(
         fixedPricePesos: service.fixed_price_pesos,
         includedHours: service.included_hours,
       });
+
       if (!pricing.success)
         return addonConflict(
           service.id,
           `${service.name} has unavailable pricing. Refresh and try again`,
         );
+
       const hours = (pricing.data.includedHours ?? 0) + item.hours;
+
       if (hours <= 0 || hours > MAX_BOOKING_ADDON_HOURS)
         return error(`Choose valid hours for ${service.name}`, 400);
 
       requestedServices.push({
+        id: randomUUID(),
         serviceId: service.id,
         name: service.name,
         hours,
@@ -141,11 +151,18 @@ export async function createBookingRequestInTransaction(
         included: false,
         updatedAt: service.updated_at.toISOString(),
         catalogPricing: pricing.data,
+        offer: { ...pricing.data, totalHours: hours },
       });
     }
   }
 
-  const services = extra?.requestedServices ?? requestedServices;
+  const services = extra
+    ? extra.requestedServices.map((service) => ({
+        ...service,
+        id: randomUUID(),
+      }))
+    : requestedServices;
+
   const values = {
     customer_id: customerId,
     package_id: input.packageId ?? null,

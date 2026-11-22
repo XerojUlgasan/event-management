@@ -210,7 +210,6 @@ export interface Notifications {
 }
 
 export interface Packages {
-  addon_services: Generated<Json>;
   archived_at: Timestamp | null;
   canvas: Generated<Json>;
   created_at: Generated<Timestamp>;

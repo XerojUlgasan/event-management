@@ -1,10 +1,19 @@
 import type { ReviewedBookingService } from "@event-management/contracts/booking-draft";
 import type { BookingStatus } from "@event-management/contracts/booking-requests";
-import type { PackagePrice } from "@event-management/contracts/catalog";
+import type {
+  PackagePrice,
+  ServicePricing,
+} from "@event-management/contracts/catalog";
 import type { BookingEstimatedDuration } from "@event-management/contracts/limits/booking-requests";
 import { request } from "../../http/request";
 
 export type { BookingStatus } from "@event-management/contracts/booking-requests";
+
+export type BookingService = ReviewedBookingService & {
+  id?: string;
+  origin?: "admin";
+  offer?: ServicePricing & { totalHours: number | null };
+};
 
 export type BookingRequestInput = {
   requestedAddons?: {
@@ -62,7 +71,7 @@ export type BookingRequest = Omit<
   endsAt: string | null;
   preferredVenueLocation: string | null;
   specialRequests: string | null;
-  requestedServices: ReviewedBookingService[];
+  requestedServices: BookingService[];
   budget: string | null;
   id: string;
   reference: string;
@@ -180,4 +189,43 @@ export const getBookingStatusHistory = (
 ) =>
   request<{ history: BookingStatusHistoryEntry[]; nextCursor: string | null }>(
     `${admin ? "/admin" : ""}/booking-requests/${encodeURIComponent(id)}/status-history${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+  );
+
+export type BookingAddonInput = {
+  expectedBookingUpdatedAt: string;
+  totalHours: number | null;
+  pricing: ServicePricing;
+};
+
+export const addBookingAddon = (
+  id: string,
+  body: BookingAddonInput & { serviceId: string },
+) =>
+  request<{ bookingRequest: BookingRequest }>(
+    `/admin/booking-requests/${encodeURIComponent(id)}/addons`,
+    body,
+  );
+
+export const updateBookingAddon = (
+  id: string,
+  addonId: string,
+  body: BookingAddonInput,
+) =>
+  request<{ bookingRequest: BookingRequest }>(
+    `/admin/booking-requests/${encodeURIComponent(id)}/addons/${encodeURIComponent(addonId)}`,
+    body,
+    undefined,
+    "PATCH",
+  );
+
+export const removeBookingAddon = (
+  id: string,
+  addonId: string,
+  expectedBookingUpdatedAt: string,
+) =>
+  request<{ bookingRequest: BookingRequest }>(
+    `/admin/booking-requests/${encodeURIComponent(id)}/addons/${encodeURIComponent(addonId)}`,
+    { expectedBookingUpdatedAt },
+    undefined,
+    "DELETE",
   );

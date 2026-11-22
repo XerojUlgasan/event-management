@@ -79,12 +79,20 @@ const php = new Intl.NumberFormat("en-PH", {
 });
 
 function agreedAddonDescription(item: QuotationAddonItem) {
-  const { source, hours, fixedPriceOverrideMinor, hourlyRateOverrideMinor } =
-    item.addon;
+  const {
+    source,
+    hours,
+    totalHours,
+    fixedPriceOverrideMinor,
+    hourlyRateOverrideMinor,
+  } = item.addon;
   const fixed = source.includedHours !== null;
   const price = fixedPriceOverrideMinor ?? source.fixedPriceMinor;
   const rate = hourlyRateOverrideMinor ?? source.hourlyRateMinor;
   const terms = [];
+
+  if (fixed && totalHours != null)
+    terms.push(`${totalHours} total ${totalHours === 1 ? "hour" : "hours"}`);
 
   if (fixed && price !== null)
     terms.push(

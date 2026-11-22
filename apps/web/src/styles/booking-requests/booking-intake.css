@@ -1,5 +1,4 @@
-.booking-review,
-.booking-intake {
+.booking-review {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
@@ -12,4 +11,84 @@
 }
 .booking-review dd {
   margin: 0;
+}
+
+.service-summary h4,
+.booking-addons h4 {
+  margin: 28px 0 0;
+  font-size: 14px;
+}
+.service-summary ul,
+.booking-addon-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+.service-summary li,
+.booking-addon-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.service-summary li > div,
+.booking-addon-copy {
+  flex: 1;
+  min-width: 0;
+}
+.service-summary strong,
+.booking-addon-copy strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.service-summary li span,
+.booking-addon-copy span,
+.service-summary small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.service-summary small {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.service-summary b,
+.booking-addon-amount {
+  flex: none;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.service-summary p {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 16px 0 0;
+  font-size: 14px;
+}
+.service-summary p span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.booking-addon-actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+.booking-addon-empty {
+  margin: 8px 0 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.booking-addons > .button {
+  margin-top: 12px;
 }

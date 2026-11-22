@@ -16,7 +16,6 @@ let window,
   createElement,
   useState,
   createRoot,
-  Addons,
   Terms,
   PackageEditor,
   CatalogEditor,
@@ -152,9 +151,6 @@ before(async () => {
     },
     logLevel: "silent",
   });
-  ({ PackageAddonServices: Addons } = await server.ssrLoadModule(
-    "/src/components/catalog/PackageAddonServices.tsx",
-  ));
   ({ ServiceTermsDialog: Terms } = await server.ssrLoadModule(
     "/src/components/catalog/ServiceTermsDialog.tsx",
   ));
@@ -308,143 +304,21 @@ test("legacy included settings stay unspecified until saved; reset failure can r
   assert.equal(document.activeElement, button("Open settings"));
 });
 
-test("add-on picker copies defaults, rejects overlap, and local override survives reopen without changing base", async () => {
-  let latest;
-  function Harness() {
-    const [content, setContent] = useState({ ...packageItem, sections: [] });
-    latest = content;
-
-    return createElement(Addons, { content, onChange: setContent });
-  }
-  await render(Harness);
-  await click("Add service");
-  await click("Photography");
-  assert.deepEqual(
-    [
-      latest.addonServices[0].fixedPricePesos,
-      latest.addonServices[0].includedHours,
-      latest.addonServices[0].hourlyRatePesos,
-    ],
-    [5000, 4, 900],
-  );
-  const tableRegion = document.querySelector(
-    '[role="region"][aria-label="Add-on services"]',
-  );
-  assert.equal(tableRegion?.tabIndex, 0);
-  assert.equal(
-    button("Remove Photography").getAttribute("title"),
-    "Remove Photography",
-  );
-  await click("Settings for Photography");
-  await change("Fixed price", "6000");
-  await change("Included hours", "5");
-  await change("Excess hourly rate", "1000");
-  await click("Save settings");
-  assert.deepEqual(
-    [
-      latest.addonServices[0].fixedPricePesos,
-      latest.addonServices[0].includedHours,
-      latest.addonServices[0].hourlyRatePesos,
-    ],
-    [6000, 5, 1000],
-  );
-  assert.equal(latest.price.amountMinor, 1000000);
-  await click("Settings for Photography");
-  assert.equal(input("Fixed price").value, "6000");
-  assert.equal(input("Included hours").value, "5");
-  await click("Save settings");
-  await click("Remove Photography");
-  assert.equal(latest.addonServices.length, 1);
-  await click("Remove package add-on");
-  assert.equal(latest.addonServices.length, 0);
-  assert.match(document.body.textContent, /No add-on services yet/);
-});
-
-test("add-on picker prevents selecting a service already included", async () => {
-  let latest;
-  function Harness() {
-    const [content, setContent] = useState(packageItem);
-    latest = content;
-
-    return createElement(Addons, { content, onChange: setContent });
-  }
-  await render(Harness);
-  await click("Add service");
-  await click("Photography");
-  assert.match(document.body.textContent, /already included/);
-  assert.equal(latest.addonServices.length, 0);
-});
-
-test("private editor saves included overrides and add-ons and reopens both without changing base price", async () => {
-  let saved;
-  const initial = {
-    ...packageItem,
-    sections: [
-      {
-        ...packageItem.sections[0],
-        widgets: [{ ...widget, serviceId: null, service: null }],
-      },
-    ],
-  };
-
-  const props = {
-    initial,
+test("private package details do not expose booking add-ons", async () => {
+  await render(PackageEditor, {
+    initial: packageItem,
     onClose: () => {},
     onSaved: () => {},
-    saveCustom: async (content) => {
-      saved = structuredClone(content);
-    },
-  };
-
-  await render(PackageEditor, props);
-  await click("Choose a service");
-  await click("Photography");
-  await click("Included service settings");
-  assert.equal(input("Included hours").value, "4");
-  await change("Included hours", "7");
-  await change("Excess hourly rate", "1200");
-  await click("Save settings");
-  await click("Change featured service");
-  await click("Photography");
-  await click("Included service settings");
-  assert.equal(input("Included hours").value, "7");
-  await click("Save settings");
-  const opener = button("Private package details");
-  opener.focus();
-  await click("Private package details");
-
-  const details = [...document.querySelectorAll("dialog")].find((node) =>
-    node.textContent.includes("Add-on services"),
-  );
-
-  assert.ok(details?.open);
-  assert.equal(details.parentElement, document.body);
-  assert.match(document.body.textContent, /Add-on services/);
-  await click("Add service");
-  await click("Music");
-  assert.ok(details.querySelector("table"));
-  await click("Settings for Music");
-  await change("Fixed price", "7000");
-  await click("Save settings");
-  await click("Done");
-  assert.equal(document.activeElement, opener);
-  await click("Save private package");
-  assert.deepEqual(saved.sections[0].widgets[0].serviceTerms, {
-    includedHours: 7,
-    hourlyRatePesos: 1200,
+    saveCustom: async () => {},
   });
-  assert.equal(saved.price.amountMinor, 1000000);
-  assert.equal(saved.addonServices[0].fixedPricePesos, 7000);
-  await act(async () => root.unmount());
-  root = null;
-  container.remove();
-  await render(PackageEditor, { ...props, initial: { ...initial, ...saved } });
-  await click("Included service settings");
-  assert.equal(input("Included hours").value, "7");
-  await click("Save settings");
   await click("Private package details");
-  await click("Settings for Music");
-  assert.equal(input("Fixed price").value, "7000");
+  assert.doesNotMatch(document.body.textContent, /Add-on services/);
+  assert.equal(
+    [...document.querySelectorAll("button")].some(
+      (node) => node.textContent.trim() === "Add service",
+    ),
+    false,
+  );
 });
 
 test("details modal dismisses on Escape and restores its opener", async () => {
@@ -459,7 +333,7 @@ test("details modal dismisses on Escape and restores its opener", async () => {
   await click("Private package details");
 
   const modal = [...document.querySelectorAll("dialog")].find((node) =>
-    node.textContent.includes("Add-on services"),
+    node.textContent.includes("Maximum guests"),
   );
 
   assert.ok(modal?.open);
@@ -469,53 +343,6 @@ test("details modal dismisses on Escape and restores its opener", async () => {
   await flush();
   assert.equal(modal.isConnected, false);
   assert.equal(document.activeElement, opener);
-});
-
-test("details shortcuts undo and redo add-ons but leave text and nested dialogs alone", async () => {
-  await render(PackageEditor, {
-    initial: packageItem,
-    onClose: () => {},
-    onSaved: () => {},
-    saveCustom: async () => {},
-  });
-  await click("Private package details");
-  await click("Add service");
-  await click("Music");
-  assert.ok(button("Settings for Music"));
-
-  async function shortcut(target, key, options = {}) {
-    const event = new window.KeyboardEvent("keydown", {
-      key,
-      ctrlKey: true,
-      bubbles: true,
-      cancelable: true,
-      ...options,
-    });
-    await act(async () => target.dispatchEvent(event));
-    await flush();
-
-    return event;
-  }
-
-  const textField = document.querySelector("textarea");
-  assert.equal((await shortcut(textField, "z")).defaultPrevented, false);
-  assert.ok(button("Settings for Music"));
-  await click("Settings for Music");
-  assert.equal(
-    (await shortcut(button("Save settings"), "z")).defaultPrevented,
-    false,
-  );
-  await click("Save settings");
-  assert.equal(
-    (await shortcut(button("Add service"), "z")).defaultPrevented,
-    true,
-  );
-  assert.match(document.body.textContent, /No add-on services yet/);
-  assert.equal(
-    (await shortcut(button("Done"), "z", { shiftKey: true })).defaultPrevented,
-    true,
-  );
-  assert.ok(button("Settings for Music"));
 });
 
 test("thumbnail Escape does not dismiss the details modal", async () => {

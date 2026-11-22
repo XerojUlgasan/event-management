@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
-import { publicSchema } from "../packages/schemas.js";
+import { packageHistorySnapshotSchema } from "../packages/schemas.js";
 import { idParams } from "./schemas.js";
 import { errors, json } from "./http.js";
 import { paginationQuerySchema } from "../../utils/pagination.js";
@@ -22,8 +22,8 @@ export const getAdminBookingPackageHistoryRoute = createRoute({
               actorId: z.string().uuid().nullable(),
               actorName: z.string().nullable(),
               action: z.string(),
-              before: publicSchema.nullable(),
-              after: publicSchema,
+              before: packageHistorySnapshotSchema.nullable(),
+              after: packageHistorySnapshotSchema,
               createdAt: z.string(),
             }),
           ),

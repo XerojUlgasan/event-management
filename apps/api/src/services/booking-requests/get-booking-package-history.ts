@@ -2,7 +2,7 @@ import { z } from "@hono/zod-openapi";
 import { createPage } from "@event-management/contracts/pagination";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
-import { publicSchema } from "../../controllers/packages/schemas.js";
+import { packageHistorySnapshotSchema } from "../../controllers/packages/schemas.js";
 import { findBookingRequestData } from "../../data/booking-requests/find-booking-request.js";
 import { listCustomPackageHistoryData } from "../../data/booking-requests/list-custom-package-history.js";
 import { encodePageCursor, parsePageCursor } from "../../utils/pagination.js";
@@ -39,7 +39,10 @@ export async function getBookingPackageHistoryService(
   return {
     history: page.items.map((row) => {
       const metadata = z
-        .object({ before: publicSchema.nullable(), after: publicSchema })
+        .object({
+          before: packageHistorySnapshotSchema.nullable(),
+          after: packageHistorySnapshotSchema,
+        })
         .parse(row.metadata);
 
       return {

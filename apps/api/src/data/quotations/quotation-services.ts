@@ -7,7 +7,7 @@ export function quotationServicesData(
 ) {
   const query = db
     .selectFrom("services")
-    .select(["id", "name", "archived_at"])
+    .select(["id", "archived_at"])
     .where("id", "in", ids)
     .orderBy("id");
 

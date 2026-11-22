@@ -79,7 +79,6 @@ export type PackagePrice = {
 };
 
 export type PackageContent = {
-  addonServices?: PackageAddonService[];
   name: string;
   description: string;
   maxGuests: number;
@@ -88,7 +87,6 @@ export type PackageContent = {
 };
 
 export type CatalogPackage = PackageContent & {
-  addonServices: PackageAddonService[];
   packageType: "catalog" | "custom";
   customForBookingRequestId: string | null;
   id: string;

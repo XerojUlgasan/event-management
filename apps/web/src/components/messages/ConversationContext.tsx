@@ -118,8 +118,7 @@ function EventDetails({
         </dl>
       )}
       <p className="conversation-details-note">
-        An inquiry does not confirm a booking. View the current package and
-        quotation using their separate conversation controls.
+        An inquiry does not confirm a booking.
       </p>
       <ActionLink
         href={

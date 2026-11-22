@@ -30,6 +30,13 @@ const addonTermsSchema = z.strictObject({
   fixedPriceOverrideMinor: quotationAmount.nullable(),
   hourlyRateOverrideMinor: quotationAmount.nullable(),
   hours: z.number().int().min(0).max(MAX_QUOTATION_HOURS).nullable(),
+  totalHours: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_QUOTATION_HOURS)
+    .nullable()
+    .optional(),
 });
 
 const addonItemSchema = z.strictObject({
@@ -62,13 +69,7 @@ export const itemSchema = z.union([
   addonItemSchema,
 ]);
 
-const itemInputSchema = z.union([
-  manualItemSchema.extend({ serviceId: z.null() }),
-  z.strictObject({
-    id: itemIdentity.id,
-    addon: z.strictObject({ hours: addonTermsSchema.shape.hours.unwrap() }),
-  }),
-]);
+const itemInputSchema = manualItemSchema.extend({ serviceId: z.null() });
 
 const itemResponseSchema = z.union([
   manualItemSchema.extend({

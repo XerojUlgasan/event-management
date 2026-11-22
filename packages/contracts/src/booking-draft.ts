@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { MAX_PACKAGE_ADDON_SERVICES } from "./catalog.js";
 import { servicePricingSchema } from "./catalog-service-terms.js";
 import {
+  MAX_BOOKING_ADDON_HOURS,
+  MAX_BOOKING_ADDON_SERVICES,
   MAX_CONTACT_NAME_LENGTH,
   MAX_EVENT_TYPE_LENGTH,
   MAX_PHONE_NUMBER_LENGTH,
@@ -67,7 +68,7 @@ const servicePatchSchema = z
   })
   .refine(hasServiceIdentity, serviceIdentityError);
 
-const serviceList = z.array(serviceSchema).max(MAX_PACKAGE_ADDON_SERVICES);
+const serviceList = z.array(serviceSchema).max(MAX_BOOKING_ADDON_SERVICES);
 
 const scalarFields = {
   eventType: text(MAX_EVENT_TYPE_LENGTH),
@@ -102,10 +103,10 @@ export const bookingDraftPatchSchema = z
     specialRequests: scalarFields.specialRequests.nullable(),
     packageId: id.nullable(),
     budget: scalarFields.budget.nullable(),
-    upsertServices: z.array(servicePatchSchema).max(MAX_PACKAGE_ADDON_SERVICES),
+    upsertServices: z.array(servicePatchSchema).max(MAX_BOOKING_ADDON_SERVICES),
     removeServices: z
       .array(text(MAX_EVENT_TYPE_LENGTH))
-      .max(MAX_PACKAGE_ADDON_SERVICES),
+      .max(MAX_BOOKING_ADDON_SERVICES),
   })
   .partial();
 
@@ -156,14 +157,32 @@ export function applyBookingDraftPatch(
   return next;
 }
 
-export const reviewedServiceSchema = z.strictObject({
-  serviceId: id.nullable(),
-  name: z.string(),
-  hours: z.number().nullable(),
-  notes: z.string().nullable(),
-  included: z.boolean(),
-  updatedAt: z.string().nullable(),
-  catalogPricing: servicePricingSchema.optional(),
+export const bookingAddonHoursSchema = z
+  .number()
+  .int()
+  .positive()
+  .max(MAX_BOOKING_ADDON_HOURS)
+  .nullable();
+
+export const bookingAddonOfferSchema = servicePricingSchema.safeExtend({
+  totalHours: bookingAddonHoursSchema,
 });
+
+export const reviewedServiceSchema = z
+  .strictObject({
+    id: id.optional(),
+    serviceId: id.nullable(),
+    name: z.string(),
+    hours: z.number().nullable(),
+    notes: z.string().nullable(),
+    included: z.boolean(),
+    updatedAt: z.string().nullable(),
+    catalogPricing: servicePricingSchema.optional(),
+    origin: z.literal("admin").optional(),
+    offer: bookingAddonOfferSchema.optional(),
+  })
+  .refine((row) => !row.offer || (!!row.id && !!row.serviceId), {
+    message: "A booking add-on requires a stable ID and a catalog service",
+  });
 
 export type ReviewedBookingService = z.infer<typeof reviewedServiceSchema>;

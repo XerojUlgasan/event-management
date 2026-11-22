@@ -1,9 +1,9 @@
 import { reviewedServiceSchema } from "@event-management/contracts/booking-draft";
-import { MAX_PACKAGE_ADDON_SERVICES } from "@event-management/contracts/catalog";
 import { bookingStatusSchema } from "@event-management/contracts/booking-requests";
 import {
   BOOKING_ESTIMATED_DURATIONS,
   MAX_BOOKING_ADDON_HOURS,
+  MAX_BOOKING_ADDON_SERVICES,
   MAX_EVENT_TYPE_LENGTH,
   MAX_TIME_ZONE_LENGTH,
   MAX_CONTACT_NAME_LENGTH,
@@ -70,7 +70,7 @@ export const createSchema = z
           })
           .strict(),
       )
-      .max(MAX_PACKAGE_ADDON_SERVICES)
+      .max(MAX_BOOKING_ADDON_SERVICES)
       .optional(),
     eventType: text(MAX_EVENT_TYPE_LENGTH),
     durationMode: durationModeSchema,
@@ -115,8 +115,10 @@ export const createSchema = z
           message: "Choose each service only once",
           path: ["requestedAddons", index, "serviceId"],
         });
+
       serviceIds.add(addon.serviceId);
     });
+
     if (
       (value.durationMode === "one_day" && value.requestedDays.length !== 1) ||
       (value.durationMode === "multi_day" && value.requestedDays.length < 2)

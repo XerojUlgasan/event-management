@@ -1,5 +1,5 @@
 import { Button, DataTable, Input } from "@event-management/ui";
-import { MAX_PACKAGE_ADDON_SERVICES } from "@event-management/contracts/catalog";
+import { MAX_BOOKING_ADDON_SERVICES } from "@event-management/contracts/limits/booking-requests";
 import { MAX_BOOKING_ADDON_HOURS } from "@event-management/contracts/limits/booking-requests";
 import {
   useId,
@@ -33,6 +33,7 @@ export function includedServiceIds(item: PublicPackage | null) {
 export function validAddonHours(row: BookingAddon) {
   const fixed =
     row.service.fixedPricePesos != null && row.service.includedHours != null;
+
   return (
     /^\d+$/.test(row.hours) &&
     Number.isSafeInteger(Number(row.hours)) &&
@@ -64,9 +65,11 @@ export function BookingAddons({
   const addService = useRef<HTMLButtonElement>(null);
   const inputPrefix = useId();
   const included = includedServiceIds(item);
+
   const load = async (next?: string) => {
     setLoading(true);
     setError("");
+
     try {
       const result = await getServices({
         limit: 20,
@@ -83,6 +86,7 @@ export function BookingAddons({
       setLoading(false);
     }
   };
+
   const update = (
     serviceId: string,
     change: (entry: BookingAddon) => BookingAddon,
@@ -92,9 +96,11 @@ export function BookingAddons({
         entry.service.id === serviceId ? change(entry) : entry,
       ),
     );
+
   const refresh = async (row: BookingAddon) => {
     setLoading(true);
     setError("");
+
     try {
       const service = await getService(row.service.id);
       update(row.service.id, (entry) => {
@@ -117,6 +123,7 @@ export function BookingAddons({
       setLoading(false);
     }
   };
+
   return (
     <section className="pe-addons booking-addons">
       <h3>Add-on services</h3>
@@ -158,6 +165,7 @@ export function BookingAddons({
                 header: "Catalog pricing",
                 cell: (row) => {
                   const labels = servicePricingLabels(row.service);
+
                   return (
                     <div className="pe-addon-pricing">
                       {labels.price}
@@ -173,6 +181,7 @@ export function BookingAddons({
                   const fixed =
                     row.service.fixedPricePesos != null &&
                     row.service.includedHours != null;
+
                   return readOnly ? (
                     fixed ? (
                       `${Number(row.hours) + (row.service.includedHours ?? 0)} total hours (${row.hours} excess)`
@@ -272,7 +281,7 @@ export function BookingAddons({
             ref={addService}
             type="button"
             variant="secondary"
-            disabled={loading || rows.length >= MAX_PACKAGE_ADDON_SERVICES}
+            disabled={loading || rows.length >= MAX_BOOKING_ADDON_SERVICES}
             onClick={() => (opened ? setOpened(false) : void load())}
           >
             {opened ? "Close services" : "Add service"}
@@ -285,8 +294,10 @@ export function BookingAddons({
                     (row) =>
                       row.service.id.toLowerCase() === service.id.toLowerCase(),
                   );
+
                   const inPackage = included.has(service.id.toLowerCase());
                   const unavailable = service.hourlyRatePesos == null;
+
                   return (
                     <li key={service.id}>
                       {service.name}{" "}
@@ -306,7 +317,7 @@ export function BookingAddons({
                           inPackage ||
                           selected ||
                           unavailable ||
-                          rows.length >= MAX_PACKAGE_ADDON_SERVICES
+                          rows.length >= MAX_BOOKING_ADDON_SERVICES
                         }
                         onClick={() => {
                           onChange((current) => [

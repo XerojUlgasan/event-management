@@ -33,11 +33,13 @@ import {
   updateBookingCustomPackageRouteHandler,
 } from "./update-booking-custom-package.js";
 import {
-  deleteBookingCustomPackageAddonRoute,
-  deleteBookingCustomPackageAddonRouteHandler,
-  updateBookingCustomPackageAddonRoute,
-  updateBookingCustomPackageAddonRouteHandler,
-} from "./update-booking-custom-package-addon.js";
+  addBookingAddonRoute,
+  addBookingAddonRouteHandler,
+  editBookingAddonRoute,
+  editBookingAddonRouteHandler,
+  removeBookingAddonRoute,
+  removeBookingAddonRouteHandler,
+} from "./change-booking-addon.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
@@ -125,14 +127,9 @@ routes.openapi(
   updateBookingCustomPackageRoute,
   updateBookingCustomPackageRouteHandler,
 );
-routes.openapi(
-  updateBookingCustomPackageAddonRoute,
-  updateBookingCustomPackageAddonRouteHandler,
-);
-routes.openapi(
-  deleteBookingCustomPackageAddonRoute,
-  deleteBookingCustomPackageAddonRouteHandler,
-);
+routes.openapi(addBookingAddonRoute, addBookingAddonRouteHandler);
+routes.openapi(editBookingAddonRoute, editBookingAddonRouteHandler);
+routes.openapi(removeBookingAddonRoute, removeBookingAddonRouteHandler);
 routes.route("/", quotationRoutes);
 
 export default routes;

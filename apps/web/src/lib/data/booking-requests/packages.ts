@@ -1,7 +1,7 @@
 import type {
   CatalogPackage,
   PackageContent,
-  ServicePricing,
+  PackageAddonService,
 } from "@event-management/contracts/catalog";
 import type { BookingRequest } from "./requests";
 import { request } from "../../http/request";
@@ -33,30 +33,13 @@ export const saveBookingPackage = (
     exists ? "PATCH" : "POST",
   );
 
-export const changeBookingPackageAddon = (
-  bookingId: string,
-  addonId: string,
-  expected: {
-    packageId: string;
-    expectedBookingUpdatedAt: string;
-    expectedUpdatedAt: string;
-  },
-  pricing: ServicePricing | null,
-) =>
-  request<{ package: CatalogPackage; bookingRequest: BookingRequest }>(
-    `/admin/booking-requests/${encodeURIComponent(bookingId)}/custom-package/addons/${encodeURIComponent(addonId)}`,
-    { ...expected, ...pricing },
-    undefined,
-    pricing ? "PATCH" : "DELETE",
-  );
-
 export type PackageHistoryEntry = {
   id: string;
   actorId: string | null;
   actorName?: string | null;
   action: string;
-  before: CatalogPackage | null;
-  after: CatalogPackage;
+  before: (CatalogPackage & { addonServices?: PackageAddonService[] }) | null;
+  after: CatalogPackage & { addonServices?: PackageAddonService[] };
   createdAt: string;
 };
 
