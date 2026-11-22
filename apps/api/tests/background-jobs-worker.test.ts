@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { test } from "node:test";
 import { Pool } from "pg";
 
-test("standalone worker repeatedly consumes its database and exits on SIGTERM", async () => {
+test("standalone worker resumes after an idle database disconnect and exits on SIGTERM", async () => {
   const host = process.env.DB_HOST ?? "localhost";
   assert.ok(["localhost", "127.0.0.1", "::1"].includes(host));
   const connection = {
@@ -98,6 +98,13 @@ test("standalone worker repeatedly consumes its database and exits on SIGTERM", 
       assert.fail("Worker did not consume the queued job");
     }
     await waitForFailure(first);
+
+    const disconnected = await databasePool.query<{ terminated: boolean }>(`
+      SELECT pg_terminate_backend(pid) AS terminated FROM pg_stat_activity
+      WHERE datname = current_database() AND pid <> pg_backend_pid() AND state = 'idle'
+    `);
+    assert.ok(disconnected.rows.some(({ terminated }) => terminated));
+
     await waitForFailure(await insert());
     assert.match(output, /polling every 3000 ms/);
     const exited = once(child, "exit");

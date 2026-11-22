@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const apiRoot = join(root, "apps/api");
 
 const functionEnvPath = join(root, "apps/supabase/.env.functions");
 
@@ -66,19 +67,19 @@ function start() {
     );
   }
 
-  const requireApi = createRequire(join(root, "apps/api/package.json"));
+  const requireApi = createRequire(join(apiRoot, "package.json"));
   const functionEnv = requireApi("dotenv").parse(readFileSync(functionEnvPath));
   const env = localWorkerEnvironment(
     functionEnv,
     JSON.parse(status.stdout),
     process.env,
   );
-  const child = spawn("pnpm", ["worker:background-jobs"], {
-    cwd: root,
-    env,
-    stdio: "inherit",
-    shell: isWindows,
-  });
+  // Forward shutdown to the worker itself, without a package-manager process in between.
+  const child = spawn(
+    process.execPath,
+    ["--import", "tsx", "src/workers/background-jobs.ts"],
+    { cwd: apiRoot, env, stdio: "inherit" },
+  );
 
   const stop = () => child.kill("SIGTERM");
 

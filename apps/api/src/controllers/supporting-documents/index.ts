@@ -7,6 +7,10 @@ import {
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
 import {
+  deleteSupportingDocumentRoute,
+  deleteSupportingDocumentRouteHandler,
+} from "./delete-supporting-document.js";
+import {
   listSupportingDocumentsRoute,
   listSupportingDocumentsRouteHandler,
 } from "./list-supporting-documents.js";
@@ -14,6 +18,10 @@ import {
   retrySupportingDocumentRoute,
   retrySupportingDocumentRouteHandler,
 } from "./retry-supporting-document.js";
+import {
+  searchSupportingDocumentsRoute,
+  searchSupportingDocumentsRouteHandler,
+} from "./search-supporting-documents.js";
 import {
   uploadSupportingDocumentRoute,
   uploadSupportingDocumentRouteHandler,
@@ -33,6 +41,10 @@ routes.use(
   "/admin/ai/documents/:id/retry",
   bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
 );
+routes.use(
+  "/admin/ai/documents/search",
+  bodyLimit({ maxSize: SMALL_JSON_BODY_LIMIT_BYTES }),
+);
 routes.openapi(
   listSupportingDocumentsRoute,
   listSupportingDocumentsRouteHandler,
@@ -44,6 +56,14 @@ routes.openapi(
 routes.openapi(
   retrySupportingDocumentRoute,
   retrySupportingDocumentRouteHandler,
+);
+routes.openapi(
+  deleteSupportingDocumentRoute,
+  deleteSupportingDocumentRouteHandler,
+);
+routes.openapi(
+  searchSupportingDocumentsRoute,
+  searchSupportingDocumentsRouteHandler,
 );
 
 export default routes;

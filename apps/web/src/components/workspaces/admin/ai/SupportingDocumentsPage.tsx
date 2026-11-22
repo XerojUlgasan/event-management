@@ -3,6 +3,7 @@ import type { SupportingDocument } from "@event-management/contracts/supporting-
 import {
   Button,
   DataTable,
+  Dialog,
   Input,
   PageHeader,
   notificationErrorMessage,
@@ -10,6 +11,7 @@ import {
 } from "@event-management/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  deleteSupportingDocument,
   listSupportingDocuments,
   retrySupportingDocument,
   uploadSupportingDocument,
@@ -25,6 +27,7 @@ import {
   SupportingDocumentState,
   upsertSupportingDocument,
 } from "./SupportingDocumentDisplay";
+import { SupportingDocumentTestDialog } from "./SupportingDocumentTestDialog";
 import "../../../../styles/ai/supporting-documents.css";
 
 const maxMegabytes = SUPPORTING_DOCUMENT_MAX_BYTES / (1024 * 1024);
@@ -51,7 +54,13 @@ export function SupportingDocumentsPage() {
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [deleting, setDeleting] = useState<SupportingDocument | null>(null);
+  const [deletePending, setDeletePending] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const input = useRef<HTMLInputElement>(null);
+  const cancelDelete = useRef<HTMLButtonElement>(null);
+  const uploadButton = useRef<HTMLButtonElement>(null);
   const lists = useRef(new Map<number, Set<string>>());
   const listGeneration = useRequestGeneration();
   const pollError = useRef("");
@@ -171,6 +180,30 @@ export function SupportingDocumentsPage() {
     }
   }
 
+  async function remove(document: SupportingDocument) {
+    setDeletePending(true);
+    setDeleteError("");
+
+    try {
+      await deleteSupportingDocument(document.id);
+      remember(document.id);
+      setDocuments((current) =>
+        current.filter((row) => row.id !== document.id),
+      );
+      setDeleting(null);
+      notify(`Deleted ${document.originalFilename}.`);
+      requestAnimationFrame(() =>
+        uploadButton.current?.focus({ preventScroll: true }),
+      );
+    } catch (cause) {
+      setDeleteError(
+        notificationErrorMessage(cause, "Could not delete the document."),
+      );
+    } finally {
+      setDeletePending(false);
+    }
+  }
+
   return (
     <div className="supporting-documents">
       <PageHeader
@@ -193,6 +226,7 @@ export function SupportingDocumentsPage() {
             />
             <Button
               icon="plus"
+              ref={uploadButton}
               pending={uploading}
               title={`PDF up to ${maxMegabytes} MB`}
               onClick={() => input.current?.click()}
@@ -208,6 +242,15 @@ export function SupportingDocumentsPage() {
               pending={refreshing}
               disabled={loading}
               onClick={() => void load("refresh")}
+            />
+            <Button
+              variant="secondary"
+              size="icon"
+              icon="flask"
+              aria-label="Test document search"
+              aria-haspopup="dialog"
+              title="Test document search"
+              onClick={() => setTesting(true)}
             />
           </div>
         }
@@ -291,9 +334,72 @@ export function SupportingDocumentsPage() {
                   </div>
                 ),
               },
+              {
+                key: "actions",
+                header: "Actions",
+                cell: (document) => (
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    icon="trash"
+                    aria-label={`Delete ${document.originalFilename}`}
+                    aria-haspopup="dialog"
+                    title="Delete document"
+                    disabled={retryingId === document.id}
+                    onClick={() => {
+                      setDeleteError("");
+                      setDeleting(document);
+                    }}
+                  />
+                ),
+              },
             ]}
           />
         </div>
+      )}
+      {testing && (
+        <SupportingDocumentTestDialog onClose={() => setTesting(false)} />
+      )}
+      {deleting && (
+        <Dialog
+          title="Delete supporting document?"
+          className="supporting-document-delete"
+          intro={
+            <>
+              This permanently deletes{" "}
+              <strong>{deleting.originalFilename}</strong> and its embeddings.
+            </>
+          }
+          initialFocus={cancelDelete}
+          onClose={() => {
+            if (!deletePending) setDeleting(null);
+          }}
+          actions={
+            <>
+              <Button
+                ref={cancelDelete}
+                variant="secondary"
+                disabled={deletePending}
+                onClick={() => setDeleting(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                pending={deletePending}
+                onClick={() => void remove(deleting)}
+              >
+                {deletePending ? "Deleting…" : "Delete document"}
+              </Button>
+            </>
+          }
+        >
+          {deleteError && (
+            <p role="alert" className="supporting-documents-error">
+              {deleteError}
+            </p>
+          )}
+        </Dialog>
       )}
     </div>
   );

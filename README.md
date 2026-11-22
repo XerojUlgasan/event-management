@@ -70,7 +70,9 @@ See the [background indexing specification](docs/specs/knowledge-catalog-backgro
 
 System Administrators open **AI → Supporting Documents** at `/app/ai/documents` to upload a PDF with selectable text, up to 25 MiB and 200 pages. The admin view shows the filename, page count, processing progress, and any unreadable page numbers. A document is ready after all its chunks have saved embeddings. When a temporary failure exhausts its retries, **Retry** resubmits the failed work for that file.
 
-Original PDFs are stored in the private `supporting-documents` bucket. The Node worker extracts text in page order, saves page and heading information with each chunk, and queues one `embed_document_chunk` job per chunk in the same transaction. Chunk embeddings start empty and are populated by their jobs. Configure the worker's existing Storage and embedding settings. For hosted deployments, provision a private `supporting-documents` bucket that accepts `application/pdf` up to 25 MiB. The local Supabase config and seed define this bucket. This workflow ends at stored vectors, with document retrieval and assistant integration planned separately.
+Use the flask icon beside **Refresh** to test a search across indexed PDF passages. The test returns up to five ranked matches. Select a passage to inspect its text, source, page range, and embedding metadata. The row's trash icon permanently removes the PDF, document record, and its embeddings after confirmation.
+
+Original PDFs are stored in the private `supporting-documents` bucket. The Node worker extracts text in page order, saves page and heading information with each chunk, and queues one `embed_document_chunk` job per chunk in the same transaction. Configure the existing Storage and embedding settings for the API and worker. For hosted deployments, provision a private `supporting-documents` bucket that accepts `application/pdf` up to 25 MiB. The local Supabase config and seed define this bucket. Assistant integration is planned separately.
 
 ### Booking requests and messages
 

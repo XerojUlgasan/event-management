@@ -6,6 +6,7 @@ import { after, before, test } from "node:test";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import {
   supportingDocumentSchema,
+  supportingDocumentSearchResponseSchema,
   supportingDocumentsResponseSchema,
 } from "@event-management/contracts/supporting-documents";
 import { Kysely, PostgresDialect, sql } from "kysely";
@@ -34,6 +35,9 @@ let adminCookie: string;
 let customerCookie: string;
 let providerCalls = 0;
 let failEmbedding = false;
+let failStorageDelete = false;
+let providerInput: string;
+let pauseEmbedding: (() => Promise<void>) | undefined;
 
 function handbookPdf() {
   return buildPdf({
@@ -109,6 +113,20 @@ before(async () => {
     );
 
     if (url.hostname === "storage.test") {
+      if (init?.method === "DELETE") {
+        assert.equal(url.pathname, "/storage/v1/object/supporting-documents");
+
+        if (failStorageDelete) return new Response(null, { status: 502 });
+
+        const { prefixes } = JSON.parse(String(init.body)) as {
+          prefixes: string[];
+        };
+
+        for (const key of prefixes) objects.delete(`${url.pathname}/${key}`);
+
+        return Response.json([]);
+      }
+
       assert.match(
         url.pathname,
         /^\/storage\/v1\/object\/supporting-documents\//,
@@ -128,6 +146,8 @@ before(async () => {
     assert.equal(values.length, 1);
     assert.equal(dimensions, 768);
     providerCalls++;
+    providerInput = values[0];
+    await pauseEmbedding?.();
 
     return failEmbedding
       ? new Response("unavailable", { status: 503 })
@@ -159,15 +179,24 @@ after(async () => {
 
 const path = "/v1/admin/ai/documents";
 
+const search = (query: string, cookie?: string) =>
+  app.request(`${path}/search`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...(cookie && { cookie }) },
+    body: JSON.stringify({ query }),
+  });
+
 const work = () =>
   runOneBackgroundJob(db, { signal: AbortSignal.timeout(30_000) });
 
-const list = async () =>
+const documents = async () =>
   supportingDocumentsResponseSchema.parse(
     await (
       await app.request(path, { headers: { cookie: adminCookie } })
     ).json(),
-  ).documents[0]!;
+  ).documents;
+
+const list = async () => (await documents())[0]!;
 
 test("document upload and retry keep their admin guards and separate body limits", async () => {
   const retryPath = `${path}/${randomUUID()}/retry`;
@@ -223,7 +252,7 @@ test("document upload and retry keep their admin guards and separate body limits
   });
 });
 
-test("admin upload persists a private PDF and independently retries one NULL chunk at a time", async () => {
+test("admin can upload, retry, inspect and delete a private PDF and its chunks", async () => {
   assert.equal((await app.request(path)).status, 401);
   assert.equal(
     (await app.request(path, { headers: { cookie: customerCookie } })).status,
@@ -330,4 +359,196 @@ test("admin upload persists a private PDF and independently retries one NULL chu
   assert.equal(ready.state, "ready");
   assert.equal(ready.embeddedCount, chunks.length);
   assert.equal(providerCalls, chunks.length + 4);
+
+  const query = "  How do I prepare the venue?  ";
+  assert.equal((await search(query)).status, 401);
+  assert.equal((await search(query, customerCookie)).status, 403);
+  assert.equal((await search("   ", adminCookie)).status, 400);
+  assert.equal(
+    (await search("x".repeat(SMALL_JSON_BODY_LIMIT_BYTES), adminCookie)).status,
+    413,
+  );
+  assert.equal(providerCalls, chunks.length + 4);
+
+  const responseToSearch = await search(query, adminCookie);
+  assert.equal(responseToSearch.status, 200);
+  assert.equal(
+    providerInput,
+    "task: search result | query: How do I prepare the venue?",
+  );
+  const { results } = supportingDocumentSearchResponseSchema.parse(
+    await responseToSearch.json(),
+  );
+  assert.equal(results.length, Math.min(5, chunks.length));
+  const first = results[0]!;
+
+  const firstChunk = chunks.find((chunk) => chunk.id === first.id)!;
+
+  const firstJob = jobs.find((job) => job.dedupe_key === first.id)!;
+
+  assert.equal(first.filename, document.originalFilename);
+  assert.equal(first.createdAt, firstJob.created_at.toISOString());
+  assert.equal(first.pageStart, firstChunk.page_start);
+  assert.equal(first.pageEnd, firstChunk.page_end);
+  assert.deepEqual(first.headingPath, firstChunk.heading_path);
+  assert.equal(first.text, firstChunk.content_text);
+
+  failEmbedding = true;
+  assert.equal((await search(query, adminCookie)).status, 503);
+  failEmbedding = false;
+
+  const remove = (cookie?: string) =>
+    app.request(`${path}/${document.id}`, {
+      method: "DELETE",
+      headers: cookie ? { cookie } : {},
+    });
+
+  assert.equal((await remove()).status, 401);
+  assert.equal((await remove(customerCookie)).status, 403);
+  failStorageDelete = true;
+  assert.equal((await remove(adminCookie)).status, 502);
+  failStorageDelete = false;
+  assert.equal((await list()).embeddedCount, chunks.length);
+  assert.equal(objects.size, 1);
+
+  assert.equal((await remove(adminCookie)).status, 204);
+  assert.equal((await remove(adminCookie)).status, 204);
+  assert.equal(objects.size, 0);
+  assert.deepEqual(await documents(), []);
+  assert.deepEqual(
+    await db.selectFrom("supporting_document_chunks").select("id").execute(),
+    [],
+  );
+  assert.deepEqual(
+    supportingDocumentSearchResponseSchema.parse(
+      await (await search(query, adminCookie)).json(),
+    ).results,
+    [],
+  );
+});
+
+test("deleting a PDF during embedding prevents the worker from recreating chunks", async () => {
+  const form = new FormData();
+  form.set(
+    "file",
+    new File([Uint8Array.from(handbookPdf())], "Remove while embedding.pdf"),
+  );
+  const upload = await app.request(path, {
+    method: "POST",
+    headers: { cookie: adminCookie },
+    body: form,
+  });
+  assert.equal(upload.status, 202);
+
+  const { id } = supportingDocumentSchema.parse(await upload.json());
+  assert.equal(await work(), true);
+
+  let markPickedUp!: () => void;
+  let allowFinish!: () => void;
+
+  const pickedUp = new Promise<void>((resolve) => {
+    markPickedUp = resolve;
+  });
+
+  const finish = new Promise<void>((resolve) => {
+    allowFinish = resolve;
+  });
+
+  pauseEmbedding = () => {
+    markPickedUp();
+
+    return finish;
+  };
+
+  const working = work();
+
+  try {
+    await Promise.race([
+      pickedUp,
+      working.then(() => {
+        throw new Error("The worker did not start embedding");
+      }),
+    ]);
+    const deletion = await app.request(`${path}/${id}`, {
+      method: "DELETE",
+      headers: { cookie: adminCookie },
+    });
+    assert.equal(deletion.status, 204);
+  } finally {
+    pauseEmbedding = undefined;
+    allowFinish();
+    await working;
+  }
+
+  const calls = providerCalls;
+
+  while (await work()) {
+    // Queued jobs for the deleted chunks should finish without another call.
+  }
+
+  assert.equal(providerCalls, calls);
+  assert.deepEqual(await documents(), []);
+  assert.deepEqual(
+    await db.selectFrom("supporting_document_chunks").select("id").execute(),
+    [],
+  );
+});
+
+test("document search ranks and limits individual passages from the active model", async () => {
+  const document = await db
+    .insertInto("supporting_documents")
+    .values({
+      original_filename: "Ranked passages.pdf",
+      storage_key: `${randomUUID()}.pdf`,
+      mime_type: "application/pdf",
+      byte_size: 500,
+      file_sha256: "a".repeat(64),
+      pipeline_version: "fixture",
+      extraction_status: "complete",
+      page_count: 1,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const suffix = Array<number>(766).fill(0);
+  const candidates = [
+    { ordinal: 1, leading: 0.1 },
+    { ordinal: 2, leading: 0.7 },
+    { ordinal: 3, leading: 0.3 },
+    { ordinal: 4, leading: 0.8 },
+    { ordinal: 5, leading: 0.4 },
+    { ordinal: 6, leading: 0.6 },
+    { ordinal: 7, leading: 1, model: "old-model" },
+    { ordinal: 8, leading: null },
+  ];
+  await db
+    .insertInto("supporting_document_chunks")
+    .values(
+      candidates.map(({ ordinal, leading, model }) => ({
+        document_id: document.id,
+        ordinal,
+        page_start: 1,
+        page_end: 1,
+        content_text: `Passage ${ordinal}`,
+        content_hash: "b".repeat(64),
+        embedding:
+          leading === null
+            ? null
+            : sql<string>`${JSON.stringify([leading, Math.sqrt(1 - leading ** 2), ...suffix])}`,
+        embedding_model:
+          leading === null ? null : (model ?? "google/gemini-embedding-2"),
+        embedded_at: leading === null ? null : new Date(),
+      })),
+    )
+    .execute();
+
+  const response = await search("entrance access", adminCookie);
+  assert.equal(response.status, 200);
+  const { results } = supportingDocumentSearchResponseSchema.parse(
+    await response.json(),
+  );
+  assert.deepEqual(
+    results.map(({ text }) => text),
+    [4, 2, 6, 5, 3].map((ordinal) => `Passage ${ordinal}`),
+  );
+  assert.ok(results.every(({ createdAt }) => createdAt === null));
 });

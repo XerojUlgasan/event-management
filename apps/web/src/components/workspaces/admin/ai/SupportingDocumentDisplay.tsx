@@ -117,11 +117,17 @@ export function mergeSupportingDocuments(
     (document) => newerIds.has(document.id) && !incomingIds.has(document.id),
   );
 
-  const rows = incoming.map((document) =>
-    newerIds.has(document.id)
-      ? (current.find((item) => item.id === document.id) ?? document)
-      : document,
+  const currentById = new Map(
+    current.map((document) => [document.id, document]),
   );
+
+  const rows = incoming.flatMap((document) => {
+    if (!newerIds.has(document.id)) return [document];
+
+    const latest = currentById.get(document.id);
+
+    return latest ? [latest] : [];
+  });
 
   return [...kept, ...rows];
 }

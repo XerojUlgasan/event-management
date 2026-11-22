@@ -17,7 +17,17 @@
 
 .supporting-documents-table thead th:first-child,
 .supporting-documents-table tbody th:first-child {
-  width: 58%;
+  width: 55%;
+}
+
+.supporting-documents-table thead th:last-child {
+  width: calc(var(--control-height-icon) + 2 * var(--control-padding-inline));
+  white-space: nowrap;
+}
+
+.supporting-documents-table thead th:last-child,
+.supporting-documents-table tbody td:nth-child(3) {
+  text-align: center;
 }
 
 .supporting-documents-file-name,
@@ -53,4 +63,140 @@
   border-radius: 8px;
   background: var(--status-danger-surface);
   color: var(--status-danger-text);
+}
+
+.supporting-document-delete .modal-intro {
+  overflow-wrap: anywhere;
+}
+
+.supporting-document-test {
+  width: min(640px, 100%);
+  padding: 28px;
+}
+
+.supporting-document-test-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.supporting-document-test-status:not(:empty) {
+  margin-top: 18px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.supporting-document-matches {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.supporting-document-match {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--surface-base);
+  color: var(--text-primary);
+  text-align: start;
+  cursor: pointer;
+}
+
+.supporting-document-match:hover,
+.supporting-document-match:focus-visible {
+  background: var(--surface-subtle);
+  border-color: var(--border-strong);
+}
+
+.supporting-document-match-content {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.supporting-document-match-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.supporting-document-match-source > span,
+.supporting-document-match-metadata dt {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.supporting-document-match-excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+
+.supporting-document-match-metadata {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+  margin: 20px 0;
+  overflow-wrap: anywhere;
+}
+
+.supporting-document-match-metadata dd {
+  margin: 2px 0 0;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.supporting-document-match-text {
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+  overflow-wrap: anywhere;
+}
+
+.supporting-document-match-text h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.supporting-document-match-text p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 480px) {
+  .supporting-documents-table thead th:first-child,
+  .supporting-documents-table tbody th:first-child {
+    width: auto;
+  }
+
+  .supporting-documents-table thead th:nth-child(2) {
+    width: 112px;
+  }
+
+  .supporting-document-test {
+    padding: 20px;
+  }
+
+  .supporting-document-test-form {
+    grid-template-columns: 1fr;
+  }
 }
