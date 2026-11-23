@@ -7,7 +7,11 @@ type Database = Kysely<DB> | Transaction<DB>;
 export function listStatusHistoryData(
   db: Database,
   bookingId: string,
-  input: { limit: number; position?: { createdAt: string; id: string } },
+  input: {
+    limit: number;
+    position?: { createdAt: string; id: string };
+    order: "asc" | "desc";
+  },
 ) {
   let query = db
     .selectFrom("booking_request_status_history")
@@ -24,13 +28,13 @@ export function listStatusHistoryData(
         "id",
         input.position.createdAt,
         input.position.id,
-        ">",
+        input.order === "desc" ? "<" : ">",
       ),
     );
 
   return query
-    .orderBy("created_at", "asc")
-    .orderBy("id", "asc")
+    .orderBy("created_at", input.order)
+    .orderBy("id", input.order)
     .limit(input.limit + 1)
     .execute();
 }

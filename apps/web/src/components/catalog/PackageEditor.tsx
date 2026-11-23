@@ -14,7 +14,8 @@ import {
 } from "../../lib/data/catalog/packages";
 import { priceLabel } from "../../lib/utils/formatting/money";
 import { PackageCanvas } from "./CatalogContent";
-import { useThumbnail } from "../../lib/utils/catalog/use-thumbnail";
+import { useThumbnail } from "../../lib/services/catalog/use-thumbnail";
+import { ApiError } from "../../lib/http/request";
 import "../../styles/catalog/package-editor.css";
 
 const blank = (): PackageContent => ({
@@ -61,9 +62,12 @@ export function PackageEditor({
   initial: AdminPackage | null;
   onClose: () => void;
   onSaved: () => void;
-  saveCustom?: (content: PackageContent) => Promise<void>;
+  saveCustom?: (
+    content: PackageContent,
+    thumbnailMediaId?: string | null,
+  ) => Promise<void>;
 }) {
-  const { notify, notifyError } = useNotifications();
+  const { notify } = useNotifications();
   const [draft, setDraft] = useState(blank);
   const [prepared, setPrepared] = useState(false);
 
@@ -72,6 +76,11 @@ export function PackageEditor({
     initial ? (packageImageSrc(initial.imageUrl ?? null) ?? null) : null,
   );
 
+  const cancel = () => {
+    thumbnail.cancelAndCleanup();
+    onClose();
+  };
+
   if (!initial && !prepared) {
     return (
       <CatalogCreateDialog
@@ -79,10 +88,7 @@ export function PackageEditor({
         privateProposal={!!saveCustom}
         initial={draft}
         uploading={thumbnail.uploading}
-        onClose={() => {
-          thumbnail.cancelAndCleanup();
-          onClose();
-        }}
+        onClose={cancel}
         onContinue={(content) => {
           setDraft(content);
           setPrepared(true);
@@ -93,10 +99,7 @@ export function PackageEditor({
             content={content}
             onChange={setContent}
             privateProposal={!!saveCustom}
-            thumbnailPreviewUrl={thumbnail.previewUrl}
-            onThumbnailChange={thumbnail.handleChange}
-            onThumbnailError={(msg) => notifyError(msg)}
-            onThumbnailBusyChange={thumbnail.setUploading}
+            thumbnail={thumbnail}
           />
         )}
       />
@@ -121,32 +124,38 @@ export function PackageEditor({
       entity="package"
       privateProposal={!!saveCustom}
       saveLabel={saveCustom ? "Save private package" : undefined}
-      onClose={onClose}
+      onClose={cancel}
       onSaved={onSaved}
+      uploadingThumbnail={thumbnail.uploading}
       validate={validatePackageDetails}
       onSave={async (content) => {
-        if (saveCustom) await saveCustom(content);
-        else if (initial)
+        const thumbnailId = thumbnail.mediaIdRef.current;
+
+        if (saveCustom) {
+          try {
+            await saveCustom(content, thumbnailId);
+          } catch (error) {
+            if (error instanceof ApiError && error.status === 409)
+              thumbnail.cancelAndCleanup();
+
+            throw error;
+          }
+        } else if (initial)
           await updatePackage(
             initial.id,
             content,
             initial.updatedAt,
-            thumbnail.mediaIdRef.current,
+            thumbnailId,
           );
-        else await createPackage(content, thumbnail.mediaIdRef.current);
+        else await createPackage(content, thumbnailId);
       }}
       renderDetails={(content, setContent) => (
-        <>
-          <PackageDetailsFields
-            content={content}
-            onChange={setContent}
-            privateProposal={!!saveCustom}
-            thumbnailPreviewUrl={thumbnail.previewUrl}
-            onThumbnailChange={thumbnail.handleChange}
-            onThumbnailError={(msg) => notifyError(msg)}
-            onThumbnailBusyChange={thumbnail.setUploading}
-          />
-        </>
+        <PackageDetailsFields
+          content={content}
+          onChange={setContent}
+          privateProposal={!!saveCustom}
+          thumbnail={thumbnail}
+        />
       )}
       renderPreview={(content, mode) =>
         mode === "customer" ? (

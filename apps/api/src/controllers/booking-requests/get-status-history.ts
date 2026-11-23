@@ -59,7 +59,12 @@ export const getAdminStatusHistoryRoute = createRoute({
   method: "get",
   path: "/admin/booking-requests/{id}/status-history",
   tags: ["Booking requests"],
-  request: { params: idParams, query: paginationQuerySchema },
+  request: {
+    params: idParams,
+    query: paginationQuerySchema.extend({
+      order: z.literal("newest").optional(),
+    }),
+  },
   responses,
 });
 

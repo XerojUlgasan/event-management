@@ -1,6 +1,10 @@
-import { sql, type Kysely, type Transaction } from "kysely";
+import type { Kysely, Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
-import { keysetPredicate, utcTimestampSql } from "../../utils/sql-page.js";
+import {
+  catalogTextMatch,
+  keysetPredicate,
+  utcTimestampSql,
+} from "../../utils/sql-page.js";
 import type {
   CatalogListOptions,
   CatalogPosition,
@@ -31,6 +35,8 @@ export function listPublicPackagesPageData(
 
   if (options.eventType !== undefined)
     query = query.where("event_type", "=", options.eventType);
+
+  if (options.search) query = query.where(catalogTextMatch(options.search));
 
   if (position)
     query = query.where(

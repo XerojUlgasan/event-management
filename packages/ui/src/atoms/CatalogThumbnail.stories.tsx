@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { CatalogThumbnail } from "@event-management/ui";
+import { expect, fn, waitFor } from "storybook/test";
 
 const meta = {
   title: "Atoms/CatalogThumbnail",
@@ -25,4 +26,9 @@ export const WithImage: Story = {
   },
 };
 
-export const BrokenImage: Story = { args: { src: "/missing-thumbnail.jpg" } };
+export const BrokenImage: Story = {
+  args: { src: "/missing-thumbnail.jpg", onImageError: fn() },
+  play: async ({ args }) => {
+    await waitFor(() => expect(args.onImageError).toHaveBeenCalled());
+  },
+};

@@ -21,20 +21,23 @@ const positionSchema = z.object({
 export async function getStatusHistoryService(
   db: Kysely<DB>,
   id: string,
-  input: { limit: number; cursor?: string },
+  input: { limit: number; cursor?: string; order?: "newest" },
   customerId?: string,
 ) {
   if (!(await findBookingRequestData(db, id, customerId))) return null;
 
+  const newestFirst = customerId === undefined && input.order === "newest";
   const scope = JSON.stringify([
     "booking-status-history",
     id,
     customerId ?? null,
+    ...(newestFirst ? ["newest"] : []),
   ]);
   const position = parsePageCursor(input.cursor, positionSchema, scope);
   const rows = await listStatusHistoryData(db, id, {
     limit: input.limit,
     position,
+    order: newestFirst ? "desc" : "asc",
   });
 
   const page = createPage(rows, input.limit, (row) =>

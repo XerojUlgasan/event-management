@@ -471,6 +471,91 @@ test("admin booking heading identifies the event", async () => {
   assert.doesNotMatch(container.textContent, /BR-private-uuid/);
 });
 
+test("admin cancellation requires a customer-visible reason and reveals the saved history", async () => {
+  const booking = {
+    id: "booking-1",
+    status: "accepted",
+    timeZone: "Asia/Manila",
+    requestedDays: [],
+    requestedServices: [],
+    updatedAt: time,
+  };
+  const reason = "Customer requested cancellation.";
+  scenario = {
+    intercept: (path, method) => {
+      if (path.endsWith("/status") && method === "PATCH")
+        return Promise.resolve(
+          json({
+            bookingRequest: {
+              ...booking,
+              status: "cancelled",
+              updatedAt: laterRevision,
+            },
+          }),
+        );
+
+      if (path.endsWith("/status-history"))
+        return Promise.resolve(
+          json({
+            history: [
+              {
+                id: "change-1",
+                status: "cancelled",
+                createdAt: laterRevision,
+                reason,
+              },
+            ],
+            nextCursor: null,
+          }),
+        );
+
+      if (path.endsWith("/booking-requests/booking-1"))
+        return Promise.resolve(json({ bookingRequest: booking }));
+
+      return null;
+    },
+  };
+
+  await render(BookingRequestPage, { bookingRequestId: booking.id });
+  await click("Change status");
+  assert.equal(button("Save status").disabled, true);
+  const select = await change("New status", "cancelled");
+  assert.deepEqual(
+    Array.from(select.options, (option) => option.value),
+    ["", "needs_details", "declined", "cancelled"],
+  );
+  assert.equal(button("Cancel request").disabled, true);
+  assert.match(
+    container.textContent,
+    /Visible to the customer in status history/,
+  );
+  assert.match(container.textContent, /cancels its scheduled event days/);
+  await change("Reason (required)", reason);
+  await click("Details");
+  assert.equal(container.querySelector("textarea").value, reason);
+  await click("Cancel request");
+
+  assert.deepEqual(JSON.parse(writes()[0].body), {
+    status: "cancelled",
+    reason,
+  });
+  assert.equal(writes().length, 1);
+  assert.equal(button("Change status"), undefined);
+  assert.equal(
+    container.querySelector(".booking-request-status-row").textContent,
+    "Cancelled",
+  );
+  assert.equal(
+    container.querySelector("details.booking-request-history").open,
+    true,
+  );
+  assert.equal(
+    container.querySelector(".booking-status-timeline li p").textContent,
+    reason,
+  );
+  assert.equal(button("Load older changes"), undefined);
+});
+
 test("open package selector and editor disappear when eligibility changes", async () => {
   scenario = {};
   await render(BookingPackage, {

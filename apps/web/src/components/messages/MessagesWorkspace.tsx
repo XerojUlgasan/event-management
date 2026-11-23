@@ -234,11 +234,6 @@ export function MessagesWorkspace({
     isTeam && active && !composerDisabled && !aiReplyPending
       ? latestSuggestedReplyMessage(messages)
       : undefined;
-  const singleConversation =
-    isTeam &&
-    conversations.length === 1 &&
-    conversations[0]?.id === activeId &&
-    !conversationFeed?.hasMore;
   const activeName = isTeam
     ? "Styled by AMAC team"
     : (active?.customerName ?? "Messages");
@@ -501,7 +496,7 @@ export function MessagesWorkspace({
 
   return (
     <div
-      className={`customer-messages messages-workspace panel ${conversationOpen ? "conversation-open" : ""} ${singleConversation ? "single-conversation" : ""}`}
+      className={`customer-messages messages-workspace panel ${conversationOpen ? "conversation-open" : ""}`}
     >
       <aside ref={inbox} tabIndex={0} aria-label="Conversations">
         <div className="messages-sidebar-head">
@@ -635,18 +630,16 @@ export function MessagesWorkspace({
 
       <section>
         <div className="message-thread-head">
-          {!singleConversation && (
-            <Button
-              variant="plain"
-              type="button"
-              className="message-back"
-              onClick={onBack}
-              aria-label="Back to conversations"
-            >
-              <Icon name="chevron" size={16} />
-              <span>Back</span>
-            </Button>
-          )}
+          <Button
+            variant="plain"
+            type="button"
+            className="message-back"
+            onClick={onBack}
+            aria-label="Back to conversations"
+          >
+            <Icon name="chevron" size={16} />
+            <span>Back</span>
+          </Button>
           <Avatar tone={isTeam ? "accent" : "default"} initials={avatar} />
           <div className="message-thread-title">
             <span className="message-thread-name">

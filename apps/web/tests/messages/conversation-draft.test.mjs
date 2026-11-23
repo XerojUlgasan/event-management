@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { Window } from "happy-dom";
 import { createServer } from "vite";
 
-test("the conversation card shows Draft only while the composer has content", async (t) => {
+test("a customer can return to a single conversation in the inbox and reopen its draft", async (t) => {
   const window = new Window();
   const cacheDir = await mkdtemp(join(tmpdir(), "clemora-conversation-draft-"));
   const server = await createServer({
@@ -70,7 +70,7 @@ test("the conversation card shows Draft only while the composer has content", as
   const sent = [];
 
   try {
-    await act(async () =>
+    const render = (conversationOpen) =>
       root.render(
         createElement(
           NotificationProvider,
@@ -80,20 +80,22 @@ test("the conversation card shows Draft only while the composer has content", as
             viewerRole: "customer",
             conversations: [conversation],
             activeId: conversation.id,
-            onSelect() {},
+            onSelect: () => render(true),
+            onBack: () => render(false),
             messages: [],
             loading: false,
             error: null,
             async onSend(body, files) {
               sent.push({ body, files });
             },
-            conversationOpen: true,
+            conversationOpen,
             listEmpty: empty,
             threadEmpty: empty,
           }),
         ),
-      ),
-    );
+      );
+
+    await act(async () => render(true));
 
     const preview = container.querySelector("aside button > span:nth-child(2)");
     const textarea = container.querySelector("textarea");
@@ -112,6 +114,16 @@ test("the conversation card shows Draft only while the composer has content", as
       preview.querySelector(".conversation-draft")?.textContent,
       "Draft",
     );
+    const back = container.querySelector(
+      '[aria-label="Back to conversations"]',
+    );
+    assert.ok(back);
+    await act(async () => back.click());
+    assert.equal(container.querySelector(".conversation-open"), null);
+    await act(async () => preview.closest("button").click());
+    assert.ok(container.querySelector(".conversation-open"));
+    assert.equal(textarea.value, "Hello");
+
     await act(async () => textarea.form.requestSubmit());
     assert.deepEqual(sent, [{ body: "Hello", files: [] }]);
     assert.equal(preview.textContent, emptyPreview);

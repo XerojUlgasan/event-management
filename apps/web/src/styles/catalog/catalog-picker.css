@@ -1,0 +1,76 @@
+.pe-reference-picker .pe-reference-options {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 3px;
+  max-height: min(42vh, 400px);
+  overflow-y: auto;
+}
+.pe-reference-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-base);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.pe-reference-option[aria-pressed="true"] {
+  border-color: var(--accent-strong);
+  background: var(--accent-faint);
+}
+.pe-reference-option:hover,
+.pe-reference-option:focus-visible {
+  background: var(--surface-muted);
+}
+.pe-reference-option > .pe-reference-option-image {
+  flex: 0 0 72px;
+  width: 72px;
+  height: 58px;
+  object-fit: cover;
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+}
+.pe-reference-option-image {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.pe-reference-option-copy {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pe-reference-option-copy > span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.pe-reference-picker-note {
+  overflow-wrap: anywhere;
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .pe-reference-option {
+    gap: 9px;
+  }
+  .pe-reference-option > .pe-reference-option-image {
+    flex-basis: 48px;
+    width: 48px;
+    height: 48px;
+  }
+}

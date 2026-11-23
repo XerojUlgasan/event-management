@@ -1,3 +1,4 @@
 export const MAX_CATALOG_TEXT_LENGTH = 4000;
+export const MAX_CATALOG_SEARCH_LENGTH = 200;
 export const MAX_CATALOG_WIDGET_ROWS = 100;
 export const MAX_CATALOG_WIDGET_Y = 100000;

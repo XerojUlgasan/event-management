@@ -13,7 +13,10 @@ export async function listPublicPackagesPageService(
   db: Kysely<DB>,
   options: CatalogListOptions,
 ) {
-  const scope = catalogFilterScope("packages", options);
+  const filterScope = catalogFilterScope("packages", options);
+  const scope = options.search
+    ? `${filterScope}:search:${options.search}`
+    : filterScope;
   const { position, cursorFor } = catalogCursor(options.cursor, scope);
 
   return db

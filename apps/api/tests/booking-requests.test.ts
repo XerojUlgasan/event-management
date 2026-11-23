@@ -840,6 +840,14 @@ test("requests enforce roles, published package availability, current package de
   );
   assert.equal(updated.status, "needs_details");
   assert.equal(customerHistory[1].reason, "Please clarify");
+  const { rows } = await pool.query<{ recorded_after_update: boolean }>(
+    `SELECT history.created_at >= booking.updated_at AS recorded_after_update
+     FROM booking_request_status_history AS history
+     JOIN booking_requests AS booking ON booking.id = history.booking_request_id
+     WHERE history.id = $1`,
+    [customerHistory[1].id],
+  );
+  assert.equal(rows[0]?.recorded_after_update, true);
 
   for (const status of ["needs_details", "declined", "cancelled"])
     await read(
@@ -1082,8 +1090,15 @@ test("requests enforce roles, published package availability, current package de
     3,
   );
   const spec: any = await (await app.request("/openapi.json")).json();
-  assert.ok(spec.paths["/v1/booking-requests/{id}/status-history"].get);
-  assert.ok(spec.paths["/v1/admin/booking-requests/{id}/status-history"].get);
+  const customerHistoryRoute =
+    spec.paths["/v1/booking-requests/{id}/status-history"].get;
+  const adminHistoryRoute =
+    spec.paths["/v1/admin/booking-requests/{id}/status-history"].get;
+
+  const isOrderParameter = (param: { name: string }) => param.name === "order";
+
+  assert.ok(adminHistoryRoute.parameters.some(isOrderParameter));
+  assert.equal(customerHistoryRoute.parameters.some(isOrderParameter), false);
   assert.ok(spec.paths["/v1/booking-requests/{id}"].get);
   assert.ok(
     spec.paths["/v1/booking-requests/{id}/requested-days/{date}/times"].patch,
@@ -1383,11 +1398,15 @@ test("status history is bounded, ordered, scoped, and authorized", async () => {
   ).rows.map((row) => row.id);
 
   const path = `/booking-requests/${booking.id}/status-history`;
+
+  const adminPath = (id: string) =>
+    `/admin/booking-requests/${id}/status-history`;
+
   await read(await call(path), 401);
   await read(await call(path, "GET", undefined, otherCustomerCookie), 404);
   await read(
     await call(
-      `/admin/booking-requests/${booking.id}/status-history`,
+      `${adminPath(booking.id)}?order=newest`,
       "GET",
       undefined,
       customerCookie,
@@ -1416,6 +1435,11 @@ test("status history is bounded, ordered, scoped, and authorized", async () => {
   const first = await read(firstResponse, 200);
   assert.equal(first.history.length, 15);
   assert.ok(first.nextCursor);
+  const customerWithOrder = await read(
+    await call(`${path}?order=newest`, "GET", undefined, customerCookie),
+    200,
+  );
+  assert.deepEqual(customerWithOrder, first);
   const forged = JSON.parse(
     Buffer.from(first.nextCursor, "base64url").toString("utf8"),
   );
@@ -1450,7 +1474,7 @@ test("status history is bounded, ordered, scoped, and authorized", async () => {
   );
   const adminHistory = await read(
     await call(
-      `/admin/booking-requests/${booking.id}/status-history?limit=50`,
+      `${adminPath(booking.id)}?limit=50`,
       "GET",
       undefined,
       adminCookie,
@@ -1463,6 +1487,52 @@ test("status history is bounded, ordered, scoped, and authorized", async () => {
   );
   await read(
     await call(
+      `${adminPath(booking.id)}?order=invalid`,
+      "GET",
+      undefined,
+      adminCookie,
+    ),
+    400,
+  );
+  const newestFirst = await read(
+    await call(
+      `${adminPath(booking.id)}?order=newest&limit=4`,
+      "GET",
+      undefined,
+      adminCookie,
+    ),
+    200,
+  );
+  assert.equal(newestFirst.history.length, 4);
+  assert.ok(newestFirst.nextCursor);
+  const newestCursor = encodeURIComponent(newestFirst.nextCursor);
+  const newestRest = await read(
+    await call(
+      `${adminPath(booking.id)}?order=newest&limit=50&cursor=${newestCursor}`,
+      "GET",
+      undefined,
+      adminCookie,
+    ),
+    200,
+  );
+  assert.equal(newestRest.nextCursor, null);
+  assert.deepEqual(
+    [...newestFirst.history, ...newestRest.history].map(
+      (item: { id: string }) => item.id,
+    ),
+    [...expected].reverse(),
+  );
+
+  for (const wrongScopePath of [
+    `${adminPath(booking.id)}?cursor=${newestCursor}`,
+    `${adminPath(other.id)}?order=newest&cursor=${newestCursor}`,
+    `${adminPath(booking.id)}?order=newest&cursor=${encodeURIComponent(adminHistory.nextCursor)}`,
+  ]) {
+    await read(await call(wrongScopePath, "GET", undefined, adminCookie), 400);
+  }
+
+  await read(
+    await call(
       `/booking-requests/${other.id}/status-history?cursor=${encodeURIComponent(first.nextCursor)}`,
       "GET",
       undefined,
@@ -1472,7 +1542,7 @@ test("status history is bounded, ordered, scoped, and authorized", async () => {
   );
   await read(
     await call(
-      `/admin/booking-requests/${booking.id}/status-history?cursor=${encodeURIComponent(first.nextCursor)}`,
+      `${adminPath(booking.id)}?cursor=${encodeURIComponent(first.nextCursor)}`,
       "GET",
       undefined,
       adminCookie,

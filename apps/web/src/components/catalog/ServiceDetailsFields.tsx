@@ -4,26 +4,17 @@ import type {
 } from "@event-management/contracts/catalog";
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 import { FormField, Input, Textarea } from "@event-management/ui";
-import { ThumbnailField } from "./ThumbnailField";
+import { ThumbnailField, type ThumbnailFieldProps } from "./ThumbnailField";
 import { EventTypeField } from "./EventTypeField";
 
 export function ServiceDetailsFields({
   content,
   onChange,
-  thumbnailPreviewUrl,
-  onThumbnailChange,
-  onThumbnailError,
-  onThumbnailBusyChange,
+  thumbnail,
 }: {
   content: ServiceContent;
   onChange: (content: ServiceContent) => void;
-  thumbnailPreviewUrl: string | null;
-  onThumbnailChange: (
-    mediaId: string | null,
-    previewUrl: string | null,
-  ) => void;
-  onThumbnailError: (message: string) => void;
-  onThumbnailBusyChange: (busy: boolean) => void;
+  thumbnail: ThumbnailFieldProps;
 }) {
   return (
     <div className="form-grid">
@@ -46,12 +37,7 @@ export function ServiceDetailsFields({
         value={content.eventType ?? null}
         onChange={(eventType) => onChange({ ...content, eventType })}
       />
-      <ThumbnailField
-        previewUrl={thumbnailPreviewUrl}
-        onChange={onThumbnailChange}
-        onError={onThumbnailError}
-        onBusyChange={onThumbnailBusyChange}
-      />
+      <ThumbnailField {...thumbnail} />
     </div>
   );
 }

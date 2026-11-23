@@ -1,26 +1,16 @@
 import { BookingOfferAddons } from "../../../booking-requests/BookingOfferAddons";
-import { BookingStatusHistory } from "../../../booking-requests/BookingStatusHistory";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type SubmitEvent,
-} from "react";
+import { AdminBookingStatusHistory } from "./AdminBookingStatusHistory";
+import { BookingStatusEditor } from "./BookingStatusEditor";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Button,
-  FormField,
   Icon,
   PageHeader,
-  Select,
   Tabs,
-  Textarea,
   useNotifications,
 } from "@event-management/ui";
-import { MAX_BOOKING_REASON_LENGTH } from "@event-management/contracts/limits/booking-requests";
 import {
   getAdminBookingRequest,
-  updateBookingRequestStatus,
   type BookingRequest,
   type BookingStatus,
 } from "../../../../lib/data/booking-requests/requests";
@@ -32,151 +22,11 @@ import { formatPesosFromMinor } from "../../../../lib/utils/formatting/money";
 import {
   bookingDate,
   bookingDateTime,
-  bookingStatusLabels,
   BookingStatusBadge,
 } from "../../../booking-requests/BookingRequestDisplay";
 import { BookingPackage } from "../../../booking-requests/BookingPackage";
 import { Quotations } from "../../../quotations/Quotations";
 import { AdminEventDays } from "../event-days/AdminEventDays";
-
-function RequestStatusForm({
-  item,
-  onSaved,
-  onClose,
-  onBusyChange,
-}: {
-  item: BookingRequest;
-  onSaved: (item: BookingRequest) => void;
-  onClose: () => void;
-  onBusyChange: (busy: boolean) => void;
-}) {
-  const { notify, notifyError } = useNotifications();
-  const [status, setStatus] = useState(item.status);
-  const [reason, setReason] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [stale, setStale] = useState(false);
-  const savingRef = useRef(false);
-  const reasonRequired =
-    status === "needs_details" ||
-    status === "declined" ||
-    status === "cancelled";
-
-  async function save(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (
-      savingRef.current ||
-      stale ||
-      status === item.status ||
-      (reasonRequired && !reason.trim())
-    )
-      return;
-
-    savingRef.current = true;
-    setSaving(true);
-    onBusyChange(true);
-    setError("");
-
-    try {
-      const result = await updateBookingRequestStatus(
-        item.id,
-        status,
-        reason.trim() || undefined,
-      );
-      notify(
-        `Request status updated to ${bookingStatusLabels[result.bookingRequest.status].toLowerCase()}.`,
-      );
-      onSaved(result.bookingRequest);
-    } catch (cause) {
-      setStale(cause instanceof ApiError && cause.status === 409);
-      setError(notifyError(cause, "Unable to update request status."));
-    } finally {
-      savingRef.current = false;
-      setSaving(false);
-      onBusyChange(false);
-    }
-  }
-
-  return (
-    <form
-      className="booking-request-status-form"
-      onSubmit={save}
-      aria-labelledby="request-status-title"
-    >
-      <h3 id="request-status-title">Update request status</h3>
-      <fieldset disabled={saving || stale}>
-        <FormField label="Status">
-          {(props) => (
-            <Select
-              {...props}
-              value={status}
-              onChange={(event) => {
-                const value = event.target.value;
-
-                if (
-                  value === "under_review" ||
-                  value === "needs_details" ||
-                  value === "accepted" ||
-                  value === "declined" ||
-                  value === "cancelled"
-                )
-                  setStatus(value);
-              }}
-            >
-              {Object.entries(bookingStatusLabels).map(([value, label]) => (
-                <option
-                  key={value}
-                  value={value}
-                  disabled={
-                    value === "under_review" && item.status !== "under_review"
-                  }
-                >
-                  {label}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
-        <FormField
-          label={`Reason (${reasonRequired ? "required" : "optional"})`}
-        >
-          {(props) => (
-            <Textarea
-              {...props}
-              value={reason}
-              maxLength={MAX_BOOKING_REASON_LENGTH}
-              required={reasonRequired}
-              onChange={(event) => setReason(event.target.value)}
-            />
-          )}
-        </FormField>
-      </fieldset>
-      {error && (
-        <p role="alert" className="booking-request-error">
-          {error}
-          {stale && " Refresh the request before trying again."}
-        </p>
-      )}
-      <div className="booking-request-actions">
-        <Button
-          type="submit"
-          pending={saving}
-          disabled={
-            stale ||
-            status === item.status ||
-            (reasonRequired && !reason.trim())
-          }
-        >
-          {saving ? "Saving…" : "Update status"}
-        </Button>
-        <Button variant="secondary" disabled={saving} onClick={onClose}>
-          Close
-        </Button>
-      </div>
-    </form>
-  );
-}
 
 function BookingQuotations({
   bookingId,
@@ -248,12 +98,19 @@ export function BookingRequestPage({
   const [savingDay, setSavingDay] = useState(false);
   const [proposalRevision, setProposalRevision] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [notice, setNotice] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const changeStatusButton = useRef<HTMLButtonElement>(null);
+  const historySummary = useRef<HTMLElement>(null);
   const [pageTab, setPageTab] = useState("details");
   const detailsPanelId = "booking-request-details-panel";
   const packagePanelId = "booking-request-package-panel";
   const quotationPanelId = "booking-request-quotation-panel";
   const generation = useRequestGeneration();
+  const canChangeStatus =
+    pageTab === "details" &&
+    item &&
+    item.status !== "declined" &&
+    item.status !== "cancelled";
 
   const refresh = useCallback(async () => {
     const current = generation.bump();
@@ -304,7 +161,8 @@ export function BookingRequestPage({
 
   useEffect(() => {
     setItem(null);
-    setNotice("");
+    setHistoryOpen(false);
+    setEditStatus(false);
     setPageTab("details");
     const pending = refresh();
     const current = generation.current();
@@ -329,7 +187,7 @@ export function BookingRequestPage({
           variant="link"
           disabled={refreshing || savingStatus || savingDay}
           onClick={() => {
-            setNotice("");
+            setEditStatus(false);
             refreshWithNotice("Unable to refresh this booking request.");
           }}
         >
@@ -367,19 +225,72 @@ export function BookingRequestPage({
               title={`${item.eventType} booking request`}
               description={item.packageName ?? "No catalog package selected"}
             />
-            <BookingStatusBadge status={item.status} />
+            <div className="booking-request-status-row">
+              <BookingStatusBadge status={item.status} />
+              {canChangeStatus && !editStatus && (
+                <Button
+                  ref={changeStatusButton}
+                  variant="secondary"
+                  size="small"
+                  disabled={savingStatus || refreshing || savingDay}
+                  onClick={() => setEditStatus(true)}
+                >
+                  Change status
+                </Button>
+              )}
+            </div>
+            {pageTab === "details" && (
+              <>
+                {editStatus && canChangeStatus && (
+                  <div inert={refreshing || savingDay || undefined}>
+                    <BookingStatusEditor
+                      key={`${item.id}:${item.status}`}
+                      item={item}
+                      onClose={() => {
+                        setEditStatus(false);
+                        requestAnimationFrame(() =>
+                          changeStatusButton.current?.focus(),
+                        );
+                      }}
+                      onBusyChange={setSavingStatus}
+                      onSaved={(updated) => {
+                        generation.bump();
+                        setItem(updated);
+                        setEditStatus(false);
+                        setHistoryOpen(true);
+                        historySummary.current?.focus();
+                      }}
+                    />
+                  </div>
+                )}
+                <details
+                  className="booking-request-history"
+                  open={historyOpen}
+                  onToggle={(event) => setHistoryOpen(event.currentTarget.open)}
+                >
+                  <summary ref={historySummary}>Status history</summary>
+                  {historyOpen && (
+                    <AdminBookingStatusHistory
+                      id={item.id}
+                      revision={item.updatedAt}
+                      timeZone={item.timeZone}
+                    />
+                  )}
+                </details>
+              </>
+            )}
           </div>
-          {notice && (
-            <p className="booking-request-success" role="status">
-              {notice}
-            </p>
-          )}
           <Tabs
             role="tablist"
             variant="underline"
             className="booking-request-tabs"
             active={pageTab}
-            onChange={setPageTab}
+            onChange={(tab) => {
+              if (tab === pageTab) return;
+
+              setEditStatus(false);
+              setPageTab(tab);
+            }}
             aria-label="Booking sections"
             items={[
               {
@@ -418,21 +329,7 @@ export function BookingRequestPage({
                 aria-labelledby="request-overview-title"
                 aria-busy={savingStatus || refreshing}
               >
-                <div className="booking-request-overview-heading">
-                  <h2 id="request-overview-title">Request details</h2>
-                  {!["declined", "cancelled"].includes(item.status) && (
-                    <Button
-                      variant="secondary"
-                      size="small"
-                      disabled={savingStatus || refreshing || savingDay}
-                      aria-expanded={editStatus}
-                      aria-controls="booking-status-editor"
-                      onClick={() => setEditStatus((value) => !value)}
-                    >
-                      Update status
-                    </Button>
-                  )}
-                </div>
+                <h2 id="request-overview-title">Request details</h2>
                 <div className="booking-request-info">
                   <dl>
                     <div>
@@ -534,40 +431,10 @@ export function BookingRequestPage({
                   disabled={refreshing || savingStatus || savingDay}
                   onChanged={setItem}
                 />
-                <div className="booking-request-overview-footer">
-                  <p>
-                    Dates are not reserved. Processing does not confirm the
-                    booking.
-                  </p>
-                  <BookingStatusHistory
-                    id={item.id}
-                    admin
-                    revision={item.updatedAt}
-                    timeZone={item.timeZone}
-                    className="booking-request-history"
-                  />
-                </div>
-                {editStatus && (
-                  <div
-                    id="booking-status-editor"
-                    inert={refreshing || savingDay || undefined}
-                  >
-                    <RequestStatusForm
-                      key={`${item.id}:${item.status}`}
-                      item={item}
-                      onClose={() => setEditStatus(false)}
-                      onBusyChange={setSavingStatus}
-                      onSaved={(updated) => {
-                        generation.bump();
-                        setItem(updated);
-                        setEditStatus(false);
-                        setNotice(
-                          `Request status updated to ${bookingStatusLabels[updated.status].toLowerCase()}.`,
-                        );
-                      }}
-                    />
-                  </div>
-                )}
+                <p className="booking-request-overview-note">
+                  Dates are not reserved. Processing does not confirm the
+                  booking.
+                </p>
               </section>
               <div
                 inert={savingStatus || refreshing || undefined}

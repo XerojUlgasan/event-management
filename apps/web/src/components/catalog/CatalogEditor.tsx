@@ -5,7 +5,6 @@ import {
   Icon,
   Input,
   NativeDialog,
-  Select,
   Textarea,
   useNotifications,
   CatalogGridGuides,
@@ -261,6 +260,7 @@ export function CatalogEditor<T extends CanvasContent>({
   renderDetails,
   renderPreview,
   saveLabel = "Save changes",
+  uploadingThumbnail = false,
   nameMaxLength = MAX_CATALOG_TEXT_LENGTH,
   privateProposal = false,
   nameBadge,
@@ -279,6 +279,7 @@ export function CatalogEditor<T extends CanvasContent>({
   renderPreview: (content: T, mode: "customer" | "card") => ReactNode;
   nameMaxLength?: number;
   saveLabel?: string;
+  uploadingThumbnail?: boolean;
   /** Optional small badge shown beside the name in the editor header. */
   nameBadge?: (content: T) => ReactNode;
   privateProposal?: boolean;
@@ -874,6 +875,8 @@ export function CatalogEditor<T extends CanvasContent>({
   }, []);
 
   const save = async () => {
+    if (busy || uploadingThumbnail) return;
+
     if (!content.name.trim()) {
       setError(notifyError(validate?.(content) || `Enter a ${entity} name.`));
       setSettings(false);
@@ -1045,6 +1048,7 @@ export function CatalogEditor<T extends CanvasContent>({
               aria-label={busy ? "Saving…" : saveLabel}
               title={busy ? "Saving…" : saveLabel}
               pending={busy}
+              disabled={uploadingThumbnail}
               onClick={() => void save()}
             />
           </div>
@@ -1104,21 +1108,6 @@ export function CatalogEditor<T extends CanvasContent>({
             >
               <div className="pe-canvas-heading">
                 <h2>{title} content</h2>
-                {content.sections.length > 1 && (
-                  <label className="pe-target">
-                    Add to section
-                    <Select
-                      value={addSectionTarget?.id ?? ""}
-                      onChange={(event) => setTargetSection(event.target.value)}
-                    >
-                      {content.sections.map((section, index) => (
-                        <option key={section.id} value={section.id}>
-                          {section.title || `Section ${index + 1}`}
-                        </option>
-                      ))}
-                    </Select>
-                  </label>
-                )}
               </div>
               {content.sections.map((section, index) => {
                 const live =

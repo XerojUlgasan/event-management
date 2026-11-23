@@ -25,10 +25,15 @@ export const saveBookingPackage = (
     sourcePackageId?: string;
   },
   exists: boolean,
+  thumbnailMediaId?: string | null,
 ) =>
   request<{ package: CatalogPackage; bookingRequest: BookingRequest }>(
     `/admin/booking-requests/${encodeURIComponent(id)}/custom-package`,
-    { ...content, ...revisions },
+    {
+      ...content,
+      ...revisions,
+      ...(thumbnailMediaId !== undefined ? { thumbnailMediaId } : {}),
+    },
     undefined,
     exists ? "PATCH" : "POST",
   );

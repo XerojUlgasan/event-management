@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { Pool } from "pg";
 import { CATALOG_COLUMNS } from "@event-management/contracts/catalog";
+import { MAX_CATALOG_SEARCH_LENGTH } from "@event-management/contracts/limits/catalog";
 import { hashSessionToken } from "../src/utils/session.js";
 
 const database = `em_packages_test_${randomUUID().replaceAll("-", "")}`;
@@ -1463,6 +1464,83 @@ test("public package and service filters apply before pagination", async () => {
   await read(await call("/services?guests=10"), 400);
 });
 
+test("public package search matches literal name and description text before pagination", async () => {
+  const term = `Package search ${randomUUID()} %_`;
+  const packages = [];
+
+  for (const [name, description, maxGuests] of [
+    [term, "Matches the package name", 100],
+    ["Search description fixture", term, 120],
+    ["Search guest filter fixture", term, 50],
+    ["Search wildcard fixture", term.replace("%_", "xy"), 120],
+    ["Search archived fixture", term, 120],
+  ] as const) {
+    const item = await read(
+      await call(
+        "/admin/packages",
+        "POST",
+        { ...data, name, description, maxGuests },
+        adminCookie,
+      ),
+      201,
+    );
+
+    if (name === "Search archived fixture")
+      await read(
+        await call(
+          `/admin/packages/${item.id}/archive`,
+          "POST",
+          undefined,
+          adminCookie,
+        ),
+        200,
+      );
+
+    packages.push(item);
+  }
+
+  const query = new URLSearchParams({
+    guests: "100",
+    limit: "1",
+    search: ` ${term.toUpperCase()} `,
+  });
+  const first = await read(await call(`/packages?${query}`), 200);
+  assert.equal(first.packages.length, 1);
+  assert.ok(first.nextCursor);
+
+  query.set("cursor", first.nextCursor);
+  query.set("search", term.toUpperCase());
+  const next = await read(await call(`/packages?${query}`), 200);
+  assert.deepEqual(
+    new Set([first.packages[0].id, next.packages[0].id]),
+    new Set(packages.slice(0, 2).map((item) => item.id)),
+  );
+  assert.equal(next.nextCursor, null);
+
+  query.set("search", "different search");
+  await read(await call(`/packages?${query}`), 400);
+  query.delete("search");
+  await read(await call(`/packages?${query}`), 400);
+  query.set("search", term.toUpperCase());
+  query.set("guests", "101");
+  await read(await call(`/packages?${query}`), 400);
+
+  const unfiltered = await read(await call("/packages?limit=1"), 200);
+  assert.ok(unfiltered.nextCursor);
+  query.delete("guests");
+  query.set("search", " ");
+  query.set("cursor", unfiltered.nextCursor);
+  await read(await call(`/packages?${query}`), 200);
+
+  query.delete("cursor");
+  query.set("search", "x".repeat(MAX_CATALOG_SEARCH_LENGTH));
+  await read(await call(`/packages?${query}`), 200);
+  query.set("search", "x".repeat(MAX_CATALOG_SEARCH_LENGTH + 1));
+  await read(await call(`/packages?${query}`), 400);
+  query.set("search", "\0");
+  await read(await call(`/packages?${query}`), 400);
+});
+
 async function uploadCanvas(
   bytes: Uint8Array,
   mime: string,
@@ -2726,6 +2804,8 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
   );
   const save = {
     ...content,
+    // The editor does not send a thumbnail change when the source image is untouched.
+    thumbnailMediaId: undefined,
     expectedUpdatedAt: before.package.updatedAt,
     expectedBookingUpdatedAt: before.bookingUpdatedAt,
   };

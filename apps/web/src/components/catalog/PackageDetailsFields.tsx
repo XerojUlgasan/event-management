@@ -5,28 +5,19 @@ import {
   centavosToPesos,
   pesosToCentavos,
 } from "../../lib/utils/formatting/money";
-import { ThumbnailField } from "./ThumbnailField";
+import { ThumbnailField, type ThumbnailFieldProps } from "./ThumbnailField";
 import { EventTypeField } from "./EventTypeField";
 
 export function PackageDetailsFields({
   content,
   onChange,
   privateProposal = false,
-  thumbnailPreviewUrl,
-  onThumbnailChange,
-  onThumbnailError,
-  onThumbnailBusyChange,
+  thumbnail,
 }: {
   privateProposal?: boolean;
   content: PackageContent;
   onChange: (content: PackageContent) => void;
-  thumbnailPreviewUrl: string | null;
-  onThumbnailChange: (
-    mediaId: string | null,
-    previewUrl: string | null,
-  ) => void;
-  onThumbnailError: (message: string) => void;
-  onThumbnailBusyChange: (busy: boolean) => void;
+  thumbnail: ThumbnailFieldProps;
 }) {
   return (
     <div className="form-grid">
@@ -100,12 +91,7 @@ export function PackageDetailsFields({
         value={content.eventType ?? null}
         onChange={(v) => onChange({ ...content, eventType: v })}
       />
-      <ThumbnailField
-        previewUrl={thumbnailPreviewUrl}
-        onChange={onThumbnailChange}
-        onError={onThumbnailError}
-        onBusyChange={onThumbnailBusyChange}
-      />
+      <ThumbnailField {...thumbnail} />
     </div>
   );
 }

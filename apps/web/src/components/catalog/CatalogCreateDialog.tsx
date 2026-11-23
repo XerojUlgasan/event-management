@@ -40,6 +40,9 @@ export function CatalogCreateDialog<T extends { name: string }>({
       <form
         onSubmit={(event) => {
           event.preventDefault();
+
+          if (uploading) return;
+
           const message = validate(content);
           setError(message ?? "");
 

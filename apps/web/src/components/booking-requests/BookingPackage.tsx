@@ -334,7 +334,7 @@ export function BookingPackage({
 
             onChanged?.();
           }}
-          saveCustom={async (content) => {
+          saveCustom={async (content, thumbnailMediaId) => {
             if (!canEditRef.current)
               throw new Error("This request is read-only.");
 
@@ -352,6 +352,7 @@ export function BookingPackage({
                     : {}),
                 },
                 loaded.package?.packageType === "custom",
+                thumbnailMediaId,
               );
             } catch (cause) {
               if (cause instanceof ApiError && cause.status === 409) {

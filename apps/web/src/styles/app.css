@@ -5829,15 +5829,6 @@ html:has(.public-site) {
     padding: 10px 12px 14px;
     gap: 8px;
   }
-  .customer-messages.single-conversation > aside {
-    display: none;
-  }
-  .customer-messages.single-conversation > section {
-    display: flex;
-  }
-  .customer-messages.single-conversation .message-back {
-    display: none;
-  }
 }
 
 /* Keep chat controls comfortable on touch screens without changing the desktop rhythm. */

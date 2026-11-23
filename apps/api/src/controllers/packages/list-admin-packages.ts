@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { MAX_CATALOG_SEARCH_LENGTH } from "@event-management/contracts/limits/catalog";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { paginationQuerySchema } from "../../utils/pagination.js";
 import { adminSchema } from "./schemas.js";
@@ -11,7 +12,7 @@ export const listAdminPackagesRoute = createRoute({
   tags: ["Packages"],
   request: {
     query: paginationQuerySchema.extend({
-      search: z.string().trim().max(200).optional(),
+      search: z.string().trim().max(MAX_CATALOG_SEARCH_LENGTH).optional(),
       archived: z.enum(["all", "active", "archived"]).default("all"),
     }),
   },

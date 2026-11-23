@@ -7,8 +7,7 @@
 .pe-card-actions,
 .pe-bar,
 .pe-bar-actions,
-.pe-section-bar,
-.pe-canvas-heading {
+.pe-section-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -207,7 +206,6 @@
   padding-bottom: 24px;
 }
 .pe-canvas-heading {
-  flex-wrap: wrap;
   padding: 16px clamp(10px, 2cqi, 24px);
 }
 .pe-canvas-heading h2 {
@@ -522,17 +520,6 @@
 .pe-grid .pe-widget .react-resizable-handle:focus-visible:before,
 .pe-grid .pe-widget .react-resizable-handle:focus-visible:after {
   border-color: var(--accent-strong);
-}
-.pe-target {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.pe-target select {
-  max-width: min(180px, 55cqi);
 }
 .pe-section-bar button {
   padding: 6px 9px;
@@ -874,99 +861,54 @@ dialog.pe-media-dialog::backdrop {
   outline: 2px solid var(--accent-strong);
   outline-offset: -2px;
 }
-.pe-reference-picker .pe-reference-options {
-  display: grid;
-  gap: 8px;
-  margin: 18px 0;
-  max-height: min(42vh, 400px);
-  overflow-y: auto;
-}
-.pe-reference-option {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  padding: 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background: var(--surface-base);
-  color: var(--text-primary);
-  text-align: left;
-  cursor: pointer;
-}
-.pe-reference-option:hover,
-.pe-reference-option:focus-visible {
-  background: var(--surface-muted);
-}
-.pe-reference-option > .pe-reference-option-image {
-  flex: 0 0 72px;
-  width: 72px;
-  height: 58px;
-  object-fit: cover;
-  border-radius: var(--radius-control);
-  background: var(--surface-muted);
-}
-.pe-reference-option-image {
-  display: grid;
-  place-items: center;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.pe-reference-option-copy {
-  display: grid;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.pe-reference-option-copy > span {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  color: var(--text-muted);
-  font-size: 13px;
-  line-height: 1.4;
-}
-.pe-reference-picker-note {
-  margin: 12px 0 0;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
 /* ── Thumbnail field ─────────────────────────────────────────────────────── */
 .thumbnail-field {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  gap: var(--field-gap);
+}
+
+.thumbnail-field-label {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .thumbnail-field-preview {
-  display: flex;
+  display: grid;
+  grid-template-columns: clamp(84px, 29%, 132px) minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
-/* Clickable thumbnail — acts as a button to open the lightbox */
+.thumbnail-field-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 11 / 7;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+}
+
+.thumbnail-field-controls {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.thumbnail-field-controls > small {
+  font-size: 13px;
+}
+
+.thumbnail-field-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
 .thumbnail-field-thumb-btn {
   position: relative;
   padding: 0;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-control);
-  background: var(--surface-muted);
-  cursor: pointer;
-  flex-shrink: 0;
-  overflow: hidden;
-  display: block;
-  width: 80px;
-  height: 60px;
-}
-
-.thumbnail-field-thumb-btn img {
-  width: 80px;
-  height: 60px;
-  object-fit: cover;
-  display: block;
 }
 
 /* Hover overlay hint */
@@ -976,8 +918,8 @@ dialog.pe-media-dialog::backdrop {
   display: grid;
   place-items: center;
   background: color-mix(in srgb, var(--overlay-black) 46%, var(--transparent));
-  color: #fff;
-  font-size: 11px;
+  color: var(--surface-base);
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
   opacity: 0;
@@ -994,11 +936,6 @@ dialog.pe-media-dialog::backdrop {
   outline-offset: 2px;
 }
 
-.thumbnail-field-uploading {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
 /* ── Thumbnail lightbox ──────────────────────────────────────────────────── */
 dialog.thumbnail-lightbox {
   position: fixed;
@@ -1010,7 +947,7 @@ dialog.thumbnail-lightbox {
   margin: 0;
   padding: 0;
   border: 0;
-  background: transparent;
+  background: var(--transparent);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -1030,7 +967,7 @@ dialog.thumbnail-lightbox:not([open]) {
   width: auto;
   height: auto;
   object-fit: contain;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   display: block;
   box-shadow: 0 24px 60px
     color-mix(in srgb, var(--overlay-black) 60%, var(--transparent));

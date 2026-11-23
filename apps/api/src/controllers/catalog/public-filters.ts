@@ -4,6 +4,7 @@ import {
   MAX_CATALOG_FILTER_GUESTS,
   MAX_CATALOG_FILTER_PRICE_PESOS,
 } from "@event-management/contracts/catalog-filters";
+import { MAX_CATALOG_SEARCH_LENGTH } from "@event-management/contracts/limits/catalog";
 import { paginationQuerySchema } from "../../utils/pagination.js";
 
 const eventType = z.enum(EVENT_TYPES).optional();
@@ -34,7 +35,18 @@ const rangeMessage = {
 };
 
 export const packageCatalogQuerySchema = paginationQuerySchema
-  .extend({ minPricePesos: price, maxPricePesos: price, guests, eventType })
+  .extend({
+    minPricePesos: price,
+    maxPricePesos: price,
+    guests,
+    eventType,
+    search: z
+      .string()
+      .trim()
+      .max(MAX_CATALOG_SEARCH_LENGTH)
+      .refine((value) => !value.includes("\0"), "Invalid search text")
+      .optional(),
+  })
   .refine(priceRange, rangeMessage);
 
 export const serviceCatalogQuerySchema = paginationQuerySchema

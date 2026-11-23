@@ -120,7 +120,7 @@ export function CustomerDashboard({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const accountTriggerRef = useRef<HTMLButtonElement>(null);
-  const [conversationOpen, setConversationOpen] = useState(false);
+  const [mobilePane, setMobilePane] = useState<"inbox" | "thread" | null>(null);
   const [outbox, setOutbox] = useState<
     Record<
       string,
@@ -161,7 +161,7 @@ export function CustomerDashboard({
     routeConversation.current = requestedConversation;
     referenceSelection.current++;
     setSelectedConversationId(requestedConversation);
-    setConversationOpen(!!requestedConversation);
+    setMobilePane(requestedConversation ? "thread" : "inbox");
   }, [tab, requestedConversation, requestedQuotation]);
 
   const [bookingItem, setBookingItem] = useState<PublicPackage | null>(() =>
@@ -265,7 +265,7 @@ export function CustomerDashboard({
           result.conversations[0]?.id ?? messageConversations[0]?.id ?? null,
         );
 
-        if (result.conversations.length) setConversationOpen(true);
+        if (result.conversations.length) setMobilePane("thread");
       })
       .catch((cause) => {
         if (active && selection === referenceSelection.current)
@@ -283,9 +283,10 @@ export function CustomerDashboard({
     messageConversations.length === 1 &&
     messageConversations[0]?.id === selectedConversationId &&
     !inbox.nextCursor;
-  const threadVisible = useThreadVisible(
-    conversationOpen || singleConversation,
-  );
+  const conversationOpen = mobilePane
+    ? mobilePane === "thread"
+    : singleConversation;
+  const threadVisible = useThreadVisible(conversationOpen);
   const pollingVisible = useRef(false);
   pollingVisible.current = tab === "Messages" && threadVisible;
 
@@ -679,7 +680,7 @@ export function CustomerDashboard({
 
       setSelectedConversationId(thread.conversation.id);
       setMessageThread(thread);
-      setConversationOpen(true);
+      setMobilePane("thread");
       notify("New chat started.");
     } catch (cause) {
       notifyError(cause, "Unable to start a new chat.");
@@ -694,7 +695,7 @@ export function CustomerDashboard({
     setHistoryNotice("");
     setThreadError("");
     setSelectedConversationId(id);
-    setConversationOpen(true);
+    setMobilePane("thread");
   };
 
   useEffect(() => {
@@ -1036,7 +1037,7 @@ export function CustomerDashboard({
                 if (requestedConversation)
                   navigateWorkspace("/app/messages", true);
 
-                setConversationOpen(false);
+                setMobilePane("inbox");
               }}
               conversationOpen={conversationOpen}
               onNewChat={startNewChat}

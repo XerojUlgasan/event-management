@@ -4,9 +4,11 @@ import { BRAND_LOGO_URL } from "../assets/brand";
 export function CatalogThumbnail({
   src,
   className = "",
+  onImageError,
 }: {
   src?: string | null;
   className?: string;
+  onImageError?: () => void;
 }) {
   return (
     <span
@@ -26,6 +28,7 @@ export function CatalogThumbnail({
           loading="lazy"
           onError={(event) => {
             event.currentTarget.hidden = true;
+            onImageError?.();
           }}
         />
       )}

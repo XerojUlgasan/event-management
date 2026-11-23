@@ -21,6 +21,7 @@ let window,
   CatalogEditor,
   Provider;
 let root, container, requests, failReset;
+let uploadThumbnail;
 
 const service = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -123,6 +124,9 @@ before(async () => {
   globalThis.fetch = async (url) => {
     requests.push(String(url));
 
+    if (String(url).endsWith("/admin/catalog-media") && uploadThumbnail)
+      return uploadThumbnail();
+
     if (String(url).includes(`/admin/services/${service.id}`))
       return failReset ? json({ error: "unavailable" }, 500) : json(service);
 
@@ -194,6 +198,7 @@ async function flush() {
 async function render(component, props) {
   requests = [];
   failReset = false;
+  uploadThumbnail = undefined;
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -365,6 +370,110 @@ test("thumbnail Escape does not dismiss the details modal", async () => {
   assert.ok(details.isConnected && details.open);
 });
 
+async function chooseThumbnail(file) {
+  const input = document.querySelector(
+    'input[aria-label="Choose card thumbnail"]',
+  );
+  assert.ok(input);
+  Object.defineProperty(input, "files", {
+    configurable: true,
+    value: file ? [file] : [],
+  });
+  await act(async () =>
+    input.dispatchEvent(new window.Event("change", { bubbles: true })),
+  );
+  await flush();
+}
+
+test("private thumbnail replacement keeps the old image through cancellation and failure, then saves the new ID", async () => {
+  const original = "https://example.test/original.png";
+  const replacement = "https://example.test/replacement.png";
+  const mediaId = "55555555-5555-4555-8555-555555555555";
+  const imageUrl = () =>
+    document
+      .querySelector(".thumbnail-field [data-catalog-thumbnail-image]")
+      ?.getAttribute("src");
+  const saves = [];
+  await render(PackageEditor, {
+    initial: { ...packageItem, imageUrl: original },
+    onClose: () => {},
+    onSaved: () => {},
+    saveCustom: async (_, id) => {
+      saves.push(id);
+    },
+  });
+  await click("Private package details");
+  let pickerOpens = 0;
+  document
+    .querySelector('input[aria-label="Choose card thumbnail"]')
+    .addEventListener("click", () => pickerOpens++);
+  await click("Change image");
+  await chooseThumbnail();
+  assert.equal(pickerOpens, 1);
+  assert.equal(imageUrl(), original);
+  await chooseThumbnail(new File(["data"], "file.gif", { type: "image/gif" }));
+  assert.match(
+    document.querySelector(".thumbnail-field [role=alert]").textContent,
+    /Choose a JPEG/,
+  );
+
+  const file = new File(["data"], "photo.png", { type: "image/png" });
+  uploadThumbnail = () => json({ error: "Unavailable" }, 502);
+  await chooseThumbnail(file);
+  assert.equal(imageUrl(), original);
+  assert.match(
+    document.querySelector(".thumbnail-field [role=alert]").textContent,
+    /upload failed/,
+  );
+
+  let completeUpload;
+  uploadThumbnail = () =>
+    new Promise((resolve) => {
+      completeUpload = resolve;
+    });
+  await chooseThumbnail(file);
+  assert.equal(imageUrl(), original);
+  assert.equal(button("Use default").disabled, true);
+  await click("Done");
+  assert.equal(button("Save private package").disabled, true);
+  await act(async () =>
+    completeUpload(json({ id: mediaId, url: replacement })),
+  );
+  await click("Private package details");
+  assert.equal(imageUrl(), replacement);
+  assert.equal(document.querySelector(".thumbnail-field [role=alert]"), null);
+  await click("Done");
+  assert.deepEqual(saves, []);
+  await click("Save private package");
+  assert.deepEqual(saves, [mediaId]);
+});
+
+test("unavailable private thumbnail displays branded artwork and resets with an explicit null", async () => {
+  const saves = [];
+  await render(PackageEditor, {
+    initial: { ...packageItem, imageUrl: "https://example.test/missing.png" },
+    onClose: () => {},
+    onSaved: () => {},
+    saveCustom: async (_, id) => {
+      saves.push(id);
+    },
+  });
+  await click("Private package details");
+  const field = document.querySelector(".thumbnail-field");
+  const image = field.querySelector("[data-catalog-thumbnail-image]");
+  await act(async () => image.dispatchEvent(new window.Event("error")));
+  assert.match(field.textContent, /Image unavailable/);
+  assert.ok(field.querySelector(".ui-catalog-thumbnail-brand"));
+  assert.equal(field.querySelector("[data-catalog-thumbnail-image]"), null);
+  assert.ok(button("Change image"));
+  await click("Use default");
+  assert.match(field.textContent, /AMAC default image/);
+  assert.equal(document.activeElement, button("Add image"));
+  await click("Done");
+  await click("Save private package");
+  assert.deepEqual(saves, [null]);
+});
+
 test("blank editor name keeps the editor open and focuses its name field", async () => {
   await render(PackageEditor, {
     initial: { ...packageItem, name: "" },
@@ -408,6 +517,43 @@ test("catalog editor does not show private add-on controls", async () => {
   });
   await click("Package details");
   assert.doesNotMatch(document.body.textContent, /Add-on services/);
+});
+
+test("the private package palette adds widgets without a section dropdown", async () => {
+  await render(PackageEditor, {
+    initial: {
+      ...packageItem,
+      sections: [
+        ...packageItem.sections,
+        {
+          id: "77777777-7777-4777-8777-777777777777",
+          title: "Second section",
+          widgets: [],
+        },
+      ],
+    },
+    onClose: () => {},
+    onSaved: () => {},
+    saveCustom: async () => {},
+  });
+
+  const sections = () => [...document.querySelectorAll(".pe-editor-section")];
+
+  assert.equal(sections().length, 2);
+  assert.doesNotMatch(document.body.textContent, /Add to section/);
+
+  await click("Add Markdown");
+  assert.deepEqual(
+    sections().map((section) => section.querySelectorAll(".pe-widget").length),
+    [2, 0],
+  );
+
+  await click("+ Add section");
+  await click("Add Markdown");
+  assert.deepEqual(
+    sections().map((section) => section.querySelectorAll(".pe-widget").length),
+    [2, 0, 1],
+  );
 });
 
 test("Markdown widgets edit in place, render on blur, and save the source", async () => {
@@ -491,4 +637,45 @@ test("private editor keeps changes after a failed save and can retry", async () 
   assert.equal(saved.sections[0].columns, 24);
   assert.equal(saved.sections[0].widgets[0].w, 12);
   assert.equal(saved.sections[0].widgets[0].serviceTerms.includedHours, 6);
+});
+
+test("conversation booking keeps the chosen package when a new search hides it", async (t) => {
+  const { ConversationBooking } = await server.ssrLoadModule(
+    "/src/components/booking-requests/ConversationBooking.tsx",
+  );
+  const queries = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    const path = new URL(url);
+
+    if (path.pathname.endsWith("/me")) return json({ role: "customer" });
+
+    assert.ok(path.pathname.endsWith("/packages"));
+    const search = path.searchParams.get("search");
+    queries.push(search);
+
+    return json({ packages: search ? [] : [packageItem], nextCursor: null });
+  });
+  await render(ConversationBooking, {
+    conversationId: "test-thread",
+    onSubmitted: () => assert.fail("Continue must only open the booking form"),
+    onClose() {},
+  });
+  const choices = document.querySelectorAll("button[aria-pressed]");
+  assert.equal(choices[0].getAttribute("aria-pressed"), "true");
+  assert.ok(choices[1].textContent.includes(packageItem.name));
+  await act(async () => choices[1].click());
+  await change("Search packages", "no match");
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  });
+  assert.deepEqual(queries, [null, "no match"]);
+  assert.ok(
+    document.body.textContent.includes("No packages match your search."),
+  );
+  await click("Continue");
+  assert.ok(
+    document
+      .querySelector(".booking-intro")
+      .textContent.includes(packageItem.name),
+  );
 });

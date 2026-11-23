@@ -28,7 +28,7 @@ import { servicePricingLabels } from "../../../../lib/utils/formatting/money";
 import { CatalogDetailPreview } from "../../../catalog/CatalogDetailPreview";
 import { CatalogEditor } from "../../../catalog/CatalogEditor";
 import { CatalogCreateDialog } from "../../../catalog/CatalogCreateDialog";
-import { useThumbnail } from "../../../../lib/utils/catalog/use-thumbnail";
+import { useThumbnail } from "../../../../lib/services/catalog/use-thumbnail";
 import { ServiceDetailsFields } from "../../../catalog/ServiceDetailsFields";
 import { validateServiceDetails } from "../../../../lib/utils/catalog/details-validation";
 
@@ -381,9 +381,10 @@ export function ServicesPage() {
           onContinue={(form) => {
             setCreating(null);
             // Transfer the create thumbnail into the edit slot before opening the editor.
-            editThumbnail.reset(createThumbnail.previewUrl);
-            editThumbnail.mediaIdRef.current =
-              createThumbnail.mediaIdRef.current;
+            editThumbnail.reset(
+              createThumbnail.previewUrl,
+              createThumbnail.mediaIdRef.current,
+            );
             setEditing(form);
           }}
           validate={validateServiceDetails}
@@ -391,10 +392,7 @@ export function ServicesPage() {
             <ServiceDetailsFields
               content={form}
               onChange={setForm}
-              thumbnailPreviewUrl={createThumbnail.previewUrl}
-              onThumbnailChange={createThumbnail.handleChange}
-              onThumbnailError={(msg) => notifyError(msg)}
-              onThumbnailBusyChange={createThumbnail.setUploading}
+              thumbnail={createThumbnail}
             />
           )}
         />
@@ -405,11 +403,13 @@ export function ServicesPage() {
           entity="service"
           nameBadge={(c) => (c.eventType ? <span>{c.eventType}</span> : null)}
           onClose={() => {
+            editThumbnail.cancelAndCleanup();
             setEditing(null);
 
             if (savedDuringEditRef.current) void load();
           }}
           onSave={(form) => save(form, editThumbnail.mediaIdRef.current)}
+          uploadingThumbnail={editThumbnail.uploading}
           onSaved={() => {
             setEditing(null);
             void load();
@@ -429,10 +429,7 @@ export function ServicesPage() {
             <ServiceDetailsFields
               content={form}
               onChange={setForm}
-              thumbnailPreviewUrl={editThumbnail.previewUrl}
-              onThumbnailChange={editThumbnail.handleChange}
-              onThumbnailError={(msg) => notifyError(msg)}
-              onThumbnailBusyChange={editThumbnail.setUploading}
+              thumbnail={editThumbnail}
             />
           )}
           renderPreview={(form, mode) =>

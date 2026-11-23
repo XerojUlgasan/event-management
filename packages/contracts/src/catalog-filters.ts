@@ -23,6 +23,10 @@ export type CatalogFilters = {
 
 export type PublicCatalogPageQuery = PaginationQuery & CatalogFilters;
 
+export type PublicPackagePageQuery = PublicCatalogPageQuery & {
+  search?: string;
+};
+
 export const MAX_CATALOG_FILTER_PRICE_PESOS = 2147483647;
 export const MAX_CATALOG_FILTER_GUESTS = 2147483647;
 

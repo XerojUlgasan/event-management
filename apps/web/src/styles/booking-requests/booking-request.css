@@ -68,11 +68,15 @@
   outline-offset: 4px;
 }
 .booking-request-heading {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.booking-request-status-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 10px;
 }
 .booking-request-heading .page-head {
   min-width: 0;
@@ -93,15 +97,8 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-panel);
 }
-.booking-request-overview-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-}
 .booking-request-overview h2 {
-  margin: 0;
+  margin: 0 0 14px;
   font-family: var(--font-serif);
   font-size: 22px;
   font-weight: 500;
@@ -129,61 +126,83 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-.booking-request-overview-footer {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
+.booking-request-overview-note {
   border-top: 1px solid var(--line);
   padding-top: 13px;
-  margin-top: 9px;
-}
-.booking-request-overview-footer > p {
-  margin: 0;
+  margin: 9px 0 0;
   color: var(--text-muted);
   font-size: 12px;
 }
 .booking-request-history {
-  flex: none;
-  font-size: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+  font-size: 13px;
 }
 .booking-request-history summary {
-  min-height: 28px;
+  width: fit-content;
+  padding-block: 7px;
   color: var(--wine);
+  font-weight: 600;
   cursor: pointer;
 }
-.booking-request-history ul {
-  padding-left: 16px;
-  max-width: 300px;
+.booking-status-timeline {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 8px;
 }
-.booking-request-history li {
-  margin-bottom: 10px;
+.booking-status-timeline li {
+  position: relative;
+  margin-inline-start: 4px;
+  padding: 0 0 14px 16px;
   overflow-wrap: anywhere;
 }
-.booking-request-history li span {
+.booking-status-timeline li:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  inset: 8px auto -8px 0;
+  border-inline-start: 1px solid var(--line);
+}
+.booking-status-timeline li::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.booking-status-timeline li:last-child {
+  padding-bottom: 0;
+}
+.booking-status-timeline time {
   display: block;
   color: var(--text-muted);
-  margin-top: 4px;
+  font-size: 12px;
+}
+.booking-status-timeline li p {
+  margin: 4px 0 0;
   white-space: pre-wrap;
 }
 .booking-request-status-form {
-  border-top: 1px solid var(--line);
-  padding-top: 20px;
-  margin-top: 20px;
-}
-.booking-request-status-form h3 {
-  margin: 0 0 14px;
-  font-size: 16px;
-  font-weight: 600;
+  box-sizing: border-box;
+  max-width: 32rem;
+  padding: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface-base);
+  border-radius: var(--radius-panel);
 }
 .booking-request-status-form fieldset {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-  gap: 20px;
+  gap: 12px;
   border: 0;
   padding: 0;
   margin: 0;
   min-width: 0;
+}
+.booking-status-impact {
+  margin: 12px 0 0;
+  color: var(--status-danger-text);
   font-size: 13px;
 }
 .booking-request-actions {
@@ -197,14 +216,6 @@
   color: var(--status-danger-text);
   font-size: 13px;
 }
-.booking-request-success {
-  margin: 0 0 18px;
-  padding: 12px 16px;
-  border-radius: var(--radius-control);
-  color: var(--status-success-dark);
-  background: var(--status-success-surface);
-  font-size: 13px;
-}
 .booking-request-load-error {
   padding: 24px;
   border: 1px solid var(--line);
@@ -215,12 +226,6 @@
   margin-right: 16px;
 }
 @media (max-width: 700px) {
-  .booking-request-heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 12px;
-    margin-bottom: 20px;
-  }
   .booking-request-heading .page-title {
     font-size: 26px;
   }
@@ -237,19 +242,6 @@
   .booking-request-info dl + dl {
     border-top: 1px solid var(--line);
     padding-top: 12px;
-  }
-  .booking-request-overview-footer {
-    flex-direction: column;
-    gap: 12px;
-  }
-  .booking-request-history {
-    max-width: 100%;
-  }
-  .booking-request-history ul {
-    max-width: none;
-  }
-  .booking-request-status-form fieldset {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 

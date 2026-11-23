@@ -182,14 +182,29 @@ export type BookingStatusHistoryEntry = {
   createdAt: string;
 };
 
+type BookingStatusHistoryPage = {
+  history: BookingStatusHistoryEntry[];
+  nextCursor: string | null;
+};
+
 export const getBookingStatusHistory = (
   id: string,
   admin: boolean,
   cursor?: string,
 ) =>
-  request<{ history: BookingStatusHistoryEntry[]; nextCursor: string | null }>(
+  request<BookingStatusHistoryPage>(
     `${admin ? "/admin" : ""}/booking-requests/${encodeURIComponent(id)}/status-history${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
   );
+
+export const getAdminBookingStatusHistory = (id: string, cursor?: string) => {
+  const query = new URLSearchParams({ order: "newest" });
+
+  if (cursor) query.set("cursor", cursor);
+
+  return request<BookingStatusHistoryPage>(
+    `/admin/booking-requests/${encodeURIComponent(id)}/status-history?${query}`,
+  );
+};
 
 export type BookingAddonInput = {
   expectedBookingUpdatedAt: string;

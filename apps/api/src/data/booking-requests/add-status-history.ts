@@ -1,4 +1,4 @@
-import type { Transaction } from "kysely";
+import { sql, type Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 
 export const addStatusHistoryData = (
@@ -15,6 +15,8 @@ export const addStatusHistoryData = (
       status,
       changed_by: changedBy,
       reason,
+      // Record the change after acquiring the booking lock, even if the transaction waited.
+      created_at: sql<Date>`clock_timestamp()`,
     })
     .returning("id")
     .executeTakeFirstOrThrow();

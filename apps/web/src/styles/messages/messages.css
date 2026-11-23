@@ -367,18 +367,30 @@
   }
 }
 @media (max-width: 760px) {
+  .customer-shell:has(.customer-messages-view) {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100dvh;
+    min-height: 0;
+  }
+  .customer-messages-view,
+  .customer-messages-view .messages-workspace {
+    height: 100%;
+    min-height: 0;
+  }
+  .customer-shell:has(.conversation-open) .customer-nav {
+    display: none;
+  }
   .messages-workspace {
     grid-template-columns: 1fr;
   }
   .messages-workspace > section {
     display: none;
   }
-  .messages-workspace.conversation-open > aside,
-  .messages-workspace.single-conversation > aside {
+  .messages-workspace.conversation-open > aside {
     display: none;
   }
-  .messages-workspace.conversation-open > section,
-  .messages-workspace.single-conversation > section {
+  .messages-workspace.conversation-open > section {
     display: flex;
   }
   .messages-workspace .message-back {
@@ -392,9 +404,6 @@
   }
   .messages-workspace .message-back svg {
     transform: rotate(180deg);
-  }
-  .messages-workspace.single-conversation .message-back {
-    display: none;
   }
   .messages-workspace .message-thread-head {
     padding: 10px 14px;
@@ -442,6 +451,12 @@
   }
   .message-composer textarea {
     font-size: 16px;
+  }
+}
+
+@media (max-width: 420px) {
+  .customer-messages-view .message-thread-head > .avatar {
+    display: none;
   }
 }
 

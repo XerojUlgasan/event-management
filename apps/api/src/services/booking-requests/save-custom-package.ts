@@ -171,7 +171,13 @@ export async function saveCustomPackageService(
         content = await stageSourceMedia(
           db,
           source.id,
-          input,
+          {
+            ...input,
+            thumbnailMediaId:
+              input.thumbnailMediaId === undefined
+                ? source.thumbnail_media_id
+                : input.thumbnailMediaId,
+          },
           actorId,
           stagedIds,
         );

@@ -7,7 +7,10 @@ export function BookingsPage({
   bookingRequestId?: string;
 }) {
   return bookingRequestId ? (
-    <BookingRequestPage bookingRequestId={bookingRequestId} />
+    <BookingRequestPage
+      key={bookingRequestId}
+      bookingRequestId={bookingRequestId}
+    />
   ) : (
     <div className="content-stack">
       <BookingList admin />

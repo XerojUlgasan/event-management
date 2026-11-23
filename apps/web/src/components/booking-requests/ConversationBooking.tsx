@@ -1,10 +1,17 @@
-import { useEffect, useState } from "react";
-import { Button, Dialog, Select, useNotifications } from "@event-management/ui";
+import { useRef, useState } from "react";
+import { Button, Dialog, Icon } from "@event-management/ui";
 import {
   getPackages,
   type PublicPackage,
 } from "../../lib/data/catalog/packages";
+import { CatalogPicker, CatalogPickerOption } from "../catalog/CatalogPicker";
 import { BookingRequestDialog } from "./BookingRequestDialog";
+
+async function loadPackages(search: string, cursor?: string) {
+  const page = await getPackages({ search, cursor });
+
+  return { items: page.packages, nextCursor: page.nextCursor };
+}
 
 export function ConversationBooking({
   conversationId,
@@ -15,37 +22,14 @@ export function ConversationBooking({
   onClose: () => void;
   onSubmitted: () => void;
 }) {
-  const { notifyError } = useNotifications();
-  const [packages, setPackages] = useState<PublicPackage[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [selected, setSelected] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [selected, setSelected] = useState<PublicPackage | null>(null);
   const [ready, setReady] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  async function load(next?: string) {
-    setLoading(true);
-
-    try {
-      const page = await getPackages(next ? { cursor: next } : undefined);
-      setPackages((previous) =>
-        next ? [...previous, ...page.packages] : page.packages,
-      );
-      setCursor(page.nextCursor);
-      setError("");
-    } catch (cause) {
-      setError(notifyError(cause, "Unable to load packages."));
-    } finally {
-      setLoading(false);
-    }
-  }
-  useEffect(() => {
-    void load();
-  }, []);
 
   if (ready)
     return (
       <BookingRequestDialog
-        item={packages.find((item) => item.id === selected) ?? null}
+        item={selected}
         conversationId={conversationId}
         onClose={onClose}
         onSubmitted={onSubmitted}
@@ -53,42 +37,38 @@ export function ConversationBooking({
     );
 
   return (
-    <Dialog title="Create booking request" onClose={onClose}>
-      <p>Choose a package or discuss a custom package with us.</p>
-      <label>
-        Package{" "}
-        <Select
-          value={selected}
-          onChange={(event) => setSelected(event.target.value)}
-        >
-          <option value="">Discuss a custom package</option>
-          {packages.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </Select>
-      </label>
-      {loading && <p role="status">Loading packages…</p>}
-      {error && (
-        <p role="alert">
-          {error}{" "}
-          <Button variant="secondary" onClick={() => void load()}>
-            Retry
-          </Button>
+    <Dialog
+      title="Create booking request"
+      intro="Choose a package or discuss a custom package with us."
+      className="pe-reference-picker"
+      onClose={onClose}
+      initialFocus={searchRef}
+      actions={<Button onClick={() => setReady(true)}>Continue</Button>}
+    >
+      <CatalogPicker
+        plural="packages"
+        searchRef={searchRef}
+        loadPage={loadPackages}
+        selectedId={selected?.id}
+        onSelect={setSelected}
+        firstOption={
+          <CatalogPickerOption
+            name="Discuss a custom package"
+            description="Tell us what you have in mind for your event."
+            artwork={<Icon name="message" />}
+            selected={selected === null}
+            onSelect={() => setSelected(null)}
+          />
+        }
+      />
+      {selected && (
+        <p className="pe-reference-picker-note">
+          Selected package: <strong>{selected.name}</strong>
         </p>
       )}
-      {cursor && (
-        <Button
-          variant="secondary"
-          disabled={loading}
-          onClick={() => void load(cursor)}
-        >
-          Load more packages
-        </Button>
-      )}
-      <p>Your request does not reserve a date or confirm a booking.</p>
-      <Button onClick={() => setReady(true)}>Continue</Button>
+      <p className="pe-reference-picker-note">
+        Your request does not reserve a date or confirm a booking.
+      </p>
     </Dialog>
   );
 }
