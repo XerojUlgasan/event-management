@@ -1,7 +1,7 @@
 # AMAC catalog browse attachments
 
 Started: 2026-11-24T00:32:33+08:00
-Updated: 2026-11-24T00:51:24+08:00
+Updated: 2026-11-24T00:57:18+08:00
 Status: complete
 Scope: AMAC tool, API and shared message contract, migration, backend tests, and documentation in the assigned worktree.
 Checkout: `feat/amac-catalog-browse` on local base `16b404b3`.
@@ -19,6 +19,10 @@ The configured live Gateway ran the three broad requests and a budget-and-capaci
 
 API type checking and the Edge build passed. The targeted API, Edge, and worker suites passed 202 cases with six opt-in skips. The nine guidance unit tests passed. The wider messages suite still has a historical fixture that lacks `booking_requests.submitted_at`. Repository lint and guidance link checks report existing failures.
 
+## Local main verification
+
+Main fast-forwarded to `8e349757`. Prisma applied the additive browse migration on local Supabase PostgreSQL at `54322`, bringing the completed count to 92. The site remained available at `http://localhost:4321` after the Edge rebuild and worker restart. A live guest text reply and a worker-processed image reply each saved both category labels, suggestions, and a linked browse audit. A fresh history read returned the saved fields. The audit recorded zero inventory calls. API type checking and the Edge bundle build passed.
+
 ## Resume here
 
-The head owns cross-branch verification with the catalog overlay. After explicit integration authorization, apply the migration to the approved local target and rebuild Edge and the worker. Repeat broad guest and signed-in chat checks through the combined UI. Hosted rollout remains unverified.
+The head owns combined browser verification with the catalog overlay. The main stack remains running for that check. Hosted rollout remains unverified.
