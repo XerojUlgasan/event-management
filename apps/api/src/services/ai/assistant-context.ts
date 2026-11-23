@@ -3,6 +3,7 @@ import type { DB } from "../../db/types.js";
 import { getBookingRequestService } from "../booking-requests/get-booking-request.js";
 import { z } from "@hono/zod-openapi";
 import { MAX_CURSOR_LENGTH } from "@event-management/contracts/pagination";
+import { catalogRecommendationsSchema } from "@event-management/contracts/messages";
 import {
   getLastCatalogToolCallData,
   listDeliveredCatalogSearchesData,
@@ -26,7 +27,9 @@ async function deliveredShortlist(
     ...reply.replyBody.matchAll(/\]\((\/(?:packages|services)\/[^()\s]+)\)/gu),
   ].map((match) => match[1]);
 
-  if (!links.length || new Set(links).size !== links.length) return undefined;
+  if (!links.length) return undefined;
+
+  if (new Set(links).size !== links.length) return null;
 
   const searches = await listDeliveredCatalogSearchesData(db, reply.replyId);
   const items = new Map<string, z.infer<typeof shownItemSchema>>();
@@ -44,7 +47,7 @@ async function deliveredShortlist(
     url && items.has(url) ? [items.get(url)!] : [],
   );
 
-  return shown.length === links.length ? shown : undefined;
+  return shown.length === links.length ? shown : null;
 }
 
 export async function buildPreviousCatalogSearchContext({
@@ -78,7 +81,36 @@ export async function buildPreviousCatalogSearchContext({
     nextCursor: output.data.nextCursor,
     triggerMessageId: previous.triggerMessageId,
     replyId: previous.replyId,
+    replyOrder: previous.replyOrder,
+    ambiguousShortlist: shownItems === null,
     ...(shownItems ? { shownItems } : {}),
+  };
+}
+
+export async function buildPreviousCatalogRecommendationsContext({
+  db,
+  conversationId,
+  customerMessageId,
+}: {
+  db: Kysely<DB>;
+  conversationId: string;
+  customerMessageId: string;
+}) {
+  const previous = await getLastCatalogToolCallData(db, {
+    conversationId,
+    customerMessageId,
+    toolName: "attachCatalogRecommendations",
+  });
+  const items = catalogRecommendationsSchema.safeParse(
+    previous?.recommendations,
+  );
+
+  if (!previous || !items.success) return undefined;
+
+  return {
+    replyId: previous.replyId,
+    replyOrder: previous.replyOrder,
+    shownItems: items.data.map(({ id, type, name }) => ({ id, type, name })),
   };
 }
 

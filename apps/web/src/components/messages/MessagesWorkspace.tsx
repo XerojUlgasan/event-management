@@ -40,6 +40,7 @@ import {
 } from "./ConversationContext";
 import "../../styles/messages/messages.css";
 import { MessageAttachments, MessageImages } from "./MessageImages";
+import { CatalogRecommendations } from "./CatalogRecommendations";
 import { MessageProcessing } from "./MessageProcessing";
 import { useAgentProfile } from "./use-agent-profile";
 import { initialsFromName } from "../../lib/utils/formatting/name";
@@ -893,6 +894,11 @@ export function MessagesWorkspace({
                     {enPhTimeFormatter.format(new Date(message.createdAt))}
                   </small>
                 </div>
+                {message.senderRole === "assistant" && (
+                  <CatalogRecommendations
+                    recommendations={message.catalogRecommendations}
+                  />
+                )}
               </Fragment>
             );
           })}

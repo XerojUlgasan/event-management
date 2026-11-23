@@ -4,12 +4,57 @@ import {
   messageProcessingSchema,
 } from "./message-images.js";
 
+export const MAX_CATALOG_RECOMMENDATIONS = 5;
+
+const recommendationFields = {
+  id: z.uuid(),
+  slug: z.string(),
+  name: z.string(),
+  description: z.string(),
+  imageUrl: z.string().nullable(),
+};
+
+export const catalogRecommendationSchema = z.discriminatedUnion("type", [
+  z.object({
+    ...recommendationFields,
+    type: z.literal("package"),
+    price: z.object({
+      kind: z.literal("fixed"),
+      currency: z.literal("PHP"),
+      amountMinor: z.number().int().nonnegative(),
+    }),
+    maxGuests: z.number().int().nonnegative(),
+    inclusions: z.array(
+      z.object({
+        name: z.string(),
+        includedHours: z.number().nullable(),
+        hourlyRatePesos: z.number().nullable(),
+      }),
+    ),
+  }),
+  z.object({
+    ...recommendationFields,
+    type: z.literal("service"),
+    fixedPricePesos: z.number().nullable(),
+    hourlyRatePesos: z.number().nullable(),
+    includedHours: z.number().nullable(),
+  }),
+]);
+
+export const catalogRecommendationsSchema = z
+  .array(catalogRecommendationSchema)
+  .min(1)
+  .max(MAX_CATALOG_RECOMMENDATIONS);
+
+export type CatalogRecommendation = z.infer<typeof catalogRecommendationSchema>;
+
 export const chatMessageSchema = z.object({
   id: z.string().uuid(),
   body: z.string(),
   images: z.array(messageImageSchema),
   processing: messageProcessingSchema.nullable(),
   quotationId: z.string().uuid().nullable(),
+  catalogRecommendations: catalogRecommendationsSchema.optional(),
   replyToMessageId: z.string().uuid().nullable(),
   senderId: z.string().uuid().nullable(),
   senderRole: z.enum(["admin", "customer", "assistant"]),

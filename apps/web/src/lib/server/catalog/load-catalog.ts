@@ -87,10 +87,16 @@ export function catalogPageLinks(url: URL, nextCursor: string | null) {
   };
 }
 
-export function loadPackage(slug: string) {
+export function loadPackage(slug: string, id?: string) {
+  if (id)
+    return serverGet<PublicPackage>(`/packages/${encodeURIComponent(id)}`);
+
   return serverGet<PublicPackage>(`/packages/slug/${encodeURIComponent(slug)}`);
 }
 
-export function loadService(slug: string) {
+export function loadService(slug: string, id?: string) {
+  if (id)
+    return serverGet<PublicService>(`/services/${encodeURIComponent(id)}`);
+
   return serverGet<PublicService>(`/services/slug/${encodeURIComponent(slug)}`);
 }

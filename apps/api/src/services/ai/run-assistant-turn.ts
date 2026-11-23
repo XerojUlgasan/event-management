@@ -3,6 +3,7 @@ import {
   type ImageMessageJobLease,
 } from "../../data/messages/message-processing.js";
 import { messageImageInterpretationSchema } from "@event-management/contracts/message-images";
+import type { CatalogRecommendation } from "@event-management/contracts/messages";
 import { randomUUID } from "node:crypto";
 import type { ModelMessage } from "ai";
 import type { Kysely } from "kysely";
@@ -18,6 +19,7 @@ import {
   buildAssistantContext,
   buildPreviousCatalogSearchContext,
   buildPreviousCatalogItemContext,
+  buildPreviousCatalogRecommendationsContext,
   previousPackageBudget,
 } from "./assistant-context.js";
 import { getAgentSettingsService } from "../ai-agent-settings/get-agent-settings.js";
@@ -131,21 +133,40 @@ export async function runAssistantTurnService({
     throw new Error("Customer message not found");
 
   const { settings } = await getAgentSettingsService(db);
-  const [previousCatalogSearch, previousCatalogItem] =
-    settings.allowPublicCatalog
-      ? await Promise.all([
-          buildPreviousCatalogSearchContext({
-            db,
-            conversationId,
-            customerMessageId,
-          }),
-          buildPreviousCatalogItemContext({
-            db,
-            conversationId,
-            customerMessageId,
-          }),
-        ])
-      : [];
+  const [
+    previousCatalogSearch,
+    previousCatalogItem,
+    previousCatalogRecommendations,
+  ] = settings.allowPublicCatalog
+    ? await Promise.all([
+        buildPreviousCatalogSearchContext({
+          db,
+          conversationId,
+          customerMessageId,
+        }),
+        buildPreviousCatalogItemContext({
+          db,
+          conversationId,
+          customerMessageId,
+        }),
+        buildPreviousCatalogRecommendationsContext({
+          db,
+          conversationId,
+          customerMessageId,
+        }),
+      ])
+    : [];
+  const {
+    replyOrder: legacyReplyOrder,
+    ambiguousShortlist,
+    ...catalogSearchContext
+  } = previousCatalogSearch ?? {};
+  const { replyOrder: attachedReplyOrder, ...recommendationsContext } =
+    previousCatalogRecommendations ?? {};
+  const legacyShortlistOrder =
+    previousCatalogSearch?.shownItems || ambiguousShortlist
+      ? legacyReplyOrder
+      : undefined;
   const context = {
     ...(guestIdentityId
       ? {
@@ -158,8 +179,14 @@ export async function runAssistantTurnService({
           customerId: customerId!,
           bookingRequestId: conversation.booking_request_id,
         })),
-    ...(previousCatalogSearch ? { previousCatalogSearch } : {}),
+    ...(previousCatalogSearch
+      ? { previousCatalogSearch: catalogSearchContext }
+      : {}),
     ...(previousCatalogItem ? { previousCatalogItem } : {}),
+    ...(attachedReplyOrder &&
+    (!legacyShortlistOrder || attachedReplyOrder >= legacyShortlistOrder)
+      ? { previousCatalogRecommendations: recommendationsContext }
+      : {}),
   };
 
   let historyMessages: ModelMessage[] = history.map((message) => {
@@ -458,6 +485,7 @@ export async function runAssistantTurnService({
   ];
 
   let persistenceFailed = false;
+  let catalogRecommendations: CatalogRecommendation[] | undefined;
   const handoff: { message: MessageWithSender | null } = { message: null };
   let draftChanged = false;
   let selectionChanged = false;
@@ -485,6 +513,9 @@ export async function runAssistantTurnService({
       selectionChanged ||= selection;
       reviewReady = complete;
       waitingForServiceChoice ||= waitForServiceChoice;
+    },
+    onRecommendationsAttached: (items) => {
+      catalogRecommendations = items;
     },
     ...(memory && memoryFits
       ? {
@@ -649,7 +680,7 @@ export async function runAssistantTurnService({
     reply,
     aiVersion,
     guestIdentityId,
-    { turnId, customerMessageId },
+    { turnId, customerMessageId, catalogRecommendations },
     jobLease,
     signal,
   );

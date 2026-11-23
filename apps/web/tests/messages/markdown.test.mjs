@@ -14,7 +14,8 @@ let server,
   MessagesWorkspace,
   MessageProcessing,
   MessageImages,
-  CustomerEventTimeline;
+  CustomerEventTimeline,
+  CatalogRecommendations;
 
 before(async () => {
   cacheDir = await mkdtemp(join(tmpdir(), "clemora-message-markdown-"));
@@ -37,6 +38,9 @@ before(async () => {
   ));
   ({ CustomerEventTimeline } = await server.ssrLoadModule(
     "/src/components/booking-requests/CustomerEventTimeline.tsx",
+  ));
+  ({ CatalogRecommendations } = await server.ssrLoadModule(
+    "/src/components/messages/CatalogRecommendations.tsx",
   ));
   ({ MessageProcessing } = await server.ssrLoadModule(
     "/src/components/messages/MessageProcessing.tsx",
@@ -448,4 +452,51 @@ test("event cards use human-readable accessible labels", () => {
   assert.match(html, /aria-label="Open chat for Birthday · Nov 15, 2026"/);
   assert.match(html, /aria-label="View details for Birthday · Nov 15, 2026"/);
   assert.doesNotMatch(html, /BR-RANDOM-REFERENCE/);
+});
+
+test("catalog recommendations render ordered snapshot terms with public links", () => {
+  const recommendations = [
+    {
+      type: "package",
+      id: "package-id",
+      slug: "garden-package",
+      name: "Garden Celebration",
+      description: "A relaxed garden event.",
+      imageUrl: null,
+      price: { kind: "fixed", currency: "PHP", amountMinor: 1250000 },
+      maxGuests: 80,
+      inclusions: [
+        { name: "Catering", includedHours: 4, hourlyRatePesos: null },
+        { name: "Styling", includedHours: null, hourlyRatePesos: null },
+        { name: "Sound", includedHours: null, hourlyRatePesos: null },
+      ],
+    },
+    {
+      type: "service",
+      id: "service-id",
+      slug: "live-music",
+      name: "Live Music",
+      description: "Acoustic music for your event.",
+      imageUrl: null,
+      fixedPricePesos: 5000,
+      hourlyRatePesos: 1200,
+      includedHours: 3,
+    },
+  ];
+  const html = renderToStaticMarkup(
+    createElement(CatalogRecommendations, { recommendations }),
+  );
+
+  assert.ok(html.indexOf("Garden Celebration") < html.indexOf("Live Music"));
+  assert.match(html, /href="\/packages\/garden-package\?catalogId=package-id"/);
+  assert.match(html, /href="\/services\/live-music\?catalogId=service-id"/);
+  assert.match(html, /target="_blank"/);
+  assert.match(html, /includes Catering \(4 hours\), Styling, and more/i);
+  assert.match(html, /Up to 80 guests/);
+  assert.match(html, /opens in a new tab/);
+
+  assert.equal(
+    renderToStaticMarkup(createElement(CatalogRecommendations, {})),
+    "",
+  );
 });

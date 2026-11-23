@@ -55,7 +55,11 @@ const linkToolCallsSchema = z.object({
 const lastCatalogToolCallSchema = z.object({
   conversationId: z.string().uuid(),
   customerMessageId: z.string().uuid(),
-  toolName: z.enum(["searchPublicCatalog", "getPublicCatalogItem"]),
+  toolName: z.enum([
+    "searchPublicCatalog",
+    "getPublicCatalogItem",
+    "attachCatalogRecommendations",
+  ]),
 });
 
 export type StartToolCallInput = {
@@ -79,11 +83,9 @@ export type LinkToolCallsInput = {
   assistantMessageId: string;
 };
 
-export type LastCatalogToolCallInput = {
-  conversationId: string;
-  customerMessageId: string;
-  toolName: "searchPublicCatalog" | "getPublicCatalogItem";
-};
+export type LastCatalogToolCallInput = z.infer<
+  typeof lastCatalogToolCallSchema
+>;
 
 function parse<T>(schema: z.ZodType<T>, value: unknown, message: string): T {
   try {

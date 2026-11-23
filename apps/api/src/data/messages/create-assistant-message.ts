@@ -8,6 +8,13 @@ import { assertGuestActive } from "../guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
 import { linkToolCallsToReplyData } from "../ai/link-tool-calls-to-reply.js";
 import { publishConversationMessageData } from "./publish-conversation-message.js";
+import type { CatalogRecommendation } from "@event-management/contracts/messages";
+
+type AssistantToolTurn = {
+  turnId: string;
+  customerMessageId: string;
+  catalogRecommendations?: CatalogRecommendation[];
+};
 
 export function createAssistantMessageData(
   db: Kysely<DB>,
@@ -16,7 +23,7 @@ export function createAssistantMessageData(
   body: string,
   aiVersion: number,
   guestIdentityId?: string,
-  toolTurn?: { turnId: string; customerMessageId: string },
+  toolTurn?: AssistantToolTurn,
   jobLease?: ImageMessageJobLease,
   abortSignal?: AbortSignal,
 ) {
@@ -110,7 +117,7 @@ export async function createAssistantMessageInTransactionData(
     conversationId: string;
     customerId: string | null;
     body: string;
-    toolTurn?: { turnId: string; customerMessageId: string };
+    toolTurn?: AssistantToolTurn;
   },
 ) {
   const message = await trx
@@ -122,6 +129,9 @@ export async function createAssistantMessageInTransactionData(
       sender_role: "assistant",
       body,
       reply_to_message_id: toolTurn?.customerMessageId ?? null,
+      catalog_recommendations: toolTurn?.catalogRecommendations
+        ? sql`${JSON.stringify(toolTurn.catalogRecommendations)}::jsonb`
+        : null,
     })
     .returningAll()
     .executeTakeFirstOrThrow();

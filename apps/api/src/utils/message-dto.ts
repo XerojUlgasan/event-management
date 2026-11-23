@@ -2,7 +2,10 @@ import {
   messageImageInterpretationSchema,
   type MessageImage,
 } from "@event-management/contracts/message-images";
-import type { ChatMessage } from "@event-management/contracts/messages";
+import {
+  catalogRecommendationsSchema,
+  type ChatMessage,
+} from "@event-management/contracts/messages";
 import type { MessageWithSender } from "../data/messages/types.js";
 
 export function messageDto(row: MessageWithSender): ChatMessage {
@@ -12,6 +15,9 @@ export function messageDto(row: MessageWithSender): ChatMessage {
       : row.sender_role === "admin"
         ? "admin"
         : "customer";
+  const recommendations = catalogRecommendationsSchema.safeParse(
+    row.catalog_recommendations,
+  );
 
   return {
     id: row.id,
@@ -37,6 +43,9 @@ export function messageDto(row: MessageWithSender): ChatMessage {
     }),
     body: row.body,
     quotationId: row.quotation_id,
+    ...(role === "assistant" && recommendations.success
+      ? { catalogRecommendations: recommendations.data }
+      : {}),
     replyToMessageId: row.reply_to_message_id,
     senderId: row.sender_id,
     senderRole: role,

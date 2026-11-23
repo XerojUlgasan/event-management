@@ -100,21 +100,33 @@ function useCatalogCalls(
   );
 }
 
+type FixtureToolCall = {
+  toolName:
+    | "getBusinessInformation"
+    | "searchSupportingDocuments"
+    | "searchPublicCatalog"
+    | "getPublicCatalogItem"
+    | "attachCatalogRecommendations"
+    | "getMyPackage"
+    | "getLatestQuotation"
+    | "getBookingDetails"
+    | "requestHumanHandoff"
+    | "updateConversationMemory"
+    | "updateBookingDraft";
+  input: Record<string, unknown>;
+};
+
 function useToolCalls(
-  calls: {
-    toolName:
-      | "getBusinessInformation"
-      | "searchSupportingDocuments"
-      | "searchPublicCatalog"
-      | "getPublicCatalogItem"
-      | "getMyPackage"
-      | "getLatestQuotation"
-      | "getBookingDetails"
-      | "requestHumanHandoff"
-      | "updateConversationMemory"
-      | "updateBookingDraft";
-    input: Record<string, unknown>;
-  }[],
+  calls: FixtureToolCall[],
+  beforeAnswer?: () => Promise<void>,
+  consent?: "continue",
+  reply = "Catalog results are ready",
+) {
+  useToolRounds([calls], beforeAnswer, consent, reply);
+}
+
+function useToolRounds(
+  rounds: FixtureToolCall[][],
   beforeAnswer?: () => Promise<void>,
   consent?: "continue",
   reply = "Catalog results are ready",
@@ -134,12 +146,17 @@ function useToolCalls(
       ? model.doGenerateCalls.filter(({ prompt }) => !isConsentPrompt(prompt))
       : model.doGenerateCalls;
 
-    if (calls.length && dialogueCalls.length === 1)
+    const calls = rounds[dialogueCalls.length - 1];
+
+    if (calls?.length)
       return {
         ...result,
         content: calls.map(({ toolName, input }, index) => ({
           type: "tool-call" as const,
-          toolCallId: `catalog-call-${index}`,
+          toolCallId:
+            dialogueCalls.length === 1
+              ? `catalog-call-${index}`
+              : `catalog-call-${dialogueCalls.length}-${index}`,
           toolName,
           input: JSON.stringify(input),
         })),
@@ -303,6 +320,7 @@ test("published agent personality and switches shape the next assistant turn", a
     const toolNames = call.tools?.map(({ name }) => name) ?? [];
 
     for (const name of [
+      "attachCatalogRecommendations",
       "getBusinessInformation",
       "searchPublicCatalog",
       "getPublicCatalogItem",
@@ -420,12 +438,17 @@ test("service clarification defers review while saving other draft changes", asy
   const named = await send(id, "Photo booth po.");
   assert.match(named.assistantMessage?.body ?? "", /Photo booth/);
   assert.match(named.assistantMessage?.body ?? "", /Requested services/i);
-  assert.match(named.assistantMessage?.body ?? "", /Should I send this request/);
+  assert.match(
+    named.assistantMessage?.body ?? "",
+    /Should I send this request/,
+  );
   const selected = await draft();
   assert.equal(selected.id, original.id);
   assert.equal(selected.guest_count, 60);
   assert.equal(selected.special_requests, "Blue decor");
-  assert.deepEqual(selected.requested_services, [{ customName: "Photo booth" }]);
+  assert.deepEqual(selected.requested_services, [
+    { customName: "Photo booth" },
+  ]);
   assert.equal(selected.submitted_at, null);
 
   useToolCalls([{ toolName: "updateBookingDraft", input: {} }]);
@@ -548,7 +571,10 @@ test("native tools collect, review and submit the same draft once", async () => 
   const saved = await savedBooking();
   assert.ok(saved.submitted_at);
   assert.equal(saved.package_id, packageId);
-  assert.doesNotMatch(JSON.stringify(saved.requested_services), /Face painting/u);
+  assert.doesNotMatch(
+    JSON.stringify(saved.requested_services),
+    /Face painting/u,
+  );
   const audit = await db
     .selectFrom("ai_tool_calls")
     .select(["tool_name", "status"])
@@ -2942,6 +2968,210 @@ test("catalog detail reaches the model as Markdown and links its audit record to
   });
 });
 
+test("a full five-package search page can be attached, reloaded, and referenced in order", async () => {
+  const price = 73919;
+  const names = ["Garden", "Coastal", "Ballroom", "Civil", "Grand"];
+
+  const packages = names.map((name) => ({
+    id: randomUUID(),
+    name: `${name} wedding fixture`,
+    slug: `${name.toLowerCase()}-${randomUUID()}`,
+    description: "Public wedding package for a catalog browsing test",
+    price,
+    max_guests: 120,
+  }));
+
+  await db.insertInto("packages").values(packages).execute();
+
+  const selections = packages.map(({ id }) => ({ catalogType: "package", id }));
+
+  useToolRounds(
+    [
+      [
+        {
+          toolName: "searchPublicCatalog",
+          input: {
+            catalogType: "package",
+            minPricePesos: price,
+            maxPricePesos: price,
+          },
+        },
+      ],
+      [
+        {
+          toolName: "attachCatalogRecommendations",
+          input: { items: selections },
+        },
+      ],
+    ],
+    undefined,
+    undefined,
+    "Here are five wedding packages you can browse. How many guests are you expecting?",
+  );
+
+  const id = await conversation();
+  const response = await send(id, "Show me five wedding packages");
+  assert.equal(response.assistantError, null);
+  const reply = response.assistantMessage;
+  assert.ok(reply?.catalogRecommendations, "Expected five attached cards");
+  assert.deepEqual(
+    reply.catalogRecommendations.map((item) => item.id),
+    packages.map((item) => item.id),
+  );
+
+  const thread = threadSchema.parse(
+    await (await call(`/messages/conversations/${id}`, customer.cookie)).json(),
+  );
+  assert.deepEqual(
+    thread.messages.at(-1)?.catalogRecommendations,
+    reply.catalogRecommendations,
+  );
+
+  useReply("I can tell you about the second package.");
+  await send(id, "Which is the second one?");
+  const { context } = turnContext(0);
+  assert.ok("previousCatalogRecommendations" in context);
+  assert.deepEqual(context.previousCatalogRecommendations, {
+    replyId: reply.id,
+    shownItems: packages.map(({ id, name }) => ({ id, type: "package", name })),
+  });
+});
+
+test("mixed recommendations save in the displayed order and ground ordinal follow-ups", async () => {
+  const packageId = await detailPackage();
+  const service = await db
+    .insertInto("services")
+    .values({
+      name: "Fixture sound service",
+      slug: `sound-${randomUUID()}`,
+      description: "Sound setup and operation",
+      hourly_rate_pesos: 1237,
+    })
+    .returning(["id", "name"])
+    .executeTakeFirstOrThrow();
+  const canvas = [
+    {
+      id: randomUUID(),
+      title: "Package inclusions",
+      widgets: [
+        {
+          id: randomUUID(),
+          type: "service",
+          x: 0,
+          y: 0,
+          w: 6,
+          h: 4,
+          markdown: "",
+          mediaId: null,
+          alt: "",
+          caption: "",
+          autoplay: false,
+          serviceId: service.id,
+          serviceTerms: { includedHours: 2, hourlyRatePesos: 425 },
+        },
+      ],
+    },
+  ];
+  await db
+    .updateTable("packages")
+    .set({ canvas: sql`${JSON.stringify(canvas)}::jsonb` })
+    .where("id", "=", packageId)
+    .execute();
+  const items = [
+    { catalogType: "service", id: service.id },
+    { catalogType: "package", id: packageId },
+  ];
+  useToolRounds(
+    [
+      [
+        {
+          toolName: "searchPublicCatalog",
+          input: {
+            catalogType: "service",
+            minPricePesos: 1237,
+            maxPricePesos: 1237,
+            pricingType: "hourly",
+          },
+        },
+      ],
+      [{ toolName: "getPublicCatalogItem", input: items[1] }],
+      [
+        { toolName: "attachCatalogRecommendations", input: { items } },
+        {
+          toolName: "attachCatalogRecommendations",
+          input: { items: [...items].reverse() },
+        },
+      ],
+    ],
+    undefined,
+    undefined,
+    "These are the options I recommend.",
+  );
+  const id = await conversation();
+  const result = await send(id, "Recommend a package and a sound service");
+  assert.equal(result.assistantError, null);
+  const reply = result.assistantMessage;
+  assert.ok(reply?.catalogRecommendations);
+  const [serviceCard, packageCard] = reply.catalogRecommendations;
+  assert.ok(serviceCard.type === "service" && packageCard.type === "package");
+  assert.equal(serviceCard.id, service.id);
+  assert.equal(serviceCard.hourlyRatePesos, 1237);
+  assert.equal(packageCard.id, packageId);
+  assert.deepEqual(packageCard.inclusions, [
+    { name: service.name, includedHours: 2, hourlyRatePesos: 425 },
+  ]);
+  assert.match(
+    JSON.stringify(model.doGenerateCalls[2].prompt),
+    /Included hours: 2/,
+  );
+  assert.match(
+    JSON.stringify(model.doGenerateCalls[3].prompt),
+    /already_attached/,
+  );
+
+  const persisted = await db
+    .selectFrom("messages")
+    .select("catalog_recommendations")
+    .where("id", "=", reply.id)
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(
+    persisted.catalog_recommendations,
+    reply.catalogRecommendations,
+  );
+  const thread = threadSchema.parse(
+    await (await call(`/messages/conversations/${id}`, customer.cookie)).json(),
+  );
+  assert.deepEqual(
+    thread.messages.at(-1)?.catalogRecommendations,
+    reply.catalogRecommendations,
+  );
+
+  useToolCalls([
+    { toolName: "attachCatalogRecommendations", input: { items } },
+  ]);
+  const followUp = await send(id, "Tell me about the second one");
+  assert.equal(followUp.assistantError, null);
+  assert.equal(followUp.assistantMessage?.catalogRecommendations, undefined);
+  const { context } = turnContext(0);
+  assert.ok("previousCatalogRecommendations" in context);
+  assert.deepEqual(context.previousCatalogRecommendations, {
+    replyId: reply.id,
+    shownItems: [
+      { id: service.id, type: "service", name: serviceCard.name },
+      { id: packageId, type: "package", name: packageCard.name },
+    ],
+  });
+  const rejected = await db
+    .selectFrom("ai_tool_calls")
+    .select(["status", "error_code"])
+    .where("customer_message_id", "=", followUp.message.id)
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(rejected, {
+    status: "failed",
+    error_code: "invalid_recommendations",
+  });
+});
+
 test("catalog detail failures hide private records and sanitize errors", async () => {
   useToolCalls([
     {
@@ -3913,7 +4143,9 @@ test("business information reads current public fields and records only field na
   });
 });
 
-function publicLookupOutput(toolName: "getBusinessInformation" | "searchSupportingDocuments") {
+function publicLookupOutput(
+  toolName: "getBusinessInformation" | "searchSupportingDocuments",
+) {
   for (const message of model.doGenerateCalls[1].prompt) {
     if (message.role !== "tool") continue;
 
@@ -4022,6 +4254,7 @@ test("the assistant can answer directly without calling a tool", async () => {
   assert.deepEqual(
     model.doGenerateCalls[0].tools?.map((entry) => entry.name).sort(),
     [
+      "attachCatalogRecommendations",
       "getBusinessInformation",
       "getMyPackage",
       "getBookingDetails",
@@ -4857,7 +5090,11 @@ test("supporting document and business lookups reach the customer model and reta
     assert.equal(output.results.length, 5);
     for (const passage of output.results) {
       assert.deepEqual(Object.keys(passage).sort(), [
-        "filename", "headingPath", "pageEnd", "pageStart", "text",
+        "filename",
+        "headingPath",
+        "pageEnd",
+        "pageStart",
+        "text",
       ]);
       assert.equal(passage.filename, "Venue handbook.pdf");
       assert.equal(passage.pageStart, passage.pageEnd);
@@ -4938,7 +5175,9 @@ test("supporting document lookup distinguishes no matches from an unavailable pr
       },
     ]);
     const failed = await send(await conversation(), "Search again");
-    const failureOutput = JSON.stringify(publicLookupOutput("searchSupportingDocuments"));
+    const failureOutput = JSON.stringify(
+      publicLookupOutput("searchSupportingDocuments"),
+    );
     assert.match(failureOutput, /failed|unavailable|could not/i);
     assert.doesNotMatch(failureOutput, /private provider failure/);
     const failedAudit = await db

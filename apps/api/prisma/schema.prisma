@@ -62,6 +62,7 @@ model Message {
   readAt         DateTime?    @map("read_at") @db.Timestamptz(6)
   guestOrigin Boolean @default(false) @map("guest_origin")
   quotationId    String?      @unique @map("quotation_id") @db.Uuid
+  catalogRecommendations Json? @map("catalog_recommendations") @db.JsonB
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User?        @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   quotation      Quotation?   @relation(fields: [quotationId], references: [id], onDelete: Restrict, onUpdate: NoAction)

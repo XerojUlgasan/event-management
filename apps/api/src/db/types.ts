@@ -200,6 +200,7 @@ export interface MessageImages {
 
 export interface Messages {
   body: string;
+  catalog_recommendations: Json | null;
   conversation_id: string;
   created_at: Generated<Timestamp>;
   guest_origin: Generated<boolean>;

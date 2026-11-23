@@ -259,22 +259,30 @@ for (const operation of ["read", "bootstrap"] as const) {
   });
 }
 
-test("guest catalog calls are persisted under the guest message and replay does not execute them twice", async () => {
+test("guest recommendations survive a thread read and replay without running tools twice", async () => {
   useReply("Here are the catalog options");
   const generate = model.doGenerate.bind(model);
   model.doGenerate = async (...args) => {
     const result = await generate(...args);
 
-    if (model.doGenerateCalls.length !== 1) return result;
+    const step = model.doGenerateCalls.length;
+
+    if (step > 2) return result;
 
     return {
       ...result,
       content: [
         {
           type: "tool-call",
-          toolCallId: "guest-catalog-call",
-          toolName: "searchPublicCatalog",
-          input: JSON.stringify({ catalogType: "package" }),
+          toolCallId:
+            step === 1 ? "guest-catalog-call" : "guest-catalog-attachment",
+          toolName:
+            step === 1 ? "searchPublicCatalog" : "attachCatalogRecommendations",
+          input: JSON.stringify(
+            step === 1
+              ? { catalogType: "package" }
+              : { items: [{ catalogType: "package", id: packageId }] },
+          ),
         },
       ],
       finishReason: { unified: "tool-calls", raw: undefined },
@@ -287,10 +295,15 @@ test("guest catalog calls are persisted under the guest message and replay does 
     201,
   );
   assert.ok(response.assistantMessage);
+  assert.equal(
+    response.assistantMessage.catalogRecommendations?.[0]?.id,
+    packageId,
+  );
   const row = await db
     .selectFrom("ai_tool_calls")
     .selectAll()
     .where("customer_message_id", "=", response.message.id)
+    .where("tool_name", "=", "searchPublicCatalog")
     .executeTakeFirstOrThrow();
   assert.equal(row.tool_name, "searchPublicCatalog");
   assert.equal(row.tool_call_id, "guest-catalog-call");
@@ -301,8 +314,28 @@ test("guest catalog calls are persisted under the guest message and replay does 
     .where("id", "=", row.customer_message_id)
     .executeTakeFirstOrThrow();
   assert.equal(message.sender_id, null);
-  await read(await send(thread, "Show your packages", requestId), 201);
-  assert.equal(model.doGenerateCalls.length, 2);
+  const replay = await read(
+    await send(thread, "Show your packages", requestId),
+    201,
+  );
+  assert.deepEqual(
+    replay.assistantMessage.catalogRecommendations,
+    response.assistantMessage.catalogRecommendations,
+  );
+  const restored = threadSchema.parse(
+    await read(
+      await call(
+        `/guest/conversations/${thread.conversation.id}`,
+        thread.cookie,
+      ),
+      200,
+    ),
+  );
+  assert.deepEqual(
+    restored.messages.at(-1)?.catalogRecommendations,
+    response.assistantMessage.catalogRecommendations,
+  );
+  assert.equal(model.doGenerateCalls.length, 3);
   assert.equal(
     (
       await db
@@ -311,7 +344,7 @@ test("guest catalog calls are persisted under the guest message and replay does 
         .where("customer_message_id", "=", response.message.id)
         .execute()
     ).length,
-    1,
+    2,
   );
 });
 
@@ -515,6 +548,7 @@ test("guests can answer directly and receive public catalog and handoff tools", 
   assert.deepEqual(
     model.doGenerateCalls[0].tools?.map((entry) => entry.name).sort(),
     [
+      "attachCatalogRecommendations",
       "getBusinessInformation",
       "getPublicCatalogItem",
       "requestHumanHandoff",

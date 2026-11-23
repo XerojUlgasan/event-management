@@ -7,7 +7,7 @@ import {
   Textarea,
 } from "@event-management/ui";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getMe } from "../../../lib/data/auth/session";
 import {
   getMyConversation,
@@ -35,6 +35,7 @@ import {
   MessageImages,
 } from "../../messages/MessageImages";
 import { MessageProcessing } from "../../messages/MessageProcessing";
+import { CatalogRecommendations } from "../../messages/CatalogRecommendations";
 import {
   hasLocalReplyPending,
   hasObservedReply,
@@ -618,9 +619,8 @@ export default function PublicChat() {
                 ).map((message) => {
                   const item = outbox[message.id];
 
-                  return (
+                  const bubble = (
                     <div
-                      key={message.id}
                       data-message-id={message.id}
                       className={`message ${message.senderRole === "customer" ? "customer-message" : "bot"}`}
                     >
@@ -748,6 +748,17 @@ export default function PublicChat() {
                         </div>
                       )}
                     </div>
+                  );
+
+                  return (
+                    <Fragment key={message.id}>
+                      {bubble}
+                      {message.senderRole === "assistant" && (
+                        <CatalogRecommendations
+                          recommendations={message.catalogRecommendations}
+                        />
+                      )}
+                    </Fragment>
                   );
                 })}
                 {aiReplyPending && (

@@ -43,6 +43,7 @@ Customers, guests, and administrators may attach images with an optional caption
 - AI replies are enabled by default per conversation. A successful admin chat message or AI-requested handoff switches the conversation to human handling. A System Administrator can also change the preference using the toggle.
 - Quotation delivery preserves the current AI preference and lets eligible replies finish. After takeover or handoff, AI stays off until an admin explicitly re-enables it.
 - Customers can continue messaging while AI is off. Re-enabling AI applies to future customer messages, without generating replies to the backlog.
+- AMAC can show public catalog recommendations inline below its reply. Customers can open the listings and discuss them before choosing a package or requesting a service. Browsing a recommendation leaves the inquiry unchanged.
 - Takeover suppresses any unfinished AI reply. Conversation history and AI preferences stay intact. Expired anonymous conversations cannot be toggled.
 
 ## AI-requested human review

@@ -422,7 +422,10 @@ test("returns only the last earlier replied catalog search in this conversation"
     conversationId: conversation.id,
     customerMessageId: currentCustomer.id,
   });
-  assert.deepEqual(beforeCurrentReply, {
+  assert.ok(beforeCurrentReply);
+  assert.ok(beforeCurrentReply.replyOrder.endsWith(firstReply.id));
+  const { replyOrder: _replyOrder, ...earlierSearch } = beforeCurrentReply;
+  assert.deepEqual(earlierSearch, {
     triggerMessageId: firstCustomer.id,
     replyId: firstReply.id,
     replyBody: "assistant fixture",
@@ -569,4 +572,59 @@ test("ordinal choices correspond to the links that appeared in the delivered ans
     JSON.stringify(context?.shownItems),
     /privateField|hidden/,
   );
+});
+
+test("the most recently displayed recommendations win when earlier turns finish late", async () => {
+  const { buildPreviousCatalogRecommendationsContext } =
+    await import("../../src/services/ai/assistant-context.js");
+  const thread = await createConversation();
+  const earlyQuestion = await createMessage(thread.id, "customer");
+  const lateQuestion = await createMessage(thread.id, "customer");
+  const fastReply = await createMessage(thread.id, "assistant");
+  const slowReply = await createMessage(thread.id, "assistant");
+
+  for (const [question, reply] of [
+    [earlyQuestion, slowReply],
+    [lateQuestion, fastReply],
+  ]) {
+    const turnId = randomUUID();
+    const lookup = await startToolCallData(db, {
+      ...startInput(turnId, question.id),
+      toolName: "attachCatalogRecommendations",
+    });
+    await finishToolCallData(db, { id: lookup.id, status: "succeeded" });
+    await db
+      .updateTable("messages")
+      .set({
+        catalog_recommendations: JSON.stringify([
+          {
+            id: reply.id,
+            type: "service",
+            slug: "fixture-service",
+            name: "Fixture service",
+            description: "",
+            imageUrl: null,
+            fixedPricePesos: null,
+            hourlyRatePesos: 1200,
+            includedHours: null,
+          },
+        ]),
+      })
+      .where("id", "=", reply.id)
+      .execute();
+    await linkToolCallsToReplyData(db, {
+      turnId,
+      customerMessageId: question.id,
+      assistantMessageId: reply.id,
+    });
+  }
+
+  const followUp = await createMessage(thread.id, "customer");
+  const context = await buildPreviousCatalogRecommendationsContext({
+    db,
+    conversationId: thread.id,
+    customerMessageId: followUp.id,
+  });
+  assert.equal(context?.replyId, slowReply.id);
+  assert.equal(context?.shownItems[0]?.id, slowReply.id);
 });

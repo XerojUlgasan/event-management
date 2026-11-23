@@ -20,6 +20,7 @@ export function selectMessageColumnsData(db: Database, conversationId: string) {
       "m.sender_role",
       "m.body",
       "m.quotation_id",
+      "m.catalog_recommendations",
       "m.created_at",
       "m.read_at",
       eb.ref("sender.display_name").as("sender_display_name"),

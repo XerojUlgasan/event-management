@@ -33,6 +33,11 @@ export function getLastCatalogToolCallData(
       "reply.id as replyId",
       "trigger_message.id as triggerMessageId",
     ])
+    .select(
+      sql<string>`to_char(reply.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US') || ':' || reply.id::text`.as(
+        "replyOrder",
+      ),
+    )
     .where("tool_call.tool_name", "=", input.toolName)
     .where("tool_call.status", "=", "succeeded")
     .where("tool_call.assistant_message_id", "is not", null)
@@ -46,6 +51,13 @@ export function getLastCatalogToolCallData(
     .where("trigger_message.sender_role", "=", "customer")
     .whereRef("reply.conversation_id", "=", "current_message.conversation_id")
     .where("reply.sender_role", "=", "assistant")
+    .$if(input.toolName === "attachCatalogRecommendations", (query) =>
+      query
+        .select("reply.catalog_recommendations as recommendations")
+        .where("reply.catalog_recommendations", "is not", null)
+        .orderBy("reply.created_at", "desc")
+        .orderBy("reply.id", "desc"),
+    )
     .where(
       sql<boolean>`(trigger_message.created_at, trigger_message.id) < (reply.created_at, reply.id)`,
     )

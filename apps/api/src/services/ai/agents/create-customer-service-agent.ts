@@ -1,5 +1,6 @@
 import { ToolLoopAgent } from "ai";
 import type { AgentSettings } from "@event-management/contracts/ai-agent-settings";
+import type { CatalogRecommendation } from "@event-management/contracts/messages";
 import { createRequestHumanHandoffTool } from "../tools/request-human-handoff.js";
 import { getTextModel } from "../models.js";
 import { buildCustomerServicePrompt } from "../prompts/customer-service-prompt.js";
@@ -7,6 +8,7 @@ import { createSearchPublicCatalogTool } from "../tools/search-public-catalog.js
 import { createSearchSupportingDocumentsTool } from "../tools/search-supporting-documents.js";
 import { createGetBusinessInformationTool } from "../tools/get-business-information.js";
 import { createGetPublicCatalogItemTool } from "../tools/get-public-catalog-item.js";
+import { createAttachCatalogRecommendationsTool } from "../tools/attach-catalog-recommendations.js";
 import { createGetMyPackageTool } from "../tools/get-my-package.js";
 import {
   createGetBookingDetailsTool,
@@ -21,10 +23,12 @@ const maxStepTokens = 800;
 export function createCustomerServiceAgent({
   settings,
   answerOnlyAfter,
+  onRecommendationsAttached,
   ...options
 }: AssistantToolContext & {
   settings: AgentSettings;
   answerOnlyAfter: number;
+  onRecommendationsAttached: (items: CatalogRecommendation[]) => void;
 }) {
   let proposedBatchSize = 0;
   let trackingUnavailable = false;
@@ -53,7 +57,9 @@ export function createCustomerServiceAgent({
 
   return new ToolLoopAgent({
     model: getTextModel(),
-    instructions: buildCustomerServicePrompt(settings),
+    instructions: buildCustomerServicePrompt(settings, {
+      catalogRecommendations: true,
+    }),
     tools: {
       searchSupportingDocuments:
         createSearchSupportingDocumentsTool(toolContext),
@@ -75,6 +81,11 @@ export function createCustomerServiceAgent({
         ? {
             searchPublicCatalog: createSearchPublicCatalogTool(toolContext),
             getPublicCatalogItem: createGetPublicCatalogItemTool(toolContext),
+            attachCatalogRecommendations:
+              createAttachCatalogRecommendationsTool({
+                ...toolContext,
+                onRecommendationsAttached,
+              }),
           }
         : {}),
       ...(options.draftScope
