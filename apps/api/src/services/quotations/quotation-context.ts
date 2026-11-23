@@ -1,52 +1,55 @@
-import type {
-  Quotation,
-  QuotationItem,
+import {
+  MAX_QUOTATION_AMOUNT_MINOR,
+  type Quotation,
+  type QuotationAddonItem,
+  type QuotationItem,
 } from "@event-management/contracts/quotations";
 import { z } from "@hono/zod-openapi";
-import type { Selectable, Transaction } from "kysely";
+import type { Selectable } from "kysely";
 import { itemSchema } from "../../controllers/quotations/schemas.js";
-import { createAuditEventData } from "../../data/audit/create-audit-event.js";
-import { lockBookingRequestData } from "../../data/booking-requests/lock-booking-request.js";
-import { resolveBookingPackageData } from "../../data/booking-requests/resolve-booking-package.js";
-import { lockAnyPackageData } from "../../data/booking-requests/lock-any-package.js";
-import {
-  findQuoteData,
-  lockQuoteData,
-} from "../../data/quotations/find-quotation.js";
-import type { BookingRequests, DB, Quotations } from "../../db/types.js";
+import type { BookingRequests, Quotations } from "../../db/types.js";
 
-export const failure = (message: string, status: 400 | 404 | 409) => ({
-  message,
-  status,
-});
-type Booking = Selectable<BookingRequests> & { revision: string };
+import {
+  centavosToPesos,
+  pesosToCentavos,
+} from "@event-management/contracts/money";
+import { serviceError } from "../../utils/service-result.js";
+
+export const failure = (message: string, status: 400 | 404 | 409) =>
+  serviceError(message, status);
+
 type Quote = Selectable<Quotations> & { revision: string };
+
 const iso = (v: Date | null) => v?.toISOString() ?? null;
-export async function proposalPackage(trx: Transaction<DB>, booking: Booking) {
-  const resolved = await resolveBookingPackageData(trx, booking);
-  if (!resolved) return null;
-  const pkg = await lockAnyPackageData(trx, resolved.id);
-  if (!pkg) throw new Error("Linked package not found");
-  return pkg;
-}
+
 export function amount(base: number, items: QuotationItem[]) {
-  const value = items.reduce(
-    (sum, item) =>
-      sum + (item.direction === "add" ? item.amountMinor : -item.amountMinor),
-    base,
-  );
+  const value = items.reduce((sum, item) => {
+    const lineAmount = item.amountMinor ?? 0;
+
+    return sum + (item.direction === "add" ? lineAmount : -lineAmount);
+  }, base);
+
   return Number.isSafeInteger(value) &&
-    value >= -2147483648 &&
-    value <= 2147483647
+    value >= -MAX_QUOTATION_AMOUNT_MINOR - 1 &&
+    value <= MAX_QUOTATION_AMOUNT_MINOR
     ? value
     : null;
 }
+
 export function basePrice(price: number) {
-  const value = price * 100;
-  return Number.isSafeInteger(value) && value > 0 && value <= 2147483647
+  const value = pesosToCentavos(price);
+
+  return Number.isSafeInteger(value) &&
+    value > 0 &&
+    value <= MAX_QUOTATION_AMOUNT_MINOR
     ? value
     : null;
 }
+
+export function quotationItems(items: Quote["items"]): QuotationItem[] {
+  return z.array(itemSchema).parse(items);
+}
+
 export function dto(row: Quote): Quotation {
   return {
     id: row.id,
@@ -60,37 +63,75 @@ export function dto(row: Quote): Quotation {
     createdAt: row.created_at.toISOString(),
     updatedAt: row.revision,
     sentAt: iso(row.sent_at),
-    acceptedAt: iso(row.accepted_at),
     supersededAt: iso(row.superseded_at),
     offeredPackageId: row.offered_package_id,
     adjustmentsReviewed: row.adjustments_reviewed,
     previousQuotationId: row.previous_quotation_id,
     revisionReason: row.revision_reason,
-    items: z.array(itemSchema).parse(row.items),
+    items: quotationItems(row.items),
   };
 }
-export async function locked(trx: Transaction<DB>, id: string) {
-  const found = await findQuoteData(trx, id);
-  if (!found) return null;
-  const booking = await lockBookingRequestData(trx, found.booking_request_id);
-  if (!booking) return null;
-  const row = await lockQuoteData(trx, id);
-  return row ? { booking, row } : null;
+
+const php = new Intl.NumberFormat("en-PH", {
+  style: "currency",
+  currency: "PHP",
+  minimumFractionDigits: 2,
+});
+
+function agreedAddonDescription(item: QuotationAddonItem) {
+  const {
+    source,
+    hours,
+    totalHours,
+    fixedPriceOverrideMinor,
+    hourlyRateOverrideMinor,
+  } = item.addon;
+  const fixed = source.includedHours !== null;
+  const price = fixedPriceOverrideMinor ?? source.fixedPriceMinor;
+  const rate = hourlyRateOverrideMinor ?? source.hourlyRateMinor;
+  const terms = [];
+
+  if (fixed && totalHours != null)
+    terms.push(`${totalHours} total ${totalHours === 1 ? "hour" : "hours"}`);
+
+  if (fixed && price !== null)
+    terms.push(
+      `${php.format(centavosToPesos(price))} for ${source.includedHours} included ${source.includedHours === 1 ? "hour" : "hours"}`,
+    );
+
+  if (rate !== null) {
+    const billedHours = hours ?? 0;
+    const unit = billedHours === 1 ? "hour" : "hours";
+    terms.push(
+      `${billedHours} ${fixed ? "extra " : ""}${unit} × ${php.format(centavosToPesos(rate))}/hour`,
+    );
+  }
+
+  return `${item.description} (${terms.join(" · ")})`;
 }
-export async function audit(
-  trx: Transaction<DB>,
-  actor: string,
-  action: string,
-  id: string,
-  meta: Record<string, unknown>,
-) {
-  await createAuditEventData(trx, {
-    actor_id: actor,
-    action,
-    entity_type: "quotation",
-    entity_id: id,
-    metadata: JSON.stringify(meta),
-  });
+
+export function customerDto(row: Quote): Quotation {
+  const quotation = dto(row);
+
+  return {
+    ...quotation,
+    items: quotation.items.map((item) => {
+      if (!item.addon) return item;
+
+      if (item.amountMinor === null)
+        throw new Error("Delivered quotation has an unpriced add-on");
+
+      return {
+        id: item.id,
+        direction: item.direction,
+        kind: item.kind,
+        description: agreedAddonDescription(item),
+        amountMinor: item.amountMinor,
+        serviceId: item.serviceId,
+      };
+    }),
+  };
 }
-export const closed = (booking: Booking) =>
+
+export const closed = (booking: Pick<Selectable<BookingRequests>, "status">) =>
   ["declined", "cancelled"].includes(booking.status);

@@ -1,0 +1,109 @@
+.agent-settings {
+  max-width: 760px;
+}
+.agent-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.agent-fields {
+  display: grid;
+  gap: 15px;
+  border: 0;
+  margin: 10px 0 0;
+  padding: 0;
+  min-width: 0;
+}
+.agent-fields textarea.agent-greeting {
+  min-height: 48px;
+}
+.agent-personality,
+.agent-capabilities {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.agent-personality legend,
+.agent-capabilities legend {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.agent-personality-options {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 3px;
+  border: 1px solid var(--border-default);
+  border-radius: 9px;
+  background: var(--surface-raised);
+}
+.agent-personality-options label {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.agent-personality-options input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+.agent-personality-options span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 36px;
+  border-radius: 6px;
+  padding: 5px 10px;
+  text-align: center;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.agent-personality-options input:checked + span {
+  color: var(--surface-base);
+  background: var(--ink);
+}
+.agent-personality-options input:focus-visible + span {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+.agent-preview:empty {
+  display: none;
+}
+.agent-capabilities label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.agent-preview {
+  max-height: 45vh;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
+.agent-preview-message {
+  background: var(--surface-subtle);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.agent-preview-message p {
+  white-space: pre-wrap;
+  margin: 4px 0 0;
+}
+.agent-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.agent-preview-compose {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.agent-preview-compose input {
+  flex: 1;
+  min-width: 0;
+}

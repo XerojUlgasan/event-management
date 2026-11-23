@@ -11,6 +11,11 @@ storybook-static/
 
 .scratch
 
+# Local test worktrees; keep the directory available in fresh checkouts.
+.room
+/.room/*
+!/.room/.gitkeep
+
 # Firebase service account keys (never commit)
 apps/api/.secrets/
 /.secrets/

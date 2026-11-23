@@ -192,15 +192,10 @@
 .event-timeline-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 16px;
-}
-.event-timeline-reference {
-  color: var(--text-muted);
-  font-size: 12px;
-  overflow-wrap: anywhere;
 }
 .event-timeline-actions {
   display: flex;

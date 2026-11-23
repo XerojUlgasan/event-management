@@ -8,17 +8,22 @@ export async function seedScenarioOperations(
   input: { bookings: ScenarioBooking[]; now: Date },
 ) {
   const days = input.bookings.flatMap((booking) => booking.eventDays);
+
   expectCount("event days", days.length);
+
   const acceptedIds = new Set(
     input.bookings
       .filter((booking) => booking.status === "accepted")
       .map((booking) => booking.id),
   );
+
   if (days.some((day) => !acceptedIds.has(day.bookingId)))
     throw new Error(
       "Operational days belong only on accepted booking requests",
     );
+
   let eventDays = 0;
+
   const ordered: ScenarioEventDay[] = [
     ...days.filter((day) => day.status !== "moved"),
     ...days.filter((day) => day.status === "moved"),
@@ -41,7 +46,9 @@ export async function seedScenarioOperations(
       .onConflict((conflict) => conflict.column("id").doNothing())
       .returning("id")
       .executeTakeFirst();
+
     if (inserted) eventDays += 1;
   }
+
   return { inserted: { eventDays } };
 }

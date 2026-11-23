@@ -36,8 +36,10 @@ export const getShowcaseMediaRouteHandler: AppRouteHandler<
   // Fall back to admin visibility if a valid admin session exists.
   if (!media) {
     const token = getCookie(c, SESSION_COOKIE);
+
     if (token) {
       const resolved = await resolveSessionService(c.get("db"), token);
+
       if (resolved.kind === "ok" && resolved.session.user.role === "admin") {
         media = await findAdminShowcaseMediaData(
           c.get("db"),
@@ -58,6 +60,7 @@ export const getShowcaseMediaRouteHandler: AppRouteHandler<
   // Sample assets have a plain url and no storage_key — redirect to it.
   if (!media.storage_key) {
     if (media.url) return c.redirect(media.url, 302);
+
     return c.json({ error: "Media not found." }, 404);
   }
 
@@ -73,6 +76,7 @@ export const getShowcaseMediaRouteHandler: AppRouteHandler<
 
   const requested = c.req.header("range");
   let range: string | undefined;
+
   if (requested) {
     const match = /^bytes=(\d*)-(\d*)$/.exec(requested);
     const suffix = match && !match[1] ? Number(match[2]) : null;
@@ -84,6 +88,7 @@ export const getShowcaseMediaRouteHandler: AppRouteHandler<
       suffix !== null || !match?.[2]
         ? media.byte_size - 1
         : Math.min(Number(match[2]), media.byte_size - 1);
+
     if (
       !match ||
       (!match[1] && !match[2]) ||
@@ -98,6 +103,7 @@ export const getShowcaseMediaRouteHandler: AppRouteHandler<
         status: 416,
         headers: { "Content-Range": `bytes */${media.byte_size}` },
       });
+
     range = `bytes=${start}-${end}`;
     headers["Content-Range"] = `bytes ${start}-${end}/${media.byte_size}`;
     headers["Content-Length"] = String(end - start + 1);
@@ -107,6 +113,7 @@ export const getShowcaseMediaRouteHandler: AppRouteHandler<
 
   try {
     const body = await getCatalogMedia(media.storage_key, range);
+
     return new Response(body, { status: range ? 206 : 200, headers });
   } catch {
     return c.json({ error: "Media unavailable. Try again." }, 502);

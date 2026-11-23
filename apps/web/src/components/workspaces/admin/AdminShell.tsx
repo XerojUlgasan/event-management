@@ -9,11 +9,12 @@ import {
 } from "@event-management/ui";
 
 import type { NavKey } from "../../app/navigation-types";
+import type { AdminAiSection } from "../../app/routes";
 import {
   firstName,
   initialsFromName,
 } from "../../../lib/utils/formatting/name";
-import { KnowledgePage } from "./ai/KnowledgePage";
+import { AiPage } from "./ai/AiPage";
 import { BookingsPage } from "./booking-requests/BookingsPage";
 import { CalendarPage } from "./calendar/CalendarPage";
 import { GenericPage } from "./navigation/GenericPage";
@@ -26,8 +27,10 @@ import { ServicesPage } from "./catalog/ServicesPage";
 import { ShowcasesPage } from "./showcases/ShowcasesPage";
 import { ReportsPage } from "./reports/ReportsPage";
 import { CustomersPage } from "./users/CustomersPage";
+import { BusinessInformationPage } from "./business-information/BusinessInformationPage";
 import { AdminSidebar } from "./AdminSidebar";
 import { SignInMethods } from "../../auth/SignInMethods";
+import { NotificationBell } from "../../notifications/NotificationBell";
 import { adminPaths } from "../../app/routes";
 
 function AccountMenu({
@@ -47,17 +50,21 @@ function AccountMenu({
 
   useEffect(() => {
     if (!open) return;
+
     const dismiss = (event: PointerEvent) => {
       if (!container.current?.contains(event.target as Node)) setOpen(false);
     };
+
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpen(false);
         trigger.current?.focus();
       }
     };
+
     document.addEventListener("pointerdown", dismiss);
     document.addEventListener("keydown", escape);
+
     return () => {
       document.removeEventListener("pointerdown", dismiss);
       document.removeEventListener("keydown", escape);
@@ -113,34 +120,67 @@ export function AdminShell({
   profile,
   onSignOut,
   active,
+  aiSection = "knowledge",
   bookingRequestId,
+  search,
 }: {
-  profile: { displayName: string | null; email: string };
+  profile: { id: string; displayName: string | null; email: string };
   onSignOut: () => void;
   active: NavKey;
+  aiSection?: AdminAiSection;
   bookingRequestId?: string;
+  search: string;
 }) {
   const name = profile.displayName ?? profile.email;
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [businessInformationVisited, setBusinessInformationVisited] = useState(
+    active === "BusinessInformation",
+  );
+
+  useEffect(() => {
+    if (active === "BusinessInformation") setBusinessInformationVisited(true);
+  }, [active]);
+
   const go = (key: NavKey) => {
     navigateWorkspace(adminPaths[key]);
   };
 
   const body = useMemo(() => {
-    if (active === "AI") return <KnowledgePage />;
+    if (active === "AI") return <AiPage section={aiSection} />;
+
     if (active === "Overview")
       return <OverviewPage firstName={firstName(name)} onNavigate={go} />;
+
     if (active === "Bookings")
       return <BookingsPage bookingRequestId={bookingRequestId} />;
-    if (active === "Messages") return <MessagesPage />;
+
+    if (active === "Messages")
+      return (
+        <MessagesPage
+          requestedConversation={new URLSearchParams(search).get(
+            "conversation",
+          )}
+        />
+      );
+
     if (active === "Customers") return <CustomersPage />;
+
     if (active === "Calendar") return <CalendarPage />;
+
     if (active === "Packages") return <PackagesPage />;
+
     if (active === "Services") return <ServicesPage />;
+
     if (active === "Showcases") return <ShowcasesPage />;
+
+    if (active === "BusinessInformation") return null;
+
     if (active === "Inventory") return <InventoryPage />;
+
     if (active === "Operations") return <OperationsPage />;
+
     if (active === "Reports") return <ReportsPage />;
+
     if (active === "Administration")
       return (
         <section className="account-settings">
@@ -161,8 +201,9 @@ export function AdminShell({
           <SignInMethods />
         </section>
       );
+
     return <GenericPage page={active} />;
-  }, [active, name, profile.email, bookingRequestId]);
+  }, [active, aiSection, name, profile.email, bookingRequestId, search]);
 
   return (
     <WorkspaceLayout
@@ -206,6 +247,7 @@ export function AdminShell({
             <Icon name="menu" />
           </Button>
           <div className="app-header-actions">
+            <NotificationBell key={profile.id} profileId={profile.id} />
             <AccountMenu
               name={name}
               onSettings={() => go("Administration")}
@@ -220,6 +262,7 @@ export function AdminShell({
         active !== "Packages" &&
         active !== "Services" &&
         active !== "Showcases" &&
+        active !== "BusinessInformation" &&
         active !== "Administration" &&
         active !== "Messages" && (
           <p className="demo-note" role="note">
@@ -227,6 +270,9 @@ export function AdminShell({
           </p>
         )}
       {body}
+      <div hidden={active !== "BusinessInformation"}>
+        {businessInformationVisited && <BusinessInformationPage />}
+      </div>
     </WorkspaceLayout>
   );
 }

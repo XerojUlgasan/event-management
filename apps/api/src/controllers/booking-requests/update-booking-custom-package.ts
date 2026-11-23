@@ -1,4 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { idParams } from "./schemas.js";
 import { json } from "./http.js";
@@ -15,6 +16,7 @@ export const updateBookingCustomPackageRoute = createRoute({
   },
   responses: saveResponses,
 });
+
 export const updateBookingCustomPackageRouteHandler: AppRouteHandler<
   typeof updateBookingCustomPackageRoute
 > = async (c) => {
@@ -25,7 +27,8 @@ export const updateBookingCustomPackageRouteHandler: AppRouteHandler<
     c.req.valid("json"),
     false,
   );
+
   return "status" in result
-    ? c.json({ error: result.message }, result.status)
+    ? jsonError(c, result.message, result.status)
     : c.json(result, 200);
 };

@@ -7,5 +7,6 @@ export function catalogSlug(name: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
+
   return slug || "item";
 }

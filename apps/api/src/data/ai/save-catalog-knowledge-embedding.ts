@@ -14,7 +14,9 @@ export async function saveCatalogKnowledgeEmbeddingData(
     where e.extname = 'vector'
   `.execute(db);
   const schema = extension.rows[0]?.schema;
+
   if (!schema) throw new Error("Catalog knowledge requires pgvector");
+
   const result = await db
     .updateTable("catalog_knowledge")
     .set({
@@ -25,5 +27,6 @@ export async function saveCatalogKnowledgeEmbeddingData(
     .where("id", "=", id)
     .where("content_hash", "=", expectedHash)
     .executeTakeFirst();
+
   return result.numUpdatedRows === 1n;
 }

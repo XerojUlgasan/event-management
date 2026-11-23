@@ -9,5 +9,6 @@ export async function getBookingRequestService(
   customerId?: string,
 ) {
   const row = await findBookingRequestData(db, id, customerId);
+
   return row ? (await bookingRequestDtos(db, [row]))[0]! : null;
 }

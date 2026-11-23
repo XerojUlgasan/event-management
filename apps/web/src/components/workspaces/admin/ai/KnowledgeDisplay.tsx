@@ -8,8 +8,10 @@ export const knowledgeStatusLabels: Record<KnowledgeStatus, string> = {
   pending: "Pending",
   "needs-refresh": "Needs refresh",
 };
+
 export const knowledgeCoverageHelp =
   "Coverage means the current source identity, preprocessing and model match a successful embedding. It does not re-download photos or prove assistant retrieval.";
+
 export function formatKnowledgeDate(value: string | null) {
   return value
     ? new Date(value).toLocaleDateString(undefined, {
@@ -19,6 +21,7 @@ export function formatKnowledgeDate(value: string | null) {
       })
     : "—";
 }
+
 export function KnowledgeHelp({ text }: { text: string }) {
   const id = useId();
   const [position, setPosition] = useState<{
@@ -26,6 +29,7 @@ export function KnowledgeHelp({ text }: { text: string }) {
     left: number;
     width: number;
   } | null>(null);
+
   const show = (element: HTMLElement) => {
     const rect = element.getBoundingClientRect();
     const width = Math.min(280, window.innerWidth - 24);
@@ -35,8 +39,10 @@ export function KnowledgeHelp({ text }: { text: string }) {
       width,
     });
   };
+
   useEffect(() => {
     if (!position) return;
+
     const dismiss = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -44,14 +50,18 @@ export function KnowledgeHelp({ text }: { text: string }) {
         setPosition(null);
       }
     };
+
     const scroll = () => setPosition(null);
+
     window.addEventListener("keydown", dismiss, true);
     window.addEventListener("scroll", scroll, true);
+
     return () => {
       window.removeEventListener("keydown", dismiss, true);
       window.removeEventListener("scroll", scroll, true);
     };
   }, [position]);
+
   return (
     <span
       className="knowledge-help"
@@ -77,6 +87,7 @@ export function KnowledgeHelp({ text }: { text: string }) {
     </span>
   );
 }
+
 export function KnowledgeStatusBadge({ status }: { status: KnowledgeStatus }) {
   return (
     <Badge tone={status === "indexed" ? "neutral" : "warning"}>

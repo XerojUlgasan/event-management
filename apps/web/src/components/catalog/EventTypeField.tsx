@@ -36,6 +36,7 @@ export function EventTypeField({
       name?: string;
     }) {
   const displayValue = value ?? "";
+
   const handleChange = (v: string) => {
     if (v === "") {
       // Safe: allowNull determines which branch of the union is active.
@@ -46,6 +47,7 @@ export function EventTypeField({
       (onChange as (value: EventType) => void)(v as EventType);
     }
   };
+
   return (
     <FormField label="Event type" className={className}>
       {(field) => (

@@ -24,15 +24,16 @@ test("showcase previews cap visible graphemes and thumbnails without limiting de
     await rm(cacheDir, { recursive: true, force: true });
   });
   const { ShowcaseExpanded } = await server.ssrLoadModule(
-    "/src/components/public/showcase/ShowcaseExpanded.tsx",
+    "/src/components/public/site/ShowcaseExpanded.tsx",
   );
   const { PublicShowcaseDetail } = await server.ssrLoadModule(
-    "/src/components/public/showcase/PublicShowcaseDetail.tsx",
+    "/src/components/public/site/PublicShowcaseDetail.tsx",
   );
 
   const ending = "👩‍👩‍👧‍👦";
   const titlePrefix = "A".repeat(58) + ending;
   const descriptionPrefix = "B".repeat(158) + ending;
+
   const item = {
     slug: "garden-party",
     title: titlePrefix + " CD",

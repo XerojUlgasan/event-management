@@ -8,7 +8,7 @@ Use this when the task adds seeded rows for one database table. [Database seed](
 
 Required fixtures are the named accounts, three canvas packages, and `demo.*` conversations in `seed.ts`, `seed-packages.ts`, and `seed-demo.ts`. Add a row there when a current test or the [QA account table](accounts.md) depends on that exact email, name, or id.
 
-Everything else belongs in `apps/api/src/db/seed/scenario/`. `scenario/index.ts` is the orchestrator. Its current order is users, sessions, catalog, activity, operations, then quotations. `schema.prisma` can contain tables that this order does not seed yet, including `package_services`. Quotations and their delivery/audit records are seeded by `scenario/quotations.ts`. Read the orchestrator before assuming a table already has rows.
+Everything else belongs in `apps/api/src/db/seed/scenario/`. `scenario/index.ts` is the orchestrator. Its current order is users, sessions, catalog, activity, operations, then quotations. Check the current schema before assuming a table exists or is seeded. Quotations and their delivery/audit records are seeded by `scenario/quotations.ts`. Read the orchestrator before assuming a table already has rows.
 
 Done when you can name the file that will insert the table and the parent rows that file must receive.
 
@@ -31,7 +31,7 @@ Follow `scenario/users.ts`.
 3. Insert with `insertIfNew`. It conflicts on `id` and leaves the stored row unchanged. Return the planned rows even when the insert inserted nothing, so the next module can reuse the ids.
 4. Pass `seedClock()` into new timestamps. Read `SEED_RANDOM_SEED` through `seedRandom` only to shuffle a fixed set of legal values. A new seed must not change the count.
 5. Reuse `LOCAL_PASSWORD` by accepting the hash `seed.ts` already computed. Reuse `catalogSlug` and `hashSessionToken` when the table uses those values.
-6. If the table's unique key is not `id`, make that natural key stable too. A new id with an existing `(package_id, service_id)` or `(booking_request_id, version)` fails the second run. `events_day.day` is a date: pass `sql\`${day}::date\`` in that insert. `insertIfNew` cannot express that cast.
+6. If the table's unique key is not `id`, make that natural key stable too. A new id with an existing `(booking_request_id, version)` fails the second run. `events_day.day` is a date: pass `sql\`${day}::date\`` in that insert. `insertIfNew` cannot express that cast.
 
 Wire the function into `seedScenario` after every parent it reads and before every child that needs its ids.
 

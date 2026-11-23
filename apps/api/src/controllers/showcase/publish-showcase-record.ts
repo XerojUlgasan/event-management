@@ -22,13 +22,17 @@ export const publishShowcaseRecordRouteHandler: AppRouteHandler<
   typeof publishShowcaseRecordRoute
 > = async (c) => {
   const { id } = c.req.valid("param");
+
   try {
     await publishShowcaseRecordData(c.get("db"), id, new Date());
   } catch {
     return c.json({ error: "Showcase not found." }, 404);
   }
+
   const dto = await showcaseDto(c.get("db"), { id });
+
   if (!dto) return c.json({ error: "Showcase not found." }, 404);
+
   return c.json(dto, 200);
 };
 
@@ -49,12 +53,16 @@ export const unpublishShowcaseRecordRouteHandler: AppRouteHandler<
   typeof unpublishShowcaseRecordRoute
 > = async (c) => {
   const { id } = c.req.valid("param");
+
   try {
     await unpublishShowcaseRecordData(c.get("db"), id, new Date());
   } catch {
     return c.json({ error: "Showcase not found." }, 404);
   }
+
   const dto = await showcaseDto(c.get("db"), { id });
+
   if (!dto) return c.json({ error: "Showcase not found." }, 404);
+
   return c.json(dto, 200);
 };

@@ -4,9 +4,9 @@ Use theme tokens from `packages/theme/src/theme.css`, shared component styles fr
 
 ## Catalog canvas
 
-The shared UI package owns the canvas, section, widget, Markdown renderer, and `CATALOG_GRID` metrics; `CatalogContent.tsx` owns entity composition and media URL resolution. Guides and ruler must represent the actual snap columns. Section height derives from the lowest widget edge, including intentional gaps, and preview counts follow drag/resize. Narrow screens distinguish the stacked view from saved coordinates. Check shared widget limits for keyboard and pointer changes.
+The shared UI package owns the canvas, section, widget, Markdown renderer, and `CATALOG_GRID` metrics. `CatalogContent.tsx` owns entity composition and media URL resolution. Guides and the ruler represent the actual snap columns. Section height follows the lowest widget edge, including intentional gaps. Narrow screens stack widgets in reading order. Check shared widget limits for keyboard and pointer changes, including new widgets dragged from the palette.
 
-Keep editor, preview, and public rendering aligned at the same viewport. Preserve uncropped media, clipped widget overflow, shared sanitized Markdown, and the separate Markdown editing dialog. The grid library hides its resize handle by default; app overrides keep an adequately sized grip visible and above media. Verify hover, focus, touch, narrow layouts, undo, dialog dismissal, and focus restoration when affected.
+The editor, preview, and public detail use width-based grid metrics to preserve widget proportions within each responsive mode. Older sections without a column count use 12 columns. The editor doubles their horizontal units for the 24-column grid and marks each section on save. Preserve uncropped media, clipped widget overflow, and shared sanitized Markdown. A Markdown widget shows its source while being edited and returns to formatted text on blur. App styles keep the corner resize grip visible above media. Verify hover, focus, touch, narrow layouts, undo, dialog dismissal, and focus restoration when affected.
 
 ## Checks
 

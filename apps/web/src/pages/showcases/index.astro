@@ -7,6 +7,7 @@ import { loadShowcasesPage } from "../../lib/server/catalog/load-showcases";
 import type { ShowcasePage } from "../../lib/data/showcases/showcases";
 
 let page: ShowcasePage | null = null;
+
 try {
   page = await loadShowcasesPage(
     SHOWCASE_LIST_PAGE_SIZE,

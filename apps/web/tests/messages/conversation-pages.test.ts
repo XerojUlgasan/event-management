@@ -37,8 +37,6 @@ const conversation = (
   eventStartsAt: null,
   eventEndsAt: null,
   guestCount: null,
-  status: "active",
-  closedAt: null,
   aiEnabled: true,
   aiVersion: 0,
   lastMessage: body === null ? null : message(`message-${id}`, body),
@@ -78,6 +76,27 @@ test("refresh moves recent rows to the head and preserves the loaded tail", () =
   assert.equal(result[2], loaded[1]);
 });
 
+test("a stale inbox page cannot restore handoff pending after a reply", () => {
+  const old = {
+    ...conversation("a"),
+    aiVersion: 2,
+    aiHandoff: {
+      reason: "customer_requested" as const,
+      summary: "Help",
+      pending: true,
+    },
+  };
+  const confirmed = {
+    ...old,
+    aiVersion: 3,
+    aiEnabled: false,
+    aiHandoff: { ...old.aiHandoff, pending: false },
+  };
+  const result = refreshConversations([confirmed], [old]);
+  assert.equal(result[0]?.aiVersion, 3);
+  assert.equal(result[0]?.aiHandoff?.pending, false);
+});
+
 test("recent read bridges new rows across pages until it reaches a known row", async () => {
   const known = conversation("known", "latest known row");
   const calls: (string | undefined)[] = [];
@@ -93,7 +112,9 @@ test("recent read bridges new rows across pages until it reaches a known row", a
     async (cursor) => {
       calls.push(cursor);
       const next = pages.shift();
+
       if (!next) throw new Error("unexpected page request");
+
       return next;
     },
     new Map([[known.id, known]]),
@@ -110,8 +131,10 @@ test("recent read bridges new rows across pages until it reaches a known row", a
 
 test("initial recent read stays bounded to one page", async () => {
   const calls: (string | undefined)[] = [];
+
   const result = await readRecentConversations(async (cursor) => {
     calls.push(cursor);
+
     return {
       conversations: [conversation("first-page")],
       nextCursor: "next-page",
@@ -137,7 +160,9 @@ test("recent read returns all rows when pagination is exhausted before a known o
     async (cursor) => {
       calls.push(cursor);
       const next = pages.shift();
+
       if (!next) throw new Error("unexpected page request");
+
       return next;
     },
     new Map([["already-loaded", conversation("already-loaded")]]),
@@ -157,6 +182,7 @@ test("recent read rejects a repeated cursor when no known row bridges the pages"
     readRecentConversations(
       async (cursor) => {
         calls.push(cursor);
+
         return {
           conversations: [conversation(`row-${calls.length}`)],
           nextCursor: "same-cursor",
@@ -195,10 +221,13 @@ test("an updated known row cannot bridge a burst of unseen conversations", async
     { conversations: [updated, conversation("new-1")], nextCursor: "next" },
     { conversations: [conversation("new-2"), unchanged], nextCursor: "older" },
   ];
+
   const result = await readRecentConversations(
     async () => {
       const page = pages.shift();
+
       if (!page) throw new Error("unexpected request");
+
       return page;
     },
     new Map([
@@ -206,6 +235,7 @@ test("an updated known row cannot bridge a burst of unseen conversations", async
       [unchanged.id, unchanged],
     ]),
   );
+
   assert.deepEqual(
     result.conversations.map((item) => item.id),
     ["known", "new-1", "new-2", "anchor"],

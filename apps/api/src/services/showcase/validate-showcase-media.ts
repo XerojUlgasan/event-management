@@ -13,6 +13,7 @@ export async function lockAndValidateShowcaseMedia(
     [coverMediaId, ...mediaIds],
     recordId,
   );
+
   const byId = new Map(assets.map((asset) => [asset.id, asset]));
 
   if (byId.get(coverMediaId)?.kind !== "image")
@@ -23,11 +24,13 @@ export async function lockAndValidateShowcaseMedia(
 
   for (const id of mediaIds) {
     const asset = byId.get(id);
+
     if (asset?.kind !== "image" && asset?.kind !== "video")
       return {
         status: 400 as const,
         message: "Choose existing images or videos for the gallery.",
       };
+
     if (asset.showcase_record_id && asset.showcase_record_id !== recordId)
       return {
         status: 409 as const,

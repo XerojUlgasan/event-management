@@ -15,8 +15,10 @@ export async function loginUserService(
   password: string,
 ) {
   if (!allowAuthAttempt(email)) return { kind: "rate-limited" as const };
+
   const row = await findUserByEmailData(db, email);
   const valid = await verifyPassword(row?.password_hash ?? null, password);
+
   return row && valid
     ? { kind: "ok" as const, row }
     : { kind: "invalid" as const };

@@ -7,9 +7,12 @@ async function serverGet<T>(
   allowMissing = false,
 ): Promise<T | null> {
   const response = await fetch(`${env.SERVER_API_URL}${path}`);
+
   if (allowMissing && response.status === 404) return null;
+
   if (!response.ok)
     throw new Error(`Showcase request failed (${response.status})`);
+
   return response.json() as Promise<T>;
 }
 
@@ -18,9 +21,13 @@ export const loadShowcasesPage = (
   cursor?: string,
 ): Promise<ShowcasePage> => {
   const params = new URLSearchParams();
+
   if (limit !== undefined) params.set("limit", String(limit));
+
   if (cursor) params.set("cursor", cursor);
+
   const qs = params.toString();
+
   return serverGet<ShowcasePage>(`/showcase-records${qs ? `?${qs}` : ""}`).then(
     (r) => ({
       showcases: r?.showcases ?? [],

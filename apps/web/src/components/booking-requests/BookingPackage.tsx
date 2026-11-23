@@ -15,29 +15,44 @@ import {
   type PackageHistoryEntry,
 } from "../../lib/data/booking-requests/packages";
 import { usePagination } from "../../lib/pagination/use-pagination";
+import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
+import { centavosToPesos } from "../../lib/utils/formatting/money";
 import {
   getPackages,
   type PublicPackage,
 } from "../../lib/data/catalog/packages";
 import { PackageCanvas } from "../catalog/CatalogContent";
 import { PackageEditor } from "../catalog/PackageEditor";
+import { ApiError } from "../../lib/http/request";
 
 export function BookingPackage({
   id,
   admin,
   onChanged,
   editable = true,
+  refreshBooking,
 }: {
   id: string;
   admin: boolean;
   editable?: boolean;
   onChanged?: () => void;
+  refreshBooking?: () => Promise<void>;
 }) {
   const { notifyError } = useNotifications();
-  const generation = useRef(0);
+  const generation = useRequestGeneration();
   const [loaded, setLoaded] = useState<BookingPackageResult | null>(null);
   const [history, setHistory] = useState<PackageHistoryEntry[]>([]);
   const [editing, setEditing] = useState(false);
+  const [needsRefresh, setNeedsRefresh] = useState(false);
+  const canEdit = admin && editable && !needsRefresh;
+  const canEditRef = useRef(canEdit);
+  canEditRef.current = canEdit;
+  useEffect(() => {
+    if (!canEdit) {
+      setEditing(false);
+      setSelecting(false);
+    }
+  }, [canEdit]);
   const [options, setOptions] = useState<PublicPackage[]>([]);
   const [optionCursor, setOptionCursor] = useState<string | null>(null);
   const [selected, setSelected] = useState("");
@@ -66,11 +81,12 @@ export function BookingPackage({
   const [error, setError] = useState("");
 
   async function load() {
-    const current = generation.current;
+    const current = generation.current();
     const sequence = ++request.current;
     const requestKey = key;
     setBusy(true);
     setError("");
+
     try {
       const [result, audit] = await Promise.all([
         getBookingPackage(id, admin),
@@ -78,28 +94,33 @@ export function BookingPackage({
           ? getBookingPackageHistory(id, pagination.cursor)
           : Promise.resolve(null),
       ]);
+
       if (
-        current !== generation.current ||
+        !generation.isCurrent(current) ||
         sequence !== request.current ||
         keyRef.current !== requestKey
       )
         return;
+
       setLoaded(result);
       setHistory(audit?.history ?? []);
       setNextCursor(audit?.nextCursor ?? null);
       setLoadedKey(requestKey);
       setLoadedIdentity(identity);
+
+      return true;
     } catch (cause) {
       if (
-        current !== generation.current ||
+        !generation.isCurrent(current) ||
         sequence !== request.current ||
         keyRef.current !== requestKey
       )
         return;
+
       setError(notifyError(cause, "Unable to load the proposed package."));
     } finally {
       if (
-        current === generation.current &&
+        generation.isCurrent(current) &&
         sequence === request.current &&
         keyRef.current === requestKey
       )
@@ -109,14 +130,41 @@ export function BookingPackage({
 
   useEffect(() => {
     void load();
+
     return () => {
-      generation.current++;
+      generation.bump();
     };
   }, [id, admin, pagination.cursor]);
 
   return (
     <section aria-label="Package" className="booking-current-package">
       {busy && <p role="status">Loading package…</p>}
+      {needsRefresh && (
+        <p role="alert">
+          Refresh the booking before retrying.{" "}
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+
+              try {
+                if (!refreshBooking) return;
+
+                await refreshBooking();
+
+                if (await load()) setNeedsRefresh(false);
+              } catch (cause) {
+                setError(notifyError(cause, "Unable to refresh the booking."));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Refresh booking
+          </Button>
+        </p>
+      )}
       {error && (
         <p role="alert">
           {error}{" "}
@@ -130,7 +178,7 @@ export function BookingPackage({
           {!loaded.package && (
             <p>Package to be prepared. Amount to be discussed.</p>
           )}
-          {admin && editable && (
+          {canEdit && (
             <div className="booking-actions">
               <Button disabled={busy} onClick={() => setEditing(true)}>
                 {loaded.package ? "Edit package" : "Create custom package"}
@@ -148,7 +196,7 @@ export function BookingPackage({
               )}
             </div>
           )}
-          {selecting && !loaded.package && (
+          {selecting && canEdit && !loaded.package && (
             <div>
               <label>
                 Catalog package{" "}
@@ -176,8 +224,11 @@ export function BookingPackage({
                 disabled={!selected || busy}
                 onClick={async () => {
                   const option = options.find((item) => item.id === selected);
-                  if (!option) return;
+
+                  if (!option || !canEditRef.current) return;
+
                   setBusy(true);
+
                   try {
                     await assignBookingPackage(id, {
                       packageId: option.id,
@@ -188,6 +239,11 @@ export function BookingPackage({
                     await load();
                     onChanged?.();
                   } catch (cause) {
+                    if (cause instanceof ApiError && cause.status === 409) {
+                      canEditRef.current = false;
+                      setNeedsRefresh(true);
+                    }
+
                     setError(notifyError(cause, "Unable to assign package."));
                   } finally {
                     setBusy(false);
@@ -201,9 +257,7 @@ export function BookingPackage({
               </Button>
             </div>
           )}
-          {loaded.package && (
-            <PackageCanvas item={loaded.package} hideServices />
-          )}
+          {loaded.package && <PackageCanvas item={loaded.package} />}
         </>
       )}
       {admin &&
@@ -219,17 +273,17 @@ export function BookingPackage({
                   {entry.action === "booking.custom_package_created"
                     ? "Created"
                     : "Updated"}{" "}
-                  · {entry.actorId ?? "Unknown administrator"}
+                  · {entry.actorName?.trim() || "Unknown administrator"}
                 </summary>
                 <p>
                   Previous:{" "}
                   {entry.before
-                    ? `${entry.before.name} · ${entry.before.maxGuests} guests · ${entry.before.price.amountMinor / 100} PHP`
+                    ? `${entry.before.name} · ${entry.before.maxGuests} guests · ${centavosToPesos(entry.before.price.amountMinor)} PHP`
                     : "No package"}
                 </p>
                 <p>
                   Saved: {entry.after.name} · {entry.after.maxGuests} guests ·{" "}
-                  {entry.after.price.amountMinor / 100} PHP
+                  {centavosToPesos(entry.after.price.amountMinor)} PHP
                 </p>
                 <p>
                   Historical media may no longer be available unless retained in
@@ -239,13 +293,19 @@ export function BookingPackage({
                   <details>
                     <summary>Previous content</summary>
                     <p>{entry.before.description}</p>
-                    <PackageCanvas item={entry.before} hideServices />
+                    <PackageCanvas
+                      item={entry.before}
+                      historicalAddons={entry.before.addonServices}
+                    />
                   </details>
                 )}
                 <details>
                   <summary>Saved content</summary>
                   <p>{entry.after.description}</p>
-                  <PackageCanvas item={entry.after} hideServices />
+                  <PackageCanvas
+                    item={entry.after}
+                    historicalAddons={entry.after.addonServices}
+                  />
                 </details>
               </details>
             ))}
@@ -259,7 +319,7 @@ export function BookingPackage({
             />
           </details>
         )}
-      {loadedIdentity === identity && editing && loaded && (
+      {loadedIdentity === identity && editing && canEdit && loaded && (
         <PackageEditor
           initial={loaded.package}
           onClose={() => {
@@ -268,25 +328,40 @@ export function BookingPackage({
           }}
           onSaved={() => {
             setEditing(false);
+
             if (pagination.page === 1) void load();
             else pagination.reset();
+
             onChanged?.();
           }}
           saveCustom={async (content) => {
-            await saveBookingPackage(
-              id,
-              content,
-              {
-                expectedBookingUpdatedAt: loaded.bookingUpdatedAt,
-                ...(loaded.package
-                  ? { expectedUpdatedAt: loaded.package.updatedAt }
-                  : {}),
-                ...(loaded.package?.packageType === "catalog"
-                  ? { sourcePackageId: loaded.package.id }
-                  : {}),
-              },
-              loaded.package?.packageType === "custom",
-            );
+            if (!canEditRef.current)
+              throw new Error("This request is read-only.");
+
+            try {
+              await saveBookingPackage(
+                id,
+                content,
+                {
+                  expectedBookingUpdatedAt: loaded.bookingUpdatedAt,
+                  ...(loaded.package
+                    ? { expectedUpdatedAt: loaded.package.updatedAt }
+                    : {}),
+                  ...(loaded.package?.packageType === "catalog"
+                    ? { sourcePackageId: loaded.package.id }
+                    : {}),
+                },
+                loaded.package?.packageType === "custom",
+              );
+            } catch (cause) {
+              if (cause instanceof ApiError && cause.status === 409) {
+                canEditRef.current = false;
+                setNeedsRefresh(true);
+                setError(notifyError(cause, "Unable to save package."));
+              }
+
+              throw cause;
+            }
           }}
         />
       )}

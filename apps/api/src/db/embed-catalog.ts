@@ -6,12 +6,16 @@ import { pruneIneligibleCatalogKnowledgeData } from "../data/ai/prune-ineligible
 import { refreshCatalogEmbeddingsService } from "../services/ai/workflows/refresh-catalog-embeddings.js";
 
 const controller = new AbortController();
+
 const stop = () => controller.abort();
+
 process.once("SIGINT", stop);
 process.once("SIGTERM", stop);
+
 try {
   if (env.AI_EMBEDDING.model !== "google/gemini-embedding-2")
     throw new Error("Catalog embedding requires google/gemini-embedding-2");
+
   await pruneIneligibleCatalogKnowledgeData(db);
   const owners = await listCatalogKnowledgeOwnersData(db);
   const total = {
@@ -21,14 +25,17 @@ try {
     superseded: 0,
     failed: 0,
   };
+
   for (const owner of owners) {
     controller.signal.throwIfAborted();
+
     try {
       const result = await refreshCatalogEmbeddingsService({
         db,
         owner,
         abortSignal: controller.signal,
       });
+
       for (const field of [
         "embedded",
         "unchanged",
@@ -45,7 +52,9 @@ try {
       });
     }
   }
+
   console.info("catalog-embedding-backfill", total);
+
   if (total.failed) process.exitCode = 1;
 } catch {
   console.error(

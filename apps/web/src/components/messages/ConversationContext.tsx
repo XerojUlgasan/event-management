@@ -1,3 +1,4 @@
+import { BookingIntake } from "../booking-requests/BookingIntake";
 import { useEffect, useState } from "react";
 import {
   Button,
@@ -26,6 +27,7 @@ import { QuotationSummaryRead } from "../quotations/Quotations";
 import { adminBookingRequestPath, customerPaths } from "../app/routes";
 
 export type ConversationContextView = "details" | "package" | "quotation";
+
 type Content =
   | { kind: "details"; booking: BookingRequest }
   | { kind: "package"; package: CatalogPackage | null }
@@ -41,7 +43,7 @@ function EventDetails({
   return (
     <div className="conversation-details">
       <div className="conversation-details-heading">
-        <span>Request {booking.reference}</span>
+        <span>Booking request</span>
         <BookingStatusBadge status={booking.status} />
       </div>
       <h3>{booking.eventType}</h3>
@@ -71,6 +73,10 @@ function EventDetails({
           <dd>{booking.specialRequests || "None provided"}</dd>
         </div>
       </dl>
+      <BookingIntake
+        requestedServices={booking.requestedServices}
+        budget={booking.budget}
+      />
       <h4>Requested dates</h4>
       <p className="conversation-details-note">
         Times use {booking.timeZone}. These dates are not reserved.
@@ -112,8 +118,7 @@ function EventDetails({
         </dl>
       )}
       <p className="conversation-details-note">
-        An inquiry does not confirm a booking. View the current package and
-        quotation using their separate conversation controls.
+        An inquiry does not confirm a booking.
       </p>
       <ActionLink
         href={
@@ -152,6 +157,7 @@ export function ConversationContext({
     async function load() {
       try {
         let result: Content;
+
         if (view === "details") {
           const response = await (admin
             ? getAdminBookingRequest(bookingId)
@@ -166,6 +172,7 @@ export function ConversationContext({
             quotation: await getLatestSentQuotation(bookingId, admin),
           };
         }
+
         if (active) setContent(result);
       } catch (cause) {
         if (active)
@@ -180,17 +187,21 @@ export function ConversationContext({
       }
     }
     void load();
+
     return () => {
       active = false;
     };
   }, [bookingId, admin, view, attempt, notifyError]);
+
   const retry = () => setAttempt((value) => value + 1);
+
   if (view === "package" && content?.kind === "package" && !content.package)
     return (
       <Dialog title="Current package" onClose={onClose}>
         <p>Package to be prepared. Amount to be discussed.</p>
       </Dialog>
     );
+
   if (view === "package")
     return (
       <PackagePreview
@@ -200,9 +211,9 @@ export function ConversationContext({
         onRetry={retry}
         onClose={onClose}
         showBookingAction={false}
-        hideServices
       />
     );
+
   const body = (
     <>
       {pending && (
@@ -228,7 +239,7 @@ export function ConversationContext({
             <p className="conversation-details-note">
               Latest sent quotation · Version {content.quotation.version}
             </p>
-            <QuotationSummaryRead quotation={content.quotation} />
+            <QuotationSummaryRead quotation={content.quotation} current />
           </>
         ) : (
           <div className="conversation-context-empty">
@@ -243,6 +254,7 @@ export function ConversationContext({
         ))}
     </>
   );
+
   return view === "details" ? (
     <Drawer
       title="Event details"

@@ -11,12 +11,15 @@ const meta = {
     onDateSelect: () => undefined,
   },
 } satisfies Meta<typeof MonthCalendar>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 function Interactive(args: ComponentProps<typeof MonthCalendar>) {
   const [month, setMonth] = useState(args.month);
   const [selected, setSelected] = useState<string>();
+
   return (
     <MonthCalendar
       {...args}
@@ -29,6 +32,7 @@ function Interactive(args: ComponentProps<typeof MonthCalendar>) {
     />
   );
 }
+
 export const WithCounts: Story = {
   args: {
     counts: { "2026-11-03": 1, "2026-11-12": 3, "2026-11-21": 5 },
@@ -36,6 +40,7 @@ export const WithCounts: Story = {
   },
   render: (args) => <Interactive {...args} />,
 };
+
 export const EmptyCompact: Story = {
   render: (args) => (
     <div style={{ maxWidth: 340 }}>
@@ -43,10 +48,12 @@ export const EmptyCompact: Story = {
     </div>
   ),
 };
+
 export const Loading: Story = {
   args: { loading: true },
   render: (args) => <Interactive {...args} />,
 };
+
 export const Error: Story = {
   args: {
     error: (

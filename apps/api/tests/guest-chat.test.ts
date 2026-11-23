@@ -5,10 +5,13 @@ import { readFile, readdir } from "node:fs/promises";
 import { after, before, test } from "node:test";
 import { Pool } from "pg";
 import { MockLanguageModelV4, MockProviderV4 } from "ai/test";
+import { humanHandoffAcknowledgement } from "../src/data/messages/request-human-handoff.js";
 import { threadSchema } from "../src/controllers/messages/schemas.js";
 import { hashSessionToken } from "../src/utils/session.js";
+import { runAssistantTurnService } from "../src/services/ai/run-assistant-turn.js";
 
 const database = `em_guest_test_${randomUUID().replaceAll("-", "")}`;
+
 const modelId = "fixture/text-model";
 let admin: Pool;
 let pool: Pool;
@@ -20,10 +23,21 @@ let team: { id: string; cookie: string };
 let model: MockLanguageModelV4;
 let packageId: string;
 
-function useReply(text: string) {
+function useReply(
+  text: string,
+  suggestions: string[] = ["What can I do next?"],
+) {
   model = new MockLanguageModelV4({
     doGenerate: async () => ({
-      content: [{ type: "text", text }],
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            message: text,
+            suggested_replies: suggestions,
+          }),
+        },
+      ],
       finishReason: { unified: "stop", raw: undefined },
       usage: {
         inputTokens: {
@@ -55,6 +69,7 @@ before(async () => {
   await admin.query(`CREATE DATABASE "${database}"`);
   pool = new Pool({ ...connection, database });
   const root = new URL("../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name))) {
@@ -62,6 +77,7 @@ before(async () => {
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
   }
+
   process.env.DB_NAME = database;
   process.env.AI_GATEWAY_API_KEY = "fixture-key";
   process.env.TEXT_MODEL = modelId;
@@ -87,6 +103,7 @@ before(async () => {
         expires_at: new Date(Date.now() + 3600000),
       })
       .execute();
+
     return { id: user.id, cookie: `em_session=${token}` };
   }
   customer = await session("customer");
@@ -110,8 +127,10 @@ after(async () => {
   delete globalThis.AI_SDK_DEFAULT_PROVIDER;
   await db?.destroy();
   await pool?.end();
+
   if (admin) {
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    // Let closing pool sockets finish instead of force-terminating them after end().
+    await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
     await admin.end();
   }
 });
@@ -130,16 +149,20 @@ function call(path: string, cookie: string, body?: unknown) {
 async function read(response: Response, status: number) {
   const value: any = await response.json();
   assert.equal(response.status, status, JSON.stringify(value));
+
   return value;
 }
+
 async function guest(cookie = "") {
   const response = await call("/guest/conversation", cookie, {});
   const value = await read(response, 200);
+
   return {
     ...value,
     cookie: response.headers.get("set-cookie")!.split(";")[0],
   };
 }
+
 function send(
   thread: any,
   body = "Hello",
@@ -152,12 +175,17 @@ function send(
     { body, requestId },
   );
 }
+
 async function expired(thread: any) {
-  await db
-    .updateTable("conversations")
-    .set({ guest_expires_at: new Date(Date.now() - 1000) })
-    .where("id", "=", thread.conversation.id)
-    .execute();
+  const id = thread.conversation.id;
+  await pool.query(
+    "UPDATE conversations SET created_at = clock_timestamp() - interval '25 hours' WHERE id = $1",
+    [id],
+  );
+  await pool.query(
+    "UPDATE messages SET created_at = clock_timestamp() - interval '25 hours' WHERE conversation_id = $1",
+    [id],
+  );
 }
 
 test("bootstrap issues opaque httponly cookies, rejects caller-chosen identities, and reuses one active conversation under concurrency", async () => {
@@ -167,9 +195,11 @@ test("bootstrap issues opaque httponly cookies, rejects caller-chosen identities
   assert.equal(first.conversation.customerEmail, null);
   assert.equal(first.conversation.customerName, "Guest");
   threadSchema.parse(first);
+
   const results = await Promise.all(
     Array.from({ length: 8 }, () => guest(first.cookie)),
   );
+
   assert.ok(
     results.every((result) => result.conversation.id === first.conversation.id),
   );
@@ -179,7 +209,6 @@ test("bootstrap issues opaque httponly cookies, rejects caller-chosen identities
         .selectFrom("conversations")
         .select("id")
         .where("guest_identity_id", "is not", null)
-        .where("status", "=", "active")
         .execute()
     ).length,
     1,
@@ -188,20 +217,83 @@ test("bootstrap issues opaque httponly cookies, rejects caller-chosen identities
   assert.notEqual(unknown.cookie, `em_guest=${"A".repeat(43)}`);
 });
 
-test("guest catalog calls are persisted under the guest message and replay does not execute them twice", async () => {
-  useReply("Here are the catalog options");
+for (const operation of ["read", "bootstrap"] as const) {
+  test(`${operation} refreshes activity after waiting for a conversation lock`, async () => {
+    const thread = await guest();
+    const id = thread.conversation.id;
+    await expired(thread);
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT id FROM conversations WHERE id = $1 FOR UPDATE",
+        [id],
+      );
+      const pending =
+        operation === "read"
+          ? call(`/guest/conversations/${id}`, thread.cookie)
+          : call("/guest/conversation", thread.cookie, {});
+      const deadline = Date.now() + 5000;
+      let blocked = false;
+      const {
+        rows: [{ pid }],
+      } = await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+
+      while (Date.now() < deadline) {
+        const result = await pool.query(
+          "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))) AS blocked",
+          [pid],
+        );
+
+        if (result.rows[0].blocked) {
+          blocked = true;
+          break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
+      assert.ok(blocked, "request must wait for the locked conversation");
+      await client.query(
+        "INSERT INTO messages (conversation_id, sender_role, body) VALUES ($1, 'assistant', 'Recent reply')",
+        [id],
+      );
+      await client.query("COMMIT");
+      const response = await read(await pending, 200);
+      assert.equal(response.conversation.id, id);
+      assert.equal(response.messages.at(-1).body, "Recent reply");
+    } finally {
+      await client.query("ROLLBACK").catch(() => {});
+      client.release();
+    }
+  });
+}
+
+test("guest recommendations and suggested replies survive a thread read and replay without running tools twice", async () => {
+  useReply("Here are the catalog options", ["Tell me about the first option"]);
   const generate = model.doGenerate.bind(model);
   model.doGenerate = async (...args) => {
     const result = await generate(...args);
-    if (model.doGenerateCalls.length !== 1) return result;
+
+    const step = model.doGenerateCalls.length;
+
+    if (step > 2) return result;
+
     return {
       ...result,
       content: [
         {
           type: "tool-call",
-          toolCallId: "guest-catalog-call",
-          toolName: "searchPublicCatalog",
-          input: JSON.stringify({ catalogType: "package" }),
+          toolCallId:
+            step === 1 ? "guest-catalog-call" : "guest-catalog-attachment",
+          toolName:
+            step === 1 ? "searchPublicCatalog" : "attachCatalogRecommendations",
+          input: JSON.stringify(
+            step === 1
+              ? { catalogType: "package" }
+              : { items: [{ catalogType: "package", id: packageId }] },
+          ),
         },
       ],
       finishReason: { unified: "tool-calls", raw: undefined },
@@ -214,10 +306,15 @@ test("guest catalog calls are persisted under the guest message and replay does 
     201,
   );
   assert.ok(response.assistantMessage);
+  assert.equal(
+    response.assistantMessage.catalogRecommendations?.[0]?.id,
+    packageId,
+  );
   const row = await db
     .selectFrom("ai_tool_calls")
     .selectAll()
     .where("customer_message_id", "=", response.message.id)
+    .where("tool_name", "=", "searchPublicCatalog")
     .executeTakeFirstOrThrow();
   assert.equal(row.tool_name, "searchPublicCatalog");
   assert.equal(row.tool_call_id, "guest-catalog-call");
@@ -228,8 +325,39 @@ test("guest catalog calls are persisted under the guest message and replay does 
     .where("id", "=", row.customer_message_id)
     .executeTakeFirstOrThrow();
   assert.equal(message.sender_id, null);
-  await read(await send(thread, "Show your packages", requestId), 201);
-  assert.equal(model.doGenerateCalls.length, 2);
+  const replay = await read(
+    await send(thread, "Show your packages", requestId),
+    201,
+  );
+  assert.deepEqual(
+    replay.assistantMessage.catalogRecommendations,
+    response.assistantMessage.catalogRecommendations,
+  );
+  const restored = threadSchema.parse(
+    await read(
+      await call(
+        `/guest/conversations/${thread.conversation.id}`,
+        thread.cookie,
+      ),
+      200,
+    ),
+  );
+  assert.deepEqual(
+    restored.messages.at(-1)?.catalogRecommendations,
+    response.assistantMessage.catalogRecommendations,
+  );
+  assert.deepEqual(response.assistantMessage.suggestedReplies, [
+    "Tell me about the first option",
+  ]);
+  assert.deepEqual(
+    replay.assistantMessage.suggestedReplies,
+    response.assistantMessage.suggestedReplies,
+  );
+  assert.deepEqual(
+    restored.messages.at(-1)?.suggestedReplies,
+    response.assistantMessage.suggestedReplies,
+  );
+  assert.equal(model.doGenerateCalls.length, 3);
   assert.equal(
     (
       await db
@@ -238,8 +366,426 @@ test("guest catalog calls are persisted under the guest message and replay does 
         .where("customer_message_id", "=", response.message.id)
         .execute()
     ).length,
-    1,
+    2,
   );
+});
+
+test("guests receive public catalog details as Markdown with owned audit records", async () => {
+  useReply("Here are the package details");
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+
+    if (model.doGenerateCalls.length !== 1) return result;
+
+    return {
+      ...result,
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "guest-detail-call",
+          toolName: "getPublicCatalogItem",
+          input: JSON.stringify({ catalogType: "package", id: packageId }),
+        },
+      ],
+      finishReason: { unified: "tool-calls", raw: undefined },
+    };
+  };
+  const thread = await guest();
+  const requestId = randomUUID();
+  const result = await read(
+    await send(thread, "Read package details", requestId),
+    201,
+  );
+  assert.ok(result.assistantMessage);
+
+  const toolMessage = model.doGenerateCalls[1].prompt.find(
+    (message) => message.role === "tool",
+  );
+
+  assert.ok(toolMessage);
+
+  const part = toolMessage.content.find((item) => item.type === "tool-result");
+
+  assert.ok(part && part.type === "tool-result");
+  assert.equal(part.output.type, "text");
+
+  if (part.output.type !== "text") throw new Error("Expected Markdown detail");
+
+  assert.match(part.output.value, /PHP 1000 per package/);
+  const record = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", result.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(record.tool_name, "getPublicCatalogItem");
+  assert.equal(record.status, "succeeded");
+  assert.equal(record.assistant_message_id, result.assistantMessage.id);
+  await read(await send(thread, "Read package details", requestId), 201);
+  assert.equal(model.doGenerateCalls.length, 2);
+});
+
+test("guests can use current public business information in a reply", async () => {
+  await pool.query(
+    "UPDATE business_information SET information = $1 WHERE id = 1",
+    [
+      JSON.stringify({
+        about: { name: "Clemora Events" },
+        contact: { phone: "12345" },
+      }),
+    ],
+  );
+  useReply("unused");
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+
+    if (model.doGenerateCalls.length === 1)
+      return {
+        ...result,
+        content: [
+          {
+            type: "tool-call",
+            toolCallId: "guest-business",
+            toolName: "getBusinessInformation",
+            input: "{}",
+          },
+        ],
+        finishReason: { unified: "tool-calls", raw: undefined },
+      };
+
+    const toolMessage = args[0].prompt.find(
+      (message) => message.role === "tool",
+    );
+
+    assert.ok(toolMessage);
+
+    const part = toolMessage.content.find(
+      (item) =>
+        item.type === "tool-result" &&
+        item.toolName === "getBusinessInformation",
+    );
+
+    assert.ok(
+      part && part.type === "tool-result" && part.output.type === "json",
+    );
+    assert.deepEqual(part.output.value, {
+      status: "found",
+      information: { name: "Clemora Events", phone: "12345" },
+    });
+    const value = part.output.value as {
+      information: { name: string; phone: string };
+    };
+
+    return {
+      ...result,
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            message: `${value.information.name}: ${value.information.phone}`,
+            suggested_replies: [],
+          }),
+        },
+      ],
+    };
+  };
+  const thread = await guest();
+  const sent = await read(await send(thread, "How can I contact you?"), 201);
+  assert.equal(sent.assistantMessage?.body, "Clemora Events: 12345");
+  const audit = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", sent.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(audit.tool_name, "getBusinessInformation");
+  assert.equal(audit.status, "succeeded");
+  assert.deepEqual(audit.input, {});
+  assert.deepEqual(audit.output, {
+    status: "found",
+    fields: ["name", "phone"],
+  });
+  assert.equal(audit.assistant_message_id, sent.assistantMessage.id);
+});
+
+test("guest turns can select supporting document search and audit the result", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json({
+      embeddings: [[1, ...Array<number>(767).fill(0)]],
+      warnings: [],
+    });
+  try {
+    useReply("I checked the supporting documents.");
+    const generate = model.doGenerate.bind(model);
+    model.doGenerate = async (...args) => {
+      const result = await generate(...args);
+      if (model.doGenerateCalls.length !== 1) return result;
+      return {
+        ...result,
+        content: [
+          {
+            type: "tool-call",
+            toolCallId: "guest-document-call",
+            toolName: "searchSupportingDocuments",
+            input: JSON.stringify({ query: "venue access" }),
+          },
+        ],
+        finishReason: { unified: "tool-calls", raw: undefined },
+      };
+    };
+    const response = await read(
+      await send(await guest(), "Search the venue handbook"),
+      201,
+    );
+    assert.ok(response.assistantMessage);
+    assert.ok(
+      model.doGenerateCalls[0].tools?.some(
+        ({ name }) => name === "searchSupportingDocuments",
+      ),
+    );
+    assert.match(
+      JSON.stringify(model.doGenerateCalls[1].prompt),
+      /"results":\[\]/,
+    );
+    const row = await db
+      .selectFrom("ai_tool_calls")
+      .selectAll()
+      .where("customer_message_id", "=", response.message.id)
+      .executeTakeFirstOrThrow();
+    assert.equal(row.tool_name, "searchSupportingDocuments");
+    assert.equal(row.status, "succeeded");
+    assert.equal(row.assistant_message_id, response.assistantMessage.id);
+    assert.deepEqual((row.output as { matches: unknown[] }).matches, []);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("guests can answer directly and receive public catalog and handoff tools", async () => {
+  useReply("Hello from AMAC AI");
+  const thread = await guest();
+  const response = await read(await send(thread, "Hello"), 201);
+  assert.equal(response.assistantError, null);
+  assert.equal(response.assistantMessage?.body, "Hello from AMAC AI");
+  assert.equal(model.doGenerateCalls.length, 1);
+  assert.deepEqual(model.doGenerateCalls[0].toolChoice, { type: "auto" });
+  assert.deepEqual(
+    model.doGenerateCalls[0].tools?.map((entry) => entry.name).sort(),
+    [
+      "attachCatalogRecommendations",
+      "getBusinessInformation",
+      "getPublicCatalogItem",
+      "requestHumanHandoff",
+      "searchPublicCatalog",
+      "searchSupportingDocuments",
+      "updateBookingDraft",
+      "updateConversationMemory",
+    ].sort(),
+  );
+  const calls = await db
+    .selectFrom("ai_tool_calls")
+    .select("id")
+    .where("customer_message_id", "=", response.message.id)
+    .execute();
+  assert.equal(calls.length, 0);
+});
+
+test("guest draft tool cannot write after the conversation is claimed", async () => {
+  let release!: () => void;
+  let entered!: () => void;
+
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+
+  useReply("unused");
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+
+    if (model.doGenerateCalls.length !== 1) return result;
+
+    entered();
+    await held;
+
+    return {
+      ...result,
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "delayed-draft",
+          toolName: "updateBookingDraft",
+          input: JSON.stringify({ eventType: "Birthday" }),
+        },
+      ],
+      finishReason: { unified: "tool-calls", raw: undefined },
+    };
+  };
+  const thread = await guest();
+  const pending = send(thread, "Please plan a birthday");
+  await started;
+  await read(
+    await call(
+      `/guest/conversations/${thread.conversation.id}/claim`,
+      `${customer.cookie}; ${thread.cookie}`,
+      {},
+    ),
+    200,
+  );
+  release();
+  await read(await pending, 201);
+  const row = await pool.query(
+    "SELECT 1 FROM conversations WHERE id = $1 AND booking_request_id IS NOT NULL",
+    [thread.conversation.id],
+  );
+  assert.equal(row.rowCount, 0);
+});
+
+test("a guest turn waiting on claim cannot read a customer's new draft", async () => {
+  useReply("Continuing");
+  const thread = await guest();
+  const id = thread.conversation.id;
+  const original = await db
+    .selectFrom("conversations")
+    .select(["guest_identity_id", "ai_version"])
+    .where("id", "=", id)
+    .executeTakeFirstOrThrow();
+  const message = await db
+    .insertInto("messages")
+    .values({
+      conversation_id: id,
+      sender_id: null,
+      sender_role: "customer",
+      guest_origin: true,
+      body: "Please help",
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  const marker = `private-${randomUUID()}`;
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      "SELECT id FROM conversations WHERE id = $1 FOR UPDATE",
+      [id],
+    );
+    await client.query(
+      "UPDATE conversations SET customer_id = $2, claimed_guest_identity_id = guest_identity_id, guest_identity_id = NULL WHERE id = $1",
+      [id, customer.id],
+    );
+    const draft = await client.query(
+      "INSERT INTO booking_requests (customer_id, event_type, submitted_at, reference, out_of_range) VALUES ($1, $2, NULL, $3, false) RETURNING id",
+      [customer.id, marker, `BR-${randomUUID()}`],
+    );
+    await client.query(
+      "UPDATE conversations SET booking_request_id = $2 WHERE id = $1",
+      [id, draft.rows[0].id],
+    );
+    const {
+      rows: [{ pid }],
+    } = await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+    const pending = runAssistantTurnService({
+      db,
+      conversationId: id,
+      customerId: null,
+      customerMessageId: message.id,
+      aiVersion: original.ai_version,
+      guestIdentityId: original.guest_identity_id!,
+    });
+    let blocked = false;
+    const deadline = Date.now() + 5000;
+
+    while (Date.now() < deadline && !blocked) {
+      const result = await pool.query(
+        "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))) AS blocked",
+        [pid],
+      );
+      blocked = result.rows[0].blocked;
+
+      if (!blocked) await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+
+    assert.ok(blocked);
+    await client.query("COMMIT");
+    await pending;
+    assert.doesNotMatch(
+      JSON.stringify(model.doGenerateCalls[0].prompt),
+      new RegExp(marker),
+    );
+    assert.ok(
+      !model.doGenerateCalls[0].tools?.some(
+        (entry) => entry.name === "updateBookingDraft",
+      ),
+    );
+  } finally {
+    await client.query("ROLLBACK");
+    client.release();
+  }
+});
+
+test("guest conversation memory follows the conversation through claim", async () => {
+  const marker = `guest-memory-${randomUUID()}`;
+  useReply("Remembered");
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+
+    if (model.doGenerateCalls.length !== 1) return result;
+
+    return {
+      ...result,
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "guest-memory",
+          toolName: "updateConversationMemory",
+          input: JSON.stringify({ markdown: marker }),
+        },
+      ],
+      finishReason: { unified: "tool-calls", raw: undefined },
+    };
+  };
+  const thread = await guest();
+  const id = thread.conversation.id;
+  const sent = await read(
+    await send(thread, "Please remember my preference"),
+    201,
+  );
+  assert.ok(sent.assistantMessage);
+  const row = await pool.query<{ conversation_memory: string | null }>(
+    "SELECT conversation_memory FROM conversations WHERE id = $1",
+    [id],
+  );
+  assert.equal(row.rows[0].conversation_memory, marker);
+  assert.doesNotMatch(JSON.stringify(sent), new RegExp(marker));
+  await read(
+    await call(
+      `/guest/conversations/${id}/claim`,
+      `${customer.cookie}; ${thread.cookie}`,
+      {},
+    ),
+    200,
+  );
+  useReply("Continuing");
+  const response = await read(
+    await call("/messages/conversation/messages", customer.cookie, {
+      conversationId: id,
+      body: "Continue",
+    }),
+    201,
+  );
+  assert.ok(response.assistantMessage);
+  assert.match(
+    JSON.stringify(model.doGenerateCalls[0].prompt),
+    new RegExp(marker),
+  );
+  assert.doesNotMatch(JSON.stringify(response), new RegExp(marker));
 });
 
 test("five customer writes and five AI replies are allowed; sixth is readable login_required; replay never calls provider again", async () => {
@@ -247,6 +793,7 @@ test("five customer writes and five AI replies are allowed; sixth is readable lo
   const thread = await guest();
   let fifth: any;
   const requestId = randomUUID();
+
   for (let index = 0; index < 5; index++) {
     const result = await read(
       await send(
@@ -264,8 +811,20 @@ test("five customer writes and five AI replies are allowed; sixth is readable lo
     );
     fifth = result;
   }
+
   assert.equal(fifth.guest.loginRequired, true);
   assert.equal(fifth.message.id, requestId);
+  assert.equal(fifth.message.processing, null);
+  assert.equal(
+    (
+      await db
+        .selectFrom("background_jobs")
+        .select("id")
+        .where("dedupe_key", "=", requestId)
+        .execute()
+    ).length,
+    0,
+  );
   assert.equal(model.doGenerateCalls.length, 5);
   const replay = await read(await send(thread, "Question 4", requestId), 201);
   assert.equal(replay.message.id, fifth.message.id);
@@ -284,7 +843,7 @@ test("five customer writes and five AI replies are allowed; sixth is readable lo
     200,
   );
   assert.equal(readable.messages.length, 10);
-  assert.equal(readable.conversation.status, "active");
+  assert.equal("status" in readable.conversation, false);
   const provenance = await db
     .selectFrom("messages")
     .select(["sender_id", "guest_origin"])
@@ -303,21 +862,26 @@ test("quota races serialize and concurrent request replays create one history en
   useReply("Race reply");
   const thread = await guest();
   const requestId = randomUUID();
+
   const duplicates = await Promise.all(
     Array.from({ length: 5 }, () => send(thread, "Same request", requestId)),
   );
+
   const values = await Promise.all(
     duplicates.map((response) => read(response, 201)),
   );
+
   assert.equal(new Set(values.map((value) => value.message.id)).size, 1);
   assert.equal(values[0].message.id, requestId);
   assert.ok(values.every((value) => value.guest.customerMessageCount === 1));
   assert.equal(model.doGenerateCalls.length, 1);
+
   const responses = await Promise.all(
     Array.from({ length: 8 }, (_, index) =>
       send(thread, `Concurrent ${index}`),
     ),
   );
+
   assert.equal(
     responses.filter((response) => response.status === 201).length,
     4,
@@ -475,17 +1039,11 @@ test("reads and AI preferences do not extend inactivity; messages from customer,
   useReply("Sliding reply");
   const thread = await guest();
   const id = thread.conversation.id;
-  const createdAt = (
-    await db
-      .selectFrom("conversations")
-      .select("created_at")
-      .where("id", "=", id)
-      .executeTakeFirstOrThrow()
-  ).created_at;
-  const early = new Date(Date.now() + 3600000);
+  const activity = new Date(Date.now() - 23 * 3600000);
+  const early = new Date(activity.getTime() + 24 * 3600000);
   await db
     .updateTable("conversations")
-    .set({ guest_expires_at: early })
+    .set({ created_at: activity })
     .where("id", "=", id)
     .execute();
   const readThread = await read(
@@ -502,22 +1060,12 @@ test("reads and AI preferences do not extend inactivity; messages from customer,
     200,
   );
   assert.equal(
-    (
-      await db
-        .selectFrom("conversations")
-        .select("guest_expires_at")
-        .where("id", "=", id)
-        .executeTakeFirstOrThrow()
-    ).guest_expires_at!.toISOString(),
+    (await read(await call(`/guest/conversations/${id}`, thread.cookie), 200))
+      .guest.expiresAt,
     early.toISOString(),
   );
   const sent = await read(await send(thread), 201);
   assert.ok(Date.parse(sent.guest.expiresAt) > early.getTime());
-  await db
-    .updateTable("conversations")
-    .set({ guest_expires_at: early })
-    .where("id", "=", id)
-    .execute();
   await read(
     await call(`/admin/conversations/${id}/messages`, team.cookie, {
       body: "Team reply",
@@ -529,8 +1077,12 @@ test("reads and AI preferences do not extend inactivity; messages from customer,
     .selectAll()
     .where("id", "=", id)
     .executeTakeFirstOrThrow();
-  assert.ok(row.guest_expires_at!.getTime() > early.getTime());
-  assert.equal(row.created_at.toISOString(), createdAt.toISOString());
+  const afterAdmin = await read(
+    await call(`/guest/conversations/${id}`, thread.cookie),
+    200,
+  );
+  assert.ok(Date.parse(afterAdmin.guest.expiresAt) > early.getTime());
+  assert.equal(row.created_at.toISOString(), activity.toISOString());
   await expired(thread);
   assert.equal(
     (await read(await call(`/guest/conversations/${id}`, thread.cookie), 410))
@@ -548,9 +1100,11 @@ test("reads and AI preferences do not extend inactivity; messages from customer,
   assert.notEqual(replacement.conversation.id, id);
   assert.equal(replacement.guest.remainingMessages, 5);
   assert.equal(replacement.cookie, thread.cookie);
+
   const replacements = await Promise.all(
     Array.from({ length: 6 }, () => guest(thread.cookie)),
   );
+
   assert.ok(
     replacements.every(
       (value) => value.conversation.id === replacement.conversation.id,
@@ -566,9 +1120,11 @@ test("admin inbox includes guests without fabricated email and normal admin resp
     await call("/admin/conversations?limit=50", team.cookie),
     200,
   );
+
   const entry = list.conversations.find(
     (value: any) => value.id === thread.conversation.id,
   );
+
   assert.equal(entry.customerName, "Guest");
   assert.equal(entry.customerEmail, null);
   const result = await read(
@@ -595,13 +1151,16 @@ test("claim requires both cookies, preserves IDs/history/provenance, revokes gue
   await read(await call(path, thread.cookie, {}), 401);
   await read(await call(path, customer.cookie, {}), 404);
   await read(await call(path, `${team.cookie}; ${thread.cookie}`, {}), 403);
+
   const claims = await Promise.all(
     Array.from({ length: 4 }, () =>
       call(path, `${customer.cookie}; ${thread.cookie}`, {}),
     ),
   );
+
   for (const response of claims)
     assert.equal((await read(response, 200)).conversationId, id);
+
   await read(await call(path, `${other.cookie}; ${thread.cookie}`, {}), 404);
   await read(await call(`/guest/conversations/${id}`, thread.cookie), 404);
   await read(await send(thread), 404);
@@ -613,6 +1172,15 @@ test("claim requires both cookies, preserves IDs/history/provenance, revokes gue
   assert.equal(owned.messages[0].id, sent.message.id);
   assert.equal(owned.messages[0].senderId, null);
   assert.equal(owned.messages[0].senderName, "Guest");
+  await expired(thread);
+  await read(await call(`/messages/conversations/${id}`, customer.cookie), 200);
+  await read(
+    await call("/messages/conversation/messages", customer.cookie, {
+      conversationId: id,
+      body: "Still available after claim",
+    }),
+    201,
+  );
   await read(await call(`/messages/conversations/${id}`, other.cookie), 404);
   assert.equal((await guest(thread.cookie)).messages.length, 0);
   const row = await db
@@ -620,18 +1188,19 @@ test("claim requires both cookies, preserves IDs/history/provenance, revokes gue
     .selectAll()
     .where("id", "=", id)
     .executeTakeFirstOrThrow();
-  assert.equal(row.guest_expires_at, null);
   assert.equal(row.guest_identity_id, null);
 });
 
 test("claim races choose one account; expired chats cannot be claimed", async () => {
   const thread = await guest();
   const path = `/guest/conversations/${thread.conversation.id}/claim`;
+
   const results = await Promise.all(
     [customer, other].map((account) =>
       call(path, `${account.cookie}; ${thread.cookie}`, {}),
     ),
   );
+
   assert.deepEqual(
     results.map((response) => response.status).sort(),
     [200, 404],
@@ -656,22 +1225,36 @@ test("claim races choose one account; expired chats cannot be claimed", async ()
 test("in-flight guest AI remains guest-scoped after claim; takeover suppresses it and pending replay never duplicates calls", async () => {
   let release!: () => void;
   let entered!: () => void;
+
   const enteredPromise = new Promise<void>((resolve) => {
     entered = resolve;
   });
+
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
+
   useReply("unused");
   let calls = 0;
   let capturedPrompt: unknown;
+  let capturedTools: unknown;
   model.doGenerate = async (options) => {
     calls++;
     capturedPrompt = options.prompt;
+    capturedTools = options.tools;
     entered();
     await held;
+
     return {
-      content: [{ type: "text", text: "Delayed guest reply" }],
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            message: "Delayed guest reply",
+            suggested_replies: ["Tell me more."],
+          }),
+        },
+      ],
       finishReason: { unified: "stop", raw: undefined },
       usage: {
         inputTokens: {
@@ -708,6 +1291,10 @@ test("in-flight guest AI remains guest-scoped after claim; takeover suppresses i
   assert.equal(completed.assistantMessage.body, "Delayed guest reply");
   const prompt = JSON.stringify(capturedPrompt);
   assert.ok(!prompt.includes("Private package marker"));
+  assert.doesNotMatch(
+    JSON.stringify(capturedTools),
+    /getMyPackage|getLatestQuotation|getBookingDetails/,
+  );
   const owned = await read(
     await call(`/messages/conversations/${id}`, customer.cookie),
     200,
@@ -720,19 +1307,31 @@ test("guest takeover invalidates a delayed AI reply through an off/on cycle with
   let release!: () => void;
   let entered!: () => void;
   let calls = 0;
+
   const started = new Promise<void>((resolve) => {
     entered = resolve;
   });
+
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
+
   useReply("unused");
   model.doGenerate = async () => {
     calls++;
     entered();
     await held;
+
     return {
-      content: [{ type: "text", text: "Must not appear" }],
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            message: "Must not appear",
+            suggested_replies: ["Tell me more."],
+          }),
+        },
+      ],
       finishReason: { unified: "stop", raw: undefined },
       usage: {
         inputTokens: {
@@ -757,12 +1356,8 @@ test("guest takeover invalidates a delayed AI reply through an off/on cycle with
     201,
   );
   const expiry = (
-    await db
-      .selectFrom("conversations")
-      .select("guest_expires_at")
-      .where("id", "=", id)
-      .executeTakeFirstOrThrow()
-  ).guest_expires_at!.toISOString();
+    await read(await call(`/guest/conversations/${id}`, thread.cookie), 200)
+  ).guest.expiresAt;
   await read(
     await app.request(`/v1/admin/conversations/${id}/ai`, {
       method: "PATCH",
@@ -836,6 +1431,7 @@ test("guest database invariants reject ambiguous ownership, over-quota counts an
     ).rows[0].count,
     0,
   );
+
   for (const { rolname } of (
     await pool.query(
       "SELECT rolname FROM pg_roles WHERE rolname IN ('anon','authenticated')",
@@ -919,6 +1515,125 @@ test("claimed guest conversation retains its history when a catalog request bind
   );
 });
 
+function useHandoff(beforeTool?: () => Promise<void>) {
+  useReply("No answer should be generated after handoff");
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+
+    if (model.doGenerateCalls.length !== 1)
+      throw new Error("Generation continued after handoff");
+
+    await beforeTool?.();
+
+    return {
+      ...result,
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "guest-handoff",
+          toolName: "requestHumanHandoff",
+          input: JSON.stringify({
+            reason: "customer_requested",
+            summary: "Guest requests an AMAC team reply.",
+          }),
+        },
+      ],
+      finishReason: { unified: "tool-calls", raw: undefined },
+    };
+  };
+}
+
+test("guest handoff persists one acknowledgement, audit and private admin state and replays it safely", async () => {
+  const thread = await guest();
+  useHandoff();
+  const requestId = randomUUID();
+  const sent = await read(
+    await send(thread, "Please get a person", requestId),
+    201,
+  );
+  assert.equal(sent.assistantMessage?.body, humanHandoffAcknowledgement);
+  assert.equal(sent.assistantMessage?.handoffAcknowledgement, true);
+  assert.equal(sent.assistantError, null);
+  assert.deepEqual(sent.assistantMessage?.suggestedReplies, [
+    "What information can I share with the team?",
+  ]);
+  assert.equal(
+    model.doGenerateCalls.filter(({ tools }) => tools?.length).length,
+    1,
+  );
+  const state = await db
+    .selectFrom("conversations")
+    .select(["ai_handoff", "ai_enabled", "ai_version"])
+    .where("id", "=", thread.conversation.id)
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(state, {
+    ai_enabled: false,
+    ai_version: 1,
+    ai_handoff: {
+      reason: "customer_requested",
+      summary: "Guest requests an AMAC team reply.",
+      pending: true,
+    },
+  });
+  const audit = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", sent.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(audit.status, "succeeded");
+  assert.equal(audit.assistant_message_id, sent.assistantMessage.id);
+  const replay = await read(
+    await send(thread, "Please get a person", requestId),
+    201,
+  );
+  assert.equal(replay.assistantMessage.id, sent.assistantMessage.id);
+  assert.equal(replay.assistantMessage.handoffAcknowledgement, true);
+  assert.equal(
+    model.doGenerateCalls.filter(({ tools }) => tools?.length).length,
+    1,
+  );
+  const visible = await read(
+    await call(`/guest/conversations/${thread.conversation.id}`, thread.cookie),
+    200,
+  );
+  assert.equal("aiHandoff" in visible.conversation, false);
+  assert.equal(visible.messages.at(-1).handoffAcknowledgement, true);
+  assert.doesNotMatch(
+    JSON.stringify(visible),
+    /Guest requests an AMAC team reply/,
+  );
+  const adminView = await read(
+    await call(`/admin/conversations/${thread.conversation.id}`, team.cookie),
+    200,
+  );
+  assert.deepEqual(adminView.conversation.aiHandoff, state.ai_handoff);
+});
+
+test("a guest conversation expiring before handoff commits receives no handoff mutation or acknowledgement", async () => {
+  const thread = await guest();
+  useHandoff(() => expired(thread));
+  const sent = await read(await send(thread, "Please get a person"), 201);
+  assert.equal(sent.assistantMessage, null);
+  const state = await db
+    .selectFrom("conversations")
+    .select(["ai_handoff", "ai_enabled", "ai_version"])
+    .where("id", "=", thread.conversation.id)
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(state, {
+    ai_handoff: null,
+    ai_enabled: true,
+    ai_version: 0,
+  });
+  const audit = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", sent.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(audit.status, "failed");
+  assert.equal(audit.assistant_message_id, null);
+});
+
 test("validation, foreign cookie isolation, body caps, OpenAPI and Edge route registration match", async () => {
   const thread = await guest();
   const another = await guest();
@@ -959,6 +1674,7 @@ test("validation, foreign cookie isolation, body caps, OpenAPI and Edge route re
     413,
   );
   const spec: any = await (await app.request("/openapi.json")).json();
+
   for (const [path, method] of [
     ["/v1/guest/conversation", "post"],
     ["/v1/guest/conversations/{id}", "get"],
@@ -966,6 +1682,7 @@ test("validation, foreign cookie isolation, body caps, OpenAPI and Edge route re
     ["/v1/guest/conversations/{id}/claim", "post"],
   ])
     assert.ok(spec.paths[path][method]);
+
   const { matchRouteFamily } = await import("../src/edge/match-route.js");
   assert.equal(matchRouteFamily("/v1/guest/conversation"), "guest-chat");
   const edge = (await import("../src/edge/server.js")).app;

@@ -17,6 +17,7 @@ export function PublicCatalogFilters({
   const hasFilters = Object.values(filters).some(
     (value) => value !== undefined,
   );
+
   return (
     <div className="catalog-browser public-catalog-filters">
       <div className="catalog-toolbar">

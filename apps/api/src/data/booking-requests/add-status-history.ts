@@ -16,4 +16,5 @@ export const addStatusHistoryData = (
       changed_by: changedBy,
       reason,
     })
-    .execute();
+    .returning("id")
+    .executeTakeFirstOrThrow();

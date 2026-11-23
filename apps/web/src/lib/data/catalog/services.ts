@@ -4,6 +4,7 @@ import { request } from "../../http/request";
 import { pageQuery, type CatalogPageQuery } from "./page-query";
 
 export type { ServiceContent } from "@event-management/contracts/catalog";
+
 export type PublicService = ServiceContent & {
   imageUrl: string | null;
   id: string;
@@ -13,6 +14,7 @@ export type PublicService = ServiceContent & {
   updatedAt: string;
   publishedAt: string;
 };
+
 export type AdminService = PublicService;
 
 export const getAdminServices = (page?: CatalogPageQuery) =>
@@ -21,14 +23,18 @@ export const getAdminServices = (page?: CatalogPageQuery) =>
     nextCursor: string | null;
     counts: { active: number; archived: number; filtered: number };
   }>(`/admin/services${pageQuery(page)}`);
+
 export const getServices = (page?: PublicCatalogPageQuery) =>
   request<{ services: PublicService[]; nextCursor: string | null }>(
     `/services${pageQuery(page)}`,
   );
+
 export const getService = (id: string) =>
   request<PublicService>(`/services/${encodeURIComponent(id)}`);
+
 export const getAdminService = (id: string) =>
   request<AdminService>(`/admin/services/${encodeURIComponent(id)}`);
+
 export const createService = (
   content: ServiceContent,
   thumbnailMediaId?: string | null,
@@ -37,6 +43,7 @@ export const createService = (
     ...content,
     ...(thumbnailMediaId !== undefined ? { thumbnailMediaId } : {}),
   });
+
 export const updateService = (
   id: string,
   content: ServiceContent,
@@ -53,11 +60,13 @@ export const updateService = (
     undefined,
     "PATCH",
   );
+
 export const archiveService = (id: string) =>
   request<AdminService>(
     `/admin/services/${encodeURIComponent(id)}/archive`,
     {},
   );
+
 export const deleteService = (id: string) =>
   request<void>(
     `/admin/services/${encodeURIComponent(id)}`,

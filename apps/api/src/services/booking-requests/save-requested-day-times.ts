@@ -22,26 +22,37 @@ export async function saveRequestedDayTimesService(
 ) {
   return db.transaction().execute(async (trx) => {
     const row = await lockBookingRequestData(trx, id);
+
     if (!row || row.customer_id !== customerId)
       return error("Booking request not found", 404);
+
     if (!["under_review", "needs_details", "accepted"].includes(row.status))
       return error("This request is read-only", 409);
+
     if (row.revision !== input.expectedUpdatedAt)
       return error("Booking request changed. Refresh and try again", 409);
+
     if (row.requested_days === null)
       return error("Legacy requests do not have editable requested days", 409);
+
     const days = requestedDaysSchema.parse(row.requested_days);
+
     const day = days.find((day) => day.date === date);
+
     if (!day) return error("Requested day not found", 404);
+
     if (day.eventDayId)
       return error("This day already has an operational schedule", 409);
+
     const invalid = requestedDayTimesError(
       date,
       input.startsAt,
       input.endsAt,
       row.time_zone,
     );
+
     if (invalid) return error(invalid, 400);
+
     const updated = await updateRequestedDaysData(
       trx,
       id,
@@ -51,6 +62,7 @@ export async function saveRequestedDayTimesService(
           : current,
       ),
     );
+
     return (await bookingRequestDtos(trx, [updated]))[0]!;
   });
 }

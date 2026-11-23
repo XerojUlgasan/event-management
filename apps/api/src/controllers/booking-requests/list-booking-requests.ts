@@ -4,6 +4,7 @@ import { listAdminBookingRequestsPageService } from "../../services/booking-requ
 import { paginationQuerySchema } from "../../utils/pagination.js";
 import { bookingSchema, statusSchema } from "./schemas.js";
 import { errors, json } from "./http.js";
+
 const responses = {
   200: {
     content: json(
@@ -18,6 +19,7 @@ const responses = {
   401: errors[401],
   403: errors[403],
 };
+
 export const listMyBookingRequestsRoute = createRoute({
   method: "get",
   path: "/booking-requests/mine",
@@ -25,6 +27,7 @@ export const listMyBookingRequestsRoute = createRoute({
   request: { query: paginationQuerySchema },
   responses,
 });
+
 export const listMyBookingRequestsRouteHandler: AppRouteHandler<
   typeof listMyBookingRequestsRoute
 > = async (c) =>
@@ -35,6 +38,7 @@ export const listMyBookingRequestsRouteHandler: AppRouteHandler<
     }),
     200,
   );
+
 const querySchema = paginationQuerySchema.extend({
   status: statusSchema.optional(),
   preferredDate: z.iso
@@ -42,6 +46,7 @@ const querySchema = paginationQuerySchema.extend({
     .refine((value) => !value.startsWith("0000-"), "Invalid date")
     .optional(),
 });
+
 export const listAdminBookingRequestsRoute = createRoute({
   method: "get",
   path: "/admin/booking-requests",
@@ -49,6 +54,7 @@ export const listAdminBookingRequestsRoute = createRoute({
   request: { query: querySchema },
   responses,
 });
+
 export const listAdminBookingRequestsRouteHandler: AppRouteHandler<
   typeof listAdminBookingRequestsRoute
 > = async (c) =>

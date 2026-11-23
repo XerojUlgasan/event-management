@@ -37,6 +37,7 @@ export function PackageMediaSettings({
     const trigger = document.activeElement as HTMLElement | null;
     const node = dialog.current;
     node?.showModal();
+
     return () => {
       node?.close();
       trigger?.focus();
@@ -83,6 +84,7 @@ export function PackageMediaSettings({
             onChange={(event) => {
               const error = onSelectFile(event.target.files?.[0]);
               setError(error || "");
+
               if (error) notifyError(error);
             }}
           />

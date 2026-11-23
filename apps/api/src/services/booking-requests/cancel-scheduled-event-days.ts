@@ -8,5 +8,6 @@ export async function cancelScheduledEventDaysService(
   bookingId: string,
 ) {
   const days = await lockScheduledEventDaysData(trx, bookingId);
+
   for (const day of days) await endEventDayData(trx, day.id, "cancelled", null);
 }

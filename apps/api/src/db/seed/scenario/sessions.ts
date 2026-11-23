@@ -18,7 +18,9 @@ export function planScenarioSessions(
         ? new Date(now.getTime() - 86_400_000)
         : new Date(now.getTime() + SESSION_TTL_MS),
   }));
+
   expectCount("sessions", sessions.length);
+
   return sessions;
 }
 
@@ -27,6 +29,7 @@ export async function seedScenarioSessions(
   input: { sessions: ScenarioSession[]; now: Date },
 ) {
   let inserted = 0;
+
   for (const session of input.sessions) {
     const created = await insertIfNew(db, "sessions", {
       id: session.id,
@@ -35,7 +38,9 @@ export async function seedScenarioSessions(
       expires_at: session.expiresAt,
       created_at: input.now,
     });
+
     if (created) inserted += 1;
   }
+
   return { sessions: input.sessions, inserted };
 }

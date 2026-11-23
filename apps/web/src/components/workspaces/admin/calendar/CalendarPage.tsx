@@ -9,11 +9,18 @@ import {
   Panel,
   useNotifications,
 } from "@event-management/ui";
+import { bookings } from "../../../../demo/booking-requests/sample-bookings";
+
+const relatedEventName = bookings.find(
+  (booking) => booking.id === "CLM-2048",
+)?.event;
 
 export function CalendarPage() {
   const { notify } = useNotifications();
+
   const unavailable = () =>
     notify("Demo only: this action is unavailable.", "info");
+
   const [mode, setMode] = useState<"Month" | "Week" | "Day">("Month");
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [conflictOpen, setConflictOpen] = useState(false);
@@ -347,7 +354,7 @@ export function CalendarPage() {
             </div>
             <div>
               <span>Related event</span>
-              <strong>CLM-2048</strong>
+              <strong>{relatedEventName ?? "Event details unavailable"}</strong>
             </div>
             <div>
               <span>Attendees</span>

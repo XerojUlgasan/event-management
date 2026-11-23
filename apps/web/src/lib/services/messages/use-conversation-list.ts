@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  notificationErrorMessage,
-  useNotifications,
-} from "@event-management/ui";
+import { useNotifications } from "@event-management/ui";
 import type { ChatConversation } from "../../data/messages/conversations";
 import {
   appendConversations,
@@ -10,6 +7,8 @@ import {
   refreshConversations,
   type ConversationLoader,
 } from "./conversation-pages";
+import { assertCursorMoved } from "./older-page";
+import { conversationLoadError } from "./load-error";
 
 type Inbox = {
   conversations: ChatConversation[];
@@ -36,20 +35,26 @@ export function useConversationList(load: ConversationLoader, enabled = true) {
   const refreshing = useRef(false);
   const appending = useRef(false);
   const failure = useRef("");
+
   const commit = useCallback((update: (value: Inbox) => Inbox) => {
     current.current = update(current.current);
     setInbox(current.current);
   }, []);
+
   const refresh = useCallback(async () => {
     if (!enabled || refreshing.current) return;
+
     refreshing.current = true;
     const request = epoch.current;
+
     try {
       const page = await readRecentConversations(
         load,
         new Map(current.current.conversations.map((item) => [item.id, item])),
       );
+
       if (request !== epoch.current) return;
+
       commit((value) => ({
         ...value,
         conversations: refreshConversations(
@@ -65,12 +70,15 @@ export function useConversationList(load: ConversationLoader, enabled = true) {
       failure.current = "";
     } catch (cause) {
       if (request !== epoch.current) return;
-      const error = notificationErrorMessage(
+
+      const error = conversationLoadError(
         cause,
-        "Unable to load conversations.",
+        "Unable to load or refresh conversations. Please try again.",
       );
       commit((value) => ({ ...value, error, loading: false }));
+
       if (failure.current !== error) notifyError(error);
+
       failure.current = error;
     } finally {
       if (request === epoch.current) refreshing.current = false;
@@ -79,29 +87,40 @@ export function useConversationList(load: ConversationLoader, enabled = true) {
 
   useEffect(() => {
     void refresh();
+
     const timer = enabled
       ? window.setInterval(() => void refresh(), 5000)
       : undefined;
+
     return () => {
       epoch.current++;
       refreshing.current = false;
       appending.current = false;
       commit((value) => ({ ...value, loadingMore: false }));
+
       if (timer) window.clearInterval(timer);
     };
   }, [enabled, refresh, commit]);
 
   const loadMore = useCallback(async () => {
     const cursor = current.current.nextCursor;
+
     if (!enabled || !cursor || appending.current) return;
+
     appending.current = true;
     const request = epoch.current;
     commit((value) => ({ ...value, loadingMore: true, moreError: "" }));
+
     try {
       const page = await load(cursor);
+
       if (request !== epoch.current) return;
-      if (page.nextCursor === cursor)
-        throw new Error("Unable to load more conversations. Please try again.");
+
+      assertCursorMoved(
+        page.nextCursor,
+        cursor,
+        "Unable to load more conversations. Please try again.",
+      );
       commit((value) => ({
         ...value,
         conversations: appendConversations(
@@ -112,6 +131,7 @@ export function useConversationList(load: ConversationLoader, enabled = true) {
       }));
     } catch (cause) {
       if (request !== epoch.current) return;
+
       const moreError = notifyError(
         cause,
         "Unable to load more conversations.",

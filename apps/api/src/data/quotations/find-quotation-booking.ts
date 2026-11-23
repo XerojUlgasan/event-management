@@ -1,10 +1,7 @@
-import { bookingRevision } from "../booking-requests/booking-revision.js";
+import { selectSubmittedBookings } from "../booking-requests/select-submitted-bookings.js";
 import { type Database } from "./quotation-revision.js";
 
 export const findQuotationBookingData = (db: Database, id: string) =>
-  db
-    .selectFrom("booking_requests")
-    .selectAll()
-    .select(bookingRevision.as("revision"))
+  selectSubmittedBookings(db)
     .where("id", "=", id)
     .executeTakeFirst();

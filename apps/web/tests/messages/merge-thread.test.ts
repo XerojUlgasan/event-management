@@ -21,13 +21,16 @@ const message = (id: number): ChatMessage => ({
   createdAt: "2090-01-01T00:00:00.000Z",
   readAt: null,
 });
+
 const thread = (ids: number[], nextCursor: string | null): ChatThread => ({
   conversation: { id: "thread" } as ChatThread["conversation"],
   messages: ids.map(message),
   nextCursor,
 });
+
 const range = (start: number, end: number) =>
   Array.from({ length: end - start + 1 }, (_, index) => start + index);
+
 const ids = (value: ChatThread) =>
   value.messages.map((item) => Number(item.id));
 
@@ -35,6 +38,7 @@ const datedMessage = (id: number, second: number): ChatMessage => ({
   ...message(id),
   createdAt: `2090-01-01T00:00:${String(second).padStart(2, "0")}.000Z`,
 });
+
 const datedThread = (messages: ChatMessage[]): ChatThread => ({
   ...thread([], "older"),
   conversation: {
@@ -56,6 +60,37 @@ test("send response deduplicates both messages already received by polling", () 
   assert.equal(result.conversation.lastMessage?.id, "3");
 });
 
+test("an admin retry after polling keeps one image message and the newer latest message", () => {
+  const imageMessage: ChatMessage = {
+    ...datedMessage(2, 2),
+    senderRole: "admin",
+    body: "",
+    images: [
+      {
+        id: "image-1",
+        url: "/v1/message-images/image-1",
+        mimeType: "image/png",
+        byteSize: 1,
+        interpretation: {
+          summary: "Photo",
+          objects: [],
+          colors: [],
+          styles: [],
+          visibleText: null,
+          uncertainty: [],
+        },
+      },
+    ],
+  };
+  const newer = datedMessage(3, 3);
+  const current = datedThread([datedMessage(1, 1), imageMessage, newer]);
+  const result = addSentMessages(current, [imageMessage]);
+  assert.deepEqual(ids(result), [1, 2, 3]);
+  assert.equal(result.messages[1].images?.[0].id, "image-1");
+  assert.equal(result.conversation.lastMessage?.id, "3");
+  assert.equal(result.conversation.updatedAt, newer.createdAt);
+});
+
 test("an older polled thread cannot replace a newer confirmed AI setting", () => {
   const current = {
     ...thread([1, 2], null),
@@ -63,6 +98,11 @@ test("an older polled thread cannot replace a newer confirmed AI setting", () =>
       id: "thread",
       aiEnabled: false,
       aiVersion: 3,
+      aiHandoff: {
+        reason: "customer_requested",
+        summary: "Needs help",
+        pending: false,
+      },
     } as ChatThread["conversation"],
   };
   const olderPoll = {
@@ -71,6 +111,11 @@ test("an older polled thread cannot replace a newer confirmed AI setting", () =>
       id: "thread",
       aiEnabled: true,
       aiVersion: 2,
+      aiHandoff: {
+        reason: "customer_requested",
+        summary: "Needs help",
+        pending: true,
+      },
     } as ChatThread["conversation"],
   };
 
@@ -78,6 +123,39 @@ test("an older polled thread cannot replace a newer confirmed AI setting", () =>
 
   assert.equal(result.thread.conversation.aiEnabled, false);
   assert.equal(result.thread.conversation.aiVersion, 3);
+  assert.equal(result.thread.conversation.aiHandoff?.pending, false);
+});
+
+test("a newer handoff replaces the previous taken-over state", () => {
+  const current = {
+    ...thread([1], null),
+    conversation: {
+      id: "thread",
+      aiEnabled: false,
+      aiVersion: 3,
+      aiHandoff: {
+        reason: "customer_requested",
+        summary: "Earlier",
+        pending: false,
+      },
+    } as ChatThread["conversation"],
+  };
+  const incoming = {
+    ...thread([1, 2], null),
+    conversation: {
+      id: "thread",
+      aiEnabled: false,
+      aiVersion: 4,
+      aiHandoff: {
+        reason: "cannot_answer",
+        summary: "New question",
+        pending: true,
+      },
+    } as ChatThread["conversation"],
+  };
+  const result = mergePolledThread(current, incoming, new Set());
+  assert.equal(result.thread.conversation.aiHandoff?.pending, true);
+  assert.equal(result.thread.conversation.aiHandoff?.summary, "New question");
 });
 
 test("send response places a missing customer message before its polled assistant reply", () => {

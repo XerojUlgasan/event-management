@@ -8,5 +8,6 @@ export async function getPublicPackageBySlugService(
   slug: string,
 ) {
   const row = await findPublicPackageBySlugData(db, slug);
+
   return row ? packageDto(db, row) : null;
 }

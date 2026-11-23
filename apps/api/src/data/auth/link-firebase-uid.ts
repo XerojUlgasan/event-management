@@ -22,7 +22,9 @@ export async function linkFirebaseUidData(
         .select("id")
         .where("firebase_uid", "=", uid)
         .executeTakeFirst();
+
       if (owner && owner.id !== userId) return undefined;
+
       return trx
         .updateTable("users")
         .set({ firebase_uid: uid, updated_at: new Date() })
@@ -34,6 +36,7 @@ export async function linkFirebaseUidData(
     .catch((error: unknown) => {
       // The unique Firebase UID also protects against links racing across users.
       if ((error as { code?: string }).code === "23505") return undefined;
+
       throw error;
     });
 }

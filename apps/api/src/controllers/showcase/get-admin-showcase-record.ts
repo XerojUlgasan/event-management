@@ -21,6 +21,8 @@ export const getAdminShowcaseRecordRouteHandler: AppRouteHandler<
 > = async (c) => {
   const { id } = c.req.valid("param");
   const dto = await showcaseDto(c.get("db"), { id });
+
   if (!dto) return c.json({ error: "Showcase not found." }, 404);
+
   return c.json(dto, 200);
 };

@@ -21,10 +21,12 @@ export const listAdminConversationsRoute = createRoute({
     403: errors[403],
   },
 });
+
 export const listAdminConversationsRouteHandler: AppRouteHandler<
   typeof listAdminConversationsRoute
 > = async (c) => {
   const { limit, cursor } = c.req.valid("query");
+
   return c.json(
     await listAdminConversationsService(c.get("db"), limit, cursor),
     200,

@@ -14,7 +14,9 @@ export async function syncFirebaseProfileService(
   displayName?: string,
 ) {
   if (!firebase.email) return { kind: "missing-email" as const };
+
   let row = await findUserByFirebaseUidData(db, firebase.uid);
+
   if (!row) {
     row = await createFirebaseUserData(
       db,
@@ -25,5 +27,6 @@ export async function syncFirebaseProfileService(
     // A simultaneous login may already have created this Firebase account.
     row ??= await findUserByFirebaseUidData(db, firebase.uid);
   }
+
   return row ? { kind: "ok" as const, row } : { kind: "conflict" as const };
 }

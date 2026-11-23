@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { OpenAPIHono, createRoute } from "@hono/zod-openapi";
 import {
+  CATALOG_COLUMNS,
+  LEGACY_CATALOG_COLUMNS,
+} from "@event-management/contracts/catalog";
+import {
   draftSectionsSchema,
   sectionsSchema,
   storedSectionsSchema,
@@ -22,12 +26,14 @@ const markdown = () => ({
   caption: "",
   autoplay: false,
 });
+
 const photo = () => ({
   ...markdown(),
   type: "photo",
   markdown: "",
   media: { id: randomUUID(), kind: "image", source: "upload", url: "/file" },
 });
+
 const section = (widgets: unknown[] = [markdown()]) => ({
   id: randomUUID(),
   title: "  Title  ",
@@ -42,6 +48,7 @@ test("canvas request rules and defaults", () => {
   assert.equal(parsed[0].title, "Title");
   assert.equal(parsed[0].widgets[0].autoplay, false);
   assert.equal(sectionsSchema.safeParse([section([photo()])]).success, true);
+
   const invalid = [
     [section([{ ...widget, x: 11, w: 2 }])],
     [section([{ ...widget, y: 100001 }])],
@@ -80,8 +87,10 @@ test("canvas request rules and defaults", () => {
     ],
     [section([{ ...widget, id: "invalid" }])],
   ];
+
   for (const value of invalid)
     assert.equal(sectionsSchema.safeParse(value).success, false);
+
   assert.equal(
     sectionsSchema.safeParse([
       section([
@@ -121,6 +130,7 @@ test("service widgets require a service and persist only the reference", () => {
     serviceId: randomUUID(),
   };
   assert.equal(sectionsSchema.safeParse([section([widget])]).success, true);
+
   for (const bad of [
     { ...widget, serviceId: null },
     { ...widget, media: photo().media },
@@ -139,6 +149,7 @@ test("service widgets require a service and persist only the reference", () => {
     },
   ])
     assert.equal(sectionsSchema.safeParse([section([bad])]).success, false);
+
   const { media: _media, ...rest } = widget;
   assert.equal(
     storedSectionsSchema.safeParse([section([{ ...rest, mediaId: null }])])
@@ -169,6 +180,7 @@ test("package widgets validate references and canonical storage", () => {
     packageId: randomUUID(),
   };
   assert.equal(sectionsSchema.safeParse([section([widget])]).success, true);
+
   for (const bad of [
     { ...widget, packageId: null },
     { ...widget, media: photo().media },
@@ -178,6 +190,7 @@ test("package widgets validate references and canonical storage", () => {
     { ...markdown(), packageId: widget.packageId },
   ])
     assert.equal(sectionsSchema.safeParse([section([bad])]).success, false);
+
   const { media: _media, ...stored } = widget;
   assert.equal(
     storedSectionsSchema.safeParse([section([{ ...stored, mediaId: null }])])
@@ -258,6 +271,7 @@ test("stored canvases enforce the shared rules and canonical media IDs", () => {
       .success,
     true,
   );
+
   for (const bad of [
     { ...storedPhoto, mediaId: mediaId.toUpperCase() },
     { ...storedPhoto, mediaId: null },
@@ -272,6 +286,7 @@ test("stored canvases enforce the shared rules and canonical media IDs", () => {
       storedSectionsSchema.safeParse([section([bad])]).success,
       false,
     );
+
   assert.equal(
     storedSectionsSchema.safeParse([
       section([storedWidget]),
@@ -305,4 +320,114 @@ test("shared schema can generate an OpenAPI document", () => {
     info: { title: "test", version: "1" },
   });
   assert.ok(document.paths?.["/package"]?.post?.requestBody);
+});
+
+test("section column markers distinguish legacy and current layout bounds", () => {
+  assert.equal(CATALOG_COLUMNS, 24);
+  assert.equal(LEGACY_CATALOG_COLUMNS, 12);
+
+  const legacyWide = section([{ ...markdown(), x: 11, w: 2 }]);
+  assert.equal(sectionsSchema.safeParse([legacyWide]).success, false);
+
+  const currentWide = {
+    ...section([{ ...markdown(), x: 11, w: 2 }]),
+    columns: CATALOG_COLUMNS,
+  };
+  assert.equal(sectionsSchema.safeParse([currentWide]).success, true);
+
+  const mixed = [
+    section([markdown()]),
+    currentWide,
+    {
+      ...section([{ ...markdown(), x: 0, w: CATALOG_COLUMNS }]),
+      columns: CATALOG_COLUMNS,
+    },
+  ];
+  assert.equal(sectionsSchema.safeParse(mixed).success, true);
+  assert.equal("columns" in mixed[0], false);
+
+  assert.equal(
+    sectionsSchema.safeParse([
+      { ...section(), columns: LEGACY_CATALOG_COLUMNS },
+    ]).success,
+    false,
+  );
+
+  const { media: _media, ...storedWidget } = markdown();
+  const storedLegacy = storedSectionsSchema.parse([
+    section([{ ...storedWidget, mediaId: null }]),
+  ]);
+  assert.equal("columns" in storedLegacy[0], false);
+
+  const storedCurrent = storedSectionsSchema.parse([
+    {
+      ...section([{ ...storedWidget, mediaId: null }]),
+      columns: CATALOG_COLUMNS,
+    },
+  ]);
+  assert.equal(storedCurrent[0].columns, CATALOG_COLUMNS);
+
+  const roundtrip = sectionsSchema.parse(
+    storedCurrent.map((item) => ({
+      ...item,
+      widgets: item.widgets.map(({ mediaId, ...widget }) => ({
+        ...widget,
+        media: null,
+      })),
+    })),
+  );
+
+  assert.equal(roundtrip[0].columns, CATALOG_COLUMNS);
+});
+
+test("included service terms remain optional and require positive whole values", () => {
+  const widget = {
+    ...markdown(),
+    type: "service",
+    markdown: "",
+    serviceId: randomUUID(),
+  };
+  const parsed = sectionsSchema.parse([section([widget])]);
+  assert.equal("serviceTerms" in parsed[0].widgets[0], false);
+
+  for (const terms of [
+    { includedHours: null, hourlyRatePesos: null },
+    { includedHours: 3, hourlyRatePesos: 800 },
+    { includedHours: null, hourlyRatePesos: 800 },
+  ]) {
+    const parsed = sectionsSchema.parse([
+      section([{ ...widget, serviceTerms: terms }]),
+    ]);
+    const { media: _media, ...stored } = parsed[0].widgets[0];
+    assert.equal(
+      storedSectionsSchema.safeParse([section([{ ...stored, mediaId: null }])])
+        .success,
+      true,
+    );
+  }
+
+  for (const terms of [
+    { includedHours: 0, hourlyRatePesos: null },
+    { includedHours: 1.5, hourlyRatePesos: null },
+    { includedHours: 3, hourlyRatePesos: -1 },
+    { includedHours: 3, hourlyRatePesos: 0.5 },
+    { includedHours: 3, hourlyRatePesos: 800, fixedPricePesos: 2000 },
+  ])
+    assert.equal(
+      sectionsSchema.safeParse([section([{ ...widget, serviceTerms: terms }])])
+        .success,
+      false,
+    );
+
+  assert.equal(
+    sectionsSchema.safeParse([
+      section([
+        {
+          ...markdown(),
+          serviceTerms: { includedHours: null, hourlyRatePesos: null },
+        },
+      ]),
+    ]).success,
+    false,
+  );
 });

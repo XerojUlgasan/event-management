@@ -1,4 +1,4 @@
-import { BRAND_LOGO_URL } from "../assets/brand";
+import { BRAND_LOGO_URL, brandLogoSize } from "../assets/brand";
 
 export function Brand({ light = false }: { light?: boolean }) {
   return (
@@ -7,8 +7,7 @@ export function Brand({ light = false }: { light?: boolean }) {
         className="brand-logo"
         src={BRAND_LOGO_URL}
         alt="Styled by AMAC"
-        width={1023}
-        height={1022}
+        {...brandLogoSize}
       />
     </span>
   );

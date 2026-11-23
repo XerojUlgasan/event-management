@@ -8,5 +8,6 @@ export async function getPublicServiceBySlugService(
   slug: string,
 ) {
   const row = await findPublicServiceBySlugData(db, slug);
+
   return row ? publicDto(db, row) : null;
 }

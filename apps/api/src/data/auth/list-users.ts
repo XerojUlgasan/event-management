@@ -14,14 +14,17 @@ export function listUsersData(
     .select(["id", "display_name", "email", "role", "created_at"])
     .select(sql<string>`coalesce(display_name, '')`.as("cursor_name"))
     .where("role", "=", "customer");
+
   if (input.search)
     query = query.where(
       sql<boolean>`strpos(lower(concat_ws(' ', display_name, email)), ${input.search}) > 0`,
     );
+
   if (input.position)
     query = query.where(
       sql<boolean>`(coalesce(display_name, ''), id) > (${input.position.name}, ${input.position.id}::uuid)`,
     );
+
   return query
     .orderBy(sql`coalesce(display_name, '')`, "asc")
     .orderBy("id", "asc")
@@ -41,6 +44,7 @@ export async function userDirectoryStats(db: Kysely<DB>) {
       ),
     ])
     .executeTakeFirstOrThrow();
+
   return {
     customerTotal: row.customer_total,
     customerJoined: row.customer_joined,

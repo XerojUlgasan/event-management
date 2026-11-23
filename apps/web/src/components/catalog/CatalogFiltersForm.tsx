@@ -40,9 +40,11 @@ export function CatalogFiltersForm({
   const [error, setError] = useState("");
   useEffect(() => {
     if (!action) return;
+
     // Back can restore the live page with a draft that no longer matches its URL.
     const restoreAppliedFilters = (event: PageTransitionEvent) => {
       if (!event.persisted) return;
+
       setMinPrice(filters.minPricePesos?.toString() ?? "");
       setMaxPrice(filters.maxPricePesos?.toString() ?? "");
       setGuests(filters.guests?.toString() ?? "");
@@ -50,14 +52,18 @@ export function CatalogFiltersForm({
       setEventType(filters.eventType ?? "");
       setError("");
     };
+
     window.addEventListener("pageshow", restoreAppliedFilters);
+
     return () => window.removeEventListener("pageshow", restoreAppliedFilters);
   }, [action, filters]);
 
   const hasPrice = kind === "packages" || pricingType !== "";
   const hasGuests = kind !== "services";
+
   const apply = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
+
     if (
       hasPrice &&
       minPrice &&
@@ -65,8 +71,10 @@ export function CatalogFiltersForm({
       Number(minPrice) > Number(maxPrice)
     ) {
       setError("Maximum price must be at least the minimum price.");
+
       return;
     }
+
     setError("");
     const next: CatalogFilters = {
       ...(eventType !== "" ? { eventType } : {}),
@@ -79,9 +87,11 @@ export function CatalogFiltersForm({
         : {}),
       ...(hasGuests && guests !== "" ? { guests: Number(guests) } : {}),
     };
+
     if (onApply) onApply(next);
     else window.location.assign(action + pageQuery(next));
   };
+
   return (
     <form
       className="catalog-filters"
@@ -120,6 +130,7 @@ export function CatalogFiltersForm({
                 value={pricingType}
                 onChange={(event) => {
                   const value = event.target.value;
+
                   if (value === "" || value === "fixed" || value === "hourly") {
                     setPricingType(value);
                     setMinPrice("");
@@ -138,7 +149,7 @@ export function CatalogFiltersForm({
         {hasPrice && (
           <>
             {action && kind === "services" && (
-              <input type="hidden" name="priceRangeType" value={pricingType} />
+              <Input type="hidden" name="priceRangeType" value={pricingType} />
             )}
             <FormField
               label={

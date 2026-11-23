@@ -32,6 +32,7 @@ export async function uploadShowcaseMediaService(
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const detected = detectCatalogMediaType(bytes);
+
   if (!detected || detected.mimeType !== file.type)
     return {
       status: 400 as const,

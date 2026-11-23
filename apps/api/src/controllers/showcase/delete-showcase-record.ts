@@ -20,6 +20,7 @@ export const deleteShowcaseRecordRouteHandler: AppRouteHandler<
   typeof deleteShowcaseRecordRoute
 > = async (c) => {
   const { id } = c.req.valid("param");
+
   if (!(await deleteShowcaseRecordService(c.get("db"), id)))
     return c.json({ error: "Showcase not found." }, 404);
 

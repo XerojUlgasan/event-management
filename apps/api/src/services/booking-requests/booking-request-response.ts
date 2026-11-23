@@ -1,3 +1,5 @@
+import { reviewedServiceSchema } from "@event-management/contracts/booking-draft";
+import { pesosToCentavos } from "@event-management/contracts/money";
 import type { Kysely, Selectable, Transaction } from "kysely";
 import type { DB, BookingRequests } from "../../db/types.js";
 import type { BookingEstimatedDuration } from "@event-management/contracts/limits/booking-requests";
@@ -19,6 +21,7 @@ export async function bookingRequestDtos(
       ])
     ).map((pkg) => [pkg.id, pkg]),
   );
+
   const schedules = new Map(
     (
       await listRequestedDaySchedulesData(
@@ -27,14 +30,30 @@ export async function bookingRequestDtos(
       )
     ).map((day) => [day.id, day]),
   );
+
   return rows.map((r) => {
+    if (
+      !r.submitted_at ||
+      r.event_type == null ||
+      r.preferred_date == null ||
+      r.time_zone == null ||
+      r.customer_id == null ||
+      r.contact_name == null ||
+      r.phone_number == null
+    )
+      throw new Error("Expected a submitted booking request");
+
+    const timeZone = r.time_zone;
     const pkg = r.package_id ? packages.get(r.package_id) : undefined;
+
     if (r.package_id && !pkg)
       throw new Error("Booking request package not found");
+
     const days =
       r.requested_days === null
         ? null
         : requestedDaysSchema.parse(r.requested_days);
+
     return {
       id: r.id,
       reference: r.reference,
@@ -44,7 +63,7 @@ export async function bookingRequestDtos(
         ? {
             kind: "fixed" as const,
             currency: "PHP" as const,
-            amountMinor: pkg.price * 100,
+            amountMinor: pesosToCentavos(pkg.price),
           }
         : null,
       packageMaxGuests: pkg?.max_guests ?? null,
@@ -57,6 +76,7 @@ export async function bookingRequestDtos(
             ? schedules.get(day.eventDayId)
             : undefined;
           const visited = new Set<string>();
+
           while (
             schedule?.replacement_event_day_id &&
             !visited.has(schedule.id)
@@ -65,9 +85,12 @@ export async function bookingRequestDtos(
             const replacement = schedules.get(
               schedule.replacement_event_day_id,
             );
+
             if (!replacement || replacement.booking_request_id !== r.id) break;
+
             schedule = replacement;
           }
+
           return {
             ...day,
             operationalSchedule:
@@ -77,7 +100,7 @@ export async function bookingRequestDtos(
                     day: schedule.day,
                     startsAt: schedule.starts_at.toISOString(),
                     endsAt: schedule.ends_at.toISOString(),
-                    timeZone: r.time_zone,
+                    timeZone,
                     status: schedule.status,
                   }
                 : null,
@@ -94,14 +117,19 @@ export async function bookingRequestDtos(
       estimatedDurationDays: r.estimated_duration_days,
       startsAt: r.starts_at?.toISOString() ?? null,
       endsAt: r.ends_at?.toISOString() ?? null,
-      timeZone: r.time_zone,
+      timeZone,
       guestCount: r.guest_count,
       contactName: r.contact_name,
       phoneNumber: r.phone_number,
       preferredVenueLocation: r.preferred_venue_location,
       specialRequests: r.special_requests,
+      requestedServices: reviewedServiceSchema
+        .array()
+        .parse(r.requested_services ?? []),
+      budget: r.budget,
       status: r.status as Status,
       outOfRange: r.out_of_range,
+      submittedAt: r.submitted_at.toISOString(),
       createdAt: r.created_at.toISOString(),
       updatedAt: r.revision,
     };

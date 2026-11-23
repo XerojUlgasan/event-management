@@ -16,14 +16,18 @@ export async function syncCatalogKnowledge(
   const source = await loadCatalogKnowledgeSource(trx, owner);
   const prepared = source ? prepareCatalogKnowledge(source) : [];
   const chunks = [];
+
   for (const chunk of prepared) {
     const media = chunk.mediaId
       ? await findCatalogKnowledgeMediaData(trx, chunk.mediaId)
       : undefined;
+
     if (chunk.mediaId && !media)
       throw new Error("Catalog photo is unavailable");
+
     const sourceHash = catalogKnowledgeSourceHash(chunk.contentMarkdown, media);
     chunks.push({ ...chunk, sourceHash });
   }
+
   return reconcileCatalogKnowledgeData(trx, owner, chunks);
 }

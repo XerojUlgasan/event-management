@@ -31,7 +31,11 @@ export const createShowcaseRecordRouteHandler: AppRouteHandler<
     body,
     c.get("session").user.id,
   );
+
   if (!result) return c.json({ error: "Failed to create showcase." }, 500);
-  if ("status" in result) return c.json({ error: result.message }, result.status);
+
+  if ("status" in result)
+    return c.json({ error: result.message }, result.status);
+
   return c.json(result, 201);
 };

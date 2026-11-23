@@ -15,12 +15,14 @@ export async function listPublicPackagesPageService(
 ) {
   const scope = catalogFilterScope("packages", options);
   const { position, cursorFor } = catalogCursor(options.cursor, scope);
+
   return db
     .transaction()
     .setIsolationLevel("repeatable read")
     .execute(async (trx) => {
       const rows = await listPublicPackagesPageData(trx, options, position);
       const page = createPage(rows, options.limit, cursorFor);
+
       return {
         packages: await Promise.all(
           page.items.map((row) => packageDto(trx, row)),

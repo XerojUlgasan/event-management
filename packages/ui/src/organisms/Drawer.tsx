@@ -18,6 +18,7 @@ export function Drawer({
   className?: string;
 }) {
   const titleId = useId();
+
   return (
     <ModalSurface
       className="drawer-backdrop"

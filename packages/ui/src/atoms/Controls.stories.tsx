@@ -5,16 +5,20 @@ import { FormField, Input, Select, Textarea } from "@event-management/ui";
 const meta = { title: "Atoms/Controls", component: Input } satisfies Meta<
   typeof Input
 >;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 export const Text: Story = {
   args: { placeholder: "Your name", "aria-label": "Your name" },
 };
+
 export const FormControls: Story = {
   render: () => {
     const fileRef = useRef<HTMLInputElement>(null);
     const [value, setValue] = useState("");
+
     return (
       <div style={{ display: "grid", gap: 12, maxWidth: 360 }}>
         <label>
@@ -49,9 +53,11 @@ export const FormControls: Story = {
     );
   },
 };
+
 export const Disabled: Story = {
   args: { value: "Unavailable", disabled: true, "aria-label": "Unavailable" },
 };
+
 export const FeedbackStates: Story = {
   render: () => (
     <div style={{ display: "grid", gap: 16, width: "min(100%, 360px)" }}>

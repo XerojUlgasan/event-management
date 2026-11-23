@@ -15,6 +15,7 @@ export async function uploadPendingCatalogMedia<T extends CatalogContent>(
   onUploaded: (widgetId: string, uploaded: CatalogMedia) => void,
 ): Promise<T> {
   const next = structuredClone(content);
+
   for (const section of next.sections)
     for (const widget of section.widgets)
       if (files[widget.id]) {
@@ -22,7 +23,9 @@ export async function uploadPendingCatalogMedia<T extends CatalogContent>(
         widget.media = uploaded;
         onUploaded(widget.id, uploaded);
       }
+
   next.name = next.name.trim();
+
   return next;
 }
 
@@ -36,5 +39,6 @@ export function unreferencedUploadIds(
       .map((widget) => widget.media?.id)
       .filter(Boolean),
   );
+
   return uploadedIds.filter((id) => !usedIds.has(id));
 }

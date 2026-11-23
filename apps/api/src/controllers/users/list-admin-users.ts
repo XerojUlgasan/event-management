@@ -5,16 +5,15 @@ import {
   listUsersData,
   userDirectoryStats,
 } from "../../data/auth/list-users.js";
+import { openapiJson as json } from "../../utils/openapi.js";
 import {
   encodePageCursor,
   parsePageCursor,
   paginationQuerySchema,
 } from "../../utils/pagination.js";
 
-const json = <T extends z.ZodType>(schema: T) => ({
-  "application/json": { schema },
-});
 const errorSchema = z.object({ error: z.string() });
+
 const userSchema = z.object({
   id: z.string().uuid(),
   displayName: z.string().nullable(),
@@ -22,14 +21,18 @@ const userSchema = z.object({
   role: z.literal("customer"),
   createdAt: z.string(),
 });
+
 const statsSchema = z.object({
   customerTotal: z.number(),
   customerJoined: z.number(),
 });
+
 const querySchema = paginationQuerySchema.extend({
   search: z.string().max(200).default(""),
 });
+
 const positionSchema = z.object({ name: z.string(), id: z.string().uuid() });
+
 export const listAdminUsersRoute = createRoute({
   method: "get",
   path: "/admin/users",
@@ -51,6 +54,7 @@ export const listAdminUsersRoute = createRoute({
     403: { content: json(errorSchema), description: "Admin access required" },
   },
 });
+
 export const listAdminUsersRouteHandler: AppRouteHandler<
   typeof listAdminUsersRoute
 > = async (c) => {
@@ -62,9 +66,11 @@ export const listAdminUsersRouteHandler: AppRouteHandler<
     listUsersData(c.get("db"), { search, position, limit }),
     userDirectoryStats(c.get("db")),
   ]);
+
   const page = createPage(rows, limit, (row) =>
     encodePageCursor(scope, { name: row.cursor_name, id: row.id }),
   );
+
   const users = page.items.map((row) => ({
     id: row.id,
     displayName: row.display_name,
@@ -72,6 +78,7 @@ export const listAdminUsersRouteHandler: AppRouteHandler<
     role: "customer" as const,
     createdAt: new Date(row.created_at).toISOString(),
   }));
+
   return c.json(
     {
       customers: users,

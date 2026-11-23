@@ -1,4 +1,8 @@
 import { Badge } from "@event-management/ui";
+import {
+  formatEnPhDate,
+  formatEnPhDateTime,
+} from "../../lib/utils/formatting/dates";
 import type { BookingStatus } from "../../lib/data/booking-requests/requests";
 
 export const bookingStatusLabels: Record<BookingStatus, string> = {
@@ -11,12 +15,9 @@ export const bookingStatusLabels: Record<BookingStatus, string> = {
 
 export function bookingDateTime(value: string | null, timeZone: string) {
   if (!value) return "To be confirmed";
+
   try {
-    return new Intl.DateTimeFormat("en-PH", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone,
-    }).format(new Date(value));
+    return formatEnPhDateTime(new Date(value), timeZone);
   } catch {
     return "To be confirmed";
   }
@@ -24,13 +25,21 @@ export function bookingDateTime(value: string | null, timeZone: string) {
 
 export function bookingDate(value: string | null) {
   if (!value) return "To be confirmed";
+
   const date = new Date(`${value}T00:00:00Z`);
+
   return Number.isNaN(date.getTime())
     ? "To be confirmed"
-    : new Intl.DateTimeFormat("en-PH", {
-        dateStyle: "medium",
-        timeZone: "UTC",
-      }).format(date);
+    : formatEnPhDate(date, "UTC");
+}
+
+export function bookingRequestLabel(
+  eventType: string | null,
+  date: string | null,
+) {
+  const name = eventType?.trim() || "Event inquiry";
+
+  return date ? `${name} · ${bookingDate(date)}` : name;
 }
 
 export function BookingStatusBadge({ status }: { status: BookingStatus }) {

@@ -16,11 +16,13 @@ export async function registerUserService(
   displayName: string,
 ) {
   if (!allowAuthAttempt(email)) return { kind: "rate-limited" as const };
+
   const row = await createLocalUserData(
     db,
     email,
     displayName,
     await hashPassword(password),
   );
+
   return row ? { kind: "ok" as const, row } : { kind: "conflict" as const };
 }

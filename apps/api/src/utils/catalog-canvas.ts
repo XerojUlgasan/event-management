@@ -7,12 +7,15 @@ import type { z } from "zod";
 import type { MediaAssets } from "../db/types.js";
 
 type StoredSections = z.infer<typeof storedSectionsSchema>;
+
 type Asset = Selectable<MediaAssets>;
+
 type CatalogReference = {
   id: string;
   slug: string;
   name: string;
   description: string;
+  thumbnail_media_id: string | null;
 };
 
 export function canvasMediaIds(sections: StoredSections) {
@@ -27,13 +30,19 @@ export function canvasMediaIds(sections: StoredSections) {
   ];
 }
 
-export function firstCanvasPhotoId(canvas: unknown) {
-  return (
-    storedSectionsSchema
-      .parse(canvas)
-      .flatMap((section) => section.widgets)
-      .find((widget) => widget.type === "photo" && widget.mediaId)?.mediaId ??
-    null
+export function canvasServiceIds(
+  sections: Array<{
+    widgets: Array<{ type: string; serviceId?: string | null }>;
+  }>,
+) {
+  return new Set(
+    sections.flatMap((section) =>
+      section.widgets.flatMap((widget) =>
+        widget.type === "service" && widget.serviceId
+          ? [widget.serviceId.toLowerCase()]
+          : [],
+      ),
+    ),
   );
 }
 
@@ -43,16 +52,15 @@ export function catalogMediaUrl(media: Asset) {
     : media.url;
 }
 
-export function canvasReference(
-  record: CatalogReference,
-  photo: Asset | undefined,
-) {
+export function canvasReference(record: CatalogReference) {
   return {
     id: record.id,
     slug: record.slug,
     name: record.name,
     description: record.description,
-    imageUrl: photo ? catalogMediaUrl(photo) : null,
+    imageUrl: record.thumbnail_media_id
+      ? `/v1/catalog-media/${record.thumbnail_media_id}`
+      : null,
   };
 }
 
@@ -79,6 +87,7 @@ export function storedCanvasWidget(
 ) {
   return {
     ...widget,
+    id: widget.id.toLowerCase(),
     mediaId,
     ...(widget.type === "service"
       ? { serviceId: serviceId?.toLowerCase() }

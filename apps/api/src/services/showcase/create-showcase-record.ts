@@ -20,6 +20,7 @@ export async function createShowcaseRecordService(
 
     const result = await db.transaction().execute(async (trx) => {
       const invalid = await lockAndValidateShowcaseMedia(trx, content);
+
       if (invalid) return invalid;
 
       const record = await createShowcaseRecordData(trx, {
@@ -44,7 +45,9 @@ export async function createShowcaseRecordService(
       cause,
       "A showcase with this title already exists.",
     );
+
     if (duplicate) return duplicate;
+
     throw cause;
   }
 }

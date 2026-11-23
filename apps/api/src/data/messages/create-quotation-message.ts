@@ -1,7 +1,8 @@
 import type { Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
+import { publishConversationMessageData } from "./publish-conversation-message.js";
 
-// Caller holds the booking lock. Check conversation status under a lock in the delivery transaction.
+// Caller holds the booking lock; lock the conversation during delivery.
 export async function createQuotationMessageData(
   trx: Transaction<DB>,
   bookingId: string,
@@ -10,11 +11,13 @@ export async function createQuotationMessageData(
 ) {
   const conversation = await trx
     .selectFrom("conversations")
-    .selectAll()
+    .select(["id", "customer_id"])
     .where("booking_request_id", "=", bookingId)
     .forUpdate()
     .executeTakeFirst();
-  if (!conversation || conversation.status !== "active") return false;
+
+  if (!conversation) return undefined;
+
   const message = await trx
     .insertInto("messages")
     .values({
@@ -25,16 +28,16 @@ export async function createQuotationMessageData(
       quotation_id: quotationId,
       read_at: null,
     })
-    .returning("created_at")
+    .returning(["id", "created_at"])
     .executeTakeFirstOrThrow();
   await trx
     .updateTable("conversations")
-    .set({
-      updated_at: message.created_at,
-      ai_enabled: false,
-      ai_version: conversation.ai_version + (conversation.ai_enabled ? 1 : 0),
-    })
+    .set({ updated_at: message.created_at })
     .where("id", "=", conversation.id)
     .execute();
-  return true;
+
+  if (conversation.customer_id)
+    await publishConversationMessageData(trx, conversation.id, message.id);
+
+  return conversation.id;
 }

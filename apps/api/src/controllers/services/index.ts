@@ -37,6 +37,7 @@ import {
   deleteServiceRoute,
   deleteServiceRouteHandler,
 } from "./delete-service.js";
+
 const routes = new OpenAPIHono<HonoEnv>({
   defaultHook: (result, c) => {
     if (!result.success)
@@ -50,7 +51,9 @@ const routes = new OpenAPIHono<HonoEnv>({
       );
   },
 });
+
 const admin = requireSystemAdmin;
+
 routes.use("/admin/services", requireSession, admin);
 routes.use("/admin/services/*", requireSession, admin);
 routes.openapi(listPublicServicesRoute, listPublicServicesRouteHandler);
@@ -62,4 +65,5 @@ routes.openapi(createServiceRoute, createServiceRouteHandler);
 routes.openapi(updateServiceRoute, updateServiceRouteHandler);
 routes.openapi(archiveServiceRoute, archiveServiceRouteHandler);
 routes.openapi(deleteServiceRoute, deleteServiceRouteHandler);
+
 export default routes;

@@ -8,12 +8,15 @@ import {
 // ── Shared field schemas ───────────────────────────────────────────────────
 
 const title = z.string().trim().min(1).max(MAX_SHOWCASE_TITLE_LENGTH);
+
 const description = z
   .string()
   .trim()
   .min(1)
   .max(MAX_SHOWCASE_DESCRIPTION_LENGTH);
+
 const mediaId = z.guid().toLowerCase();
+
 const mediaIds = z
   .array(mediaId)
   .max(MAX_SHOWCASE_GALLERY)
@@ -74,4 +77,5 @@ export type ShowcaseRecord = {
 };
 
 export type CreateShowcaseRecord = z.infer<typeof createShowcaseRecordSchema>;
+
 export type UpdateShowcaseRecord = z.infer<typeof updateShowcaseRecordSchema>;

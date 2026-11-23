@@ -1,4 +1,5 @@
 import type { GuestThread } from "../../data/messages/guest";
+import { mergeAiStateByVersion } from "./merge-thread";
 import type { ChatMessage } from "../../data/messages/conversations";
 
 export function mergeGuestMessages(
@@ -7,11 +8,14 @@ export function mergeGuestMessages(
   older = false,
 ) {
   const seen = new Set<string>();
+
   return (
     older ? [...incoming, ...existing] : [...existing, ...incoming]
   ).filter((message) => {
     if (seen.has(message.id)) return false;
+
     seen.add(message.id);
+
     return true;
   });
 }
@@ -23,14 +27,19 @@ export function addGuestSentMessages(
   sent: ChatMessage[],
 ) {
   const messages = [...existing];
+
   for (const [index, message] of sent.entries()) {
     if (messages.some((item) => item.id === message.id)) continue;
+
     const following = new Set(sent.slice(index + 1).map((item) => item.id));
+
     const at = messages.findIndex(
       (item) => following.has(item.id) || item.createdAt > message.createdAt,
     );
+
     messages.splice(at < 0 ? messages.length : at, 0, message);
   }
+
   return messages;
 }
 
@@ -40,6 +49,7 @@ export function mergeGuestThread(
   older = false,
 ): GuestThread {
   if (!current || current.conversation.id !== next.conversation.id) return next;
+
   // If a polling page has no overlap, keep its server boundary so older pages
   // can fill the gap instead of silently presenting a discontinuous history.
   const gap =
@@ -50,24 +60,41 @@ export function mergeGuestThread(
     !next.messages.some((message) =>
       current.messages.some((old) => old.id === message.id),
     );
+
+  next = {
+    ...next,
+    conversation: mergeAiStateByVersion(
+      current.conversation,
+      next.conversation,
+    ),
+  };
+
   if (gap) return next;
+
   if (older)
     return {
       ...next,
+      conversation: current.conversation,
       messages: mergeGuestMessages(current.messages, next.messages, true),
       nextCursor: next.nextCursor,
     };
+
   const ids = new Set(next.messages.map((message) => message.id));
+
   const first = current.messages.findIndex((message) => ids.has(message.id));
+
   const last = current.messages.findLastIndex((message) => ids.has(message.id));
+
   const prefix =
     first < 0 ? current.messages : current.messages.slice(0, first);
+
   const suffix =
     last < 0
       ? []
       : current.messages
           .slice(last + 1)
           .filter((message) => !ids.has(message.id));
+
   return {
     ...next,
     messages: [...prefix, ...next.messages, ...suffix],
@@ -75,16 +102,45 @@ export function mergeGuestThread(
   };
 }
 
-export type PendingGuestSend = { body: string; requestId: string };
+export type PendingGuestSend = {
+  body: string;
+  requestId: string;
+  files?: File[];
+};
+
 /** An uncertain delivery is retried with the original key and payload. */
 export function prepareGuestSend(
   pending: PendingGuestSend | null,
   draft: string,
   createId: () => string,
+  files: File[] = [],
 ): PendingGuestSend | null {
   if (pending) return pending;
+
   const body = draft.trim();
-  return body ? { body, requestId: createId() } : null;
+
+  return body || files.length
+    ? { body, requestId: createId(), ...(files.length ? { files } : {}) }
+    : null;
+}
+
+/** Only requests that may have been saved reserve the guest allowance. */
+export function guestReservedSends(
+  outbox: Record<string, { definitelyUnsent?: boolean }>,
+) {
+  return Object.values(outbox).filter((item) => !item.definitelyUnsent).length;
+}
+
+/** A polled saved message confirms delivery even when the send response was lost. */
+export function acknowledgeGuestSends<T>(
+  outbox: Record<string, T>,
+  messages: ChatMessage[],
+) {
+  const next = { ...outbox };
+
+  for (const message of messages) delete next[message.id];
+
+  return next;
 }
 
 /** Reserve a slot for each unresolved request until its outcome is known. */

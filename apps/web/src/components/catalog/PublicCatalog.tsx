@@ -6,6 +6,7 @@ import {
   type CatalogKind,
 } from "@event-management/contracts/catalog-filters";
 import { usePagination } from "../../lib/pagination/use-pagination";
+import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
 import {
   Button,
   Pagination,
@@ -17,7 +18,6 @@ import { createPortal } from "react-dom";
 import {
   getPackage,
   getPackages,
-  packageImageSrc,
   type PublicPackage,
 } from "../../lib/data/catalog/packages";
 import {
@@ -26,98 +26,14 @@ import {
   type PublicService,
 } from "../../lib/data/catalog/services";
 import { PackagePreview } from "./PackagePreview";
-import {
-  priceLabel,
-  servicePricingLabels,
-} from "../../lib/utils/formatting/money";
 import { CatalogDetailPreview } from "./CatalogDetailPreview";
 import { ServiceCanvas } from "./CatalogContent";
-import { photos } from "../../demo/catalog/photos";
 import { CatalogFiltersForm } from "./CatalogFiltersForm";
+import { PackageCard, ServiceCard } from "./CatalogListingCards";
 
 type Kind = CatalogKind;
+
 type Preview = { kind: Kind; id: string } | null;
-
-function PackageCard({
-  item,
-  onPreview,
-}: {
-  item: PublicPackage;
-  onPreview: () => void;
-}) {
-  return (
-    <article className="catalog-card">
-      <div className="catalog-card-image">
-        <img
-          src={packageImageSrc(item.imageUrl) || photos.dinner}
-          alt=""
-          loading="lazy"
-          onError={(event) => {
-            event.currentTarget.onerror = null;
-            event.currentTarget.src = photos.dinner;
-          }}
-        />
-      </div>
-      <div className="catalog-card-body">
-        <span className="catalog-card-kicker">
-          {item.eventType ? `${item.eventType} · Event package` : "Event package"}
-        </span>
-        <h3>{item.name}</h3>
-        <p>{item.description}</p>
-        <div className="catalog-card-meta">
-          <span>{priceLabel(item.price)}</span>
-          <span>Up to {item.maxGuests} guests</span>
-        </div>
-        <Button
-          variant="secondary"
-          type="button"
-          className="catalog-card-action"
-          onClick={onPreview}
-        >
-          View package <span aria-hidden="true">↗</span>
-        </Button>
-      </div>
-    </article>
-  );
-}
-
-function ServiceCard({
-  item,
-  onPreview,
-}: {
-  item: PublicService;
-  onPreview: () => void;
-}) {
-  const pricing = servicePricingLabels(item);
-  return (
-    <article className="catalog-card">
-      <div className="catalog-card-image">
-        {item.imageUrl && (
-          <img src={packageImageSrc(item.imageUrl)} alt="" loading="lazy" />
-        )}
-      </div>
-      <div className="catalog-card-body">
-        <span className="catalog-card-kicker">
-          {item.eventType ? `${item.eventType} · Event service` : "Event service"}
-        </span>
-        <h3>{item.name}</h3>
-        <p>{item.description}</p>
-        <div className="catalog-card-meta">
-          <span>{pricing.price}</span>
-          {pricing.excess && <span>{pricing.excess}</span>}
-        </div>
-        <Button
-          variant="secondary"
-          type="button"
-          className="catalog-card-action"
-          onClick={onPreview}
-        >
-          View service <span aria-hidden="true">↗</span>
-        </Button>
-      </div>
-    </article>
-  );
-}
 
 function ServicePreview({ id, onClose }: { id: string; onClose: () => void }) {
   const { notifyError } = useNotifications();
@@ -138,10 +54,12 @@ function ServicePreview({ id, onClose }: { id: string; onClose: () => void }) {
       .finally(() => {
         if (active) setLoading(false);
       });
+
     return () => {
       active = false;
     };
   }, [id, notifyError]);
+
   return (
     <CatalogDetailPreview entity="service" onClose={onClose}>
       {loading && (
@@ -176,6 +94,7 @@ function CatalogPreview({
   const [error, setError] = useState("");
   useEffect(() => {
     if (selected?.kind !== "packages") return;
+
     let active = true;
     setPackageDetail(null);
     setLoading(true);
@@ -192,12 +111,15 @@ function CatalogPreview({
       .finally(() => {
         if (active) setLoading(false);
       });
+
     return () => {
       active = false;
     };
   }, [selected, notifyError]);
+
   if (selected?.kind === "services")
     return <ServicePreview id={selected.id} onClose={onClose} />;
+
   if (selected?.kind === "packages")
     return (
       <PackagePreview
@@ -208,6 +130,7 @@ function CatalogPreview({
         onClose={onClose}
       />
     );
+
   return null;
 }
 
@@ -239,35 +162,41 @@ export function PublicCatalog({
   const [selected, setSelected] = useState<Preview>(null);
   const [parentService, setParentService] = useState<string | null>(null);
   const busy = useRef(false);
-  const generation = useRef(0);
+  const generation = useRequestGeneration();
   const limit = mode === "featured" ? 3 : DEFAULT_PAGE_SIZE;
 
   const load = useCallback(
     async (cursor: string | undefined) => {
       if (busy.current) return;
-      const current = generation.current;
+
+      const current = generation.current();
       busy.current = true;
       setLoading(true);
       setError("");
       setItems([]);
       setNextCursor(null);
+
       try {
         if (kind === "packages") {
           const result = await getPackages({ limit, cursor, ...filters });
-          if (current !== generation.current) return;
+
+          if (!generation.isCurrent(current)) return;
+
           setItems(result.packages);
           setNextCursor(result.nextCursor);
         } else {
           const result = await getServices({ limit, cursor, ...filters });
-          if (current !== generation.current) return;
+
+          if (!generation.isCurrent(current)) return;
+
           setItems(result.services);
           setNextCursor(result.nextCursor);
         }
       } catch (reason) {
-        if (current === generation.current)
+        if (generation.isCurrent(current))
           setError(notifyError(reason, `Unable to load ${kind}.`));
       } finally {
-        if (current === generation.current) {
+        if (generation.isCurrent(current)) {
           busy.current = false;
           setLoading(false);
           setInitialized(true);
@@ -279,26 +208,31 @@ export function PublicCatalog({
 
   useEffect(() => {
     void load(pagination.cursor);
+
     return () => {
-      generation.current++;
+      generation.bump();
       busy.current = false;
     };
   }, [load, pagination.cursor]);
 
   const showPackage = (id: string) => {
     if (selected?.kind === "services") setParentService(selected.id);
+
     setSelected({ kind: "packages", id });
   };
+
   const closePreview = () => {
     if (selected?.kind === "packages" && parentService) {
       setSelected({ kind: "services", id: parentService });
       setParentService(null);
     } else setSelected(null);
   };
+
   const scrollToTop = () => {
     topRef.current?.focus({ preventScroll: true });
     topRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
   };
+
   const hasFilters = Object.keys(filters).length > 0;
 
   return (
@@ -445,6 +379,7 @@ export function CatalogOverlay({
     const unlockScroll = lockCatalogScroll();
     dialog?.showModal();
     dialog?.querySelector<HTMLButtonElement>(".package-preview-close")?.focus();
+
     return () => {
       dialog?.close();
       unlockScroll();

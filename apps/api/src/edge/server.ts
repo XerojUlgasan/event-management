@@ -1,3 +1,4 @@
+import { messageBodyLimit } from "../constants/http.js";
 import { env } from "../utils/env.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
@@ -7,7 +8,8 @@ import {
   CATALOG_JSON_BODY_LIMIT_BYTES,
   MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
   SMALL_JSON_BODY_LIMIT_BYTES,
-  QUOTATION_JSON_BODY_LIMIT_BYTES,
+  AGENT_PREVIEW_JSON_BODY_LIMIT_BYTES,
+  BUSINESS_INFORMATION_JSON_BODY_LIMIT_BYTES,
   bookingBodyLimit,
 } from "../constants/http.js";
 import type { HonoEnv } from "../types/hono.js";
@@ -20,9 +22,14 @@ import {
 const allowedOrigins = env.WEB_ORIGINS;
 
 const loaders = {
+  "message-images": () => import("../controllers/message-images/index.js"),
   "guest-chat": () => import("../controllers/guest-chat/index.js"),
   ai: () => import("../controllers/ai/index.js"),
+  "ai-agent-settings": () =>
+    import("../controllers/ai-agent-settings/index.js"),
   health: () => import("../controllers/health/index.js"),
+  "business-information": () =>
+    import("../controllers/business-information/index.js"),
   "catalog-media": () => import("../controllers/catalog-media/index.js"),
   showcase: () => import("../controllers/showcase/index.js"),
   services: () => import("../controllers/services/index.js"),
@@ -30,6 +37,7 @@ const loaders = {
   "booking-requests": () => import("../controllers/booking-requests/index.js"),
   "event-days": () => import("../controllers/event-days/index.js"),
   messages: () => import("../controllers/messages/index.js"),
+  notifications: () => import("../controllers/notifications/index.js"),
   auth: () => import("../controllers/auth/index.js"),
   users: () => import("../controllers/users/index.js"),
 } satisfies Record<
@@ -40,10 +48,21 @@ const loaders = {
 const bodyLimits: Partial<
   Record<RouteFamilyId, ReadonlyArray<{ path: string; maxSize: number }>>
 > = {
+  "ai-agent-settings": [
+    { path: "/admin/ai/agent-settings", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
+    {
+      path: "/admin/ai/agent-settings/preview",
+      maxSize: AGENT_PREVIEW_JSON_BODY_LIMIT_BYTES,
+    },
+  ],
   "guest-chat": [{ path: "/guest/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES }],
   ai: [
     {
       path: "/admin/ai/knowledge/search",
+      maxSize: SMALL_JSON_BODY_LIMIT_BYTES,
+    },
+    {
+      path: "/admin/ai/knowledge/index",
       maxSize: SMALL_JSON_BODY_LIMIT_BYTES,
     },
   ],
@@ -55,6 +74,9 @@ const bodyLimits: Partial<
   messages: [
     { path: "/messages/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
     { path: "/admin/conversations/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
+  ],
+  notifications: [
+    { path: "/notifications/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
   ],
   packages: [
     { path: "/admin/packages", maxSize: CATALOG_JSON_BODY_LIMIT_BYTES },
@@ -76,17 +98,26 @@ const bodyLimits: Partial<
       maxSize: MAX_VIDEO_SIZE_BYTES + MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
     },
     { path: "/admin/showcase-records", maxSize: CATALOG_JSON_BODY_LIMIT_BYTES },
-    { path: "/admin/showcase-records/*", maxSize: CATALOG_JSON_BODY_LIMIT_BYTES },
+    {
+      path: "/admin/showcase-records/*",
+      maxSize: CATALOG_JSON_BODY_LIMIT_BYTES,
+    },
   ],
   "booking-requests": [
     { path: "/booking-requests", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
     { path: "/booking-requests/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
-    { path: "/admin/quotations/*", maxSize: QUOTATION_JSON_BODY_LIMIT_BYTES },
     { path: "/quotations/*", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
+  ],
+  "business-information": [
+    {
+      path: "/admin/business-information",
+      maxSize: BUSINESS_INFORMATION_JSON_BODY_LIMIT_BYTES,
+    },
   ],
 };
 
 const familyApps = new Map<RouteFamilyId, Promise<OpenAPIHono<HonoEnv>>>();
+
 let documentationApp: Promise<OpenAPIHono<HonoEnv>> | undefined;
 
 function remember<T>(load: () => Promise<T>, drop: () => void) {
@@ -94,6 +125,7 @@ function remember<T>(load: () => Promise<T>, drop: () => void) {
     drop();
     throw error;
   });
+
   return pending;
 }
 
@@ -108,52 +140,75 @@ async function createFamilyApp(id: RouteFamilyId) {
     c.set("db", db);
     await next();
   });
+
   for (const limit of bodyLimits[id] ?? [])
-    family.use(limit.path, bodyLimit({ maxSize: limit.maxSize }));
+    family.use(limit.path, (c, next) =>
+      bodyLimit({
+        maxSize:
+          id === "messages" || id === "guest-chat"
+            ? messageBodyLimit(c.req.path, c.req.header("content-type"))
+            : id === "booking-requests"
+              ? bookingBodyLimit(c.req.path)
+              : limit.maxSize,
+      })(c, next),
+    );
+
   if (id === "booking-requests")
     family.use("/admin/booking-requests/*", (c, next) =>
       bodyLimit({ maxSize: bookingBodyLimit(c.req.path) })(c, next),
     );
+
   family.route("/", routes);
+
   return family;
 }
 
 function loadFamily(id: RouteFamilyId) {
   const cached = familyApps.get(id);
+
   if (cached) return cached;
+
   const pending = remember(
     () => createFamilyApp(id),
     () => familyApps.delete(id),
   );
+
   familyApps.set(id, pending);
+
   return pending;
 }
 
 function loadDocumentation() {
   if (documentationApp) return documentationApp;
+
   documentationApp = remember(
     async () => {
       const docs = new OpenAPIHono<HonoEnv>();
+
       for (const family of routeFamilies) {
         const { default: routes } = await loaders[family.id]();
         docs.route("/v1", routes);
       }
+
       docs.doc("/openapi.json", {
         openapi: "3.0.0",
         info: { title: "Event Management API", version: "0.1.0" },
       });
+
       return docs;
     },
     () => {
       documentationApp = undefined;
     },
   );
+
   return documentationApp;
 }
 
 function stripMountPrefix(request: Request) {
   const url = new URL(request.url);
   url.pathname = url.pathname.replace(/^\/v1(?=\/|$)/, "") || "/";
+
   return new Request(url, request);
 }
 
@@ -172,6 +227,7 @@ app.use(
 
 app.use("/v1/*", async (c, next) => {
   const origin = c.req.header("origin");
+
   if (
     ["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method) &&
     origin &&
@@ -179,6 +235,7 @@ app.use("/v1/*", async (c, next) => {
   ) {
     return c.json({ error: "Origin is not allowed" }, 403);
   }
+
   await next();
 });
 
@@ -188,7 +245,10 @@ app.all("/openapi.json", (c) =>
 
 app.all("/v1/*", async (c) => {
   const family = matchRouteFamily(c.req.path);
+
   if (!family) return c.notFound();
+
   const familyApp = await loadFamily(family);
+
   return familyApp.fetch(stripMountPrefix(c.req.raw));
 });

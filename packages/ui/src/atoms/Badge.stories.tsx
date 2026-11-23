@@ -21,9 +21,11 @@ const meta = {
 } satisfies Meta<typeof Badge>;
 
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
 export const Counter: Story = {
   args: {
     tone: "accent",
@@ -32,6 +34,7 @@ export const Counter: Story = {
     "aria-label": "3 unread messages",
   },
 };
+
 export const WithIcon: Story = {
   args: { "aria-label": "Status: Confirmed" },
   render: (args) => (
@@ -41,6 +44,7 @@ export const WithIcon: Story = {
     </Badge>
   ),
 };
+
 export const AllTones: Story = {
   render: () => (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 12, maxWidth: 500 }}>

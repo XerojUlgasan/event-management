@@ -11,6 +11,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
 const isWindows = process.platform === "win32";
 
 function run(command, args, label) {
@@ -24,6 +25,7 @@ function run(command, args, label) {
     console.error(`\n[dev] Could not run ${label}: ${result.error.message}`);
     process.exit(1);
   }
+
   if (result.status !== 0) {
     console.error(`\n[dev] ${label} failed (exit ${result.status}).`);
     process.exit(result.status ?? 1);
@@ -31,6 +33,7 @@ function run(command, args, label) {
 }
 
 const envFile = join(root, "apps", "supabase", ".env.functions");
+
 if (!existsSync(envFile)) {
   writeFileSync(
     envFile,

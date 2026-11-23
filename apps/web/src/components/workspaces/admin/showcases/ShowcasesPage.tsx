@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Button,
   PageHeader,
+  Dialog,
   SearchField,
   Tabs,
   Pagination,
@@ -19,7 +20,7 @@ import {
 import type { ShowcaseRecord } from "@event-management/contracts/showcase";
 import { usePagination } from "../../../../lib/pagination/use-pagination";
 import "../../../../styles/catalog/package-editor.css";
-import "../../../../styles/showcase-admin.css";
+import "../../../../styles/showcases/admin.css";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-PH", {
@@ -34,7 +35,10 @@ export function ShowcasesPage() {
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; };
+
+    return () => {
+      mounted.current = false;
+    };
   }, []);
 
   const [rows, setRows] = useState<ShowcaseRecord[]>([]);
@@ -46,46 +50,50 @@ export function ShowcasesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const requestId = useRef(0);
-  const pagination = usePagination(tab);
+  const pagination = usePagination(JSON.stringify([tab, search.trim()]));
 
   const load = useCallback(async () => {
     const current = ++requestId.current;
     setLoading(true);
     setError("");
+
     try {
-      const page = await getAdminShowcases(pagination.cursor);
+      const page = await getAdminShowcases(
+        tab,
+        search.trim(),
+        pagination.cursor,
+      );
+
       if (!mounted.current || current !== requestId.current) return;
+
       setRows(page.showcases);
       setNextCursor(page.nextCursor);
     } catch (e) {
       if (!mounted.current || current !== requestId.current) return;
+
       setError(notifyError(e, "Could not load showcases."));
     } finally {
       if (mounted.current && current === requestId.current) setLoading(false);
     }
-  }, [notifyError, pagination.cursor]);
+  }, [notifyError, pagination.cursor, tab, search]);
 
   useEffect(() => {
     void load();
-    return () => { requestId.current++; };
+
+    return () => {
+      requestId.current++;
+    };
   }, [load]);
 
-  // Filter client-side by tab and search.
-  const published = rows.filter((r) => r.publishedAt !== null);
-  const drafts = rows.filter((r) => r.publishedAt === null);
-  const active = tab === "published" ? published : drafts;
-  const filtered = search.trim()
-    ? active.filter(
-        (r) =>
-          r.title.toLowerCase().includes(search.toLowerCase()) ||
-          r.description.toLowerCase().includes(search.toLowerCase()),
-      )
-    : active;
+  function refreshPage() {
+    if (pagination.page === 1) void load();
+    else pagination.reset();
+  }
 
   async function handlePublish(id: string) {
     try {
-      const updated = await publishShowcase(id);
-      setRows((prev) => prev.map((r) => (r.id === id ? updated : r)));
+      await publishShowcase(id);
+      refreshPage();
       notify("Showcase published.");
     } catch (e) {
       setError(notifyError(e, "Could not publish showcase."));
@@ -94,8 +102,8 @@ export function ShowcasesPage() {
 
   async function handleUnpublish(id: string) {
     try {
-      const updated = await unpublishShowcase(id);
-      setRows((prev) => prev.map((r) => (r.id === id ? updated : r)));
+      await unpublishShowcase(id);
+      refreshPage();
       notify("Showcase unpublished. It's now a draft.");
     } catch (e) {
       setError(notifyError(e, "Could not unpublish showcase."));
@@ -104,10 +112,12 @@ export function ShowcasesPage() {
 
   async function confirmDelete() {
     if (!deletingId) return;
+
     const item = rows.find((r) => r.id === deletingId);
+
     try {
       await deleteShowcase(deletingId);
-      setRows((prev) => prev.filter((r) => r.id !== deletingId));
+      refreshPage();
       setDeletingId(null);
       notify(`"${item?.title}" deleted.`);
     } catch (e) {
@@ -136,8 +146,8 @@ export function ShowcasesPage() {
           setTab(value === "Published" ? "published" : "drafts")
         }
         items={[
-          { value: "Published", label: "Published", count: published.length },
-          { value: "Drafts", label: "Drafts", count: drafts.length },
+          { value: "Published", label: "Published" },
+          { value: "Drafts", label: "Drafts" },
         ]}
       />
 
@@ -150,8 +160,7 @@ export function ShowcasesPage() {
           ariaLabel="Search showcases"
         />
         <span>
-          {filtered.length}{" "}
-          {filtered.length === 1 ? "showcase" : "showcases"}
+          {rows.length} {rows.length === 1 ? "showcase" : "showcases"}
         </span>
       </div>
 
@@ -165,7 +174,7 @@ export function ShowcasesPage() {
         </p>
       )}
 
-      {!loading && filtered.length === 0 && !error && (
+      {!loading && rows.length === 0 && !error && (
         <p className="pe-empty">
           {search
             ? "No showcases match your search."
@@ -176,7 +185,7 @@ export function ShowcasesPage() {
       )}
 
       <div className="pe-cards">
-        {filtered.map((item) => (
+        {rows.map((item) => (
           <CatalogCard
             key={item.id}
             image={showcaseMediaSrc(item.coverUrl)}
@@ -203,8 +212,14 @@ export function ShowcasesPage() {
                 }
                 actions={[
                   item.publishedAt
-                    ? { label: "Unpublish", onSelect: () => void handleUnpublish(item.id) }
-                    : { label: "Publish", onSelect: () => void handlePublish(item.id) },
+                    ? {
+                        label: "Unpublish",
+                        onSelect: () => void handleUnpublish(item.id),
+                      }
+                    : {
+                        label: "Publish",
+                        onSelect: () => void handlePublish(item.id),
+                      },
                   { label: "Delete", onSelect: () => setDeletingId(item.id) },
                 ]}
                 onEdit={() => setEditing(item)}
@@ -227,34 +242,38 @@ export function ShowcasesPage() {
         <ShowcaseEditor
           initial={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
-          onSaved={(saved) => {
-            setRows((prev) => {
-              const idx = prev.findIndex((r) => r.id === saved.id);
-              return idx === -1 ? [saved, ...prev] : prev.map((r) => (r.id === saved.id ? saved : r));
-            });
-            // A new record is always a draft — switch to that tab so it's visible.
-            if (editing === "new") setTab("drafts");
+          onSaved={() => {
+            if (editing === "new") {
+              setSearch("");
+              setTab("drafts");
+              pagination.reset();
+            }
+
+            refreshPage();
             setEditing(null);
           }}
         />
       )}
 
       {deletingId && (
-        <div className="showcase-delete-backdrop" role="dialog" aria-modal="true" aria-label="Confirm delete">
-          <div className="showcase-delete-dialog">
-            <h3>Delete showcase?</h3>
-            <p>
-              This permanently removes the showcase and cannot be undone.
-              Unpublishing keeps the content saved.
-            </p>
-            <div className="showcase-delete-actions">
-              <Button variant="secondary" onClick={() => setDeletingId(null)}>Cancel</Button>
-              <Button className="button-danger" onClick={() => void confirmDelete()}>
+        <Dialog
+          title="Delete showcase?"
+          intro="This permanently removes the showcase. Unpublishing keeps it saved."
+          onClose={() => setDeletingId(null)}
+          actions={
+            <>
+              <Button variant="secondary" onClick={() => setDeletingId(null)}>
+                Cancel
+              </Button>
+              <Button
+                className="button-danger"
+                onClick={() => void confirmDelete()}
+              >
                 Delete permanently
               </Button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        />
       )}
     </div>
   );

@@ -2,15 +2,36 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { matchRouteFamily } from "../src/edge/match-route.js";
 import {
+  messageBodyLimit,
+  MESSAGE_UPLOAD_BODY_LIMIT_BYTES,
   bookingBodyLimit,
+  BOOKING_CREATE_JSON_BODY_LIMIT_BYTES,
   CATALOG_JSON_BODY_LIMIT_BYTES,
+  QUOTATION_JSON_BODY_LIMIT_BYTES,
   SMALL_JSON_BODY_LIMIT_BYTES,
 } from "../src/constants/http.js";
+
+test("manual booking submissions have room for service selections and UTF-8 notes", () => {
+  assert.equal(
+    bookingBodyLimit("/v1/booking-requests"),
+    BOOKING_CREATE_JSON_BODY_LIMIT_BYTES,
+  );
+  assert.equal(
+    bookingBodyLimit("/booking-requests"),
+    BOOKING_CREATE_JSON_BODY_LIMIT_BYTES,
+  );
+  assert.equal(
+    bookingBodyLimit("/v1/booking-requests/id/requested-day-times"),
+    SMALL_JSON_BODY_LIMIT_BYTES,
+  );
+});
 
 test("route families follow the longest owned prefix", () => {
   assert.equal(matchRouteFamily("/v1/admin/ai/knowledge"), "ai");
   assert.equal(matchRouteFamily("/v1/admin/ai/knowledge/search"), "ai");
   assert.equal(matchRouteFamily("/v1/admin/ai/knowledge/package/id"), "ai");
+  assert.equal(matchRouteFamily("/v1/admin/ai/documents"), "ai");
+  assert.equal(matchRouteFamily("/v1/admin/ai/documents/id/retry"), "ai");
   assert.equal(matchRouteFamily("/v1/health"), "health");
   assert.equal(matchRouteFamily("/v1/me"), "auth");
   assert.equal(matchRouteFamily("/v1/auth/login"), "auth");
@@ -36,13 +57,10 @@ test("route families follow the longest owned prefix", () => {
     "booking-requests",
   );
   assert.equal(
-    matchRouteFamily("/v1/admin/quotations/id/send"),
+    matchRouteFamily("/v1/admin/booking-requests/id/quotations/send"),
     "booking-requests",
   );
-  assert.equal(
-    matchRouteFamily("/v1/quotations/id/accept"),
-    "booking-requests",
-  );
+  assert.equal(matchRouteFamily("/v1/quotations/id"), "booking-requests");
   assert.equal(matchRouteFamily("/v1/admin/catalog-media"), "catalog-media");
   assert.equal(matchRouteFamily("/v1/catalog-media/asset"), "catalog-media");
   assert.equal(matchRouteFamily("/v1/services/svc"), "services");
@@ -69,6 +87,18 @@ test("unknown paths and near-miss prefixes stay unmatched", () => {
   assert.equal(matchRouteFamily("/v1/admin"), null);
   assert.equal(matchRouteFamily("/v1/media"), null);
   assert.equal(matchRouteFamily("/openapi.json"), null);
+  assert.equal(matchRouteFamily("/v1/admin/quotations/id/send"), null);
+});
+
+test("quotation delivery keeps the full item-list cap in Node and Edge", () => {
+  assert.equal(
+    bookingBodyLimit("/v1/admin/booking-requests/id/quotations/send"),
+    QUOTATION_JSON_BODY_LIMIT_BYTES,
+  );
+  assert.equal(
+    bookingBodyLimit("/admin/booking-requests/id/quotations/send"),
+    QUOTATION_JSON_BODY_LIMIT_BYTES,
+  );
 });
 
 test("package attachment uses the booking route family and small body cap", () => {
@@ -78,6 +108,31 @@ test("package attachment uses the booking route family and small body cap", () =
   );
   assert.equal(
     bookingBodyLimit("/v1/admin/booking-requests/id/package"),
+    SMALL_JSON_BODY_LIMIT_BYTES,
+  );
+});
+
+test("message image reads and multipart send caps agree in Node and Edge paths", () => {
+  assert.equal(matchRouteFamily("/v1/message-images/id"), "message-images");
+
+  for (const path of [
+    "/v1/messages/conversation/messages",
+    "/messages/conversation/messages",
+    "/v1/admin/conversations/id/messages",
+    "/guest/conversations/id/messages",
+  ]) {
+    assert.equal(
+      messageBodyLimit(path, "multipart/form-data; boundary=test"),
+      MESSAGE_UPLOAD_BODY_LIMIT_BYTES,
+    );
+    assert.equal(
+      messageBodyLimit(path, "application/json"),
+      SMALL_JSON_BODY_LIMIT_BYTES,
+    );
+  }
+
+  assert.equal(
+    messageBodyLimit("/guest/conversations/id/claim", "multipart/form-data"),
     SMALL_JSON_BODY_LIMIT_BYTES,
   );
 });

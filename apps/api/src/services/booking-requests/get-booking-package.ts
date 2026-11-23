@@ -14,15 +14,13 @@ export async function getBookingPackageService(
     .setIsolationLevel("repeatable read")
     .execute(async (trx) => {
       const booking = await findBookingRequestData(trx, id, customerId);
+
       if (!booking) return null;
+
       const pkg = await resolveBookingPackageData(trx, booking);
+
       return {
-        package: pkg
-          ? await packageDto(trx, pkg, {
-              includeArchivedServices:
-                !customerId || pkg.package_type === "custom",
-            })
-          : null,
+        package: pkg ? await packageDto(trx, pkg) : null,
         bookingUpdatedAt: booking.revision,
       };
     });

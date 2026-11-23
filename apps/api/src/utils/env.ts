@@ -4,7 +4,9 @@ type EnvSource = Record<string, string | undefined>;
 export function createEnv(source: EnvSource) {
   function required(name: "DB_NAME" | "DB_USER" | "DB_PASSWORD") {
     const value = source[name];
+
     if (!value) throw new Error(`${name} is required`);
+
     return value;
   }
 
@@ -16,21 +18,52 @@ export function createEnv(source: EnvSource) {
     const direct =
       configured("SUPABASE_SERVICE_ROLE_KEY") ??
       configured("SUPABASE_SECRET_KEY");
+
     if (direct) return direct;
+
     const raw = configured("SUPABASE_SECRET_KEYS");
+
     if (!raw) return undefined;
+
     try {
       const parsed: unknown = JSON.parse(raw);
+
       // Object.values also accepts arrays and primitive JSON values, as before.
       if (parsed === null || parsed === undefined) return undefined;
+
       const entries = Object.values(parsed);
       const candidate =
         (typeof parsed === "object" && "default" in parsed
           ? parsed.default
           : undefined) ?? entries[0];
+
       return typeof candidate === "string" && candidate.trim()
         ? candidate.trim()
         : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  function localRealtimeSecret() {
+    const secret = configured("REALTIME_JWT_SECRET");
+    const target = configured("SUPABASE_URL");
+
+    if (!secret || !target || source.NODE_ENV === "production")
+      return undefined;
+
+    try {
+      const url = new URL(target);
+
+      if (url.protocol !== "http:" && url.protocol !== "https:")
+        return undefined;
+
+      const isLoopback = ["localhost", "127.0.0.1", "[::1]"].includes(
+        url.hostname,
+      );
+      const isLocalEdgeGateway = url.origin === "http://kong:8000";
+
+      return isLoopback || isLocalEdgeGateway ? secret : undefined;
     } catch {
       return undefined;
     }
@@ -63,6 +96,7 @@ export function createEnv(source: EnvSource) {
     },
     get SESSION_TTL_MS() {
       const days = Number(source.SESSION_TTL_DAYS ?? 7);
+
       return (
         (Number.isFinite(days) && days > 0 ? days : 7) * 24 * 60 * 60 * 1000
       );
@@ -96,27 +130,45 @@ export function createEnv(source: EnvSource) {
       const apiKey = storageKey();
       const bucket =
         configured("SUPABASE_STORAGE_BUCKET") ?? "event-management";
+
       if (!url || !apiKey) throw new Error("Media storage is not configured");
+
       return { url, apiKey, bucket };
+    },
+    get REALTIME_SIGNING() {
+      return {
+        jwk: configured("REALTIME_JWT_SIGNING_JWK"),
+        localSecret: localRealtimeSecret(),
+      };
     },
     get AI_TEXT() {
       const apiKey = configured("AI_GATEWAY_API_KEY");
       const model = configured("TEXT_MODEL");
+
       if (!apiKey || !model) throw new Error("AI text model is not configured");
+
+      return { apiKey, model };
+    },
+    get AI_VISION() {
+      const apiKey = configured("AI_GATEWAY_API_KEY");
+      const model = configured("VISION_MODEL");
+
+      if (!apiKey || !model)
+        throw new Error("AI vision model is not configured");
+
       return { apiKey, model };
     },
     get AI_EMBEDDING() {
       const apiKey = configured("AI_GATEWAY_API_KEY");
       const model = configured("EMBEDDING_MODEL");
+
       if (!apiKey || !model)
         throw new Error("AI embedding model is not configured");
+
       return { apiKey, model };
     },
     get SEED_CLOCK() {
       return source.SEED_CLOCK;
-    },
-    get CATALOG_EMBEDDING_AWAIT() {
-      return source.CATALOG_EMBEDDING_AWAIT === "true";
     },
     get SEED_RANDOM_SEED() {
       return source.SEED_RANDOM_SEED ?? "clemora-scenario-v1";

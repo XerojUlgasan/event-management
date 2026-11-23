@@ -1,12 +1,15 @@
 import { z } from "@hono/zod-openapi";
+import { openapiJson as json } from "../../utils/openapi.js";
+
 const error = z.object({ error: z.string() });
-export const json = <T extends z.ZodType>(schema: T) => ({
-  "application/json": { schema },
-});
+
+export { json };
+
 export const body = <T extends z.ZodType>(schema: T) => ({
   content: json(schema),
   required: true as const,
 });
+
 export const errors = {
   400: { content: json(error), description: "Invalid request" },
   401: { content: json(error), description: "Sign in required" },

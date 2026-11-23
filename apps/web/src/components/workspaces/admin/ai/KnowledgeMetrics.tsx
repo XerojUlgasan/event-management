@@ -19,6 +19,7 @@ function Metric({
   onClick?: () => void;
 }) {
   const ratio = total ? indexed / total : 0;
+
   return (
     <Panel
       className={`knowledge-metric${attention && indexed ? " knowledge-metric-alert" : ""}${selected ? " knowledge-metric-selected" : ""}`}

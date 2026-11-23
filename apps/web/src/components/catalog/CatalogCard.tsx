@@ -1,12 +1,12 @@
-import { Badge, Button } from "@event-management/ui";
+import { Badge, Button, CatalogThumbnail } from "@event-management/ui";
 import type { ReactNode } from "react";
 
 type CardStatus = { label: string; tone: "neutral" | "warning" | "success" };
+
 type CardAction = { label: string; onSelect: () => void };
 
 export function CatalogCard({
   image,
-  imageFallback,
   eyebrow,
   title,
   description,
@@ -15,7 +15,6 @@ export function CatalogCard({
   eventTypeBadge,
 }: {
   image?: string;
-  imageFallback?: string;
   eyebrow: string;
   title: string;
   description: string;
@@ -25,25 +24,12 @@ export function CatalogCard({
 }) {
   return (
     <article className="pe-card">
-      {image ? (
-        <div className="pe-card-image-wrap">
-          <img src={image} alt="" />
-          {eventTypeBadge && (
-            <span className="pe-card-event-badge" aria-label={`Event type: ${eventTypeBadge}`}>
-              {eventTypeBadge}
-            </span>
-          )}
-        </div>
-      ) : (
-        <div className="pe-card-image-placeholder">
-          {eventTypeBadge && (
-            <span className="pe-card-event-badge" aria-label={`Event type: ${eventTypeBadge}`}>
-              {eventTypeBadge}
-            </span>
-          )}
-          {imageFallback}
-        </div>
-      )}
+      <div className="pe-card-image-wrap">
+        <CatalogThumbnail src={image} />
+        {eventTypeBadge && (
+          <span className="pe-card-event-badge">{eventTypeBadge}</span>
+        )}
+      </div>
       <div className="pe-card-body">
         <span>{eyebrow}</span>
         <h2>{title}</h2>

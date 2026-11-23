@@ -19,7 +19,9 @@ export const getPublicShowcaseRecordRouteHandler: AppRouteHandler<
 > = async (c) => {
   const { slug } = c.req.valid("param");
   const dto = await showcaseDto(c.get("db"), { slug });
+
   if (!dto || dto.publishedAt === null)
     return c.json({ error: "Showcase not found." }, 404);
+
   return c.json(dto, 200);
 };

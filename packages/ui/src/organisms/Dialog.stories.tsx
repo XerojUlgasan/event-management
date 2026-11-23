@@ -36,10 +36,12 @@ const meta = {
 } satisfies Meta<typeof Dialog>;
 
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 function Example(args: ComponentProps<typeof Dialog>) {
   const [open, setOpen] = useState(false);
+
   return (
     <>
       <Button onClick={() => setOpen(true)}>Open dialog</Button>
@@ -59,6 +61,7 @@ function Example(args: ComponentProps<typeof Dialog>) {
 }
 
 export const Default: Story = { render: (args) => <Example {...args} /> };
+
 export const RichTitle: Story = {
   args: {
     title: (
@@ -69,6 +72,7 @@ export const RichTitle: Story = {
   },
   render: (args) => <Example {...args} />,
 };
+
 export const LongContent: Story = {
   args: {
     title: "Review the complete event plan",
@@ -89,6 +93,7 @@ export const LongContent: Story = {
 function BusyExample() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(true);
+
   return (
     <>
       <Button onClick={() => setOpen(true)}>Open guarded dialog</Button>
@@ -120,10 +125,12 @@ function BusyExample() {
     </>
   );
 }
+
 export const BusyDismissal: Story = { render: () => <BusyExample /> };
 
 function FocusExample() {
   const input = useRef<HTMLInputElement>(null);
+
   return (
     <Example
       title="Contact details"
@@ -136,4 +143,5 @@ function FocusExample() {
     </Example>
   );
 }
+
 export const InitialFocus: Story = { render: () => <FocusExample /> };

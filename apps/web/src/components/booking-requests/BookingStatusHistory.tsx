@@ -1,10 +1,11 @@
 import { Button, Pagination } from "@event-management/ui";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getBookingStatusHistory,
   type BookingStatusHistoryEntry,
 } from "../../lib/data/booking-requests/requests";
 import { usePagination } from "../../lib/pagination/use-pagination";
+import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
 import { bookingDateTime, bookingStatusLabels } from "./BookingRequestDisplay";
 
 export function BookingStatusHistory({
@@ -28,30 +29,34 @@ export function BookingStatusHistory({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
-  const generation = useRef(0);
+  const generation = useRequestGeneration();
   const pagination = usePagination(JSON.stringify([id, admin, revision]));
   useEffect(() => {
     if (!open) return;
-    const current = ++generation.current;
+
+    const current = generation.bump();
     setLoading(true);
     setError("");
     getBookingStatusHistory(id, admin, pagination.cursor)
       .then((result) => {
-        if (generation.current !== current) return;
+        if (!generation.isCurrent(current)) return;
+
         setEntries(result.history);
         setNextCursor(result.nextCursor);
       })
       .catch(() => {
-        if (generation.current === current)
+        if (generation.isCurrent(current))
           setError("Unable to load status history.");
       })
       .finally(() => {
-        if (generation.current === current) setLoading(false);
+        if (generation.isCurrent(current)) setLoading(false);
       });
+
     return () => {
-      generation.current++;
+      generation.bump();
     };
   }, [open, id, admin, revision, pagination.cursor, retry]);
+
   return (
     <details
       className={className}

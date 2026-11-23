@@ -6,12 +6,15 @@ const meta = {
   title: "Organisms/NativeDialog",
   component: NativeDialog,
 } satisfies Meta<typeof NativeDialog>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 export const NativeModal: Story = {
   render: () => {
     const dialog = useRef<HTMLDialogElement>(null);
+
     return (
       <>
         <Button onClick={() => dialog.current?.showModal()}>Open dialog</Button>

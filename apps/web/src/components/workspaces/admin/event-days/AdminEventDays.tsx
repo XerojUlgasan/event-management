@@ -24,6 +24,7 @@ import {
   zonedInstant,
   localInput,
 } from "../../../../lib/utils/event-days/event-day-time";
+
 function ScheduleForm({
   booking,
   initial,
@@ -51,21 +52,27 @@ function ScheduleForm({
     localInput(initial?.endsAt ?? booking.endsAt, zone),
   );
   const [error, setError] = useState("");
+
   const onSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
+
     try {
       if (!day || start.slice(0, 10) !== day)
         throw new Error("The start date must match the event day.");
+
       const startsAt = zonedInstant(start, zone),
         endsAt = zonedInstant(end, zone);
+
       if (endsAt <= startsAt)
         throw new Error("End time must be after start time.");
+
       submit({ day, startsAt, endsAt });
     } catch (cause) {
       setError(notifyError(cause, "Check the schedule."));
     }
   };
+
   return (
     <form className="admin-event-editor" onSubmit={onSubmit}>
       <p>All times use {zone}. An end time may fall on the next day.</p>
@@ -120,6 +127,7 @@ function ScheduleForm({
 }
 
 type RequestedDay = NonNullable<BookingRequest["requestedDays"]>[number];
+
 type DayEntry = {
   key: string;
   date: string;
@@ -129,6 +137,7 @@ type DayEntry = {
 
 function dateLabel(date: string, includeYear = true) {
   const [year, month, day] = date.split("-").map(Number);
+
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",
@@ -136,16 +145,20 @@ function dateLabel(date: string, includeYear = true) {
     timeZone: "UTC",
   }).format(new Date(Date.UTC(year, month - 1, day)));
 }
+
 function scheduleLabel(start: string | null, end: string | null, zone: string) {
   if (!start || !end) return "Time to be confirmed";
+
   const startDate = localInput(start, zone).slice(0, 10);
   const endDate = localInput(end, zone).slice(0, 10);
+
   const time = (instant: string) =>
     new Intl.DateTimeFormat(undefined, {
       hour: "numeric",
       minute: "2-digit",
       timeZone: zone,
     }).format(new Date(instant));
+
   return `${dateLabel(startDate)} · ${time(start)} – ${time(end)}${startDate !== endDate ? ` (${dateLabel(endDate)}, overnight)` : ""}`;
 }
 
@@ -154,12 +167,14 @@ function dayState(entry: DayEntry) {
     return entry.requested?.startsAt && entry.requested.endsAt
       ? "Ready to schedule"
       : "Waiting for times";
+
   if (entry.day.status !== "scheduled")
     return entry.day.status === "moved"
       ? "Moved"
       : entry.day.status === "cancelled"
         ? "Cancelled"
         : entry.day.status;
+
   return "Scheduled";
 }
 
@@ -198,6 +213,7 @@ export function AdminEventDays({
     getAdminEventDays(booking.id)
       .then((result) => {
         if (!active || generation !== loadGeneration.current) return;
+
         setDays(result.eventDays);
         loadFailure.current = "";
         setLoadedRevision(revision);
@@ -205,12 +221,14 @@ export function AdminEventDays({
       })
       .catch((cause) => {
         if (!active || generation !== loadGeneration.current) return;
+
         setStale(true);
         const message = notificationErrorMessage(
           cause,
           "Unable to load event days.",
         );
         setError(message);
+
         if (loadFailure.current !== message) {
           loadFailure.current = message;
           notifyError(message);
@@ -219,12 +237,14 @@ export function AdminEventDays({
       .finally(() => {
         if (active && generation === loadGeneration.current) setLoading(false);
       });
+
     return () => {
       active = false;
     };
   }, [booking.id, revision, reload, refreshKey, notifyError]);
   useEffect(() => {
     onBusyChange?.(busy || loading);
+
     return () => onBusyChange?.(false);
   }, [busy, loading, onBusyChange]);
   useEffect(() => {
@@ -238,6 +258,7 @@ export function AdminEventDays({
       (action && (busy || loading || stale || loadedRevision !== revision))
     )
       return;
+
     busyRef.current = true;
     loadGeneration.current++;
     setLoading(false);
@@ -245,12 +266,14 @@ export function AdminEventDays({
     setStale(true);
     setError("");
     let saved = false;
+
     try {
       if (action) {
         await action();
         saved = true;
         notify("Event day changes saved.");
       }
+
       await onBookingChanged();
       setMoving("");
       setCancelDayId("");
@@ -270,9 +293,11 @@ export function AdminEventDays({
       setBusy(false);
     }
   };
+
   const locked = busy || loading || stale || loadedRevision !== revision;
   const accepted = booking.status === "accepted";
   const entries: DayEntry[] = [];
+
   for (const requested of booking.requestedDays ?? []) {
     if (!requested.eventDayId)
       entries.push({
@@ -281,29 +306,38 @@ export function AdminEventDays({
         requested,
       });
   }
+
   for (const day of days) {
     const requested = booking.requestedDays?.find((item) => {
       let id = item.eventDayId;
       const seen = new Set<string>();
+
       while (id && !seen.has(id)) {
         if (id === day.id) return true;
+
         seen.add(id);
         id =
           days.find((candidate) => candidate.id === id)
             ?.replacementEventDayId ?? undefined;
       }
+
       return item.operationalSchedule?.id === day.id;
     });
+
     entries.push({ key: day.id, date: day.day, day, requested });
   }
+
   entries.sort(
     (a, b) => a.date.localeCompare(b.date) || a.key.localeCompare(b.key),
   );
+
   const multipleYears =
     new Set(entries.map((entry) => entry.date.slice(0, 4))).size > 1;
+
   const selectedRequestedDate = selected.startsWith("requested:")
     ? selected.slice("requested:".length)
     : "";
+
   const current =
     entries.find((entry) => entry.key === selected) ??
     entries.find(
@@ -314,8 +348,10 @@ export function AdminEventDays({
     entries.find((entry) => entry.day?.status === "scheduled") ??
     entries.find((entry) => !entry.day) ??
     entries[0];
+
   const day = current?.day;
   const requested = current?.requested;
+
   if (!booking.requestedDays && !accepted && !loading && !error && !days.length)
     return null;
 

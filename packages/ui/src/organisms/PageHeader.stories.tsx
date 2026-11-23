@@ -21,12 +21,15 @@ const meta = {
 } satisfies Meta<typeof PageHeader>;
 
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
 export const SectionHeading: Story = {
   args: { titleAs: "h2", title: "Upcoming events" },
 };
+
 export const WithEyebrow: Story = {
   args: {
     className: "welcome-row",

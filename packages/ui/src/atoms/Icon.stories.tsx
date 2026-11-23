@@ -10,6 +10,8 @@ const names = [
   "chart",
   "settings",
   "spinner",
+  "refresh",
+  "flask",
   "search",
   "filter",
   "bell",
@@ -29,6 +31,16 @@ const names = [
   "clock",
   "location",
   "camera",
+  "image",
+  "text",
+  "video",
+  "grip",
+  "eye",
+  "plus",
+  "minus",
+  "edit",
+  "save",
+  "trash",
   "undo",
   "redo",
 ] satisfies IconName[];
@@ -41,9 +53,11 @@ const meta = {
 } satisfies Meta<typeof Icon>;
 
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
 export const Gallery: Story = {
   render: () => (
     <div

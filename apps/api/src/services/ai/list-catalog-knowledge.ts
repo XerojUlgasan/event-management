@@ -6,6 +6,7 @@ import { encodePageCursor, parsePageCursor } from "../../utils/pagination.js";
 import { loadCatalogKnowledge } from "./load-catalog-knowledge.js";
 
 type Kind = "package" | "service";
+
 type Query = {
   limit: number;
   cursor?: string;
@@ -13,11 +14,13 @@ type Query = {
   kind?: Kind;
   status?: KnowledgeStatus | "attention";
 };
+
 const positionSchema = z.object({
   name: z.string(),
   kind: z.enum(["package", "service"]),
   id: z.string(),
 });
+
 function compare(
   a: { name: string; kind: string; id: string },
   b: { name: string; kind: string; id: string },
@@ -28,6 +31,7 @@ function compare(
     a.id.localeCompare(b.id)
   );
 }
+
 export async function listCatalogKnowledgeService(
   db: Kysely<DB>,
   query: Query,
@@ -40,10 +44,12 @@ export async function listCatalogKnowledgeService(
     query.status ?? "",
   ]);
   const position = parsePageCursor(query.cursor, positionSchema, scope);
+
   const result = await db
     .transaction()
     .setIsolationLevel("repeatable read")
     .execute((trx) => loadCatalogKnowledge(trx));
+
   const filtered = result.entries
     .map((item) => item.listing)
     .filter(
@@ -56,9 +62,11 @@ export async function listCatalogKnowledgeService(
         item.name.toLowerCase().includes(search),
     )
     .sort(compare);
+
   const remaining = position
     ? filtered.filter((item) => compare(item, position) > 0)
     : filtered;
+
   const listings = remaining.slice(0, query.limit);
   const last = listings.at(-1);
   const nextCursor =
@@ -69,6 +77,7 @@ export async function listCatalogKnowledgeService(
           id: last.id,
         })
       : null;
+
   return {
     summary: result.summary,
     listings,

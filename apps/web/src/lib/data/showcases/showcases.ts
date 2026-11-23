@@ -10,7 +10,9 @@ import { request } from "../../http/request";
 /** Keep SSR and browser media URLs identical for both API origins and proxies. */
 export const showcaseMediaSrc = (url: string): string => {
   if (!url.startsWith("/v1/showcase-media/")) return url;
+
   const base = env.PUBLIC_API_URL.replace(/\/$/, "");
+
   return `${base}${url.slice("/v1".length)}`;
 };
 
@@ -26,12 +28,22 @@ export const getPublicShowcasesPage = (
     cursor,
     limit: String(SHOWCASE_LIST_PAGE_SIZE),
   });
+
   return request<ShowcasePage>(`/showcase-records?${params}`);
 };
 
-export const getAdminShowcases = (cursor?: string): Promise<ShowcasePage> => {
-  const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  return request<ShowcasePage>(`/admin/showcase-records${qs}`);
+export const getAdminShowcases = (
+  status: "published" | "drafts",
+  search: string,
+  cursor?: string,
+): Promise<ShowcasePage> => {
+  const params = new URLSearchParams({ status });
+
+  if (search) params.set("search", search);
+
+  if (cursor) params.set("cursor", cursor);
+
+  return request<ShowcasePage>(`/admin/showcase-records?${params}`);
 };
 
 export const getAdminShowcase = (id: string): Promise<ShowcaseRecord> =>
@@ -48,6 +60,7 @@ export const uploadShowcaseMedia = (
 }> => {
   const body = new FormData();
   body.set("file", file);
+
   return request("/admin/showcase-media", body);
 };
 

@@ -17,14 +17,17 @@ import {
 import { assessKnowledgeListing } from "../../src/services/ai/catalog-knowledge-status.js";
 
 const chunk = {
-  chunkKey: "overview",
+  chunkKey: "text",
   contentMarkdown: "fixture",
   mediaId: null,
 };
+
 const owner = { id: "owner", name: "Fixture", kind: "service" as const };
+
 const hash = catalogKnowledgeSourceHash(chunk.contentMarkdown, undefined);
+
 const ready = {
-  chunk_key: "overview",
+  chunk_key: "text",
   content_markdown: "fixture",
   content_hash: `${hash}:${catalogKnowledgeDigest("fixture")}`,
   media_id: null,
@@ -32,6 +35,7 @@ const ready = {
   embedded_at: new Date("2026-01-01T00:00:00Z"),
   has_embedding: true,
 };
+
 test("coverage requires expected content, input hash and model and detects withdrawn rows", () => {
   assert.equal(
     assessKnowledgeListing(owner, [chunk], [], new Map()).listing.status,
@@ -172,11 +176,13 @@ test("photo coverage checks metadata and stored digest without fetching bytes", 
 });
 
 const database = `em_knowledge_dashboard_${randomUUID().replaceAll("-", "")}`;
+
 let admin: Pool | undefined;
 let db: Kysely<DB> | undefined;
 let app: OpenAPIHono<HonoEnv>;
 let adminCookie: string;
 let customerCookie: string;
+
 before(async () => {
   const host = process.env.DB_HOST ?? "localhost";
   assert.ok(["localhost", "127.0.0.1", "::1"].includes(host));
@@ -191,12 +197,14 @@ before(async () => {
   const pool = new Pool({ ...connection, database });
   db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
   const root = new URL("../../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name)))
     await pool.query(
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
+
   async function session(role: string) {
     const token = randomUUID();
     const user = await db!
@@ -216,6 +224,7 @@ before(async () => {
         expires_at: new Date(Date.now() + 3600000),
       })
       .execute();
+
     return `em_session=${token}`;
   }
   adminCookie = await session("admin");
@@ -236,6 +245,7 @@ before(async () => {
 });
 after(async () => {
   await db?.destroy();
+
   if (admin) {
     await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await admin.end();
@@ -244,6 +254,7 @@ after(async () => {
 test("admin endpoints enforce sessions, global summary, filters, scoped paging and do not mutate knowledge", async () => {
   const request = (path: string, cookie?: string) =>
     app.request(path, { headers: cookie ? { cookie } : {} });
+
   assert.equal((await request("/v1/admin/ai/knowledge")).status, 401);
   assert.equal(
     (await request("/v1/admin/ai/knowledge", customerCookie)).status,
@@ -283,7 +294,7 @@ test("admin endpoints enforce sessions, global summary, filters, scoped paging a
     adminCookie,
   );
   assert.equal(detail.status, 200);
-  assert.equal((await detail.json()).chunks[0].key, "overview");
+  assert.equal((await detail.json()).chunks[0].key, "text");
   assert.deepEqual(
     await db!.selectFrom("catalog_knowledge").selectAll().execute(),
     beforeCount,
@@ -324,9 +335,11 @@ test("detail exposes withdrawn chunks without counting or serving removed media"
   assert.equal(detail.listing.expectedChunks, 1);
   assert.equal(detail.listing.indexedChunks, 0);
   assert.equal(detail.listing.photoChunks, 0);
+
   const removed = detail.chunks.find(
     (chunk: { key: string }) => chunk.key === "photo:removed",
   );
+
   assert.equal(removed.withdrawn, true);
   assert.equal(removed.contentMarkdown, "Old photo context");
   assert.equal(removed.mediaUrl, null);
@@ -334,4 +347,97 @@ test("detail exposes withdrawn chunks without counting or serving removed media"
     await db!.selectFrom("catalog_knowledge").selectAll().execute(),
     before,
   );
+});
+
+test("package detail labels included services in prepared and saved chunks", async () => {
+  const serviceId = randomUUID();
+  const unavailableId = randomUUID();
+  await db!
+    .insertInto("services")
+    .values({
+      id: serviceId,
+      name: "Music *Live*",
+      slug: "music-live",
+      description: "",
+      hourly_rate_pesos: 1,
+    })
+    .execute();
+
+  const { id } = await db!
+    .insertInto("packages")
+    .values({
+      name: "Music package",
+      slug: "music-package",
+      price: 100,
+      max_guests: 20,
+      canvas: JSON.stringify([
+        {
+          id: randomUUID(),
+          title: "Included services",
+          widgets: [serviceId, unavailableId].map((linkedId, index) => ({
+            id: randomUUID(),
+            type: "service",
+            x: index,
+            y: 0,
+            w: 1,
+            h: 1,
+            markdown: "",
+            mediaId: null,
+            alt: "",
+            caption: "",
+            autoplay: false,
+            serviceId: linkedId,
+          })),
+        },
+      ]),
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+
+  const load = async () => {
+    const response = await app.request(`/v1/admin/ai/knowledge/package/${id}`, {
+      headers: { cookie: adminCookie },
+    });
+    assert.equal(response.status, 200);
+
+    return response.json();
+  };
+
+  const prepared = await load();
+  assert.equal(prepared.chunks[0].status, "pending");
+  assert.ok(
+    prepared.chunks[0].contentMarkdown.includes(
+      "Included service: Music \\*Live\\*",
+    ),
+  );
+  assert.ok(
+    prepared.chunks[0].contentMarkdown.includes(
+      "Included service: Service details unavailable",
+    ),
+  );
+  assert.ok(!prepared.chunks[0].contentMarkdown.includes(serviceId));
+  assert.ok(!prepared.chunks[0].contentMarkdown.includes(unavailableId));
+
+  const savedMarkdown = `# Saved text\nIncluded service ID: ${serviceId}\nIncluded service ID: ${unavailableId}`;
+  await db!
+    .insertInto("catalog_knowledge")
+    .values({
+      package_id: id,
+      chunk_key: "text",
+      content_markdown: savedMarkdown,
+      content_hash: "older",
+    })
+    .execute();
+  const saved = await load();
+  assert.equal(saved.chunks[0].status, "needs-refresh");
+  assert.equal(
+    saved.chunks[0].contentMarkdown,
+    "# Saved text\nIncluded service: Music \\*Live\\*\nIncluded service: Service details unavailable",
+  );
+  const stored = await db!
+    .selectFrom("catalog_knowledge")
+    .select("content_markdown")
+    .where("package_id", "=", id)
+    .executeTakeFirstOrThrow();
+  assert.equal(stored.content_markdown, savedMarkdown);
 });

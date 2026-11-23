@@ -35,6 +35,7 @@ export async function seedScenarioQuotations(
     .where("role", "=", "admin")
     .orderBy("id")
     .executeTakeFirst();
+
   if (!admin)
     throw new Error("Scenario quotations require a System Administrator");
 
@@ -49,7 +50,6 @@ export async function seedScenarioQuotations(
       "b.customer_id",
       "b.status",
       "c.id as conversation_id",
-      "c.status as conversation_status",
     ])
     .where(
       "b.id",
@@ -59,6 +59,7 @@ export async function seedScenarioQuotations(
     .where("customer.role", "=", "customer")
     .orderBy("b.id")
     .execute();
+
   const existing = await db
     .selectFrom("quotations")
     .select(["id", "booking_request_id"])
@@ -68,6 +69,7 @@ export async function seedScenarioQuotations(
       input.bookings.map((booking) => booking.id),
     )
     .execute();
+
   const seededBookings = new Set(
     existing
       .filter(
@@ -77,16 +79,18 @@ export async function seedScenarioQuotations(
       )
       .map((row) => row.booking_request_id),
   );
+
   const occupiedBookings = new Set(
     existing.map((row) => row.booking_request_id),
   );
+
   const eligible = parents.filter(
     (booking) =>
       seededBookings.has(booking.id) ||
       (!occupiedBookings.has(booking.id) &&
-        !["declined", "cancelled"].includes(booking.status) &&
-        booking.conversation_status === "active"),
+        !["declined", "cancelled"].includes(booking.status)),
   );
+
   // Keep previously selected parents even when a user later closes their request.
   const selected = eligible
     .sort(
@@ -96,6 +100,7 @@ export async function seedScenarioQuotations(
     )
     .slice(0, SCENARIO_COUNT / 2)
     .sort((a, b) => a.id.localeCompare(b.id));
+
   if (selected.length !== SCENARIO_COUNT / 2) {
     throw new Error(
       "Scenario quotations require 50 customer bookings with an open conversation (or existing scenario quotations)",
@@ -103,13 +108,16 @@ export async function seedScenarioQuotations(
   }
 
   const plan = [];
+
   for (const [index, booking] of selected.entries()) {
     const pkg = await resolveBookingPackageData(db, booking);
     const base = pkg ? basePrice(pkg.price) : null;
+
     if (!pkg || base === null)
       throw new Error(
         `Scenario quotation booking ${booking.id} needs a priced proposal`,
       );
+
     const items: QuotationItem[] =
       index % 4 === 0
         ? []
@@ -132,22 +140,19 @@ export async function seedScenarioQuotations(
             },
           ];
     const total = amount(base, items);
+
     if (total === null || total < 0)
       throw new Error(
         `Scenario quotation booking ${booking.id} has an invalid total`,
       );
+
     for (const version of [1, 2]) {
-      const status: QuotationStatus =
-        version === 1 ? "superseded" : index % 3 === 0 ? "draft" : "sent";
-      const createdAt = new Date(
-        input.now.getTime() + (version === 1 ? 0 : 3_000),
+      const status: QuotationStatus = version === 1 ? "superseded" : "sent";
+      const sentAt = new Date(
+        input.now.getTime() + (version === 1 ? 1_000 : 4_000),
       );
-      const sentAt =
-        status === "draft"
-          ? null
-          : new Date(input.now.getTime() + (version === 1 ? 1_000 : 4_000));
       const supersededAt =
-        version === 1 ? new Date(input.now.getTime() + 3_000) : null;
+        version === 1 ? new Date(input.now.getTime() + 4_000) : null;
       plan.push({
         booking,
         row: {
@@ -160,13 +165,12 @@ export async function seedScenarioQuotations(
           items: JSON.stringify(items),
           status,
           created_by: admin.id,
-          created_at: createdAt,
-          updated_at: supersededAt ?? sentAt ?? createdAt,
+          created_at: sentAt,
+          updated_at: supersededAt ?? sentAt,
           sent_at: sentAt,
-          accepted_at: null,
           superseded_at: supersededAt,
           offered_package_id: pkg.id,
-          adjustments_reviewed: status !== "draft",
+          adjustments_reviewed: true,
           previous_quotation_id: version === 1 ? null : quoteId(booking.id, 1),
           revision_reason:
             version === 1
@@ -176,19 +180,23 @@ export async function seedScenarioQuotations(
       });
     }
   }
+
   expectCount("quotations", plan.length);
 
   let quotations = 0;
   let quotationMessages = 0;
   let quotationAuditEvents = 0;
+
   for (const { row, booking } of plan) {
     const inserted = await insertIfNew(db, "quotations", row);
+
     if (inserted) quotations += 1;
+
     // Existing quotations may have been revised by the API. Preserve their lifecycle too.
     if (!inserted) continue;
+
     if (
-      row.sent_at &&
-      (await insertIfNew(db, "messages", {
+      await insertIfNew(db, "messages", {
         id: scenarioId(`quotation-message:${row.id}`),
         conversation_id: booking.conversation_id,
         sender_id: admin.id,
@@ -197,52 +205,33 @@ export async function seedScenarioQuotations(
         quotation_id: row.id,
         created_at: row.sent_at,
         read_at: null,
-      }))
+      })
     )
       quotationMessages += 1;
-    const events = [
-      {
-        action: row.version === 1 ? "quotation.created" : "quotation.revised",
-        actor: admin.id,
-        at: row.created_at,
-      },
-      ...(row.sent_at && (row.version === 2 || row.items !== "[]")
-        ? [
-            {
-              action: "quotation.updated",
-              actor: admin.id,
-              at: new Date(row.created_at.getTime() + 500),
-            },
-          ]
-        : []),
-      ...(row.sent_at
-        ? [{ action: "quotation.sent", actor: admin.id, at: row.sent_at }]
-        : []),
-    ];
-    for (const event of events) {
-      if (
-        await insertIfNew(db, "audit_events", {
-          id: scenarioId(`quotation-audit:${row.id}:${event.action}`),
-          actor_id: event.actor,
-          action: event.action,
-          entity_type: "quotation",
-          entity_id: row.id,
-          metadata: JSON.stringify({
-            bookingRequestId: booking.id,
-            version: row.version,
-            ...(row.previous_quotation_id
-              ? {
-                  previousQuotationId: row.previous_quotation_id,
-                  reason: row.revision_reason,
-                }
-              : {}),
-          }),
-          created_at: event.at,
-        })
-      )
-        quotationAuditEvents += 1;
-    }
+
+    if (
+      await insertIfNew(db, "audit_events", {
+        id: scenarioId(`quotation-audit:${row.id}:quotation.sent`),
+        actor_id: admin.id,
+        action: "quotation.sent",
+        entity_type: "quotation",
+        entity_id: row.id,
+        metadata: JSON.stringify({
+          bookingRequestId: booking.id,
+          version: row.version,
+          ...(row.previous_quotation_id
+            ? {
+                previousQuotationId: row.previous_quotation_id,
+                reason: row.revision_reason,
+              }
+            : {}),
+        }),
+        created_at: row.sent_at,
+      })
+    )
+      quotationAuditEvents += 1;
   }
+
   return {
     quotations: plan.map(({ row }) => row),
     inserted: { quotations, quotationMessages, quotationAuditEvents },

@@ -43,4 +43,5 @@ routes.openapi(createEventDayRoute, createEventDayRouteHandler);
 routes.openapi(scheduleRequestedDaysRoute, scheduleRequestedDaysRouteHandler);
 routes.openapi(cancelEventDayRoute, cancelEventDayRouteHandler);
 routes.openapi(moveEventDayRoute, moveEventDayRouteHandler);
+
 export default routes;

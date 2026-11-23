@@ -1,26 +1,35 @@
 import { Button, Icon } from "@event-management/ui";
 import type { BookingRequest } from "../../lib/data/booking-requests/requests";
 import { groupCustomerEvents } from "../../lib/services/booking-requests/customer-event-timeline";
-import { bookingDate, BookingStatusBadge } from "./BookingRequestDisplay";
+import {
+  bookingDate,
+  bookingRequestLabel,
+  BookingStatusBadge,
+} from "./BookingRequestDisplay";
 import { localInput } from "../../lib/utils/event-days/event-day-time";
+import { formatEnPh } from "../../lib/utils/formatting/dates";
 
 function requestedTime(item: BookingRequest, date: string | null) {
   const day = item.requestedDays?.find((day) => day.date === date);
+
   const startsAt = day ? day.startsAt : item.startsAt;
   const endsAt = day ? day.endsAt : item.endsAt;
+
   if (!startsAt || !endsAt) return "Time to be arranged";
+
   const overnight =
     localInput(startsAt, item.timeZone).slice(0, 10) !==
     localInput(endsAt, item.timeZone).slice(0, 10);
-  const start = new Intl.DateTimeFormat("en-PH", {
+  const start = formatEnPh(new Date(startsAt), {
     timeStyle: "short",
     timeZone: item.timeZone,
-  }).format(new Date(startsAt));
-  const end = new Intl.DateTimeFormat("en-PH", {
+  });
+  const end = formatEnPh(new Date(endsAt), {
     ...(overnight ? { dateStyle: "medium" } : {}),
     timeStyle: "short",
     timeZone: item.timeZone,
-  }).format(new Date(endsAt));
+  });
+
   return `${start} – ${end}`;
 }
 
@@ -41,6 +50,7 @@ export function CustomerEventTimeline({
     <div className="customer-event-timeline">
       {groupCustomerEvents(items, now).map((group) => {
         if (!group.events.length && group.key !== "upcoming") return null;
+
         return (
           <section
             className={`event-timeline-group event-timeline-${group.key}`}
@@ -131,16 +141,13 @@ export function CustomerEventTimeline({
                           </p>
                         )}
                         <div className="event-timeline-footer">
-                          <span className="event-timeline-reference">
-                            Request {item.reference}
-                          </span>
                           <div className="event-timeline-actions">
                             {onOpenChat && (
                               <Button
                                 variant="light"
                                 icon="message"
                                 onClick={() => onOpenChat(item.reference)}
-                                aria-label={`Open chat for request ${item.reference}`}
+                                aria-label={`Open chat for ${bookingRequestLabel(item.eventType, date)}`}
                               >
                                 Open chat
                               </Button>
@@ -148,7 +155,7 @@ export function CustomerEventTimeline({
                             <Button
                               variant="secondary"
                               onClick={() => onDetails(item)}
-                              aria-label={`View details for request ${item.reference}`}
+                              aria-label={`View details for ${bookingRequestLabel(item.eventType, date)}`}
                             >
                               View details <Icon name="arrow" size={15} />
                             </Button>

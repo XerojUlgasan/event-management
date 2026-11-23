@@ -1,7 +1,15 @@
 export const routeFamilies = [
   { id: "guest-chat", prefixes: ["/v1/guest"] },
-  { id: "ai", prefixes: ["/v1/admin/ai/knowledge"] },
+  { id: "ai", prefixes: ["/v1/admin/ai/knowledge", "/v1/admin/ai/documents"] },
+  {
+    id: "ai-agent-settings",
+    prefixes: ["/v1/admin/ai/agent-settings", "/v1/ai/agent-profile"],
+  },
   { id: "health", prefixes: ["/v1/health"] },
+  {
+    id: "business-information",
+    prefixes: ["/v1/business-information", "/v1/admin/business-information"],
+  },
   {
     id: "catalog-media",
     prefixes: ["/v1/admin/catalog-media", "/v1/catalog-media"],
@@ -22,17 +30,16 @@ export const routeFamilies = [
     prefixes: [
       "/v1/admin/booking-requests",
       "/v1/booking-requests",
-      "/v1/admin/quotations",
       "/v1/quotations",
     ],
   },
   {
     id: "event-days",
-    prefixes: [
-      "/v1/admin/event-days",
-    ],
+    prefixes: ["/v1/admin/event-days"],
   },
+  { id: "message-images", prefixes: ["/v1/message-images"] },
   { id: "messages", prefixes: ["/v1/admin/conversations", "/v1/messages"] },
+  { id: "notifications", prefixes: ["/v1/notifications"] },
   { id: "auth", prefixes: ["/v1/auth", "/v1/me"] },
   { id: "users", prefixes: ["/v1/admin/users"] },
 ] as const;

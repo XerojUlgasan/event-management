@@ -1,4 +1,9 @@
+import {
+  retryGuestMessageRoute,
+  retryGuestMessageRouteHandler,
+} from "../messages/retry-message-processing.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import { HTTPException } from "hono/http-exception";
 import { createMiddleware } from "hono/factory";
 import type { HonoEnv } from "../../types/hono.js";
@@ -34,21 +39,29 @@ const routes = new OpenAPIHono<HonoEnv>({
       );
   },
 });
+
 routes.onError((error, c) => {
   if (error instanceof GuestChatError)
     return c.json(
       { error: error.message, ...(error.code ? { code: error.code } : {}) },
       error.status,
     );
-  if (error instanceof HTTPException) return error.getResponse();
+
+  if (error instanceof HTTPException)
+    return c.json({ error: error.message }, error.status);
+
   console.error("guest-chat", { outcome: "failed" });
-  return c.json({ error: "Unable to complete guest chat request" }, 500);
+
+  return jsonError(c, "Unable to complete guest chat request", 500);
 });
+
 const customerOnly = createMiddleware<HonoEnv>(async (c, next) => {
   if (c.get("session").user.role !== "customer")
-    return c.json({ error: "Customer access required" }, 403);
+    return jsonError(c, "Customer access required", 403);
+
   await next();
 });
+
 routes.use("/guest/conversations/:id/claim", requireSession, customerOnly);
 
 routes.openapi(
@@ -58,4 +71,7 @@ routes.openapi(
 routes.openapi(getGuestConversationRoute, getGuestConversationRouteHandler);
 routes.openapi(sendGuestMessageRoute, sendGuestMessageRouteHandler);
 routes.openapi(claimGuestConversationRoute, claimGuestConversationRouteHandler);
+
+routes.openapi(retryGuestMessageRoute, retryGuestMessageRouteHandler);
+
 export default routes;

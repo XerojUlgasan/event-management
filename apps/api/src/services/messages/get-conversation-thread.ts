@@ -15,10 +15,12 @@ import { markMessagesReadData } from "../../data/messages/mark-messages-read.js"
 import { listThreadMessagesData } from "../../data/messages/list-thread-messages.js";
 import { listLastMessagesData } from "../../data/messages/list-last-messages.js";
 import { messageDto, conversationDto } from "./message-response.js";
+
 const cursorSchema = z.object({
   createdAt: postgresTimestampSchema.and(z.iso.datetime({ precision: 6 })),
   id: z.string().uuid(),
 });
+
 export async function getConversationThreadService(
   db: Kysely<DB>,
   conversation: ConversationWithCustomer,
@@ -35,17 +37,21 @@ export async function getConversationThreadService(
     limit,
     position,
   );
+
   const page = createPage(fetched, limit, (row) =>
     encodePageCursor(scope, { createdAt: row.cursor_created_at, id: row.id }),
   );
+
   const latest = cursor
     ? (await listLastMessagesData(db, [conversation.id])).get(conversation.id)
     : page.items[0];
+
   return {
     conversation: conversationDto(
       conversation,
       latest ? messageDto(latest) : null,
       0,
+      viewer,
     ),
     messages: page.items.map(messageDto).reverse(),
     nextCursor: page.nextCursor,

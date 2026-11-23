@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { attachBookingPackageService } from "../../services/booking-requests/attach-booking-package.js";
 import { bookingSchema, idParams } from "./schemas.js";
@@ -28,6 +29,7 @@ export const attachBookingPackageRoute = createRoute({
     ...errors,
   },
 });
+
 export const attachBookingPackageRouteHandler: AppRouteHandler<
   typeof attachBookingPackageRoute
 > = async (c) => {
@@ -37,7 +39,8 @@ export const attachBookingPackageRouteHandler: AppRouteHandler<
     c.get("session").user.id,
     c.req.valid("json"),
   );
+
   return "message" in result
-    ? c.json({ error: result.message }, result.status)
+    ? jsonError(c, result.message, result.status)
     : c.json(result, 200);
 };

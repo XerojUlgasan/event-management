@@ -41,6 +41,7 @@ const empty = (): ServiceContent => ({
   sections: [{ id: crypto.randomUUID(), title: "", widgets: [] }],
   eventType: null,
 });
+
 const content = (version: AdminService): ServiceContent => ({
   name: version.name,
   description: version.description,
@@ -61,10 +62,10 @@ function ServiceCard({
   action?: ReactNode;
 }) {
   const pricing = servicePricingLabels(item);
+
   return (
     <CatalogCard
       image={item.imageUrl ? catalogMediaSrc(item.imageUrl) : undefined}
-      imageFallback="No service photo available"
       eyebrow="Event service"
       title={item.name || "Untitled service"}
       description={item.description}
@@ -85,6 +86,7 @@ export function ServicesPage() {
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
+
     return () => {
       mounted.current = false;
     };
@@ -116,16 +118,19 @@ export function ServicesPage() {
     action: "archive" | "delete";
   } | null>(null);
   const pagination = usePagination(`${tab}:${search}`);
+
   const load = useCallback(async () => {
     const current = ++requestId.current;
     setLoading(true);
     setError("");
+
     try {
       const result = await getAdminServices({
         cursor: pagination.cursor,
         search,
         archived: tab === "Archives" ? "archived" : "active",
       });
+
       if (mounted.current && current === requestId.current) {
         setRows(result.services);
         setNextCursor(result.nextCursor);
@@ -133,36 +138,50 @@ export function ServicesPage() {
       }
     } catch (err) {
       if (!mounted.current || current !== requestId.current) return;
+
       setError(notifyError(err, "Something went wrong. Please try again."));
     } finally {
       if (mounted.current && current === requestId.current) setLoading(false);
     }
   }, [notifyError, pagination.cursor, search, tab]);
+
   useEffect(() => {
     void load();
+
     return () => {
       requestId.current++;
     };
   }, [load]);
+
   const openEdit = async (id: string) => {
     setBusy(true);
     setError("");
+
     try {
       const item = await getAdminService(id);
+
       if (!mounted.current) return;
+
       savedDuringEditRef.current = false;
       savedRef.current = { id, updatedAt: item.updatedAt };
       // Reset to untouched, seed preview from the existing imageUrl.
-      editThumbnail.reset(item.imageUrl ? catalogMediaSrc(item.imageUrl) : null);
+      editThumbnail.reset(
+        item.imageUrl ? catalogMediaSrc(item.imageUrl) : null,
+      );
       setEditing(content(item));
     } catch (err) {
       if (!mounted.current) return;
+
       setError(notifyError(err, "Something went wrong. Please try again."));
     } finally {
       if (mounted.current) setBusy(false);
     }
   };
-  const save = async (form: ServiceContent, thumbnailId: string | null | undefined) => {
+
+  const save = async (
+    form: ServiceContent,
+    thumbnailId: string | null | undefined,
+  ) => {
     try {
       const { id, updatedAt } = savedRef.current;
       const result =
@@ -176,16 +195,21 @@ export function ServicesPage() {
         throw new Error(
           `${err.message} This service changed. Close and reopen it to load the latest details.`,
         );
+
       throw err;
     }
   };
+
   const act = async () => {
     if (!confirm) return;
+
     setBusy(true);
     setError("");
+
     try {
       if (confirm.action === "archive") await archiveService(confirm.item.id);
       else await deleteService(confirm.item.id);
+
       notify(
         `Service ${confirm.action === "archive" ? "archived" : "deleted"}.`,
       );
@@ -198,10 +222,13 @@ export function ServicesPage() {
       setBusy(false);
     }
   };
+
   // A knowledge-dashboard link opens the exact source listing without editing it.
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("listing");
+
     if (!id) return;
+
     let current = true;
     void getAdminService(id)
       .then((item) => {
@@ -210,11 +237,13 @@ export function ServicesPage() {
       .catch((err) => {
         if (current) setError(notifyError(err, "Could not open listing."));
       });
+
     return () => {
       current = false;
     };
   }, [notifyError]);
   const visible = rows;
+
   return (
     <div className="pe-list">
       <PageHeader
@@ -353,7 +382,8 @@ export function ServicesPage() {
             setCreating(null);
             // Transfer the create thumbnail into the edit slot before opening the editor.
             editThumbnail.reset(createThumbnail.previewUrl);
-            editThumbnail.mediaIdRef.current = createThumbnail.mediaIdRef.current;
+            editThumbnail.mediaIdRef.current =
+              createThumbnail.mediaIdRef.current;
             setEditing(form);
           }}
           validate={validateServiceDetails}
@@ -373,9 +403,10 @@ export function ServicesPage() {
         <CatalogEditor
           initial={editing}
           entity="service"
-          nameBadge={(c) => c.eventType ? <span>{c.eventType}</span> : null}
+          nameBadge={(c) => (c.eventType ? <span>{c.eventType}</span> : null)}
           onClose={() => {
             setEditing(null);
+
             if (savedDuringEditRef.current) void load();
           }}
           onSave={(form) => save(form, editThumbnail.mediaIdRef.current)}
@@ -383,9 +414,8 @@ export function ServicesPage() {
             setEditing(null);
             void load();
           }}
-          validate={(form) => {
-            const detailsError = validateServiceDetails(form);
-            if (detailsError) return detailsError;
+          validate={validateServiceDetails}
+          validateCanvas={(form) => {
             if (
               !form.sections.some((section) =>
                 section.widgets.some(
@@ -411,7 +441,7 @@ export function ServicesPage() {
             ) : (
               <div className="pe-card-preview">
                 <ServiceCard
-                  item={form}
+                  item={{ ...form, imageUrl: editThumbnail.previewUrl }}
                   action={
                     <CatalogCardActions
                       name={form.name}

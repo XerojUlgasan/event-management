@@ -13,6 +13,7 @@ import {
   saveRequestedDayTimesRouteHandler,
 } from "./save-requested-day-times.js";
 import quotationRoutes from "../quotations/index.js";
+import { jsonError } from "../../utils/service-result.js";
 import {
   getMyBookingPackageRoute,
   getMyBookingPackageRouteHandler,
@@ -31,6 +32,14 @@ import {
   updateBookingCustomPackageRoute,
   updateBookingCustomPackageRouteHandler,
 } from "./update-booking-custom-package.js";
+import {
+  addBookingAddonRoute,
+  addBookingAddonRouteHandler,
+  editBookingAddonRoute,
+  editBookingAddonRouteHandler,
+  removeBookingAddonRoute,
+  removeBookingAddonRouteHandler,
+} from "./change-booking-addon.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
@@ -63,6 +72,7 @@ import {
   getAdminBookingRequestRoute,
   getAdminBookingRequestRouteHandler,
 } from "./get-booking-request.js";
+
 const routes = new OpenAPIHono<HonoEnv>({
   defaultHook: (result, c) => {
     if (!result.success)
@@ -76,11 +86,14 @@ const routes = new OpenAPIHono<HonoEnv>({
       );
   },
 });
+
 const customer = createMiddleware<HonoEnv>(async (c, next) => {
   if (c.get("session").user.role !== "customer")
-    return c.json({ error: "Customer access required" }, 403);
+    return jsonError(c, "Customer access required", 403);
+
   await next();
 });
+
 routes.use("/booking-requests", requireSession, customer);
 routes.use("/booking-requests/*", requireSession, customer);
 routes.use("/admin/booking-requests", requireSession, requireSystemAdmin);
@@ -114,5 +127,9 @@ routes.openapi(
   updateBookingCustomPackageRoute,
   updateBookingCustomPackageRouteHandler,
 );
+routes.openapi(addBookingAddonRoute, addBookingAddonRouteHandler);
+routes.openapi(editBookingAddonRoute, editBookingAddonRouteHandler);
+routes.openapi(removeBookingAddonRoute, removeBookingAddonRouteHandler);
 routes.route("/", quotationRoutes);
+
 export default routes;

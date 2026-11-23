@@ -17,18 +17,22 @@ test("flat catalog migration keeps published content and canvases, archives draf
   const database = `em_flat_migration_${randomUUID().replaceAll("-", "")}`;
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
+
   try {
     await admin.query(`CREATE DATABASE "${database}"`);
     pool = new Pool({ ...connection, database });
     const root = new URL("../prisma/migrations/", import.meta.url);
     const migration = "20261102180000_flat_services_venues";
+
     const entries = (await readdir(root, { withFileTypes: true }))
       .filter((e) => e.isDirectory())
       .sort((a, b) => a.name.localeCompare(b.name));
+
     for (const entry of entries.filter((e) => e.name < migration))
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );
+
     const createdAt = "2026-10-01T00:00:00.000Z";
     const updatedAt = "2026-10-05T00:00:00.000Z";
     const legacyImage = randomUUID();
@@ -141,6 +145,7 @@ test("flat catalog migration keeps published content and canvases, archives draf
           [p],
         )
       ).rows[0].id;
+
       const w = (
         await pool!.query(
           `INSERT INTO catalog_widgets(section_id,type,sort_order,x,y,w,h,markdown,media_id,alt,caption,autoplay)
@@ -154,6 +159,7 @@ test("flat catalog migration keeps published content and canvases, archives draf
           ],
         )
       ).rows.map((r) => r.id);
+
       return { p, s, w };
     }
     const servicePage = await page(
@@ -239,9 +245,11 @@ test("flat catalog migration keeps published content and canvases, archives draf
         ])
       ).rows[0].archived_at,
     );
+
     const pages = (
       await pool.query("SELECT id FROM catalog_pages ORDER BY id")
     ).rows.map((r) => r.id);
+
     assert.deepEqual(
       pages,
       [servicePage.p, venuePage.p, retainedDraftPage.p, packagePage.p].sort(),
@@ -286,12 +294,14 @@ test("flat catalog migration keeps published content and canvases, archives draf
         .rows[0].description,
       "Keep package",
     );
+
     for (const name of ["service_versions", "venue_versions"])
       assert.equal(
         (await pool.query("SELECT to_regclass($1) AS name", [name])).rows[0]
           .name,
         null,
       );
+
     assert.equal(
       (
         await pool.query(

@@ -30,8 +30,11 @@ export const updateShowcaseRecordRouteHandler: AppRouteHandler<
   const { id } = c.req.valid("param");
   const body = c.req.valid("json");
   const result = await updateShowcaseRecordService(c.get("db"), id, body);
+
   if (!result) return c.json({ error: "Showcase not found." }, 404);
+
   if ("status" in result)
     return c.json({ error: result.message }, result.status);
+
   return c.json(result, 200);
 };

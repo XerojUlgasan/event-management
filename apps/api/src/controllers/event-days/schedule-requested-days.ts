@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import { scheduleRequestedDaysService } from "../../services/event-days/schedule-requested-days.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { body } from "../booking-requests/http.js";
@@ -8,7 +9,9 @@ const input = z.strictObject({
   bookingRequestId: id,
   expectedUpdatedAt: instant,
 });
+
 export type ScheduleRequestedDaysInput = z.infer<typeof input>;
+
 export const scheduleRequestedDaysRoute = createRoute({
   method: "post",
   path: "/admin/event-days/schedule-requested-days",
@@ -16,6 +19,7 @@ export const scheduleRequestedDaysRoute = createRoute({
   request: { body: body(input) },
   responses: listResponse,
 });
+
 export const scheduleRequestedDaysRouteHandler: AppRouteHandler<
   typeof scheduleRequestedDaysRoute
 > = async (c) => {
@@ -31,6 +35,7 @@ export const scheduleRequestedDaysRouteHandler: AppRouteHandler<
     );
   } catch (e) {
     const error = errorResponse(e);
-    return c.json({ error: error.message }, error.status);
+
+    return jsonError(c, error.message, error.status);
   }
 };

@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { paginationQuerySchema } from "../../utils/pagination.js";
 import { getStatusHistoryService } from "../../services/booking-requests/get-status-history.js";
@@ -28,6 +29,7 @@ const responses = {
   403: errors[403],
   404: errors[404],
 };
+
 export const getMyStatusHistoryRoute = createRoute({
   method: "get",
   path: "/booking-requests/{id}/status-history",
@@ -35,6 +37,7 @@ export const getMyStatusHistoryRoute = createRoute({
   request: { params: idParams, query: paginationQuerySchema },
   responses,
 });
+
 export const getMyStatusHistoryRouteHandler: AppRouteHandler<
   typeof getMyStatusHistoryRoute
 > = async (c) => {
@@ -44,10 +47,14 @@ export const getMyStatusHistoryRouteHandler: AppRouteHandler<
     c.req.valid("query"),
     c.get("session").user.id,
   );
-  if (!result) return c.json({ error: "Booking request not found" }, 404);
+
+  if (!result) return jsonError(c, "Booking request not found", 404);
+
   c.header("Cache-Control", "private, no-store");
+
   return c.json(result, 200);
 };
+
 export const getAdminStatusHistoryRoute = createRoute({
   method: "get",
   path: "/admin/booking-requests/{id}/status-history",
@@ -55,6 +62,7 @@ export const getAdminStatusHistoryRoute = createRoute({
   request: { params: idParams, query: paginationQuerySchema },
   responses,
 });
+
 export const getAdminStatusHistoryRouteHandler: AppRouteHandler<
   typeof getAdminStatusHistoryRoute
 > = async (c) => {
@@ -63,7 +71,10 @@ export const getAdminStatusHistoryRouteHandler: AppRouteHandler<
     c.req.valid("param").id,
     c.req.valid("query"),
   );
-  if (!result) return c.json({ error: "Booking request not found" }, 404);
+
+  if (!result) return jsonError(c, "Booking request not found", 404);
+
   c.header("Cache-Control", "private, no-store");
+
   return c.json(result, 200);
 };

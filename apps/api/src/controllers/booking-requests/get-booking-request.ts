@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { getBookingRequestService } from "../../services/booking-requests/get-booking-request.js";
 import { bookingSchema, idParams } from "./schemas.js";
@@ -14,6 +15,7 @@ const responses = {
   403: errors[403],
   404: errors[404],
 };
+
 export const getMyBookingRequestRoute = createRoute({
   method: "get",
   path: "/booking-requests/{id}",
@@ -21,6 +23,7 @@ export const getMyBookingRequestRoute = createRoute({
   request: { params: idParams },
   responses,
 });
+
 export const getMyBookingRequestRouteHandler: AppRouteHandler<
   typeof getMyBookingRequestRoute
 > = async (c) => {
@@ -29,10 +32,13 @@ export const getMyBookingRequestRouteHandler: AppRouteHandler<
     c.req.valid("param").id,
     c.get("session").user.id,
   );
+
   if (!bookingRequest)
-    return c.json({ error: "Booking request not found" }, 404);
+    return jsonError(c, "Booking request not found", 404);
+
   return c.json({ bookingRequest }, 200);
 };
+
 export const getAdminBookingRequestRoute = createRoute({
   method: "get",
   path: "/admin/booking-requests/{id}",
@@ -40,6 +46,7 @@ export const getAdminBookingRequestRoute = createRoute({
   request: { params: idParams },
   responses,
 });
+
 export const getAdminBookingRequestRouteHandler: AppRouteHandler<
   typeof getAdminBookingRequestRoute
 > = async (c) => {
@@ -47,7 +54,9 @@ export const getAdminBookingRequestRouteHandler: AppRouteHandler<
     c.get("db"),
     c.req.valid("param").id,
   );
+
   if (!bookingRequest)
-    return c.json({ error: "Booking request not found" }, 404);
+    return jsonError(c, "Booking request not found", 404);
+
   return c.json({ bookingRequest }, 200);
 };

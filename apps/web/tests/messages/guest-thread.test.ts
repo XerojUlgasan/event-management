@@ -4,13 +4,17 @@ import type { GuestThread } from "../../src/lib/data/messages/guest";
 import type { ChatMessage } from "../../src/lib/data/messages/conversations";
 import {
   addGuestSentMessages,
+  acknowledgeGuestSends,
   guestRemaining,
+  guestReservedSends,
   mergeGuestAllowance,
   mergeGuestMessages,
   mergeGuestThread,
   prepareGuestSend,
 } from "../../src/lib/services/messages/guest-thread";
+
 const message = (id: string) => ({ id }) as ChatMessage;
+
 const thread = (ids: string[], cursor: string | null, id = "guest") =>
   ({
     conversation: { id },
@@ -18,6 +22,21 @@ const thread = (ids: string[], cursor: string | null, id = "guest") =>
     nextCursor: cursor,
     guest: { remainingMessages: 1 },
   }) as GuestThread;
+
+test("polling confirms a saved guest message even after its send response is lost", () => {
+  const outbox = {
+    saved: { failed: true, definitelyUnsent: false },
+    pending: { failed: false, definitelyUnsent: false },
+  };
+  assert.deepEqual(acknowledgeGuestSends(outbox, [message("saved")]), {
+    pending: { failed: false, definitelyUnsent: false },
+  });
+  assert.equal(
+    guestReservedSends(acknowledgeGuestSends(outbox, [message("saved")])),
+    1,
+  );
+});
+
 test("send and polling responses do not duplicate the same messages", () => {
   assert.deepEqual(
     mergeGuestMessages(
@@ -62,6 +81,7 @@ test("a different guest conversation never inherits earlier history", () => {
 
 test("an uncertain send retries the original request even if the draft changes", () => {
   const first = prepareGuestSend(null, " hello ", () => "request-one");
+
   assert.deepEqual(first, { body: "hello", requestId: "request-one" });
   assert.deepEqual(
     prepareGuestSend(first, "changed", () => "request-two"),
@@ -77,6 +97,24 @@ test("an uncertain send retries the original request even if the draft changes",
   );
 });
 
+test("confirmed image rejections release guest slots while uncertain sends remain reserved", () => {
+  const rejected = Object.fromEntries(
+    Array.from({ length: 5 }, (_, index) => [
+      String(index),
+      { definitelyUnsent: true },
+    ]),
+  );
+
+  assert.equal(guestRemaining(5, guestReservedSends(rejected)), 5);
+  const withUncertain = {
+    ...rejected,
+    pending: {},
+    uncertain: { definitelyUnsent: false },
+  };
+  assert.equal(guestRemaining(5, guestReservedSends(withUncertain)), 3);
+  assert.equal(guestRemaining(0, guestReservedSends(rejected)), 0);
+});
+
 test("overlapping guest sends reserve slots and stale responses cannot restore allowance", () => {
   assert.equal(guestRemaining(5, 2), 3);
   const newerResponse = mergeGuestAllowance(5, 3);
@@ -89,6 +127,7 @@ test("overlapping guest sends reserve slots and stale responses cannot restore a
 test("late guest response is inserted by creation time without duplicating a polled reply", () => {
   const timed = (id: string, createdAt: string) =>
     ({ id, createdAt }) as ChatMessage;
+
   const m1 = timed("m1", "2026-01-01T00:00:01.000Z");
   const m2 = timed("m2", "2026-01-01T00:00:02.000Z");
   const a2 = timed("a2", "2026-01-01T00:00:03.000Z");

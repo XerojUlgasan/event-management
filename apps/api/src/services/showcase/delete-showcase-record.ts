@@ -9,15 +9,19 @@ import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-med
 export async function deleteShowcaseRecordService(db: Kysely<DB>, id: string) {
   const removed = await db.transaction().execute(async (trx) => {
     const record = await lockShowcaseRecordData(trx, id);
+
     if (!record) return null;
 
     await lockShowcaseMediaData(trx, [], id);
     const gallery = await replaceShowcaseGalleryData(trx, id, []);
     await deleteShowcaseRecordData(trx, id);
+
     return [record.cover_media_id, ...gallery];
   });
 
   if (!removed) return false;
+
   await cleanupCatalogMediaService(db, removed);
+
   return true;
 }

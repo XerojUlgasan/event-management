@@ -21,5 +21,6 @@ export async function createEventDayData(
     })
     .returning("id")
     .executeTakeFirstOrThrow();
+
   return row.id;
 }

@@ -1,3 +1,4 @@
+import { showcasePageQuery } from "./schemas.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { findPublicShowcaseRecordsData } from "../../data/showcase-records/find-public-showcase-records.js";
@@ -11,10 +12,7 @@ const responseSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
-const querySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(50).optional(),
-  cursor: z.string().optional(),
-});
+const querySchema = showcasePageQuery;
 
 export const listPublicShowcaseRecordsRoute = createRoute({
   method: "get",
@@ -59,7 +57,7 @@ export const listPublicShowcaseRecordsRouteHandler: AppRouteHandler<
   const last = page.at(-1);
   const nextCursor =
     hasMore && last && last.published_at
-      ? `${last.published_at.toISOString()}_${last.id}`
+      ? `${last.page_sort}_${last.id}`
       : null;
 
   return c.json({ showcases, nextCursor }, 200);

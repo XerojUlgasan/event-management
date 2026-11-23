@@ -23,7 +23,9 @@ const EVENT_TYPES = [
   "Conference",
   "Reunion",
 ] as const;
+
 const DATE_WINDOW_DAYS = 30;
+
 const STATUSES = [
   ...Array<BookingStatus>(25).fill("under_review"),
   ...Array<BookingStatus>(10).fill("needs_details"),
@@ -31,8 +33,10 @@ const STATUSES = [
   ...Array<BookingStatus>(10).fill("declined"),
   ...Array<BookingStatus>(5).fill("cancelled"),
 ] as const;
+
 type BookingStatus =
   "under_review" | "needs_details" | "accepted" | "declined" | "cancelled";
+
 type DayKind = "scheduled" | "moved" | "cancelled";
 
 export type ScenarioEventDay = {
@@ -61,9 +65,12 @@ function datesInWindow(now: Date, index: number, count: number) {
   const span = DATE_WINDOW_DAYS * 2;
   let start =
     -DATE_WINDOW_DAYS + Math.round((index * span) / (SCENARIO_COUNT - 1));
+
   if (start + count - 1 > DATE_WINDOW_DAYS)
     start = DATE_WINDOW_DAYS - (count - 1);
+
   if (start < -DATE_WINDOW_DAYS) start = -DATE_WINDOW_DAYS;
+
   return Array.from({ length: count }, (_, day) =>
     addUtcDays(now, start + day),
   );
@@ -83,9 +90,13 @@ function patternFor(position: number): DayKind[] {
     ["scheduled", "scheduled"],
   ];
   const pattern = patterns[position % 5];
+
   if (!pattern) throw new Error("Missing event-day pattern");
+
   const days = [...pattern];
+
   if (position % 5 === 0 && position < 20) days.push("scheduled");
+
   return days;
 }
 
@@ -105,6 +116,7 @@ function dayRecord(
   day: string,
 ): ScenarioEventDay {
   const interval = manilaInterval(day);
+
   return {
     id: scenarioId(`event-day:${bookingIndex}:${dayIndex}`),
     bookingId,
@@ -123,53 +135,71 @@ export function planScenarioActivity(input: {
   random: () => number;
 }): PlannedActivity {
   const customers = input.users.filter((user) => user.role === "customer");
+
   const availablePackages = input.packages.filter((pkg) => !pkg.archived);
+
   if (customers.length < 2 || availablePackages.length === 0) {
     throw new Error(
       "Scenario activity requires customers and a published package",
     );
   }
+
   const statuses = shuffle(STATUSES, input.random);
+
   const drafts = statuses.map((status, index) => ({
     index,
     status,
     id: scenarioId(`booking:${index}`),
   }));
+
   const scheduled = drafts
     .filter((booking) => booking.status === "accepted")
     .sort((a, b) => a.id.localeCompare(b.id))
     .slice(0, 40);
+
   const scheduledIds = new Set(scheduled.map((booking) => booking.id));
+
   const bookings: ScenarioBooking[] = [];
   const requestedDays = new Map<string, string | null>();
 
   for (const draft of drafts) {
     const customer = customers[draft.index % customers.length];
     const pkg = availablePackages[draft.index % availablePackages.length];
+
     if (!customer || !pkg)
       throw new Error("Scenario booking is missing a customer or package");
+
     const eventDays: ScenarioEventDay[] = [];
     let requested: string | null = null;
+
     if (scheduledIds.has(draft.id)) {
       const position = scheduled.findIndex(
         (booking) => booking.id === draft.id,
       );
+
       const specs = patternFor(position);
       const dates = datesInWindow(input.now, draft.index, specs.length);
       specs.forEach((spec, dayIndex) => {
         const day = dates[dayIndex];
+
         if (!day) throw new Error("Scenario event day is missing a date");
+
         eventDays.push(dayRecord(draft.id, draft.index, dayIndex, spec, day));
       });
+
       const moved = eventDays.find((day) => day.status === "moved");
+
       if (moved) {
         const replacement = eventDays.find((day) => day.status === "scheduled");
+
         if (!replacement || replacement.id === moved.id)
           throw new Error(
             `Moved day ${moved.id} needs a replacement on the same booking`,
           );
+
         moved.replacementEventDayId = replacement.id;
       }
+
       requested = JSON.stringify(
         eventDays.map((day) => ({
           date: day.day,
@@ -188,14 +218,17 @@ export function planScenarioActivity(input: {
         dates.map((date) => ({ date, startsAt: null, endsAt: null })),
       );
     }
+
     const preferredDate =
       eventDays[0]?.day ??
       (requested
         ? (JSON.parse(requested) as Array<{ date: string }>)[0]?.date
         : undefined) ??
       datesInWindow(input.now, draft.index, 1)[0];
+
     if (!preferredDate)
       throw new Error("Scenario booking is missing a preferred date");
+
     requestedDays.set(draft.id, requested);
     const reference = `SCN-${scenarioIndex(draft.index)}`;
     bookings.push({
@@ -212,17 +245,23 @@ export function planScenarioActivity(input: {
       eventDays,
     });
   }
+
   const earliest = addUtcDays(input.now, -DATE_WINDOW_DAYS);
   const latest = addUtcDays(input.now, DATE_WINDOW_DAYS);
   const covered = new Set<string>();
+
   for (const booking of bookings) {
     covered.add(booking.preferredDate);
+
     for (const day of booking.eventDays) covered.add(day.day);
+
     const requested = requestedDays.get(booking.id);
+
     if (requested)
       for (const day of JSON.parse(requested) as Array<{ date: string }>)
         covered.add(day.date);
   }
+
   if (
     !covered.has(earliest) ||
     !covered.has(latest) ||
@@ -238,6 +277,7 @@ export function planScenarioActivity(input: {
     "event days",
     bookings.reduce((sum, booking) => sum + booking.eventDays.length, 0),
   );
+
   return { bookings, requestedDays };
 }
 
@@ -251,10 +291,15 @@ export async function seedScenarioActivity(
   },
 ) {
   const admins = input.users.filter((user) => user.role === "admin");
+
   const admin = admins[0];
+
   if (!admin) throw new Error("Scenario activity requires an administrator");
+
   const packages = new Map(input.packages.map((pkg) => [pkg.id, pkg]));
+
   const customers = new Map(input.users.map((user) => [user.id, user]));
+
   let bookings = 0;
   let history = 0;
   let conversations = 0;
@@ -263,10 +308,12 @@ export async function seedScenarioActivity(
   for (const [index, booking] of input.plan.bookings.entries()) {
     const pkg = packages.get(booking.packageId);
     const customer = customers.get(booking.customerId);
+
     if (!pkg || !customer)
       throw new Error(
         `Scenario booking ${booking.reference} is missing its customer or package`,
       );
+
     const guestCount =
       index % 7 === 0
         ? null
@@ -281,6 +328,7 @@ export async function seedScenarioActivity(
       : "undecided";
     const requested = input.plan.requestedDays.get(booking.id);
     const preferredDate = booking.preferredDate;
+
     if (
       await insertIfNew(db, "booking_requests", {
         id: booking.id,
@@ -321,6 +369,7 @@ export async function seedScenarioActivity(
           : booking.status === "cancelled"
             ? "The customer cancelled this request."
             : null;
+
     if (
       await insertIfNew(db, "booking_request_status_history", {
         id: scenarioId(`history:${index}`),
@@ -333,16 +382,10 @@ export async function seedScenarioActivity(
     )
       history += 1;
 
-    const closed =
-      booking.status === "declined" ||
-      booking.status === "cancelled" ||
-      index % 17 === 0;
     if (
       await insertIfNew(db, "conversations", {
         id: scenarioId(`conversation:${index}`),
         customer_id: customer.id,
-        status: closed ? "closed" : "active",
-        closed_at: closed ? input.now : null,
         booking_request_id: booking.id,
         created_at: input.now,
         updated_at: new Date(input.now.getTime() - 1000),
@@ -351,8 +394,10 @@ export async function seedScenarioActivity(
       conversations += 1;
 
     const messageCount = index < 40 ? 1 : index < 60 ? 2 : index < 65 ? 4 : 0;
+
     for (let step = 0; step < messageCount; step += 1) {
       const fromCustomer = step % 2 === 0;
+
       if (
         await insertIfNew(db, "messages", {
           id: scenarioId(`message:${index}:${step}`),
@@ -372,6 +417,7 @@ export async function seedScenarioActivity(
 
   expectCount("status history", input.plan.bookings.length);
   expectCount("booking conversations", input.plan.bookings.length);
+
   return {
     bookings: input.plan.bookings,
     inserted: { bookings, history, conversations, messages },

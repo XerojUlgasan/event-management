@@ -19,6 +19,7 @@ export async function replaceShowcaseGalleryData(
     const positions = mediaIds.map(
       (id, position) => sql`WHEN ${id}::uuid THEN ${position}::integer`,
     );
+
     await db
       .updateTable("media_assets")
       .set({

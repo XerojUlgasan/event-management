@@ -25,6 +25,7 @@ export function CatalogCreateDialog<T extends { name: string }>({
   const [content, setContent] = useState(initial);
   const [error, setError] = useState("");
   const nameInput = useRef<HTMLInputElement>(null);
+
   return (
     <Dialog
       title={privateProposal ? "Create private package" : `Create ${entity}`}
@@ -41,6 +42,7 @@ export function CatalogCreateDialog<T extends { name: string }>({
           event.preventDefault();
           const message = validate(content);
           setError(message ?? "");
+
           if (!message) onContinue(content);
         }}
       >

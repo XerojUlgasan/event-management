@@ -11,6 +11,7 @@ export async function getAdminConversationService(
   cursor?: string,
 ) {
   const conversation = await findConversationData(db, id);
+
   return conversation
     ? getConversationThreadService(db, conversation, "admin", limit, cursor)
     : null;

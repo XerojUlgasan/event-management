@@ -4,8 +4,11 @@ const configuredApiUrl = env.PUBLIC_API_URL;
 
 export function apiBase() {
   const trimmed = configuredApiUrl.replace(/\/$/, "");
+
   if (/^https?:\/\//.test(trimmed)) return trimmed;
+
   if (typeof window === "undefined") return trimmed;
+
   return new URL(
     trimmed.replace(/^\//, ""),
     `${window.location.origin}/`,
@@ -17,6 +20,7 @@ export class ApiError extends Error {
     message: string,
     public status: number,
     public code?: string,
+    public resourceId?: string,
   ) {
     super(message);
   }
@@ -41,6 +45,7 @@ export async function request<T>(
       ? { body: body instanceof FormData ? body : JSON.stringify(body) }
       : {}),
   });
+
   if (!response.ok) {
     // A 401 on a data request may mean the cookie expired. Authentication
     // endpoints also use 401 for bad credentials, so they are excluded.
@@ -52,13 +57,16 @@ export async function request<T>(
     ) {
       window.dispatchEvent(new Event("clemora:session-check"));
     }
+
     const result = (await response.json().catch(() => ({}))) as {
       success?: boolean;
       code?: string;
+      resourceId?: string;
       error?:
         | string
         | { issues?: { path?: (string | number)[]; message?: string }[] };
     };
+
     throw new ApiError(
       typeof result.error === "string"
         ? result.error
@@ -69,11 +77,15 @@ export async function request<T>(
                   `${issue.path?.join(".") || "Field"}: ${issue.message || "invalid value"}`,
               )
               .join("; ")
-          : "Please check the form and try again.",
+          : response.status === 400 || response.status === 422
+            ? "Please check the form and try again."
+            : "Unable to complete the request. Please try again.",
       response.status,
       result.code,
+      typeof result.resourceId === "string" ? result.resourceId : undefined,
     );
   }
+
   return response.status === 204
     ? (undefined as T)
     : ((await response.json()) as T);

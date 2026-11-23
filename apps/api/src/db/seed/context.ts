@@ -5,6 +5,7 @@ import type { DB } from "../types.js";
 
 export const SCENARIO_COUNT = 100;
 export const LOCAL_PASSWORD = "p@ssword01";
+
 export type SeedDb = Transaction<DB>;
 
 /** Stable UUID for a seed key. Existing rows are never updated. */
@@ -16,6 +17,7 @@ export function scenarioId(key: string) {
   bytes[6] = (bytes[6] & 0x0f) | 0x50;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = bytes.toString("hex");
+
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
@@ -25,50 +27,64 @@ export function scenarioIndex(index: number) {
 
 export function seedClock() {
   const value = env.SEED_CLOCK;
+
   if (!value) return new Date();
+
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) {
     throw new Error(
       "SEED_CLOCK must be an ISO UTC timestamp, for example 2026-10-31T00:00:00Z",
     );
   }
+
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime()))
     throw new Error("SEED_CLOCK is not a valid date");
+
   return date;
 }
 
 /** Deterministic unit interval. SEED_RANDOM_SEED changes the shuffle only. */
 export function seedRandom(seedText = env.SEED_RANDOM_SEED) {
   let hash = 2166136261;
+
   for (let i = 0; i < seedText.length; i += 1)
     hash = Math.imul(hash ^ seedText.charCodeAt(i), 16777619);
+
   let state = hash >>> 0;
+
   return () => {
     state = (state + 0x6d2b79f5) >>> 0;
     let value = state;
     value = Math.imul(value ^ (value >>> 15), value | 1);
     value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+
     return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
   };
 }
 
 export function shuffle<T>(items: readonly T[], random: () => number) {
   const copy = [...items];
+
   for (let i = copy.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
     const current = copy[i];
     const swap = copy[j];
+
     if (current === undefined || swap === undefined)
       throw new Error("Shuffle index was empty");
+
     copy[i] = swap;
     copy[j] = current;
   }
+
   return copy;
 }
 
 export function addUtcDays(date: Date, days: number) {
   const next = new Date(date.getTime());
   next.setUTCDate(next.getUTCDate() + days);
+
   return next.toISOString().slice(0, 10);
 }
 
@@ -90,6 +106,7 @@ export async function insertIfNew<
     .onConflict((conflict) => conflict.column("id").doNothing())
     .returning("id")
     .executeTakeFirst();
+
   return inserted !== undefined;
 }
 

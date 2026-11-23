@@ -12,7 +12,9 @@ import {
 } from "./catalog-knowledge-hash.js";
 
 const model = "google/gemini-embedding-2";
+
 type Asset = Selectable<MediaAssets>;
+
 type Row = {
   chunk_key: string;
   content_markdown: string;
@@ -22,6 +24,7 @@ type Row = {
   embedded_at: Date | null;
   has_embedding: boolean;
 };
+
 type Chunk = ReturnType<typeof prepareCatalogKnowledge>[number];
 
 export function assessKnowledgeChunk(
@@ -57,6 +60,7 @@ export function assessKnowledgeChunk(
     digestMatches;
   const invalidEmbedded = !!row?.has_embedding && !indexed;
   let mediaUrl: string | null = null;
+
   if (
     kind === "photo" &&
     (!row || row.media_id === chunk.mediaId) &&
@@ -71,6 +75,7 @@ export function assessKnowledgeChunk(
     sampleCatalogPhotoPaths.includes(asset.url)
   )
     mediaUrl = asset.url;
+
   return {
     key: chunk.chunkKey,
     kind,
@@ -97,6 +102,7 @@ export function assessKnowledgeListing(
   assets: Map<string, Asset>,
 ) {
   const byKey = new Map(rows.map((row) => [row.chunk_key, row]));
+
   const chunks = expected.map((chunk) =>
     assessKnowledgeChunk(
       chunk,
@@ -104,11 +110,15 @@ export function assessKnowledgeListing(
       chunk.mediaId ? assets.get(chunk.mediaId) : undefined,
     ),
   );
+
   const expectedKeys = new Set(expected.map((chunk) => chunk.chunkKey));
+
   const extra = rows.some((row) => !expectedKeys.has(row.chunk_key));
+
   const indexedChunks = chunks.filter(
     (chunk) => chunk.status === "indexed",
   ).length;
+
   const status =
     extra || chunks.some((chunk) => chunk.status === "needs-refresh")
       ? "needs-refresh"
@@ -117,10 +127,12 @@ export function assessKnowledgeListing(
         : indexedChunks > 0
           ? "partial"
           : "pending";
+
   // Listing time covers expected source chunks; withdrawn rows are separate.
   const timestamps = chunks
     .flatMap((chunk) => (chunk.embeddedAt ? [chunk.embeddedAt] : []))
     .sort();
+
   const listing: KnowledgeListing = {
     ...owner,
     status,
@@ -130,6 +142,7 @@ export function assessKnowledgeListing(
     photoChunks: chunks.filter((chunk) => chunk.kind === "photo").length,
     lastIndexedAt: timestamps.at(-1) ?? null,
   };
+
   const withdrawn: KnowledgeChunk[] = rows
     .filter((row) => !expectedKeys.has(row.chunk_key))
     .map((row) => ({
@@ -141,5 +154,6 @@ export function assessKnowledgeListing(
       mediaUrl: null,
       embeddedAt: row.embedded_at?.toISOString() ?? null,
     }));
+
   return { listing, chunks: [...chunks, ...withdrawn] };
 }

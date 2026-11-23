@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Badge,
   Button,
-  CatalogMarkdown,
+  Markdown,
   Drawer,
   Pagination,
 } from "@event-management/ui";
@@ -47,11 +47,13 @@ export function KnowledgeDetailDrawer({
       .finally(() => {
         if (seq.current === current) setLoading(false);
       });
+
     return () => {
       seq.current++;
     };
   }, [item.id, item.kind, pages.cursor, retry]);
   const listing = data?.listing ?? item;
+
   return (
     <Drawer
       title={listing.name}
@@ -105,7 +107,7 @@ export function KnowledgeDetailDrawer({
                   <KnowledgeHelp text="Old content awaiting reconciliation; excluded from coverage." />
                 )}
                 {chunk.contentMarkdown && (
-                  <CatalogMarkdown source={chunk.contentMarkdown} />
+                  <Markdown source={chunk.contentMarkdown} />
                 )}
                 {chunk.kind === "photo" && chunk.mediaUrl && (
                   <img

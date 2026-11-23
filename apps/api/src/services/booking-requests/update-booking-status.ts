@@ -4,6 +4,7 @@ import type { Status } from "../../controllers/booking-requests/schemas.js";
 import { addStatusHistoryData } from "../../data/booking-requests/add-status-history.js";
 import { lockBookingRequestData } from "../../data/booking-requests/lock-booking-request.js";
 import { updateBookingStatusData } from "../../data/booking-requests/update-booking-status.js";
+import { createNotificationData } from "../../data/notifications/create-notification.js";
 import { error } from "./booking-request-rules.js";
 import { bookingRequestDtos } from "./booking-request-response.js";
 import { cancelScheduledEventDaysService } from "./cancel-scheduled-event-days.js";
@@ -17,16 +18,37 @@ export async function updateBookingStatusService(
 ) {
   return db.transaction().execute(async (trx) => {
     const row = await lockBookingRequestData(trx, id);
+
     if (!row) return error("Booking request not found", 404);
+
     if (
       ["declined", "cancelled"].includes(row.status) ||
       row.status === status ||
       status === "under_review"
     )
       return error("Invalid status transition", 409);
+
     if (status === "cancelled") await cancelScheduledEventDaysService(trx, id);
+
     const updated = await updateBookingStatusData(trx, id, status);
-    await addStatusHistoryData(trx, id, status, actorId, reason || null);
+    const event = await addStatusHistoryData(
+      trx,
+      id,
+      status,
+      actorId,
+      reason || null,
+    );
+
+    if (row.customer_id !== actorId)
+      await createNotificationData(trx, { userId: row.customer_id }, event.id, {
+        type: "booking_status_updated",
+        payload: {
+          bookingRequestId: id,
+          bookingReference: row.reference,
+          status,
+        },
+      });
+
     return (await bookingRequestDtos(trx, [updated]))[0]!;
   });
 }

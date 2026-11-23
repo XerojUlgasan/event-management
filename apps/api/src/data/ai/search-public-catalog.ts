@@ -1,5 +1,6 @@
 import type { Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
+
 type Filters = {
   catalogType: "package" | "service";
   minPricePesos?: number;
@@ -19,11 +20,15 @@ export async function searchPublicCatalogData(
       .where("package_type", "=", "catalog")
       .where("archived_at", "is", null)
       .where("published_at", "is not", null);
+
     if (input.minPricePesos !== undefined)
       q = q.where("price", ">=", input.minPricePesos);
+
     if (input.maxPricePesos !== undefined)
       q = q.where("price", "<=", input.maxPricePesos);
+
     if (input.pax !== undefined) q = q.where("max_guests", ">=", input.pax);
+
     return (await q.execute()).map((row) => ({
       id: row.id,
       type: "package" as const,
@@ -39,6 +44,7 @@ export async function searchPublicCatalogData(
       capacity: row.max_guests,
     }));
   }
+
   let q = db
     .selectFrom("services")
     .select([
@@ -51,16 +57,22 @@ export async function searchPublicCatalogData(
       "included_hours",
     ])
     .where("archived_at", "is", null);
+
   if (input.pricingType === "fixed")
     q = q.where("fixed_price_pesos", "is not", null);
+
   if (input.pricingType === "hourly")
     q = q.where("fixed_price_pesos", "is", null);
+
   const priceColumn =
     input.pricingType === "fixed" ? "fixed_price_pesos" : "hourly_rate_pesos";
+
   if (input.minPricePesos !== undefined)
     q = q.where(priceColumn, ">=", input.minPricePesos);
+
   if (input.maxPricePesos !== undefined)
     q = q.where(priceColumn, "<=", input.maxPricePesos);
+
   return (await q.execute()).map((row) => ({
     id: row.id,
     type: "service" as const,

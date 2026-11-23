@@ -1,0 +1,16 @@
+.message-suggested-replies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-self: flex-start;
+  max-width: 100%;
+  margin-top: 4px;
+}
+.message-suggested-replies > .button {
+  min-width: 0;
+  max-width: 100%;
+  padding-block: 4px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}

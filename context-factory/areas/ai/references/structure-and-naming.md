@@ -1,98 +1,48 @@
 # AI structure and naming
 
-Read [AI](../SKILL.md) for routing and [standards](standards-and-verification.md) for execution rules. This is the agreed placement for new AI work, not a claim that these application files exist. Start with the files required by the authorized slice; introduce the remaining responsibilities when needed.
+Use this page to decide where a change belongs. Follow the [code walkthrough](code-examples.md) for runtime composition and [standards](standards-and-verification.md) for execution rules.
 
-## Placement
+## Current owners
 
-Keep the first assistant in `apps/api/src/services/ai/`. Its current consumers and business dependencies belong to the API. A separate workspace package becomes appropriate when a second real server consumer needs a shared implementation; it is not required to make the first agent modular.
+The assistant stays in `apps/api/src/services/ai/`, alongside its API consumers and business dependencies. Introduce a shared workspace package when a second real server consumer needs it.
 
-```text
-apps/api/src/services/ai/
-├── run-assistant-turn.ts
-├── assistant-context.ts
-├── models.ts
-├── agents/
-│   └── create-customer-service-agent.ts
-├── tools/
-│   ├── list-public-packages.ts
-│   ├── get-public-package.ts
-│   └── get-my-inquiry.ts
-├── prompts/
-│   └── customer-service-prompt.ts
-├── decisions/
-│   └── classify-customer-message.ts
-├── workflows/
-│   ├── collect-inquiry-details.ts
-│   └── request-human-handoff.ts
-└── retrieval/
-    ├── retrieve-approved-knowledge.ts
-    └── embed-knowledge-text.ts
-```
+| Owner                                                                                                                   | Responsibility                                                                                                                                                    |
+| ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [run-assistant-turn.ts](../../../../apps/api/src/services/ai/run-assistant-turn.ts)                                     | Application entry: authorized conversation/history, server context, turn identity/deadline, agent execution, and guarded reply coordination.                      |
+| [assistant-context.ts](../../../../apps/api/src/services/ai/assistant-context.ts)                                       | Build the narrow timestamp/booking projection and eligible prior search continuation from server-loaded records.                                                  |
+| [models.ts](../../../../apps/api/src/services/ai/models.ts)                                                             | Construct the text-model handle on use; configuration belongs to [env.ts](../../../../apps/api/src/utils/env.ts). Embedding setup lives in the retrieval adapter. |
+| [agents/create-customer-service-agent.ts](../../../../apps/api/src/services/ai/agents/create-customer-service-agent.ts) | Compose the model, prompt, explicit tool map, and bounded SDK loop.                                                                                               |
+| [tools/search-public-catalog.ts](../../../../apps/api/src/services/ai/tools/search-public-catalog.ts)                   | Adapt a capability to the SDK: description/schema, trusted dependencies, execution guards, audit lifecycle, and sanitized tool errors.                            |
+| [search-public-catalog.ts](../../../../apps/api/src/services/ai/search-public-catalog.ts)                               | Search input validation, exact-filter semantics, optional semantic ranking, pagination, and small public result projection.                                       |
+| [tools/get-public-catalog-item.ts](../../../../apps/api/src/services/ai/tools/get-public-catalog-item.ts) | Public detail tool, execution guards/audit, and Markdown model-output conversion. |
+| [get-public-catalog-item.ts](../../../../apps/api/src/services/ai/get-public-catalog-item.ts) | Current public facts, ordered canvas projection, and bounded source-bound continuation. |
+| [prompts/customer-service-prompt.ts](../../../../apps/api/src/services/ai/prompts/customer-service-prompt.ts)           | Reusable assistant instructions. Current facts arrive as context or tool results.                                                                                 |
+| [retrieval/](../../../../apps/api/src/services/ai/retrieval/)                                                           | Embedding/image adapters and knowledge retrieval. Reuse source/freshness assessment without depending on an admin dashboard builder.                              |
+| [workflows/](../../../../apps/api/src/services/ai/workflows/)                                                           | Application-defined catalog preparation, synchronization, and embedding refresh; durable scheduling belongs to [background jobs](../../background-jobs/SKILL.md).                                                                   |
+| [data/ai/](../../../../apps/api/src/data/ai/)                                                                           | Focused Kysely queries for knowledge/search and tool-call persistence; shared database/owner types stay here.                                                     |
+| [create-assistant-message.ts](../../../../apps/api/src/data/messages/create-assistant-message.ts)                       | Existing message transaction, including final AI-state guard and links from completed tool calls to the saved reply.                                              |
 
-The [code examples](code-examples.md) demonstrate every file above. The full tree explains the available responsibilities; creating empty folders or unused functions is not part of adopting it.
+## Extending the assistant
 
-The implemented customer-service agent lives in `agents/create-customer-service-agent.ts`; `tools/search-public-catalog.ts` owns the SDK definition, execution bounds, and audit lifecycle. `services/ai/search-public-catalog.ts` owns search validation, exact filtering, semantic freshness/ranking, pagination, and the small public projection. Focused query and audit operations live in `data/ai/`. The application entry retains trusted conversation scope and reply coordination; resulting tool-call links share the assistant-message transaction.
+The assistant can call `updateBookingDraft` to save details for the current conversation. When the customer replies to a current review, the server assesses their intent in context. An approval authorizes the server to revalidate and submit the reviewed row. [Draft tool](../../../../apps/api/src/services/ai/tools/booking-draft.ts) · [Consent assessment](../../../../apps/api/src/services/ai/assess-booking-consent.ts) · [Booking specification](../../../../docs/specs/amac-conversational-booking.md)
 
-The implemented catalog knowledge slice keeps admin list/detail operations in
-`services/ai/`, with shared source loading, freshness assessment, and hashing in
-purpose-named files there. `workflows/` owns catalog preparation, transactional
-synchronization, embedding refresh, and its separate after-commit scheduler.
-`retrieval/` owns semantic search and embedding/image adapters. Search and admin
-inspection share knowledge assessment rather than depending on a dashboard
-builder. Queries live in operation-named files under `data/ai/`; import them
-directly, with shared database/owner types in `catalog-knowledge-types.ts`.
+Customer-only [getMyPackage](../../../../apps/api/src/services/ai/tools/get-my-package.ts) uses an empty input schema and server-bound conversation/customer scope. Its [service](../../../../apps/api/src/services/ai/get-my-package.ts) reuses the owned booking-package read and returns complete sections/widgets as JSON. The SDK adapter preserves full Markdown while auditing bounded result identity/count metadata; the agent shares call and remaining proposal-result character budgets. Guest turns never receive this tool.
 
-| Owner                   | Responsibility                                                                                             | Keep elsewhere                                                             |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `run-assistant-turn.ts` | Public application entry; coordinate the authorized context, selected path, agent result, and turn outcome | HTTP parsing/response mapping in controllers; SQL in data                  |
-| `assistant-context.ts`  | Narrow trusted runtime input, such as authenticated customer scope and provided dependencies               | Model-controlled identity/roles and raw client-supplied history            |
-| `models.ts`             | Map configured model IDs to language, decision, and embedding roles; construct provider handles on use     | Env parsing/defaults in `src/utils/env.ts`                                 |
-| `agents/`               | Compose a model, prompt, permitted tools, and bounded model-driven loop                                    | Domain rules, transactions, and direct SQL                                 |
-| `tools/`                | SDK descriptions, input schemas, scoped execution, and small result projections                            | Duplicated package/inquiry/message business logic                          |
-| `prompts/`              | Agent behavior and reusable prompt builders                                                                | Credentials, live prices, authorization, and authoritative business policy |
-| `decisions/`            | Typed model assessments with explicit questions and criteria                                               | Permissions or binding business commitments                                |
-| `workflows/`            | Application-controlled sequences, branching, and side-effect policy                                        | A second agent loop or wrappers that only forward arguments                |
-| `retrieval/`            | Prepare search input, obtain approved evidence, and retain source identity                                 | SQL in data; document approval and publishing in their domain owners       |
+Automatic [interpretMessageImage](../../../../apps/api/src/services/ai/tools/interpret-message-image.ts) is an audited SDK tool invoked by the [image-message worker](../../../../apps/api/src/services/background-jobs/handlers/process-image-message.ts) after private upload and message acceptance. Only image-containing messages enqueue this job; text-only customer/guest replies stay in the synchronous send flow. Server-bound saved IDs and the active lease determine tool scope; the vision service owns interpretation and the adapter owns execution records. Interpretation runs independently of chat AI state and links directly to the saved human source message. It is absent from the chat agent's optional tool map. [Message-processing data](../../../../apps/api/src/data/messages/message-processing.ts) owns atomic image-job enqueue, lease checks and derived public progress; the worker sequences validation, observations and any eligible scoped assistant turn.
 
-Use `workflows/` for processes so the directory's meaning stays consistent. An agent chooses among tools; a workflow defines steps in code. A tool can call a workflow when the agent needs to select that process. The root entry already owns one turn's coordination; it needs no extra workflow file that merely repeats the same call.
+1. Define the capability's audience, allowed inputs, result, and failure behavior using the relevant business rules. Determine which values are model choices and which must come from the authorized turn.
+2. Put domain behavior in the existing domain service. Use `services/ai/` for AI-specific orchestration/search policy and `data/<domain>/` for SQL. Reuse these owners rather than copying business rules into an SDK callback.
+3. Add a purpose-named tool factory under `tools/` when the model must choose that capability. Bind trusted dependencies when constructing it, then register its camelCase key explicitly in the agent's `tools` map. Keep tool use model-selected from the first step. Update descriptions and prompt instructions for source selection and interpretation.
+4. Extend the existing turn entry and audit path as needed. A new tool does not require another HTTP endpoint, agent, or generic registry. Add public contracts or UI only when the authorized consumer needs them.
 
-## Keep existing layers
+Route middleware does not execute when a tool calls a service directly. Pass trusted owner scope to domain services and inspect their checks; for example, a customer tool calling [getBookingRequestService](../../../../apps/api/src/services/booking-requests/get-booking-request.ts) must supply its customer argument.
 
-```text
-HTTP controller
-  → runAssistantTurnService
-    → agent / selected workflow
-      → scoped tools / typed decisions / retrieval
-        → existing business services
-          → domain data queries
-```
+An agent chooses tools; a workflow defines steps in code. Add a workflow for a concrete multi-step responsibility, and a separate decision module only when a typed model assessment improves the flow. Neither folder provides durable execution. Do not create unused classifiers, handoff adapters, or placeholder trees.
 
-- HTTP validation, sessions, OpenAPI, and response/stream mapping stay in `controllers/<domain>/`. Use `controllers/ai/` for a dedicated AI route family when needed, or the existing messages controller when that flow owns the operation. Update both Node and Edge registration for the chosen route; see [API structure](../../api/references/structure-and-routes.md).
-- Tools call the existing package, inquiry, and message services with explicit trusted scope. Route middleware does not run when a tool calls a service directly. The optional customer argument of [get-booking-request.ts](../../../../apps/api/src/services/booking-requests/get-booking-request.ts) must be supplied by a customer tool.
-- Kysely queries remain in `data/<domain>/`. Add `data/ai/` only for actual AI-owned persistence. Shared contracts and limits stay in `packages/contracts`; schema and migrations retain their existing owners.
-- Environment names, validation, and defaults stay in [env.ts](../../../../apps/api/src/utils/env.ts). Model setup consumes that utility on use. Framework initialization remains at existing entry points.
-- Put new AI behavior tests under `apps/api/tests/ai/`, with descriptive filenames such as `customer-inquiry-access.test.ts` or `assistant-turn.test.ts`. Existing domain suites continue to prove their domain behavior.
+HTTP validation, sessions, OpenAPI, and response mapping stay with the existing controller family. Follow [API structure](../../api/references/structure-and-routes.md) if route registration changes, including Node and Edge. Model credentials/configuration stay server-side in the existing env owner. Behavior tests belong under `apps/api/tests/ai/`; domain suites retain their own responsibilities.
 
-## Naming
+## Naming and imports
 
-| Item                                          | Convention                                          | Example                                  |
-| --------------------------------------------- | --------------------------------------------------- | ---------------------------------------- |
-| Folders and TypeScript files                  | kebab-case, responsibility-specific                 | `tools/get-my-inquiry.ts`                |
-| Public application operation                  | verb + object, `Service` suffix                     | `runAssistantTurnService`                |
-| Agent factory                                 | `create` + purpose + `Agent`                        | `createCustomerServiceAgent`             |
-| Tool factory                                  | `create` + action + `Tool`                          | `createGetMyInquiryTool`                 |
-| Tool key exposed to the model                 | Clear camelCase action                              | `getMyInquiry`                           |
-| Internal workflow/decision/retrieval function | camelCase verb + object                             | `classifyCustomerMessage`                |
-| Prompt value or builder                       | purpose + `Prompt`, or `build` + purpose + `Prompt` | `customerServicePrompt`                  |
-| Types and schemas                             | PascalCase type; camelCase schema                   | `AssistantContext`, `inquiryDraftSchema` |
-| Relative TypeScript imports                   | Existing NodeNext `.js` convention                  | `../models.js`                           |
+Use kebab-case files named for their operation, such as `tools/search-public-catalog.ts`. Follow existing exports: `runAssistantTurnService`, `createCustomerServiceAgent`, `createSearchPublicCatalogTool`, `searchPublicCatalog`, and `customerServicePrompt`. Tool names should communicate action and audience; service exports retain their domain terminology. Use normal direct imports with the existing NodeNext `.js` suffix.
 
-Names should identify the action and audience: `list-public-packages`, `get-my-inquiry`, and `retrieve-approved-knowledge` reveal scope. Keep existing API names such as booking requests in their domain owners; a customer-facing inquiry tool can call them without renaming that domain. Avoid generic `manager`, `processor`, `helpers`, `common`, and `shared` files whose purpose is unclear.
-
-Use normal imports and a deliberate tool map in the agent factory. Add registries, generic base agents, provider interfaces, or re-export layers only for an established need. Multiple agents can share tools and retrieval; group by agent later when independent behavior actually differs.
-
-## Prompt files
-
-Start with TypeScript strings or builders in `prompts/`. This works with the current Node entry and [Edge bundler](../../../../apps/api/scripts/build-edge.ts) without runtime filesystem reads or a new Markdown loader. Short operation-specific extraction instructions and decision criteria may remain beside their schema; extract reusable or substantial prompts into purpose-named files.
-
-Prompts contain instructions, not current catalog facts. Supply retrieved evidence and user text as data, keep their provenance, and enforce access in code. If Markdown prompts become useful, first define their build-time loading and verify both runtimes.
+Keep prompts as TypeScript strings/builders so Node and Edge can load them without runtime filesystem access. Add a registry, base agent, provider abstraction, or Markdown loader only for a demonstrated need, and verify affected runtimes.

@@ -1,5 +1,6 @@
 import type { Kysely, Selectable, Transaction } from "kysely";
 import type { DB, MediaAssets, ShowcaseRecords } from "../../db/types.js";
+
 type Database = Kysely<DB> | Transaction<DB>;
 
 export type AssetRow = Pick<
@@ -16,6 +17,7 @@ export async function findAssetsForRecordsData(
   records: Selectable<ShowcaseRecords>[],
 ): Promise<Map<string, AssetRow>> {
   const ids = new Set(records.map((record) => record.cover_media_id));
+
   if (ids.size === 0) return new Map();
 
   const rows = await db

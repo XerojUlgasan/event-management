@@ -23,6 +23,7 @@ export const listPublicPackagesRoute = createRoute({
     ...errors,
   },
 });
+
 export const listPublicPackagesRouteHandler: AppRouteHandler<
   typeof listPublicPackagesRoute
 > = async (c) =>

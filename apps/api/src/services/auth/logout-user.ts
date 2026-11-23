@@ -13,7 +13,9 @@ type AuthContext = Context<HonoEnv>;
 
 export async function logoutUserService(c: AuthContext) {
   const token = getCookie(c, SESSION_COOKIE);
+
   if (token)
     await deleteSessionByTokenHashData(c.get("db"), hashSessionToken(token));
+
   clearSessionCookie(c);
 }

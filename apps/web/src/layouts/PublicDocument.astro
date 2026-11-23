@@ -1,8 +1,11 @@
 ---
 import "../styles/app.css";
 import "../styles/catalog/public-catalog.css";
-import "../styles/showcase.css";
+import "../styles/showcases/public.css";
 import { Brand, Icon } from "@event-management/ui";
+import { BusinessInformationFooter } from "../components/public/site/BusinessInformationFooter";
+import { loadBusinessInformation } from "../lib/server/business-information/load-business-information";
+import type { BusinessInformation } from "@event-management/contracts/business-information";
 
 interface Props {
   title: string;
@@ -10,6 +13,16 @@ interface Props {
 }
 
 const { title, description } = Astro.props;
+
+Astro.response.headers.set("Cache-Control", "no-store");
+
+let businessInformation: BusinessInformation | null = null;
+
+try {
+  businessInformation = (await loadBusinessInformation()).information;
+} catch {
+  // Optional footer details must not prevent visitors from browsing the catalog.
+}
 ---
 
 <!doctype html>
@@ -21,6 +34,28 @@ const { title, description } = Astro.props;
     <link rel="canonical" href={Astro.url.href} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>{title}</title>
+    <script>
+      // Public catalog cards are server-rendered, so React handlers do not run.
+      const hideFailedThumbnail = (image: HTMLImageElement) => {
+        if (image.matches("[data-catalog-thumbnail-image]"))
+          image.hidden = true;
+      };
+
+      document.addEventListener(
+        "error",
+        (event) => {
+          if (event.target instanceof HTMLImageElement)
+            hideFailedThumbnail(event.target);
+        },
+        true,
+      );
+      document
+        .querySelectorAll<HTMLImageElement>("[data-catalog-thumbnail-image]")
+        .forEach((image) => {
+          if (image.complete && image.naturalWidth === 0)
+            hideFailedThumbnail(image);
+        });
+    </script>
   </head>
   <body>
     <div class="public-site">
@@ -32,7 +67,6 @@ const { title, description } = Astro.props;
           <a href="/packages">Packages</a>
           <a href="/services">Services</a>
           <a href="/showcases">Showcases</a>
-          <a href="/about">About us</a>
         </nav>
         <div class="header-actions">
           <a class="button button-link" href="/login">
@@ -46,7 +80,6 @@ const { title, description } = Astro.props;
               <a href="/packages">Packages</a>
               <a href="/services">Services</a>
               <a href="/showcases">Showcases</a>
-              <a href="/about">About us</a>
             </nav>
           </details>
         </div>
@@ -54,20 +87,7 @@ const { title, description } = Astro.props;
       <main>
         <slot />
       </main>
-      <footer class="public-footer">
-        <Brand light />
-        <p>
-          Thoughtful event planning and calm coordination, from first idea to
-          final update.
-        </p>
-        <div>
-          <a href="/packages">Packages</a>
-          <a href="/services">Services</a>
-          <a href="/showcases">Showcases</a>
-          <a href="/about">About us</a>
-        </div>
-        <span>© {new Date().getFullYear()} Styled by AMAC</span>
-      </footer>
+      <BusinessInformationFooter information={businessInformation} />
     </div>
   </body>
 </html>

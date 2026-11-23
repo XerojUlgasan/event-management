@@ -22,13 +22,19 @@ export function ModalSurface({
 
   useEffect(() => {
     const dialog = ref.current;
+
     if (!dialog) return;
+
     const opener = document.activeElement;
+
     if (!dialog.open) dialog.showModal();
+
     if (initialFocus?.current && dialog.contains(initialFocus.current))
       initialFocus.current.focus({ preventScroll: true });
+
     return () => {
       dialog.close();
+
       // React may detach the dialog before passive cleanup; restore explicitly.
       if (opener instanceof HTMLElement && opener.isConnected)
         opener.focus({ preventScroll: true });
@@ -50,6 +56,7 @@ export function ModalSurface({
       onClick={(event) => {
         if (event.target === event.currentTarget && backdropPressed.current)
           onClose();
+
         backdropPressed.current = false;
       }}
     />

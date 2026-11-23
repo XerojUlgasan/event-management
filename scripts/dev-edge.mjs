@@ -20,9 +20,11 @@ function serve() {
   );
   child.on("exit", (code, signal) => {
     child = undefined;
+
     if (stopping) {
       process.exit(0);
     }
+
     const status = signal ? `signal ${signal}` : `exit ${code ?? 0}`;
     console.error(
       `\n[dev] Edge function server stopped (${status}). Starting it again in 2 seconds.`,
@@ -33,7 +35,9 @@ function serve() {
 
 function stop() {
   stopping = true;
+
   if (!child) process.exit(0);
+
   child.kill("SIGTERM");
 }
 

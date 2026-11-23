@@ -4,31 +4,46 @@ import { z } from "@hono/zod-openapi";
 import { EVENT_TYPES } from "@event-management/contracts/catalog-filters";
 
 const eventTypeSchema = z.enum(EVENT_TYPES).nullable().optional();
+
 const text = z.string().trim().min(1).max(MAX_CATALOG_TEXT_LENGTH);
+
 export const contentSchema = z.object({
   name: text,
   hourlyRatePesos: z.number().int().positive().max(2147483647),
   fixedPricePesos: z.number().int().positive().max(2147483647).nullable(),
   includedHours: z.number().int().positive().max(2147483647).nullable(),
   description: text,
-  sections: sectionsSchema.optional(),
+  sections: sectionsSchema
+    .refine(
+      (sections) =>
+        sections.every((section) =>
+          section.widgets.every((widget) => widget.serviceTerms === undefined),
+        ),
+      "Package service terms are not allowed on service pages",
+    )
+    .optional(),
   thumbnailMediaId: z.string().uuid().nullable().optional(),
   eventType: eventTypeSchema,
 });
+
 export type ServiceContent = z.infer<typeof contentSchema>;
+
 const validPricing = (value: {
   fixedPricePesos: number | null;
   includedHours: number | null;
 }) => (value.fixedPricePesos === null) === (value.includedHours === null);
+
 export const serviceInputSchema = contentSchema.strict().refine(validPricing, {
   message: "Fixed price and included hours must be provided together",
 });
+
 export const serviceEditSchema = contentSchema
   .extend({ expectedUpdatedAt: z.string().datetime() })
   .strict()
   .refine(validPricing, {
     message: "Fixed price and included hours must be provided together",
   });
+
 export const adminSchema = z.object({
   id: z.string().uuid(),
   slug: z.string(),
@@ -45,4 +60,5 @@ export const adminSchema = z.object({
   publishedAt: z.string(),
   eventType: z.enum(EVENT_TYPES).nullable(),
 });
+
 export const publicSchema = adminSchema;

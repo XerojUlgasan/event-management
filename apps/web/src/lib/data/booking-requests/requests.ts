@@ -1,10 +1,26 @@
-import type { PackagePrice } from "@event-management/contracts/catalog";
+import type { ReviewedBookingService } from "@event-management/contracts/booking-draft";
+import type { BookingStatus } from "@event-management/contracts/booking-requests";
+import type {
+  PackagePrice,
+  ServicePricing,
+} from "@event-management/contracts/catalog";
 import type { BookingEstimatedDuration } from "@event-management/contracts/limits/booking-requests";
 import { request } from "../../http/request";
 
-export type BookingStatus =
-  "under_review" | "needs_details" | "accepted" | "declined" | "cancelled";
+export type { BookingStatus } from "@event-management/contracts/booking-requests";
+
+export type BookingService = ReviewedBookingService & {
+  id?: string;
+  origin?: "admin";
+  offer?: ServicePricing & { totalHours: number | null };
+};
+
 export type BookingRequestInput = {
+  requestedAddons?: {
+    serviceId: string;
+    serviceUpdatedAt: string;
+    hours: number;
+  }[];
   packageId?: string | null;
   packageUpdatedAt?: string;
   conversationId?: string;
@@ -16,6 +32,7 @@ export type BookingRequestInput = {
   phoneNumber: string;
   specialRequests?: string;
 };
+
 export type BookingRequest = Omit<
   BookingRequestInput,
   | "packageId"
@@ -54,6 +71,8 @@ export type BookingRequest = Omit<
   endsAt: string | null;
   preferredVenueLocation: string | null;
   specialRequests: string | null;
+  requestedServices: BookingService[];
+  budget: string | null;
   id: string;
   reference: string;
   customerId: string;
@@ -63,9 +82,11 @@ export type BookingRequest = Omit<
   packageMaxGuests: number | null;
   status: BookingStatus;
   outOfRange: boolean;
+  submittedAt: string;
   createdAt: string;
   updatedAt: string;
 };
+
 export type BookingRequestFilters = {
   status?: BookingStatus;
   preferredDate?: string;
@@ -75,39 +96,52 @@ export type BookingRequestFilters = {
 
 export const createBookingRequest = (body: BookingRequestInput) =>
   request<{ bookingRequest: BookingRequest }>("/booking-requests", body);
+
 export const getMyBookingRequests = (cursor?: string) =>
   request<{ bookingRequests: BookingRequest[]; nextCursor: string | null }>(
     `/booking-requests/mine${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
   );
+
 export const getMyBookingRequest = (id: string) =>
   request<{ bookingRequest: BookingRequest }>(
     `/booking-requests/${encodeURIComponent(id)}`,
   );
+
 export const getAdminBookingRequest = (id: string) =>
   request<{ bookingRequest: BookingRequest }>(
     `/admin/booking-requests/${encodeURIComponent(id)}`,
   );
+
 export const getAdminBookingRequestsPage = (filters: BookingRequestFilters) => {
   const query = new URLSearchParams();
+
   if (filters.limit) query.set("limit", String(filters.limit));
+
   if (filters.status) query.set("status", filters.status);
+
   if (filters.preferredDate) query.set("preferredDate", filters.preferredDate);
+
   if (filters.cursor) query.set("cursor", filters.cursor);
+
   return request<{
     bookingRequests: BookingRequest[];
     nextCursor: string | null;
   }>(`/admin/booking-requests?${query}`);
 };
+
 export const getBookingRequestCalendar = (
   month: string,
   status?: BookingStatus,
 ) => {
   const query = new URLSearchParams({ month });
+
   if (status) query.set("status", status);
+
   return request<{ dailyCounts: { preferredDate: string; count: number }[] }>(
     `/admin/booking-requests/calendar?${query}`,
   );
 };
+
 export const updateBookingRequestStatus = (
   id: string,
   status: BookingStatus,
@@ -119,6 +153,7 @@ export const updateBookingRequestStatus = (
     undefined,
     "PATCH",
   );
+
 export const cancelMyBookingRequest = (id: string, reason: string) =>
   request<{ bookingRequest: BookingRequest }>(
     `/booking-requests/${encodeURIComponent(id)}/cancel`,
@@ -146,6 +181,7 @@ export type BookingStatusHistoryEntry = {
   changedBy: string;
   createdAt: string;
 };
+
 export const getBookingStatusHistory = (
   id: string,
   admin: boolean,
@@ -153,4 +189,43 @@ export const getBookingStatusHistory = (
 ) =>
   request<{ history: BookingStatusHistoryEntry[]; nextCursor: string | null }>(
     `${admin ? "/admin" : ""}/booking-requests/${encodeURIComponent(id)}/status-history${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+  );
+
+export type BookingAddonInput = {
+  expectedBookingUpdatedAt: string;
+  totalHours: number | null;
+  pricing: ServicePricing;
+};
+
+export const addBookingAddon = (
+  id: string,
+  body: BookingAddonInput & { serviceId: string },
+) =>
+  request<{ bookingRequest: BookingRequest }>(
+    `/admin/booking-requests/${encodeURIComponent(id)}/addons`,
+    body,
+  );
+
+export const updateBookingAddon = (
+  id: string,
+  addonId: string,
+  body: BookingAddonInput,
+) =>
+  request<{ bookingRequest: BookingRequest }>(
+    `/admin/booking-requests/${encodeURIComponent(id)}/addons/${encodeURIComponent(addonId)}`,
+    body,
+    undefined,
+    "PATCH",
+  );
+
+export const removeBookingAddon = (
+  id: string,
+  addonId: string,
+  expectedBookingUpdatedAt: string,
+) =>
+  request<{ bookingRequest: BookingRequest }>(
+    `/admin/booking-requests/${encodeURIComponent(id)}/addons/${encodeURIComponent(addonId)}`,
+    { expectedBookingUpdatedAt },
+    undefined,
+    "DELETE",
   );

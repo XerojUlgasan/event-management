@@ -24,6 +24,7 @@ export function ConversationBooking({
   const [error, setError] = useState("");
   async function load(next?: string) {
     setLoading(true);
+
     try {
       const page = await getPackages(next ? { cursor: next } : undefined);
       setPackages((previous) =>
@@ -40,6 +41,7 @@ export function ConversationBooking({
   useEffect(() => {
     void load();
   }, []);
+
   if (ready)
     return (
       <BookingRequestDialog
@@ -49,6 +51,7 @@ export function ConversationBooking({
         onSubmitted={onSubmitted}
       />
     );
+
   return (
     <Dialog title="Create booking request" onClose={onClose}>
       <p>Choose a package or discuss a custom package with us.</p>

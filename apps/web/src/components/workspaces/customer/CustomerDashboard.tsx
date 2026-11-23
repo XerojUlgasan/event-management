@@ -1,28 +1,43 @@
+import {
+  reconcileSubmissionRetries,
+  retryableSubmissionError,
+} from "../../../lib/services/messages/booking-review";
+import { ApiError } from "../../../lib/http/request";
 import { navigateWorkspace } from "../../../lib/navigation/workspace-navigation";
-import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import { useEffect, useRef, useState } from "react";
 import {
   Avatar,
   Brand,
   Button,
-  Dialog,
   Icon,
   type IconName,
   PageHeader,
   Panel,
-  Textarea,
-  FormField,
   useNotifications,
-  notificationErrorMessage,
 } from "@event-management/ui";
 
+import { NotificationBell } from "../../notifications/NotificationBell";
 import { photos } from "../../../demo/catalog/photos";
 import { BookingList } from "../../booking-requests/BookingList";
 import { CustomerCatalogPage } from "./catalog/CustomerCatalogPage";
+import { CustomerHomeNextStep } from "./home/CustomerHomeNextStep";
 import { BookingRequestDialog } from "../../booking-requests/BookingRequestDialog";
 import { initialsFromName } from "../../../lib/utils/formatting/name";
 import { SignInMethods } from "../../auth/SignInMethods";
 import { useConversationList } from "../../../lib/services/messages/use-conversation-list";
+import {
+  hasLocalReplyPending,
+  hasObservedReply,
+  reconcilePendingReplies,
+} from "../../../lib/services/messages/pending-replies";
+import { assertCursorMoved } from "../../../lib/services/messages/older-page";
+import { conversationLoadError } from "../../../lib/services/messages/load-error";
+import { shouldRefreshAiMetadata } from "../../../lib/services/messages/realtime-event";
+import {
+  startVisiblePolling,
+  useRealtimeThread,
+  useThreadVisible,
+} from "../../../lib/services/messages/use-realtime-thread";
 import { MessagesWorkspace } from "../../messages/MessagesWorkspace";
 import {
   addSentMessages,
@@ -38,20 +53,26 @@ import {
 import {
   createMyConversation,
   getMyConversations,
-  getMyConversation,
   getMyConversationById,
   sendMyMessage,
+  retryMyMessageProcessing,
   type ChatMessage,
   type ChatConversation,
   type ChatThread,
 } from "../../../lib/data/messages/conversations";
 
-import { customerPaths, customerTab, type CustomerTab } from "../../app/routes";
+import {
+  customerPaths,
+  customerTab,
+  normalizePath,
+  type CustomerTab,
+} from "../../app/routes";
 
 export function CustomerDashboard({
   path,
   search,
   onPublic,
+  profileId,
   userName,
   userEmail,
   onSignOut,
@@ -59,6 +80,7 @@ export function CustomerDashboard({
   path: string;
   search: string;
   onPublic: () => void;
+  profileId: string;
   userName: string;
   userEmail: string;
   onSignOut: () => void;
@@ -66,8 +88,15 @@ export function CustomerDashboard({
   const { notify, notifyError } = useNotifications();
   const mounted = useRef(true);
   const localMessages = useRef(new Set<string>());
+  const localFiles = useRef(new Map<string, File[]>());
+  const replyRevision = useRef(0);
+  const successfulPolls = useRef(0);
+  const [pendingReplies, setPendingReplies] = useState<
+    Record<string, { conversationId: string; aiVersion: number }>
+  >({});
   useEffect(() => {
     mounted.current = true;
+
     return () => {
       mounted.current = false;
     };
@@ -83,24 +112,26 @@ export function CustomerDashboard({
     }
   }, [notify]);
   const tab = customerTab(path);
+
   const go = (next: CustomerTab) => {
     navigateWorkspace(customerPaths[next]);
   };
-  const [messageOpen, setMessageOpen] = useState(false);
+
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const accountTriggerRef = useRef<HTMLButtonElement>(null);
   const [conversationOpen, setConversationOpen] = useState(false);
-  const [messageDraft, setMessageDraft] = useState("");
-  const messageInputRef = useRef<HTMLTextAreaElement>(null);
-  const [dialogSending, setDialogSending] = useState(false);
   const [outbox, setOutbox] = useState<
     Record<
       string,
-      { conversationId: string; message: ChatMessage; failed: boolean }
+      {
+        conversationId: string;
+        message: ChatMessage;
+        failed: boolean;
+        error?: string;
+      }
     >
   >({});
-  const [dialogError, setDialogError] = useState("");
   const [messageThread, setMessageThread] = useState<ChatThread | null>(null);
   const inbox = useConversationList(getMyConversations, tab === "Messages");
   const {
@@ -112,22 +143,37 @@ export function CustomerDashboard({
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | null
   >(null);
+  const selectedConversationRef = useRef(selectedConversationId);
+  selectedConversationRef.current = selectedConversationId;
   const pendingBookingReference = new URLSearchParams(search).get("request");
   const requestedConversation = new URLSearchParams(search).get("conversation");
+  const requestedQuotation = new URLSearchParams(search).get("quotation");
+  const routeConversation = useRef<string | null>(null);
   useEffect(() => {
-    if (tab === "Messages" && requestedConversation) {
-      setSelectedConversationId(requestedConversation);
-      setConversationOpen(true);
+    if (tab !== "Messages") {
+      routeConversation.current = null;
+
+      return;
     }
-  }, [tab, requestedConversation]);
+
+    if (!requestedConversation && !routeConversation.current) return;
+
+    routeConversation.current = requestedConversation;
+    referenceSelection.current++;
+    setSelectedConversationId(requestedConversation);
+    setConversationOpen(!!requestedConversation);
+  }, [tab, requestedConversation, requestedQuotation]);
+
   const [bookingItem, setBookingItem] = useState<PublicPackage | null>(() =>
     new URLSearchParams(search).get("booking") === "resume"
       ? (readBookingDraft()?.item ?? null)
       : null,
   );
+
   const [bookingResume, setBookingResume] = useState(
     () => new URLSearchParams(search).get("booking") === "resume",
   );
+
   const [threadLoading, setThreadLoading] = useState(false);
   const [threadError, setThreadError] = useState("");
   const [newChatBusy, setNewChatBusy] = useState(false);
@@ -144,14 +190,19 @@ export function CustomerDashboard({
     const params = new URLSearchParams(search);
     const slug = params.get("book");
     const resume = params.get("booking") === "resume";
+
     if (resume) {
       setBookingItem(readBookingDraft()?.item ?? null);
       setBookingResume(true);
+
       return;
     }
+
     setBookingItem(null);
     setBookingResume(false);
+
     if (!slug) return;
+
     let active = true;
     getPackageBySlug(slug)
       .then((item) => {
@@ -166,6 +217,7 @@ export function CustomerDashboard({
           notifyError(cause, "Unable to open the selected package.");
         }
       });
+
     return () => {
       active = false;
     };
@@ -173,11 +225,13 @@ export function CustomerDashboard({
 
   useEffect(() => {
     if (tab !== "Messages") return;
+
     if (
       pendingBookingReference &&
       handledReference.current !== pendingBookingReference
     )
       return;
+
     if (
       !requestedConversation &&
       !selectedConversationId &&
@@ -199,15 +253,18 @@ export function CustomerDashboard({
       handledReference.current === pendingBookingReference
     )
       return;
+
     let active = true;
     const selection = referenceSelection.current;
     getMyConversations(undefined, pendingBookingReference)
       .then((result) => {
         if (!active || selection !== referenceSelection.current) return;
+
         handledReference.current = pendingBookingReference;
         setSelectedConversationId(
           result.conversations[0]?.id ?? messageConversations[0]?.id ?? null,
         );
+
         if (result.conversations.length) setConversationOpen(true);
       })
       .catch((cause) => {
@@ -216,14 +273,63 @@ export function CustomerDashboard({
             notifyError(cause, "Unable to find this booking conversation."),
           );
       });
+
     return () => {
       active = false;
     };
   }, [tab, pendingBookingReference, notifyError, referenceAttempt]);
 
+  const singleConversation =
+    messageConversations.length === 1 &&
+    messageConversations[0]?.id === selectedConversationId &&
+    !inbox.nextCursor;
+  const threadVisible = useThreadVisible(
+    conversationOpen || singleConversation,
+  );
+  const pollingVisible = useRef(false);
+  pollingVisible.current = tab === "Messages" && threadVisible;
+
+  const refreshThread = useRef<() => void>(() => {});
+
+  useRealtimeThread({
+    id: selectedConversationId,
+    enabled:
+      tab === "Messages" &&
+      threadVisible &&
+      messageThread?.conversation.id === selectedConversationId,
+    admin: false,
+    onRejoin: () => refreshThread.current(),
+    onMessage: (message) => {
+      if (
+        document.visibilityState === "visible" &&
+        messageThread &&
+        shouldRefreshAiMetadata(messageThread.conversation, message)
+      )
+        refreshThread.current();
+
+      localMessages.current.add(message.id);
+      setMessageThread((current) =>
+        addSentMessagesToConversation(current, selectedConversationId!, [
+          message,
+        ]),
+      );
+      setPendingReplies((current) =>
+        messageThread
+          ? reconcilePendingReplies(current, messageThread.conversation, [
+              message,
+            ])
+          : current,
+      );
+      setOutbox((current) => reconcileSubmissionRetries(current, [message]));
+    },
+  });
+
   useEffect(() => {
     if (tab !== "Messages" || !selectedConversationId) return;
+
     let active = true;
+    let inFlight = false;
+    let reloadRequested = false;
     const id = selectedConversationId;
     olderRequest.current++;
     olderPending.current = false;
@@ -233,25 +339,57 @@ export function CustomerDashboard({
     setMessageThread((current) =>
       current?.conversation.id === id ? current : null,
     );
+
     const load = async () => {
+      if (
+        !active ||
+        selectedConversationRef.current !== id ||
+        !pollingVisible.current ||
+        document.visibilityState !== "visible"
+      )
+        return;
+
+      if (inFlight) {
+        reloadRequested = true;
+
+        return;
+      }
+
+      inFlight = true;
+      const revision = replyRevision.current;
+
       try {
         const thread = await getMyConversationById(id);
-        if (!active) return;
+
+        if (!active || revision !== replyRevision.current) return;
+
+        successfulPolls.current++;
+        setPendingReplies((current) =>
+          reconcilePendingReplies(
+            current,
+            thread.conversation,
+            thread.messages,
+          ),
+        );
         const unacknowledged = new Set(localMessages.current);
-        setOutbox((current) => {
-          const next = { ...current };
-          thread.messages.forEach((message) => delete next[message.id]);
-          return next;
-        });
+        setOutbox((current) =>
+          reconcileSubmissionRetries(current, thread.messages),
+        );
         thread.messages.forEach((message) =>
           localMessages.current.delete(message.id),
         );
         setMessageThread((current) => {
-          const merged = mergePolledThread(current, thread, unacknowledged);
+          const merged = mergePolledThread(
+            current,
+            thread,
+            new Set([...unacknowledged, ...localMessages.current]),
+          );
+
           if (merged.gap)
             setHistoryNotice(
               "New messages arrived while you were away. Earlier history was reset; scroll up to see it.",
             );
+
           return merged.thread;
         });
         setThreadError("");
@@ -261,21 +399,36 @@ export function CustomerDashboard({
       } catch (cause) {
         if (active)
           setThreadError(
-            notificationErrorMessage(
+            conversationLoadError(
               cause,
-              "Unable to load this conversation.",
+              "Unable to load or refresh this conversation. Please try again.",
             ),
           );
       } finally {
-        if (active) setThreadLoading(false);
+        inFlight = false;
+
+        if (active) {
+          setThreadLoading(false);
+
+          if (reloadRequested) {
+            reloadRequested = false;
+            void load();
+          }
+        }
       }
     };
-    void load();
-    const timer = window.setInterval(() => void load(), 5000);
+
+    refreshThread.current = () => void load();
+    const stopPolling = startVisiblePolling(
+      refreshThread.current,
+      threadVisible,
+    );
+
     return () => {
       active = false;
       olderRequest.current++;
-      window.clearInterval(timer);
+      refreshThread.current = () => {};
+      stopPolling();
     };
   }, [
     tab,
@@ -283,6 +436,7 @@ export function CustomerDashboard({
     notifyError,
     threadRevision,
     setMessageConversations,
+    threadVisible,
   ]);
 
   const showSentInList = (
@@ -301,7 +455,6 @@ export function CustomerDashboard({
             )))
           ? {
               ...item,
-              status: "active",
               lastMessage: message,
               updatedAt: message.createdAt,
             }
@@ -318,17 +471,20 @@ export function CustomerDashboard({
 
   const loadOlder = async () => {
     if (!messageThread?.nextCursor || olderPending.current) return;
+
     const id = messageThread.conversation.id;
     const cursor = messageThread.nextCursor;
     const request = ++olderRequest.current;
     olderPending.current = true;
     setLoadingOlder(true);
     setOlderError("");
+
     try {
       const older = await getMyConversationById(id, cursor);
+
       if (!mounted.current || request !== olderRequest.current) return;
-      if (older.nextCursor === cursor)
-        throw new Error("Unable to load older messages. Please try again.");
+
+      assertCursorMoved(older.nextCursor, cursor);
       older.messages.forEach((message) =>
         localMessages.current.delete(message.id),
       );
@@ -352,74 +508,143 @@ export function CustomerDashboard({
     conversation: ChatConversation,
     message: ChatMessage,
   ) => {
+    if (conversation.aiEnabled)
+      setPendingReplies((current) => ({
+        ...current,
+        [message.id]: {
+          conversationId: conversation.id,
+          aiVersion: conversation.aiVersion,
+        },
+      }));
+
+    if (message.pendingFiles?.length)
+      localFiles.current.set(message.id, message.pendingFiles);
+
     setOutbox((current) => ({
       ...current,
-      [message.id]: { conversationId: conversation.id, message, failed: false },
+      [message.id]: {
+        conversationId: conversation.id,
+        message,
+        failed: false,
+      },
     }));
     localMessages.current.add(message.id);
+
     try {
       const result = await sendMyMessage(
         message.body,
         conversation.id,
         message.id,
+        message.pendingFiles ?? [],
+        message.reviewMessageId,
       );
+      replyRevision.current++;
+
+      if (result.message.processing?.replyPending)
+        setMessageThread((current) =>
+          current?.conversation.id === conversation.id &&
+          current.conversation.aiEnabled &&
+          current.conversation.aiVersion === conversation.aiVersion &&
+          !hasObservedReply(current.messages, message.id) &&
+          !current.messages.some(
+            (item) =>
+              item.id === message.id &&
+              ["completed", "failed", "suppressed"].includes(
+                item.processing?.status ?? "",
+              ),
+          )
+            ? {
+                ...current,
+                conversation: { ...current.conversation, aiReplyPending: true },
+              }
+            : current,
+        );
+
       const sent = result.assistantMessage
         ? [result.message, result.assistantMessage]
         : [result.message];
       sent.forEach((item) => localMessages.current.add(item.id));
       appendMessages(sent, conversation.id);
-      setOutbox((current) =>
-        current[message.id]
-          ? {
-              ...current,
-              [message.id]: { ...current[message.id], message: result.message },
-            }
-          : current,
-      );
+      setOutbox((current) => {
+        if (!current[message.id]) return current;
+
+        if (retryableSubmissionError(message, result.assistantError))
+          return {
+            ...current,
+            [message.id]: {
+              conversationId: conversation.id,
+              message,
+              failed: true,
+              error:
+                "Your message was saved, but the AI reply could not be completed.",
+            },
+          };
+
+        if (message.reviewMessageId) {
+          const next = { ...current };
+          delete next[message.id];
+
+          return next;
+        }
+
+        return {
+          ...current,
+          [message.id]: { ...current[message.id], message: result.message },
+        };
+      });
       showSentInList(
         conversation,
         result.assistantMessage ?? result.message,
         sent,
       );
-      if (result.assistantError) notifyError(new Error(result.assistantError));
-      if (conversation.status === "closed") {
-        setMessageThread((current) =>
-          current?.conversation.id === conversation.id
-            ? {
-                ...current,
-                conversation: {
-                  ...current.conversation,
-                  status: "active",
-                  closedAt: null,
-                  packageId: null,
-                  packageName: null,
-                  eventType: null,
-                  eventStartsAt: null,
-                  eventEndsAt: null,
-                  guestCount: null,
-                },
-              }
-            : current,
-        );
+
+      if (message.reviewMessageId) {
+        setThreadRevision((value) => value + 1);
+        void inbox.refresh();
       }
-    } catch {
+
+      if (result.assistantError) notifyError(new Error(result.assistantError));
+    } catch (cause) {
+      const error =
+        message.pendingFiles?.length &&
+        cause instanceof ApiError &&
+        [400, 413].includes(cause.status)
+          ? cause.message
+          : undefined;
       setOutbox((current) =>
         current[message.id]
           ? {
               ...current,
-              [message.id]: { ...current[message.id], failed: true },
+              [message.id]: { ...current[message.id], failed: true, error },
             }
           : current,
       );
+    } finally {
+      setPendingReplies((current) => {
+        const next = { ...current };
+        delete next[message.id];
+
+        return next;
+      });
     }
   };
 
-  const sendMessage = async (body: string, thread = messageThread) => {
+  const sendMessage = async (
+    body: string,
+    files: File[] = [],
+    requestId: string = crypto.randomUUID(),
+    reviewMessageId?: string,
+    thread = messageThread,
+  ) => {
     const conversation = thread?.conversation;
+
     if (!conversation) return;
+
     const message: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: requestId,
       body,
+      pendingFiles: files,
+      reviewMessageId,
       quotationId: null,
       senderId: conversation.customerId,
       senderRole: "customer",
@@ -432,14 +657,28 @@ export function CustomerDashboard({
 
   const startNewChat = async () => {
     if (newChatBusy) return;
-    referenceSelection.current++;
+
+    const selection = ++referenceSelection.current;
     handledReference.current = pendingBookingReference;
     setNewChatBusy(true);
+
     try {
       const thread = await createMyConversation();
+      void inbox.refresh();
+
+      if (
+        selection !== referenceSelection.current ||
+        normalizePath(window.location.pathname) !== customerPaths.Messages
+      )
+        return;
+
+      if (routeConversation.current) {
+        routeConversation.current = null;
+        navigateWorkspace(customerPaths.Messages, true);
+      }
+
       setSelectedConversationId(thread.conversation.id);
       setMessageThread(thread);
-      void inbox.refresh();
       setConversationOpen(true);
       notify("New chat started.");
     } catch (cause) {
@@ -458,41 +697,24 @@ export function CustomerDashboard({
     setConversationOpen(true);
   };
 
-  const sendFromDialog = async () => {
-    const body = messageDraft.trim();
-    if (!body || dialogSending) return;
-    setDialogSending(true);
-    setDialogError("");
-    try {
-      const thread = messageThread ?? (await getMyConversation());
-      setSelectedConversationId(thread.conversation.id);
-      setMessageThread(thread);
-      setMessageDraft((current) => (current.trim() === body ? "" : current));
-      setMessageOpen(false);
-      setConversationOpen(true);
-      go("Messages");
-      void sendMessage(body, thread);
-    } catch (cause) {
-      setDialogError(notifyError(cause, "Unable to open your conversation."));
-    } finally {
-      setDialogSending(false);
-    }
-  };
-
   useEffect(() => {
     if (!accountMenuOpen) return;
+
     const closeOnOutside = (event: MouseEvent) => {
       if (!accountMenuRef.current?.contains(event.target as Node))
         setAccountMenuOpen(false);
     };
+
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setAccountMenuOpen(false);
         accountTriggerRef.current?.focus();
       }
     };
+
     document.addEventListener("mousedown", closeOnOutside);
     document.addEventListener("keydown", closeOnEscape);
+
     return () => {
       document.removeEventListener("mousedown", closeOnOutside);
       document.removeEventListener("keydown", closeOnEscape);
@@ -530,6 +752,7 @@ export function CustomerDashboard({
           ))}
         </nav>
         <div className="customer-header-actions">
+          <NotificationBell key={profileId} profileId={profileId} />
           <div className="customer-account-menu" ref={accountMenuRef}>
             <Button
               variant="plain"
@@ -602,41 +825,13 @@ export function CustomerDashboard({
                 </div>
               </div>
             </section>
-            <section className="customer-grid">
-              <Panel
-                title="Your requests"
-                description="See the latest status of your event requests."
-              >
-                <p>
-                  Preferred dates and final prices are reviewed by our team.
-                </p>
-                <Button variant="secondary" onClick={() => go("My events")}>
-                  View my events
-                </Button>
-              </Panel>
-              <Panel
-                className="customer-manager-card"
-                title="Talk with our team"
-                description="Have a question about your plans?"
-              >
-                <p>
-                  Send us a message and we’ll continue the conversation in your
-                  workspace.
-                </p>
-                <Button
-                  variant="secondary"
-                  className="full-button"
-                  onClick={() => setMessageOpen(true)}
-                >
-                  Send a message
-                </Button>
-              </Panel>
-            </section>
+            <CustomerHomeNextStep key={profileId} />
           </div>
         )}
         {tab === "My events" && (
           <div className="customer-content">
             <BookingList
+              requestedId={new URLSearchParams(search).get("bookingRequest")}
               onExplore={() => go("Catalogs")}
               onOpenChat={(reference: string) => {
                 navigateWorkspace(
@@ -675,15 +870,74 @@ export function CustomerDashboard({
         {tab === "Messages" && (
           <div className="customer-messages-view">
             <MessagesWorkspace
+              requestedQuotationId={
+                requestedConversation === selectedConversationId
+                  ? requestedQuotation
+                  : null
+              }
               title="Messages"
               viewerRole="customer"
-              resumeBooking={
-                new URLSearchParams(search).get("createRequest") === "1" &&
-                selectedConversationId === requestedConversation
+              localAiReplyPending={
+                !!messageThread &&
+                hasLocalReplyPending(pendingReplies, messageThread.conversation)
               }
+              localImageFiles={localFiles.current}
+              onRetryProcessing={async (messageId) => {
+                if (!selectedConversationId) return;
+
+                const id = selectedConversationId;
+                const aiVersion = messageThread?.conversation.aiVersion;
+                const pollAtStart = successfulPolls.current;
+                const { message } = await retryMyMessageProcessing(
+                  id,
+                  messageId,
+                );
+                replyRevision.current++;
+                setMessageThread((current) =>
+                  current?.conversation.id === id
+                    ? {
+                        ...current,
+                        conversation: {
+                          ...current.conversation,
+                          aiReplyPending:
+                            current.conversation.aiReplyPending ||
+                            (current.conversation.aiEnabled &&
+                              current.conversation.aiVersion === aiVersion &&
+                              !!message.processing?.replyPending &&
+                              !hasObservedReply(current.messages, messageId) &&
+                              !(
+                                successfulPolls.current > pollAtStart &&
+                                current.messages.some(
+                                  (item) =>
+                                    item.id === messageId &&
+                                    [
+                                      "completed",
+                                      "failed",
+                                      "suppressed",
+                                    ].includes(item.processing?.status ?? ""),
+                                )
+                              )),
+                        },
+                        messages: current.messages.map((item) =>
+                          item.id === message.id &&
+                          !hasObservedReply(current.messages, messageId) &&
+                          !(
+                            successfulPolls.current > pollAtStart &&
+                            ["completed", "failed", "suppressed"].includes(
+                              item.processing?.status ?? "",
+                            )
+                          )
+                            ? message
+                            : item,
+                        ),
+                      }
+                    : current,
+                );
+              }}
               onBookingSubmitted={() => setThreadRevision((value) => value + 1)}
               onBookingClosed={() => {
                 const url = new URL(window.location.href);
+
                 if (url.searchParams.has("createRequest")) {
                   url.searchParams.delete("createRequest");
                   navigateWorkspace(
@@ -699,7 +953,14 @@ export function CustomerDashboard({
                   : null
               }
               activeId={selectedConversationId}
-              onSelect={(id) => void selectConversation(id)}
+              onSelect={(id) => {
+                if (requestedConversation) {
+                  routeConversation.current = null;
+                  navigateWorkspace(customerPaths.Messages, true);
+                }
+
+                void selectConversation(id);
+              }}
               messages={
                 messageThread?.conversation.id === selectedConversationId
                   ? addSentMessages(
@@ -749,18 +1010,34 @@ export function CustomerDashboard({
                   (item) =>
                     item.conversationId === selectedConversationId &&
                     item.failed &&
-                    !messageThread?.messages.some(
-                      (message) => message.id === item.message.id,
-                    ),
+                    (item.message.reviewMessageId ||
+                      !messageThread?.messages.some(
+                        (message) => message.id === item.message.id,
+                      )),
                 )
                 .map((item) => item.message.id)}
+              failedMessageErrors={Object.fromEntries(
+                Object.entries(outbox)
+                  .filter(
+                    ([, item]) =>
+                      item.conversationId === selectedConversationId &&
+                      item.error,
+                  )
+                  .map(([id, item]) => [id, item.error ?? ""]),
+              )}
               onRetryMessage={(id) => {
                 const item = outbox[id];
                 const conversation = messageThread?.conversation;
+
                 if (item && conversation?.id === item.conversationId)
                   void deliverMessage(conversation, item.message);
               }}
-              onBack={() => setConversationOpen(false)}
+              onBack={() => {
+                if (requestedConversation)
+                  navigateWorkspace("/app/messages", true);
+
+                setConversationOpen(false);
+              }}
               conversationOpen={conversationOpen}
               onNewChat={startNewChat}
               newChatBusy={newChatBusy}
@@ -776,59 +1053,6 @@ export function CustomerDashboard({
           </div>
         )}
       </main>
-
-      {messageOpen && (
-        <Dialog
-          onClose={() => setMessageOpen(false)}
-          initialFocus={messageInputRef}
-          className="compact-modal"
-          eyebrow="Message the Styled by AMAC team"
-          title="How can we help?"
-          intro="Send a message about your event, quotation, or booking. Our team will reply in Messages."
-          actions={
-            <>
-              <Button
-                variant="secondary"
-                onClick={() => setMessageOpen(false)}
-                disabled={dialogSending}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={sendFromDialog}
-                disabled={!messageDraft.trim() || dialogSending}
-              >
-                Send message
-              </Button>
-            </>
-          }
-        >
-          <FormField className="message-compose" label="Message">
-            <Textarea
-              value={messageDraft}
-              onChange={(event) => setMessageDraft(event.target.value)}
-              placeholder="Write a message"
-              maxLength={MAX_MESSAGE_BODY_LENGTH}
-              ref={messageInputRef}
-              onKeyDown={(event) => {
-                if (
-                  event.key === "Enter" &&
-                  !event.shiftKey &&
-                  !event.nativeEvent.isComposing
-                ) {
-                  event.preventDefault();
-                  void sendFromDialog();
-                }
-              }}
-            />
-          </FormField>
-          {dialogError && (
-            <p className="messages-send-error" role="alert">
-              {dialogError}
-            </p>
-          )}
-        </Dialog>
-      )}
 
       {bookingItem && (
         <BookingRequestDialog

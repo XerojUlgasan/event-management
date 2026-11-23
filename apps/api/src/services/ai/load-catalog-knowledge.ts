@@ -11,14 +11,9 @@ export async function loadCatalogKnowledge(
   db: Database,
   owner?: { kind: "package" | "service"; id: string },
 ) {
-  const {
-    packages,
-    services,
-    servicesByPackage,
-    assetMap,
-    rowsByOwner,
-    sections,
-  } = await loadKnowledgeSourcesData(db, owner);
+  const { packages, services, assetMap, rowsByOwner, sections } =
+    await loadKnowledgeSourcesData(db, owner);
+
   const entries = [
     ...packages.map((record) => {
       const owner = {
@@ -26,13 +21,13 @@ export async function loadCatalogKnowledge(
         name: record.name,
         kind: "package" as const,
       };
+
       return assessKnowledgeListing(
         owner,
         prepareCatalogKnowledge({
           kind: "package",
           record,
           sections: sections(record.canvas),
-          services: servicesByPackage.get(record.id) ?? [],
         }),
         rowsByOwner.get(`package:${record.id}`) ?? [],
         assetMap,
@@ -44,6 +39,7 @@ export async function loadCatalogKnowledge(
         name: record.name,
         kind: "service" as const,
       };
+
       return assessKnowledgeListing(
         owner,
         prepareCatalogKnowledge({
@@ -56,18 +52,22 @@ export async function loadCatalogKnowledge(
       );
     }),
   ];
+
   const summary: KnowledgeSummary = {
     packages: { total: 0, indexed: 0 },
     services: { total: 0, indexed: 0 },
     attention: 0,
     total: entries.length,
   };
+
   for (const { listing } of entries) {
     const group =
       listing.kind === "package" ? summary.packages : summary.services;
     group.total++;
+
     if (listing.status === "indexed") group.indexed++;
     else summary.attention++;
   }
+
   return { entries, summary };
 }

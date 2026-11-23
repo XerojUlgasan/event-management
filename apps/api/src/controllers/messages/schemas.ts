@@ -1,7 +1,10 @@
+import { chatMessageSchema } from "@event-management/contracts/messages";
+import { aiHandoffSchema } from "@event-management/contracts/ai-handoff";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import { z } from "@hono/zod-openapi";
 
 export const messageBodySchema = z.object({
+  requestId: z.string().uuid().optional(),
   conversationId: z.string().uuid().optional(),
   body: z
     .string()
@@ -13,22 +16,16 @@ export const messageBodySchema = z.object({
     ),
 });
 
-export const customerMessageBodySchema = messageBodySchema.extend({
-  requestId: z.string().uuid().optional(),
-});
+export const customerMessageBodySchema = messageBodySchema
+  .extend({ reviewMessageId: z.string().uuid().optional() })
+  .refine(
+    (input) =>
+      !input.reviewMessageId ||
+      Boolean(input.conversationId && input.requestId),
+    "A conversation ID and request ID are required for a review reply",
+  );
 
-export const messageSchema = z.object({
-  id: z.string().uuid(),
-  body: z.string(),
-  quotationId: z.string().uuid().nullable(),
-  senderId: z.string().uuid().nullable(),
-  senderRole: z.enum(["admin", "customer", "assistant"]),
-  senderName: z.string(),
-  createdAt: z.string(),
-  readAt: z.string().nullable(),
-});
-
-export const conversationStatusSchema = z.enum(["active", "closed"]);
+export const messageSchema = chatMessageSchema;
 
 export const conversationSchema = z.object({
   id: z.string().uuid(),
@@ -40,13 +37,14 @@ export const conversationSchema = z.object({
   bookingRequestId: z.string().uuid().nullable(),
   bookingRequestReference: z.string().nullable(),
   eventType: z.string().nullable(),
+  eventPreferredDate: z.string().nullable(),
   eventStartsAt: z.string().nullable(),
   eventEndsAt: z.string().nullable(),
   guestCount: z.number().int().positive().nullable(),
-  status: conversationStatusSchema,
   aiEnabled: z.boolean(),
   aiVersion: z.number().int().nonnegative(),
-  closedAt: z.string().nullable(),
+  aiReplyPending: z.boolean(),
+  aiHandoff: aiHandoffSchema.nullable().optional(),
   lastMessage: messageSchema.nullable(),
   unreadCount: z.number().int().nonnegative(),
   updatedAt: z.string(),
@@ -63,6 +61,16 @@ export const conversationsSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
+export const customerConversationsSchema = conversationsSchema.extend({
+  latestBookingDraft: z
+    .object({
+      conversationId: z.string().uuid(),
+      eventType: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
+});
+
 export const adminConversationsPageSchema = conversationsSchema.extend({
   nextCursor: z.string().nullable(),
 });
@@ -72,6 +80,7 @@ export const messageResultSchema = z.object({
 });
 
 export const conversationAiSchema = z.object({
+  aiHandoff: aiHandoffSchema.nullable(),
   aiEnabled: z.boolean(),
   aiVersion: z.number().int().nonnegative(),
 });

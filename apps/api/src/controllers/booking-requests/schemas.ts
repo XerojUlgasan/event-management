@@ -1,26 +1,30 @@
+import { reviewedServiceSchema } from "@event-management/contracts/booking-draft";
+import { bookingStatusSchema } from "@event-management/contracts/booking-requests";
 import {
   BOOKING_ESTIMATED_DURATIONS,
+  MAX_BOOKING_ADDON_HOURS,
+  MAX_BOOKING_ADDON_SERVICES,
   MAX_EVENT_TYPE_LENGTH,
   MAX_TIME_ZONE_LENGTH,
   MAX_CONTACT_NAME_LENGTH,
   MAX_PHONE_NUMBER_LENGTH,
+  MAX_PREFERRED_VENUE_LOCATION_LENGTH,
   MAX_SPECIAL_REQUESTS_LENGTH,
   MAX_BOOKING_REASON_LENGTH,
 } from "@event-management/contracts/limits/booking-requests";
 import { z } from "@hono/zod-openapi";
 import { priceSchema } from "../packages/schemas.js";
+
 const text = (max: number) => z.string().trim().min(1).max(max);
-export const statusSchema = z.enum([
-  "under_review",
-  "needs_details",
-  "accepted",
-  "declined",
-  "cancelled",
-]);
+
+export const statusSchema = bookingStatusSchema;
+
 export const estimatedDurationSchema = z.enum(BOOKING_ESTIMATED_DURATIONS);
+
 export const requestedDateSchema = z.iso
   .date()
   .refine((value) => !value.startsWith("0000-"), "Invalid date");
+
 export const requestedDaySchema = z
   .object({
     date: requestedDateSchema,
@@ -33,7 +37,9 @@ export const requestedDaySchema = z
     (value) => (value.startsAt === null) === (value.endsAt === null),
     "Start and end are required together",
   );
+
 export const requestedDaysSchema = z.array(requestedDaySchema).min(1);
+
 export const requestedDayResponseSchema = requestedDaySchema.safeExtend({
   operationalSchedule: z
     .object({
@@ -46,12 +52,26 @@ export const requestedDayResponseSchema = requestedDaySchema.safeExtend({
     })
     .nullable(),
 });
+
 export const durationModeSchema = z.enum(["one_day", "multi_day"]);
+
 export const createSchema = z
   .object({
     packageId: z.string().uuid().nullable().optional(),
     conversationId: z.string().uuid().optional(),
     packageUpdatedAt: z.string().datetime().optional(),
+    requestedAddons: z
+      .array(
+        z
+          .object({
+            serviceId: z.string().uuid().toLowerCase(),
+            serviceUpdatedAt: z.string().datetime(),
+            hours: z.number().int().min(0).max(MAX_BOOKING_ADDON_HOURS),
+          })
+          .strict(),
+      )
+      .max(MAX_BOOKING_ADDON_SERVICES)
+      .optional(),
     eventType: text(MAX_EVENT_TYPE_LENGTH),
     durationMode: durationModeSchema,
     requestedDays: z
@@ -60,6 +80,7 @@ export const createSchema = z
     timeZone: text(MAX_TIME_ZONE_LENGTH).refine((value) => {
       try {
         new Intl.DateTimeFormat("en", { timeZone: value });
+
         return true;
       } catch {
         return false;
@@ -74,6 +95,9 @@ export const createSchema = z
       .optional(),
     contactName: text(MAX_CONTACT_NAME_LENGTH),
     phoneNumber: text(MAX_PHONE_NUMBER_LENGTH),
+    preferredVenueLocation: text(MAX_PREFERRED_VENUE_LOCATION_LENGTH)
+      .nullable()
+      .optional(),
     specialRequests: z
       .string()
       .trim()
@@ -83,6 +107,18 @@ export const createSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
+    const serviceIds = new Set<string>();
+    value.requestedAddons?.forEach((addon, index) => {
+      if (serviceIds.has(addon.serviceId))
+        ctx.addIssue({
+          code: "custom",
+          message: "Choose each service only once",
+          path: ["requestedAddons", index, "serviceId"],
+        });
+
+      serviceIds.add(addon.serviceId);
+    });
+
     if (
       (value.durationMode === "one_day" && value.requestedDays.length !== 1) ||
       (value.durationMode === "multi_day" && value.requestedDays.length < 2)
@@ -93,6 +129,7 @@ export const createSchema = z
         path: ["requestedDays"],
       });
     }
+
     const dates = new Set<string>();
     value.requestedDays.forEach((day, index) => {
       if (dates.has(day.date))
@@ -101,9 +138,11 @@ export const createSchema = z
           message: "Choose distinct dates",
           path: ["requestedDays", index, "date"],
         });
+
       dates.add(day.date);
     });
   });
+
 export const saveRequestedDayTimesSchema = z
   .object({
     startsAt: z.iso.datetime({ offset: true }),
@@ -111,14 +150,18 @@ export const saveRequestedDayTimesSchema = z
     expectedUpdatedAt: z.iso.datetime({ offset: true }),
   })
   .strict();
+
 export const requestedDayParams = z.object({
   id: z.string().uuid(),
   date: requestedDateSchema,
 });
+
 export type RequestedDay = z.infer<typeof requestedDaySchema>;
+
 export type SaveRequestedDayTimesInput = z.infer<
   typeof saveRequestedDayTimesSchema
 >;
+
 export const updateStatusSchema = z
   .object({
     status: statusSchema,
@@ -136,6 +179,7 @@ export const updateStatusSchema = z
       Boolean(value.reason),
     { message: "A reason is required for this status", path: ["reason"] },
   );
+
 export const cancelSchema = z.object({
   reason: z
     .string()
@@ -143,7 +187,9 @@ export const cancelSchema = z.object({
     .min(1, "A cancellation reason is required")
     .max(MAX_BOOKING_REASON_LENGTH),
 });
+
 export const idParams = z.object({ id: z.string().uuid() });
+
 export const bookingSchema = z.object({
   id: z.string().uuid(),
   reference: z.string(),
@@ -167,10 +213,15 @@ export const bookingSchema = z.object({
   phoneNumber: z.string(),
   preferredVenueLocation: z.string().nullable(),
   specialRequests: z.string().nullable(),
+  requestedServices: z.array(reviewedServiceSchema),
+  budget: z.string().nullable(),
   status: statusSchema,
   outOfRange: z.boolean(),
+  submittedAt: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+
 export type CreateInput = z.infer<typeof createSchema>;
+
 export type Status = z.infer<typeof statusSchema>;

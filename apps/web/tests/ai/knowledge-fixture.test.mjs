@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
+
 // Synthetic browser fixture: expected package and service coverage 1/3 (33.3%),
 // attention 4/6, and current/expected chunks 7/14. Never used by the app.
 const listing = (id, kind, name, status, indexedChunks, expectedChunks) => ({
@@ -13,6 +14,7 @@ const listing = (id, kind, name, status, indexedChunks, expectedChunks) => ({
   photoChunks: 0,
   lastIndexedAt: indexedChunks ? "2026-11-16T00:00:00.000Z" : null,
 });
+
 export const listings = [
   listing("p1", "package", "Classic", "indexed", 4, 4),
   listing("p2", "package", "Garden", "partial", 1, 3),
@@ -21,12 +23,14 @@ export const listings = [
   listing("s2", "service", "Music", "needs-refresh", 0, 2),
   listing("s3", "service", "Photography", "pending", 0, 1),
 ];
+
 export const summary = {
   packages: { total: 3, indexed: 1 },
   services: { total: 3, indexed: 1 },
   attention: 4,
   total: 6,
 };
+
 export const detail = (item) => ({
   listing: item,
   chunks: Array.from({ length: item.expectedChunks }, (_, i) => ({

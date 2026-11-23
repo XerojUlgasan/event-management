@@ -17,12 +17,18 @@ import {
   linkFirebaseRoute,
   linkFirebaseRouteHandler,
 } from "./link-firebase.js";
+import {
+  issueRealtimeTokenRoute,
+  issueRealtimeTokenRouteHandler,
+} from "./issue-realtime-token.js";
 
 const authRoutes = new OpenAPIHono<HonoEnv>();
+
 authRoutes.use("/auth/sync", requireFirebaseAuth);
 authRoutes.use("/me", requireSession);
 authRoutes.use("/auth/link/firebase", requireSession, requireFirebaseAuth);
 authRoutes.use("/auth/password", requireSession, requireFirebaseAuth);
+authRoutes.use("/auth/realtime-token", requireSession);
 
 authRoutes.openapi(syncFirebaseProfileRoute, syncFirebaseProfileRouteHandler);
 authRoutes.openapi(getMeRoute, getMeRouteHandler);
@@ -31,4 +37,13 @@ authRoutes.openapi(registerUserRoute, registerUserRouteHandler);
 authRoutes.openapi(loginUserRoute, loginUserRouteHandler);
 authRoutes.openapi(linkFirebaseRoute, linkFirebaseRouteHandler);
 authRoutes.openapi(addPasswordRoute, addPasswordRouteHandler);
+authRoutes.openapi(
+  issueRealtimeTokenRoute,
+  issueRealtimeTokenRouteHandler,
+  (result, c) => {
+    if (!result.success)
+      return c.json({ error: "Invalid Realtime token request" }, 400);
+  },
+);
+
 export default authRoutes;

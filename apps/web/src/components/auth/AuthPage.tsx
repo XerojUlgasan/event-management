@@ -65,15 +65,19 @@ export function AuthPage({
             `Use a password with at least ${MIN_PASSWORD_LENGTH} characters.`,
           ),
         );
+
         return;
       }
+
       if (password !== confirmPassword) {
         setFormError(notifyError("Passwords do not match."));
+
         return;
       }
     }
 
     setSubmitting(true);
+
     try {
       if (mode === "register") {
         await signUp(name.trim(), email.trim(), password);
@@ -94,6 +98,7 @@ export function AuthPage({
     setFormError("");
     clearError();
     setSubmitting(true);
+
     try {
       await signInWithGoogle();
     } catch {
@@ -324,11 +329,6 @@ export function AuthPage({
               </Button>
             </>
           )}
-
-          <p className="login-disclaimer">
-            Customer sign-up is open. Administrator access is managed
-            separately.
-          </p>
         </div>
       </main>
     </div>

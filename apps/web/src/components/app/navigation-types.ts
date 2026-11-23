@@ -1,5 +1,7 @@
 export type Role = "admin" | "customer";
+
 export type View = "public" | "login" | "customer" | "app";
+
 export type NavKey =
   | "AI"
   | "Overview"
@@ -10,6 +12,7 @@ export type NavKey =
   | "Packages"
   | "Services"
   | "Showcases"
+  | "BusinessInformation"
   | "Inventory"
   | "Operations"
   | "Reports"

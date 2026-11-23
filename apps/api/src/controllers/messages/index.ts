@@ -1,4 +1,12 @@
+import {
+  retryCustomerMessageRoute,
+  retryCustomerMessageRouteHandler,
+  retryAdminMessageRoute,
+  retryAdminMessageRouteHandler,
+} from "./retry-message-processing.js";
+import { HTTPException } from "hono/http-exception";
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import { createMiddleware } from "hono/factory";
 import { requireSession, requireSystemAdmin } from "../../middleware/auth.js";
 import type { HonoEnv } from "../../types/hono.js";
@@ -38,6 +46,12 @@ import {
   getCustomerConversationByIdRoute,
   getCustomerConversationByIdRouteHandler,
 } from "./get-customer-conversation-by-id.js";
+import {
+  markAdminConversationReadRoute,
+  markAdminConversationReadRouteHandler,
+  markCustomerConversationReadRoute,
+  markCustomerConversationReadRouteHandler,
+} from "./mark-conversation-read.js";
 
 const routes = new OpenAPIHono<HonoEnv>({
   defaultHook: (result, c) => {
@@ -52,12 +66,25 @@ const routes = new OpenAPIHono<HonoEnv>({
       );
   },
 });
+
+routes.onError((error, c) => {
+  if (error instanceof HTTPException)
+    return c.json({ error: error.message }, error.status);
+
+  console.error("messages", { outcome: "failed" });
+
+  return c.json({ error: "Unable to complete message request" }, 500);
+});
+
 const customerOnly = createMiddleware<HonoEnv>(async (c, next) => {
   if (c.get("session").user.role !== "customer")
-    return c.json({ error: "Customer access required" }, 403);
+    return jsonError(c, "Customer access required", 403);
+
   await next();
 });
+
 const adminOnly = requireSystemAdmin;
+
 routes.use("/messages", requireSession, customerOnly);
 routes.use("/messages/*", requireSession, customerOnly);
 routes.use("/admin/conversations", requireSession, adminOnly);
@@ -84,4 +111,16 @@ routes.openapi(listAdminConversationsRoute, listAdminConversationsRouteHandler);
 routes.openapi(getAdminConversationRoute, getAdminConversationRouteHandler);
 routes.openapi(sendAdminMessageRoute, sendAdminMessageRouteHandler);
 routes.openapi(updateConversationAiRoute, updateConversationAiRouteHandler);
+
+routes.openapi(retryCustomerMessageRoute, retryCustomerMessageRouteHandler);
+routes.openapi(retryAdminMessageRoute, retryAdminMessageRouteHandler);
+routes.openapi(
+  markCustomerConversationReadRoute,
+  markCustomerConversationReadRouteHandler,
+);
+routes.openapi(
+  markAdminConversationReadRoute,
+  markAdminConversationReadRouteHandler,
+);
+
 export default routes;

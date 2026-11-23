@@ -8,7 +8,7 @@ import { encodePageCursor, parsePageCursor } from "../../utils/pagination.js";
 import { bookingRequestDtos } from "./booking-request-response.js";
 
 const positionSchema = z.object({
-  createdAt: z.iso
+  submittedAt: z.iso
     .datetime()
     .refine(
       (value) =>
@@ -17,6 +17,7 @@ const positionSchema = z.object({
     ),
   id: z.string().uuid(),
 });
+
 export async function listAdminBookingRequestsPageService(
   db: Kysely<DB>,
   input: {
@@ -38,9 +39,11 @@ export async function listAdminBookingRequestsPageService(
     ...input,
     position,
   });
+
   const page = createPage(rows, input.limit, (row) =>
-    encodePageCursor(scope, { createdAt: row.cursor_created_at, id: row.id }),
+    encodePageCursor(scope, { submittedAt: row.cursor_submitted_at, id: row.id }),
   );
+
   return {
     bookingRequests: await bookingRequestDtos(db, page.items),
     nextCursor: page.nextCursor,

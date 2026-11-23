@@ -19,6 +19,7 @@ export async function linkToolCallsToReplyData(
     .where("assistant_message_id", "is not", null)
     .where("assistant_message_id", "!=", input.assistantMessageId)
     .executeTakeFirst();
+
   if (conflicting)
     throw new Error("AI tool calls are already linked to another reply");
 

@@ -23,6 +23,7 @@ type LoadState = "loading" | "ready" | "error";
 
 function initials(name: string | null) {
   if (!name) return "?";
+
   return name
     .split(" ")
     .map((part) => part[0])
@@ -59,6 +60,7 @@ export function CustomersPage() {
     getAdminUsers(search, pagination.cursor ?? undefined)
       .then(({ customers, stats, nextCursor }) => {
         if (!active || currentScope.current !== requestKey) return;
+
         setCustomers(customers);
         setStats(stats);
         setNextCursor(nextCursor);
@@ -71,6 +73,7 @@ export function CustomersPage() {
           notifyError("Unable to load customers.");
         }
       });
+
     return () => {
       active = false;
     };

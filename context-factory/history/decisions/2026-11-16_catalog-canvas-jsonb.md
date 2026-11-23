@@ -5,6 +5,8 @@ Status: accepted
 Authority: User instruction to store each package/service canvas in JSONB without versioning  
 Implementation: implemented in source; applied to the configured loopback Supabase database, with no deployment claim for other environments ([migration](../../../apps/api/prisma/migrations/20261116072801_embed_catalog_canvas/migration.sql))
 
+Superseded in part: the [assignment-removal decision](2026-11-18_remove-package-service-assignments.md) removes the relational `package_services` portion. The canvas JSONB decision remains in effect.
+
 ## Problem
 
 Package and service canvas data was stored through separate catalog page, section, and widget tables. The current catalog save treats a canvas as one complete document owned by its package or service, and the accepted request excludes canvas/document versioning.

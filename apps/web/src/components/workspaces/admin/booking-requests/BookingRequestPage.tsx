@@ -1,3 +1,4 @@
+import { BookingOfferAddons } from "../../../booking-requests/BookingOfferAddons";
 import { BookingStatusHistory } from "../../../booking-requests/BookingStatusHistory";
 import {
   useCallback,
@@ -21,10 +22,13 @@ import {
   getAdminBookingRequest,
   updateBookingRequestStatus,
   type BookingRequest,
+  type BookingStatus,
 } from "../../../../lib/data/booking-requests/requests";
 import { getBookingPackage } from "../../../../lib/data/booking-requests/packages";
 import { ApiError } from "../../../../lib/http/request";
 import { durationLabel } from "../../../../lib/utils/booking-requests/duration";
+import { useRequestGeneration } from "../../../../lib/pagination/use-request-generation";
+import { formatPesosFromMinor } from "../../../../lib/utils/formatting/money";
 import {
   bookingDate,
   bookingDateTime,
@@ -60,6 +64,7 @@ function RequestStatusForm({
 
   async function save(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
+
     if (
       savingRef.current ||
       stale ||
@@ -67,10 +72,12 @@ function RequestStatusForm({
       (reasonRequired && !reason.trim())
     )
       return;
+
     savingRef.current = true;
     setSaving(true);
     onBusyChange(true);
     setError("");
+
     try {
       const result = await updateBookingRequestStatus(
         item.id,
@@ -106,6 +113,7 @@ function RequestStatusForm({
               value={status}
               onChange={(event) => {
                 const value = event.target.value;
+
                 if (
                   value === "under_review" ||
                   value === "needs_details" ||
@@ -170,7 +178,15 @@ function RequestStatusForm({
   );
 }
 
-function BookingQuotations({ bookingId }: { bookingId: string }) {
+function BookingQuotations({
+  bookingId,
+  status,
+  onBookingChanged,
+}: {
+  bookingId: string;
+  status: BookingStatus;
+  onBookingChanged: (booking: BookingRequest) => void;
+}) {
   const [state, setState] = useState<"loading" | "ready" | "missing" | "error">(
     "loading",
   );
@@ -185,11 +201,14 @@ function BookingQuotations({ bookingId }: { bookingId: string }) {
       .catch(() => {
         if (active) setState("error");
       });
+
     return () => {
       active = false;
     };
   }, [bookingId, attempt]);
+
   if (state === "loading") return <p role="status">Checking package…</p>;
+
   if (state === "error")
     return (
       <p role="alert">
@@ -202,9 +221,16 @@ function BookingQuotations({ bookingId }: { bookingId: string }) {
         </Button>
       </p>
     );
-  if (state === "missing")
-    return <p>Prepare or choose a package before creating a quotation.</p>;
-  return <Quotations bookingId={bookingId} admin />;
+
+  return (
+    <Quotations
+      bookingId={bookingId}
+      admin
+      bookingStatus={status}
+      onBookingChanged={onBookingChanged}
+      proposalAvailable={state === "ready"}
+    />
+  );
 }
 
 export function BookingRequestPage({
@@ -227,23 +253,31 @@ export function BookingRequestPage({
   const detailsPanelId = "booking-request-details-panel";
   const packagePanelId = "booking-request-package-panel";
   const quotationPanelId = "booking-request-quotation-panel";
-  const generation = useRef(0);
+  const generation = useRequestGeneration();
 
   const refresh = useCallback(async () => {
-    const current = ++generation.current;
+    const current = generation.bump();
     setRefreshing(true);
     setError("");
     setNeedsSignIn(false);
+
     try {
       const result = await getAdminBookingRequest(bookingRequestId);
-      if (current !== generation.current)
+
+      if (!generation.isCurrent(current))
         throw new Error(
           "The request changed while refreshing. Please try again.",
         );
-      setItem(result.bookingRequest);
+
+      const next = result.bookingRequest;
+      setItem((current) =>
+        current?.id === next.id && current.updatedAt > next.updatedAt
+          ? current
+          : next,
+      );
       setRefreshKey((value) => value + 1);
     } catch (cause) {
-      if (current === generation.current) {
+      if (generation.isCurrent(current)) {
         setNeedsSignIn(cause instanceof ApiError && cause.status === 401);
         setError(
           cause instanceof ApiError && cause.status === 404
@@ -253,17 +287,18 @@ export function BookingRequestPage({
               : "Unable to load this booking request.",
         );
       }
+
       throw cause;
     } finally {
-      if (current === generation.current) setRefreshing(false);
+      if (generation.isCurrent(current)) setRefreshing(false);
     }
-  }, [bookingRequestId]);
+  }, [bookingRequestId, generation]);
 
   const refreshWithNotice = (fallback: string) => {
     const pending = refresh();
-    const current = generation.current;
+    const current = generation.current();
     void pending.catch((cause) => {
-      if (current === generation.current) notifyError(cause, fallback);
+      if (generation.isCurrent(current)) notifyError(cause, fallback);
     });
   };
 
@@ -272,15 +307,16 @@ export function BookingRequestPage({
     setNotice("");
     setPageTab("details");
     const pending = refresh();
-    const current = generation.current;
+    const current = generation.current();
     void pending.catch((cause) => {
-      if (current === generation.current)
+      if (generation.isCurrent(current))
         notifyError(cause, "Unable to load this booking request.");
     });
+
     return () => {
-      generation.current++;
+      generation.bump();
     };
-  }, [refresh, notifyError]);
+  }, [refresh, notifyError, generation]);
 
   return (
     <div className="booking-request-page">
@@ -328,8 +364,8 @@ export function BookingRequestPage({
         <>
           <div className="booking-request-heading">
             <PageHeader
-              title={`Booking request ${item.reference}`}
-              description={`${item.eventType} · ${item.packageName ?? "No catalog package selected"}`}
+              title={`${item.eventType} booking request`}
+              description={item.packageName ?? "No catalog package selected"}
             />
             <BookingStatusBadge status={item.status} />
           </div>
@@ -409,10 +445,9 @@ export function BookingRequestPage({
                         {item.packageName && item.packagePrice ? (
                           <>
                             {item.packageName} ·{" "}
-                            {new Intl.NumberFormat("en-PH", {
-                              style: "currency",
-                              currency: "PHP",
-                            }).format(item.packagePrice.amountMinor / 100)}{" "}
+                            {formatPesosFromMinor(
+                              item.packagePrice.amountMinor,
+                            )}{" "}
                             · up to {item.packageMaxGuests} guests
                           </>
                         ) : (
@@ -480,12 +515,25 @@ export function BookingRequestPage({
                       <dt>Special requests</dt>
                       <dd>{item.specialRequests || "None"}</dd>
                     </div>
+                    {item.budget && (
+                      <div>
+                        <dt>Budget</dt>
+                        <dd>{item.budget}</dd>
+                      </div>
+                    )}
                     <div>
                       <dt>Requested</dt>
-                      <dd>{bookingDateTime(item.createdAt, item.timeZone)}</dd>
+                      <dd>
+                        {bookingDateTime(item.submittedAt, item.timeZone)}
+                      </dd>
                     </div>
                   </dl>
                 </div>
+                <BookingOfferAddons
+                  booking={item}
+                  disabled={refreshing || savingStatus || savingDay}
+                  onChanged={setItem}
+                />
                 <div className="booking-request-overview-footer">
                   <p>
                     Dates are not reserved. Processing does not confirm the
@@ -510,7 +558,7 @@ export function BookingRequestPage({
                       onClose={() => setEditStatus(false)}
                       onBusyChange={setSavingStatus}
                       onSaved={(updated) => {
-                        generation.current++;
+                        generation.bump();
                         setItem(updated);
                         setEditStatus(false);
                         setNotice(
@@ -545,6 +593,7 @@ export function BookingRequestPage({
               <BookingPackage
                 id={item.id}
                 admin
+                refreshBooking={refresh}
                 editable={!["declined", "cancelled"].includes(item.status)}
                 onChanged={() => {
                   setProposalRevision((value) => value + 1);
@@ -563,6 +612,15 @@ export function BookingRequestPage({
               <BookingQuotations
                 key={`${item.id}:${proposalRevision}`}
                 bookingId={item.id}
+                status={item.status}
+                onBookingChanged={(booking) => {
+                  setItem((current) =>
+                    current?.id === booking.id &&
+                    current.updatedAt < booking.updatedAt
+                      ? booking
+                      : current,
+                  );
+                }}
               />
             </div>
           )}

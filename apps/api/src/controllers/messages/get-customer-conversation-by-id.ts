@@ -1,4 +1,5 @@
 import { paginationQuerySchema } from "../../utils/pagination.js";
+import { jsonError } from "../../utils/service-result.js";
 import { createRoute } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { threadSchema } from "./schemas.js";
@@ -30,7 +31,8 @@ export const getCustomerConversationByIdRouteHandler: AppRouteHandler<
     c.req.valid("query").limit,
     c.req.valid("query").cursor,
   );
+
   return result
     ? c.json(result, 200)
-    : c.json({ error: "Conversation not found" }, 404);
+    : jsonError(c, "Conversation not found", 404);
 };

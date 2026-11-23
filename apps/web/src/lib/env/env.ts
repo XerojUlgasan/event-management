@@ -1,5 +1,7 @@
 type PublicEnv = {
   PUBLIC_API_URL?: string;
+  PUBLIC_SUPABASE_URL?: string;
+  PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string;
   PUBLIC_FIREBASE_API_KEY?: string;
   PUBLIC_FIREBASE_AUTH_DOMAIN?: string;
   PUBLIC_FIREBASE_PROJECT_ID?: string;
@@ -20,6 +22,8 @@ export function createPublicEnv(source: PublicEnv) {
 
   return {
     PUBLIC_API_URL: source.PUBLIC_API_URL ?? "http://localhost:3000/v1",
+    PUBLIC_SUPABASE_URL: source.PUBLIC_SUPABASE_URL,
+    PUBLIC_SUPABASE_PUBLISHABLE_KEY: source.PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     firebaseConfig,
     firebaseConfigured: Boolean(
       firebaseConfig.apiKey &&
@@ -33,6 +37,9 @@ export function createPublicEnv(source: PublicEnv) {
 // Optional access also supports source imports in the Node test runner.
 export const env = createPublicEnv({
   PUBLIC_API_URL: import.meta.env?.PUBLIC_API_URL,
+  PUBLIC_SUPABASE_URL: import.meta.env?.PUBLIC_SUPABASE_URL,
+  PUBLIC_SUPABASE_PUBLISHABLE_KEY: import.meta.env
+    ?.PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   PUBLIC_FIREBASE_API_KEY: import.meta.env?.PUBLIC_FIREBASE_API_KEY,
   PUBLIC_FIREBASE_AUTH_DOMAIN: import.meta.env?.PUBLIC_FIREBASE_AUTH_DOMAIN,
   PUBLIC_FIREBASE_PROJECT_ID: import.meta.env?.PUBLIC_FIREBASE_PROJECT_ID,

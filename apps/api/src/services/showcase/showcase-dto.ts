@@ -6,6 +6,7 @@ import type {
 } from "@event-management/contracts/showcase";
 import { findShowcaseRecordWithMediaData } from "../../data/showcase-records/find-showcase-record-with-media.js";
 import type { AssetRow } from "../../data/showcase-records/find-assets-for-records.js";
+
 type Database = Kysely<DB> | Transaction<DB>;
 
 /**
@@ -16,6 +17,7 @@ type Database = Kysely<DB> | Transaction<DB>;
  */
 function assetUrl(id: string, asset: AssetRow | null): string {
   if (asset && asset.storage_key === null && asset.url) return asset.url;
+
   return `/v1/showcase-media/${id}`;
 }
 
@@ -53,6 +55,8 @@ export async function showcaseDto(
   lookup: { id: string } | { slug: string },
 ) {
   const result = await findShowcaseRecordWithMediaData(db, lookup);
+
   if (!result) return null;
+
   return buildShowcaseDto(result.record, result.coverAsset, result.mediaRows);
 }

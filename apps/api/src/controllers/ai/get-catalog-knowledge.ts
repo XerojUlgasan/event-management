@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { paginationQuerySchema } from "../../utils/pagination.js";
 import { getCatalogKnowledgeService } from "../../services/ai/get-catalog-knowledge.js";
@@ -9,6 +10,7 @@ import {
   errors,
   response,
 } from "./schemas.js";
+
 export const detailRoute = createRoute({
   method: "get",
   path: "/admin/ai/knowledge/{kind}/{id}",
@@ -29,6 +31,7 @@ export const detailRoute = createRoute({
     ...errors,
   },
 });
+
 export const detailRouteHandler: AppRouteHandler<typeof detailRoute> = async (
   c,
 ) => {
@@ -37,7 +40,8 @@ export const detailRouteHandler: AppRouteHandler<typeof detailRoute> = async (
     c.req.valid("param"),
     c.req.valid("query"),
   );
+
   return result
     ? c.json(result, 200)
-    : c.json({ error: "Listing not found" }, 404);
+    : jsonError(c, "Listing not found", 404);
 };

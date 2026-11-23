@@ -45,6 +45,7 @@ export async function seedScenario(db: SeedDb, passwordHash: string) {
     users: persistedUsers.users,
     now,
   });
+
   return {
     users: persistedUsers.inserted,
     sessions: sessions.inserted,

@@ -14,9 +14,13 @@ export function createServerEnv(source: ServerEnv) {
     },
     get SERVER_API_URL() {
       const proxy = source.API_PROXY_TARGET?.replace(/\/$/, "");
+
       if (proxy) return `${proxy}/functions/v1/api/v1`;
+
       const configured = source.PUBLIC_API_URL ?? DEFAULT_SERVER_API_URL;
+
       if (/^https?:\/\//.test(configured)) return configured.replace(/\/$/, "");
+
       return DEFAULT_SERVER_API_URL;
     },
   };

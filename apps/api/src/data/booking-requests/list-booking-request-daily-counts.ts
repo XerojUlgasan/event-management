@@ -1,5 +1,6 @@
 import { sql, type Kysely, type Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
+
 type Database = Kysely<DB> | Transaction<DB>;
 
 export async function listBookingRequestDailyCountsData(
@@ -16,9 +17,10 @@ export async function listBookingRequestDailyCountsData(
       UNION
       SELECT day->>'date' FROM jsonb_array_elements(br.requested_days) AS requested(day)
     ) AS dates(preferred_date)
-    WHERE dates.preferred_date LIKE ${month + "-%"}
+    WHERE br.submitted_at IS NOT NULL AND dates.preferred_date LIKE ${month + "-%"}
       ${status ? sql`AND br.status = ${status}` : sql``}
     GROUP BY dates.preferred_date ORDER BY dates.preferred_date ASC
   `.execute(db);
+
   return result.rows;
 }

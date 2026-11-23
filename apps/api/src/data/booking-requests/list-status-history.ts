@@ -1,6 +1,9 @@
-import { sql, type Kysely, type Transaction } from "kysely";
+import type { Kysely, Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
+import { keysetPredicate, utcTimestampSql } from "../../utils/sql-page.js";
+
 type Database = Kysely<DB> | Transaction<DB>;
+
 export function listStatusHistoryData(
   db: Database,
   bookingId: string,
@@ -10,18 +13,35 @@ export function listStatusHistoryData(
     .selectFrom("booking_request_status_history")
     .selectAll()
     .select(
-      sql<string>`to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`.as(
-        "cursor_created_at",
-      ),
+      utcTimestampSql("created_at").as("cursor_created_at"),
     )
     .where("booking_request_id", "=", bookingId);
+
   if (input.position)
     query = query.where(
-      sql<boolean>`(created_at, id) > (${input.position.createdAt}::timestamptz, ${input.position.id}::uuid)`,
+      keysetPredicate(
+        "created_at",
+        "id",
+        input.position.createdAt,
+        input.position.id,
+        ">",
+      ),
     );
+
   return query
     .orderBy("created_at", "asc")
     .orderBy("id", "asc")
     .limit(input.limit + 1)
     .execute();
+}
+
+export function latestStatusHistoryData(db: Database, bookingId: string) {
+  return db
+    .selectFrom("booking_request_status_history")
+    .selectAll()
+    .where("booking_request_id", "=", bookingId)
+    .orderBy("created_at", "desc")
+    .orderBy("id", "desc")
+    .limit(1)
+    .executeTakeFirst();
 }

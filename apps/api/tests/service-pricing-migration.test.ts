@@ -19,16 +19,19 @@ test("service pricing migration preserves old rates and enforces fixed pricing",
   const database = `em_service_pricing_${randomUUID().replaceAll("-", "")}`;
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
+
   try {
     await admin.query(`CREATE DATABASE "${database}"`);
     pool = new Pool({ ...connection, database });
     const root = new URL("../prisma/migrations/", import.meta.url);
+
     for (const entry of (await readdir(root, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory() && entry.name < migration)
       .sort((a, b) => a.name.localeCompare(b.name)))
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );
+
     await pool.query(`INSERT INTO services(name,slug,description,hourly_rate_pesos)
       VALUES ('Hourly','hourly','Description',500), ('Unknown','unknown','Description',NULL)`);
     await pool.query(
@@ -51,6 +54,7 @@ test("service pricing migration preserves old rates and enforces fixed pricing",
         included_hours: null,
       },
     ]);
+
     for (const [fixed, hours, hourly] of [
       [1000, null, 500],
       [null, 2, 500],
@@ -64,6 +68,7 @@ test("service pricing migration preserves old rates and enforces fixed pricing",
           [fixed, hours, hourly],
         ),
       );
+
     await pool.query(
       "UPDATE services SET fixed_price_pesos=1000,included_hours=2 WHERE slug='hourly'",
     );

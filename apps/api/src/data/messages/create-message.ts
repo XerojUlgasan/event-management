@@ -1,9 +1,22 @@
-import { sql, type Kysely } from "kysely";
+import { withConversationActivity } from "../guest-chat/activity.js";
 import {
-  assertGuestActive,
-  guestExpiry,
-} from "../guest-chat/guest-conversation.js";
+  enqueueImageMessageProcessingData,
+  messageProcessingSelection,
+} from "./message-processing.js";
+import {
+  insertMessageImagesData,
+  listMessageImagesData,
+  matchingMessageImagesData,
+  type SavedMessageImage,
+} from "./message-images.js";
+import {
+  clearPendingAiHandoff,
+  parseAiHandoff,
+} from "../../utils/ai-handoff.js";
+import { sql, type Kysely } from "kysely";
+import { assertGuestActive } from "../guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
+import { publishConversationMessageData } from "./publish-conversation-message.js";
 
 type Database = Kysely<DB>;
 
@@ -14,6 +27,9 @@ export async function createMessageData(
   senderRole: "customer" | "admin",
   body: string,
   requestId?: string,
+  images: SavedMessageImage[] = [],
+  imageHashes = images.map((image) => image.content_hash),
+  preflight = false,
 ) {
   return db.transaction().execute(async (trx) => {
     const conversation = await trx
@@ -22,52 +38,77 @@ export async function createMessageData(
       .where("id", "=", conversationId)
       .forUpdate()
       .executeTakeFirst();
+
     if (
       !conversation ||
       (senderRole === "customer" && conversation.customer_id !== senderId)
     )
       throw new Error("Conversation not found");
+
     if (requestId) {
       const previous = await trx
         .selectFrom("messages")
         .selectAll()
         .where("id", "=", requestId)
         .executeTakeFirst();
+
       if (previous) {
         if (
           previous.conversation_id !== conversation.id ||
           previous.sender_id !== senderId ||
           previous.sender_role !== senderRole ||
-          previous.body !== body
+          previous.body !== body ||
+          !(await matchingMessageImagesData(trx, previous.id, imageHashes))
         )
           throw new Error("Message request conflict");
+
         const sender = await trx
           .selectFrom("users")
           .select(["display_name", "email"])
           .where("id", "=", senderId)
           .executeTakeFirstOrThrow();
+
         return {
           aiEnabled: conversation.ai_enabled,
           aiVersion: conversation.ai_version,
+          aiHandoff: parseAiHandoff(conversation.ai_handoff),
           replayed: true,
           message: {
             ...previous,
+            images: await listMessageImagesData(trx, previous.id),
+            processing:
+              (
+                await trx
+                  .selectFrom("messages as m")
+                  .select(messageProcessingSelection())
+                  .where("m.id", "=", previous.id)
+                  .executeTakeFirst()
+              )?.processing ?? null,
             sender_display_name: sender.display_name,
             sender_email: sender.email,
           },
         };
       }
     }
-    if (
-      conversation.status === "closed" &&
-      (senderRole === "admin" || conversation.booking_request_id)
-    )
-      throw new Error("Conversation is closed");
-    if (conversation.guest_identity_id) assertGuestActive(conversation);
+
+    if (conversation.guest_identity_id)
+      assertGuestActive(await withConversationActivity(trx, conversation));
+
+    if (preflight) return null;
+
+    const previousHandoff = parseAiHandoff(conversation.ai_handoff);
+    const aiHandoff =
+      senderRole === "admin"
+        ? clearPendingAiHandoff(conversation.ai_handoff)
+        : previousHandoff;
     const aiEnabled = senderRole === "admin" ? false : conversation.ai_enabled;
     const aiVersion =
       conversation.ai_version +
-      (conversation.ai_enabled && senderRole === "admin" ? 1 : 0);
+      (senderRole === "admin" &&
+      (conversation.ai_enabled || previousHandoff?.pending)
+        ? 1
+        : 0);
+
     const row = await trx
       .insertInto("messages")
       .values({
@@ -82,20 +123,26 @@ export async function createMessageData(
       .onConflict((conflict) => conflict.column("id").doNothing())
       .returningAll()
       .executeTakeFirst();
+
     // Another conversation can insert the same globally unique ID while its
     // row lock is held. Do not expose that message to this customer.
     if (!row) throw new Error("Message request conflict");
+
+    await insertMessageImagesData(trx, row.id, conversation.id, images);
+    const processing = await enqueueImageMessageProcessingData(
+      trx,
+      row.id,
+      { ...conversation, ai_enabled: aiEnabled, ai_version: aiVersion },
+      senderRole,
+      images.length > 0,
+    );
     await trx
       .updateTable("conversations")
       .set({
         updated_at: row.created_at,
-        ...(conversation.guest_identity_id
-          ? { guest_expires_at: guestExpiry(row.created_at) }
-          : {}),
-        status: "active",
-        closed_at: null,
         ai_enabled: aiEnabled,
         ai_version: aiVersion,
+        ai_handoff: aiHandoff,
       })
       .where("id", "=", conversation.id)
       .execute();
@@ -104,12 +151,19 @@ export async function createMessageData(
       .select(["display_name", "email"])
       .where("id", "=", senderId)
       .executeTakeFirstOrThrow();
+
+    if (conversation.customer_id)
+      await publishConversationMessageData(trx, conversation.id, row.id);
+
     return {
       aiEnabled,
       aiVersion,
+      aiHandoff,
       replayed: false,
       message: {
         ...row,
+        images,
+        processing,
         sender_display_name: sender.display_name,
         sender_email: sender.email,
       },

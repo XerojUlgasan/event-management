@@ -4,9 +4,13 @@ export function showcasePageLinks(url: URL, nextCursor: string | null) {
 
   const link = (current: string | undefined, previous: string[]) => {
     const params = new URLSearchParams();
+
     if (current) params.set("cursor", current);
+
     for (const item of previous) params.append("previous", item);
+
     const query = params.toString();
+
     return `${url.pathname}${query ? `?${query}` : ""}`;
   };
 

@@ -1,21 +1,13 @@
 .brand {
-  position: relative;
   display: inline-block;
   width: var(--brand-width, 180px);
   max-width: 100%;
-  aspect-ratio: 3.3 / 1;
-  overflow: hidden;
   vertical-align: middle;
-  background: var(--brand-paper);
 }
 .brand-logo {
-  position: absolute;
-  top: 50%;
-  left: 0;
+  display: block;
   width: 100%;
   height: auto;
-  max-width: none;
-  transform: translateY(-50%);
 }
 .brand-light {
   background: var(--brand-paper);
@@ -241,6 +233,46 @@ textarea.ui-control {
 .button[aria-busy="true"],
 .ui-button-plain[aria-busy="true"] {
   cursor: wait;
+}
+.ui-info-disclosure {
+  position: relative;
+  flex: none;
+}
+.ui-info-disclosure-hint,
+.ui-info-disclosure-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--surface-base);
+  color: var(--text-primary);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.ui-info-disclosure-hint {
+  visibility: hidden;
+  top: 100%;
+}
+.ui-info-disclosure-panel {
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+}
+.ui-info-disclosure:not([data-hint-dismissed="true"]):is(
+    :hover,
+    :has(button:focus-visible)
+  )
+  .ui-info-disclosure-hint {
+  visibility: visible;
+}
+.ui-info-disclosure:has(button[aria-expanded="true"]) .ui-info-disclosure-hint {
+  visibility: hidden;
 }
 .badge {
   display: inline-flex;
@@ -1331,6 +1363,72 @@ textarea.ui-control {
   text-decoration: none;
 }
 
+.wmde-markdown.ui-markdown {
+  background: var(--transparent);
+  color: inherit;
+  font-family: inherit;
+}
+.wmde-markdown.ui-markdown-message {
+  min-width: 0;
+  max-width: 100%;
+  font-size: inherit;
+  line-height: inherit;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ui-markdown-message :is(p, li) {
+  white-space: pre-wrap;
+}
+.ui-markdown-message :is(p, ul, ol, blockquote, pre, table) {
+  margin-block: 0 0.65em;
+}
+.ui-markdown-message :is(ul, ol) {
+  padding-left: 1.5em;
+}
+.ui-markdown-message ul {
+  list-style-type: disc;
+}
+.ui-markdown-message ol {
+  list-style-type: decimal;
+}
+.ui-markdown-message :is(h1, h2, h3, h4, h5, h6) {
+  margin-block: 0.75em 0.4em;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  font-family: inherit;
+  font-size: 1em;
+  line-height: inherit;
+}
+.ui-markdown-message :is(h1, h2, h3, h4, h5, h6) > a:empty {
+  display: none;
+}
+.ui-markdown-message a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ui-markdown-message a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.ui-markdown-message blockquote {
+  color: inherit;
+  border-left-color: currentColor;
+}
+.ui-markdown-message :is(pre, table) {
+  max-width: 100%;
+  overflow-x: auto;
+  color: var(--text-primary);
+  background: var(--surface-subtle);
+}
+.ui-markdown-message table {
+  display: block;
+}
+.ui-markdown-message :not(pre) > code {
+  color: var(--text-primary);
+  background: var(--surface-muted);
+}
 /* Shared author and public catalog canvas. The container, not the viewport,
    determines when the authored grid stacks. */
 .ui-catalog-canvas {
@@ -1362,6 +1460,11 @@ textarea.ui-control {
   padding: var(--catalog-padding);
 }
 .ui-catalog-guides {
+  --catalog-guide-ink: color-mix(
+    in srgb,
+    var(--border-subtle) 65%,
+    var(--transparent)
+  );
   position: absolute;
   pointer-events: none;
   top: var(--catalog-padding);
@@ -1374,20 +1477,21 @@ textarea.ui-control {
         (var(--catalog-row-height) + var(--catalog-gap)) - var(--catalog-gap)
     )
   );
+  /* Feather each half-pixel stroke to keep it visible at 1x. */
   background-image:
     linear-gradient(
       to right,
-      var(--border-subtle) 1px,
+      var(--catalog-guide-ink) 0.5px,
       var(--transparent) 1px,
       var(--transparent) calc(100% - var(--catalog-gap) - 1px),
-      var(--border-subtle) calc(100% - var(--catalog-gap) - 1px)
+      var(--catalog-guide-ink) calc(100% - var(--catalog-gap) - 0.5px)
     ),
     linear-gradient(
       to bottom,
-      var(--border-subtle) 1px,
+      var(--catalog-guide-ink) 0.5px,
       var(--transparent) 1px,
       var(--transparent) calc(var(--catalog-row-height) - 1px),
-      var(--border-subtle) calc(var(--catalog-row-height) - 1px)
+      var(--catalog-guide-ink) calc(var(--catalog-row-height) - 0.5px)
     );
   background-size: calc(
       (100% + var(--catalog-gap)) / var(--catalog-guide-columns)
@@ -1416,7 +1520,7 @@ textarea.ui-control {
   gap: var(--catalog-gap);
   padding: 4px var(--catalog-padding);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 10px;
   text-align: center;
 }
 .ui-catalog-widget {
@@ -1429,6 +1533,14 @@ textarea.ui-control {
   height: 100%;
   min-height: 0;
   overflow: clip;
+}
+.ui-catalog-widget-content:is(
+  .ui-catalog-markdown,
+  .ui-catalog-photo,
+  .ui-catalog-video
+) {
+  box-sizing: border-box;
+  padding: clamp(4px, 0.65cqi, 10px);
 }
 .ui-catalog-markdown .wmde-markdown,
 .ui-catalog-markdown .wmde-markdown pre,
@@ -1494,17 +1606,24 @@ textarea.ui-control {
   text-decoration: none;
   cursor: pointer;
 }
+.ui-catalog-widget .ui-catalog-reference-service > .ui-catalog-reference-card {
+  box-sizing: border-box;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+}
+.ui-catalog-reference-card:not(.ui-catalog-reference-action)
+  .ui-catalog-reference-link {
+  visibility: hidden;
+}
 .ui-catalog-reference-card > .ui-catalog-caption {
   display: block;
 }
-.ui-catalog-reference-card > img {
+.ui-catalog-reference-card > .ui-catalog-thumbnail {
   display: block;
   width: 100%;
   height: 45%;
   min-height: 0;
-  object-fit: contain;
   flex: 0 1 auto;
-  background: var(--accent-soft);
 }
 .ui-catalog-reference-details {
   display: flex;
@@ -1543,7 +1662,12 @@ textarea.ui-control {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
-@container catalog-canvas (width < 520px) {
+@container catalog-canvas (width < 580px) {
+  .ui-catalog-grid,
+  .ui-catalog-ruler,
+  .ui-catalog-guides {
+    --catalog-grid-reference: var(--catalog-stacked-reference);
+  }
   .ui-catalog-grid {
     display: flex;
     flex-direction: column;
@@ -1555,5 +1679,83 @@ textarea.ui-control {
         (var(--catalog-row-height) + var(--catalog-gap)) - var(--catalog-gap)
     );
     flex: none;
+  }
+}
+
+.ui-catalog-thumbnail {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--brand-paper);
+}
+.ui-catalog-thumbnail-brand {
+  position: absolute;
+  inset: 12%;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+.ui-catalog-thumbnail > img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ui-catalog-reference-card > .ui-catalog-thumbnail > img {
+  object-fit: contain;
+}
+.ui-catalog-thumbnail:has(> img:not([hidden])) > .ui-catalog-thumbnail-brand {
+  display: none;
+}
+.ui-catalog-thumbnail > img[hidden] {
+  display: none;
+}
+
+.ui-assistant-typing {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+.ui-assistant-typing > span {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.ui-assistant-typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: ui-assistant-dot 1.2s infinite ease-in-out;
+}
+.ui-assistant-typing i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.ui-assistant-typing i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes ui-assistant-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.4;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-assistant-typing i {
+    animation: none;
   }
 }

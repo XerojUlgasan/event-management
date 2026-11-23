@@ -1,4 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { json, errors, idParams, result } from "./http.js";
 import { archivePackageService } from "../../services/packages/archive-package.js";
@@ -10,6 +11,7 @@ export const archivePackageRoute = createRoute({
   request: { params: idParams },
   responses: { 200: result, ...errors },
 });
+
 export const archivePackageRouteHandler: AppRouteHandler<
   typeof archivePackageRoute
 > = async (c) => {
@@ -17,7 +19,9 @@ export const archivePackageRouteHandler: AppRouteHandler<
     c.get("db"),
     c.req.valid("param").id,
   );
+
   if ("status" in outcome)
-    return c.json({ error: outcome.message }, outcome.status);
+    return jsonError(c, outcome.message, outcome.status);
+
   return c.json(outcome, 200);
 };

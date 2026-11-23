@@ -21,9 +21,13 @@ import {
   todayInZone,
 } from "../../lib/utils/booking-requests/booking-dates";
 import { ApiError } from "../../lib/http/request";
+import { priceLabel } from "../../lib/utils/formatting/money";
 import { getMe } from "../../lib/data/auth/session";
 import { createBookingRequest } from "../../lib/data/booking-requests/requests";
-import type { PublicPackage } from "../../lib/data/catalog/packages";
+import {
+  getPackage,
+  type PublicPackage,
+} from "../../lib/data/catalog/packages";
 import {
   clearBookingDraft,
   readBookingDraft,
@@ -31,25 +35,37 @@ import {
   type BookingDraftFields,
 } from "../../lib/services/booking-requests/booking-draft";
 
+import {
+  BookingAddons,
+  includedServiceIds,
+  validAddonHours,
+} from "./BookingAddons";
+
 const OTHER = "__other__";
+
 const COMMON_EVENT_TYPES: readonly string[] = [
   "Birthday",
   "Wedding",
   "Corporate",
 ];
+
 type Fields = BookingDraftFields;
+
 type Errors = Partial<Record<keyof Fields, string>>;
+
 function validate(fields: Fields, zone: string, requireName = true): Errors {
   const errors: Errors = {};
   const eventType =
     fields.eventType === OTHER
       ? fields.customEventType.trim()
       : fields.eventType.trim();
+
   if (!fields.eventType) errors.eventType = "Choose an event type.";
   else if (!eventType) errors.customEventType = "Enter your event type.";
   else if (eventType.length > MAX_EVENT_TYPE_LENGTH)
     errors[fields.eventType === OTHER ? "customEventType" : "eventType"] =
       `Use ${MAX_EVENT_TYPE_LENGTH} characters or fewer.`;
+
   if (
     fields.dates.length < (fields.durationMode === "multi_day" ? 2 : 1) ||
     (fields.durationMode === "one_day" && fields.dates.length !== 1)
@@ -61,9 +77,12 @@ function validate(fields: Fields, zone: string, requireName = true): Errors {
     )
   )
     errors.dates = "Check the dates below.";
+
   if (requireName && !fields.contactName.trim())
     errors.contactName = "Enter a contact person.";
+
   if (!fields.phoneNumber.trim()) errors.phoneNumber = "Enter a phone number.";
+
   for (const [key, limit] of [
     ["contactName", MAX_CONTACT_NAME_LENGTH],
     ["phoneNumber", MAX_PHONE_NUMBER_LENGTH],
@@ -71,10 +90,12 @@ function validate(fields: Fields, zone: string, requireName = true): Errors {
   ] as const)
     if (fields[key].trim().length > limit)
       errors[key] = `Use ${limit} characters or fewer.`;
+
   return errors;
 }
+
 export function BookingRequestDialog({
-  item,
+  item: initialItem,
   resume = false,
   onClose,
   conversationId,
@@ -88,6 +109,9 @@ export function BookingRequestDialog({
 }) {
   const { notify, notifyError } = useNotifications();
   const saved = resume ? readBookingDraft() : null;
+  const [item, setItem] = useState(initialItem);
+  const [packageChanged, setPackageChanged] = useState(false);
+
   const [fields, setFields] = useState<Fields>(() => {
     const old = saved?.fields;
     const oldType = typeof old?.eventType === "string" ? old.eventType : "";
@@ -96,6 +120,7 @@ export function BookingRequestDialog({
       oldType === OTHER ||
       oldType === "Other" ||
       (!!oldType && !options.includes(oldType));
+
     return {
       eventType: oldType ? (custom ? OTHER : oldType) : "",
       customEventType: custom
@@ -120,8 +145,17 @@ export function BookingRequestDialog({
         typeof old?.specialRequests === "string" ? old.specialRequests : "",
     };
   });
+
   const timeZone =
     saved?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const [addons, setAddons] = useState(() => saved?.addons ?? []);
+  const included = includedServiceIds(item);
+  const needsAddonReview = addons.some(
+    (row) =>
+      !validAddonHours(row) ||
+      row.needsReview ||
+      included.has(row.service.id.toLowerCase()),
+  );
   const [review, setReview] = useState(!!saved);
   const [confirmOneDay, setConfirmOneDay] = useState(false);
   const [touched, setTouched] = useState<
@@ -131,15 +165,19 @@ export function BookingRequestDialog({
     "loading" | "customer" | "signed-out" | "admin" | "error"
   >("loading");
   const [busy, setBusy] = useState(false);
+
   const [noteOpen, setNoteOpen] = useState(() => !!fields.specialRequests);
+
   const [error, setError] = useState(
     saved && saved.timeZone !== Intl.DateTimeFormat().resolvedOptions().timeZone
       ? "Your browser time zone changed. Your request still uses the saved time zone; please review your dates."
       : "",
   );
-  const [reference, setReference] = useState("");
+  const [submitted, setSubmitted] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null),
     summary = useRef<HTMLDivElement>(null),
+    formError = useRef<HTMLParagraphElement>(null),
+    heading = useRef<HTMLHeadingElement>(null),
     nameEdited = useRef(false);
   const currentFields = useRef(fields);
   currentFields.current = fields;
@@ -148,11 +186,13 @@ export function BookingRequestDialog({
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
     dialog.current?.showModal();
+
     return () => {
       dialog.current?.close();
       trigger?.focus();
     };
   }, []);
+
   const checkAuth = () => {
     setAuth("loading");
     getMe()
@@ -162,8 +202,10 @@ export function BookingRequestDialog({
           currentFields.current.contactName.trim() ||
           (!nameEdited.current ? profile.displayName?.trim() : "") ||
           "";
+
         if (name && !currentFields.current.contactName.trim())
           setFields((current) => ({ ...current, contactName: name }));
+
         if (profile.role === "customer" && !name && resume) {
           setReview(false);
           setError(
@@ -180,24 +222,52 @@ export function BookingRequestDialog({
             ? "signed-out"
             : "error",
         );
+
         if (!(cause instanceof ApiError && cause.status === 401))
           notifyError("Unable to check your session. Try again.");
       });
   };
+
   useEffect(() => {
     checkAuth();
   }, []);
+  useEffect(() => {
+    if (review) heading.current?.focus();
+  }, [review]);
   const errors = validate(fields, timeZone, auth === "customer");
+
   const change = (key: keyof Fields, value: string) => {
     if (key === "contactName") nameEdited.current = true;
+
     setFields((current) => ({ ...current, [key]: value }));
   };
+
   const cancel = () => {
     clearBookingDraft();
     onClose();
   };
+
+  const refreshPackage = async () => {
+    if (!item) return;
+
+    setBusy(true);
+    try {
+      setItem(await getPackage(item.id));
+      setPackageChanged(false);
+      setError(
+        "Package details refreshed. Review your request before submitting.",
+      );
+    } catch (cause) {
+      setError(notifyError(cause, "Unable to refresh this package."));
+    } finally {
+      setBusy(false);
+      requestAnimationFrame(() => formError.current?.focus());
+    }
+  };
+
   const submit = async () => {
     const found = validate(fields, timeZone);
+
     if (Object.keys(found).length) {
       notifyError("Please check the highlighted fields before submitting.");
       setTouched(
@@ -205,12 +275,32 @@ export function BookingRequestDialog({
       );
       setReview(false);
       requestAnimationFrame(() => summary.current?.focus());
+
       return;
     }
+
+    if (needsAddonReview) {
+      setReview(false);
+      setError(
+        "Check the hours, confirm changed services, and remove any services already included in the package.",
+      );
+      return;
+    }
+
     setBusy(true);
     setError("");
+
     try {
-      const result = await createBookingRequest({
+      await createBookingRequest({
+        ...(addons.length
+          ? {
+              requestedAddons: addons.map((row) => ({
+                serviceId: row.service.id,
+                serviceUpdatedAt: row.service.updatedAt,
+                hours: Number(row.hours),
+              })),
+            }
+          : {}),
         packageId: item?.id ?? null,
         ...(item ? { packageUpdatedAt: item.updatedAt } : {}),
         ...(conversationId ? { conversationId } : {}),
@@ -227,8 +317,9 @@ export function BookingRequestDialog({
           ? { specialRequests: fields.specialRequests.trim() }
           : {}),
       });
+
       clearBookingDraft();
-      setReference(result.bookingRequest.reference);
+      setSubmitted(true);
       onSubmitted?.();
       notify(
         "Booking request submitted. Your preferred dates are not reserved.",
@@ -238,6 +329,34 @@ export function BookingRequestDialog({
         setAuth("signed-out");
         setReview(false);
         setError(notifyError("Your session ended. Sign in to continue."));
+      } else if (
+        cause instanceof ApiError &&
+        cause.code === "booking_package_changed"
+      ) {
+        setPackageChanged(true);
+        setReview(false);
+        setError(
+          "This package changed. Refresh it to review the current details.",
+        );
+        requestAnimationFrame(() => formError.current?.focus());
+      } else if (
+        cause instanceof ApiError &&
+        cause.status === 409 &&
+        cause.code === "requested_addon_conflict" &&
+        cause.resourceId
+      ) {
+        setAddons((current) =>
+          current.map((row) =>
+            row.service.id.toLowerCase() === cause.resourceId?.toLowerCase()
+              ? { ...row, needsReview: true, refreshed: false }
+              : row,
+          ),
+        );
+        setReview(false);
+        setError(
+          `${cause.message} Refresh and confirm the affected service, or remove it.`,
+        );
+        requestAnimationFrame(() => formError.current?.focus());
       } else {
         setError(notifyError(cause, "Unable to submit request."));
       }
@@ -245,8 +364,30 @@ export function BookingRequestDialog({
       setBusy(false);
     }
   };
+
   const next = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    const found = validate(fields, timeZone, auth === "customer");
+
+    if (Object.keys(found).length) {
+      notifyError("Please check the highlighted fields before continuing.");
+      setTouched(
+        Object.fromEntries(Object.keys(found).map((key) => [key, true])),
+      );
+      requestAnimationFrame(() => summary.current?.focus());
+
+      return;
+    }
+
+    if (needsAddonReview) {
+      setError(
+        "Check the hours, confirm changed services, and remove any services already included in the package.",
+      );
+      requestAnimationFrame(() => formError.current?.focus());
+      return;
+    }
+
     if (auth === "signed-out") {
       if (conversationId) {
         setError(
@@ -254,27 +395,21 @@ export function BookingRequestDialog({
             "Your session ended. Sign in again and reopen this conversation to submit your request.",
           ),
         );
+
         return;
       }
+
       if (!item) return;
-      saveBookingDraft({ item, fields, timeZone });
+
+      saveBookingDraft({ item, fields, timeZone, addons });
       window.location.assign("/login?booking=resume");
+
       return;
     }
-    const found = validate(fields, timeZone, auth === "customer");
-    if (Object.keys(found).length) {
-      notifyError("Please check the highlighted fields before submitting.");
-      setTouched(
-        Object.fromEntries(Object.keys(found).map((key) => [key, true])),
-      );
-      requestAnimationFrame(() => summary.current?.focus());
-      return;
-    }
-    if (auth === "customer") {
-      if (resume) setReview(true);
-      else void submit();
-    }
+
+    if (auth === "customer") setReview(true);
   };
+
   const field = (
     key: keyof Fields,
     label: string,
@@ -293,6 +428,7 @@ export function BookingRequestDialog({
       {control}
     </FormField>
   );
+
   const props = (key: Exclude<keyof Fields, "dates" | "durationMode">) => ({
     value: fields[key],
     onChange: (
@@ -302,6 +438,7 @@ export function BookingRequestDialog({
     ) => change(key, e.target.value),
     onBlur: () => setTouched((current) => ({ ...current, [key]: true })),
   });
+
   return createPortal(
     <NativeDialog
       ref={dialog}
@@ -327,22 +464,21 @@ export function BookingRequestDialog({
         <span className="booking-eyebrow">
           Styled by AMAC / Booking request
         </span>
-        <h2 id={titleId}>
-          {reference
+        <h2 id={titleId} ref={heading} tabIndex={-1}>
+          {submitted
             ? "Request submitted"
             : review
               ? "Review your request"
               : "Let’s plan your event"}
         </h2>
         <p className="booking-intro">
-          {item?.name ?? "Package to be discussed"}
+          {item
+            ? `${item.name} · ${priceLabel(item.price)}`
+            : "Package to be discussed"}
         </p>
-        {reference ? (
+        {submitted ? (
           <>
-            <p>
-              Your request reference is <strong>{reference}</strong>. An
-              administrator will review it.
-            </p>
+            <p>An administrator will review your request.</p>
             <Button variant="secondary" type="button" onClick={cancel}>
               Close
             </Button>
@@ -389,6 +525,12 @@ export function BookingRequestDialog({
                 <dd>{fields.specialRequests || "None"}</dd>
               </div>
             </dl>
+            <BookingAddons
+              item={item}
+              rows={addons}
+              onChange={setAddons}
+              readOnly
+            />
             <p>
               Your preferred date is not reserved. An administrator will review
               availability and the final price.
@@ -473,10 +615,13 @@ export function BookingRequestDialog({
                         event.target.value === "multi_day"
                           ? "multi_day"
                           : "one_day";
+
                       if (mode === "one_day" && fields.dates.length > 1) {
                         setConfirmOneDay(true);
+
                         return;
                       }
+
                       setConfirmOneDay(false);
                       setFields((current) => ({
                         ...current,
@@ -639,6 +784,7 @@ export function BookingRequestDialog({
                 ))}
               </div>
             </div>
+            <BookingAddons item={item} rows={addons} onChange={setAddons} />
             <details
               className="booking-note"
               open={noteOpen}
@@ -684,7 +830,21 @@ export function BookingRequestDialog({
                 </Button>
               </p>
             )}
-            {error && <p role="alert">{error}</p>}
+            {error && (
+              <p ref={formError} role="alert" tabIndex={-1}>
+                {error}
+              </p>
+            )}
+            {packageChanged && (
+              <Button
+                variant="secondary"
+                type="button"
+                disabled={busy}
+                onClick={() => void refreshPackage()}
+              >
+                Refresh package
+              </Button>
+            )}
             <div className="booking-actions">
               <Button variant="secondary" type="button" onClick={cancel}>
                 Cancel
@@ -694,6 +854,7 @@ export function BookingRequestDialog({
                 type="submit"
                 disabled={
                   busy ||
+                  packageChanged ||
                   auth === "loading" ||
                   auth === "admin" ||
                   auth === "error"
@@ -705,9 +866,7 @@ export function BookingRequestDialog({
                     ? "Checking session…"
                     : auth === "signed-out"
                       ? "Sign in to continue"
-                      : resume
-                        ? "Review request"
-                        : "Submit request"}
+                      : "Review request"}
               </Button>
             </div>
           </form>

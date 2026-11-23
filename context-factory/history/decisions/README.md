@@ -8,6 +8,23 @@ Preserve historical reasoning. When a decision changes, link a successor and mar
 
 | Record | Status / purpose |
 | --- | --- |
+| [Booking-owned add-ons](2026-11-22_booking-owned-add-ons.md) | Accepted booking ownership for add-ons and historical quotation snapshots |
+| [Single-row booking drafts](2026-11-22_single-row-booking-drafts.md) | Accepted one booking row from first detail through confirmed submission |
+| [Conversational booking drafts](2026-11-21_conversational-booking-drafts.md) | Superseded storage and message review design |
+| [Markdown conversation memory](2026-11-21_conversation-memory.md) | Accepted single note on the conversation, updated during normal replies |
+| [Package-owned add-ons and direct quotation sending](2026-11-21_direct-quotation-send.md) | Superseded add-on ownership and accepted Send or Cancel for every version |
+| [Quotation package add-ons](2026-11-21_quotation-package-addons.md) | Superseded draft, override, and removal rules |
+| [Package service terms](2026-11-20_package-service-terms.md) | Accepted package-owned inclusion terms and superseded add-on storage |
+| [Derive conversation availability](2026-11-20_derive-conversation-availability.md) | Accepted removal of stored closure and guest deadlines; expiry follows saved activity and ownership |
+| [Retire quotation acceptance](2026-11-20_retire-quotation-acceptance.md) | Accepted removal of quotation acceptance state/timestamps; admin revisions and booking-request acceptance remain |
+| [Catalog indexing scheduling](2026-11-19_catalog-index-scheduling.md) | Accepted manual ensure-scheduled no-ops for active jobs; catalog saves retain refresh successors |
+| [Combined catalog text](2026-11-19_combined-catalog-text.md) | Accepted one text entry per package/service across all sections, with only photo widgets indexed separately |
+| [Conversation AI handoff](2026-11-19_conversation-ai-handoff.md) | Accepted latest JSONB reason/summary/pending, atomic acknowledgement, and admin attention indicator |
+| [Model-selected tool use](2026-11-19_model-selected-tool-use.md) | Accepted removal of mandatory evidence selection; the model chooses direct answers or tools |
+| [Assistant evidence grounding](2026-11-18_assistant-evidence-grounding.md) | Superseded by model-selected tool use; historical mandatory-selector rationale |
+| [Remove package service assignments](2026-11-18_remove-package-service-assignments.md) | Accepted removal of relational included/optional assignments; linked canvas widgets remain |
+| [Shared peso conversion and civil dates](2026-11-18_shared-money-and-dates.md) | Accepted shared money and calendar helpers; display, SQL, and request guards stay in their apps |
+| [Catalog media owner folders](2026-11-18_catalog-media-folders.md) | Accepted owner paths for new uploads; development scope excludes existing-file migration and a move journal |
 | [Public catalog search and tool-call records](2026-11-18_catalog-search-and-tool-calls.md)   | Accepted public discovery tool and many execution records per message; local implementation and verification                                           |
 | [Linked service canvas widget](2026-11-17_service-widget.md) | Accepted service previews with direct picker access and no price/inclusion calculations; local implementation verified |
 | [Conversation-based booking intake](2026-11-17_conversation-booking-intake.md) | Accepted existing-thread binding, optional package, and administrator preparation; local migration and verification complete |

@@ -17,18 +17,22 @@ test("checklist removal drops populated documents and validation while retaining
   };
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
+
   try {
     await admin.query(`CREATE DATABASE "${database}"`);
     pool = new Pool({ ...connection, database });
     const root = new URL("../prisma/migrations/", import.meta.url);
     const migrationName = "20261114154206_remove_event_checklists";
+
     const entries = (await readdir(root, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory())
       .sort((a, b) => a.name.localeCompare(b.name));
+
     for (const entry of entries.filter((entry) => entry.name < migrationName))
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );
+
     const user = (
       await pool.query(
         "INSERT INTO users(email,password_hash,role) VALUES('checklist-removal@example.test','unused','admin') RETURNING id",
@@ -88,11 +92,13 @@ test("checklist removal drops populated documents and validation while retaining
         },
       ],
     };
+
     for (const day of [original, replacement])
       await pool.query(
         "INSERT INTO event_checklists(event_day_id,title,content,revision,created_by,updated_by) VALUES($1,'Obsolete checklist',$2::jsonb,7,$3,$3)",
         [day, JSON.stringify(tasks), user],
       );
+
     assert.equal(
       (await pool.query("SELECT count(*)::int AS count FROM event_checklists"))
         .rows[0].count,
@@ -103,10 +109,12 @@ test("checklist removal drops populated documents and validation while retaining
       (SELECT jsonb_agg(to_jsonb(h) ORDER BY h.id) FROM booking_request_status_history h WHERE h.booking_request_id=b.id) AS history
       FROM booking_requests b JOIN users u ON u.id=b.customer_id JOIN packages p ON p.id=b.package_id WHERE b.id=$1`;
     const before = (await pool.query(preservedQuery, [booking])).rows;
+
     for (const entry of entries.filter((entry) => entry.name === migrationName))
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );
+
     assert.deepEqual(
       (await pool.query(preservedQuery, [booking])).rows,
       before,
@@ -150,6 +158,7 @@ test("checklist removal drops populated documents and validation while retaining
     );
   } finally {
     await pool?.end();
+
     for (let attempt = 0; attempt < 20; attempt += 1) {
       if (
         (
@@ -159,8 +168,10 @@ test("checklist removal drops populated documents and validation while retaining
         ).rowCount === 0
       )
         break;
+
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
+
     await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await admin.end();
   }

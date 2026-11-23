@@ -1,19 +1,28 @@
+import {
+  reviewForComposition,
+  reviewForSend,
+} from "../../lib/services/messages/booking-review";
+import { latestSuggestedReplyMessage } from "../../lib/services/messages/suggested-replies";
+import { navigateWorkspace } from "../../lib/navigation/workspace-navigation";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import {
   Fragment,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
-  type SubmitEvent,
 } from "react";
 import {
+  AssistantTyping,
   Avatar,
   Badge,
   Button,
   Dialog,
   Icon,
+  InfoDisclosure,
+  Markdown,
   Textarea,
   useNotifications,
 } from "@event-management/ui";
@@ -22,6 +31,7 @@ import type {
   ChatConversation,
   ChatMessage,
 } from "../../lib/data/messages/conversations";
+import { bookingDate } from "../booking-requests/BookingRequestDisplay";
 import { ConversationBooking } from "../booking-requests/ConversationBooking";
 import { Quotations } from "../quotations/Quotations";
 import {
@@ -29,17 +39,17 @@ import {
   type ConversationContextView,
 } from "./ConversationContext";
 import "../../styles/messages/messages.css";
+import { MessageAttachments, MessageImages } from "./MessageImages";
+import { CatalogRecommendations } from "./CatalogRecommendations";
+import { SuggestedReplies } from "./SuggestedReplies";
+import { MessageProcessing } from "./MessageProcessing";
+import { useAgentProfile } from "./use-agent-profile";
 import { initialsFromName } from "../../lib/utils/formatting/name";
-
-const dayFormatter = new Intl.DateTimeFormat("en-PH", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
-const timeFormatter = new Intl.DateTimeFormat("en-PH", {
-  hour: "numeric",
-  minute: "2-digit",
-});
+import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
+import {
+  enPhDayFormatter,
+  enPhTimeFormatter,
+} from "../../lib/utils/formatting/dates";
 
 function dayKey(value: string) {
   return new Date(value).toDateString();
@@ -50,16 +60,30 @@ function dayLabel(value: string) {
   const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
+
   if (dayKey(value) === dayKey(today.toISOString())) return "Today";
+
   if (dayKey(value) === dayKey(yesterday.toISOString())) return "Yesterday";
-  return dayFormatter.format(date);
+
+  return enPhDayFormatter.format(date);
 }
 
 function preview(conversation: ChatConversation) {
   const message = conversation.lastMessage;
+
   if (!message) return "No messages yet";
-  return message.body;
+
+  return (
+    message.body ||
+    (message.images?.length || message.pendingFiles?.length ? "Image" : "")
+  );
 }
+
+const handoffReason = {
+  customer_requested: "Customer requested a person",
+  needs_admin_review: "Requires an admin decision",
+  cannot_answer: "AI could not answer with available information",
+} as const;
 
 export function MessagesWorkspace({
   title,
@@ -75,7 +99,9 @@ export function MessagesWorkspace({
   onRetry,
   onSend,
   failedMessageIds = [],
+  failedMessageErrors = {},
   onRetryMessage,
+  onRetryProcessing,
   onToggleAi,
   pendingAiToggle = false,
   onBack,
@@ -84,18 +110,19 @@ export function MessagesWorkspace({
   threadEmpty,
   onNewChat,
   newChatBusy = false,
-  readOnly = false,
   sendDisabled = false,
   hasOlder = false,
   loadingOlder = false,
   olderError = "",
   onLoadOlder,
   historyNotice = "",
-  resumeBooking = false,
+  localAiReplyPending = false,
+  localImageFiles,
+  requestedQuotationId,
   onBookingSubmitted,
   onBookingClosed,
 }: {
-  resumeBooking?: boolean;
+  requestedQuotationId?: string | null;
   onBookingSubmitted?: () => void;
   onBookingClosed?: () => void;
   title: string;
@@ -114,9 +141,16 @@ export function MessagesWorkspace({
   loading: boolean;
   error: string | null;
   onRetry?: () => void;
-  onSend: (body: string) => Promise<void>;
+  onSend: (
+    body: string,
+    files: File[],
+    requestId: string,
+    reviewMessageId?: string,
+  ) => Promise<void>;
   failedMessageIds?: string[];
+  failedMessageErrors?: Record<string, string>;
   onRetryMessage?: (id: string) => void;
+  onRetryProcessing?: (id: string) => Promise<void>;
   onToggleAi?: (
     conversationId: string,
     aiEnabled: boolean,
@@ -129,21 +163,45 @@ export function MessagesWorkspace({
   threadEmpty: { title: string; body: string };
   onNewChat?: () => void;
   newChatBusy?: boolean;
-  readOnly?: boolean;
   sendDisabled?: boolean;
   hasOlder?: boolean;
   loadingOlder?: boolean;
   olderError?: string;
   onLoadOlder?: () => void;
   historyNotice?: string;
+  localAiReplyPending?: boolean;
+  localImageFiles?: ReadonlyMap<string, File[]>;
 }) {
   const { notify, notifyError } = useNotifications();
+  const composerShortcutId = useId();
+  const agentProfile = useAgentProfile();
   const [quotationId, setQuotationId] = useState<string | null>(null);
+  const visibleQuotationId = requestedQuotationId ?? quotationId;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draft = activeId ? (drafts[activeId] ?? "") : "";
+  const reviewPins = useRef<Record<string, string | null | undefined>>({});
+  const respondedToSuggestion = useRef<Record<string, string>>({});
+
   const setDraft = (value: string) => {
-    if (activeId) setDrafts((previous) => ({ ...previous, [activeId]: value }));
+    if (!activeId) return;
+
+    if (viewerRole === "customer")
+      reviewPins.current[activeId] = reviewForComposition(
+        draft,
+        value,
+        reviewPins.current[activeId],
+        messages,
+      );
+
+    setSendError("");
+    setDrafts((previous) => ({ ...previous, [activeId]: value }));
   };
+
+  const [fileDrafts, setFileDrafts] = useState<Record<string, File[]>>({});
+  const files = activeId ? (fileDrafts[activeId] ?? []) : [];
+  const sendKeys = useRef<
+    Record<string, { body: string; files: File[]; requestId: string }>
+  >({});
   const [pendingSends, setPendingSends] = useState<Record<string, boolean>>({});
   const sending = !!activeId && !!pendingSends[activeId];
   const pendingSendIds = useRef(new Set<string>());
@@ -152,18 +210,29 @@ export function MessagesWorkspace({
     conversationId: string;
     view: ConversationContextView;
   } | null>(null);
-  const generation = useRef(0);
+  const generation = useRequestGeneration();
   const thread = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const inbox = useRef<HTMLElement>(null);
   const inboxBoundary = useRef<HTMLDivElement>(null);
   const historyBoundary = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
+
   const active =
+    (activeConversation?.id === activeId ? activeConversation : null) ??
     conversations.find((item) => item.id === activeId) ??
-    activeConversation ??
     null;
+
+  const aiReplyPending =
+    !!activeId &&
+    !!active?.aiEnabled &&
+    (localAiReplyPending || !!active.aiReplyPending);
   const isTeam = viewerRole === "customer";
+  const composerDisabled = !activeId || (!isTeam && sending) || sendDisabled;
+  const suggestedMessage =
+    isTeam && active && !composerDisabled && !aiReplyPending
+      ? latestSuggestedReplyMessage(messages)
+      : undefined;
   const singleConversation =
     isTeam &&
     conversations.length === 1 &&
@@ -185,29 +254,17 @@ export function MessagesWorkspace({
   const [bookingConversationId, setBookingConversationId] = useState<
     string | null
   >(null);
-  useEffect(() => {
-    if (
-      resumeBooking &&
-      active?.id &&
-      !active.bookingRequestId &&
-      active.status === "active"
-    )
-      setBookingConversationId(active.id);
-  }, [resumeBooking, active?.id, active?.bookingRequestId, active?.status]);
-  const closedBookingForCustomer =
-    isTeam && active?.status === "closed" && !!active.bookingRequestId;
-  const closedForCustomer =
-    isTeam && active?.status === "closed" && !active.bookingRequestId;
 
   useEffect(() => {
     setSendError("");
     setContext(null);
     setQuotationId(null);
-    generation.current++;
+    generation.bump();
+
     return () => {
-      generation.current++;
+      generation.bump();
     };
-  }, [activeId]);
+  }, [activeId, generation]);
 
   const olderScroll = useRef<{
     id?: string;
@@ -220,13 +277,18 @@ export function MessagesWorkspace({
   useLayoutEffect(() => {
     const element = thread.current;
     const changedConversation = previousActive.current !== activeId;
+
     if (changedConversation) olderScroll.current = null;
+
     const first = messages[0]?.id;
+
     if (element && olderScroll.current && first !== previousFirst.current) {
       const anchor = olderScroll.current;
+
       const row = [
         ...element.querySelectorAll<HTMLElement>("[data-message-id]"),
       ].find((item) => item.dataset.messageId === anchor.id);
+
       element.scrollTop = row
         ? element.scrollTop +
           row.getBoundingClientRect().top -
@@ -243,12 +305,14 @@ export function MessagesWorkspace({
     ) {
       element.scrollTop = element.scrollHeight;
     }
+
     if (element)
       nearBottom.current =
         element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+
     previousFirst.current = first;
     previousActive.current = activeId;
-  }, [messages, activeId]);
+  }, [messages, activeId, aiReplyPending]);
 
   useEffect(() => {
     if (!loadingOlder) olderScroll.current = null;
@@ -256,12 +320,16 @@ export function MessagesWorkspace({
 
   const requestOlder = useCallback(() => {
     if (!onLoadOlder || loadingOlder || !hasOlder) return;
+
     const element = thread.current;
+
     if (element) {
       const top = element.getBoundingClientRect().top;
+
       const row = [
         ...element.querySelectorAll<HTMLElement>("[data-message-id]"),
       ].find((item) => item.getBoundingClientRect().bottom > top);
+
       olderScroll.current = {
         id: row?.dataset.messageId,
         offset: row ? row.getBoundingClientRect().top - top : 0,
@@ -269,12 +337,14 @@ export function MessagesWorkspace({
         top: element.scrollTop,
       };
     }
+
     onLoadOlder();
   }, [onLoadOlder, loadingOlder, hasOlder]);
 
   useEffect(() => {
     const root = inbox.current;
     const boundary = inboxBoundary.current;
+
     if (
       !root ||
       !boundary ||
@@ -284,6 +354,7 @@ export function MessagesWorkspace({
       loading
     )
       return;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && root.clientHeight > 0)
@@ -291,13 +362,16 @@ export function MessagesWorkspace({
       },
       { root, rootMargin: "120px 0px" },
     );
+
     observer.observe(boundary);
+
     return () => observer.disconnect();
   }, [conversationFeed, loading, conversationOpen]);
 
   useEffect(() => {
     const root = thread.current;
     const boundary = historyBoundary.current;
+
     if (
       !root ||
       !boundary ||
@@ -308,13 +382,16 @@ export function MessagesWorkspace({
       !messages.length
     )
       return;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && root.clientHeight > 0) requestOlder();
       },
       { root, rootMargin: "120px 0px" },
     );
+
     observer.observe(boundary);
+
     return () => observer.disconnect();
   }, [
     requestOlder,
@@ -327,41 +404,91 @@ export function MessagesWorkspace({
     conversationOpen,
   ]);
 
-  async function submit(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const body = draft.trim();
+  async function send(suggestion?: { messageId: string; body: string }) {
+    const body = suggestion?.body ?? draft.trim();
+    const sentFiles = suggestion ? [] : files;
+
     if (
-      !body ||
-      (!isTeam && sending) ||
-      readOnly ||
-      sendDisabled ||
+      (!body && !sentFiles.length) ||
+      composerDisabled ||
       !activeId ||
       (!isTeam && pendingSendIds.current.has(activeId))
     )
       return;
-    const request = generation.current;
+
+    if (
+      suggestion &&
+      (suggestion.messageId !== suggestedMessage?.id ||
+        respondedToSuggestion.current[activeId] === suggestion.messageId ||
+        !suggestedMessage.replies.includes(body))
+    )
+      return;
+
+    const request = generation.current();
     const conversationId = activeId;
     const sentDraft = draft;
+    const previous = sendKeys.current[conversationId];
+    const reviewMessageId =
+      isTeam && !suggestion
+        ? reviewForSend(
+            reviewPins.current[conversationId],
+            sentFiles.length > 0,
+          )
+        : undefined;
+
+    const requestId =
+      !suggestion &&
+      previous &&
+      previous.body === body &&
+      previous.files.length === sentFiles.length &&
+      previous.files.every((file, i) => file === sentFiles[i])
+        ? previous.requestId
+        : crypto.randomUUID();
+
+    if (!suggestion)
+      sendKeys.current[conversationId] = { body, files, requestId };
+
     if (isTeam) {
-      setDrafts((previous) => ({ ...previous, [conversationId]: "" }));
-      void onSend(body);
+      if (suggestedMessage)
+        respondedToSuggestion.current[conversationId] = suggestedMessage.id;
+
+      if (!suggestion) {
+        setDrafts((previous) => ({ ...previous, [conversationId]: "" }));
+        delete reviewPins.current[conversationId];
+        setFileDrafts((previous) => ({ ...previous, [conversationId]: [] }));
+        delete sendKeys.current[conversationId];
+      }
+
+      void onSend(body, sentFiles, requestId, reviewMessageId);
       composer.current?.focus();
+
       return;
     }
+
     pendingSendIds.current.add(conversationId);
     setPendingSends((previous) => ({ ...previous, [conversationId]: true }));
     setSendError("");
+
     try {
-      await onSend(body);
+      await onSend(body, sentFiles, requestId);
+      delete sendKeys.current[conversationId];
+      setFileDrafts((previous) =>
+        previous[conversationId] === sentFiles
+          ? { ...previous, [conversationId]: [] }
+          : previous,
+      );
       setDrafts((previous) =>
         previous[conversationId] === sentDraft
           ? { ...previous, [conversationId]: "" }
           : previous,
       );
-      if (request !== generation.current) return;
+
+      if (!generation.isCurrent(request)) return;
+
       notify("Message sent.");
     } catch (cause) {
-      if (request !== generation.current) return;
+      if (!generation.isCurrent(request)) return;
+
       setSendError(
         notifyError(cause, "Unable to send your message. Please try again."),
       );
@@ -397,6 +524,7 @@ export function MessagesWorkspace({
           const conversationAvatar = isTeam
             ? "C"
             : initialsFromName(conversation.customerName);
+
           return (
             <Button
               variant="plain"
@@ -417,16 +545,16 @@ export function MessagesWorkspace({
                     {conversation.eventType}
                   </em>
                 )}
-                {conversation.bookingRequestReference && (
+                {conversation.bookingRequestId && (
                   <small className="conversation-reference">
-                    {conversation.bookingRequestReference}
-                    {conversation.eventStartsAt
-                      ? ` · ${dayFormatter.format(new Date(conversation.eventStartsAt))}`
-                      : ""}
+                    {conversation.eventPreferredDate
+                      ? `Requested ${bookingDate(conversation.eventPreferredDate)}`
+                      : "Date to be arranged"}
                   </small>
                 )}
                 <small>{preview(conversation)}</small>
-                {drafts[conversation.id] && (
+                {(drafts[conversation.id] ||
+                  (fileDrafts[conversation.id]?.length ?? 0) > 0) && (
                   <small className="conversation-draft">Draft</small>
                 )}
               </span>
@@ -437,8 +565,8 @@ export function MessagesWorkspace({
                 >
                   {dayKey(conversation.updatedAt) ===
                   dayKey(new Date().toISOString())
-                    ? timeFormatter.format(new Date(conversation.updatedAt))
-                    : `${dayLabel(conversation.updatedAt)} · ${timeFormatter.format(new Date(conversation.updatedAt))}`}
+                    ? enPhTimeFormatter.format(new Date(conversation.updatedAt))
+                    : `${dayLabel(conversation.updatedAt)} · ${enPhTimeFormatter.format(new Date(conversation.updatedAt))}`}
                 </time>
                 {conversation.unreadCount > 0 && (
                   <Badge
@@ -450,6 +578,9 @@ export function MessagesWorkspace({
                       ? "9+"
                       : conversation.unreadCount}
                   </Badge>
+                )}
+                {viewerRole === "admin" && conversation.aiHandoff?.pending && (
+                  <Badge tone="warning">Needs attention</Badge>
                 )}
               </span>
             </Button>
@@ -519,71 +650,111 @@ export function MessagesWorkspace({
           <div className="message-thread-title">
             <span className="message-thread-name">
               <strong>{activeName}</strong>
-              {active?.status === "closed" && (
-                <Badge tone="neutral">Closed</Badge>
-              )}
             </span>
             <small>{activeDetail}</small>
           </div>
-          {viewerRole === "admin" && active && onToggleAi && (
-            <div className="message-head-actions" aria-label="AI reply setting">
-              <Button
-                variant="secondary"
-                size="small"
-                aria-label="AI replies"
-                aria-pressed={active.aiEnabled}
-                title="Automatically reply to customer messages with AI"
-                pending={pendingAiToggle}
-                disabled={active.status !== "active"}
-                onClick={() =>
-                  onToggleAi(active.id, !active.aiEnabled, active.aiVersion)
-                }
-              >
-                {active.aiEnabled ? "AI on" : "AI off (Human)"}
-              </Button>
-            </div>
+          {viewerRole === "customer" && active && !active.bookingRequestId && (
+            <Button
+              variant="secondary"
+              className="message-booking-action"
+              aria-label="Create booking request"
+              aria-haspopup="dialog"
+              onClick={() => setBookingConversationId(active.id)}
+            >
+              <Icon name="plus" size={20} />
+              <span>Create booking request</span>
+            </Button>
           )}
-          {viewerRole === "customer" &&
-            active &&
-            !active.bookingRequestId &&
-            active.status === "active" && (
-              <Button
-                variant="secondary"
-                onClick={() => setBookingConversationId(active.id)}
-              >
-                Create booking request
-              </Button>
-            )}
-          {active?.bookingRequestId && (
+          {active && (active.bookingRequestId || onToggleAi) && (
             <div
               className="message-head-actions"
-              aria-label="Conversation information"
+              role="group"
+              aria-label="Conversation controls"
             >
-              {(
-                [
-                  ["details", "info", "Details"],
-                  ["package", "box", "Current package"],
-                  ["quotation", "clipboard", "Quotation"],
-                ] as const
-              ).map(([view, icon, label]) => (
-                <Button
-                  variant="secondary"
-                  key={view}
-                  icon={icon}
-                  aria-label={
-                    view === "details"
-                      ? "View event details"
-                      : view === "package"
-                        ? "View current package"
-                        : "View latest sent quotation"
-                  }
-                  onClick={() =>
-                    setContext({ conversationId: active.id, view })
-                  }
-                >
-                  {label}
-                </Button>
-              ))}
+              {viewerRole === "admin" && onToggleAi && (
+                <>
+                  <Button
+                    variant="plain"
+                    className="message-ai-switch"
+                    role="switch"
+                    aria-label="AI replies"
+                    aria-checked={active.aiEnabled}
+                    aria-busy={pendingAiToggle}
+                    title={
+                      active.aiEnabled ? "AI replies on" : "AI replies off"
+                    }
+                    disabled={pendingAiToggle}
+                    onClick={() =>
+                      onToggleAi(active.id, !active.aiEnabled, active.aiVersion)
+                    }
+                  >
+                    <span className="message-ai-switch-track">
+                      <span className="message-ai-switch-thumb">
+                        <Icon
+                          name={pendingAiToggle ? "spinner" : "spark"}
+                          size={14}
+                        />
+                      </span>
+                    </span>
+                  </Button>
+                  {active.aiHandoff && (
+                    <div
+                      className="message-handoff"
+                      data-pending={active.aiHandoff.pending}
+                    >
+                      <InfoDisclosure
+                        key={active.id}
+                        icon={active.aiHandoff.pending ? "alert" : "users"}
+                        label={
+                          active.aiHandoff.pending
+                            ? "Needs attention: View AI handoff details"
+                            : "View AI handoff details"
+                        }
+                        hint={handoffReason[active.aiHandoff.reason]}
+                      >
+                        <div className="message-handoff-details">
+                          <strong>
+                            {handoffReason[active.aiHandoff.reason]}
+                          </strong>
+                          <div className="message-handoff-summary-label">
+                            AI summary
+                          </div>
+                          <p>{active.aiHandoff.summary}</p>
+                          <Badge
+                            tone={
+                              active.aiHandoff.pending ? "warning" : "neutral"
+                            }
+                          >
+                            {active.aiHandoff.pending
+                              ? "Needs attention"
+                              : "Taken over"}
+                          </Badge>
+                        </div>
+                      </InfoDisclosure>
+                    </div>
+                  )}
+                </>
+              )}
+              {active.bookingRequestId &&
+                (
+                  [
+                    ["details", "info", "View event details"],
+                    ["package", "box", "View current package"],
+                    ["quotation", "clipboard", "View latest sent quotation"],
+                  ] as const
+                ).map(([view, icon, label]) => (
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    key={view}
+                    icon={icon}
+                    aria-label={label}
+                    title={label}
+                    onClick={() =>
+                      setContext({ conversationId: active.id, view })
+                    }
+                  />
+                ))}
             </div>
           )}
         </div>
@@ -591,11 +762,8 @@ export function MessagesWorkspace({
           <div className="message-event-context">
             <Icon name="calendar" size={16} />
             <strong>{active.eventType || "Event inquiry"}</strong>
-            <span>{active.bookingRequestReference}</span>
-            {active.eventStartsAt && (
-              <span>
-                Requested {dayFormatter.format(new Date(active.eventStartsAt))}
-              </span>
+            {active.eventPreferredDate && (
+              <span>Requested {bookingDate(active.eventPreferredDate)}</span>
             )}
           </div>
         )}
@@ -619,6 +787,7 @@ export function MessagesWorkspace({
           aria-live="polite"
           onScroll={() => {
             const element = thread.current;
+
             if (element)
               nearBottom.current =
                 element.scrollHeight -
@@ -684,6 +853,7 @@ export function MessagesWorkspace({
               index === 0 ||
               dayKey(message.createdAt) !==
                 dayKey(messages[index - 1].createdAt);
+
             return (
               <Fragment key={message.id}>
                 {showDay && (
@@ -713,31 +883,68 @@ export function MessagesWorkspace({
                       </div>
                     </div>
                   ) : (
-                    message.body
+                    <Markdown source={message.body} variant="message" />
                   )}
+                  <MessageImages
+                    message={{
+                      ...message,
+                      pendingFiles:
+                        message.pendingFiles ??
+                        localImageFiles?.get(message.id),
+                    }}
+                  />
+                  <MessageProcessing
+                    message={message}
+                    onRetry={
+                      viewerRole === "admin" ||
+                      message.senderRole === "customer"
+                        ? onRetryProcessing
+                        : undefined
+                    }
+                  />
                   {failedMessageIds.includes(message.id) && (
                     <div className="message-delivery-error" role="alert">
-                      Delivery could not be confirmed.{" "}
-                      {!readOnly &&
-                        !closedBookingForCustomer &&
-                        onRetryMessage && (
-                          <Button
-                            variant="link"
-                            onClick={() => onRetryMessage(message.id)}
-                          >
-                            Retry
-                          </Button>
-                        )}
+                      {failedMessageErrors[message.id] ||
+                        "Delivery could not be confirmed."}{" "}
+                      {onRetryMessage && (
+                        <Button
+                          variant="link"
+                          onClick={() => onRetryMessage(message.id)}
+                        >
+                          Retry
+                        </Button>
+                      )}
                     </div>
                   )}
                   <small className="message-meta">
-                    {!mine && `${message.senderName} · `}
-                    {timeFormatter.format(new Date(message.createdAt))}
+                    {!mine &&
+                      `${message.senderRole === "assistant" ? agentProfile.senderLabel : message.senderName} · `}
+                    {enPhTimeFormatter.format(new Date(message.createdAt))}
                   </small>
                 </div>
+                {message.senderRole === "assistant" && (
+                  <CatalogRecommendations
+                    recommendations={message.catalogRecommendations}
+                  />
+                )}
+                {suggestedMessage?.id === message.id &&
+                  activeId &&
+                  respondedToSuggestion.current[activeId] !== message.id && (
+                    <SuggestedReplies
+                      replies={suggestedMessage.replies}
+                      onSelect={(body) =>
+                        void send({ messageId: message.id, body })
+                      }
+                    />
+                  )}
               </Fragment>
             );
           })}
+          {aiReplyPending && (
+            <div className="message bot message-typing">
+              <AssistantTyping />
+            </div>
+          )}
         </div>
 
         {sendError && (
@@ -746,51 +953,39 @@ export function MessagesWorkspace({
           </p>
         )}
 
-        {readOnly && (
-          <p className="messages-closed-note">
-            This conversation is closed. Its history is kept for reference.
-          </p>
-        )}
-        {closedBookingForCustomer && (
-          <p className="messages-closed-note">
-            This booking conversation is closed. Start a new chat to message the
-            team.
-          </p>
-        )}
-        {closedForCustomer && (
-          <p className="messages-closed-note">
-            This conversation is closed. Send a message to reopen it; the
-            history stays here.
-          </p>
-        )}
-
-        {!readOnly && !closedBookingForCustomer && (
-          <form
-            className={`thread-input message-composer ${isTeam ? "customer-composer" : ""}`}
-            onSubmit={submit}
+        <form
+          className="message-composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void send();
+          }}
+        >
+          <span id={composerShortcutId} className="sr-only">
+            Enter to send. Shift plus Enter for a new line.
+          </span>
+          <MessageAttachments
+            files={files}
+            onChange={(next) =>
+              activeId &&
+              setFileDrafts((previous) => ({ ...previous, [activeId]: next }))
+            }
+            disabled={composerDisabled}
           >
-            <label htmlFor="conversation-message">
-              {isTeam ? "Message the Styled by AMAC team" : "Reply to customer"}
-            </label>
             <Textarea
               variant="plain"
               ref={composer}
-              rows={2}
-              id="conversation-message"
+              rows={1}
               aria-label="Write a message"
-              placeholder={
-                closedForCustomer
-                  ? "Send a message to reopen this conversation"
-                  : "Write a message…"
-              }
+              aria-describedby={composerShortcutId}
+              placeholder="Message…"
               value={draft}
-              disabled={!activeId || (!isTeam && sending) || sendDisabled}
+              disabled={composerDisabled}
               maxLength={MAX_MESSAGE_BODY_LENGTH}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (
                   event.key === "Enter" &&
-                  (isTeam ? !event.shiftKey : event.ctrlKey || event.metaKey) &&
+                  !event.shiftKey &&
                   !event.nativeEvent.isComposing
                 ) {
                   event.preventDefault();
@@ -798,31 +993,37 @@ export function MessagesWorkspace({
                 }
               }}
             />
-            <div className="message-composer-actions">
-              {!isTeam && <small>Ctrl/⌘ + Enter to send</small>}
-              <Button
-                type="submit"
-                icon="arrow"
-                pending={!isTeam && sending}
-                aria-label={isTeam ? "Send message" : undefined}
-                disabled={
-                  !draft.trim() ||
-                  !activeId ||
-                  (!isTeam && sending) ||
-                  sendDisabled
-                }
-              >
-                {!isTeam && (sending ? "Sending…" : "Send message")}
-              </Button>
-            </div>
-          </form>
-        )}
+            <Button
+              type="submit"
+              size="icon"
+              icon="arrow"
+              pending={!isTeam && sending}
+              aria-label="Send message"
+              title="Send message"
+              disabled={composerDisabled || (!draft.trim() && !files.length)}
+            />
+          </MessageAttachments>
+        </form>
       </section>
-      {quotationId && (
-        <Dialog title="Quotation" onClose={() => setQuotationId(null)}>
+      {visibleQuotationId && (
+        <Dialog
+          title="Quotation"
+          onClose={() => {
+            setQuotationId(null);
+
+            if (requestedQuotationId) {
+              const url = new URL(window.location.href);
+              url.searchParams.delete("quotation");
+              navigateWorkspace(
+                `${url.pathname}${url.search}${url.hash}`,
+                true,
+              );
+            }
+          }}
+        >
           <Quotations
-            key={quotationId}
-            quotationId={quotationId}
+            key={visibleQuotationId}
+            quotationId={visibleQuotationId}
             bookingId={active?.bookingRequestId ?? undefined}
             admin={!isTeam}
           />

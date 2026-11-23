@@ -5,7 +5,7 @@ import {
   type ShowcasePage,
 } from "../../../lib/data/showcases/showcases";
 import { showcasePageLinks } from "../../../lib/pagination/showcase-page-links";
-import { ShowcaseExpanded } from "../showcase/ShowcaseExpanded";
+import { ShowcaseExpanded } from "./ShowcaseExpanded";
 
 type Props = { initialPage: ShowcasePage; initialUrl: string };
 
@@ -30,11 +30,13 @@ export function ShowcaseListing({ initialPage, initialUrl }: Props) {
   const loadMore = useCallback(
     async (retry = false) => {
       if (!nextCursor || !next || pending.current) return;
+
       pending.current = true;
       setStatus(retry ? "retrying" : "loading");
 
       try {
         const page = await getPublicShowcasesPage(nextCursor);
+
         if (
           page.nextCursor &&
           (page.nextCursor === nextCursor ||
@@ -44,14 +46,18 @@ export function ShowcaseListing({ initialPage, initialUrl }: Props) {
         }
 
         loadedCursors.current.add(nextCursor);
+
         if (retry) retryFocus.current = showcases.length;
+
         setPage((current) => {
           const records = new Map(
             current.showcases.map((item) => [item.id, item]),
           );
+
           for (const item of page.showcases) {
             if (!records.has(item.id)) records.set(item.id, item);
           }
+
           return {
             showcases: [...records.values()],
             nextCursor: page.nextCursor,
@@ -70,6 +76,7 @@ export function ShowcaseListing({ initialPage, initialUrl }: Props) {
 
   useEffect(() => {
     const link = nextLink.current;
+
     if (
       !link ||
       status !== "idle" ||
@@ -80,18 +87,22 @@ export function ShowcaseListing({ initialPage, initialUrl }: Props) {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry?.isIntersecting || document.activeElement === link) return;
+
         observer.disconnect();
         void loadMore();
       },
       { rootMargin: "0px 0px 200px" },
     );
+
     observer.observe(link);
+
     return () => observer.disconnect();
   }, [loadMore, status]);
 
   useEffect(() => {
     const index = retryFocus.current;
     retryFocus.current = null;
+
     if (index === null || document.activeElement !== document.body) return;
 
     const titles = list.current?.querySelectorAll<HTMLAnchorElement>("h2 a");

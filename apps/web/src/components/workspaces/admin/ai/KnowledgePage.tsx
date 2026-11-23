@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Badge,
   Button,
   DataTable,
   PageHeader,
@@ -8,12 +7,16 @@ import {
   Panel,
   SearchField,
   Select,
+  useNotifications,
 } from "@event-management/ui";
 import type {
   KnowledgeListing,
   KnowledgePage as Page,
 } from "@event-management/contracts/catalog-knowledge";
-import { getKnowledge } from "../../../../lib/data/ai/knowledge";
+import {
+  getKnowledge,
+  indexPendingKnowledge,
+} from "../../../../lib/data/ai/knowledge";
 import { navigateWorkspace } from "../../../../lib/navigation/workspace-navigation";
 import { usePagination } from "../../../../lib/pagination/use-pagination";
 import { KnowledgeDetailDrawer } from "./KnowledgeDetailDrawer";
@@ -23,10 +26,11 @@ import {
   KnowledgeStatusBadge,
 } from "./KnowledgeDisplay";
 import { KnowledgeMetrics } from "./KnowledgeMetrics";
-import { KnowledgeSearch } from "./KnowledgeSearch";
+import { KnowledgeSearchDialog } from "./KnowledgeSearchDialog";
 import "../../../../styles/ai/knowledge.css";
 
 export function KnowledgePage() {
+  const { notify } = useNotifications();
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState("");
   const [status, setStatus] = useState("");
@@ -35,9 +39,70 @@ export function KnowledgePage() {
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
   const [detail, setDetail] = useState<KnowledgeListing | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [indexing, setIndexing] = useState(false);
+  const [indexMessage, setIndexMessage] = useState("");
+  const [indexError, setIndexError] = useState(false);
+  const indexRun = useRef<{ stopped: boolean } | null>(null);
   const seq = useRef(0);
   const pages = usePagination(`${search}:${kind}:${status}`);
+
   const load = useCallback(() => setRetry((n) => n + 1), []);
+
+  useEffect(
+    () => () => {
+      if (indexRun.current) indexRun.current.stopped = true;
+    },
+    [],
+  );
+  async function indexPending() {
+    if (indexRun.current) return;
+
+    const run = { stopped: false };
+    indexRun.current = run;
+    setIndexing(true);
+    setIndexError(false);
+    setIndexMessage("Submitting pending indexing…");
+    setDetail(null);
+
+    try {
+      const result = await indexPendingKnowledge();
+
+      if (run.stopped) return;
+
+      const counts = [
+        `${result.submittedListings} listings queued`,
+        ...(result.skippedListings
+          ? [
+              `${result.skippedListings} already queued or no longer need indexing`,
+            ]
+          : []),
+      ].join("; ");
+      const message = result.failedListings
+        ? `${counts}; ${result.failedListings} could not be queued. Select Index pending to retry remaining work.`
+        : result.pendingListings
+          ? `${counts}. You can leave this page. Use Refresh to check coverage.`
+          : "No pending listings to submit.";
+      setIndexMessage(message);
+      setIndexError(result.failedListings > 0);
+      notify(message, result.failedListings ? "info" : "success");
+    } catch {
+      if (!run.stopped) {
+        setIndexError(true);
+        const message =
+          "Could not finish submitting pending indexing. Some listings may already be queued. Select Index pending to retry.";
+        setIndexMessage(message);
+        notify(message, "danger");
+      }
+    } finally {
+      if (indexRun.current === run) indexRun.current = null;
+
+      if (!run.stopped) {
+        setIndexing(false);
+        load();
+      }
+    }
+  }
   useEffect(() => {
     const current = ++seq.current;
     setLoading(true);
@@ -52,27 +117,63 @@ export function KnowledgePage() {
       .finally(() => {
         if (seq.current === current) setLoading(false);
       });
+
     return () => {
       seq.current++;
     };
   }, [search, kind, status, pages.cursor, retry]);
+
   return (
     <div className="knowledge-page">
       <PageHeader
         title="Knowledge Catalog"
         actions={
           <div className="knowledge-header-actions">
-            <Badge tone="neutral">
-              Assistant catalog search: Not connected
-            </Badge>
-            <KnowledgeHelp text="The assistant is not connected to catalog search." />
-            <Button variant="secondary" onClick={load} pending={loading}>
-              Refresh
-            </Button>
+            <Button
+              size="icon"
+              icon="spark"
+              aria-label={
+                indexing ? "Submitting pending indexing…" : "Index pending"
+              }
+              title="Index pending"
+              onClick={() => void indexPending()}
+              pending={indexing}
+              disabled={loading || !data || data.summary.attention === 0}
+            />
+            <KnowledgeHelp text="Queue pending and outdated text and photos across all eligible catalog listings. Listings already queued or being indexed keep their existing jobs and retry timing. Use Refresh to check coverage." />
+            <Button
+              variant="secondary"
+              size="icon"
+              icon="refresh"
+              aria-label="Refresh"
+              title="Refresh"
+              onClick={load}
+              pending={loading}
+              disabled={indexing}
+            />
+            <Button
+              variant="secondary"
+              size="icon"
+              icon="flask"
+              aria-label="Search knowledge"
+              aria-haspopup="dialog"
+              title="Search knowledge"
+              onClick={(event) => {
+                event.currentTarget.focus();
+                setSearchOpen(true);
+              }}
+            />
           </div>
         }
       />
-      <KnowledgeSearch />
+      {indexMessage && (
+        <p
+          role={indexError ? "alert" : "status"}
+          className={indexError ? "knowledge-error" : undefined}
+        >
+          {indexMessage}
+        </p>
+      )}
       {error && (
         <div role="alert" className="knowledge-error">
           Could not load knowledge catalog.{" "}
@@ -221,6 +322,9 @@ export function KnowledgePage() {
       )}
       {detail && (
         <KnowledgeDetailDrawer item={detail} onClose={() => setDetail(null)} />
+      )}
+      {searchOpen && (
+        <KnowledgeSearchDialog onClose={() => setSearchOpen(false)} />
       )}
     </div>
   );

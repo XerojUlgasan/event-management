@@ -3,12 +3,14 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import { exportJWK, generateKeyPair, jwtVerify } from "jose";
 import { Pool } from "pg";
 import { sql } from "kysely";
 import { hashSessionToken } from "../src/utils/session.js";
 import { encodePageCursor } from "../src/utils/pagination.js";
 
 const database = `em_messages_test_${randomUUID().replaceAll("-", "")}`;
+
 let app: typeof import("../src/app.js").app;
 let db: typeof import("../src/db/client.js").db;
 let admin: Pool;
@@ -39,11 +41,13 @@ before(async () => {
   await admin.query(`CREATE DATABASE "${database}"`);
   pool = new Pool({ ...connection, database });
   const root = new URL("../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((item) => item.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name))) {
     let legacyCustomerId: string | undefined;
     let legacyConversationIds: string[] = [];
+
     if (entry.name === "20261101130000_remove_deferred_ai_conversation_state") {
       legacyCustomerId = (
         await pool.query(
@@ -61,9 +65,11 @@ before(async () => {
         [legacyConversationIds[0], legacyCustomerId],
       );
     }
+
     await pool.query(
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
+
     if (legacyCustomerId) {
       const conversations = await pool.query(
         "SELECT status FROM conversations WHERE id = ANY($1::uuid[])",
@@ -113,6 +119,7 @@ before(async () => {
       );
     }
   }
+
   // This human-messaging suite must never make live provider requests.
   delete process.env.AI_GATEWAY_API_KEY;
   process.env.DB_NAME = database;
@@ -139,6 +146,7 @@ before(async () => {
         expires_at: new Date(Date.now() + 3600000),
       })
       .execute();
+
     return { cookie: `em_session=${token}`, id: user.id };
   }
 
@@ -169,8 +177,9 @@ before(async () => {
 after(async () => {
   await db?.destroy();
   await pool?.end();
+
   if (admin) {
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
     await admin.end();
   }
 });
@@ -188,11 +197,264 @@ function call(path: string, method = "GET", body?: unknown, cookie?: string) {
 
 async function read(response: Response, status: number): Promise<any> {
   assert.equal(response.status, status, await response.clone().text());
+
   return response.status === 204 ? null : response.json();
 }
 
+test("Realtime tokens are limited to the live session and requested receive scope", async (t) => {
+  const existingKey = process.env.REALTIME_JWT_SIGNING_JWK;
+  const existingSecret = process.env.REALTIME_JWT_SECRET;
+  t.after(() => {
+    if (existingKey === undefined) delete process.env.REALTIME_JWT_SIGNING_JWK;
+    else process.env.REALTIME_JWT_SIGNING_JWK = existingKey;
+
+    if (existingSecret === undefined) delete process.env.REALTIME_JWT_SECRET;
+    else process.env.REALTIME_JWT_SECRET = existingSecret;
+  });
+  delete process.env.REALTIME_JWT_SIGNING_JWK;
+  delete process.env.REALTIME_JWT_SECRET;
+
+  const id = randomUUID();
+  const guestConversationId = randomUUID();
+  const guestIdentity = await db
+    .insertInto("guest_chat_identities")
+    .values({ token_hash: randomUUID() })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  await db
+    .insertInto("conversations")
+    .values([
+      { id, customer_id: customerId },
+      { id: guestConversationId, guest_identity_id: guestIdentity.id },
+    ])
+    .execute();
+  t.after(async () => {
+    await db
+      .deleteFrom("conversations")
+      .where("id", "in", [id, guestConversationId])
+      .execute();
+    await db
+      .deleteFrom("guest_chat_identities")
+      .where("id", "=", guestIdentity.id)
+      .execute();
+  });
+
+  const issue = (conversationId: string, cookie?: string) =>
+    call("/auth/realtime-token", "POST", { conversationId }, cookie);
+
+  const issueNotifications = (cookie?: string) =>
+    call("/auth/realtime-token", "POST", { scope: "notifications" }, cookie);
+
+  await read(await issue(id), 401);
+  await read(await issueNotifications(), 401);
+  await read(await issue("invalid", customerCookie), 400);
+
+  for (const scope of [
+    { scope: "unknown" },
+    { scope: "notifications", conversationId: id },
+    { scope: "notifications", userId: otherCustomerId },
+  ]) {
+    await read(
+      await call("/auth/realtime-token", "POST", scope, customerCookie),
+      400,
+    );
+  }
+
+  await read(await issue(id, otherCustomerCookie), 404);
+  await read(await issue(guestConversationId, adminCookie), 404);
+  await read(await issue(id, customerCookie), 503);
+  await read(await issueNotifications(customerCookie), 503);
+
+  const kid = randomUUID();
+  const pair = await generateKeyPair("ES256", { extractable: true });
+  process.env.REALTIME_JWT_SIGNING_JWK = JSON.stringify({
+    ...(await exportJWK(pair.privateKey)),
+    kid,
+  });
+
+  for (const cookie of [customerCookie, adminCookie]) {
+    const response = await issue(id, cookie);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    const result = await read(response, 200);
+    const { payload, protectedHeader } = await jwtVerify(
+      result.token,
+      pair.publicKey,
+      {
+        algorithms: ["ES256"],
+        audience: "authenticated",
+      },
+    );
+    const session = await db
+      .selectFrom("sessions")
+      .select(["id", "user_id"])
+      .where(
+        "token_hash",
+        "=",
+        hashSessionToken(cookie.slice("em_session=".length)),
+      )
+      .executeTakeFirstOrThrow();
+
+    assert.equal(protectedHeader.kid, kid);
+    assert.equal(payload.sub, session.user_id);
+    assert.equal(payload.role, "authenticated");
+    assert.equal(payload.clemora_scope, "conversation_messages");
+    assert.equal(payload.clemora_session_id, session.id);
+    assert.equal(payload.conversation_id, id);
+    assert.ok(payload.exp && payload.iat);
+    assert.equal(payload.exp - payload.iat, 300);
+    assert.equal(new Date(result.expiresAt).getTime(), payload.exp * 1000);
+
+    const notificationResponse = await issueNotifications(cookie);
+    assert.equal(notificationResponse.headers.get("cache-control"), "no-store");
+    const notificationResult = await read(notificationResponse, 200);
+    const { payload: notificationPayload } = await jwtVerify(
+      notificationResult.token,
+      pair.publicKey,
+      { algorithms: ["ES256"], audience: "authenticated" },
+    );
+    assert.equal(notificationPayload.sub, session.user_id);
+    assert.equal(notificationPayload.role, "authenticated");
+    assert.equal(notificationPayload.clemora_scope, "user_notifications");
+    assert.equal(notificationPayload.clemora_session_id, session.id);
+    assert.equal(notificationPayload.conversation_id, undefined);
+    assert.ok(notificationPayload.exp && notificationPayload.iat);
+    assert.equal(notificationPayload.exp - notificationPayload.iat, 300);
+    assert.equal(
+      new Date(notificationResult.expiresAt).getTime(),
+      notificationPayload.exp * 1000,
+    );
+  }
+
+  const shortSessionToken = randomUUID();
+  const shortSessionCookie = `em_session=${shortSessionToken}`;
+  const expiration = Math.floor(Date.now() / 1000) + 90;
+  const shortSession = await db
+    .insertInto("sessions")
+    .values({
+      user_id: customerId,
+      token_hash: hashSessionToken(shortSessionToken),
+      expires_at: new Date(expiration * 1000),
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+
+  const shortResult = await read(
+    await issueNotifications(shortSessionCookie),
+    200,
+  );
+  const { payload: shortPayload } = await jwtVerify(
+    shortResult.token,
+    pair.publicKey,
+  );
+  assert.equal(shortPayload.exp, expiration);
+
+  await db.deleteFrom("sessions").where("id", "=", shortSession.id).execute();
+  await read(await issueNotifications(shortSessionCookie), 401);
+});
+
+test("read receipts mark only incoming messages through a saved keyset boundary", async (t) => {
+  const conversationId = randomUUID();
+  const otherId = randomUUID();
+  const afterBoundaryId = "00000000-0000-4000-8000-000000000003";
+  const boundaryId = "00000000-0000-4000-8000-000000000002";
+  const ownId = "00000000-0000-4000-8000-000000000001";
+  const beforeId = randomUUID();
+  const foreignId = randomUUID();
+  await db
+    .insertInto("conversations")
+    .values([
+      { id: conversationId, customer_id: customerId },
+      { id: otherId, customer_id: customerId },
+    ])
+    .execute();
+  t.after(async () => {
+    await db
+      .deleteFrom("conversations")
+      .where("id", "in", [conversationId, otherId])
+      .execute();
+  });
+
+  await db
+    .insertInto("messages")
+    .values([
+      {
+        id: beforeId,
+        conversation_id: conversationId,
+        sender_role: "assistant",
+        body: "Previous",
+        created_at: "2026-11-21T00:00:00.000001Z",
+      },
+      {
+        id: ownId,
+        conversation_id: conversationId,
+        sender_role: "customer",
+        sender_id: customerId,
+        body: "Own message",
+        created_at: "2026-11-21T00:00:00.000002Z",
+      },
+      {
+        id: boundaryId,
+        conversation_id: conversationId,
+        sender_role: "assistant",
+        body: "Boundary",
+        created_at: "2026-11-21T00:00:00.000002Z",
+      },
+      {
+        id: afterBoundaryId,
+        conversation_id: conversationId,
+        sender_role: "assistant",
+        body: "Later by UUID",
+        created_at: "2026-11-21T00:00:00.000002Z",
+      },
+      {
+        id: foreignId,
+        conversation_id: otherId,
+        sender_role: "assistant",
+        body: "Different conversation",
+      },
+    ])
+    .execute();
+
+  const customerPath = `/messages/conversations/${conversationId}/read`;
+  const adminPath = `/admin/conversations/${conversationId}/read`;
+
+  const receipt = (path: string, messageId: string, cookie?: string) =>
+    call(path, "POST", { messageId }, cookie);
+
+  const readAt = async (id: string) =>
+    (
+      await db
+        .selectFrom("messages")
+        .select("read_at")
+        .where("id", "=", id)
+        .executeTakeFirstOrThrow()
+    ).read_at;
+
+  await read(await receipt(customerPath, boundaryId), 401);
+  await read(await receipt(customerPath, boundaryId, otherCustomerCookie), 404);
+  await read(await receipt(adminPath, boundaryId, customerCookie), 403);
+  await read(await receipt(customerPath, foreignId, customerCookie), 404);
+  await read(await receipt(customerPath, randomUUID(), customerCookie), 404);
+  assert.equal(await readAt(boundaryId), null);
+
+  await read(await receipt(customerPath, boundaryId, customerCookie), 204);
+  assert.ok(await readAt(beforeId));
+  const firstReceipt = await readAt(boundaryId);
+  assert.ok(firstReceipt);
+  assert.equal(await readAt(ownId), null);
+  assert.equal(await readAt(afterBoundaryId), null);
+  assert.equal(await readAt(foreignId), null);
+  await read(await receipt(customerPath, boundaryId, customerCookie), 204);
+  assert.deepEqual(await readAt(boundaryId), firstReceipt);
+
+  await read(await receipt(adminPath, boundaryId, adminCookie), 204);
+  assert.ok(await readAt(ownId));
+  assert.equal(await readAt(afterBoundaryId), null);
+});
+
 test("customer request IDs replay safely and reject collisions", async () => {
   const ids = Array.from({ length: 3 }, () => randomUUID());
+
   await db
     .insertInto("conversations")
     .values([
@@ -207,9 +469,11 @@ test("customer request IDs replay safely and reject collisions", async () => {
     call("/messages/conversation/messages", "POST", payload, customerCookie),
     call("/messages/conversation/messages", "POST", payload, customerCookie),
   ]);
+
   const results = await Promise.all(
     responses.map((response) => read(response, 201)),
   );
+
   assert.deepEqual(results[0].message, results[1].message);
   assert.equal(results[0].message.id, requestId);
   assert.equal(
@@ -307,11 +571,10 @@ test("customer request IDs replay safely and reject collisions", async () => {
     400,
   );
 
-  const closedAt = new Date();
   const updatedAt = new Date("2020-01-01T00:00:00Z");
   await db
     .updateTable("conversations")
-    .set({ status: "closed", closed_at: closedAt, updated_at: updatedAt })
+    .set({ updated_at: updatedAt })
     .where("id", "=", ids[0])
     .execute();
   const replay = await read(
@@ -330,11 +593,9 @@ test("customer request IDs replay safely and reject collisions", async () => {
   });
   const closed = await db
     .selectFrom("conversations")
-    .select(["status", "closed_at", "updated_at"])
+    .select("updated_at")
     .where("id", "=", ids[0])
     .executeTakeFirstOrThrow();
-  assert.equal(closed.status, "closed");
-  assert.equal(closed.closed_at?.getTime(), closedAt.getTime());
   assert.equal(closed.updated_at.getTime(), updatedAt.getTime());
 
   const sharedId = randomUUID();
@@ -630,11 +891,12 @@ test("customers can start a separate conversation without losing the previous on
   );
 });
 
-test("old general threads stay open and explicitly closed threads can reopen", async () => {
+test("old general threads stay available", async () => {
   const thread = await read(
     await call("/messages/conversation", "GET", undefined, chatCustomerCookie),
     200,
   );
+
   for (const field of [
     "packageId",
     "packageName",
@@ -646,6 +908,7 @@ test("old general threads stay open and explicitly closed threads can reopen", a
   ]) {
     assert.equal(thread.conversation[field], null);
   }
+
   const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
   await db
     .updateTable("conversations")
@@ -661,7 +924,7 @@ test("old general threads stay open and explicitly closed threads can reopen", a
     ),
     200,
   );
-  assert.equal(active.conversation.status, "active");
+  assert.equal("status" in active.conversation, false);
   assert.equal("expiresAt" in active.conversation, false);
   await read(
     await call(
@@ -672,11 +935,6 @@ test("old general threads stay open and explicitly closed threads can reopen", a
     ),
     201,
   );
-  await db
-    .updateTable("conversations")
-    .set({ status: "closed", closed_at: new Date() })
-    .where("id", "=", thread.conversation.id)
-    .execute();
   await read(
     await call(
       "/messages/conversation/messages",
@@ -695,8 +953,7 @@ test("old general threads stay open and explicitly closed threads can reopen", a
     ),
     200,
   );
-  assert.equal(reopened.conversation.status, "active");
-  assert.equal(reopened.conversation.closedAt, null);
+  assert.equal("closedAt" in reopened.conversation, false);
   assert.deepEqual(
     reopened.messages.map((message: any) => message.body),
     ["Can you help?", "Hello again"],
@@ -713,7 +970,7 @@ test("old general threads stay open and explicitly closed threads can reopen", a
   );
 });
 
-test("old booking conversations remain active and explicitly closed history stays closed", async () => {
+test("old booking conversations remain available", async () => {
   for (const pastEnd of [false, true]) {
     const booking = (
       await read(
@@ -735,6 +992,7 @@ test("old booking conversations remain active and explicitly closed history stay
         201,
       )
     ).bookingRequest;
+
     const linked = (
       await read(
         await call(
@@ -746,7 +1004,9 @@ test("old booking conversations remain active and explicitly closed history stay
         200,
       )
     ).conversations.find((item: any) => item.bookingRequestId === booking.id);
+
     assert.ok(linked);
+    assert.equal(linked.eventPreferredDate, "2099-01-02");
     const byReference = await read(
       await call(
         `/messages/conversations?reference=${encodeURIComponent(booking.reference)}`,
@@ -773,6 +1033,7 @@ test("old booking conversations remain active and explicitly closed history stay
       .set({ created_at: old })
       .where("id", "=", linked.id)
       .execute();
+
     if (pastEnd) {
       await db
         .updateTable("booking_requests")
@@ -780,15 +1041,19 @@ test("old booking conversations remain active and explicitly closed history stay
         .where("id", "=", booking.id)
         .execute();
     }
+
     for (const [path, cookie] of [
       ["/messages/conversations", chatCustomerCookie],
       ["/admin/conversations", adminCookie],
     ] as const) {
       const list = await read(await call(path, "GET", undefined, cookie), 200);
+
       const row = list.conversations.find((item: any) => item.id === linked.id);
-      assert.equal(row?.status, "active");
+
+      assert.equal("status" in row, false);
       assert.equal("expiresAt" in row, false);
     }
+
     for (const [path, cookie] of [
       [`/messages/conversations/${linked.id}`, chatCustomerCookie],
       [`/admin/conversations/${linked.id}`, adminCookie],
@@ -797,12 +1062,13 @@ test("old booking conversations remain active and explicitly closed history stay
         await call(path, "GET", undefined, cookie),
         200,
       );
-      assert.equal(result.conversation.status, "active");
+      assert.equal("status" in result.conversation, false);
       assert.equal(
         result.conversation.eventEndsAt,
         pastEnd ? old.toISOString() : null,
       );
     }
+
     await read(
       await call(
         "/messages/conversation/messages",
@@ -821,29 +1087,6 @@ test("old booking conversations remain active and explicitly closed history stay
       ),
       201,
     );
-    await db
-      .updateTable("conversations")
-      .set({ status: "closed", closed_at: new Date() })
-      .where("id", "=", linked.id)
-      .execute();
-    await read(
-      await call(
-        "/messages/conversation/messages",
-        "POST",
-        { body: "Blocked", conversationId: linked.id },
-        chatCustomerCookie,
-      ),
-      409,
-    );
-    await read(
-      await call(
-        `/admin/conversations/${linked.id}/messages`,
-        "POST",
-        { body: "Blocked" },
-        adminCookie,
-      ),
-      409,
-    );
     const closed = await read(
       await call(
         `/messages/conversations/${linked.id}`,
@@ -853,7 +1096,7 @@ test("old booking conversations remain active and explicitly closed history stay
       ),
       200,
     );
-    assert.equal(closed.conversation.status, "closed");
+    assert.equal("status" in closed.conversation, false);
     assert.deepEqual(
       closed.messages.map((message: any) => message.body),
       ["Customer message", "Admin reply"],
@@ -867,13 +1110,36 @@ test("message routes appear in the OpenAPI document", async () => {
     spec.paths["/v1/messages/conversation"].get.responses["200"].content[
       "application/json"
     ].schema;
-  assert.ok(threadSchema.properties.conversation.properties.status);
+  assert.equal(
+    "status" in threadSchema.properties.conversation.properties,
+    false,
+  );
+  assert.equal(
+    "closedAt" in threadSchema.properties.conversation.properties,
+    false,
+  );
   assert.equal(
     "expiresAt" in threadSchema.properties.conversation.properties,
     false,
   );
   assert.ok(spec.paths["/v1/messages/conversations"].post);
   assert.ok(spec.paths["/v1/messages/conversation/messages"].post);
+  assert.ok(
+    spec.paths["/v1/messages/conversations/{id}/read"].post.responses["204"],
+  );
+  assert.ok(
+    spec.paths["/v1/admin/conversations/{id}/read"].post.responses["204"],
+  );
+  const realtimeToken = spec.paths["/v1/auth/realtime-token"].post;
+  assert.ok(realtimeToken.responses["200"]);
+  const scopes =
+    realtimeToken.requestBody.content["application/json"].schema.anyOf;
+  assert.deepEqual(
+    scopes.map(({ required }: { required: string[] }) => required),
+    [["conversationId"], ["scope"]],
+  );
+  assert.equal(scopes[1].additionalProperties, false);
+  assert.deepEqual(scopes[1].properties.scope.enum, ["notifications"]);
 
   assert.equal(spec.paths["/v1/messages/conversation/context"], undefined);
 
@@ -886,13 +1152,13 @@ test("admin conversation pages include empty threads and order by precise update
   const ids = Array.from({ length: 31 }, () => randomUUID())
     .sort()
     .reverse();
+
   await db
     .insertInto("conversations")
     .values(
       ids.map((id) => ({
         id,
         customer_id: customerId,
-        status: "active",
         updated_at: new Date("2090-01-01T00:00:00.000Z"),
       })),
     )
@@ -925,6 +1191,7 @@ test("admin conversation pages include empty threads and order by precise update
   );
   const pages: any[] = [];
   let cursor: string | null = null;
+
   do {
     const page = await read(
       await call(
@@ -936,7 +1203,9 @@ test("admin conversation pages include empty threads and order by precise update
       200,
     );
     assert.ok(page.conversations.length <= 15);
+
     if (pages.length === 0) assert.equal(page.conversations.length, 15);
+
     pages.push(...page.conversations);
     cursor = page.nextCursor;
   } while (cursor);
@@ -946,10 +1215,14 @@ test("admin conversation pages include empty threads and order by precise update
     ids,
   );
   assert.equal(new Set(pages.map((item: any) => item.id)).size, pages.length);
+
   const preview = pages.find((item: any) => item.id === ids[0]);
+
   assert.equal(preview.lastMessage.body, "Page preview");
   assert.equal(preview.unreadCount, 1);
+
   const empty = pages.find((item: any) => item.id === ids[1]);
+
   assert.equal(empty.lastMessage, null);
   assert.equal(empty.unreadCount, 0);
   await db.deleteFrom("conversations").where("id", "in", ids).execute();
@@ -961,6 +1234,7 @@ test("legacy AI routes remain absent and unconfigured generation creates no assi
     await call("/messages/conversation", "GET", undefined, customerCookie),
     200,
   );
+
   for (const path of [
     "/chatbot/guest-reply",
     "/messages/conversation/claim",
@@ -985,6 +1259,7 @@ test("legacy AI routes remain absent and unconfigured generation creates no assi
       undefined,
     );
   }
+
   assert.equal(
     (
       await db
@@ -1001,13 +1276,13 @@ test("customer conversation and thread pages are bounded, scoped, and keep preci
   const conversations = Array.from({ length: 7 }, () => randomUUID())
     .sort()
     .reverse();
+
   await db
     .insertInto("conversations")
     .values(
       conversations.map((id) => ({
         id,
         customer_id: chatCustomerId,
-        status: "active",
         updated_at: new Date("2091-01-01T00:00:00Z"),
       })),
     )
@@ -1020,6 +1295,7 @@ test("customer conversation and thread pages are bounded, scoped, and keep preci
   );
   const ids: string[] = [];
   let cursor: string | null = null;
+
   do {
     const page = await read(
       await call(
@@ -1034,6 +1310,7 @@ test("customer conversation and thread pages are bounded, scoped, and keep preci
     ids.push(...page.conversations.map((item: any) => item.id));
     cursor = page.nextCursor;
   } while (cursor);
+
   assert.deepEqual(ids.slice(0, 7), conversations);
   assert.equal(new Set(ids).size, ids.length);
   const firstPage = await read(
@@ -1094,6 +1371,7 @@ test("customer conversation and thread pages are bounded, scoped, and keep preci
   const messageIds = Array.from({ length: 7 }, () => randomUUID())
     .sort()
     .reverse();
+
   await db
     .insertInto("messages")
     .values(

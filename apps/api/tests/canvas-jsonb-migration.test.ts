@@ -19,13 +19,16 @@ test("canvas migration preserves ordered package and service content and media r
   const database = `em_json_canvas_${randomUUID().replaceAll("-", "")}`;
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
+
   try {
     await admin.query(`CREATE DATABASE "${database}"`);
     pool = new Pool({ ...connection, database });
     const root = new URL("../prisma/migrations/", import.meta.url);
+
     const entries = (await readdir(root, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory() && entry.name < migration)
       .sort((a, b) => a.name.localeCompare(b.name));
+
     for (const entry of entries)
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
@@ -97,6 +100,7 @@ test("canvas migration preserves ordered package and service content and media r
       [photoId, textId, videoId, first, serviceSection, photo, video],
     );
     const ownerSnapshots = new Map<string, unknown>();
+
     for (const table of ["packages", "services"])
       ownerSnapshots.set(
         table,
@@ -106,9 +110,11 @@ test("canvas migration preserves ordered package and service content and media r
           )
         ).rows,
       );
+
     await pool.query(
       await readFile(new URL(`${migration}/migration.sql`, root), "utf8"),
     );
+
     for (const table of ["packages", "services"])
       assert.deepEqual(
         (
@@ -200,6 +206,7 @@ test("canvas migration preserves ordered package and service content and media r
       ).rows[0].count,
       2,
     );
+
     for (const table of [
       "catalog_widgets",
       "catalog_sections",
@@ -210,6 +217,7 @@ test("canvas migration preserves ordered package and service content and media r
           .name,
         null,
       );
+
     for (const table of ["packages", "services"]) {
       await assert.rejects(
         pool.query(`UPDATE ${table} SET canvas='{}'::jsonb WHERE id=$1`, [

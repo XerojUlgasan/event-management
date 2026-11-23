@@ -60,10 +60,12 @@ function CatalogPreviewContent({ selection }: { selection: CatalogSelection }) {
     let active = true;
     setLoading(true);
     setError("");
+
     const request =
       entity === "package"
         ? getPackage(id).then((item) => ({ entity: "package" as const, item }))
         : getService(id).then((item) => ({ entity: "service" as const, item }));
+
     request
       .then((result) => {
         if (active) setDetail(result);
@@ -74,6 +76,7 @@ function CatalogPreviewContent({ selection }: { selection: CatalogSelection }) {
       .finally(() => {
         if (active) setLoading(false);
       });
+
     return () => {
       active = false;
     };

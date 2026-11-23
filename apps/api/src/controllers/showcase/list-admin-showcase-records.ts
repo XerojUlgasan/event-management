@@ -1,3 +1,4 @@
+import { showcasePageQuery } from "./schemas.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { findAdminShowcaseRecordsData } from "../../data/showcase-records/find-admin-showcase-records.js";
@@ -6,9 +7,9 @@ import { findAssetsForRecordsData } from "../../data/showcase-records/find-asset
 import { buildShowcaseDto } from "../../services/showcase/showcase-dto.js";
 import { DEFAULT_PAGE_SIZE } from "@event-management/contracts/pagination";
 
-const querySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(50).optional(),
-  cursor: z.string().optional(),
+const querySchema = showcasePageQuery.extend({
+  status: z.enum(["published", "drafts"]).optional(),
+  search: z.string().trim().max(200).optional(),
 });
 
 export const listAdminShowcaseRecordsRoute = createRoute({
@@ -27,9 +28,20 @@ export const listAdminShowcaseRecordsRouteHandler: AppRouteHandler<
   typeof listAdminShowcaseRecordsRoute
 > = async (c) => {
   const db = c.get("db");
-  const { limit = DEFAULT_PAGE_SIZE, cursor } = c.req.valid("query");
+  const {
+    limit = DEFAULT_PAGE_SIZE,
+    cursor,
+    status,
+    search,
+  } = c.req.valid("query");
 
-  const rows = await findAdminShowcaseRecordsData(db, limit, cursor);
+  const rows = await findAdminShowcaseRecordsData(
+    db,
+    limit,
+    cursor,
+    status,
+    search,
+  );
   const hasMore = rows.length > limit;
   const page = rows.slice(0, limit);
 
@@ -51,8 +63,7 @@ export const listAdminShowcaseRecordsRouteHandler: AppRouteHandler<
   );
 
   const last = page.at(-1);
-  const nextCursor =
-    hasMore && last ? `${last.created_at.toISOString()}_${last.id}` : null;
+  const nextCursor = hasMore && last ? `${last.page_sort}_${last.id}` : null;
 
   return c.json({ showcases, nextCursor }, 200);
 };

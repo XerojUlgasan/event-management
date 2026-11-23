@@ -28,8 +28,10 @@ export function ThumbnailField({
 
   const handleFile = async (file: File) => {
     const error = validateImageFile(file);
+
     if (error) {
       onError(error);
+
       return;
     }
 
@@ -37,11 +39,13 @@ export function ThumbnailField({
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
     }
+
     const preview = URL.createObjectURL(file);
     objectUrlRef.current = preview;
 
     setUploading(true);
     onBusyChange(true);
+
     try {
       const result = await uploadCatalogMedia(file);
       onChange(result.id ?? null, preview);
@@ -60,6 +64,7 @@ export function ThumbnailField({
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
     }
+
     onChange(null, null);
   };
 
@@ -68,6 +73,7 @@ export function ThumbnailField({
     e.stopPropagation();
     lightboxRef.current?.showModal();
   };
+
   const closeLightbox = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     lightboxRef.current?.close();
@@ -79,7 +85,7 @@ export function ThumbnailField({
     <FormField
       className="full"
       label="Card thumbnail"
-      description={`Optional. JPEG, PNG, or WebP, up to ${MAX_IMAGE_SIZE_BYTES / 1024 / 1024} MiB. Independent of canvas photos — reordering photos will not change it.`}
+      description={`Optional. JPEG, PNG, or WebP, up to ${MAX_IMAGE_SIZE_BYTES / 1024 / 1024} MiB. A branded default is used when no thumbnail is set. Independent of canvas photos.`}
     >
       {(field) => (
         <div className="thumbnail-field">
@@ -94,7 +100,12 @@ export function ThumbnailField({
                 aria-label="View thumbnail full size"
                 title="Click to view full size"
               >
-                <img src={previewUrl} alt="Current card thumbnail" width={80} height={60} />
+                <img
+                  src={previewUrl}
+                  alt="Current card thumbnail"
+                  width={80}
+                  height={60}
+                />
                 <span className="thumbnail-field-thumb-hint" aria-hidden="true">
                   View
                 </span>
@@ -119,6 +130,7 @@ export function ThumbnailField({
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 e.currentTarget.value = "";
+
                 if (file) void handleFile(file);
               }}
             />
@@ -134,6 +146,7 @@ export function ThumbnailField({
             ref={lightboxRef}
             className="thumbnail-lightbox"
             aria-label="Thumbnail preview"
+            onCancel={(event) => event.stopPropagation()}
             onClick={(e) => {
               // Close when clicking the backdrop (outside the image).
               if (e.target === e.currentTarget) closeLightbox(e);

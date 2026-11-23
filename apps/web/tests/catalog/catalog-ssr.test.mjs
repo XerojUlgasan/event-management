@@ -10,8 +10,19 @@ import { join } from "node:path";
 
 // Vite processes the real TSX and its CSS imports, as the Astro SSR build does.
 const root = fileURLToPath(new URL("../../", import.meta.url));
-let server, cacheDir, canvas, publicDetails, publicPackage, ui, scrollLock;
+
+let server,
+  cacheDir,
+  canvas,
+  publicDetails,
+  publicPackage,
+  publicCards,
+  ui,
+  markdownUi,
+  scrollLock;
+
 let CatalogFiltersForm, readCatalogFilters, catalogPageLinks;
+
 before(async () => {
   cacheDir = await mkdtemp(join(tmpdir(), "clemora-catalog-ssr-"));
   server = await createServer({
@@ -45,11 +56,23 @@ before(async () => {
   ({ readCatalogFilters, catalogPageLinks } = await server.ssrLoadModule(
     "/src/lib/server/catalog/load-catalog.ts",
   ));
+  publicCards = await server.ssrLoadModule(
+    "/src/components/public/catalog/CatalogCards.tsx",
+  );
   ui = await server.ssrLoadModule(
     "/@fs" +
       fileURLToPath(
         new URL(
           "../../../../packages/ui/src/organisms/CatalogCanvas.tsx",
+          import.meta.url,
+        ),
+      ),
+  );
+  markdownUi = await server.ssrLoadModule(
+    "/@fs" +
+      fileURLToPath(
+        new URL(
+          "../../../../packages/ui/src/molecules/Markdown.tsx",
           import.meta.url,
         ),
       ),
@@ -62,6 +85,7 @@ after(async () => {
     if (cacheDir) await rm(cacheDir, { recursive: true, force: true });
   }
 });
+
 const render = (component, props) =>
   renderToStaticMarkup(createElement(component, props));
 
@@ -96,6 +120,7 @@ test("the shared filter form renders native GET controls and keeps workspace sub
     filters: {},
     onApply: () => {},
   });
+
   assert.doesNotMatch(workspace, /action=|method=|name="minPricePesos"/);
   assert.match(
     workspace,
@@ -105,8 +130,10 @@ test("the shared filter form renders native GET controls and keeps workspace sub
 
 test("native service GET drops stale bounds and cursor links retain only applied filters", () => {
   const url = new URL("https://example.test/services");
+
   const nativeFilters = (query) =>
     readCatalogFilters("services", new URLSearchParams(query));
+
   for (const type of ["", "hourly"]) {
     const filters = nativeFilters(
       `pricingType=${type}&priceRangeType=fixed&minPricePesos=0&maxPricePesos=5000`,
@@ -115,6 +142,7 @@ test("native service GET drops stale bounds and cursor links retain only applied
     assert.equal(filters.maxPricePesos, undefined);
     assert.equal(filters.pricingType, type || undefined);
   }
+
   for (const marker of ["", "&priceRangeType=fixed"]) {
     const filters = nativeFilters(
       `pricingType=fixed&minPricePesos=0&maxPricePesos=5000${marker}`,
@@ -145,6 +173,7 @@ const video = (id, autoplay) => ({
   caption: "Film caption",
   autoplay,
 });
+
 const photo = {
   id: "photo",
   type: "photo",
@@ -158,6 +187,7 @@ const photo = {
   caption: "Photo caption",
   autoplay: false,
 };
+
 const markdown = {
   id: "markdown",
   type: "markdown",
@@ -172,6 +202,7 @@ const markdown = {
   markdown:
     "# Heading\n\n*italic* and **bold**\n\n- First item\n- Second item\n\n[Safe link](https://example.com)\n\n| Name | Value |\n| --- | --- |\n| One | Two |\n\n<script>alert(1)</script>\n\n[bad](javascript:alert(1))",
 };
+
 const sections = [
   {
     id: "section",
@@ -179,18 +210,16 @@ const sections = [
     widgets: [photo, markdown, video("on", true), video("off", false)],
   },
 ];
+
 const packageItem = {
   name: "Celebration",
   description: "Package summary",
   maxGuests: 120,
   price: { kind: "fixed", currency: "PHP", amountMinor: 125000 },
-  services: [
-    { serviceId: "s1", name: "Catering", role: "included" },
-    { serviceId: "s2", name: "Music", role: "optional" },
-  ],
   sections,
   slug: "celebration",
 };
+
 const service = {
   name: "Catering",
   description: "Service **summary**",
@@ -213,16 +242,17 @@ test("public package renders the canonical canvas with the booking action", () =
     actual,
     render(canvas.PackageCanvas, { item: packageItem, bookingAction: action }),
   );
+
   for (const value of [
     "Celebration",
     "Package summary",
     "Up to 120 guests",
-    "Catering · Included",
-    "Music · Optional",
     "Book now",
   ])
     assert.ok(actual.includes(value), value);
+
   assert.match(actual, /1,250/);
+  assert.doesNotMatch(actual, /Package services|Included|Optional/);
 });
 test("public service renders its canonical canvas and metadata", () => {
   const serviceHtml = render(publicDetails.PublicServiceDetail, {
@@ -238,6 +268,7 @@ test("SSR renders complete sanitized Markdown and media on every catalog", () =>
     [publicDetails.PublicServiceDetail, service],
   ]) {
     const html = render(component, { item });
+
     for (const pattern of [
       /<h1[^>]*>.*?Heading<\/h1>/,
       /<em>italic<\/em>/,
@@ -252,6 +283,7 @@ test("SSR renders complete sanitized Markdown and media on every catalog", () =>
       /Film caption/,
     ])
       assert.match(html, pattern);
+
     assert.doesNotMatch(html, /<script|javascript:|onerror=/i);
     const videos = html.match(/<video\b[^>]*>/g) ?? [];
     assert.equal(videos.length, 2);
@@ -281,10 +313,9 @@ test("editing media retains caption and suppresses autoplay without suppressing 
   assert.match(image, /Photo caption/);
 });
 
-test("private package canvas retains description while hiding services and booking action", () => {
+test("private package canvas retains description without a booking action", () => {
   const html = render(canvas.PackageCanvas, {
     item: packageItem,
-    hideServices: true,
   });
   assert.match(html, /Package summary/);
   assert.doesNotMatch(
@@ -330,7 +361,8 @@ test("empty media has meaningful fallback and Markdown requests light mode", () 
     assert.ok(html.includes(message));
     assert.doesNotMatch(html, /<img|<video/);
   }
-  const html = render(ui.CatalogMarkdown, { source: "**Light content**" });
+
+  const html = render(markdownUi.Markdown, { source: "**Light content**" });
   assert.match(html, /data-color-mode="light"/);
   assert.match(html, /<strong>Light content<\/strong>/);
 });
@@ -365,17 +397,18 @@ const serviceWidget = {
     imageUrl: "/images/wedding.jpg",
   },
 };
-test("linked service cards render on public and private canvases without prices or inclusion claims", () => {
+
+test("linked service cards render on public and private canvases", () => {
   const item = {
     ...packageItem,
-    services: [],
     sections: [
       { id: "linked-services", title: "Explore", widgets: [serviceWidget] },
     ],
   };
+
   for (const html of [
     render(publicPackage.PublicPackageDetail, { item }),
-    render(canvas.PackageCanvas, { item, hideServices: true }),
+    render(canvas.PackageCanvas, { item }),
     render(canvas.ServiceCanvas, {
       item: { ...service, sections: item.sections },
     }),
@@ -385,8 +418,8 @@ test("linked service cards render on public and private canvases without prices 
     assert.match(html, /href="\/services\/photo-booth"/);
     assert.match(html, /Ask us about a photo booth for your event/);
     assert.match(html, /src="\/images\/wedding.jpg"/);
-    assert.doesNotMatch(html, /Included|Optional|additional charge/);
   }
+
   const card = render(ui.CatalogWidgetContent, { widget: serviceWidget });
   assert.doesNotMatch(card, /₱|PHP|hour|rate|price/i);
 });
@@ -398,10 +431,12 @@ test("service card uses one whole-card action for public and workspace contexts"
     /<a\b[^>]*href="\/services\/photo-booth"[^>]*>[\s\S]*<img[\s\S]*Photo booth[\s\S]*Portraits for your guests[\s\S]*Ask us about[\s\S]*<\/a>/,
   );
   assert.equal((publicCard.match(/<a\b/g) ?? []).length, 1);
+
   const workspaceCard = render(ui.CatalogWidgetContent, {
     widget: serviceWidget,
     onOpenService: () => {},
   });
+
   assert.match(
     workspaceCard,
     /<button\b[^>]*type="button"[^>]*>[\s\S]*<img[\s\S]*Photo booth[\s\S]*Ask us about[\s\S]*<\/button>/,
@@ -438,6 +473,7 @@ test("service editor content has no nested link and preserves captions and unava
 test("stacked catalog scroll locks restore the original overflow in either close order", () => {
   const originalDocument = globalThis.document;
   globalThis.document = { body: { style: { overflow: "auto" } } };
+
   try {
     const releaseParent = scrollLock.lockCatalogScroll();
     const releaseChild = scrollLock.lockCatalogScroll();
@@ -473,17 +509,18 @@ const packageWidget = {
     imageUrl: "/images/wedding.jpg",
   },
 };
+
 test("linked package cards share public and private canvases without prices or inclusion claims", () => {
   const sections = [
     { id: "linked-packages", title: "Explore", widgets: [packageWidget] },
   ];
+
   for (const html of [
     render(publicPackage.PublicPackageDetail, {
-      item: { ...packageItem, services: [], sections },
+      item: { ...packageItem, sections },
     }),
     render(canvas.PackageCanvas, {
-      item: { ...packageItem, services: [], sections },
-      hideServices: true,
+      item: { ...packageItem, sections },
     }),
     render(canvas.ServiceCanvas, { item: { ...service, sections } }),
   ]) {
@@ -494,6 +531,7 @@ test("linked package cards share public and private canvases without prices or i
     assert.match(html, /src="\/images\/wedding.jpg"/);
     assert.doesNotMatch(html, /Included|Optional|additional charge/);
   }
+
   assert.doesNotMatch(
     render(ui.CatalogWidgetContent, { widget: packageWidget }),
     /₱|PHP|hour|rate|price/i,
@@ -506,20 +544,24 @@ test("package cards use a single whole-card action and inert editor or unavailab
     /<a\b[^>]*href="\/packages\/celebration"[^>]*>[\s\S]*<img[\s\S]*Celebration package[\s\S]*Explore this arrangement[\s\S]*<\/a>/,
   );
   assert.equal((publicCard.match(/<a\b/g) ?? []).length, 1);
+
   const workspace = render(ui.CatalogWidgetContent, {
     widget: packageWidget,
     onOpenPackage: () => {},
   });
+
   assert.match(
     workspace,
     /<button\b[^>]*aria-label="View package: Celebration package"/,
   );
   assert.doesNotMatch(workspace, /<a\b/);
+
   const editor = render(ui.CatalogWidgetContent, {
     widget: packageWidget,
     editor: true,
     onOpenPackage: () => {},
   });
+
   assert.doesNotMatch(editor, /<a\b|<button\b/);
   const unavailable = render(ui.CatalogWidgetContent, {
     widget: { ...packageWidget, package: null },
@@ -541,4 +583,132 @@ test("package cards use a single whole-card action and inert editor or unavailab
     }),
     /<img/,
   );
+});
+
+test("public catalog thumbnails use the brand for absent images and retain dedicated images", () => {
+  for (const [component, item] of [
+    [publicCards.PackageCards, packageItem],
+    [publicCards.ServiceCards, service],
+  ]) {
+    const empty = render(component, {
+      items: [{ ...item, id: "one", imageUrl: null }],
+    });
+    assert.match(empty, /ui-catalog-thumbnail-brand/);
+    assert.doesNotMatch(empty, /data-catalog-thumbnail-image/);
+    const dedicated = render(component, {
+      items: [{ ...item, id: "one", imageUrl: "/dedicated.jpg" }],
+    });
+    assert.match(
+      dedicated,
+      /data-catalog-thumbnail-image="true"[^>]*src="\/dedicated.jpg"/,
+    );
+    assert.match(dedicated, /ui-catalog-thumbnail-brand/);
+  }
+
+  const reference = render(ui.CatalogWidgetContent, {
+    widget: {
+      ...serviceWidget,
+      service: { ...serviceWidget.service, imageUrl: null },
+    },
+  });
+  assert.match(reference, /ui-catalog-thumbnail-brand/);
+  assert.doesNotMatch(reference, /data-catalog-thumbnail-image/);
+});
+
+test("package services display local terms while service pages stay neutral and add-ons stay private", () => {
+  const service = {
+    id: "s",
+    slug: "s",
+    name: "Photography",
+    description: "Coverage",
+    imageUrl: null,
+  };
+  const widget = {
+    ...photo,
+    id: "service",
+    type: "service",
+    media: null,
+    serviceId: "s",
+    service,
+    serviceTerms: { includedHours: 3, hourlyRatePesos: 800 },
+  };
+  const sections = [{ id: "section", title: "", widgets: [widget] }];
+  const addon = {
+    id: "addon",
+    serviceId: "s",
+    service,
+    fixedPricePesos: null,
+    includedHours: null,
+    hourlyRatePesos: 1200,
+  };
+  const item = {
+    name: "Package",
+    description: "",
+    maxGuests: 100,
+    price: { kind: "fixed", currency: "PHP", amountMinor: 100000 },
+    sections,
+    addonServices: [addon],
+  };
+  const publicHtml = render(canvas.PackageCanvas, { item });
+  assert.match(
+    publicHtml,
+    /Included · 3 hours included · ₱800 \/ additional hour/,
+  );
+  assert.doesNotMatch(publicHtml, /Addon Services/);
+  const privateHtml = render(canvas.PackageCanvas, {
+    item,
+    historicalAddons: [addon],
+  });
+  assert.match(privateHtml, /Historical add-on services/);
+  assert.match(privateHtml, /₱1,200 \/ hour/);
+  assert.ok(
+    privateHtml.indexOf("catalog-addons") >
+      privateHtml.indexOf("ui-catalog-section"),
+  );
+  const addonHtml = privateHtml.slice(privateHtml.indexOf("catalog-addons"));
+  assert.match(addonHtml, /ui-catalog-reference-card/);
+  assert.doesNotMatch(addonHtml, /Included ·/);
+  const serviceHtml = render(canvas.ServiceCanvas, {
+    item: {
+      ...item,
+      fixedPricePesos: null,
+      includedHours: null,
+      hourlyRatePesos: 800,
+    },
+  });
+  assert.doesNotMatch(serviceHtml, /Included ·/);
+  const legacyHtml = render(canvas.PackageCanvas, {
+    item: {
+      ...item,
+      sections: [
+        { ...sections[0], widgets: [{ ...widget, serviceTerms: undefined }] },
+      ],
+    },
+  });
+  assert.match(
+    legacyHtml,
+    /Included · Hours unspecified · Excess rate unspecified/,
+  );
+});
+
+test("unavailable service preserves package-owned included terms only in package context", () => {
+  const widget = {
+    ...serviceWidget,
+    service: null,
+    serviceTerms: { includedHours: 6, hourlyRatePesos: 1250 },
+  };
+  const sections = [{ id: "unavailable", title: "", widgets: [widget] }];
+  const packageHtml = render(canvas.PackageCanvas, {
+    item: { ...packageItem, sections },
+  });
+  assert.match(packageHtml, /This service is unavailable/);
+  assert.match(
+    packageHtml,
+    /Included · 6 hours included · ₱1,250 \/ additional hour/,
+  );
+  const serviceHtml = render(canvas.ServiceCanvas, {
+    item: { ...service, sections },
+  });
+  assert.match(serviceHtml, /This service is unavailable/);
+  assert.doesNotMatch(serviceHtml, /Included|₱1,250|additional hour/);
 });

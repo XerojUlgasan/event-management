@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { saveRequestedDayTimesService } from "../../services/booking-requests/save-requested-day-times.js";
 import {
@@ -7,6 +8,7 @@ import {
   saveRequestedDayTimesSchema,
 } from "./schemas.js";
 import { body, errors, json } from "./http.js";
+
 export const saveRequestedDayTimesRoute = createRoute({
   method: "patch",
   path: "/booking-requests/{id}/requested-days/{date}/times",
@@ -23,6 +25,7 @@ export const saveRequestedDayTimesRoute = createRoute({
     ...errors,
   },
 });
+
 export const saveRequestedDayTimesRouteHandler: AppRouteHandler<
   typeof saveRequestedDayTimesRoute
 > = async (c) => {
@@ -34,7 +37,9 @@ export const saveRequestedDayTimesRouteHandler: AppRouteHandler<
     c.get("session").user.id,
     c.req.valid("json"),
   );
+
   if ("message" in result)
-    return c.json({ error: result.message }, result.status);
+    return jsonError(c, result.message, result.status);
+
   return c.json({ bookingRequest: result }, 200);
 };

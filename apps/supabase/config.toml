@@ -118,11 +118,16 @@ enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
 
-# Catalog uploads use this private bucket. Object keys stay catalog-media/<id>.
+# Catalog uploads use this private bucket with pending/ and owner folders.
 [storage.buckets.event-management]
 public = false
 file_size_limit = "25MiB"
 allowed_mime_types = ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm"]
+
+[storage.buckets.supporting-documents]
+public = false
+file_size_limit = "25MiB"
+allowed_mime_types = ["application/pdf"]
 
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]
@@ -387,7 +392,7 @@ enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
 # `per_worker` enables hot reload. This bundle is large, and reloading it killed the
 # runtime container with exit 137, so local serving uses the oneshot fallback.
-policy = "oneshot"
+policy = "per_worker"
 # Port to attach the Chrome inspector for debugging edge functions.
 inspector_port = 8083
 # The Deno major version to use.

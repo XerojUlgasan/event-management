@@ -1,9 +1,12 @@
 import { sql, type Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
+import { utcTimestampSql } from "../../utils/sql-page.js";
 
 // pg's Date parser discards microseconds. Keep this opaque revision as SQL text.
-export const bookingRevision = sql<string>`to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
+export const bookingRevision = utcTimestampSql("updated_at");
+
 export const nextBookingRevision = sql<Date>`greatest(clock_timestamp(), updated_at + interval '1 microsecond')`;
+
 export const touchBookingRevisionData = (db: Transaction<DB>, id: string) =>
   db
     .updateTable("booking_requests")

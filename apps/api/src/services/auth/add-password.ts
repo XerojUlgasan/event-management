@@ -22,7 +22,9 @@ export async function addPasswordService(
   password: string,
 ) {
   const user = session.user;
+
   if (!allowAuthAttempt(user.id)) return { kind: "rate-limited" as const };
+
   if (
     firebase.uid !== user.firebase_uid ||
     !firebase.emailVerified ||
@@ -30,10 +32,12 @@ export async function addPasswordService(
     !recentlyAuthenticated(firebase)
   )
     return { kind: "invalid" as const };
+
   const row = await addLocalPasswordData(
     db,
     user.id,
     await hashPassword(password),
   );
+
   return row ? { kind: "ok" as const, row } : { kind: "conflict" as const };
 }

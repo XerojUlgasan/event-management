@@ -17,6 +17,7 @@ export async function searchCatalogKnowledgeService(
   abortSignal?: AbortSignal,
 ): Promise<KnowledgeSearchResponse> {
   let vector: Awaited<ReturnType<typeof embedCatalogContent>>;
+
   try {
     vector = await embedCatalogContent({
       contentMarkdown: query,
@@ -26,12 +27,15 @@ export async function searchCatalogKnowledgeService(
   } catch {
     throw new KnowledgeSearchUnavailable();
   }
+
   abortSignal?.throwIfAborted();
+
   const results = await db
     .transaction()
     .setIsolationLevel("repeatable read")
     .execute(async (trx) => {
       const knowledge = await loadCatalogKnowledge(trx);
+
       const eligible = new Map<
         string,
         Omit<KnowledgeSearchResult, "similarity">
@@ -58,22 +62,37 @@ export async function searchCatalogKnowledgeService(
             ),
         ),
       );
+
       const ranked = await searchCatalogKnowledgeData(
         trx,
         vector.embedding,
         vector.model,
       );
-      return ranked.rows
-        .flatMap((row) => {
-          const key = row.package_id
-            ? `package:${row.package_id}:${row.chunk_key}`
-            : `service:${row.service_id}:${row.chunk_key}`;
-          const result = eligible.get(key);
-          return result && Number.isFinite(row.similarity)
-            ? [{ ...result, similarity: row.similarity }]
-            : [];
-        })
-        .slice(0, KNOWLEDGE_SEARCH_LIMIT);
+
+      const results: KnowledgeSearchResult[] = [];
+      const matchedListings = new Set<string>();
+
+      for (const row of ranked.rows) {
+        const listingKey = row.package_id
+          ? `package:${row.package_id}`
+          : `service:${row.service_id}`;
+        const result = eligible.get(`${listingKey}:${row.chunk_key}`);
+
+        if (
+          !result ||
+          !Number.isFinite(row.similarity) ||
+          matchedListings.has(listingKey)
+        )
+          continue;
+
+        matchedListings.add(listingKey);
+        results.push({ ...result, similarity: row.similarity });
+
+        if (results.length === KNOWLEDGE_SEARCH_LIMIT) break;
+      }
+
+      return results;
     });
+
   return { query, model: vector.model, results };
 }

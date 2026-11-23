@@ -1,18 +1,22 @@
 import { lockCatalogScroll } from "./catalog-scroll-lock";
 import {
   Button,
+  Dialog,
   Icon,
   Input,
   NativeDialog,
   Select,
+  Textarea,
   useNotifications,
   CatalogGridGuides,
   CatalogGridRuler,
   CATALOG_GRID,
+  catalogGridMetrics,
   catalogGridStyle,
 } from "@event-management/ui";
 import {
   CATALOG_COLUMNS,
+  LEGACY_CATALOG_COLUMNS,
   MAX_CATALOG_SECTIONS,
   MAX_CATALOG_WIDGETS,
   MAX_WIDGET_MARKDOWN_LENGTH,
@@ -27,8 +31,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import GridLayout from "react-grid-layout/legacy";
-import MDEditor from "@uiw/react-md-editor";
-import rehypeSanitize from "rehype-sanitize";
+import { calcGridItemPosition, calcXY, collides } from "react-grid-layout/core";
 import type {
   CatalogSection,
   CatalogWidget,
@@ -42,24 +45,36 @@ import {
 } from "../../lib/services/catalog/save-catalog-media";
 import { WidgetContent } from "./CatalogContent";
 import { PackageMediaSettings } from "./PackageMediaSettings";
+import { ServiceTermsDialog } from "./ServiceTermsDialog";
 import { CatalogReferencePickerDialog } from "./CatalogReferencePickerDialog";
+import { CatalogWidgetPalette } from "./CatalogWidgetPalette";
+import type { PalettePoint, PaletteWidget } from "./CatalogWidgetPalette";
 import "react-grid-layout/css/styles.css";
 import "../../styles/catalog/package-editor.css";
 
 const uuid = () => crypto.randomUUID();
+
 export const newCatalogSection = (): CatalogSection => ({
   id: uuid(),
   title: "",
+  columns: CATALOG_COLUMNS,
   widgets: [],
 });
+
 const newSection = newCatalogSection;
-const widget = (type: CatalogWidget["type"], y: number): CatalogWidget => ({
+
+const NEW_WIDGET_WIDTH = CATALOG_COLUMNS / 2;
+const NEW_WIDGET_HEIGHT = 5;
+const MIN_WIDGET_WIDTH = CATALOG_COLUMNS / 4;
+const MAX_GRID_ROWS = MAX_CATALOG_WIDGET_Y + MAX_CATALOG_WIDGET_ROWS;
+
+const widget = (type: PaletteWidget, x: number, y: number): CatalogWidget => ({
   id: uuid(),
   type,
-  x: 0,
+  x,
   y,
-  w: 6,
-  h: 5,
+  w: NEW_WIDGET_WIDTH,
+  h: NEW_WIDGET_HEIGHT,
   markdown:
     type === "markdown" ? "## Your heading\n\nTell your story here." : "",
   media: null,
@@ -67,16 +82,45 @@ const widget = (type: CatalogWidget["type"], y: number): CatalogWidget => ({
   caption: "",
   autoplay: false,
 });
+
 const sectionRows = (widgets: readonly { y: number; h: number }[]) =>
   Math.max(0, ...widgets.map((w) => w.y + w.h));
+
+function editorSection(section: CatalogSection): CatalogSection {
+  if (section.columns === CATALOG_COLUMNS) return section;
+
+  const scale = CATALOG_COLUMNS / LEGACY_CATALOG_COLUMNS;
+
+  return {
+    ...section,
+    columns: CATALOG_COLUMNS,
+    widgets: section.widgets.map((item) => ({
+      ...item,
+      x: item.x * scale,
+      w: item.w * scale,
+    })),
+  };
+}
+
+type DropTarget = {
+  sectionId: string;
+  x: number;
+  y: number;
+  valid: boolean;
+  box: ReturnType<typeof calcGridItemPosition>;
+};
+
 type ActiveLayout = {
   sectionId: string;
   items: readonly { i: string; x: number; y: number; w: number; h: number }[];
 };
+
 const HISTORY_LIMIT = 50;
 const TEXT_BURST_MS = 700;
+
 const isTextField = (target: EventTarget | null) => {
   if (target instanceof HTMLTextAreaElement) return true;
+
   if (target instanceof HTMLInputElement)
     return ![
       "checkbox",
@@ -88,8 +132,10 @@ const isTextField = (target: EventTarget | null) => {
       "submit",
       "reset",
     ].includes(target.type);
+
   return target instanceof HTMLElement && target.isContentEditable;
 };
+
 function MediaWidget({
   widget,
   onSelectFile,
@@ -98,6 +144,7 @@ function MediaWidget({
   onSelectFile: (file?: File) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
+
   return (
     <div className="pe-media-preview">
       <WidgetContent
@@ -132,67 +179,77 @@ function MediaWidget({
     </div>
   );
 }
-function MarkdownSettings({
+
+function InlineMarkdownWidget({
   widget,
+  editing,
   onChange,
-  onClose,
+  onEdit,
+  onBlur,
 }: {
   widget: CatalogWidget;
+  editing: boolean;
   onChange: (markdown: string) => void;
-  onClose: () => void;
+  onEdit: () => void;
+  onBlur: () => void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const trigger = document.activeElement as HTMLElement | null;
-    const node = dialog.current;
-    node?.showModal();
-    return () => {
-      node?.close();
-      trigger?.focus();
-    };
-  }, []);
-  return createPortal(
-    <NativeDialog
-      ref={dialog}
-      className="pe-media-dialog pe-markdown-dialog"
-      aria-label="Edit Markdown"
-      onCancel={(event) => {
+  const source = useRef<HTMLTextAreaElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const restoreFocus = useRef(false);
+
+  useLayoutEffect(() => {
+    if (editing) {
+      source.current?.focus({ preventScroll: true });
+    } else if (restoreFocus.current) {
+      restoreFocus.current = false;
+      trigger.current?.focus({ preventScroll: true });
+    }
+  }, [editing]);
+
+  return editing ? (
+    <Textarea
+      ref={source}
+      variant="plain"
+      className="pe-markdown-source"
+      aria-label="Markdown content"
+      spellCheck={false}
+      maxLength={MAX_WIDGET_MARKDOWN_LENGTH}
+      value={widget.markdown}
+      onChange={(event) => onChange(event.target.value)}
+      onBlur={onBlur}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
+
         event.preventDefault();
-        event.stopPropagation();
-        onClose();
+        restoreFocus.current = true;
+        onBlur();
       }}
-    >
-      <header>
-        <h2>Edit Markdown</h2>
-        <Button
-          variant="plain"
-          aria-label="Close Markdown editor"
-          onClick={onClose}
-        >
-          <Icon name="close" size={20} />
-        </Button>
-      </header>
-      <div className="pe-media-dialog-body" data-color-mode="light">
-        <MDEditor
-          textareaProps={{ "aria-label": "Markdown content" }}
-          value={widget.markdown}
-          onChange={(value) =>
-            onChange((value || "").slice(0, MAX_WIDGET_MARKDOWN_LENGTH))
-          }
-          height={360}
-          visibleDragbar={false}
-          previewOptions={{ rehypePlugins: [rehypeSanitize] }}
-        />
+    />
+  ) : (
+    <div className="pe-markdown-widget">
+      <div className="pe-markdown-rendered" inert>
+        <WidgetContent widget={widget} editor />
       </div>
-      <footer>
-        <p>Only content that fits the widget will appear on the page.</p>
-        <Button onClick={onClose}>Done</Button>
-      </footer>
-    </NativeDialog>,
-    document.body,
+      <Button
+        ref={trigger}
+        variant="plain"
+        className="pe-markdown-edit-trigger"
+        aria-label="Edit Markdown widget"
+        title="Edit Markdown"
+        onClick={onEdit}
+      >
+        {widget.markdown.trim() ? null : "Add Markdown"}
+      </Button>
+    </div>
   );
 }
-type CanvasContent = { name: string; sections: CatalogSection[]; eventType?: string | null };
+
+type CanvasContent = {
+  name: string;
+  eventType?: string | null;
+  sections: CatalogSection[];
+};
+
 export function CatalogEditor<T extends CanvasContent>({
   initial,
   entity,
@@ -200,6 +257,7 @@ export function CatalogEditor<T extends CanvasContent>({
   onSaved,
   onSave,
   validate,
+  validateCanvas,
   renderDetails,
   renderPreview,
   saveLabel = "Save changes",
@@ -213,6 +271,7 @@ export function CatalogEditor<T extends CanvasContent>({
   onSaved: () => void;
   onSave: (content: T) => Promise<void>;
   validate?: (content: T) => string | undefined;
+  validateCanvas?: (content: T) => string | undefined;
   renderDetails: (
     content: T,
     setContent: Dispatch<SetStateAction<T>>,
@@ -228,31 +287,45 @@ export function CatalogEditor<T extends CanvasContent>({
   const title = privateProposal
     ? "Private package"
     : entity[0].toUpperCase() + entity.slice(1);
-  const [content, setContentState] = useState<T>(() =>
-    structuredClone(initial),
-  );
+
+  const [content, setContentState] = useState<T>(() => {
+    const draft = structuredClone(initial);
+
+    return { ...draft, sections: draft.sections.map(editorSection) };
+  });
+
   const contentRef = useRef(content);
   const historyRef = useRef<{ past: T[]; future: T[] }>({
     past: [],
     future: [],
   });
-  const lastEdit = useRef<{ at: number; kind: "text" | "action" }>({
+  const lastEdit = useRef<{ at: number; field: Element | null }>({
     at: 0,
-    kind: "action",
+    field: null,
   });
+
   const shortcuts = useRef({ undo: () => {}, redo: () => {}, busy: false });
+
   const [canUndo, setCanUndo] = useState(false),
     [canRedo, setCanRedo] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [markdownEditing, setMarkdownEditing] = useState<{
-    sectionId: string;
-    widgetId: string;
-  } | null>(null);
+  const detailsRef = useRef<HTMLDivElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const [markdownEditing, setMarkdownEditing] = useState<string | null>(null);
   const [referenceEditing, setReferenceEditing] = useState<{
     sectionId: string;
     widgetId: string;
   } | null>(null);
-  const [targetSection, setTargetSection] = useState(0);
+  const [termsEditing, setTermsEditing] = useState<{
+    sectionId: string;
+    widgetId: string;
+  } | null>(null);
+  const [targetSection, setTargetSection] = useState(initial.sections[0]?.id);
+  const [paletteTarget, setPaletteTarget] = useState<DropTarget | null>(null);
+  const [reordering, setReordering] = useState<{
+    sectionId: string;
+    widgetId: string;
+  } | null>(null);
   const [activeLayout, setActiveLayout] = useState<ActiveLayout | null>(null);
   const [gridReset, setGridReset] = useState<Record<string, number>>({});
   const [settings, setSettings] = useState(false),
@@ -266,6 +339,7 @@ export function CatalogEditor<T extends CanvasContent>({
     sectionId: string;
     widgetId: string;
   } | null>(null);
+
   // Content-only history. Publishing a snapshot is cheap because each change
   // replaces the section or widget objects it touches and reuses the rest.
   const applyContent = (next: T) => {
@@ -274,19 +348,24 @@ export function CatalogEditor<T extends CanvasContent>({
     setCanUndo(historyRef.current.past.length > 0);
     setCanRedo(historyRef.current.future.length > 0);
   };
+
   const setContent = (update: T | ((current: T) => T)) => {
     const previous = contentRef.current;
     const next =
       typeof update === "function"
         ? (update as (current: T) => T)(previous)
         : update;
+
     if (next === previous) return;
-    const typing = isTextField(document.activeElement);
+
+    const activeElement = document.activeElement;
+    const field = isTextField(activeElement) ? activeElement : null;
     const now = Date.now();
+
     // One burst of typing in a field becomes a single undo step.
     if (!(
-      typing &&
-      lastEdit.current.kind === "text" &&
+      field &&
+      lastEdit.current.field === field &&
       now - lastEdit.current.at < TEXT_BURST_MS
     )) {
       historyRef.current.past = [...historyRef.current.past, previous].slice(
@@ -294,31 +373,39 @@ export function CatalogEditor<T extends CanvasContent>({
       );
       historyRef.current.future = [];
     }
-    lastEdit.current = { at: now, kind: typing ? "text" : "action" };
+
+    lastEdit.current = { at: now, field };
     applyContent(next);
   };
+
   const undo = () => {
     const past = historyRef.current.past;
+
     if (busy || !past.length) return;
+
     historyRef.current.past = past.slice(0, -1);
     historyRef.current.future = [
       contentRef.current,
       ...historyRef.current.future,
     ].slice(0, HISTORY_LIMIT);
-    lastEdit.current = { at: 0, kind: "action" };
+    lastEdit.current = { at: 0, field: null };
     applyContent(past[past.length - 1]);
   };
+
   const redo = () => {
     const [next, ...future] = historyRef.current.future;
+
     if (busy || !next) return;
+
     historyRef.current.future = future;
     historyRef.current.past = [
       ...historyRef.current.past,
       contentRef.current,
     ].slice(-HISTORY_LIMIT);
-    lastEdit.current = { at: 0, kind: "action" };
+    lastEdit.current = { at: 0, field: null };
     applyContent(next);
   };
+
   useEffect(() => {
     shortcuts.current = { undo, redo, busy };
   });
@@ -330,25 +417,39 @@ export function CatalogEditor<T extends CanvasContent>({
         event.isComposing
       )
         return;
+
       const key = event.key.toLowerCase();
       const undoStep = key === "z" && !event.shiftKey;
       const redoStep = key === "y" || (key === "z" && event.shiftKey);
+
       if (!undoStep && !redoStep) return;
+
       const target = event.target instanceof HTMLElement ? event.target : null;
+
       // Text fields keep their native text undo; other dialogs keep their own shortcuts.
+      const targetDialog = target?.closest("dialog");
+      const detailsDialog = detailsRef.current?.closest("dialog");
+
       if (
         isTextField(target) ||
-        target?.closest("dialog") !== dialogRef.current
+        !targetDialog ||
+        (targetDialog !== dialogRef.current && targetDialog !== detailsDialog)
       )
         return;
+
       event.preventDefault();
+
       if (shortcuts.current.busy) return;
+
       if (redoStep) shortcuts.current.redo();
       else shortcuts.current.undo();
     };
+
     window.addEventListener("keydown", onShortcut);
+
     return () => window.removeEventListener("keydown", onShortcut);
   }, []);
+
   const displayContent = {
     ...content,
     sections: content.sections.map((s) => ({
@@ -360,33 +461,75 @@ export function CatalogEditor<T extends CanvasContent>({
       ),
     })),
   };
+
   const editingMedia =
     mediaEditing &&
     displayContent.sections
       .find((s) => s.id === mediaEditing.sectionId)
       ?.widgets.find((w) => w.id === mediaEditing.widgetId);
+
   const editingReference =
     referenceEditing &&
     displayContent.sections
       .find((s) => s.id === referenceEditing.sectionId)
       ?.widgets.find((w) => w.id === referenceEditing.widgetId);
-  const editingMarkdown =
-    markdownEditing &&
+
+  const editingTerms =
+    termsEditing &&
     displayContent.sections
-      .find((s) => s.id === markdownEditing.sectionId)
-      ?.widgets.find((w) => w.id === markdownEditing.widgetId);
+      .find((s) => s.id === termsEditing.sectionId)
+      ?.widgets.find((w) => w.id === termsEditing.widgetId);
+
+  const reorderingSection = content.sections.find(
+    (section) => section.id === reordering?.sectionId,
+  );
+
+  const reorderIndex = reorderingSection
+    ? [...reorderingSection.widgets]
+        .sort((a, b) => a.y - b.y || a.x - b.x)
+        .findIndex((item) => item.id === reordering?.widgetId)
+    : -1;
+
   const pending = useRef<string[]>([]),
     objectUrls = useRef<string[]>([]);
-  const [width, setWidth] = useState(800),
-    gridContainer = useRef<HTMLDivElement>(null);
+  const [{ width, stacked }, setCanvasSize] = useState({
+    width: 800,
+    stacked: false,
+  });
+  const gridContainer = useRef<HTMLDivElement>(null);
+  const { rowHeight, gap, padding } = catalogGridMetrics(width, stacked);
+  const gridMetrics = {
+    containerWidth: width,
+    margin: [gap, gap] as const,
+    containerPadding: [padding, padding] as const,
+    rowHeight,
+    cols: CATALOG_COLUMNS,
+    maxRows: MAX_GRID_ROWS,
+  };
   useLayoutEffect(() => {
     const node = gridContainer.current;
+
     if (!node) return;
-    setWidth(node.clientWidth);
+
+    const measure = (canvasWidth: number) => {
+      // Use the same available width to choose a mode as the preview without its rail.
+      const viewportWidth =
+        (node.parentElement?.clientWidth ?? node.offsetWidth) -
+        (node.offsetWidth - node.clientWidth);
+      setCanvasSize({
+        width: canvasWidth,
+        stacked: viewportWidth < CATALOG_GRID.stackedBelow,
+      });
+    };
+
+    measure(node.clientWidth);
+
     const observer = new ResizeObserver((entries) =>
-      setWidth(entries[0].contentRect.width),
+      measure(entries[0].contentRect.width),
     );
+
     observer.observe(node);
+
     return () => observer.disconnect();
   }, [preview]);
   useEffect(
@@ -395,11 +538,94 @@ export function CatalogEditor<T extends CanvasContent>({
     },
     [],
   );
+
   const setSection = (id: string, fn: (s: CatalogSection) => CatalogSection) =>
     setContent((c) => ({
       ...c,
       sections: c.sections.map((s) => (s.id === id ? fn(s) : s)),
     }));
+
+  const addSectionTarget =
+    content.sections.find((section) => section.id === targetSection) ??
+    content.sections[0];
+
+  const paletteDisabled =
+    busy ||
+    content.sections.reduce(
+      (count, section) => count + section.widgets.length,
+      0,
+    ) >= MAX_CATALOG_WIDGETS;
+
+  const addWidget = (
+    sectionId: string,
+    type: PaletteWidget,
+    x: number,
+    y: number,
+  ) => {
+    if (paletteDisabled) return;
+
+    if (y > MAX_CATALOG_WIDGET_Y) {
+      notify("This section has reached the last available row.", "danger");
+
+      return;
+    }
+
+    setSection(sectionId, (section) => ({
+      ...section,
+      widgets: [...section.widgets, widget(type, x, y)],
+    }));
+    setTargetSection(sectionId);
+  };
+
+  const findDropTarget = ({ x, y }: PalettePoint): DropTarget | null => {
+    const grid = document
+      .elementFromPoint(x, y)
+      ?.closest<HTMLElement>("[data-catalog-drop-section]");
+
+    const section = contentRef.current.sections.find(
+      (item) => item.id === grid?.dataset.catalogDropSection,
+    );
+
+    if (!grid || !section) return null;
+
+    const rect = grid.getBoundingClientRect();
+    const append = section.widgets.length > 0 && y >= rect.bottom - padding;
+    const snapped = calcXY(
+      gridMetrics,
+      y - rect.top,
+      x - rect.left,
+      NEW_WIDGET_WIDTH,
+      NEW_WIDGET_HEIGHT,
+    );
+    const placement = stacked
+      ? { x: 0, y: sectionRows(section.widgets) }
+      : { ...snapped, y: append ? sectionRows(section.widgets) : snapped.y };
+    const candidate = {
+      i: "",
+      ...placement,
+      w: NEW_WIDGET_WIDTH,
+      h: NEW_WIDGET_HEIGHT,
+    };
+
+    const valid =
+      placement.y <= MAX_CATALOG_WIDGET_Y &&
+      !section.widgets.some((item) =>
+        collides(candidate, { ...item, i: item.id }),
+      );
+
+    const box = calcGridItemPosition(
+      gridMetrics,
+      placement.x,
+      stacked
+        ? section.widgets.reduce((rows, item) => rows + item.h, 0)
+        : placement.y,
+      stacked ? CATALOG_COLUMNS : NEW_WIDGET_WIDTH,
+      NEW_WIDGET_HEIGHT,
+    );
+
+    return { sectionId: section.id, ...placement, valid, box };
+  };
+
   const changeWidget = (
     sid: string,
     id: string,
@@ -409,18 +635,51 @@ export function CatalogEditor<T extends CanvasContent>({
       ...s,
       widgets: s.widgets.map((w) => (w.id === id ? { ...w, ...patch } : w)),
     }));
+
+  const widgetSettingsLabel = (item: CatalogWidget) =>
+    item.type === "markdown"
+      ? "Edit Markdown"
+      : item.type === "service" && entity === "package" && item.serviceId
+        ? "Included service settings"
+        : `${item.type[0].toUpperCase()}${item.type.slice(1)} settings`;
+
+  const openWidgetSettings = (sectionId: string, item: CatalogWidget) => {
+    const selection = { sectionId, widgetId: item.id };
+
+    switch (item.type) {
+      case "markdown":
+        setMarkdownEditing(item.id);
+        break;
+      case "service":
+        if (entity === "package" && item.serviceId) {
+          setTermsEditing(selection);
+          break;
+        }
+
+        setReferenceEditing(selection);
+        break;
+      case "package":
+        setReferenceEditing(selection);
+        break;
+      default:
+        setMediaEditing(selection);
+    }
+  };
+
   const keyboardLayout = (
     section: CatalogSection,
     current: CatalogWidget,
     event: React.KeyboardEvent,
   ) => {
     if (event.target !== event.currentTarget) return;
+
     if (
       busy ||
-      width < 520 ||
+      stacked ||
       !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
     )
       return;
+
     event.preventDefault();
     const dx =
       event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
@@ -428,16 +687,18 @@ export function CatalogEditor<T extends CanvasContent>({
     const next = event.shiftKey
       ? { ...current, w: current.w + dx, h: current.h + dy }
       : { ...current, x: current.x + dx, y: current.y + dy };
+
     if (
       next.x < 0 ||
       next.y < 0 ||
       next.y > MAX_CATALOG_WIDGET_Y ||
-      next.w < Math.min(3, current.w) ||
+      next.w < Math.min(MIN_WIDGET_WIDTH, current.w) ||
       next.h < Math.min(4, current.h) ||
       next.h > MAX_CATALOG_WIDGET_ROWS ||
       next.x + next.w > CATALOG_COLUMNS
     )
       return;
+
     if (
       section.widgets.some(
         (other) =>
@@ -449,6 +710,7 @@ export function CatalogEditor<T extends CanvasContent>({
       )
     )
       return;
+
     changeWidget(section.id, current.id, {
       x: next.x,
       y: next.y,
@@ -456,11 +718,13 @@ export function CatalogEditor<T extends CanvasContent>({
       h: next.h,
     });
   };
+
   const commitLayout = (
     section: CatalogSection,
     items: ActiveLayout["items"],
   ) => {
     setActiveLayout(null);
+
     if (
       items.some(
         (item) =>
@@ -475,8 +739,10 @@ export function CatalogEditor<T extends CanvasContent>({
         `A widget can start at row ${MAX_CATALOG_WIDGET_Y + 1} at most and span up to ${MAX_CATALOG_WIDGET_ROWS} rows.`,
         "danger",
       );
+
       return;
     }
+
     setSection(section.id, (s) => ({
       ...s,
       widgets: s.widgets.map((w) => ({
@@ -487,40 +753,53 @@ export function CatalogEditor<T extends CanvasContent>({
       })),
     }));
   };
+
   const reorderMobile = (
     section: CatalogSection,
     id: string,
     direction: number,
   ) => {
     const sorted = [...section.widgets].sort((a, b) => a.y - b.y || a.x - b.x);
+
     const index = sorted.findIndex((w) => w.id === id),
       target = index + direction;
+
     if (index < 0 || target < 0 || target >= sorted.length) return;
+
     [sorted[index], sorted[target]] = [sorted[target], sorted[index]];
     let y = 0;
+
     const widgets = sorted.map((w) => {
       const next = { ...w, x: 0, y };
       y += w.h;
+
       return next;
     });
+
     setSection(section.id, (s) => ({ ...s, widgets }));
   };
+
   const selectFile = (
     sid: string,
     w: CatalogWidget,
     file?: File,
   ): string | undefined => {
     if (!file) return;
+
     if (w.type === "photo") {
       const photoError = validateImageFile(file);
+
       if (photoError) return photoError;
     } else {
       const max = MAX_VIDEO_SIZE_BYTES;
       const types = ["video/mp4", "video/webm"];
+
       if (!types.includes(file.type)) return "Choose an MP4 or WebM video.";
+
       if (!file.size || file.size > max)
         return `File must be ${Math.floor(max / 1024 / 1024)} MiB or smaller.`;
     }
+
     const url = URL.createObjectURL(file);
     objectUrls.current.push(url);
     setLocalUrls((f) => ({ ...f, [w.id]: url }));
@@ -533,16 +812,20 @@ export function CatalogEditor<T extends CanvasContent>({
       },
     });
   };
+
   const cancel = () => {
     if (busy || !window.confirm("Discard unsaved changes?")) return;
+
     void Promise.allSettled(pending.current.map(deleteCatalogMedia));
     onClose();
   };
+
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
     const unlockScroll = lockCatalogScroll();
     dialogRef.current?.showModal();
     document.querySelector<HTMLInputElement>(".pe-name input")?.focus();
+
     return () => {
       dialogRef.current?.close();
       unlockScroll();
@@ -551,19 +834,31 @@ export function CatalogEditor<T extends CanvasContent>({
   }, []);
   useEffect(() => {
     const dialog = dialogRef.current;
+
     const trap = (event: KeyboardEvent) => {
-      if (event.key !== "Tab" || !dialog) return;
+      if (
+        event.key !== "Tab" ||
+        !dialog ||
+        (event.target instanceof Element &&
+          event.target.closest("dialog") !== dialog)
+      )
+        return;
+
       const controls = [
         ...dialog.querySelectorAll<HTMLElement>(
           'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
         ),
       ].filter((el) => el.getClientRects().length > 0);
+
       if (!controls.length) {
         event.preventDefault();
+
         return;
       }
+
       const first = controls[0],
         last = controls[controls.length - 1];
+
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
@@ -572,34 +867,53 @@ export function CatalogEditor<T extends CanvasContent>({
         first.focus();
       }
     };
+
     dialog?.addEventListener("keydown", trap);
+
     return () => dialog?.removeEventListener("keydown", trap);
   }, []);
+
   const save = async () => {
+    if (!content.name.trim()) {
+      setError(notifyError(validate?.(content) || `Enter a ${entity} name.`));
+      setSettings(false);
+      setPreview(false);
+      nameRef.current?.focus();
+
+      return;
+    }
+
     const validationError = validate?.(content);
+
     if (validationError) {
       setError(notifyError(validationError));
       setSettings(true);
+
       return;
     }
-    const canvasError = validateCatalogCanvas(
-      content.sections,
-      new Set(Object.keys(files)),
-    );
+
+    const canvasError =
+      validateCanvas?.(content) ||
+      validateCatalogCanvas(content.sections, new Set(Object.keys(files)));
+
     if (canvasError) {
       setError(notifyError(canvasError));
       setSettings(false);
       setPreview(false);
+
       return;
     }
+
     setBusy(true);
     setError("");
+
     try {
       const next = await uploadPendingCatalogMedia(
         content,
         files,
         (widgetId, uploaded) => {
           if (uploaded.id) pending.current.push(uploaded.id);
+
           setContent((c) => ({
             ...c,
             sections: c.sections.map((s) => ({
@@ -612,12 +926,16 @@ export function CatalogEditor<T extends CanvasContent>({
           setFiles((f) => {
             const copy = { ...f };
             delete copy[widgetId];
+
             return copy;
           });
         },
       );
+
       const uploadedCanvasError = validateCatalogCanvas(next.sections);
+
       if (uploadedCanvasError) throw new Error(uploadedCanvasError);
+
       await onSave(next);
       void Promise.allSettled(
         unreferencedUploadIds(next.sections, pending.current).map(
@@ -633,6 +951,7 @@ export function CatalogEditor<T extends CanvasContent>({
       setBusy(false);
     }
   };
+
   return createPortal(
     <NativeDialog
       ref={dialogRef}
@@ -640,6 +959,7 @@ export function CatalogEditor<T extends CanvasContent>({
       aria-label={`${title} editor`}
       onCancel={(event) => {
         event.preventDefault();
+
         if (settings) setSettings(false);
         else cancel();
       }}
@@ -658,13 +978,16 @@ export function CatalogEditor<T extends CanvasContent>({
             <small>{title.toUpperCase()} NAME</small>
             <Input
               variant="plain"
+              ref={nameRef}
               aria-label={`${title} name`}
               maxLength={nameMaxLength}
               value={content.name}
               placeholder={`Untitled ${entity}`}
               onChange={(e) => setContent({ ...content, name: e.target.value })}
             />
-            {nameBadge && <span className="pe-name-badge">{nameBadge(content)}</span>}
+            {nameBadge && (
+              <span className="pe-name-badge">{nameBadge(content)}</span>
+            )}
           </label>
           <div className="pe-bar-actions">
             <Button
@@ -687,37 +1010,45 @@ export function CatalogEditor<T extends CanvasContent>({
             />
             <Button
               variant="secondary"
-              onClick={() => setSettings(!settings)}
+              size="icon"
+              icon="settings"
+              aria-label={`${title} details`}
+              title={`${title} details`}
+              aria-haspopup="dialog"
               aria-expanded={settings}
-            >
-              ⚙ &nbsp; {title} details
-            </Button>
+              onClick={() => setSettings(true)}
+            />
             <Button
               variant="secondary"
+              size="icon"
+              icon={preview ? "edit" : "eye"}
+              aria-label={preview ? "Back to editor" : "Preview"}
+              title={preview ? "Back to editor" : "Preview"}
+              aria-pressed={preview}
               onClick={() => {
+                setMarkdownEditing(null);
                 setPreview(!preview);
-                setSettings(false);
               }}
-            >
-              {preview ? "✎  Back to editor" : "◉  Preview"}
-            </Button>
-            <Button variant="secondary" onClick={cancel} disabled={busy}>
-              Cancel
-            </Button>
-            <Button onClick={() => void save()} disabled={busy}>
-              {busy ? "Saving…" : saveLabel}
-            </Button>
+            />
+            <Button
+              variant="secondary"
+              size="icon"
+              icon="close"
+              aria-label="Cancel"
+              title="Cancel"
+              onClick={cancel}
+              disabled={busy}
+            />
+            <Button
+              size="icon"
+              icon="save"
+              aria-label={busy ? "Saving…" : saveLabel}
+              title={busy ? "Saving…" : saveLabel}
+              pending={busy}
+              onClick={() => void save()}
+            />
           </div>
         </header>
-        {settings && (
-          <div className="pe-settings">
-            <h2>{title} details</h2>
-            {renderDetails(content, setContent)}
-            <Button variant="secondary" onClick={() => setSettings(false)}>
-              Done
-            </Button>
-          </div>
-        )}
         {error && (
           <p className="pe-error" role="alert">
             {error}
@@ -745,131 +1076,65 @@ export function CatalogEditor<T extends CanvasContent>({
           </div>
         ) : (
           <div className="pe-workspace">
-            <aside className="pe-sidebar">
-              <small>BUILD YOUR PAGE</small>
-              <h2>Tell the story</h2>
-              <p className="pe-clipping-note">
-                Content outside a widget is clipped.
-              </p>
-              <small>ADD A WIDGET</small>
-              {content.sections.length > 1 && (
-                <label className="pe-target">
-                  Add to section
-                  <Select
-                    value={Math.min(targetSection, content.sections.length - 1)}
-                    onChange={(e) => setTargetSection(Number(e.target.value))}
-                  >
-                    {content.sections.map((s, i) => (
-                      <option key={s.id} value={i}>
-                        {s.title || `Section ${i + 1}`}
-                      </option>
-                    ))}
-                  </Select>
-                </label>
-              )}
-              {(
-                ["photo", "markdown", "video", "service", "package"] as const
-              ).map((t) => (
-                <Button
-                  variant="secondary"
-                  key={t}
-                  disabled={
-                    content.sections.reduce(
-                      (n, s) => n + s.widgets.length,
-                      0,
-                    ) >= MAX_CATALOG_WIDGETS ||
-                    sectionRows(
-                      content.sections[
-                        Math.min(targetSection, content.sections.length - 1)
-                      ]?.widgets ?? [],
-                    ) > MAX_CATALOG_WIDGET_Y
-                  }
-                  onClick={() => {
-                    const sid =
-                      content.sections[
-                        Math.min(targetSection, content.sections.length - 1)
-                      ]?.id;
-                    if (sid)
-                      setSection(sid, (s) => ({
-                        ...s,
-                        widgets: [
-                          ...s.widgets,
-                          widget(
-                            t,
-                            Math.max(0, ...s.widgets.map((w) => w.y + w.h)),
-                          ),
-                        ],
-                      }));
-                  }}
-                >
-                  <b>
-                    {t === "photo" ? (
-                      "▧"
-                    ) : t === "markdown" ? (
-                      "T"
-                    ) : t === "video" ? (
-                      "▷"
-                    ) : (
-                      <Icon name="box" size={18} />
-                    )}
-                  </b>
-                  <span>
-                    <strong>
-                      {t === "markdown"
-                        ? "Markdown"
-                        : t[0].toUpperCase() + t.slice(1)}
-                    </strong>
-                    <small>
-                      {t === "photo"
-                        ? "Set the scene"
-                        : t === "markdown"
-                          ? "Share the details"
-                          : t === "video"
-                            ? "Bring it to life"
-                            : `Feature a ${t}`}
-                    </small>
-                  </span>
-                </Button>
-              ))}
-              <p className="pe-tip">
-                <strong>Make it yours.</strong>
-                <br />
-                {width < 520
-                  ? "Use the arrows to reorder. Open the editor on a wider screen to drag and resize widgets."
-                  : "Drag widgets by their header and resize from the corner. Widgets snap to the grid."}
-              </p>
-            </aside>
-            <div className="pe-canvas-area" ref={gridContainer}>
+            <CatalogWidgetPalette
+              disabled={paletteDisabled}
+              onAdd={(type) => {
+                if (addSectionTarget)
+                  addWidget(
+                    addSectionTarget.id,
+                    type,
+                    0,
+                    sectionRows(addSectionTarget.widgets),
+                  );
+              }}
+              onDrag={(point) =>
+                setPaletteTarget(point ? findDropTarget(point) : null)
+              }
+              onDrop={(type, point) => {
+                const target = findDropTarget(point);
+
+                if (target?.valid)
+                  addWidget(target.sectionId, type, target.x, target.y);
+              }}
+            />
+            <div
+              className="pe-canvas-area"
+              ref={gridContainer}
+              data-stacked={stacked || undefined}
+            >
               <div className="pe-canvas-heading">
-                <div>
-                  <small>YOUR CANVAS</small>
-                  <h2>{title} content</h2>
-                  <p>
-                    Drag and resize widgets. Content outside a widget is
-                    clipped.
-                  </p>
-                  {width < 520 && (
-                    <p>
-                      Use the arrows to reorder. Drag and resize on a wider
-                      screen.
-                    </p>
-                  )}
-                </div>
-                <span>▦ &nbsp; 12-column layout · widgets snap to grid</span>
+                <h2>{title} content</h2>
+                {content.sections.length > 1 && (
+                  <label className="pe-target">
+                    Add to section
+                    <Select
+                      value={addSectionTarget?.id ?? ""}
+                      onChange={(event) => setTargetSection(event.target.value)}
+                    >
+                      {content.sections.map((section, index) => (
+                        <option key={section.id} value={section.id}>
+                          {section.title || `Section ${index + 1}`}
+                        </option>
+                      ))}
+                    </Select>
+                  </label>
+                )}
               </div>
               {content.sections.map((section, index) => {
-                const stacked = width < 520;
                 const live =
                   activeLayout?.sectionId === section.id
                     ? activeLayout.items
                     : null;
+
                 const rows = stacked
                   ? section.widgets.reduce((total, item) => total + item.h, 0)
                   : sectionRows(live ?? section.widgets);
-                const position = (w: CatalogWidget) => {
-                  const p = live?.find((item) => item.i === w.id) ?? w;
-                  return `Column ${p.x + 1}, Row ${p.y + 1} · ${p.w} × ${p.h}`;
-                };
+
+                const drop =
+                  paletteTarget?.sectionId === section.id
+                    ? paletteTarget
+                    : null;
+
                 return (
                   <section key={section.id} className="pe-editor-section">
                     <div className="pe-section-bar">
@@ -888,6 +1153,11 @@ export function CatalogEditor<T extends CanvasContent>({
                       />
                       <Button
                         variant="secondary"
+                        size="icon"
+                        icon="arrow"
+                        className="pe-section-up"
+                        aria-label="Move section up"
+                        title="Move section up"
                         disabled={index === 0}
                         onClick={() =>
                           setContent((c) => {
@@ -896,14 +1166,18 @@ export function CatalogEditor<T extends CanvasContent>({
                               sections[index],
                               sections[index - 1],
                             ];
+
                             return { ...c, sections };
                           })
                         }
-                      >
-                        ↑
-                      </Button>
+                      />
                       <Button
                         variant="secondary"
+                        size="icon"
+                        icon="arrow"
+                        className="pe-section-down"
+                        aria-label="Move section down"
+                        title="Move section down"
                         disabled={index === content.sections.length - 1}
                         onClick={() =>
                           setContent((c) => {
@@ -912,14 +1186,17 @@ export function CatalogEditor<T extends CanvasContent>({
                               sections[index + 1],
                               sections[index],
                             ];
+
                             return { ...c, sections };
                           })
                         }
-                      >
-                        ↓
-                      </Button>
+                      />
                       <Button
                         variant="secondary"
+                        size="icon"
+                        icon="trash"
+                        aria-label="Remove section"
+                        title="Remove section"
                         onClick={() =>
                           setContent((c) => ({
                             ...c,
@@ -929,45 +1206,33 @@ export function CatalogEditor<T extends CanvasContent>({
                           }))
                         }
                         disabled={content.sections.length === 1}
-                      >
-                        Remove section
-                      </Button>
-                    </div>
-                    <div className="pe-grid-meta">
-                      <span>
-                        {stacked
-                          ? `Stacked view · ${rows} rows`
-                          : `${rows} ${rows === 1 ? "row" : "rows"} · 12 columns`}
-                      </span>
-                      {stacked && (
-                        <span>
-                          Saved layout: 12 columns,{" "}
-                          {sectionRows(section.widgets)} rows
-                        </span>
-                      )}
+                      />
                     </div>
                     <CatalogGridRuler stacked={stacked} />
-                    <div className="pe-grid" style={catalogGridStyle}>
+                    <div
+                      className="pe-grid"
+                      style={catalogGridStyle}
+                      data-catalog-drop-section={section.id}
+                      data-empty={!section.widgets.length || undefined}
+                      data-drop-active={!!drop || undefined}
+                    >
                       <CatalogGridGuides rows={rows} stacked={stacked} />
                       <GridLayout
-                        key={gridReset[section.id] ?? 0}
+                        key={`${stacked}-${gridReset[section.id] ?? 0}`}
                         width={Math.max(0, width)}
                         cols={CATALOG_COLUMNS}
-                        maxRows={MAX_CATALOG_WIDGET_Y + MAX_CATALOG_WIDGET_ROWS}
+                        maxRows={MAX_GRID_ROWS}
                         compactType={null}
                         preventCollision
-                        isDraggable={!busy && width >= 520}
-                        isResizable={!busy && width >= 520}
-                        rowHeight={CATALOG_GRID.rowHeight}
-                        margin={[CATALOG_GRID.gap, CATALOG_GRID.gap]}
-                        containerPadding={[
-                          CATALOG_GRID.padding,
-                          CATALOG_GRID.padding,
-                        ]}
-                        draggableHandle=".pe-widget-handle"
-                        draggableCancel="button, input, textarea, select, video"
+                        isDraggable={!busy && !stacked}
+                        isResizable={!busy && !stacked}
+                        rowHeight={rowHeight}
+                        margin={[gap, gap]}
+                        containerPadding={[padding, padding]}
+                        draggableHandle=".pe-widget-move, .pe-widget-drag-surface"
+                        draggableCancel="button, input, textarea, select, video, a"
                         layout={
-                          width < 520
+                          stacked
                             ? [...section.widgets]
                                 .sort((a, b) => a.y - b.y || a.x - b.x)
                                 .map((w, i, sorted) => ({
@@ -989,7 +1254,7 @@ export function CatalogEditor<T extends CanvasContent>({
                                 y: w.y,
                                 w: w.w,
                                 h: w.h,
-                                minW: Math.min(3, w.w),
+                                minW: Math.min(MIN_WIDGET_WIDTH, w.w),
                                 minH: Math.min(4, w.h),
                                 maxH: MAX_CATALOG_WIDGET_ROWS,
                               }))
@@ -1012,90 +1277,63 @@ export function CatalogEditor<T extends CanvasContent>({
                         {section.widgets.map((w) => (
                           <div
                             key={w.id}
-                            className={`pe-widget ${w.type === "markdown" ? "pe-markdown-widget" : "pe-media-widget"}`}
+                            className="pe-widget"
+                            data-tools-end={
+                              (!stacked &&
+                                w.x + w.w / 2 > CATALOG_COLUMNS / 2) ||
+                              undefined
+                            }
                           >
-                            <div
-                              className="pe-widget-handle"
-                              tabIndex={0}
-                              role="group"
-                              aria-label={
-                                width < 520
-                                  ? `${w.type} widget, saved ${position(w)}`
-                                  : `${w.type}, ${position(w)}. Use arrow keys to move, Shift and arrow keys to resize.`
-                              }
-                              onKeyDown={(event) =>
-                                keyboardLayout(section, w, event)
-                              }
-                            >
-                              <span>
-                                ⠿ &nbsp;{" "}
-                                {w.type === "markdown"
-                                  ? "Markdown"
-                                  : w.type[0].toUpperCase() +
-                                    w.type.slice(1)}{" "}
-                                · {stacked ? "Saved " : ""}
-                                {position(w)}
-                              </span>
-                              {width < 520 && (
-                                <span className="pe-widget-order">
-                                  <Button
-                                    variant="secondary"
-                                    type="button"
-                                    aria-label={`Move ${w.type} up`}
-                                    onClick={() =>
-                                      reorderMobile(section, w.id, -1)
-                                    }
-                                  >
-                                    ↑
-                                  </Button>
-                                  <Button
-                                    variant="secondary"
-                                    type="button"
-                                    aria-label={`Move ${w.type} down`}
-                                    onClick={() =>
-                                      reorderMobile(section, w.id, 1)
-                                    }
-                                  >
-                                    ↓
-                                  </Button>
-                                </span>
-                              )}
-                              {(w.type === "photo" || w.type === "video") && (
+                            <div className="pe-widget-tools">
+                              {stacked ? (
                                 <Button
                                   variant="plain"
-                                  className="pe-widget-settings"
-                                  type="button"
-                                  aria-label={`${w.type === "photo" ? "Photo" : "Video"} settings`}
+                                  icon="grip"
+                                  className="pe-widget-control"
+                                  aria-label={`Reorder ${w.type} widget`}
+                                  title="Reorder widget"
                                   aria-haspopup="dialog"
+                                  disabled={section.widgets.length < 2}
                                   onClick={() =>
-                                    setMediaEditing({
+                                    setReordering({
                                       sectionId: section.id,
                                       widgetId: w.id,
                                     })
                                   }
-                                >
-                                  <Icon name="more" size={20} />
-                                </Button>
-                              )}
-                              {w.type === "markdown" && (
-                                <Button
-                                  variant="plain"
-                                  className="pe-markdown-toggle"
-                                  type="button"
-                                  aria-haspopup="dialog"
-                                  onClick={() =>
-                                    setMarkdownEditing({
-                                      sectionId: section.id,
-                                      widgetId: w.id,
-                                    })
+                                />
+                              ) : (
+                                <div
+                                  className="pe-widget-control pe-widget-move"
+                                  tabIndex={0}
+                                  role="group"
+                                  title="Drag to move"
+                                  aria-label={`Move ${w.type} widget. Use arrow keys to move, Shift and arrow keys to resize.`}
+                                  onKeyDown={(event) =>
+                                    keyboardLayout(section, w, event)
                                   }
                                 >
-                                  Edit Markdown
-                                </Button>
+                                  <Icon name="grip" size={17} />
+                                </div>
                               )}
                               <Button
                                 variant="plain"
+                                icon="more"
+                                className="pe-widget-control"
+                                aria-label={widgetSettingsLabel(w)}
+                                title={widgetSettingsLabel(w)}
+                                aria-haspopup={
+                                  w.type === "markdown" ? undefined : "dialog"
+                                }
+                                onClick={() =>
+                                  openWidgetSettings(section.id, w)
+                                }
+                              />
+                              <Button
+                                variant="plain"
+                                icon="close"
+                                className="pe-widget-control pe-widget-remove"
                                 aria-label={`Remove ${w.type}`}
+                                title={`Remove ${w.type}`}
                                 onClick={() =>
                                   setSection(section.id, (s) => ({
                                     ...s,
@@ -1104,13 +1342,25 @@ export function CatalogEditor<T extends CanvasContent>({
                                     ),
                                   }))
                                 }
-                              >
-                                ×
-                              </Button>
+                              />
                             </div>
-                            <div className="pe-widget-body">
+                            <div
+                              className={`ui-catalog-widget pe-widget-body${!stacked && w.type === "photo" ? " pe-widget-drag-surface" : ""}`}
+                            >
                               {w.type === "markdown" ? (
-                                <WidgetContent widget={w} editor />
+                                <InlineMarkdownWidget
+                                  widget={w}
+                                  editing={markdownEditing === w.id}
+                                  onEdit={() => setMarkdownEditing(w.id)}
+                                  onBlur={() =>
+                                    setMarkdownEditing((current) =>
+                                      current === w.id ? null : current,
+                                    )
+                                  }
+                                  onChange={(markdown) =>
+                                    changeWidget(section.id, w.id, { markdown })
+                                  }
+                                />
                               ) : w.type === "service" ||
                                 w.type === "package" ? (
                                 <Button
@@ -1134,7 +1384,11 @@ export function CatalogEditor<T extends CanvasContent>({
                                     })
                                   }
                                 >
-                                  <WidgetContent widget={w} editor />
+                                  <WidgetContent
+                                    widget={w}
+                                    editor
+                                    includedService={entity === "package"}
+                                  />
                                 </Button>
                               ) : (
                                 <MediaWidget
@@ -1153,6 +1407,7 @@ export function CatalogEditor<T extends CanvasContent>({
                                         file,
                                       );
                                       setError(error || "");
+
                                       if (error) notifyError(error);
                                     }
                                   }}
@@ -1164,8 +1419,18 @@ export function CatalogEditor<T extends CanvasContent>({
                       </GridLayout>
                       {!section.widgets.length && (
                         <p className="pe-grid-empty">
-                          Add a widget to start building this section.
+                          Drag a widget here or select one from the sidebar.
                         </p>
+                      )}
+                      {drop && (
+                        <div
+                          className="pe-drop-preview"
+                          style={drop.box}
+                          data-valid={drop.valid}
+                          aria-hidden="true"
+                        >
+                          {!drop.valid && "Drop in an open area"}
+                        </div>
                       )}
                     </div>
                   </section>
@@ -1176,10 +1441,11 @@ export function CatalogEditor<T extends CanvasContent>({
                 className="pe-add-section"
                 disabled={content.sections.length >= MAX_CATALOG_SECTIONS}
                 onClick={() => {
-                  setTargetSection(content.sections.length);
+                  const section = newSection();
+                  setTargetSection(section.id);
                   setContent((c) => ({
                     ...c,
-                    sections: [...c.sections, newSection()],
+                    sections: [...c.sections, section],
                   }));
                 }}
               >
@@ -1189,6 +1455,50 @@ export function CatalogEditor<T extends CanvasContent>({
           </div>
         )}
       </fieldset>
+      {reordering &&
+        reorderingSection &&
+        reorderIndex !== -1 &&
+        createPortal(
+          <Dialog
+            title="Reorder widget"
+            onClose={() => setReordering(null)}
+            actions={<Button onClick={() => setReordering(null)}>Done</Button>}
+          >
+            <div className="pe-reorder-actions">
+              <Button
+                variant="secondary"
+                disabled={reorderIndex === 0}
+                onClick={() =>
+                  reorderMobile(reorderingSection, reordering.widgetId, -1)
+                }
+              >
+                Move up
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={reorderIndex >= reorderingSection.widgets.length - 1}
+                onClick={() =>
+                  reorderMobile(reorderingSection, reordering.widgetId, 1)
+                }
+              >
+                Move down
+              </Button>
+            </div>
+          </Dialog>,
+          document.body,
+        )}
+      {settings &&
+        createPortal(
+          <Dialog
+            title={`${title} details`}
+            className="pe-details-dialog"
+            onClose={() => setSettings(false)}
+            actions={<Button onClick={() => setSettings(false)}>Done</Button>}
+          >
+            <div ref={detailsRef}>{renderDetails(content, setContent)}</div>
+          </Dialog>,
+          document.body,
+        )}
       {mediaEditing && editingMedia && (
         <PackageMediaSettings
           entity={entity}
@@ -1222,25 +1532,49 @@ export function CatalogEditor<T extends CanvasContent>({
               })
             }
             onSelect={(item) => {
+              const { pricing, ...reference } = item;
               changeWidget(referenceEditing.sectionId, editingReference.id, {
                 ...(editingReference.type === "package"
-                  ? { packageId: item.id, package: item }
-                  : { serviceId: item.id, service: item }),
+                  ? { packageId: item.id, package: reference }
+                  : {
+                      serviceId: item.id,
+                      service: reference,
+                      ...(entity === "package" &&
+                      item.id !== editingReference.serviceId &&
+                      pricing
+                        ? {
+                            serviceTerms: {
+                              includedHours: pricing.includedHours,
+                              hourlyRatePesos: pricing.hourlyRatePesos,
+                            },
+                          }
+                        : {}),
+                    }),
               });
               setReferenceEditing(null);
             }}
             onClose={() => setReferenceEditing(null)}
           />
         )}
-      {markdownEditing && editingMarkdown && (
-        <MarkdownSettings
-          widget={editingMarkdown}
-          onChange={(markdown) =>
-            changeWidget(markdownEditing.sectionId, markdownEditing.widgetId, {
-              markdown,
-            })
+      {termsEditing && editingTerms?.serviceId && (
+        <ServiceTermsDialog
+          serviceId={editingTerms.serviceId}
+          terms={
+            editingTerms.serviceTerms ?? {
+              includedHours: null,
+              hourlyRatePesos: null,
+            }
           }
-          onClose={() => setMarkdownEditing(null)}
+          onSave={(value) => {
+            changeWidget(termsEditing.sectionId, editingTerms.id, {
+              serviceTerms: {
+                includedHours: value.includedHours,
+                hourlyRatePesos: value.hourlyRatePesos,
+              },
+            });
+            setTermsEditing(null);
+          }}
+          onClose={() => setTermsEditing(null)}
         />
       )}
     </NativeDialog>,

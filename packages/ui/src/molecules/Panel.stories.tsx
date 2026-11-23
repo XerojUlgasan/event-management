@@ -13,15 +13,19 @@ const meta = {
 } satisfies Meta<typeof Panel>;
 
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
 export const SemanticSection: Story = {
   args: { as: "section", "aria-label": "Assignments" },
 };
+
 export const WithAction: Story = {
   args: { action: <Button variant="secondary">View all</Button> },
 };
+
 export const WithBadgeAction: Story = {
   args: {
     title: "Needs attention",
@@ -29,6 +33,7 @@ export const WithBadgeAction: Story = {
     action: <Badge tone="danger">3 urgent</Badge>,
   },
 };
+
 export const BodyOnly: Story = {
   args: { title: undefined, description: undefined },
 };

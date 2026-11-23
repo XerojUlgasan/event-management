@@ -1,6 +1,7 @@
 import type { Kysely, NotNull, Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 import type { AssetRow } from "./find-assets-for-records.js";
+
 type Database = Kysely<DB> | Transaction<DB>;
 
 /**
@@ -30,10 +31,12 @@ export async function findGalleryForRecordsData(
     .execute();
 
   const map = new Map<string, AssetRow[]>();
+
   for (const { showcase_record_id, ...asset } of rows) {
     const list = map.get(showcase_record_id) ?? [];
     list.push(asset);
     map.set(showcase_record_id, list);
   }
+
   return map;
 }

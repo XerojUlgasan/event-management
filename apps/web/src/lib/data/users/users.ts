@@ -12,9 +12,12 @@ export type DirectoryStats = {
   customerTotal: number;
   customerJoined: number;
 };
+
 export const getAdminUsers = (search: string, cursor?: string) => {
   const query = new URLSearchParams({ search });
+
   if (cursor) query.set("cursor", cursor);
+
   return request<{
     customers: AdminUser[];
     nextCursor: string | null;

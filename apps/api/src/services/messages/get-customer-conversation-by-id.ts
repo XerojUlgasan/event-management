@@ -11,7 +11,9 @@ export async function getCustomerConversationByIdService(
   cursor?: string,
 ) {
   const conversation = await findConversationData(db, id);
+
   if (!conversation || conversation.customer_id !== customerId) return null;
+
   return getConversationThreadService(
     db,
     conversation,

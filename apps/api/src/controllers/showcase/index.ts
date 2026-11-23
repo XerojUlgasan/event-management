@@ -55,16 +55,28 @@ routes.use("/admin/showcase-records/*", requireSession, requireSystemAdmin);
 // Admin routes.
 routes.openapi(uploadShowcaseMediaRoute, uploadShowcaseMediaRouteHandler);
 routes.openapi(createShowcaseRecordRoute, createShowcaseRecordRouteHandler);
-routes.openapi(listAdminShowcaseRecordsRoute, listAdminShowcaseRecordsRouteHandler);
+routes.openapi(
+  listAdminShowcaseRecordsRoute,
+  listAdminShowcaseRecordsRouteHandler,
+);
 routes.openapi(getAdminShowcaseRecordRoute, getAdminShowcaseRecordRouteHandler);
 routes.openapi(updateShowcaseRecordRoute, updateShowcaseRecordRouteHandler);
 routes.openapi(deleteShowcaseRecordRoute, deleteShowcaseRecordRouteHandler);
 routes.openapi(publishShowcaseRecordRoute, publishShowcaseRecordRouteHandler);
-routes.openapi(unpublishShowcaseRecordRoute, unpublishShowcaseRecordRouteHandler);
+routes.openapi(
+  unpublishShowcaseRecordRoute,
+  unpublishShowcaseRecordRouteHandler,
+);
 
 // Public routes (no auth).
-routes.openapi(listPublicShowcaseRecordsRoute, listPublicShowcaseRecordsRouteHandler);
-routes.openapi(getPublicShowcaseRecordRoute, getPublicShowcaseRecordRouteHandler);
+routes.openapi(
+  listPublicShowcaseRecordsRoute,
+  listPublicShowcaseRecordsRouteHandler,
+);
+routes.openapi(
+  getPublicShowcaseRecordRoute,
+  getPublicShowcaseRecordRouteHandler,
+);
 routes.openapi(getShowcaseMediaRoute, getShowcaseMediaRouteHandler);
 
 export default routes;

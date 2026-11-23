@@ -11,11 +11,14 @@ import {
 import type { PublicService } from "../../lib/data/catalog/services";
 
 const q = Astro.url.searchParams;
+
 const filters = readCatalogFilters("services", q);
 
 let services: PublicService[] = [];
+
 let unavailable = false;
 let nextCursor: string | null = null;
+
 try {
   const page = await loadServicesPage(
     filters,
@@ -29,6 +32,7 @@ try {
 }
 
 const links = catalogPageLinks(Astro.url, nextCursor, filters);
+
 const hasFilters = Object.values(filters).some((v) => v !== undefined);
 ---
 

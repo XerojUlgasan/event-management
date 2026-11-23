@@ -20,6 +20,7 @@ const legacyAccounts = [
     role: "customer",
   })),
 ];
+
 const demoAccounts = [
   ...Array.from({ length: 10 }, (_, i) => ({
     email: `customer${i + 1}@example.test`,
@@ -30,8 +31,10 @@ const demoAccounts = [
 
 try {
   const passwordHash = await hashPassword(LOCAL_PASSWORD);
+
   const seeded = await db.transaction().execute(async (db) => {
     const rows = [];
+
     // Fixture addresses are insert-only: a pre-existing account is never claimed.
     for (const account of [...legacyAccounts, ...demoAccounts]) {
       const row = await db
@@ -42,14 +45,18 @@ try {
         )
         .returning(["id", "email", "role"])
         .executeTakeFirst();
+
       if (row) rows.push(row);
     }
+
     const packageCount = await seedSamplePackages(db);
     const showcaseCount = await seedSampleShowcases(db);
     const demo = await seedDemo(db, passwordHash);
     const scenario = await seedScenario(db, passwordHash);
+
     return { accounts: rows, packageCount, showcaseCount, demo, scenario };
   });
+
   console.table(
     seeded.accounts.map(({ email, role }) => ({
       email,

@@ -105,7 +105,7 @@ components:
 
 The approved identity uses the actual supplied AMAC logo with a charcoal, off-white, and taupe palette. Public pages use spacious serif-led composition and a restrained catalog presentation. The same brand theme carries through login and administrator, customer, and staff workspaces, where information density follows the task.
 
-Shared controls and theme values are owned by `packages/ui` and `packages/theme`; app-specific public composition lives in `apps/web/src/styles/public/site.css`. The logo itself remains unmodified; the shared Brand and Wordmark treatments crop only its blank image padding for display. The favicon frames the first A directly from the same embedded, unmodified artwork for recognition at browser-tab sizes.
+Shared controls and theme values are owned by `packages/ui` and `packages/theme`. App-specific public composition lives in `apps/web/src/styles/public/site.css`. The shared Brand and Wordmark render the supplied transparent logo at its original proportions. The favicon frames the first A from the original artwork for recognition at browser-tab sizes.
 
 **Key Characteristics:**
 - Quiet, spacious public presentation with serif display headings.
@@ -156,22 +156,22 @@ Both font files are served locally from `apps/web/public/fonts/`. Playfair Displ
 
 ## Layout
 
-The public landing hero uses a centered container up to 1440px, with a two-column text-and-image composition and responsive spacing. Catalog and editorial sections use generous vertical padding. Public catalog entries use open card treatments in a three-column grid, then two columns below 900px and one below 620px; cards have restrained dividers and no resting shadow. At narrower widths, the navigation switches to a mobile menu and page composition adapts in `apps/web/src/styles/public/site.css`.
+The public landing hero uses a centered container up to 1440px, with a two-column text-and-image composition and responsive spacing. Catalog and editorial sections use generous vertical padding. Public catalog entries use the same rounded cards as the signed-in catalog in a responsive grid. At narrower widths, the navigation switches to a mobile menu and page composition adapts in `apps/web/src/styles/public/site.css`.
 
 Login uses an image-and-quote split beside the form on desktop. At widths up to 600px, the visual panel hides and the form gains a logo, prioritizing the brand and sign-in flow. Operational workspaces retain layouts suited to administration, customer tasks, and staff coordination. The admin sidebar and header share the paper surface, with charcoal text and soft taupe selection and hover states. Their shared brand tokens and controls come from the theme and UI packages; operational density and status cues remain task-led.
 
 ## Elevation & Depth
 
-Public catalog rows are flat at rest, with depth expressed through space, dividers, and restrained image interaction. Shared application surfaces still use the existing theme's subtle elevation where it supports controls, dialogs, and workspace hierarchy.
+Catalog cards sit flat at rest and lift with a soft shadow on hover. Shared application surfaces use the theme's subtle elevation where it supports controls, dialogs, and workspace hierarchy.
 
 ## Shapes
 
-Public content favors open space, simple rectangular imagery, fine dividers, and square-edged catalog rows and callout panels. Shared controls retain their established rounded control and button corners, with larger rounding for panels and dialogs. Public and workspace component shapes can differ by purpose while sharing the same palette and typography.
+Public content favors open space, simple rectangular imagery, fine dividers, and square-edged callout panels. Catalog cards use the same rounded corners across public and workspace views. Shared controls retain their established rounded control and button corners, with larger rounding for panels and dialogs.
 
 ## Components
 
 ### Brand
-- The shared `Brand` and `Wordmark` components use the supplied logo asset and crop blank padding with an overflow-hidden display frame. Keep the source image intact.
+- The shared `Brand` and `Wordmark` components scale the supplied transparent logo proportionally. Keep the source image intact.
 
 ### Buttons
 - Shared buttons use charcoal for primary actions, white surfaces for secondary actions, and existing link, light, and ghost variants where appropriate. They retain visible keyboard focus and disabled states from `packages/ui/src/styles.css`.
@@ -180,13 +180,16 @@ Public content favors open space, simple rectangular imagery, fine dividers, and
 - Shared fields use a white surface, subtle border, and rounded control shape. Focus, invalid, disabled, and read-only states remain visibly distinct.
 
 ### Public navigation
-- The spacious desktop navigation uses a readable taupe focus outline. At the 1100px breakpoint it switches to the mobile menu.
+- Public navigation uses a compact header and a readable taupe focus outline. At the 1100px breakpoint it switches to the mobile menu.
 
 ### Public catalog
-- Public catalog entries use open row composition, subtle bottom dividers, and no resting shadow; imagery may have a restrained hover zoom.
+- Public and signed-in catalog entries share the card layout, thumbnail treatment, and pricing summary. Public cards link to the full detail page. Signed-in catalog actions open an in-place preview.
 
 ### Status badges
 - Workspace badges preserve distinct success, warning, danger, information, and neutral meanings through the shared UI styles.
+
+### Conversation controls
+- Customer and admin Messages share the same icon-only buttons for booking details, package, and quotation. Each button has an accessible name. The admin AI switch uses a pill-shaped track with a thumb that shows the current position. Customer and admin composers share one row for the camera, message field, and send button. Image drafts and validation messages appear below it.
 
 ## Do's and Don'ts
 
@@ -194,6 +197,6 @@ Public content favors open space, simple rectangular imagery, fine dividers, and
 - **Do** use Playfair Display for editorial display headings and DM Sans for body and operational text.
 - **Do** use readable taupe for text and reserve decorative taupe for non-text accents.
 - **Do** preserve the operational status palette and clarity of dense workspace tasks.
-- **Don't** redraw, recolor, or distort the supplied logo; only its blank padding is cropped by the display treatment.
+- **Do** preserve the original artwork and proportions when sizing the supplied logo.
 - **Don't** apply the spacious public-page density to information-heavy admin, customer, or staff workflows.
 - **Don't** treat brand or visual choices as changes to product policy or scope.

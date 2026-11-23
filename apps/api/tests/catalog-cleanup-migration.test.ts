@@ -17,14 +17,17 @@ test("catalog cleanup retains records, guest limits, inquiry snapshots and canva
   const database = `em_cleanup_migration_${randomUUID().replaceAll("-", "")}`;
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
+
   try {
     await admin.query(`CREATE DATABASE "${database}"`);
     pool = new Pool({ ...connection, database });
     const root = new URL("../prisma/migrations/", import.meta.url);
     const migration = "20261102190000_cleanup_catalog_fields";
+
     const entries = (await readdir(root, { withFileTypes: true }))
       .filter((e) => e.isDirectory())
       .sort((a, b) => a.name.localeCompare(b.name));
+
     for (const entry of entries.filter((e) => e.name < migration))
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
@@ -82,6 +85,7 @@ test("catalog cleanup retains records, guest limits, inquiry snapshots and canva
         "INSERT INTO media_assets(kind,source,storage_key,mime_type,byte_size) VALUES('image','upload','catalog-media/retained','image/png',9) RETURNING id",
       )
     ).rows[0].id;
+
     for (const [owner, id] of [
       ["package", pkg],
       ["venue", venue],
@@ -104,6 +108,7 @@ test("catalog cleanup retains records, guest limits, inquiry snapshots and canva
         [section, media],
       );
     }
+
     const omitted: Record<string, string[]> = {
       packages: ["event_types", "guest_max"],
       venues: ["categories", "image_urls", "capacity_max"],
@@ -125,18 +130,24 @@ test("catalog cleanup retains records, guest limits, inquiry snapshots and canva
       "media_assets",
     ];
     const before: Record<string, unknown[]> = {};
+
     for (const table of tables) {
       before[table] = (
         await pool.query(`SELECT * FROM ${table} ORDER BY id`)
       ).rows.map((row) => {
         if (table === "packages") row.max_guests = row.guest_max;
+
         if (table === "venues") row.max_guests = row.capacity_max;
+
         if (table === "booking_requests")
           row.package_max_guests = row.package_guest_max;
+
         for (const key of omitted[table] ?? []) delete row[key];
+
         return row;
       });
     }
+
     for (const entry of entries.filter(
       (e) =>
         e.name >= migration &&
@@ -145,12 +156,14 @@ test("catalog cleanup retains records, guest limits, inquiry snapshots and canva
       await pool.query(
         await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
       );
+
     for (const table of tables)
       assert.deepEqual(
         (await pool.query(`SELECT * FROM ${table} ORDER BY id`)).rows,
         before[table],
         `${table} retained content`,
       );
+
     assert.equal(
       (
         await pool.query("SELECT max_guests FROM venues WHERE id=$1", [
@@ -175,6 +188,7 @@ test("catalog cleanup retains records, guest limits, inquiry snapshots and canva
         )
       ).rows[0].name,
     );
+
     for (const [table, columns] of Object.entries(omitted)) {
       assert.equal(
         (
@@ -186,6 +200,7 @@ test("catalog cleanup retains records, guest limits, inquiry snapshots and canva
         0,
       );
     }
+
     await assert.rejects(
       pool.query("UPDATE packages SET max_guests=0 WHERE id=$1", [pkg]),
       /packages_max_guests_check/,

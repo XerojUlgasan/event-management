@@ -16,6 +16,7 @@ type AuthContext = Context<HonoEnv>;
 
 export async function startSessionService(c: AuthContext, userId: string) {
   const previousToken = getCookie(c, SESSION_COOKIE);
+
   const session = await c
     .get("db")
     .transaction()
@@ -25,10 +26,13 @@ export async function startSessionService(c: AuthContext, userId: string) {
           trx,
           hashSessionToken(previousToken),
         );
+
       const token = randomBytes(32).toString("base64url");
       const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
       await insertSessionData(trx, userId, hashSessionToken(token), expiresAt);
+
       return { token, expiresAt };
     });
+
   setSessionCookie(c, session.token, session.expiresAt);
 }

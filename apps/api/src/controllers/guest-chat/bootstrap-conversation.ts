@@ -22,6 +22,7 @@ export const bootstrapGuestConversationRoute = createRoute({
     ...errors,
   },
 });
+
 export const bootstrapGuestConversationRouteHandler: AppRouteHandler<
   typeof bootstrapGuestConversationRoute
 > = async (c) => {
@@ -31,5 +32,6 @@ export const bootstrapGuestConversationRouteHandler: AppRouteHandler<
     : createGuestToken();
   const result = await bootstrapGuestChatService(c.get("db"), token);
   setGuestCookie(c, token);
+
   return c.json(result, 200);
 };

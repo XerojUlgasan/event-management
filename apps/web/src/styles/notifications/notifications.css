@@ -1,0 +1,85 @@
+.notification-bell {
+  position: relative;
+}
+.notification-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.notification-arrival {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(320px, calc(100vw - 24px));
+  padding: 14px;
+  color: var(--text-primary);
+  background: var(--surface-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow);
+}
+.notification-arrival-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.notification-arrival-dismiss {
+  display: grid;
+  place-items: center;
+  min-width: 36px;
+  min-height: 36px;
+}
+.notification-arrival p {
+  margin: 4px 0 12px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .notification-arrival {
+    position: fixed;
+    top: 60px;
+    right: 12px;
+  }
+}
+.notification-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+.notification-trigger .badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+.notification-list {
+  list-style: none;
+  margin: 1rem 0;
+  padding: 0;
+}
+.notification-list li {
+  border-bottom: 1px solid var(--border-default);
+}
+.notification-item {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem 0;
+  text-align: left;
+}
+.notification-item span {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.notification-item time {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}

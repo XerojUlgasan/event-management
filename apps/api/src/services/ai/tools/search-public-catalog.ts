@@ -1,9 +1,9 @@
 import { tool } from "ai";
-import type { Kysely } from "kysely";
-import type { DB } from "../../../db/types.js";
+import type { AssistantToolContext } from "./assistant-tool-context.js";
 import { startToolCallData } from "../../../data/ai/start-tool-call.js";
 import { finishToolCallData } from "../../../data/ai/finish-tool-call.js";
 import {
+  PUBLIC_CATALOG_SEARCH_PAGE_SIZE,
   searchPublicCatalogInputSchema,
   searchPublicCatalogService,
 } from "../search-public-catalog.js";
@@ -15,15 +15,8 @@ export function createSearchPublicCatalogTool({
   assertActive,
   onPersistenceFailure,
   canRecord = () => true,
-}: {
-  db: Kysely<DB>;
-  customerMessageId: string;
-  turnId: string;
-  assertActive: () => Promise<void>;
-  onPersistenceFailure: () => void;
-  canRecord?: () => boolean;
-}) {
-  let calls = 0;
+  canExecute = () => true,
+}: AssistantToolContext) {
   async function persist<T>(operation: Promise<T>): Promise<T> {
     try {
       return await operation;
@@ -36,11 +29,11 @@ export function createSearchPublicCatalogTool({
   return tool({
     description:
       "Search customer-visible catalog packages or services. Choose catalogType. " +
-      "Use package pax for required capacity, and minPricePesos/maxPricePesos for package prices. " +
+      "Use package pax for the customer's guest count; each result's maximumGuestCapacity is its maximum, not a minimum number of guests. Use minPricePesos/maxPricePesos for package prices only when the customer explicitly says the budget is for the package. An event budget or 'my budget is PHP 80,000' is not necessarily a package budget: omit both price filters and ask which scope applies. " +
       "For service price filters choose pricingType: fixed (price for includedHours, with possible excess-hour rate) " +
       "or hourly (hourly-only services). Pax does not apply to services. " +
       "Optional query ranks fresh indexed evidence semantically; omit query to browse by exact filters without embeddings. " +
-      "Return at most five unique listings. To continue, reuse the exact filters/query with the returned cursor. " +
+      `Returns up to ${PUBLIC_CATALOG_SEARCH_PAGE_SIZE} unique listings of the selected type per page. Pass nextCursor as cursor with the same catalogType, query, and filters to continue. ` +
       "Use only catalog keywords in query, without customer contact information. " +
       "Results are catalog terms, not quotations, availability checks or booking confirmation.",
     inputSchema: searchPublicCatalogInputSchema,
@@ -49,6 +42,7 @@ export function createSearchPublicCatalogTool({
         onPersistenceFailure();
         throw new Error("The catalog search call budget was exceeded");
       }
+
       const call = await persist(
         startToolCallData(db, {
           turnId,
@@ -59,11 +53,13 @@ export function createSearchPublicCatalogTool({
         }),
       );
       let errorCode = "search_unavailable";
+
       try {
-        if (++calls > 6) {
+        if (!canExecute()) {
           errorCode = "call_limit";
           throw new Error("Search call limit reached");
         }
+
         errorCode = "turn_inactive";
         await assertActive();
         abortSignal?.throwIfAborted();
@@ -79,9 +75,11 @@ export function createSearchPublicCatalogTool({
         await persist(
           finishToolCallData(db, { id: call.id, status: "succeeded", output }),
         );
+
         return output;
       } catch {
         if (abortSignal?.aborted) errorCode = "cancelled";
+
         await persist(
           finishToolCallData(db, {
             id: call.id,
@@ -95,5 +93,15 @@ export function createSearchPublicCatalogTool({
         );
       }
     },
+    toModelOutput: ({ output }) => ({
+      type: "json",
+      value: {
+        ...output,
+        results: output.results.map(({ capacity, ...result }) => ({
+          ...result,
+          maximumGuestCapacity: capacity,
+        })),
+      },
+    }),
   });
 }

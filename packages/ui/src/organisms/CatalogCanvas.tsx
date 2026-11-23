@@ -1,24 +1,49 @@
-import MarkdownPreview from "@uiw/react-markdown-preview";
-import rehypeSanitize from "rehype-sanitize";
 import {
   CATALOG_COLUMNS,
+  LEGACY_CATALOG_COLUMNS,
   type CatalogSection,
   type CatalogWidget,
 } from "@event-management/contracts/catalog";
 import type { CSSProperties, ReactNode } from "react";
+import { CatalogThumbnail } from "../atoms/CatalogThumbnail";
+import { Markdown } from "../molecules/Markdown";
 
 type WidgetStyle = CSSProperties & { "--catalog-widget-h": number };
+
 export const CATALOG_GRID = {
   columns: CATALOG_COLUMNS,
   rowHeight: 52,
   gap: 12,
-  padding: 12,
+  padding: 20,
+  referenceWidth: 1000,
+  stackedReferenceWidth: 460,
+  stackedBelow: 580,
 } as const;
+
+export function catalogGridMetrics(width: number, stacked: boolean) {
+  const scale =
+    width /
+    (stacked
+      ? CATALOG_GRID.stackedReferenceWidth
+      : CATALOG_GRID.referenceWidth);
+
+  return {
+    rowHeight: CATALOG_GRID.rowHeight * scale,
+    gap: CATALOG_GRID.gap * scale,
+    padding: CATALOG_GRID.padding * scale,
+  };
+}
+
+// Scale both axes from the same canvas width to keep widget proportions.
+const scaled = (pixels: number) =>
+  `calc(${pixels} * 100cqi / var(--catalog-grid-reference, ${CATALOG_GRID.referenceWidth}))`;
+
 export const catalogGridStyle = {
   "--catalog-columns": CATALOG_GRID.columns,
-  "--catalog-row-height": `${CATALOG_GRID.rowHeight}px`,
-  "--catalog-gap": `${CATALOG_GRID.gap}px`,
-  "--catalog-padding": `${CATALOG_GRID.padding}px`,
+  "--catalog-stacked-reference": CATALOG_GRID.stackedReferenceWidth,
+  "--catalog-row-height": scaled(CATALOG_GRID.rowHeight),
+  "--catalog-gap": scaled(CATALOG_GRID.gap),
+  "--catalog-padding": scaled(CATALOG_GRID.padding),
 } as CSSProperties;
 
 /** Decorative guides use a constant-size pattern, even for large saved row gaps. */
@@ -35,14 +60,17 @@ export function CatalogGridGuides({
     "--catalog-guide-columns": columns,
     "--catalog-guide-rows": rows,
   } as CSSProperties;
+
   return <div className="ui-catalog-guides" style={style} aria-hidden="true" />;
 }
+
 export function CatalogGridRuler({ stacked = false }: { stacked?: boolean }) {
   const columns = stacked ? 1 : CATALOG_GRID.columns;
   const style = {
     ...catalogGridStyle,
     "--catalog-guide-columns": columns,
   } as CSSProperties;
+
   return (
     <div className="ui-catalog-ruler" style={style} aria-hidden="true">
       {Array.from({ length: columns }, (_, i) => (
@@ -61,23 +89,9 @@ export function CatalogCanvas({
   className?: string;
 }) {
   return (
-    <div
-      className={`ui-catalog-canvas${className ? ` ${className}` : ""}`}
-      style={catalogGridStyle}
-    >
+    <div className={`ui-catalog-canvas${className ? ` ${className}` : ""}`}>
       <div className="ui-catalog-frame">{children}</div>
     </div>
-  );
-}
-
-export function CatalogMarkdown({ source }: { source: string }) {
-  return (
-    <MarkdownPreview
-      source={source}
-      rehypePlugins={[rehypeSanitize]}
-      wrapperElement={{ "data-color-mode": "light" }}
-      disableCopy
-    />
   );
 }
 
@@ -88,8 +102,10 @@ export function CatalogWidgetContent({
   servicePlaceholder,
   onOpenService,
   onOpenPackage,
+  includedService = false,
 }: {
   widget: CatalogWidget;
+  includedService?: boolean;
   editor?: boolean;
   mediaPlaceholder?: ReactNode;
   servicePlaceholder?: ReactNode;
@@ -101,30 +117,49 @@ export function CatalogWidgetContent({
   const reference = widget.type === "package" ? widget.package : widget.service;
   const entity = widget.type === "package" ? "package" : "service";
   const onOpen = entity === "package" ? onOpenPackage : onOpenService;
+
+  const includedTerms = includedService && widget.type === "service" && (
+    <span>
+      Included ·{" "}
+      {widget.serviceTerms?.includedHours == null
+        ? "Hours unspecified"
+        : `${widget.serviceTerms.includedHours} hours included`}{" "}
+      ·{" "}
+      {widget.serviceTerms?.hourlyRatePesos == null
+        ? "Excess rate unspecified"
+        : `₱${widget.serviceTerms.hourlyRatePesos.toLocaleString("en-PH")} / additional hour`}
+    </span>
+  );
+
   if ((widget.type === "service" || widget.type === "package") && reference) {
     const content = (
       <>
-        {reference.imageUrl && (
-          <img src={reference.imageUrl} alt="" loading="lazy" />
-        )}
+        <CatalogThumbnail src={reference.imageUrl} />
         <span className="ui-catalog-reference-details">
           <span className="ui-catalog-reference-name">{reference.name}</span>
+          {includedTerms}
           {reference.description && (
             <span className="ui-catalog-reference-description">
               {reference.description}
             </span>
           )}
-          {!editor && (
-            <span className="ui-catalog-reference-link">View {entity}</span>
-          )}
+          <span
+            className="ui-catalog-reference-link"
+            aria-hidden={editor || undefined}
+          >
+            View {entity}
+          </span>
         </span>
         {widget.caption && (
           <span className="ui-catalog-caption">{widget.caption}</span>
         )}
       </>
     );
+
     return (
-      <div className="ui-catalog-widget-content ui-catalog-reference">
+      <div
+        className={`ui-catalog-widget-content ui-catalog-reference ui-catalog-reference-${entity}`}
+      >
         {editor ? (
           <div className="ui-catalog-reference-card">{content}</div>
         ) : onOpen ? (
@@ -148,16 +183,21 @@ export function CatalogWidgetContent({
       </div>
     );
   }
+
   return (
     <div
       className={`ui-catalog-widget-content ui-catalog-${widget.type === "service" || widget.type === "package" ? "reference" : widget.type}`}
     >
       {widget.type === "markdown" && (
-        <CatalogMarkdown source={widget.markdown || ""} />
+        <Markdown source={widget.markdown || ""} />
       )}
       {widget.type === "photo" &&
         (url ? (
-          <img src={url} alt={widget.alt} />
+          <img
+            src={url}
+            alt={widget.alt}
+            draggable={editor ? false : undefined}
+          />
         ) : (
           (mediaPlaceholder ?? (
             <div className="ui-catalog-empty">Add a photo</div>
@@ -177,6 +217,7 @@ export function CatalogWidgetContent({
             <div className="ui-catalog-empty">Add a video</div>
           ))
         ))}
+      {includedTerms}
       {widget.type === "service" &&
         (servicePlaceholder ?? (
           <div className="ui-catalog-empty">
@@ -199,10 +240,12 @@ export function CatalogWidgetContent({
 
 export function CatalogSections({
   sections,
+  includedServices = false,
   onOpenService,
   onOpenPackage,
 }: {
   sections: CatalogSection[];
+  includedServices?: boolean;
   onOpenService?: (id: string) => void;
   onOpenPackage?: (id: string) => void;
 }) {
@@ -211,7 +254,15 @@ export function CatalogSections({
       {sections.map((section) => (
         <section className="ui-catalog-section" key={section.id}>
           {section.title && <h2>{section.title}</h2>}
-          <div className="ui-catalog-grid">
+          <div
+            className="ui-catalog-grid"
+            style={
+              {
+                ...catalogGridStyle,
+                "--catalog-columns": section.columns ?? LEGACY_CATALOG_COLUMNS,
+              } as CSSProperties
+            }
+          >
             {[...section.widgets]
               .sort((a, b) => a.y - b.y || a.x - b.x)
               .map((widget) => {
@@ -220,6 +271,7 @@ export function CatalogSections({
                   gridRow: `${widget.y + 1} / span ${widget.h}`,
                   "--catalog-widget-h": widget.h,
                 };
+
                 return (
                   <div
                     key={widget.id}
@@ -228,6 +280,7 @@ export function CatalogSections({
                   >
                     <CatalogWidgetContent
                       widget={widget}
+                      includedService={includedServices}
                       onOpenService={onOpenService}
                       onOpenPackage={onOpenPackage}
                     />

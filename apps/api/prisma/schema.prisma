@@ -17,9 +17,11 @@ model User {
   conversations Conversation[] @relation("CustomerConversations")
   sentMessages Message[]     @relation("MessageSender")
   mediaAssets MediaAsset[]
+  supportingDocuments SupportingDocument[]
   quotations Quotation[]
   auditEvents AuditEvent[]
   showcaseRecords ShowcaseRecord[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -27,10 +29,10 @@ model User {
 model Conversation {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   customerId      String?   @map("customer_id") @db.Uuid
-  status          String    @default("active")
   aiEnabled       Boolean   @default(true) @map("ai_enabled")
   aiVersion       Int       @default(0) @map("ai_version")
-  closedAt        DateTime? @map("closed_at") @db.Timestamptz(6)
+  aiHandoff       Json?     @map("ai_handoff") @db.JsonB
+  conversationMemory String? @map("conversation_memory") @db.Text
   bookingRequestId String?  @unique @map("booking_request_id") @db.Uuid
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -40,13 +42,12 @@ model Conversation {
   guestIdentity GuestChatIdentity? @relation("GuestOwner", fields: [guestIdentityId], references: [id], onDelete: Restrict)
   claimedGuestIdentityId String? @map("claimed_guest_identity_id") @db.Uuid
   claimedGuestIdentity GuestChatIdentity? @relation("GuestClaim", fields: [claimedGuestIdentityId], references: [id], onDelete: Restrict)
-  guestExpiresAt DateTime? @map("guest_expires_at") @db.Timestamptz(6)
   guestCustomerMessageCount Int @default(0) @map("guest_customer_message_count")
   guestRequests GuestMessageRequest[]
   messages        Message[]
 
   @@index([claimedGuestIdentityId], map: "conversations_claimed_guest_identity_idx")
-  @@index([status])
+  @@index([guestIdentityId, createdAt(sort: Desc), id(sort: Desc)], map: "conversations_guest_activity_idx")
   @@index([customerId, createdAt])
   @@index([updatedAt(sort: Desc), id(sort: Desc)])
   @@map("conversations")
@@ -62,14 +63,36 @@ model Message {
   readAt         DateTime?    @map("read_at") @db.Timestamptz(6)
   guestOrigin Boolean @default(false) @map("guest_origin")
   quotationId    String?      @unique @map("quotation_id") @db.Uuid
+  catalogRecommendations Json? @map("catalog_recommendations") @db.JsonB
+  suggestedReplies Json? @map("suggested_replies") @db.JsonB
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User?        @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   quotation      Quotation?   @relation(fields: [quotationId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  images MessageImage[]
+  replyToMessageId String? @unique @map("reply_to_message_id") @db.Uuid
+  replyToMessage Message? @relation("MessageReply", fields: [replyToMessageId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  reply Message? @relation("MessageReply")
   aiToolCallsAsCustomerMessage AiToolCall[] @relation("AiToolCallCustomerMessage")
   aiToolCallsAsAssistantMessage AiToolCall[] @relation("AiToolCallAssistantMessage")
+  aiToolCallsAsSourceMessage AiToolCall[] @relation("AiToolCallSourceMessage")
 
   @@index([conversationId, createdAt])
   @@map("messages")
+}
+
+model MessageImage {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  messageId String @map("message_id") @db.Uuid
+  position Int
+  storageKey String @unique @map("storage_key")
+  mimeType String @map("mime_type")
+  byteSize Int @map("byte_size")
+  contentHash String @map("content_hash")
+  interpretation Json? @db.JsonB
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, position])
+  @@map("message_images")
 }
 
 model AiToolCall {
@@ -77,8 +100,9 @@ model AiToolCall {
   turnId             String    @map("turn_id") @db.Uuid
   toolCallId         String    @map("tool_call_id")
   toolName           String    @map("tool_name")
-  customerMessageId  String    @map("customer_message_id") @db.Uuid
+  customerMessageId  String?   @map("customer_message_id") @db.Uuid
   assistantMessageId String?   @map("assistant_message_id") @db.Uuid
+  sourceMessageId    String?   @map("source_message_id") @db.Uuid
   status             String    @default("started")
   input              Json      @db.JsonB
   output             Json?     @db.JsonB
@@ -86,13 +110,36 @@ model AiToolCall {
   startedAt          DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
   completedAt        DateTime? @map("completed_at") @db.Timestamptz(6)
 
-  customerMessage  Message  @relation("AiToolCallCustomerMessage", fields: [customerMessageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  customerMessage  Message? @relation("AiToolCallCustomerMessage", fields: [customerMessageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   assistantMessage Message? @relation("AiToolCallAssistantMessage", fields: [assistantMessageId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  sourceMessage Message? @relation("AiToolCallSourceMessage", fields: [sourceMessageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([turnId, toolCallId], map: "ai_tool_calls_turn_id_tool_call_id_key")
   @@index([customerMessageId], map: "ai_tool_calls_customer_message_id_idx")
   @@index([assistantMessageId], map: "ai_tool_calls_assistant_message_id_idx")
+  @@index([sourceMessageId], map: "ai_tool_calls_source_message_id_idx")
   @@map("ai_tool_calls")
+}
+
+// State checks, pending-job deduplication, and RLS live in SQL.
+model BackgroundJob {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type           String
+  payload        Json      @default("{}") @db.JsonB
+  dedupeKey      String?   @map("dedupe_key")
+  status         String    @default("pending")
+  attempts       Int       @default(0)
+  availableAt    DateTime  @default(now()) @map("available_at") @db.Timestamptz(6)
+  leaseToken     String?   @map("lease_token") @db.Uuid
+  leaseExpiresAt DateTime? @map("lease_expires_at") @db.Timestamptz(6)
+  lastError      String?   @map("last_error")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  @@index([status, availableAt])
+  @@index([status, leaseExpiresAt])
+  @@map("background_jobs")
 }
 
 model Session {
@@ -105,6 +152,22 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+// Type and payload checks, RLS, and the partial unread index live in SQL.
+model Notification {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipientUserId String @map("recipient_user_id") @db.Uuid
+  type String
+  sourceEventId String @map("source_event_id") @db.Uuid
+  payload Json @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  readAt DateTime? @map("read_at") @db.Timestamptz(6)
+  recipient User @relation(fields: [recipientUserId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([recipientUserId, type, sourceEventId], map: "notifications_recipient_source_event_key")
+  @@index([recipientUserId, createdAt(sort: Desc), id(sort: Desc)], map: "notifications_recipient_created_at_id_idx")
+  @@map("notifications")
 }
 
 model Package {
@@ -122,11 +185,11 @@ model Package {
   customForBookingRequestId String? @unique @map("custom_for_booking_request_id") @db.Uuid
   customForBookingRequest BookingRequest? @relation("CustomBookingPackage", fields: [customForBookingRequestId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   bookingRequests BookingRequest[] @relation("InquiryPackage")
-  services PackageService[]
   knowledge CatalogKnowledge[]
   canvas          Json              @default("[]") @db.JsonB
   thumbnailMediaId String?          @map("thumbnail_media_id") @db.Uuid
   eventType       String?           @map("event_type")
+  thumbnailMedia MediaAsset? @relation("PackageThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@index([canvas(ops: JsonbPathOps)], type: Gin, map: "packages_canvas_idx")
   @@map("packages")
@@ -148,7 +211,7 @@ model Service {
   canvas Json @default("[]") @db.JsonB
   thumbnailMediaId String? @map("thumbnail_media_id") @db.Uuid
   eventType String? @map("event_type")
-  packages PackageService[]
+  thumbnailMedia MediaAsset? @relation("ServiceThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   knowledge CatalogKnowledge[]
   @@index([canvas(ops: JsonbPathOps)], type: Gin, map: "services_canvas_idx")
   @@map("services")
@@ -165,6 +228,8 @@ model MediaAsset {
   createdBy String? @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   creator User? @relation(fields: [createdBy], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  thumbnailPackages Package[] @relation("PackageThumbnail")
+  thumbnailServices Service[] @relation("ServiceThumbnail")
   knowledge CatalogKnowledge[]
   showcaseCover ShowcaseRecord[] @relation("ShowcaseCover")
   showcaseRecordId String? @map("showcase_record_id") @db.Uuid
@@ -195,20 +260,43 @@ model CatalogKnowledge {
   @@map("catalog_knowledge")
 }
 
-model PackageService {
+model SupportingDocument {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  packageId String @map("package_id") @db.Uuid
-  serviceId String @map("service_id") @db.Uuid
-  role String
-  sortOrder Int @map("sort_order")
+  originalFilename    String   @map("original_filename")
+  storageKey          String   @unique @map("storage_key")
+  mimeType            String   @map("mime_type")
+  byteSize            Int      @map("byte_size")
+  fileSha256          String   @map("file_sha256")
+  uploadedBy          String?  @map("uploaded_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  service Service @relation(fields: [serviceId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  pipelineVersion     String   @map("pipeline_version")
+  extractionStatus    String   @default("pending") @map("extraction_status")
+  pageCount           Int?     @map("page_count")
+  unreadablePages     Int[]    @default([]) @map("unreadable_pages")
+  extractionErrorCode String?  @map("extraction_error_code")
+  uploader            User?    @relation(fields: [uploadedBy], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  chunks              SupportingDocumentChunk[]
 
-  @@unique([packageId, serviceId])
-  @@unique([packageId, sortOrder])
-  @@index([serviceId])
-  @@map("package_services")
+  @@index([uploadedBy])
+  @@map("supporting_documents")
+}
+
+model SupportingDocumentChunk {
+  id             String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId     String                  @map("document_id") @db.Uuid
+  ordinal        Int
+  pageStart      Int                     @map("page_start")
+  pageEnd        Int                     @map("page_end")
+  headingPath    String[]                @default([]) @map("heading_path")
+  contentText    String                  @map("content_text")
+  contentHash    String                  @map("content_hash")
+  embedding      Unsupported("vector(768)")?
+  embeddingModel String?                 @map("embedding_model")
+  embeddedAt     DateTime?               @map("embedded_at") @db.Timestamptz(6)
+  document       SupportingDocument      @relation(fields: [documentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([documentId, ordinal])
+  @@map("supporting_document_chunks")
 }
 
 model Quotation {
@@ -224,7 +312,6 @@ model Quotation {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   sentAt DateTime? @map("sent_at") @db.Timestamptz(6)
-  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(6)
   supersededAt DateTime? @map("superseded_at") @db.Timestamptz(6)
   offeredPackageId String @map("offered_package_id") @db.Uuid
   adjustmentsReviewed Boolean @default(true) @map("adjustments_reviewed")
@@ -259,28 +346,32 @@ model AuditEvent {
 }
 
 model BookingRequest {
+  submittedAt DateTime? @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  durationMode String? @map("duration_mode")
+  requestedServices Json? @map("requested_services") @db.JsonB
+  budget String?
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   reference String @unique
-  customerId String @map("customer_id") @db.Uuid
+  customerId String? @map("customer_id") @db.Uuid
   packageId String? @map("package_id") @db.Uuid
-  eventType String @map("event_type")
-  preferredDate String @map("preferred_date")
+  eventType String? @map("event_type")
+  preferredDate String? @map("preferred_date")
   requestedDays Json? @map("requested_days") @db.JsonB
   estimatedDuration String @default("undecided") @map("estimated_duration")
   estimatedDurationDays Int? @map("estimated_duration_days")
   startsAt DateTime? @map("starts_at") @db.Timestamptz(6)
   endsAt DateTime? @map("ends_at") @db.Timestamptz(6)
-  timeZone String @map("time_zone")
+  timeZone String? @map("time_zone")
   guestCount Int? @map("guest_count")
-  contactName String @map("contact_name")
-  phoneNumber String @map("phone_number")
+  contactName String? @map("contact_name")
+  phoneNumber String? @map("phone_number")
   preferredVenueLocation String? @map("preferred_venue_location")
   specialRequests String? @map("special_requests")
   status String @default("under_review")
   outOfRange Boolean @map("out_of_range")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-  customer User @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  customer User? @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   package Package? @relation("InquiryPackage", fields: [packageId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   customPackage Package? @relation("CustomBookingPackage")
   quotations Quotation[]
@@ -288,6 +379,7 @@ model BookingRequest {
   conversation Conversation? @relation("BookingRequestConversation")
   eventDays EventDay[]
   @@index([customerId, createdAt])
+  @@index([requestedServices(ops: JsonbPathOps)], type: Gin, map: "booking_requests_requested_services_idx")
   @@map("booking_requests")
 }
 
@@ -323,6 +415,28 @@ model EventDay {
   @@index([bookingRequestId, day])
   @@index([replacementEventDayId, bookingRequestId])
   @@map("events_day")
+}
+
+model AiAgentSettings {
+  id                       Int      @id
+  displayName              String   @default("AMAC AI") @map("display_name")
+  greeting                 String?
+  personality              String   @default("warm_concise")
+  additionalInstructions   String   @default("") @map("additional_instructions")
+  allowBusinessInformation Boolean  @default(true) @map("allow_business_information")
+  allowPublicCatalog        Boolean  @default(true) @map("allow_public_catalog")
+  revision                 Int      @default(1)
+  updatedAt                DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("ai_agent_settings")
+}
+
+model BusinessInformation {
+  id          Int      @id
+  information Json     @default("{}") @db.JsonB
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("business_information")
 }
 
 model GuestChatIdentity {

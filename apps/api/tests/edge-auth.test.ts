@@ -32,23 +32,69 @@ test("Edge OpenAPI loads every router including auth", async () => {
   assert.equal(response.status, 200, await response.clone().text());
   const document = await response.json();
   assert.ok(document.paths["/v1/auth/login"]);
-  assert.ok(document.paths["/v1/admin/booking-requests/{id}/quotations"]);
+  assert.ok(document.paths["/v1/admin/ai/documents"].get);
+  assert.ok(document.paths["/v1/admin/ai/documents"].post);
+  assert.ok(document.paths["/v1/admin/ai/documents/{id}/retry"].post);
+  const adminBooking = "/v1/admin/booking-requests/{id}";
+  assert.ok(document.paths[`${adminBooking}/quotations`].get);
+  assert.equal(document.paths[`${adminBooking}/quotations`].post, undefined);
+  assert.ok(document.paths[`${adminBooking}/quotations/prepare`].get);
+  assert.ok(document.paths[`${adminBooking}/quotations/send`].post);
+  assert.ok(document.paths[`${adminBooking}/addons`].post);
+  assert.ok(document.paths[`${adminBooking}/addons/{addonId}`].patch);
+  assert.ok(document.paths[`${adminBooking}/addons/{addonId}`].delete);
+  assert.equal(
+    document.paths[`${adminBooking}/custom-package/addons/{addonId}`],
+    undefined,
+  );
   assert.ok(document.paths["/v1/booking-requests/{id}/quotations"]);
-  assert.ok(document.paths["/v1/admin/quotations/{id}/send"]);
+  assert.equal(document.paths["/v1/admin/quotations/{id}/send"], undefined);
   assert.equal(document.paths["/v1/quotations/{id}/accept"], undefined);
   assert.equal(document.paths["/v1/quotations/{id}/revision"], undefined);
-  assert.ok(document.paths["/v1/admin/quotations/{id}/revision"]);
+  assert.equal(document.paths["/v1/admin/quotations/{id}/revision"], undefined);
+  const quotation =
+    document.paths["/v1/quotations/{id}"].get.responses[200].content[
+      "application/json"
+    ].schema.properties.quotation;
+  assert.deepEqual(quotation.properties.status.enum, [
+    "draft",
+    "sent",
+    "superseded",
+  ]);
+  assert.equal("acceptedAt" in quotation.properties, false);
+  assert.equal(quotation.required.includes("acceptedAt"), false);
 });
 
 test("Edge loads nested and top-level quotation/private package routes with authentication", async () => {
   const id = randomUUID();
+
   for (const path of [
     `/admin/booking-requests/${id}/quotations`,
+    `/admin/booking-requests/${id}/quotations/prepare`,
     `/booking-requests/${id}/quotations`,
     `/admin/booking-requests/${id}/package`,
     `/quotations/${id}`,
   ]) {
     const response = await fetch(`${api}/v1${path}`);
+    assert.equal(
+      response.status,
+      401,
+      `${path}: ${await response.clone().text()}`,
+    );
+  }
+});
+
+test("Edge protects quotation delivery and booking add-on changes", async () => {
+  const id = randomUUID();
+  const addon = randomUUID();
+
+  for (const [method, path] of [
+    ["POST", `/admin/booking-requests/${id}/quotations/send`],
+    ["POST", `/admin/booking-requests/${id}/addons`],
+    ["PATCH", `/admin/booking-requests/${id}/addons/${addon}`],
+    ["DELETE", `/admin/booking-requests/${id}/addons/${addon}`],
+  ]) {
+    const response = await fetch(`${api}/v1${path}`, { method });
     assert.equal(
       response.status,
       401,

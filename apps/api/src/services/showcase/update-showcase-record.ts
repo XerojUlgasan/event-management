@@ -12,6 +12,7 @@ import { duplicateTitle } from "../../utils/catalog-title.js";
 function notFound() {
   return { status: 404 as const, message: "Showcase not found." };
 }
+
 function stale() {
   return {
     status: 409 as const,
@@ -29,12 +30,14 @@ export async function updateShowcaseRecordService(
 
     const outcome = await db.transaction().execute(async (trx) => {
       const current = await lockShowcaseRecordData(trx, id);
+
       if (!current) return notFound();
 
       if (current.updated_at.toISOString() !== content.expectedUpdatedAt)
         return stale();
 
       const invalid = await lockAndValidateShowcaseMedia(trx, content, id);
+
       if (invalid) return invalid;
 
       const now = new Date();
@@ -50,6 +53,7 @@ export async function updateShowcaseRecordService(
         id,
         content.mediaIds,
       );
+
       if (current.cover_media_id !== content.coverMediaId)
         removedMediaIds.push(current.cover_media_id);
 
@@ -77,7 +81,9 @@ export async function updateShowcaseRecordService(
       cause,
       "A showcase with this title already exists.",
     );
+
     if (duplicate) return duplicate;
+
     throw cause;
   }
 }

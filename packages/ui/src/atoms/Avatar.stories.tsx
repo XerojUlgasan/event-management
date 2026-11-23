@@ -9,12 +9,17 @@ const meta = {
 } satisfies Meta<typeof Avatar>;
 
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
 export const Accent: Story = { args: { tone: "accent", initials: "C" } };
+
 export const Small: Story = { args: { size: "sm", initials: "AS" } };
+
 export const Large: Story = { args: { size: "lg", initials: "JB" } };
+
 export const Group: Story = {
   render: () => (
     <div style={{ display: "flex" }}>

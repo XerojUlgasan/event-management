@@ -23,14 +23,27 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface AiAgentSettings {
+  additional_instructions: Generated<string>;
+  allow_business_information: Generated<boolean>;
+  allow_public_catalog: Generated<boolean>;
+  display_name: Generated<string>;
+  greeting: string | null;
+  id: number;
+  personality: Generated<string>;
+  revision: Generated<number>;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface AiToolCalls {
   assistant_message_id: string | null;
   completed_at: Timestamp | null;
-  customer_message_id: string;
+  customer_message_id: string | null;
   error_code: string | null;
   id: Generated<string>;
   input: Json;
   output: Json | null;
+  source_message_id: string | null;
   started_at: Generated<Timestamp>;
   status: Generated<string>;
   tool_call_id: string;
@@ -48,27 +61,47 @@ export interface AuditEvents {
   metadata: Generated<Json>;
 }
 
-export interface BookingRequests {
-  contact_name: string;
+export interface BackgroundJobs {
+  attempts: Generated<number>;
+  available_at: Generated<Timestamp>;
+  completed_at: Timestamp | null;
   created_at: Generated<Timestamp>;
-  customer_id: string;
+  dedupe_key: string | null;
+  id: Generated<string>;
+  last_error: string | null;
+  lease_expires_at: Timestamp | null;
+  lease_token: string | null;
+  payload: Generated<Json>;
+  status: Generated<string>;
+  type: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface BookingRequests {
+  budget: string | null;
+  contact_name: string | null;
+  created_at: Generated<Timestamp>;
+  customer_id: string | null;
+  duration_mode: string | null;
   ends_at: Timestamp | null;
   estimated_duration: Generated<string>;
   estimated_duration_days: number | null;
-  event_type: string;
+  event_type: string | null;
   guest_count: number | null;
   id: Generated<string>;
   out_of_range: boolean;
   package_id: string | null;
-  phone_number: string;
-  preferred_date: string;
+  phone_number: string | null;
+  preferred_date: string | null;
   preferred_venue_location: string | null;
   reference: string;
   requested_days: Json | null;
+  requested_services: Json | null;
   special_requests: string | null;
   starts_at: Timestamp | null;
   status: Generated<string>;
-  time_zone: string;
+  submitted_at: Generated<Timestamp | null>;
+  time_zone: string | null;
   updated_at: Generated<Timestamp>;
 }
 
@@ -79,6 +112,12 @@ export interface BookingRequestStatusHistory {
   id: Generated<string>;
   reason: string | null;
   status: string;
+}
+
+export interface BusinessInformation {
+  id: number;
+  information: Generated<Json>;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface CatalogKnowledge {
@@ -96,17 +135,16 @@ export interface CatalogKnowledge {
 
 export interface Conversations {
   ai_enabled: Generated<boolean>;
+  ai_handoff: Json | null;
   ai_version: Generated<number>;
   booking_request_id: string | null;
   claimed_guest_identity_id: string | null;
-  closed_at: Timestamp | null;
+  conversation_memory: string | null;
   created_at: Generated<Timestamp>;
   customer_id: string | null;
   guest_customer_message_count: Generated<number>;
-  guest_expires_at: Timestamp | null;
   guest_identity_id: string | null;
   id: Generated<string>;
-  status: Generated<string>;
   updated_at: Generated<Timestamp>;
 }
 
@@ -151,16 +189,40 @@ export interface MediaAssets {
   url: string | null;
 }
 
+export interface MessageImages {
+  byte_size: number;
+  content_hash: string;
+  id: Generated<string>;
+  interpretation: Json | null;
+  message_id: string;
+  mime_type: string;
+  position: number;
+  storage_key: string;
+}
+
 export interface Messages {
   body: string;
+  catalog_recommendations: Json | null;
   conversation_id: string;
   created_at: Generated<Timestamp>;
   guest_origin: Generated<boolean>;
   id: Generated<string>;
   quotation_id: string | null;
   read_at: Timestamp | null;
+  reply_to_message_id: string | null;
   sender_id: string | null;
   sender_role: Generated<string>;
+  suggested_replies: Json | null;
+}
+
+export interface Notifications {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  payload: Json;
+  read_at: Timestamp | null;
+  recipient_user_id: string;
+  source_event_id: string;
+  type: string;
 }
 
 export interface Packages {
@@ -181,17 +243,7 @@ export interface Packages {
   updated_at: Generated<Timestamp>;
 }
 
-export interface PackageServices {
-  created_at: Generated<Timestamp>;
-  id: Generated<string>;
-  package_id: string;
-  role: string;
-  service_id: string;
-  sort_order: number;
-}
-
 export interface Quotations {
-  accepted_at: Timestamp | null;
   adjustments_reviewed: Generated<boolean>;
   base_amount_minor: number;
   booking_request_id: string;
@@ -248,6 +300,36 @@ export interface ShowcaseRecords {
   updated_at: Generated<Timestamp>;
 }
 
+export interface SupportingDocumentChunks {
+  content_hash: string;
+  content_text: string;
+  document_id: string;
+  embedded_at: Timestamp | null;
+  embedding: string | null;
+  embedding_model: string | null;
+  heading_path: Generated<string[]>;
+  id: Generated<string>;
+  ordinal: number;
+  page_end: number;
+  page_start: number;
+}
+
+export interface SupportingDocuments {
+  byte_size: number;
+  created_at: Generated<Timestamp>;
+  extraction_error_code: string | null;
+  extraction_status: Generated<string>;
+  file_sha256: string;
+  id: Generated<string>;
+  mime_type: string;
+  original_filename: string;
+  page_count: number | null;
+  pipeline_version: string;
+  storage_key: string;
+  unreadable_pages: Generated<number[]>;
+  uploaded_by: string | null;
+}
+
 export interface Users {
   created_at: Generated<Timestamp>;
   display_name: string | null;
@@ -260,22 +342,28 @@ export interface Users {
 }
 
 export interface DB {
+  ai_agent_settings: AiAgentSettings;
   ai_tool_calls: AiToolCalls;
   audit_events: AuditEvents;
+  background_jobs: BackgroundJobs;
   booking_request_status_history: BookingRequestStatusHistory;
   booking_requests: BookingRequests;
+  business_information: BusinessInformation;
   catalog_knowledge: CatalogKnowledge;
   conversations: Conversations;
   events_day: EventsDay;
   guest_chat_identities: GuestChatIdentities;
   guest_message_requests: GuestMessageRequests;
   media_assets: MediaAssets;
+  message_images: MessageImages;
   messages: Messages;
-  package_services: PackageServices;
+  notifications: Notifications;
   packages: Packages;
   quotations: Quotations;
   services: Services;
   sessions: Sessions;
   showcase_records: ShowcaseRecords;
+  supporting_document_chunks: SupportingDocumentChunks;
+  supporting_documents: SupportingDocuments;
   users: Users;
 }

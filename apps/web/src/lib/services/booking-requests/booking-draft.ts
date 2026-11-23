@@ -1,3 +1,11 @@
+import type { PublicService } from "../../data/catalog/services";
+
+export type BookingAddon = {
+  service: PublicService;
+  hours: string;
+  needsReview?: boolean;
+  refreshed?: boolean;
+};
 import type { PublicPackage } from "../../data/catalog/packages";
 
 const KEY = "clemora-booking-draft";
@@ -16,11 +24,13 @@ export type BookingDraft = {
   item: PublicPackage;
   fields: BookingDraftFields;
   timeZone: string;
+  addons?: BookingAddon[];
 };
 
 export function readBookingDraft(): BookingDraft | null {
   try {
     const draft = JSON.parse(sessionStorage.getItem(KEY) || "null");
+
     return draft &&
       typeof draft.item?.id === "string" &&
       typeof draft.item?.updatedAt === "string" &&

@@ -1,6 +1,6 @@
 import {
   CatalogCanvas,
-  CatalogMarkdown,
+  Markdown,
   CatalogSections,
   CatalogWidgetContent,
 } from "@event-management/ui";
@@ -8,7 +8,7 @@ import type {
   CatalogSection,
   CatalogWidget,
   PackageContent,
-  PackageServiceInput,
+  PackageAddonService,
 } from "@event-management/contracts/catalog";
 import type { ReactNode } from "react";
 import type { ServiceContent } from "../../lib/data/catalog/services";
@@ -42,6 +42,7 @@ const resolveWidget = (widget: CatalogWidget): CatalogWidget => ({
       }
     : widget.service,
 });
+
 const resolveSections = (sections: CatalogSection[]): CatalogSection[] =>
   sections.map((section) => ({
     ...section,
@@ -53,15 +54,18 @@ export function WidgetContent({
   widget,
   editor = false,
   mediaPlaceholder,
+  includedService = false,
 }: {
   widget: CatalogWidget;
   editor?: boolean;
+  includedService?: boolean;
   mediaPlaceholder?: ReactNode;
 }) {
   return (
     <CatalogWidgetContent
       widget={resolveWidget(widget)}
       editor={editor}
+      includedService={includedService}
       mediaPlaceholder={mediaPlaceholder}
     />
   );
@@ -69,16 +73,15 @@ export function WidgetContent({
 
 export function PackageCanvas({
   item,
-  hideServices = false,
   bookingAction,
+  historicalAddons,
 }: {
-  item: Omit<PackageContent, "services"> & {
-    services: (PackageServiceInput & { name?: string })[];
-  };
-  hideServices?: boolean;
+  item: PackageContent;
+  historicalAddons?: PackageAddonService[];
   bookingAction?: ReactNode;
 }) {
   const openCatalog = useCatalogNavigation();
+
   return (
     <CatalogCanvas>
       <div className="catalog-detail-intro">
@@ -88,29 +91,15 @@ export function PackageCanvas({
         <div className="catalog-detail-meta">
           <strong>{priceLabel(item.price)}</strong>
           <strong>Up to {item.maxGuests} guests</strong>
-          {item.eventType && (
-            <span>{item.eventType}</span>
-          )}
+          {item.eventType && <span>{item.eventType}</span>}
         </div>
         {bookingAction && (
           <div className="catalog-detail-action">{bookingAction}</div>
         )}
       </div>
-      {!hideServices && item.services.length > 0 && (
-        <section className="ui-catalog-section">
-          <h2>Package services</h2>
-          <ul>
-            {item.services.map((service) => (
-              <li key={service.serviceId}>
-                {service.name ?? "Service"} ·{" "}
-                {service.role === "included" ? "Included" : "Optional"}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
       <CatalogSections
         sections={resolveSections(item.sections)}
+        includedServices
         onOpenService={
           openCatalog
             ? (id) => openCatalog({ entity: "service", id })
@@ -122,6 +111,52 @@ export function PackageCanvas({
             : undefined
         }
       />
+      {!!historicalAddons?.length && (
+        <section className="catalog-addons">
+          <h2>Historical add-on services</h2>
+          <div className="catalog-addons-grid">
+            {historicalAddons.map((addon) => {
+              const pricing = servicePricingLabels(addon);
+              const widget: CatalogWidget = {
+                id: addon.id,
+                type: "service",
+                x: 0,
+                y: 0,
+                w: 6,
+                h: 5,
+                markdown: "",
+                media: null,
+                alt: "",
+                caption: "",
+                autoplay: false,
+                serviceId: addon.serviceId,
+                service: addon.service,
+              };
+
+              return (
+                <article className="catalog-addon" key={addon.id}>
+                  {addon.service ? (
+                    <CatalogWidgetContent
+                      widget={resolveWidget(widget)}
+                      onOpenService={
+                        openCatalog
+                          ? (id) => openCatalog({ entity: "service", id })
+                          : undefined
+                      }
+                    />
+                  ) : (
+                    <p>Unavailable service</p>
+                  )}
+                  <p className="catalog-addon-pricing">
+                    <strong>{pricing.price}</strong>
+                    {pricing.excess && <span>{pricing.excess}</span>}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </CatalogCanvas>
   );
 }
@@ -129,12 +164,13 @@ export function PackageCanvas({
 export function ServiceCanvas({ item }: { item: ServiceContent }) {
   const pricing = servicePricingLabels(item);
   const openCatalog = useCatalogNavigation();
+
   return (
     <CatalogCanvas>
       <div className="catalog-detail-intro">
         <h1>{item.name || "Untitled service"}</h1>
         <div className="catalog-detail-summary">
-          <CatalogMarkdown source={item.description} />
+          <Markdown source={item.description} />
         </div>
         <div className="catalog-detail-meta">
           <strong>{pricing.price}</strong>

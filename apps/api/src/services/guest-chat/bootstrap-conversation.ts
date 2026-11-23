@@ -7,5 +7,6 @@ export async function bootstrapGuestChatService(
   token: string,
 ) {
   const conversation = await bootstrapGuestConversationData(db, token);
+
   return getGuestChatService(db, conversation.id, token);
 }

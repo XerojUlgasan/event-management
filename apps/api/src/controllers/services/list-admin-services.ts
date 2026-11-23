@@ -33,6 +33,7 @@ export const listAdminServicesRoute = createRoute({
     ...errors,
   },
 });
+
 export const listAdminServicesRouteHandler: AppRouteHandler<
   typeof listAdminServicesRoute
 > = async (c) =>

@@ -48,7 +48,9 @@ class FakeWindow extends EventTarget {
     },
   };
 }
+
 const browser = new FakeWindow();
+
 Object.assign(globalThis, { window: browser });
 
 test("workspace navigation pushes URLs, replaces redirects, and leaves history available for back", () => {
@@ -73,6 +75,7 @@ class FakeElement {
     return this;
   }
 }
+
 class FakeAnchor extends FakeElement {
   target = "";
   constructor(
@@ -85,12 +88,15 @@ class FakeAnchor extends FakeElement {
     return name === "download" && this.download;
   }
 }
+
 Object.assign(globalThis, {
   Element: FakeElement,
   HTMLAnchorElement: FakeAnchor,
 });
+
 function click(anchor: FakeAnchor, options: Partial<MouseEvent> = {}) {
   let prevented = false;
+
   const event = {
     target: anchor,
     button: 0,
@@ -104,7 +110,9 @@ function click(anchor: FakeAnchor, options: Partial<MouseEvent> = {}) {
     },
     ...options,
   } as unknown as MouseEvent;
+
   interceptWorkspaceLink(event);
+
   return prevented;
 }
 

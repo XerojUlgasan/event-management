@@ -1,8 +1,10 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { json, errors, body, idParams } from "../packages/http.js";
 import { contentSchema, adminSchema, publicSchema } from "./schemas.js";
 import { archiveServiceService } from "../../services/services/archive-service.js";
+
 export const archiveServiceRoute = createRoute({
   method: "post",
   path: "/admin/services/{id}/archive",
@@ -13,6 +15,7 @@ export const archiveServiceRoute = createRoute({
     ...errors,
   },
 });
+
 export const archiveServiceRouteHandler: AppRouteHandler<
   typeof archiveServiceRoute
 > = async (c) => {
@@ -20,6 +23,8 @@ export const archiveServiceRouteHandler: AppRouteHandler<
     c.get("db"),
     c.req.valid("param").id,
   );
-  if ("status" in value) return c.json({ error: value.message }, value.status);
+
+  if ("status" in value) return jsonError(c, value.message, value.status);
+
   return c.json(value, 200);
 };

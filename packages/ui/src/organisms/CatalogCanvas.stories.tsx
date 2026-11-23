@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { CATALOG_COLUMNS } from "@event-management/contracts/catalog";
 import type {
   CatalogSection,
   CatalogWidget,
@@ -32,6 +33,7 @@ const widget = (
   autoplay: false,
   ...overrides,
 });
+
 const sections: CatalogSection[] = [
   {
     id: "story",
@@ -65,6 +67,7 @@ const sections: CatalogSection[] = [
     ],
   },
 ];
+
 const meta = {
   title: "Organisms/CatalogCanvas",
   component: CatalogSections,
@@ -75,9 +78,46 @@ const meta = {
     </CatalogCanvas>
   ),
 } satisfies Meta<typeof CatalogSections>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
+
 export const AllWidgets: Story = {};
+
+export const FinerGrid: Story = {
+  args: {
+    sections: [
+      ...sections,
+      {
+        id: "finer-grid",
+        title: "24-column layout",
+        columns: CATALOG_COLUMNS,
+        widgets: [
+          widget("finer-text", "markdown", {
+            x: 1,
+            w: 13,
+            markdown:
+              "## An offset text block\n\nThis one starts in column two.",
+          }),
+          widget("finer-service", "service", {
+            x: 15,
+            w: 9,
+            serviceId: "styling",
+            service: {
+              id: "styling",
+              slug: "floral-styling",
+              name: "Floral styling",
+              description: "Arrangements for the ceremony and reception.",
+              imageUrl: null,
+            },
+          }),
+        ],
+      },
+    ],
+  },
+};
+
 export const Narrow: Story = {
   render: (args) => (
     <div style={{ width: 380 }}>
@@ -87,6 +127,7 @@ export const Narrow: Story = {
     </div>
   ),
 };
+
 export const LongMarkdown: Story = {
   args: {
     sections: [
@@ -108,6 +149,7 @@ export const LongMarkdown: Story = {
     ],
   },
 };
+
 export const EmptyMedia: Story = {
   args: {
     sections: [
@@ -122,6 +164,7 @@ export const EmptyMedia: Story = {
     ],
   },
 };
+
 export const ServiceWidgets: Story = {
   args: {
     sections: [
@@ -152,6 +195,7 @@ export const ServiceWidgets: Story = {
     ],
   },
 };
+
 export const PackageWidgets: Story = {
   args: {
     sections: [
@@ -192,8 +236,10 @@ export const PackageWidgets: Story = {
     ],
   },
 };
+
 function WorkspacePackageExample() {
   const [selected, setSelected] = useState<string | null>(null);
+
   return (
     <>
       <CatalogCanvas>
@@ -210,9 +256,11 @@ function WorkspacePackageExample() {
     </>
   );
 }
+
 export const WorkspacePackageAction: Story = {
   render: () => <WorkspacePackageExample />,
 };
+
 export const PackageEditor: Story = {
   render: () => (
     <div style={{ width: 320, height: 244 }}>
@@ -225,6 +273,7 @@ export const PackageEditor: Story = {
     </div>
   ),
 };
+
 export const NarrowPackages: Story = {
   args: PackageWidgets.args,
   render: (args) => (
@@ -235,8 +284,10 @@ export const NarrowPackages: Story = {
     </div>
   ),
 };
+
 function WorkspaceServiceExample() {
   const [selected, setSelected] = useState<string | null>(null);
+
   return (
     <>
       <CatalogCanvas>
@@ -253,9 +304,11 @@ function WorkspaceServiceExample() {
     </>
   );
 }
+
 export const WorkspaceServiceAction: Story = {
   render: () => <WorkspaceServiceExample />,
 };
+
 export const ServiceEditor: Story = {
   render: () => (
     <div style={{ width: 320, height: 244 }}>
@@ -273,6 +326,7 @@ export const ServiceEditor: Story = {
     </div>
   ),
 };
+
 export const EmptyMediaWithCaption: Story = {
   render: () => (
     <div style={{ width: 320, height: 244 }}>
@@ -323,34 +377,87 @@ export const OverflowClipped: Story = {
 
 export const GridGuides: Story = {
   render: () => (
-    <div>
-      <p>12 columns · 9 rows with a gap</p>
+    <CatalogCanvas>
+      <p>{CATALOG_COLUMNS} columns · 9 rows with a gap</p>
       <CatalogGridRuler />
       <div style={{ ...catalogGridStyle, position: "relative", height: 600 }}>
         <CatalogGridGuides rows={9} />
       </div>
-    </div>
+    </CatalogCanvas>
   ),
 };
+
 export const StackedGuides: Story = {
   render: () => (
     <div style={{ width: 380 }}>
-      <p>Stacked view · 5 rows</p>
-      <CatalogGridRuler stacked />
-      <div style={{ ...catalogGridStyle, position: "relative", height: 344 }}>
-        <CatalogGridGuides rows={5} stacked />
-      </div>
+      <CatalogCanvas>
+        <p>Stacked view · 5 rows</p>
+        <CatalogGridRuler stacked />
+        <div style={{ ...catalogGridStyle, position: "relative", height: 344 }}>
+          <CatalogGridGuides rows={5} stacked />
+        </div>
+      </CatalogCanvas>
     </div>
   ),
 };
+
 export const EmptyGuides: Story = {
   render: () => (
-    <div>
+    <CatalogCanvas>
       <p>0 rows</p>
       <CatalogGridRuler />
       <div style={{ ...catalogGridStyle, position: "relative", height: 24 }}>
         <CatalogGridGuides rows={0} />
       </div>
-    </div>
+    </CatalogCanvas>
   ),
+};
+
+export const IncludedService: Story = {
+  args: {
+    includedServices: true,
+    sections: [
+      {
+        id: "included",
+        title: "Included",
+        widgets: [
+          widget("service", "service", {
+            serviceId: "service",
+            service: {
+              id: "service",
+              slug: "service",
+              name: "Photography",
+              description: "Event coverage",
+              imageUrl: null,
+            },
+            serviceTerms: { includedHours: 4, hourlyRatePesos: 500 },
+          }),
+        ],
+      },
+    ],
+  },
+};
+
+export const LegacyIncludedService: Story = {
+  args: {
+    ...IncludedService.args,
+    sections: [
+      {
+        id: "legacy",
+        title: "Legacy",
+        widgets: [
+          widget("legacy", "service", {
+            serviceId: "service",
+            service: {
+              id: "service",
+              slug: "service",
+              name: "Photography",
+              description: "Event coverage",
+              imageUrl: null,
+            },
+          }),
+        ],
+      },
+    ],
+  },
 };

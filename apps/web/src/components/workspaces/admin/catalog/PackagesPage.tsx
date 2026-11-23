@@ -25,6 +25,7 @@ export function PackagesPage() {
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
+
     return () => {
       mounted.current = false;
     };
@@ -40,29 +41,36 @@ export function PackagesPage() {
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true);
   const pagination = usePagination(`${archived}:${search}`);
+
   const load = useCallback(async () => {
     const current = ++requestId.current;
     setLoading(true);
     setError("");
+
     try {
       const packages = await getAdminPackages({
         cursor: pagination.cursor,
         search,
         archived: archived ? "archived" : "active",
       });
+
       if (!mounted.current || current !== requestId.current) return;
+
       setNextCursor(packages.nextCursor);
       setCounts(packages.counts);
       setRows(packages.packages);
     } catch (e) {
       if (!mounted.current || current !== requestId.current) return;
+
       setError(notifyError(e, "Something went wrong."));
     } finally {
       if (mounted.current && current === requestId.current) setLoading(false);
     }
   }, [notifyError, pagination.cursor, search, archived]);
+
   useEffect(() => {
     void load();
+
     return () => {
       requestId.current++;
     };
@@ -70,7 +78,9 @@ export function PackagesPage() {
   // A knowledge-dashboard link opens the exact source listing without editing it.
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("listing");
+
     if (!id) return;
+
     let current = true;
     void getAdminPackage(id)
       .then((item) => {
@@ -79,11 +89,13 @@ export function PackagesPage() {
       .catch((err) => {
         if (current) setError(notifyError(err, "Could not open listing."));
       });
+
     return () => {
       current = false;
     };
   }, [notifyError]);
   const visible = rows;
+
   const act = async (item: AdminPackage, action: "archive" | "delete") => {
     if (
       !window.confirm(
@@ -91,15 +103,18 @@ export function PackagesPage() {
       )
     )
       return;
+
     try {
       if (action === "archive") await archivePackage(item.id);
       else await deletePackage(item.id);
+
       notify(`Package ${action === "archive" ? "archived" : "deleted"}.`);
       await load();
     } catch (e) {
       setError(notifyError(e, "Something went wrong."));
     }
   };
+
   return (
     <div className="pe-list">
       <PageHeader

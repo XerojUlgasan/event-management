@@ -24,6 +24,7 @@ test("showcase gallery migration preserves attachments and refuses shared owners
   const database = `em_showcase_gallery_${randomUUID().replaceAll("-", "")}`;
   const admin = new Pool({ ...connection, database: process.env.DB_NAME });
   let pool: Pool | undefined;
+
   try {
     await admin.query(`CREATE DATABASE "${database}"`);
     pool = new Pool({ ...connection, database, max: 1 });
@@ -36,6 +37,7 @@ test("showcase gallery migration preserves attachments and refuses shared owners
     const [cover, photo, video, preview] = Array.from({ length: 4 }, () =>
       randomUUID(),
     );
+
     const existing = "b5f66ec3-856c-5cec-cf03-49f8e3a37262";
     const draft = randomUUID();
     await pool.query(

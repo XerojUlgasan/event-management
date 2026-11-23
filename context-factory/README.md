@@ -13,6 +13,7 @@ Follow the standing rules in [AGENTS.md](../AGENTS.md). Select all rows that mat
 
 | Work | Required area |
 | --- | --- |
+| Background jobs, queue, workers, retries, or job types | [Background jobs](areas/background-jobs/SKILL.md) and [API](areas/api/SKILL.md) |
 | HTTP routes, auth/sessions, API services, SQL, schema, migrations | [API](areas/api/SKILL.md); authentication/permission work also reads [auth/sessions](areas/api/references/auth-and-sessions.md) |
 | AI agents, tools, prompts, model decisions, knowledge retrieval, or AI Gateway | [AI](areas/ai/SKILL.md); API integration also reads [API](areas/api/SKILL.md); product actions also read the matching [business rules](business/README.md) |
 | Astro pages, React views, client requests/auth, app CSS | [Frontend](areas/frontend/SKILL.md) |
@@ -26,6 +27,7 @@ Follow the standing rules in [AGENTS.md](../AGENTS.md). Select all rows that mat
 | --- | --- |
 | Explore, explain, plan a design, debug before editing, recover context, review lessons, sharpen a prompt | [Investigate](workflows/investigate/SKILL.md) |
 | Implement, refactor, fix a bug, change contracts, use TDD | [Implement](workflows/implement/SKILL.md) |
+| Create, test in, or remove a Git worktree | [Test worktrees in .room](workflows/implement/references/worktrees.md) |
 | Review a diff, branch, PR, or proposed design | [Review](workflows/review/SKILL.md) |
 | Test accounts, authenticate API checks, inspect SQL, seed one table, benchmark | [QA](workflows/qa/SKILL.md) |
 | Write/revise repository guidance or documents; polish a paper or produce a document artifact | [Documentation](workflows/documentation/SKILL.md) |

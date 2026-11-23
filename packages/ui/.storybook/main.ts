@@ -7,6 +7,7 @@ const config: StorybookConfig = {
   addons: ["@storybook/addon-docs"],
   async viteFinal(viteConfig) {
     viteConfig.plugins = [...(viteConfig.plugins ?? []), tailwindcss()];
+
     return viteConfig;
   },
 };

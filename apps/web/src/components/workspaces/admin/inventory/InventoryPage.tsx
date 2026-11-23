@@ -24,6 +24,7 @@ export function InventoryPage() {
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [allocationOpen, setAllocationOpen] = useState(false);
   const { notify } = useNotifications();
+
   const unavailable = () =>
     notify("Demo only: this action is unavailable.", "info");
 

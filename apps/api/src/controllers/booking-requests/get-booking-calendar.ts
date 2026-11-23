@@ -30,10 +30,12 @@ export const getBookingCalendarRoute = createRoute({
     403: errors[403],
   },
 });
+
 export const getBookingCalendarRouteHandler: AppRouteHandler<
   typeof getBookingCalendarRoute
 > = async (c) => {
   const { month, status } = c.req.valid("query");
+
   return c.json(
     {
       dailyCounts: await listBookingRequestDailyCountsService(

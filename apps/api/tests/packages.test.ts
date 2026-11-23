@@ -5,9 +5,11 @@ import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { Pool } from "pg";
+import { CATALOG_COLUMNS } from "@event-management/contracts/catalog";
 import { hashSessionToken } from "../src/utils/session.js";
 
 const database = `em_packages_test_${randomUUID().replaceAll("-", "")}`;
+
 let app: typeof import("../src/app.js").app;
 let db: typeof import("../src/db/client.js").db;
 let admin: Pool;
@@ -17,6 +19,12 @@ let otherCustomerCookie: string;
 let customerCookie: string;
 let storageServer: Server;
 let failStorageDeletes = false;
+let failStorageWrites = false;
+let missingStorageGetAs400 = false;
+
+let beforeStorageGet:
+  { path: string; callback: () => Promise<void> } | undefined;
+
 const storedImages = new Map<string, { bytes: Buffer; contentType: string }>();
 
 before(async () => {
@@ -38,6 +46,7 @@ before(async () => {
   await admin.query(`CREATE DATABASE "${database}"`);
   pool = new Pool({ ...connection, database });
   const root = new URL("../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((e) => e.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name))) {
@@ -45,11 +54,32 @@ before(async () => {
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
   }
+
   storageServer = createServer(async (req, res) => {
     const path = req.url!.split("?")[0]!;
+
     if (req.method === "POST" || req.method === "PUT") {
       const chunks: Buffer[] = [];
+
       for await (const chunk of req) chunks.push(Buffer.from(chunk));
+
+      if (failStorageWrites) {
+        res.statusCode = 503;
+        res.end();
+
+        return;
+      }
+
+      if (
+        storedImages.has(path) &&
+        String(req.headers["x-upsert"]).toLowerCase() !== "true"
+      ) {
+        res.statusCode = 409;
+        res.end();
+
+        return;
+      }
+
       storedImages.set(path, {
         bytes: Buffer.concat(chunks),
         contentType: String(req.headers["content-type"]),
@@ -61,30 +91,50 @@ before(async () => {
         res.end();
       } else {
         const chunks: Buffer[] = [];
+
         for await (const chunk of req) chunks.push(Buffer.from(chunk));
+
         const payload = Buffer.concat(chunks).toString();
+
         if (payload) {
           const prefixes =
             (JSON.parse(payload) as { prefixes?: string[] }).prefixes ?? [];
+
           for (const prefix of prefixes) {
             const encoded = prefix
               .split("/")
               .map((segment) => encodeURIComponent(segment))
               .join("/");
+
             storedImages.delete(`${path}/${encoded}`);
           }
         } else storedImages.delete(path);
+
         res.statusCode = 204;
         res.end();
       }
     } else {
+      if (beforeStorageGet?.path === path) {
+        const callback = beforeStorageGet.callback;
+        beforeStorageGet = undefined;
+        await callback();
+      }
+
       const image = storedImages.get(path);
+
       if (!image) {
-        res.statusCode = 404;
-        res.end();
+        if (missingStorageGetAs400) {
+          res.statusCode = 400;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ code: "NoSuchKey", statusCode: "404" }));
+        } else {
+          res.statusCode = 404;
+          res.end();
+        }
       } else {
         res.setHeader("Content-Type", image.contentType);
         const range = req.headers.range?.match(/^bytes=(\d+)-(\d+)$/);
+
         if (range) {
           const start = Number(range[1]),
             end = Number(range[2]);
@@ -132,6 +182,7 @@ before(async () => {
         expires_at: new Date(Date.now() + 3600000),
       })
       .execute();
+
     return `em_session=${token}`;
   }
   adminCookie = await session("admin");
@@ -143,21 +194,27 @@ after(async () => {
     await new Promise<void>((resolve, reject) =>
       storageServer.close((err) => (err ? reject(err) : resolve())),
     );
+
   await db?.destroy();
   await pool?.end();
+
   if (admin) {
     for (let attempt = 0; attempt < 100; attempt++) {
       const active = await admin.query(
         "SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1",
         [database],
       );
+
       if (active.rows[0].count === 0) break;
+
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
+
     await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
     await admin.end();
   }
 });
+
 function call(
   path: string,
   method = "GET",
@@ -175,6 +232,7 @@ function call(
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 }
+
 const data = {
   name: "Celebration",
   description: "An elegant celebration with thoughtful details.",
@@ -217,8 +275,10 @@ const data = {
     },
   ],
 };
+
 async function read(response: Response, status: number): Promise<any> {
   assert.equal(response.status, status, await response.clone().text());
+
   return response.status === 204 ? null : response.json();
 }
 
@@ -230,6 +290,7 @@ async function createServiceWithPhoto(content: unknown) {
     ),
     201,
   );
+
   return read(
     await call(
       "/admin/services",
@@ -274,8 +335,10 @@ test("services save directly, validate complete content, and enforce permissions
     includedHours: null,
   };
   await read(await call("/admin/services", "POST", content), 401);
+
   for (const cookie of [customerCookie, otherCustomerCookie])
     await read(await call("/admin/services", "POST", content, cookie), 403);
+
   for (const hourlyRatePesos of [null, 0, -1, 1.5, 2147483648])
     await read(
       await call(
@@ -286,19 +349,23 @@ test("services save directly, validate complete content, and enforce permissions
       ),
       400,
     );
+
   await read(await call("/admin/services", "POST", content, adminCookie), 400);
   const created = await createServiceWithPhoto(content);
   assert.equal(created.name, content.name);
   assert.equal(created.hourlyRatePesos, 500);
   assert.equal("imageId" in created, false);
-  assert.equal(created.imageUrl, created.sections[0].widgets[0].media.url);
+  assert.equal(created.imageUrl, null);
   assert.ok(created.publishedAt);
+
   for (const key of ["draft", "published", "versions", "version", "state"])
     assert.equal(key in created, false);
+
   assert.equal(
     (await read(await call(`/services/${created.id}`), 200)).name,
     content.name,
   );
+
   for (const field of [
     { imageUrl: "https://example.test/image.jpg" },
     { imageId: randomUUID() },
@@ -322,6 +389,7 @@ test("services save directly, validate complete content, and enforce permissions
       400,
     );
   }
+
   const edited = await read(
     await call(
       `/admin/services/${created.id}`,
@@ -385,6 +453,7 @@ test("services save directly, validate complete content, and enforce permissions
     await call(`/admin/services/${created.id}`, "GET", undefined, adminCookie),
     404,
   );
+
   for (const route of ["draft", "publish"])
     assert.equal(
       (
@@ -397,6 +466,7 @@ test("services save directly, validate complete content, and enforce permissions
       ).status,
       404,
     );
+
   const spec: any = await (await app.request("/openapi.json")).json();
   assert.ok(spec.paths["/v1/admin/services/{id}"].patch);
   assert.equal(spec.paths["/v1/admin/services/{id}/draft"], undefined);
@@ -426,6 +496,7 @@ test("service pricing validates and switches between fixed and hourly modes", as
     ],
     [3000, 3, 500],
   );
+
   for (const pricing of [
     { fixedPricePesos: 2000, includedHours: null },
     { fixedPricePesos: null, includedHours: 2 },
@@ -461,6 +532,7 @@ test("service pricing validates and switches between fixed and hourly modes", as
       400,
     );
   }
+
   const { fixedPricePesos: omitted, ...missingFixed } = hourly;
   await read(
     await call(
@@ -583,7 +655,7 @@ test("service canvas photos replace legacy image uploads and clean up removed me
   );
   assert.equal(
     (await read(await call(`/services/${created.id}`), 200)).imageUrl,
-    newPhoto.url,
+    null,
   );
   assert.equal((await app.request(oldPhoto.url)).status, 404);
   await read(
@@ -615,6 +687,7 @@ test("service canvas photos replace legacy image uploads and clean up removed me
     204,
   );
   assert.equal((await app.request(newPhoto.url)).status, 404);
+
   for (const [path, method] of [
     ["/admin/service-uploads", "POST"],
     [`/admin/service-uploads/${created.id}`, "PATCH"],
@@ -630,13 +703,16 @@ test("service canvas photos replace legacy image uploads and clean up removed me
       404,
     );
   }
+
   const spec: any = await (await app.request("/openapi.json")).json();
+
   for (const path of [
     "/v1/admin/service-uploads",
     "/v1/admin/service-uploads/{id}",
     "/v1/service-images/{id}",
   ])
     assert.equal(spec.paths[path], undefined);
+
   const input =
     spec.paths["/v1/admin/services"].post.requestBody.content[
       "application/json"
@@ -651,8 +727,10 @@ test("service canvas photos replace legacy image uploads and clean up removed me
 
 test("canvas saves publish atomically and protect concurrent edits", async () => {
   await read(await call("/admin/packages"), 401);
+
   for (const cookie of [customerCookie, otherCustomerCookie])
     await read(await call("/admin/packages", "POST", data, cookie), 403);
+
   for (const patch of [
     { name: "" },
     { price: null },
@@ -660,11 +738,13 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
     { maxGuests: 0 },
     { eventTypes: ["Birthday"] },
     { guestMax: 100 },
+    { services: [] },
   ])
     await read(
       await call("/admin/packages", "POST", { ...data, ...patch }, adminCookie),
       400,
     );
+
   const gridContent = structuredClone(data);
   Object.assign(gridContent.sections[0].widgets[0], { x: 0, y: 2, w: 4, h: 8 });
   Object.assign(gridContent.sections[0].widgets[1], {
@@ -677,15 +757,18 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
     [0, 2, 4, 8],
     [7, 14, 5, 3],
   ];
+
   const geometry = (item: any) =>
     item.sections[0].widgets.map(({ x, y, w, h }: any) => [x, y, w, h]);
+
   const created = await read(
     await call("/admin/packages", "POST", gridContent, adminCookie),
     201,
   );
   assert.equal(created.name, data.name);
   assert.equal(created.description, data.description);
-  assert.equal(created.imageUrl, "/images/wedding.jpg");
+  assert.equal(created.imageUrl, null);
+
   for (const key of [
     "draft",
     "published",
@@ -693,11 +776,24 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
     "versionId",
     "eventTypes",
     "guestMax",
+    "services",
   ])
     assert.equal(key in created, false);
+
   const detail = await read(await call(`/packages/${created.id}`), 200);
+  assert.equal("services" in detail, false);
   assert.equal(detail.sections[0].widgets.length, 2);
   assert.deepEqual(geometry(detail), expectedGeometry);
+  await read(
+    await call(
+      `/admin/packages/${created.id}`,
+      "PATCH",
+      { ...gridContent, services: [], expectedUpdatedAt: created.updatedAt },
+      adminCookie,
+    ),
+    400,
+  );
+
   const edits = await Promise.all(
     ["First edit", "Second edit"].map((name) =>
       call(
@@ -708,6 +804,7 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
       ),
     ),
   );
+
   assert.deepEqual(edits.map((r) => r.status).sort(), [200, 409]);
   const current = await read(
     await call(`/admin/packages/${created.id}`, "GET", undefined, adminCookie),
@@ -718,9 +815,40 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
     geometry(await read(await call(`/packages/${created.id}`), 200)),
     expectedGeometry,
   );
+  const [section] = gridContent.sections;
+  const finerGrid = {
+    ...gridContent,
+    name: current.name,
+    sections: [
+      {
+        ...section,
+        columns: CATALOG_COLUMNS,
+        widgets: [
+          { ...section.widgets[0], x: 0, w: 8 },
+          { ...section.widgets[1], x: 15, w: 9 },
+        ],
+      },
+    ],
+  };
+  const savedGrid = await read(
+    await call(
+      `/admin/packages/${created.id}`,
+      "PATCH",
+      { ...finerGrid, expectedUpdatedAt: current.updatedAt },
+      adminCookie,
+    ),
+    200,
+  );
+  const publicGrid = await read(await call(`/packages/${created.id}`), 200);
+  assert.equal(publicGrid.sections[0].columns, CATALOG_COLUMNS);
+  assert.deepEqual(geometry(publicGrid), [
+    [0, 2, 8, 8],
+    [15, 14, 9, 3],
+  ]);
   const before = (
     await pool.query("SELECT canvas FROM packages WHERE id=$1", [created.id])
   ).rows[0].canvas;
+  assert.equal(before[0].columns, CATALOG_COLUMNS);
   const bad = structuredClone(data);
   bad.sections[0].widgets[0].media = {
     kind: "image",
@@ -732,7 +860,11 @@ test("canvas saves publish atomically and protect concurrent edits", async () =>
     await call(
       `/admin/packages/${created.id}`,
       "PATCH",
-      { ...bad, name: "Must roll back", expectedUpdatedAt: current.updatedAt },
+      {
+        ...bad,
+        name: "Must roll back",
+        expectedUpdatedAt: savedGrid.updatedAt,
+      },
       adminCookie,
     ),
     400,
@@ -950,6 +1082,7 @@ test("catalog validates widget sources, bounds, counts and paginates direct pack
     };
     await read(await call("/admin/packages", "POST", c, adminCookie), 400);
   }
+
   const linkedPhoto = structuredClone(data);
   linkedPhoto.sections[0].widgets[0].media = {
     kind: "image",
@@ -999,6 +1132,7 @@ test("catalog validates widget sources, bounds, counts and paginates direct pack
     ),
     204,
   );
+
   for (const invalidGeometry of [
     { x: 11, w: 2 },
     { h: MAX_CATALOG_WIDGET_ROWS + 1 },
@@ -1009,11 +1143,13 @@ test("catalog validates widget sources, bounds, counts and paginates direct pack
     Object.assign(c.sections[0].widgets[0], invalidGeometry);
     await read(await call("/admin/packages", "POST", c, adminCookie), 400);
   }
+
   const c = structuredClone(data);
   c.sections[0].widgets.push({ ...c.sections[0].widgets[0] });
   await read(await call("/admin/packages", "POST", c, adminCookie), 400);
   const countBefore = (await read(await call("/packages?limit=50"), 200))
     .packages.length;
+
   for (let i = 0; i < 17; i++)
     await read(
       await call(
@@ -1024,6 +1160,7 @@ test("catalog validates widget sources, bounds, counts and paginates direct pack
       ),
       201,
     );
+
   const first = await read(await call("/packages?limit=15"), 200);
   assert.equal(first.packages.length, 15);
   assert.ok(first.nextCursor);
@@ -1035,7 +1172,9 @@ test("catalog validates widget sources, bounds, counts and paginates direct pack
   );
   assert.equal(second.packages.length, countBefore + 2);
   assert.equal(second.nextCursor, null);
+
   const ids = [...first.packages, ...second.packages].map((p) => p.id);
+
   assert.equal(new Set(ids).size, ids.length);
   await read(await call("/packages?limit=51"), 400);
   await read(await call("/packages?cursor=invalid"), 400);
@@ -1043,6 +1182,7 @@ test("catalog validates widget sources, bounds, counts and paginates direct pack
 
 test("service pages preserve microsecond boundaries and filter scope", async () => {
   const created = [];
+
   for (let i = 0; i < 3; i++)
     created.push(
       await createServiceWithPhoto({
@@ -1051,11 +1191,13 @@ test("service pages preserve microsecond boundaries and filter scope", async () 
         hourlyRatePesos: 500,
       }),
     );
+
   for (let i = 0; i < created.length; i++)
     await pool.query(
       "UPDATE services SET created_at = $1::timestamptz, published_at = $1::timestamptz WHERE id = $2",
       [`2026-01-01T00:00:00.00000${i + 1}Z`, created[i].id],
     );
+
   const first = await read(
     await call(
       "/admin/services?limit=1&archived=active&search=Cursor%20service",
@@ -1124,6 +1266,7 @@ test("service pages preserve microsecond boundaries and filter scope", async () 
     ),
     400,
   );
+
   for (const service of [second.services[0], third.services[0]])
     await read(
       await call(
@@ -1138,6 +1281,7 @@ test("service pages preserve microsecond boundaries and filter scope", async () 
 
 test("public package and service filters apply before pagination", async () => {
   const packages = [];
+
   for (const [index, price, guests] of [
     [0, 765000, 100],
     [1, 765000, 150],
@@ -1160,6 +1304,7 @@ test("public package and service filters apply before pagination", async () => {
       ),
     );
   }
+
   const first = await read(
     await call(
       "/packages?limit=1&minPricePesos=765000&maxPricePesos=765000&guests=100",
@@ -1197,6 +1342,7 @@ test("public package and service filters apply before pagination", async () => {
   );
 
   const services: { id: string }[] = [];
+
   for (const [index, rate] of [
     [0, 765000],
     [1, 765000],
@@ -1210,6 +1356,7 @@ test("public package and service filters apply before pagination", async () => {
       }),
     );
   }
+
   await pool.query(
     "UPDATE services SET hourly_rate_pesos = NULL WHERE id = $1",
     [services[2].id],
@@ -1239,6 +1386,7 @@ test("public package and service filters apply before pagination", async () => {
     400,
   );
   const fixedServices = [];
+
   for (const index of [0, 1])
     fixedServices.push(
       await createServiceWithPhoto({
@@ -1249,6 +1397,7 @@ test("public package and service filters apply before pagination", async () => {
         hourlyRatePesos: 12,
       }),
     );
+
   const fixedPage = await read(
     await call(
       "/services?pricingType=fixed&limit=1&minPricePesos=765000&maxPricePesos=765000",
@@ -1285,6 +1434,7 @@ test("public package and service filters apply before pagination", async () => {
       (s: { fixedPricePesos: number | null }) => s.fixedPricePesos === null,
     ),
   );
+
   for (const query of [
     "minPricePesos=765000",
     "pricingType=unknown",
@@ -1292,10 +1442,12 @@ test("public package and service filters apply before pagination", async () => {
     "pricingType=hourly&minPricePesos=1.5",
   ])
     await read(await call(`/services?${query}`), 400);
+
   const unfiltered = await read(await call("/services?limit=50"), 200);
   assert.ok(
     unfiltered.services.some((s: { id: string }) => s.id === services[2].id),
   );
+
   for (const query of [
     "minPricePesos=",
     "maxPricePesos=-1",
@@ -1307,6 +1459,7 @@ test("public package and service filters apply before pagination", async () => {
   ]) {
     await read(await call(`/packages?${query}`), 400);
   }
+
   await read(await call("/services?guests=10"), 400);
 });
 
@@ -1317,11 +1470,57 @@ async function uploadCanvas(
 ) {
   const form = new FormData();
   form.set("file", new Blob([Buffer.from(bytes)], { type: mime }), "media");
+
   return app.request("/v1/admin/catalog-media", {
     method: "POST",
     headers: { Cookie: cookie },
     body: form,
   });
+}
+
+function storageObjectPath(key: string) {
+  return `/storage/v1/object/test/${key
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")}`;
+}
+
+function assertStoredMedia(
+  key: string,
+  bytes: Uint8Array,
+  contentType: string,
+) {
+  const stored = storedImages.get(storageObjectPath(key));
+  assert.ok(stored, `Storage object is missing at ${key}`);
+  assert.equal(stored.contentType, contentType);
+  assert.deepEqual(stored.bytes, Buffer.from(bytes));
+}
+
+async function mediaStorageRecord(id: string) {
+  const result = await pool.query(
+    "SELECT id, created_by, storage_key, mime_type, kind FROM media_assets WHERE id=$1",
+    [id],
+  );
+  assert.equal(result.rowCount, 1, `Media asset ${id} is missing`);
+
+  return result.rows[0] as {
+    id: string;
+    created_by: string | null;
+    storage_key: string | null;
+    mime_type: string | null;
+    kind: string;
+  };
+}
+
+async function actorIdForCookie(cookie: string) {
+  const token = cookie.slice("em_session=".length);
+  const result = await pool.query(
+    "SELECT user_id FROM sessions WHERE token_hash=$1",
+    [hashSessionToken(token)],
+  );
+  assert.equal(result.rowCount, 1);
+
+  return result.rows[0].user_id as string;
 }
 
 test("catalog media retains validation, streaming, permissions, and OpenAPI contracts", async () => {
@@ -1361,6 +1560,7 @@ test("catalog media retains validation, streaming, permissions, and OpenAPI cont
     new Blob(["second"], { type: "image/png" }),
     "second.png",
   );
+
   for (const form of [missing, duplicate]) {
     const response = await app.request("/v1/admin/catalog-media", {
       method: "POST",
@@ -1513,6 +1713,7 @@ test("video autoplay is opt-in, persists on public reads, and cannot be enabled 
       (widget: { autoplay: boolean }) => widget.autoplay === false,
     ),
   );
+
   for (const index of [0, 1]) {
     const invalid = structuredClone(data);
     Object.assign(invalid.sections[0].widgets[index], { autoplay: true });
@@ -1521,6 +1722,7 @@ test("video autoplay is opt-in, persists on public reads, and cannot be enabled 
       400,
     );
   }
+
   const invalidEdit = structuredClone(data);
   Object.assign(invalidEdit.sections[0].widgets[0], { autoplay: true });
   await read(
@@ -1628,12 +1830,29 @@ test("pending media stays private, published video streams ranges, and cleanup p
     0, 0, 0, 20, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0, 105, 115,
     111, 109,
   ]);
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
   await read(await uploadCanvas(mp4, "video/mp4", customerCookie), 403);
   await read(await uploadCanvas(mp4, "image/png"), 400);
   const media = await read(await uploadCanvas(mp4, "video/mp4"), 201);
+  const thumbnail = await read(await uploadCanvas(png, "image/png"), 201);
+  const adminId = await actorIdForCookie(adminCookie);
+  const pendingVideoKey = `pending/${adminId}/${media.id}.mp4`;
+  const pendingThumbnailKey = `pending/${adminId}/${thumbnail.id}.png`;
+  assert.equal(
+    (await mediaStorageRecord(media.id)).storage_key,
+    pendingVideoKey,
+  );
+  assert.equal((await mediaStorageRecord(media.id)).created_by, adminId);
+  assert.equal(
+    (await mediaStorageRecord(thumbnail.id)).storage_key,
+    pendingThumbnailKey,
+  );
+  assertStoredMedia(pendingVideoKey, mp4, "video/mp4");
+  assertStoredMedia(pendingThumbnailKey, png, "image/png");
   await read(await app.request(media.url), 404);
   const c = {
     ...data,
+    thumbnailMediaId: thumbnail.id,
     sections: [
       {
         id: randomUUID(),
@@ -1659,6 +1878,20 @@ test("pending media stays private, published video streams ranges, and cleanup p
     await call("/admin/packages", "POST", c, adminCookie),
     201,
   );
+  const packageVideoKey = `packages/${saved.id}/videos/${media.id}.mp4`;
+  const packageThumbnailKey = `packages/${saved.id}/images/${thumbnail.id}.png`;
+  assert.equal(
+    (await mediaStorageRecord(media.id)).storage_key,
+    packageVideoKey,
+  );
+  assert.equal(
+    (await mediaStorageRecord(thumbnail.id)).storage_key,
+    packageThumbnailKey,
+  );
+  assertStoredMedia(packageVideoKey, mp4, "video/mp4");
+  assertStoredMedia(packageThumbnailKey, png, "image/png");
+  assert.equal(storedImages.has(storageObjectPath(pendingVideoKey)), false);
+  assert.equal(storedImages.has(storageObjectPath(pendingThumbnailKey)), false);
   const stream = await app.request(media.url);
   assert.equal(stream.status, 200);
   assert.equal(stream.headers.get("accept-ranges"), "bytes");
@@ -1766,6 +1999,220 @@ test("stale pending uploads can be swept while referenced media survives", async
   );
 });
 
+test("catalog media promotion retries failed copies and reads through relocation", async () => {
+  const { promoteOwnerCatalogMediaService } =
+    await import("../src/services/catalog-media/promote-catalog-media.js");
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
+  const media = await read(await uploadCanvas(png, "image/png"), 201);
+  const pendingKey = `pending/${await actorIdForCookie(adminCookie)}/${media.id}.png`;
+  const sections = structuredClone(data.sections);
+  sections[0].widgets[0] = { ...sections[0].widgets[0], media };
+  sections[0].widgets[1] = { ...sections[0].widgets[1] };
+  const content = {
+    ...data,
+    name: `Promotion retry ${randomUUID()}`,
+    sections,
+  };
+
+  let saved: any;
+  failStorageWrites = true;
+
+  try {
+    saved = await read(
+      await call("/admin/packages", "POST", content, adminCookie),
+      201,
+    );
+  } finally {
+    failStorageWrites = false;
+  }
+
+  const destinationKey = `packages/${saved.id}/images/${media.id}.png`;
+  assert.equal((await mediaStorageRecord(media.id)).storage_key, pendingKey);
+  assertStoredMedia(pendingKey, png, "image/png");
+  assert.equal(storedImages.has(storageObjectPath(destinationKey)), false);
+
+  let promotionResult: unknown;
+  beforeStorageGet = {
+    path: storageObjectPath(pendingKey),
+    callback: async () => {
+      promotionResult = await promoteOwnerCatalogMediaService(db, {
+        kind: "package",
+        id: saved.id,
+      });
+    },
+  };
+  const readDuringMove = await app.request(media.url);
+  assert.equal(beforeStorageGet, undefined);
+  assert.ok(promotionResult !== undefined);
+  assert.equal(readDuringMove.status, 200);
+  assert.deepEqual(new Uint8Array(await readDuringMove.arrayBuffer()), png);
+  assert.equal(
+    (await mediaStorageRecord(media.id)).storage_key,
+    destinationKey,
+  );
+  assertStoredMedia(destinationKey, png, "image/png");
+  assert.equal(storedImages.has(storageObjectPath(pendingKey)), false);
+
+  const noSuchKeyMedia = await read(await uploadCanvas(png, "image/png"), 201);
+  const noSuchKeyPendingKey = `pending/${await actorIdForCookie(adminCookie)}/${noSuchKeyMedia.id}.png`;
+  const noSuchKeySections = structuredClone(data.sections);
+  noSuchKeySections[0].widgets[0] = {
+    ...noSuchKeySections[0].widgets[0],
+    media: noSuchKeyMedia,
+  };
+  const noSuchKeyContent = {
+    ...data,
+    name: `NoSuchKey promotion retry ${randomUUID()}`,
+    sections: noSuchKeySections,
+  };
+  let noSuchKeyPackage: any;
+  failStorageWrites = true;
+
+  try {
+    noSuchKeyPackage = await read(
+      await call("/admin/packages", "POST", noSuchKeyContent, adminCookie),
+      201,
+    );
+  } finally {
+    failStorageWrites = false;
+  }
+
+  const noSuchKeyDestinationKey = `packages/${noSuchKeyPackage.id}/images/${noSuchKeyMedia.id}.png`;
+  assert.equal(
+    (await mediaStorageRecord(noSuchKeyMedia.id)).storage_key,
+    noSuchKeyPendingKey,
+  );
+  assertStoredMedia(noSuchKeyPendingKey, png, "image/png");
+  beforeStorageGet = {
+    path: storageObjectPath(noSuchKeyPendingKey),
+    callback: () =>
+      promoteOwnerCatalogMediaService(db, {
+        kind: "package",
+        id: noSuchKeyPackage.id,
+      }).then(() => undefined),
+  };
+  let noSuchKeyRead: Response;
+  missingStorageGetAs400 = true;
+
+  try {
+    noSuchKeyRead = await app.request(noSuchKeyMedia.url);
+  } finally {
+    missingStorageGetAs400 = false;
+  }
+
+  assert.equal(beforeStorageGet, undefined);
+  assert.equal(noSuchKeyRead!.status, 200);
+  assert.deepEqual(new Uint8Array(await noSuchKeyRead!.arrayBuffer()), png);
+  assert.equal(
+    (await mediaStorageRecord(noSuchKeyMedia.id)).storage_key,
+    noSuchKeyDestinationKey,
+  );
+  assert.equal(storedImages.has(storageObjectPath(noSuchKeyPendingKey)), false);
+  assertStoredMedia(noSuchKeyDestinationKey, png, "image/png");
+
+  const retainedMedia = await read(await uploadCanvas(png, "image/png"), 201);
+  const retainedPendingKey = `pending/${await actorIdForCookie(adminCookie)}/${retainedMedia.id}.png`;
+  const retainedSections = structuredClone(data.sections);
+  retainedSections[0].widgets[0] = {
+    ...retainedSections[0].widgets[0],
+    media: retainedMedia,
+  };
+  const retainedContent = {
+    ...data,
+    name: `Promotion delete retry ${randomUUID()}`,
+    sections: retainedSections,
+  };
+  let retainedPackage: any;
+  failStorageDeletes = true;
+
+  try {
+    retainedPackage = await read(
+      await call("/admin/packages", "POST", retainedContent, adminCookie),
+      201,
+    );
+  } finally {
+    failStorageDeletes = false;
+  }
+
+  const retainedDestinationKey = `packages/${retainedPackage.id}/images/${retainedMedia.id}.png`;
+  assert.equal(
+    (await mediaStorageRecord(retainedMedia.id)).storage_key,
+    retainedDestinationKey,
+  );
+  assertStoredMedia(retainedPendingKey, png, "image/png");
+  assertStoredMedia(retainedDestinationKey, png, "image/png");
+  const retainedRead = await app.request(retainedMedia.url);
+  assert.equal(retainedRead.status, 200);
+  assert.deepEqual(new Uint8Array(await retainedRead.arrayBuffer()), png);
+
+  await read(
+    await call(
+      `/admin/packages/${retainedPackage.id}`,
+      "PATCH",
+      { ...retainedContent, expectedUpdatedAt: retainedPackage.updatedAt },
+      adminCookie,
+    ),
+    200,
+  );
+  assert.equal(storedImages.has(storageObjectPath(retainedPendingKey)), false);
+  assertStoredMedia(retainedDestinationKey, png, "image/png");
+});
+
+test("stale package saves leave new media pending and untouched", async () => {
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
+  const packageContent = {
+    ...data,
+    name: `Stale media save ${randomUUID()}`,
+  };
+  const created = await read(
+    await call("/admin/packages", "POST", packageContent, adminCookie),
+    201,
+  );
+  const advanced = await read(
+    await call(
+      `/admin/packages/${created.id}`,
+      "PATCH",
+      {
+        ...packageContent,
+        name: `${packageContent.name} updated`,
+        expectedUpdatedAt: created.updatedAt,
+      },
+      adminCookie,
+    ),
+    200,
+  );
+  const media = await read(await uploadCanvas(png, "image/png"), 201);
+  const pendingKey = `pending/${await actorIdForCookie(adminCookie)}/${media.id}.png`;
+  const sections = structuredClone(data.sections);
+  sections[0].widgets[0].media = media;
+  await read(
+    await call(
+      `/admin/packages/${created.id}`,
+      "PATCH",
+      {
+        ...packageContent,
+        sections,
+        expectedUpdatedAt: created.updatedAt,
+      },
+      adminCookie,
+    ),
+    409,
+  );
+  assert.equal((await mediaStorageRecord(media.id)).storage_key, pendingKey);
+  assertStoredMedia(pendingKey, png, "image/png");
+  assert.equal(advanced.name, `${packageContent.name} updated`);
+  await read(
+    await call(
+      `/admin/catalog-media/${media.id}`,
+      "DELETE",
+      undefined,
+      adminCookie,
+    ),
+    204,
+  );
+  assert.equal(storedImages.has(storageObjectPath(pendingKey)), false);
+});
+
 test("admin archived media is private and unclaimed uploads cannot be taken by another admin", async () => {
   const token = randomUUID();
   const user = await db
@@ -1860,6 +2307,7 @@ test("canvas collection, Markdown and transport boundaries are enforced", async 
     await import("../src/constants/http.js");
   const { MAX_VIDEO_SIZE_BYTES } =
     await import("@event-management/contracts/limits/videos");
+
   const makeWidget = (i: number, length = 1) => ({
     id: randomUUID(),
     type: "markdown",
@@ -1872,6 +2320,7 @@ test("canvas collection, Markdown and transport boundaries are enforced", async 
     alt: "",
     caption: "",
   });
+
   const maximum = {
     ...data,
     sections: [
@@ -1884,6 +2333,7 @@ test("canvas collection, Markdown and transport boundaries are enforced", async 
       },
     ],
   };
+
   const saved = await read(
     await call("/admin/packages", "POST", maximum, adminCookie),
     201,
@@ -2040,6 +2490,27 @@ test("service canvases save rich content directly and enforce media ownership", 
     await call("/admin/services", "POST", service, adminCookie),
     201,
   );
+  const adminId = await actorIdForCookie(adminCookie);
+  const servicePhotoKey = `services/${created.id}/images/${photo.id}.png`;
+  const serviceVideoKey = `services/${created.id}/videos/${video.id}.mp4`;
+  assert.equal(
+    (await mediaStorageRecord(photo.id)).storage_key,
+    servicePhotoKey,
+  );
+  assert.equal(
+    (await mediaStorageRecord(video.id)).storage_key,
+    serviceVideoKey,
+  );
+  assertStoredMedia(servicePhotoKey, image, "image/png");
+  assertStoredMedia(serviceVideoKey, mp4, "video/mp4");
+  assert.equal(
+    storedImages.has(storageObjectPath(`pending/${adminId}/${photo.id}.png`)),
+    false,
+  );
+  assert.equal(
+    storedImages.has(storageObjectPath(`pending/${adminId}/${video.id}.mp4`)),
+    false,
+  );
   const savedCanvas = (
     await pool.query("SELECT canvas FROM services WHERE id=$1", [created.id])
   ).rows[0].canvas;
@@ -2055,7 +2526,7 @@ test("service canvases save rich content directly and enforce media ownership", 
     })),
   );
   const visible = await read(await call(`/services/${created.id}`), 200);
-  assert.equal(visible.imageUrl, photo.url);
+  assert.equal(visible.imageUrl, null);
   assert.deepEqual(
     visible.sections[0].widgets.map((w: any) => [w.type, w.x, w.y, w.w, w.h]),
     [
@@ -2155,6 +2626,7 @@ test("service canvases save rich content directly and enforce media ownership", 
 test("booking-owned packages retain the inquiry and isolate copied media", async () => {
   const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
   const media = await read(await uploadCanvas(png, "image/png"), 201);
+  const thumbnail = await read(await uploadCanvas(png, "image/png"), 201);
   const includedService = await createServiceWithPhoto({
     name: `Included ${randomUUID()}`,
     description: "Coverage",
@@ -2163,7 +2635,7 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
   const content = {
     ...data,
     name: `Original ${randomUUID()}`,
-    services: [{ serviceId: includedService.id, role: "included" }],
+    thumbnailMediaId: thumbnail.id,
     sections: [
       {
         id: randomUUID(),
@@ -2203,6 +2675,29 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
     await call("/admin/packages", "POST", content, adminCookie),
     201,
   );
+  const adminId = await actorIdForCookie(adminCookie);
+  const sourceMediaKey = `packages/${original.id}/images/${media.id}.png`;
+  const sourceThumbnailKey = `packages/${original.id}/images/${thumbnail.id}.png`;
+  assert.equal(
+    (await mediaStorageRecord(media.id)).storage_key,
+    sourceMediaKey,
+  );
+  assertStoredMedia(sourceMediaKey, png, "image/png");
+  assert.equal(
+    (await mediaStorageRecord(thumbnail.id)).storage_key,
+    sourceThumbnailKey,
+  );
+  assertStoredMedia(sourceThumbnailKey, png, "image/png");
+  assert.equal(
+    storedImages.has(storageObjectPath(`pending/${adminId}/${media.id}.png`)),
+    false,
+  );
+  assert.equal(
+    storedImages.has(
+      storageObjectPath(`pending/${adminId}/${thumbnail.id}.png`),
+    ),
+    false,
+  );
   const bookingInput = {
     packageId: original.id,
     packageUpdatedAt: original.updatedAt,
@@ -2234,6 +2729,15 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
     expectedUpdatedAt: before.package.updatedAt,
     expectedBookingUpdatedAt: before.bookingUpdatedAt,
   };
+  await read(
+    await call(
+      `/admin/booking-requests/${booking.id}/custom-package`,
+      "POST",
+      { ...save, services: [] },
+      adminCookie,
+    ),
+    400,
+  );
   const saved = await read(
     await call(
       `/admin/booking-requests/${booking.id}/custom-package`,
@@ -2244,7 +2748,30 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
     200,
   );
   const custom = saved.package;
+  const copiedMediaId = custom.sections[0].widgets[0].media.id;
+  const copiedMediaKey = `bookings/${booking.id}/custom-package/images/${copiedMediaId}.png`;
+  const copiedThumbnailId = custom.imageUrl.split("/").at(-1)!;
+  const copiedThumbnailKey = `bookings/${booking.id}/custom-package/images/${copiedThumbnailId}.png`;
   assert.notEqual(custom.id, original.id);
+  assert.notEqual(copiedMediaId, media.id);
+  assert.notEqual(copiedThumbnailId, thumbnail.id);
+  assert.equal(
+    (await mediaStorageRecord(copiedMediaId)).storage_key,
+    copiedMediaKey,
+  );
+  assert.equal((await mediaStorageRecord(copiedMediaId)).created_by, adminId);
+  assertStoredMedia(copiedMediaKey, png, "image/png");
+  assertStoredMedia(sourceMediaKey, png, "image/png");
+  assert.equal(
+    (await mediaStorageRecord(copiedThumbnailId)).storage_key,
+    copiedThumbnailKey,
+  );
+  assert.equal(
+    (await mediaStorageRecord(copiedThumbnailId)).created_by,
+    adminId,
+  );
+  assertStoredMedia(copiedThumbnailKey, png, "image/png");
+  assertStoredMedia(sourceThumbnailKey, png, "image/png");
   assert.equal(custom.name, original.name);
   assert.equal(custom.packageType, "custom");
   const privateWidget = {
@@ -2269,15 +2796,14 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
         ...data,
         name: `Private link ${randomUUID()}`,
         sections: [{ id: randomUUID(), title: "", widgets: [privateWidget] }],
-        services: [],
       },
       adminCookie,
     ),
     400,
   );
 
-  assert.equal(custom.services[0].serviceId, includedService.id);
-  assert.equal(custom.services[0].role, "included");
+  assert.equal("services" in custom, false);
+  assert.equal("services" in original, false);
   assert.equal(custom.sections[0].widgets[1].service.id, includedService.id);
   assert.equal(custom.sections[0].widgets[1].caption, "Included service");
   assert.equal(custom.customForBookingRequestId, booking.id);
@@ -2362,6 +2888,7 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
         ...content,
         name: "Changed",
         sections: custom.sections,
+        thumbnailMediaId: copiedThumbnailId,
         expectedUpdatedAt: custom.updatedAt,
         expectedBookingUpdatedAt: before.bookingUpdatedAt,
       },
@@ -2377,6 +2904,7 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
         ...content,
         name: "Changed",
         sections: custom.sections,
+        thumbnailMediaId: copiedThumbnailId,
         expectedUpdatedAt: custom.updatedAt,
         expectedBookingUpdatedAt: saved.bookingRequest.updatedAt,
       },
@@ -2407,12 +2935,21 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
     await call(
       `/admin/packages/${original.id}`,
       "PATCH",
-      { ...content, sections: [], expectedUpdatedAt: original.updatedAt },
+      {
+        ...content,
+        sections: [],
+        thumbnailMediaId: null,
+        expectedUpdatedAt: original.updatedAt,
+      },
       adminCookie,
     ),
     200,
   );
   assert.equal((await app.request(media.url)).status, 404);
+  assert.equal(storedImages.has(storageObjectPath(sourceMediaKey)), false);
+  assert.equal(storedImages.has(storageObjectPath(sourceThumbnailKey)), false);
+  assertStoredMedia(copiedMediaKey, png, "image/png");
+  assertStoredMedia(copiedThumbnailKey, png, "image/png");
   assert.deepEqual(
     new Uint8Array(
       await (
@@ -2461,7 +2998,6 @@ test("quotations do not retain removed package media or grant historical media a
   const content = {
     ...data,
     name: `Quotation media ${randomUUID()}`,
-    services: [],
     sections: [
       {
         id: randomUUID(),
@@ -2507,23 +3043,29 @@ test("quotations do not retain removed package media or grant historical media a
       201,
     )
   ).bookingRequest;
-  const draft = (
-    await read(
-      await call(
-        `/admin/booking-requests/${booking.id}/quotations`,
-        "POST",
-        { expectedUpdatedAt: booking.updatedAt },
-        adminCookie,
-      ),
-      201,
-    )
-  ).quotation;
+  const { preparation } = await read(
+    await call(
+      `/admin/booking-requests/${booking.id}/quotations/prepare`,
+      "GET",
+      undefined,
+      adminCookie,
+    ),
+    200,
+  );
   const sent = (
     await read(
       await call(
-        `/admin/quotations/${draft.id}/send`,
+        `/admin/booking-requests/${booking.id}/quotations/send`,
         "POST",
-        { expectedUpdatedAt: draft.updatedAt },
+        {
+          requestId: randomUUID(),
+          expectedBookingUpdatedAt: preparation.expectedBookingUpdatedAt,
+          packageId: preparation.packageId,
+          expectedPackageUpdatedAt: preparation.expectedPackageUpdatedAt,
+          currentOffer: preparation.currentOffer,
+          revisionReason: null,
+          items: [],
+        },
         adminCookie,
       ),
       200,
@@ -2553,11 +3095,13 @@ test("quotations do not retain removed package media or grant historical media a
     ).rows[0].count,
     0,
   );
+
   for (const cookie of [customerCookie, adminCookie])
     assert.equal(
       (await app.request(media.url, { headers: { Cookie: cookie } })).status,
       404,
     );
+
   const history = (
     await read(
       await call(
@@ -2608,11 +3152,12 @@ test("linked service widgets are validated, hydrated, and protect references", a
     },
   };
   const sections = [{ id: randomUUID(), title: "Services", widgets: [widget] }];
-  const content = { ...data, name: "Linked package", sections, services: [] };
+  const content = { ...data, name: "Linked package", sections };
   await read(
     await call("/admin/packages", "POST", content, customerCookie),
     403,
   );
+
   for (const bad of [
     { ...widget, serviceId: null },
     { ...widget, markdown: "bad" },
@@ -2630,6 +3175,7 @@ test("linked service widgets are validated, hydrated, and protect references", a
       400,
     );
   }
+
   const pkg = await read(
     await call("/admin/packages", "POST", content, adminCookie),
     201,
@@ -2652,9 +3198,9 @@ test("linked service widgets are validated, hydrated, and protect references", a
     "select chunk_key, content_markdown, media_id from catalog_knowledge where package_id = $1",
     [pkg.id],
   );
-  const serviceChunk = chunks.rows.find(
-    (row) => row.chunk_key === `service:${widget.id}`,
-  );
+
+  const serviceChunk = chunks.rows.find((row) => row.chunk_key === "text");
+
   assert.match(serviceChunk.content_markdown, /Our recommendation/);
   assert.doesNotMatch(serviceChunk.content_markdown, /Forged|Linked service/);
   assert.equal(serviceChunk.media_id, null);
@@ -2663,10 +3209,7 @@ test("linked service widgets are validated, hydrated, and protect references", a
     publicPackage.sections[0].widgets[0].service.name,
     "Linked service",
   );
-  assert.equal(
-    publicPackage.sections[0].widgets[0].service.imageUrl,
-    "/images/wedding.jpg",
-  );
+  assert.equal(publicPackage.sections[0].widgets[0].service.imageUrl, null);
   await read(
     await call(
       `/admin/services/${service.id}`,
@@ -2770,7 +3313,7 @@ test("linked package widgets hydrate public records and protect both owner types
     await call(
       "/admin/packages",
       "POST",
-      { ...data, name: `Target ${randomUUID()}`, services: [] },
+      { ...data, name: `Target ${randomUUID()}` },
       adminCookie,
     ),
     201,
@@ -2801,7 +3344,6 @@ test("linked package widgets hydrate public records and protect both owner types
     ...data,
     name: `Owner ${randomUUID()}`,
     sections,
-    services: [],
   };
   await read(
     await call(
@@ -2837,10 +3379,7 @@ test("linked package widgets hydrate public records and protect both owner types
   assert.equal("package" in stored, false);
   const visible = await read(await call(`/packages/${owner.id}`), 200);
   assert.equal(visible.sections[0].widgets[0].package.name, target.name);
-  assert.equal(
-    visible.sections[0].widgets[0].package.imageUrl,
-    "/images/wedding.jpg",
-  );
+  assert.equal(visible.sections[0].widgets[0].package.imageUrl, null);
   await read(
     await call(
       `/admin/packages/${target.id}`,
@@ -2928,8 +3467,142 @@ test("linked package widgets hydrate public records and protect both owner types
   );
 });
 
+test("only dedicated thumbnails override defaults across catalog reads and linked cards", async () => {
+  for (const kind of ["packages", "services"] as const) {
+    const content = {
+      ...(kind === "packages"
+        ? data
+        : {
+            description: "A service with a canvas photo",
+            hourlyRatePesos: 500,
+            fixedPricePesos: null,
+            includedHours: null,
+            sections: data.sections,
+          }),
+      name: `Thumbnail policy ${kind} ${randomUUID()}`,
+    };
+    let saved = await read(
+      await call(`/admin/${kind}`, "POST", content, adminCookie),
+      201,
+    );
+    const linkedKind = kind === "packages" ? "package" : "service";
+    const owner = await read(
+      await call(
+        "/admin/packages",
+        "POST",
+        {
+          ...data,
+          name: `Thumbnail reference ${randomUUID()}`,
+          sections: [
+            {
+              id: randomUUID(),
+              title: "Recommended",
+              widgets: [
+                {
+                  id: randomUUID(),
+                  type: linkedKind,
+                  x: 0,
+                  y: 0,
+                  w: 6,
+                  h: 4,
+                  markdown: "",
+                  media: null,
+                  alt: "",
+                  caption: "",
+                  autoplay: false,
+                  [`${linkedKind}Id`]: saved.id,
+                },
+              ],
+            },
+          ],
+        },
+        adminCookie,
+      ),
+      201,
+    );
+
+    const verify = async (expected: string | null) => {
+      assert.equal(saved.imageUrl, expected);
+      assert.equal(
+        saved.sections[0].widgets[0].media.url,
+        "/images/wedding.jpg",
+      );
+
+      for (const cookie of [undefined, customerCookie, adminCookie]) {
+        const detail = await read(
+          await call(`/${kind}/${saved.id}`, "GET", undefined, cookie),
+          200,
+        );
+        assert.equal(detail.imageUrl, expected);
+        const page = await read(
+          await call(`/${kind}?limit=15`, "GET", undefined, cookie),
+          200,
+        );
+        assert.equal(
+          page[kind].find((item: { id: string }) => item.id === saved.id)
+            ?.imageUrl,
+          expected,
+        );
+        const linked = await read(
+          await call(`/packages/${owner.id}`, "GET", undefined, cookie),
+          200,
+        );
+        assert.equal(
+          linked.sections[0].widgets[0][linkedKind].imageUrl,
+          expected,
+        );
+      }
+
+      const adminDetail = await read(
+        await call(`/admin/${kind}/${saved.id}`, "GET", undefined, adminCookie),
+        200,
+      );
+      assert.equal(adminDetail.imageUrl, expected);
+      const adminPage = await read(
+        await call(`/admin/${kind}?limit=15`, "GET", undefined, adminCookie),
+        200,
+      );
+      assert.equal(
+        adminPage[kind].find((item: { id: string }) => item.id === saved.id)
+          ?.imageUrl,
+        expected,
+      );
+    };
+
+    await verify(null);
+
+    for (const state of ["set", "replace", "remove"] as const) {
+      const thumbnail =
+        state === "remove"
+          ? null
+          : await read(
+              await uploadCanvas(
+                new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]),
+                "image/png",
+              ),
+              201,
+            );
+      saved = await read(
+        await call(
+          `/admin/${kind}/${saved.id}`,
+          "PATCH",
+          {
+            ...content,
+            thumbnailMediaId: thumbnail?.id ?? null,
+            expectedUpdatedAt: saved.updatedAt,
+          },
+          adminCookie,
+        ),
+        200,
+      );
+      await verify(thumbnail?.url ?? null);
+    }
+  }
+});
+
 test("catalog title conflicts preserve names, slugs, and unchanged-title edits", async () => {
   const name = `Café title ${randomUUID()}`;
+
   for (const kind of ["packages", "services"] as const) {
     const content =
       kind === "packages"
@@ -2946,6 +3619,7 @@ test("catalog title conflicts preserve names, slugs, and unchanged-title edits",
       await call(`/admin/${kind}`, "POST", content, adminCookie),
       201,
     );
+
     for (const conflictingName of [
       name.toUpperCase(),
       name.replace("Café", "Cafe"),
@@ -2960,6 +3634,7 @@ test("catalog title conflicts preserve names, slugs, and unchanged-title edits",
         409,
       );
     }
+
     const unchanged = await read(
       await call(
         `/admin/${kind}/${created.id}`,
@@ -2982,6 +3657,7 @@ test("catalog title conflicts preserve names, slugs, and unchanged-title edits",
       ),
       201,
     );
+
     for (const conflictingName of [
       name.toUpperCase(),
       name.replace("Café", "Cafe"),
@@ -3000,6 +3676,7 @@ test("catalog title conflicts preserve names, slugs, and unchanged-title edits",
         409,
       );
     }
+
     const preserved = await read(
       await call(`/admin/${kind}/${other.id}`, "GET", undefined, adminCookie),
       200,
@@ -3008,4 +3685,247 @@ test("catalog title conflicts preserve names, slugs, and unchanged-title edits",
     assert.equal(preserved.slug, other.slug);
     assert.equal(preserved.updatedAt, other.updatedAt);
   }
+});
+
+test("package inclusions retain local terms and legacy add-ons are absent from live packages", async () => {
+  const pricing = {
+    hourlyRatePesos: 500,
+    fixedPricePesos: 2000,
+    includedHours: 4,
+  };
+
+  const makeService = async (name: string) =>
+    createServiceWithPhoto({
+      name: `${name} ${randomUUID()}`,
+      description: "Actual catalog description",
+      ...pricing,
+    });
+
+  const included = await makeService("Included");
+  const extra = await makeService("Add-on");
+  const hourly = await makeService("Offered add-on");
+  const widget = {
+    id: randomUUID(),
+    type: "service",
+    x: 0,
+    y: 0,
+    w: 6,
+    h: 4,
+    markdown: "",
+    media: null,
+    alt: "",
+    caption: "Included",
+    autoplay: false,
+    serviceId: included.id,
+  };
+  const content = {
+    ...data,
+    name: `Service terms ${randomUUID()}`,
+    sections: [
+      { id: randomUUID(), title: "Included services", widgets: [widget] },
+    ],
+  };
+  const legacy = await read(
+    await call("/admin/packages", "POST", content, adminCookie),
+    201,
+  );
+  assert.equal("serviceTerms" in legacy.sections[0].widgets[0], false);
+  assert.equal("addonServices" in legacy, false);
+  assert.equal(
+    "serviceTerms" in
+      (await read(await call(`/packages/${legacy.id}`), 200)).sections[0]
+        .widgets[0],
+    false,
+  );
+
+  const terms = { includedHours: 6, hourlyRatePesos: 350 };
+  const sections = [
+    { ...content.sections[0], widgets: [{ ...widget, serviceTerms: terms }] },
+  ];
+  await read(
+    await call(
+      "/admin/services",
+      "POST",
+      {
+        ...pricing,
+        name: `Invalid service terms ${randomUUID()}`,
+        description: "Reference only",
+        sections,
+      },
+      adminCookie,
+    ),
+    400,
+  );
+  await read(
+    await call(
+      `/admin/services/${included.id}`,
+      "PATCH",
+      {
+        ...pricing,
+        name: included.name,
+        description: included.description,
+        sections,
+        expectedUpdatedAt: included.updatedAt,
+      },
+      adminCookie,
+    ),
+    400,
+  );
+  const pkg = await read(
+    await call(
+      `/admin/packages/${legacy.id}`,
+      "PATCH",
+      { ...content, sections, expectedUpdatedAt: legacy.updatedAt },
+      adminCookie,
+    ),
+    200,
+  );
+  assert.deepEqual(pkg.sections[0].widgets[0].serviceTerms, terms);
+  assert.deepEqual(pkg.price, legacy.price);
+  const storedCanvas = (
+    await pool.query("select canvas from packages where id=$1", [pkg.id])
+  ).rows[0].canvas;
+  assert.deepEqual(storedCanvas[0].widgets[0].serviceTerms, terms);
+
+  const addon = {
+    id: randomUUID(),
+    serviceId: extra.id,
+    hourlyRatePesos: 450,
+    fixedPricePesos: 1500,
+    includedHours: 5,
+  };
+  await read(
+    await call(
+      "/admin/packages",
+      "POST",
+      { ...content, addonServices: [addon] },
+      adminCookie,
+    ),
+    400,
+  );
+  const booking = (
+    await read(
+      await call(
+        "/booking-requests",
+        "POST",
+        {
+          packageId: pkg.id,
+          packageUpdatedAt: pkg.updatedAt,
+          eventType: "Wedding",
+          durationMode: "one_day",
+          requestedDays: [{ date: "2099-01-02" }],
+          timeZone: "Asia/Manila",
+          guestCount: 50,
+          contactName: "Customer",
+          phoneNumber: "123",
+        },
+        customerCookie,
+      ),
+      201,
+    )
+  ).bookingRequest;
+  const endpoint = `/admin/booking-requests/${booking.id}/custom-package`;
+  const custom = await read(
+    await call(
+      endpoint,
+      "POST",
+      {
+        ...content,
+        sections,
+        sourcePackageId: pkg.id,
+        expectedUpdatedAt: pkg.updatedAt,
+        expectedBookingUpdatedAt: booking.updatedAt,
+      },
+      adminCookie,
+    ),
+    200,
+  );
+  assert.equal("addonServices" in custom.package, false);
+  const oldPackage = { ...custom.package, addonServices: [addon] };
+  await pool.query(
+    "insert into audit_events(actor_id,action,entity_type,entity_id,metadata) values($1,'booking.custom_package_updated','booking_request',$2,$3::jsonb)",
+    [
+      await actorIdForCookie(adminCookie),
+      booking.id,
+      JSON.stringify({ before: oldPackage, after: oldPackage }),
+    ],
+  );
+  const history = (
+    await read(
+      await call(
+        `/admin/booking-requests/${booking.id}/package-history`,
+        "GET",
+        undefined,
+        adminCookie,
+      ),
+      200,
+    )
+  ).history;
+  assert.deepEqual(history[0].after.addonServices, [addon]);
+  assert.equal("addonServices" in history[1].after, false);
+  const live = (
+    await read(
+      await call(
+        `/booking-requests/${booking.id}/package`,
+        "GET",
+        undefined,
+        customerCookie,
+      ),
+      200,
+    )
+  ).package;
+  assert.equal("addonServices" in live, false);
+  // Only an offer on the same requested-service row protects the service.
+  const requested = [
+    {
+      serviceId: extra.id,
+      name: extra.name,
+      hours: null,
+      notes: null,
+      included: false,
+      updatedAt: null,
+    },
+    {
+      id: randomUUID(),
+      serviceId: hourly.id,
+      name: hourly.name,
+      hours: null,
+      notes: null,
+      included: false,
+      updatedAt: null,
+      offer: {
+        totalHours: 2,
+        fixedPricePesos: null,
+        includedHours: null,
+        hourlyRatePesos: 700,
+      },
+    },
+  ];
+  await pool.query(
+    "update booking_requests set requested_services=$1::jsonb where id=$2",
+    [JSON.stringify(requested), booking.id],
+  );
+  assert.equal(
+    (
+      await call(
+        `/admin/services/${hourly.id}`,
+        "DELETE",
+        undefined,
+        adminCookie,
+      )
+    ).status,
+    409,
+  );
+  // A request without an offer does not protect it.
+  assert.equal(
+    (
+      await call(
+        `/admin/services/${extra.id}`,
+        "DELETE",
+        undefined,
+        adminCookie,
+      )
+    ).status,
+    204,
+  );
 });

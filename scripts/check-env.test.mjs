@@ -9,17 +9,20 @@ const checker = new URL("./check-env.mjs", import.meta.url);
 
 async function checkFixture(files) {
   const root = await mkdtemp(join(tmpdir(), "clemora-env-check-"));
+
   try {
     for (const [path, source] of Object.entries(files)) {
       const target = join(root, path);
       await mkdir(join(target, ".."), { recursive: true });
       await writeFile(target, source);
     }
+
     const result = spawnSync(
       process.execPath,
       [checker.pathname, "--root", root],
       { encoding: "utf8" },
     );
+
     return { status: result.status, output: result.stdout + result.stderr };
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -53,6 +56,7 @@ test("rejects raw reads in app source, config, scripts and future apps", async (
       "---\nconst url = import.meta.env.PUBLIC_API_URL;\n---\n<h1>Example</h1>",
   });
   assert.equal(result.status, 1, result.output);
+
   for (const file of [
     "src/app.ts",
     "http/request.ts",

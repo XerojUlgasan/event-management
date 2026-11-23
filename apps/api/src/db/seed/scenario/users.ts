@@ -29,6 +29,7 @@ const GIVEN_NAMES = [
   "Enzo",
   "Rosa",
 ];
+
 const FAMILY_NAMES = [
   "Santos",
   "Reyes",
@@ -61,6 +62,7 @@ export type ScenarioUser = {
 
 function roleFor(index: number): Pick<ScenarioUser, "role"> {
   if (index < 4) return { role: "admin" };
+
   return { role: "customer" };
 }
 
@@ -71,6 +73,7 @@ export function planScenarioUsers(): ScenarioUser[] {
       const given = GIVEN_NAMES[index % GIVEN_NAMES.length] ?? "Guest";
       const family = FAMILY_NAMES[index % FAMILY_NAMES.length] ?? "Sample";
       const role = roleFor(index);
+
       return {
         id: scenarioId(`user:${index}`),
         email: `scenario.user${scenarioIndex(index)}@clemora.example.test`,
@@ -79,7 +82,9 @@ export function planScenarioUsers(): ScenarioUser[] {
       };
     },
   );
+
   expectCount("users", users.length);
+
   return users;
 }
 
@@ -88,6 +93,7 @@ export async function seedScenarioUsers(
   input: { users: ScenarioUser[]; passwordHash: string; now: Date },
 ) {
   let inserted = 0;
+
   for (const user of input.users) {
     const created = await insertIfNew(db, "users", {
       id: user.id,
@@ -99,7 +105,9 @@ export async function seedScenarioUsers(
       created_at: input.now,
       updated_at: input.now,
     });
+
     if (created) inserted += 1;
   }
+
   return { users: input.users, inserted };
 }

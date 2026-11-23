@@ -23,6 +23,7 @@ export const listPublicServicesRoute = createRoute({
     ...errors,
   },
 });
+
 export const listPublicServicesRouteHandler: AppRouteHandler<
   typeof listPublicServicesRoute
 > = async (c) =>

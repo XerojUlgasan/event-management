@@ -13,22 +13,8 @@ export async function lockCatalogKnowledgeOwnerData(
     .where("id", "=", owner.id)
     .forUpdate()
     .executeTakeFirst();
+
   if (!row) return false;
-  if (owner.kind === "package") {
-    await trx
-      .selectFrom("services")
-      .select("services.id")
-      .where(
-        "services.id",
-        "in",
-        trx
-          .selectFrom("package_services")
-          .select("service_id")
-          .where("package_id", "=", owner.id),
-      )
-      .orderBy("services.id")
-      .forUpdate()
-      .execute();
-  }
+
   return true;
 }

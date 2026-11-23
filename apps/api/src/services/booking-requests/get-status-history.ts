@@ -17,6 +17,7 @@ const positionSchema = z.object({
   ),
   id: z.string().uuid(),
 });
+
 export async function getStatusHistoryService(
   db: Kysely<DB>,
   id: string,
@@ -24,6 +25,7 @@ export async function getStatusHistoryService(
   customerId?: string,
 ) {
   if (!(await findBookingRequestData(db, id, customerId))) return null;
+
   const scope = JSON.stringify([
     "booking-status-history",
     id,
@@ -34,9 +36,11 @@ export async function getStatusHistoryService(
     limit: input.limit,
     position,
   });
+
   const page = createPage(rows, input.limit, (row) =>
     encodePageCursor(scope, { createdAt: row.cursor_created_at, id: row.id }),
   );
+
   return {
     history: page.items.map((row) => ({
       id: row.id,

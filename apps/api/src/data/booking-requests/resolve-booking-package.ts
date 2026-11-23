@@ -2,6 +2,7 @@ import type { Kysely, Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 
 type Database = Kysely<DB> | Transaction<DB>;
+
 export async function resolveBookingPackageData(
   db: Database,
   booking: { id: string; package_id: string | null },
@@ -12,8 +13,11 @@ export async function resolveBookingPackageData(
     .where("package_type", "=", "custom")
     .where("custom_for_booking_request_id", "=", booking.id)
     .executeTakeFirst();
+
   if (custom) return custom;
+
   if (!booking.package_id) return undefined;
+
   return db
     .selectFrom("packages")
     .selectAll()

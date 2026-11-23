@@ -7,12 +7,14 @@ import { Kysely, PostgresDialect } from "kysely";
 import { Pool, type QueryResult } from "pg";
 import type { DB } from "../../src/db/types.js";
 import { finishToolCallData } from "../../src/data/ai/finish-tool-call.js";
-import { getLastCatalogSearchData } from "../../src/data/ai/get-last-catalog-search.js";
+import { getLastCatalogToolCallData } from "../../src/data/ai/get-last-catalog-tool-call.js";
 import { linkToolCallsToReplyData } from "../../src/data/ai/link-tool-calls-to-reply.js";
 import { startToolCallData } from "../../src/data/ai/start-tool-call.js";
 
 const database = `em_ai_tool_calls_${randomUUID().replaceAll("-", "")}`;
+
 const messageEpoch = Date.UTC(2026, 0, 1);
+
 let messageSequence = 0;
 let admin: Pool | undefined;
 let pool: Pool | undefined;
@@ -34,6 +36,7 @@ before(async () => {
   db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
 
   const root = new URL("../../prisma/migrations/", import.meta.url);
+
   for (const entry of (await readdir(root, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name)))
@@ -56,8 +59,9 @@ before(async () => {
 
 after(async () => {
   await db?.destroy();
+
   if (admin) {
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
     await admin.end();
   }
 });
@@ -77,6 +81,7 @@ async function createMessage(
   const id = randomUUID();
   const senderId = senderRole === "customer" ? customerId : null;
   const createdAt = new Date(messageEpoch + messageSequence++ * 1_000);
+
   return db
     .insertInto("messages")
     .values({
@@ -412,11 +417,18 @@ test("returns only the last earlier replied catalog search in this conversation"
     output: { items: [{ id: "current" }], nextCursor: "cursor-current" },
   });
 
-  const beforeCurrentReply = await getLastCatalogSearchData(db, {
+  const beforeCurrentReply = await getLastCatalogToolCallData(db, {
+    toolName: "searchPublicCatalog",
     conversationId: conversation.id,
     customerMessageId: currentCustomer.id,
   });
-  assert.deepEqual(beforeCurrentReply, {
+  assert.ok(beforeCurrentReply);
+  assert.ok(beforeCurrentReply.replyOrder.endsWith(firstReply.id));
+  const { replyOrder: _replyOrder, ...earlierSearch } = beforeCurrentReply;
+  assert.deepEqual(earlierSearch, {
+    triggerMessageId: firstCustomer.id,
+    replyId: firstReply.id,
+    replyBody: "assistant fixture",
     input: { catalogType: "package", minPricePesos: 100 },
     output: { items: [{ id: "old" }], nextCursor: "cursor-old" },
   });
@@ -447,21 +459,24 @@ test("returns only the last earlier replied catalog search in this conversation"
   });
 
   assert.deepEqual(
-    await getLastCatalogSearchData(db, {
+    await getLastCatalogToolCallData(db, {
+      toolName: "searchPublicCatalog",
       conversationId: conversation.id,
       customerMessageId: currentCustomer.id,
     }),
     beforeCurrentReply,
   );
   assert.equal(
-    await getLastCatalogSearchData(db, {
+    await getLastCatalogToolCallData(db, {
+      toolName: "searchPublicCatalog",
       conversationId: conversation.id,
       customerMessageId: otherCustomer.id,
     }),
     undefined,
   );
   assert.equal(
-    await getLastCatalogSearchData(db, {
+    await getLastCatalogToolCallData(db, {
+      toolName: "searchPublicCatalog",
       conversationId: conversation.id,
       customerMessageId: currentReply.id,
     }),
@@ -496,6 +511,7 @@ test("enables RLS and denies client-role table privileges", async () => {
     "SELECT rolname FROM pg_roles WHERE rolname = ANY($1::text[])",
     [["anon", "authenticated"]],
   );
+
   for (const { rolname } of roles.rows) {
     const roleAccess: QueryResult<{ has_privilege: boolean }> =
       await queryPool.query(
@@ -504,4 +520,111 @@ test("enables RLS and denies client-role table privileges", async () => {
       );
     assert.equal(roleAccess.rows[0]?.has_privilege, false, `${rolname} access`);
   }
+});
+
+test("ordinal choices correspond to the links that appeared in the delivered answer", async () => {
+  const { buildPreviousCatalogSearchContext } =
+    await import("../../src/services/ai/assistant-context.js");
+  const thread = await createConversation();
+  const query = await createMessage(thread.id, "customer");
+  const turnId = randomUUID();
+
+  const candidates = ["first", "hidden", "third"].map((name) => ({
+    id: randomUUID(),
+    name,
+    type: "package",
+    url: "/packages/" + name,
+    privateField: "ignore",
+  }));
+
+  for (const items of [candidates.slice(0, 2), candidates.slice(2)]) {
+    const call = await startToolCallData(db, startInput(turnId, query.id));
+    await finishToolCallData(db, {
+      id: call.id,
+      status: "succeeded",
+      output: { results: items, nextCursor: null },
+    });
+  }
+
+  const reply = await createMessage(thread.id, "assistant");
+  await db
+    .updateTable("messages")
+    .set({ body: "1. [Third](/packages/third)\n2. [First](/packages/first)" })
+    .where("id", "=", reply.id)
+    .execute();
+  await linkToolCallsToReplyData(db, {
+    turnId,
+    customerMessageId: query.id,
+    assistantMessageId: reply.id,
+  });
+  const next = await createMessage(thread.id, "customer");
+  const context = await buildPreviousCatalogSearchContext({
+    db,
+    conversationId: thread.id,
+    customerMessageId: next.id,
+  });
+  assert.deepEqual(
+    context?.shownItems?.map((item) => item.name),
+    ["third", "first"],
+  );
+  assert.equal(context?.shownItems?.[1]?.id, candidates[0]?.id);
+  assert.doesNotMatch(
+    JSON.stringify(context?.shownItems),
+    /privateField|hidden/,
+  );
+});
+
+test("the most recently displayed recommendations win when earlier turns finish late", async () => {
+  const { buildPreviousCatalogRecommendationsContext } =
+    await import("../../src/services/ai/assistant-context.js");
+  const thread = await createConversation();
+  const earlyQuestion = await createMessage(thread.id, "customer");
+  const lateQuestion = await createMessage(thread.id, "customer");
+  const fastReply = await createMessage(thread.id, "assistant");
+  const slowReply = await createMessage(thread.id, "assistant");
+
+  for (const [question, reply] of [
+    [earlyQuestion, slowReply],
+    [lateQuestion, fastReply],
+  ]) {
+    const turnId = randomUUID();
+    const lookup = await startToolCallData(db, {
+      ...startInput(turnId, question.id),
+      toolName: "attachCatalogRecommendations",
+    });
+    await finishToolCallData(db, { id: lookup.id, status: "succeeded" });
+    await db
+      .updateTable("messages")
+      .set({
+        catalog_recommendations: JSON.stringify([
+          {
+            id: reply.id,
+            type: "service",
+            slug: "fixture-service",
+            name: "Fixture service",
+            description: "",
+            imageUrl: null,
+            fixedPricePesos: null,
+            hourlyRatePesos: 1200,
+            includedHours: null,
+          },
+        ]),
+      })
+      .where("id", "=", reply.id)
+      .execute();
+    await linkToolCallsToReplyData(db, {
+      turnId,
+      customerMessageId: question.id,
+      assistantMessageId: reply.id,
+    });
+  }
+
+  const followUp = await createMessage(thread.id, "customer");
+  const context = await buildPreviousCatalogRecommendationsContext({
+    db,
+    conversationId: thread.id,
+    customerMessageId: followUp.id,
+  });
+  assert.equal(context?.replyId, slowReply.id);
+  assert.equal(context?.shownItems[0]?.id, slowReply.id);
 });

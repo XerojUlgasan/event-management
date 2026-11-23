@@ -7,6 +7,7 @@ export function listRequestedDaySchedulesData(
   bookingIds: string[],
 ) {
   if (!bookingIds.length) return Promise.resolve([]);
+
   return db
     .selectFrom("events_day")
     .select([

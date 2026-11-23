@@ -5,6 +5,10 @@ Status: accepted
 Authority: User authorized ingestion only, automatic refresh after catalog changes, backfill, actual uploaded/sample photos with context, `google/gemini-embedding-2`, and 768 dimensions; videos and search are excluded.
 Implementation: Ingestion implemented and verified against the configured local database, live provider, and local Edge runtime. Hosted deployment remains separate; dated evidence is in the linked run.
 
+Superseded in part: the [assignment-removal decision](2026-11-18_remove-package-service-assignments.md) removes assignment text and dependent-package overview invalidation. Other ingestion behavior remains in effect.
+
+Superseded in part: the [combined-text decision](2026-11-19_combined-catalog-text.md) replaces separate overview, per-widget Markdown slices, and linked-caption rows with one text entry per listing. Photo chunks remain separate. The preparation description below records the original implementation.
+
 ## Problem
 
 Populate the existing catalog corpus from current package/service content without introducing another authority for catalog facts or delaying catalog transactions on provider calls.

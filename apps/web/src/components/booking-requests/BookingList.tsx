@@ -1,5 +1,9 @@
+import { BookingIntake } from "./BookingIntake";
 import { BookingStatusHistory } from "./BookingStatusHistory";
 import { usePagination } from "../../lib/pagination/use-pagination";
+import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
+import { formatPesosFromMinor } from "../../lib/utils/formatting/money";
+import { formatEnPhDate } from "../../lib/utils/formatting/dates";
 import { navigateWorkspace } from "../../lib/navigation/workspace-navigation";
 import { BookingPackage } from "./BookingPackage";
 import { Quotations } from "../quotations/Quotations";
@@ -49,6 +53,7 @@ import {
   bookingStatusLabels as labels,
   bookingDateTime as dateLabel,
   bookingDate as preferredDateLabel,
+  bookingRequestLabel,
   BookingStatusBadge,
 } from "./BookingRequestDisplay";
 import { CustomerEventTimeline } from "./CustomerEventTimeline";
@@ -60,26 +65,31 @@ export function BookingList(props: {
   readOnly?: boolean;
   onExplore?: () => void;
   onOpenChat?: (reference: string) => void;
+  requestedId?: string | null;
 }) {
   return props.admin ? <AdminBookingList /> : <BookingCards {...props} />;
 }
+
 function requestedSummary(item: BookingRequest) {
   return item.requestedDays
     ? `${preferredDateLabel(item.requestedDays[0]?.date ?? null)}${item.requestedDays.length > 1 ? ` + ${item.requestedDays.length - 1} more` : ""}`
     : preferredDateLabel(item.preferredDate);
 }
+
 function OperationalSchedule({
   day,
 }: {
   day: NonNullable<BookingRequest["requestedDays"]>[number];
 }) {
   const schedule = day.operationalSchedule;
+
   if (!schedule)
     return (
       <span>
         {day.eventDayId ? "Operational schedule unavailable" : "Not scheduled"}
       </span>
     );
+
   const moved = schedule.id !== day.eventDayId;
   const status =
     schedule.status === "cancelled"
@@ -87,6 +97,7 @@ function OperationalSchedule({
       : schedule.status === "scheduled"
         ? "Scheduled"
         : schedule.status;
+
   return (
     <span>
       {moved ? `Moved · ${status}` : status}: {preferredDateLabel(schedule.day)}{" "}
@@ -95,46 +106,76 @@ function OperationalSchedule({
     </span>
   );
 }
+
 function BookingCards({
   onExplore,
   onOpenChat,
+  requestedId,
 }: {
   onExplore?: () => void;
   onOpenChat?: (reference: string) => void;
+  requestedId?: string | null;
 }) {
   const { notify, notifyError } = useNotifications();
   const mounted = useRef(true);
-  const generation = useRef(0);
+  const generation = useRequestGeneration();
   const [items, setItems] = useState<BookingRequest[]>([]);
-  const [selected, setSelected] = useState<BookingRequest | null>(null);
+  const [manualBooking, setManualBooking] = useState<BookingRequest | null>(
+    null,
+  );
+  const [linkedBooking, setLinkedBooking] = useState<BookingRequest | null>(
+    null,
+  );
+  const [linkError, setLinkError] = useState<{
+    id: string;
+    message: string;
+  } | null>(null);
+  const [linkAttempt, setLinkAttempt] = useState(0);
+  const selected = requestedId
+    ? linkedBooking?.id === requestedId
+      ? linkedBooking
+      : null
+    : manualBooking;
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [cancelError, setCancelError] = useState("");
   const [busy, setBusy] = useState("");
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+
   const [now, setNow] = useState(() => new Date());
+
   useEffect(() => {
     mounted.current = true;
+
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
+
     return () => {
       mounted.current = false;
-      generation.current++;
+      generation.bump();
       window.clearInterval(timer);
     };
   }, []);
+
   const load = useCallback(
     async (cursor?: string) => {
-      const current = ++generation.current;
+      const current = generation.bump();
+
       if (cursor) setLoadingMore(true);
       else setLoading(true);
+
       setError("");
+
       try {
         const result = await getMyBookingRequests(cursor);
-        if (!mounted.current || generation.current !== current) return;
+
+        if (!mounted.current || !generation.isCurrent(current)) return;
+
         setItems((rows) => {
           if (!cursor) return result.bookingRequests;
+
           const ids = new Set(rows.map((row) => row.id));
+
           return [
             ...rows,
             ...result.bookingRequests.filter((row) => !ids.has(row.id)),
@@ -142,10 +183,10 @@ function BookingCards({
         });
         setNextCursor(result.nextCursor);
       } catch (cause) {
-        if (mounted.current && generation.current === current)
+        if (mounted.current && generation.isCurrent(current))
           setError(notifyError(cause, "Unable to load your event requests."));
       } finally {
-        if (mounted.current && generation.current === current) {
+        if (mounted.current && generation.isCurrent(current)) {
           setLoading(false);
           setLoadingMore(false);
         }
@@ -153,27 +194,66 @@ function BookingCards({
     },
     [notifyError],
   );
+
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!requestedId) return;
+
+    let active = true;
+    setLinkedBooking(null);
+    setLinkError(null);
+    setManualBooking(null);
+    setCancelError("");
+    getMyBookingRequest(requestedId)
+      .then((result) => {
+        if (active) setLinkedBooking(result.bookingRequest);
+      })
+      .catch((cause) => {
+        if (active)
+          setLinkError({
+            id: requestedId,
+            message: notifyError(cause, "Unable to load this event request."),
+          });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [requestedId, notifyError, linkAttempt]);
+
+  function dismissLink() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("bookingRequest");
+    navigateWorkspace(`${url.pathname}${url.search}${url.hash}`, true);
+  }
+
   const saveItem = (updated: BookingRequest) => {
-    setSelected((current) =>
+    const apply = (current: BookingRequest | null) =>
       current?.id === updated.id
         ? latestCustomerEvent(current, updated)
-        : current,
-    );
+        : current;
+
+    setManualBooking(apply);
+    setLinkedBooking(apply);
     setItems((rows) =>
       rows.map((row) =>
         row.id === updated.id ? latestCustomerEvent(row, updated) : row,
       ),
     );
   };
+
   const cancel = async (id: string, reason: string) => {
     setBusy(id);
     setCancelError("");
+
     try {
       const result = await cancelMyBookingRequest(id, reason.trim());
+
       if (!mounted.current) return;
+
       saveItem(result.bookingRequest);
       notify("Booking request cancelled.");
     } catch (cause) {
@@ -183,6 +263,7 @@ function BookingCards({
       if (mounted.current) setBusy("");
     }
   };
+
   return (
     <div className="customer-events-page">
       <PageHeader
@@ -247,11 +328,25 @@ function BookingCards({
             hasMore={!!nextCursor}
             onDetails={(item) => {
               setCancelError("");
-              setSelected(item);
+
+              if (requestedId) dismissLink();
+
+              setManualBooking(item);
             }}
             onOpenChat={onOpenChat}
           />
         </>
+      )}
+      {requestedId && linkError?.id === requestedId && (
+        <div className="customer-events-error" role="alert">
+          <p>{linkError.message}</p>
+          <Button
+            variant="secondary"
+            onClick={() => setLinkAttempt((current) => current + 1)}
+          >
+            Retry booking details
+          </Button>
+        </div>
       )}
       {error && (
         <div className="customer-events-error" role="alert">
@@ -287,10 +382,16 @@ function BookingCards({
       </p>
       {selected && (
         <BookingDetails
+          key={selected.id}
           item={selected}
           customerCanEditTimes
           onClose={() => {
-            if (!busy) setSelected(null);
+            if (!busy) {
+              setManualBooking(null);
+              setLinkedBooking(null);
+
+              if (requestedId) dismissLink();
+            }
           }}
           onSaved={saveItem}
           requestActions={
@@ -311,6 +412,7 @@ function BookingCards({
     </div>
   );
 }
+
 function CancelForm({
   item,
   busy,
@@ -322,6 +424,7 @@ function CancelForm({
 }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
+
   if (!open)
     return (
       <div className="booking-cancel">
@@ -330,11 +433,13 @@ function CancelForm({
         </Button>
       </div>
     );
+
   return (
     <form
       className="booking-cancel-confirm"
       onSubmit={(event) => {
         event.preventDefault();
+
         if (reason.trim()) void onCancel(item.id, reason);
       }}
     >
@@ -375,18 +480,19 @@ function CancelForm({
 
 const dateKey = (year: number, month: number, day: number) =>
   `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-const shortDate = (value: string) =>
-  new Intl.DateTimeFormat("en-PH", { dateStyle: "medium" }).format(
-    new Date(value),
-  );
+
+const shortDate = (value: string) => formatEnPhDate(new Date(value));
 
 function AdminBookingList() {
   const { notifyError } = useNotifications();
   const [status, setStatus] = useState<BookingStatus | "all">("all");
+
   const [month, setMonth] = useState(() => {
     const now = new Date();
+
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+
   const [day, setDay] = useState<string | undefined>();
   const [items, setItems] = useState<BookingRequest[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -432,6 +538,7 @@ function AdminBookingList() {
       .finally(() => {
         if (active && currentScope.current === requestKey) setLoading(false);
       });
+
     return () => {
       active = false;
     };
@@ -461,10 +568,12 @@ function AdminBookingList() {
       .finally(() => {
         if (active) setCalendarLoading(false);
       });
+
     return () => {
       active = false;
     };
   }, [monthKey, statusFilter, revision, notifyError]);
+
   return (
     <div className="booking-admin">
       <PageHeader
@@ -552,7 +661,6 @@ function AdminBookingList() {
                 <tr>
                   <th>Requested ↓</th>
                   <th>Requested dates</th>
-                  <th>Reference</th>
                   <th>Event / package</th>
                   <th>Contact person</th>
                   <th>Status</th>
@@ -575,14 +683,13 @@ function AdminBookingList() {
                           event.stopPropagation();
                           navigateWorkspace(adminBookingRequestPath(item.id));
                         }}
-                        aria-label={`View request ${item.reference}`}
+                        aria-label={`View request for ${bookingRequestLabel(item.eventType, item.preferredDate)} · ${item.contactName}`}
                       >
-                        {shortDate(item.createdAt)}{" "}
+                        {shortDate(item.submittedAt)}{" "}
                         <span aria-hidden="true">↗</span>
                       </Button>
                     </td>
                     <td>{requestedSummary(item)}</td>
-                    <td>{item.reference}</td>
                     <td>
                       {item.eventType}
                       <small>
@@ -628,6 +735,7 @@ function AdminBookingList() {
     </div>
   );
 }
+
 export function BookingDetails({
   item,
   customerCanEditTimes = false,
@@ -649,11 +757,13 @@ export function BookingDetails({
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
     dialog.current?.showModal();
+
     return () => {
       dialog.current?.close();
       trigger?.focus();
     };
   }, []);
+
   return createPortal(
     <NativeDialog
       ref={dialog}
@@ -675,7 +785,9 @@ export function BookingDetails({
         >
           ×
         </Button>
-        <h2 id="booking-details-title">Booking request {item.reference}</h2>
+        <h2 id="booking-details-title">
+          {bookingRequestLabel(item.eventType, item.preferredDate)}
+        </h2>
         <BookingStatusBadge status={item.status} />
         <Tabs
           role="tablist"
@@ -726,10 +838,7 @@ export function BookingDetails({
                       {item.packageName && item.packagePrice ? (
                         <>
                           {item.packageName} ·{" "}
-                          {new Intl.NumberFormat("en-PH", {
-                            style: "currency",
-                            currency: "PHP",
-                          }).format(item.packagePrice.amountMinor / 100)}{" "}
+                          {formatPesosFromMinor(item.packagePrice.amountMinor)}{" "}
                           · up to {item.packageMaxGuests} guests
                         </>
                       ) : (
@@ -808,11 +917,15 @@ export function BookingDetails({
                   </div>
                   <div>
                     <dt>Requested</dt>
-                    <dd>{dateLabel(item.createdAt, item.timeZone)}</dd>
+                    <dd>{dateLabel(item.submittedAt, item.timeZone)}</dd>
                   </div>
                 </dl>
               </section>
             </div>
+            <BookingIntake
+              requestedServices={item.requestedServices}
+              budget={item.budget}
+            />
             {item.requestedDays && (
               <section>
                 <h3>Requested days</h3>
@@ -890,6 +1003,7 @@ function RequestedDay({
     [error, setError] = useState("");
   const [stale, setStale] = useState(false);
   const dirty = useRef(false);
+
   const resetTimes = (saved: typeof day) => {
     const savedStart = localInput(saved.startsAt, item.timeZone),
       savedEnd = localInput(saved.endsAt, item.timeZone);
@@ -898,6 +1012,7 @@ function RequestedDay({
     setNextDay(!!savedEnd && savedEnd.slice(0, 10) !== saved.date);
     dirty.current = false;
   };
+
   useEffect(() => {
     if (!dirty.current) resetTimes(day);
   }, [day.startsAt, day.endsAt, day.date, item.timeZone]);
@@ -906,19 +1021,25 @@ function RequestedDay({
     setError("");
     setStale(false);
     setBusy(true);
+
     try {
       if (!start || !end) throw new Error("Enter both start and end times.");
+
       const date = new Date(`${day.date}T00:00:00Z`);
+
       if (nextDay) date.setUTCDate(date.getUTCDate() + 1);
+
       const startsAt = zonedInstant(`${day.date}T${start}`, item.timeZone),
         endsAt = zonedInstant(
           `${date.toISOString().slice(0, 10)}T${end}`,
           item.timeZone,
         );
+
       if (endsAt <= startsAt)
         throw new Error(
           "End time must be after start time. Select next day for an overnight event.",
         );
+
       const result = await updateRequestedDayTimes(item.id, day.date, {
         startsAt,
         endsAt,
@@ -934,6 +1055,7 @@ function RequestedDay({
       setBusy(false);
     }
   }
+
   return (
     <Panel as="article" className="requested-day">
       <h4>{preferredDateLabel(day.date)}</h4>
@@ -1000,11 +1122,14 @@ function RequestedDay({
                   onClick={async () => {
                     try {
                       const result = await getMyBookingRequest(item.id);
+
                       const refreshed =
                         result.bookingRequest.requestedDays?.find(
                           (entry) => entry.date === day.date,
                         );
+
                       if (refreshed) resetTimes(refreshed);
+
                       onSaved(result.bookingRequest);
                       setStale(false);
                       setError("");

@@ -46,19 +46,24 @@ export const uploadShowcaseMediaRouteHandler: AppRouteHandler<
   typeof uploadShowcaseMediaRoute
 > = async (c) => {
   let form: FormData;
+
   try {
     form = await c.req.raw.formData();
   } catch {
     return c.json({ error: "Invalid multipart form." }, 400);
   }
+
   const file = form.get("file");
+
   if (!(file instanceof File) || form.getAll("file").length !== 1)
     return c.json({ error: "Choose one media file." }, 400);
+
   const result = await uploadShowcaseMediaService(
     c.get("db"),
     c.get("session").user.id,
     file,
   );
+
   return "status" in result
     ? c.json({ error: result.message }, result.status)
     : c.json(result, 201);

@@ -1,4 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { updateConversationAiService } from "../../services/messages/update-conversation-ai.js";
 import { conversationAiSchema, updateConversationAiSchema } from "./schemas.js";
@@ -29,10 +30,16 @@ export const updateConversationAiRouteHandler: AppRouteHandler<
     aiEnabled,
     expectedAiVersion,
   );
+
   if (result.kind === "ok")
     return c.json(
-      { aiEnabled: result.aiEnabled, aiVersion: result.aiVersion },
+      {
+        aiEnabled: result.aiEnabled,
+        aiVersion: result.aiVersion,
+        aiHandoff: result.aiHandoff,
+      },
       200,
     );
-  return c.json({ error: result.error }, result.status);
+
+  return jsonError(c, result.error, result.status);
 };

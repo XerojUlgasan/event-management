@@ -61,6 +61,40 @@ test("storage is checked on use and keys use existing precedence", () => {
   assert.throws(() => env.STORAGE, /Media storage is not configured/);
 });
 
+test("Realtime legacy signing is restricted to local Supabase targets", () => {
+  const source: Record<string, string | undefined> = {
+    REALTIME_JWT_SECRET: " fixture-secret ",
+    REALTIME_JWT_SIGNING_JWK: " fixture-jwk ",
+  };
+  const env = createEnv(source);
+  assert.deepEqual(env.REALTIME_SIGNING, {
+    jwk: "fixture-jwk",
+    localSecret: undefined,
+  });
+
+  for (const target of [
+    "https://project.supabase.co",
+    "http://localhost.example",
+    "ftp://localhost",
+    "invalid",
+  ]) {
+    source.SUPABASE_URL = target;
+    assert.equal(env.REALTIME_SIGNING.localSecret, undefined);
+  }
+
+  for (const target of [
+    "http://127.0.0.1:54321",
+    "http://kong:8000",
+    "http://[::1]:54321",
+  ]) {
+    source.SUPABASE_URL = target;
+    assert.equal(env.REALTIME_SIGNING.localSecret, "fixture-secret");
+  }
+
+  source.NODE_ENV = "production";
+  assert.equal(env.REALTIME_SIGNING.localSecret, undefined);
+});
+
 test("AI text configuration is lazy and does not require unused model roles", () => {
   const source: Record<string, string | undefined> = {};
   const env = createEnv(source);

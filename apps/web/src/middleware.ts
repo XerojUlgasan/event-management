@@ -15,6 +15,7 @@ const dropped = [
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const target = env.API_PROXY_TARGET;
+
   if (!target || !context.url.pathname.startsWith("/v1")) return next();
 
   const path = context.url.pathname.replace(
@@ -26,6 +27,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   headers.delete("host");
   const hasBody =
     context.request.method !== "GET" && context.request.method !== "HEAD";
+
   try {
     const response = await fetch(upstream, {
       method: context.request.method,
@@ -34,7 +36,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
       redirect: "manual",
     });
     const outgoing = new Headers(response.headers);
+
     for (const name of dropped) outgoing.delete(name);
+
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
@@ -42,6 +46,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     });
   } catch (error) {
     console.error(error);
+
     return new Response("The API could not be reached.", { status: 502 });
   }
 });

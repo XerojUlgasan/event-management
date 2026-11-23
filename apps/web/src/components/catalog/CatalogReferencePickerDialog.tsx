@@ -1,10 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Badge, Button, Dialog, FormField, Input } from "@event-management/ui";
+import {
+  Badge,
+  Button,
+  CatalogThumbnail,
+  Dialog,
+  FormField,
+  Input,
+} from "@event-management/ui";
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 import { getAdminServices } from "../../lib/data/catalog/services";
 import { getAdminPackages } from "../../lib/data/catalog/packages";
-import type { CatalogServicePreview } from "@event-management/contracts/catalog";
+import type {
+  CatalogServicePreview,
+  ServicePricing,
+} from "@event-management/contracts/catalog";
 import { catalogMediaSrc } from "../../lib/data/catalog/media";
 
 // API pages include pricing and nested canvases; widgets only carry this preview.
@@ -29,28 +39,50 @@ export function CatalogReferencePickerDialog({
   onCaptionChange,
   onSelect,
   onClose,
+  hideCaption = false,
 }: {
+  hideCaption?: boolean;
   kind: "service" | "package";
   selectedId?: string | null;
   caption: string;
   onCaptionChange: (caption: string) => void;
-  onSelect: (item: CatalogServicePreview) => void;
+  onSelect: (
+    item: CatalogServicePreview & { pricing?: ServicePricing },
+  ) => void;
   onClose: () => void;
 }) {
   const plural = kind === "package" ? "packages" : "services";
+
   const loadPage = async (search: string, cursor?: string) => {
     const query = { archived: "active" as const, search, cursor };
+
     if (kind === "package") {
       const page = await getAdminPackages(query);
+
       return { items: page.packages.map(preview), nextCursor: page.nextCursor };
     }
+
     const page = await getAdminServices(query);
-    return { items: page.services.map(preview), nextCursor: page.nextCursor };
+
+    return {
+      items: page.services.map((service) => ({
+        ...preview(service),
+        pricing: {
+          fixedPricePesos: service.fixedPricePesos,
+          includedHours: service.includedHours,
+          hourlyRatePesos: service.hourlyRatePesos,
+        },
+      })),
+      nextCursor: page.nextCursor,
+    };
   };
+
   const searchRef = useRef<HTMLInputElement>(null);
   const requestId = useRef(0);
   const [search, setSearch] = useState("");
-  const [items, setItems] = useState<CatalogServicePreview[]>([]);
+  const [items, setItems] = useState<
+    (CatalogServicePreview & { pricing?: ServicePricing })[]
+  >([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -62,17 +94,20 @@ export function CatalogReferencePickerDialog({
     setError(false);
     setItems([]);
     setCursor(null);
+
     const timer = window.setTimeout(
       () => {
         void loadPage(search.trim()).then(
           (page) => {
             if (id !== requestId.current) return;
+
             setItems(page.items);
             setCursor(page.nextCursor);
             setLoading(false);
           },
           () => {
             if (id !== requestId.current) return;
+
             setError(true);
             setLoading(false);
           },
@@ -80,6 +115,7 @@ export function CatalogReferencePickerDialog({
       },
       search ? 250 : 0,
     );
+
     return () => {
       window.clearTimeout(timer);
       requestId.current++;
@@ -88,12 +124,16 @@ export function CatalogReferencePickerDialog({
 
   const loadMore = async () => {
     if (!cursor || loading) return;
+
     const id = ++requestId.current;
     setLoading(true);
     setError(false);
+
     try {
       const page = await loadPage(search.trim(), cursor);
+
       if (id !== requestId.current) return;
+
       setItems((previous) => [...previous, ...page.items]);
       setCursor(page.nextCursor);
     } catch {
@@ -138,13 +178,10 @@ export function CatalogReferencePickerDialog({
             aria-pressed={item.id === selectedId}
             onClick={() => onSelect(item)}
           >
-            {item.imageUrl ? (
-              <img src={catalogMediaSrc(item.imageUrl)} alt="" />
-            ) : (
-              <span className="pe-reference-option-image" aria-hidden="true">
-                No photo
-              </span>
-            )}
+            <CatalogThumbnail
+              className="pe-reference-option-image"
+              src={item.imageUrl ? catalogMediaSrc(item.imageUrl) : null}
+            />
             <span className="pe-reference-option-copy">
               <strong>{item.name}</strong>
               <span>{item.description}</span>
@@ -184,16 +221,18 @@ export function CatalogReferencePickerDialog({
           </Button>
         )}
       </div>
-      <FormField label="Caption (optional)">
-        {(props) => (
-          <Input
-            {...props}
-            value={caption}
-            maxLength={MAX_CATALOG_TEXT_LENGTH}
-            onChange={(event) => onCaptionChange(event.target.value)}
-          />
-        )}
-      </FormField>
+      {!hideCaption && (
+        <FormField label="Caption (optional)">
+          {(props) => (
+            <Input
+              {...props}
+              value={caption}
+              maxLength={MAX_CATALOG_TEXT_LENGTH}
+              onChange={(event) => onCaptionChange(event.target.value)}
+            />
+          )}
+        </FormField>
+      )}
       <p className="pe-reference-picker-note">Changes apply when you save.</p>
     </Dialog>,
     document.body,

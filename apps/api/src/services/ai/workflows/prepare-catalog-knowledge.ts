@@ -1,9 +1,7 @@
 import type { CatalogSection } from "@event-management/contracts/catalog";
 import type { Selectable } from "kysely";
-import type { PackageServiceRow } from "../../../data/packages/package-services.js";
 import type { Packages, Services } from "../../../db/types.js";
-
-const MAX_MARKDOWN_CHUNK_CHARACTERS = 6_000;
+import { includedServiceTermsLines } from "../catalog-service-terms.js";
 
 type PackageRecord = Pick<
   Selectable<Packages>,
@@ -32,7 +30,6 @@ export type PrepareCatalogKnowledgeInput =
       kind: "package";
       record: PackageRecord;
       sections: CatalogSection[];
-      services: PackageServiceRow[];
     }
   | {
       kind: "service";
@@ -54,7 +51,7 @@ function nonemptyLine(label: string, value: string) {
   return value ? [`${label}: ${value}`] : [];
 }
 
-function packageOverview(record: PackageRecord, services: PackageServiceRow[]) {
+function packageOverview(record: PackageRecord) {
   const lines = [
     "Catalog package",
     `Name: ${record.name}`,
@@ -63,19 +60,6 @@ function packageOverview(record: PackageRecord, services: PackageServiceRow[]) {
     `Capacity: up to ${record.max_guests} guests.`,
   ];
 
-  const activeServices = services
-    .filter((service) => service.archived_at === null)
-    .slice()
-    .sort((left, right) => left.sort_order - right.sort_order);
-  for (const role of ["included", "optional"] as const) {
-    const names = activeServices
-      .filter((service) => service.role === role)
-      .map((service) => service.name);
-    if (names.length)
-      lines.push(
-        `${role === "included" ? "Included" : "Optional"} services: ${names.join(", ")}.`,
-      );
-  }
   return lines.join("\n");
 }
 
@@ -90,6 +74,7 @@ function serviceOverview(record: ServiceRecord) {
     lines.push(
       `Fixed price: PHP ${record.fixed_price_pesos} for ${record.included_hours} included hours.`,
     );
+
     if (record.hourly_rate_pesos !== null)
       lines.push(`Additional time: PHP ${record.hourly_rate_pesos} per hour.`);
   } else if (record.hourly_rate_pesos !== null) {
@@ -97,28 +82,14 @@ function serviceOverview(record: ServiceRecord) {
   } else if (record.fixed_price_pesos !== null) {
     lines.push(`Fixed price: PHP ${record.fixed_price_pesos}.`);
   }
+
   return lines.join("\n");
 }
 
-function splitMarkdown(markdown: string) {
-  const characters = Array.from(markdown);
-  const chunks: string[] = [];
-  for (
-    let start = 0;
-    start < characters.length;
-    start += MAX_MARKDOWN_CHUNK_CHARACTERS
-  ) {
-    chunks.push(
-      characters.slice(start, start + MAX_MARKDOWN_CHUNK_CHARACTERS).join(""),
-    );
-  }
-  return chunks;
-}
+function prepareSections(input: PrepareCatalogKnowledgeInput) {
+  const text: string[] = [];
+  const photos: PreparedCatalogKnowledgeChunk[] = [];
 
-function prepareSections(
-  input: PrepareCatalogKnowledgeInput,
-): PreparedCatalogKnowledgeChunk[] {
-  const chunks: PreparedCatalogKnowledgeChunk[] = [];
   for (const section of input.sections) {
     const widgets = section.widgets
       .map((widget, index) => ({ widget, index }))
@@ -133,28 +104,29 @@ function prepareSections(
       if (widget.type === "video") continue;
 
       const context = `${listingLabel(input)}\nSection: ${section.title}`;
+
       if (widget.type === "service" || widget.type === "package") {
-        if (widget.caption)
-          chunks.push({
-            chunkKey: `${widget.type}:${widget.id}`,
-            contentMarkdown: `${context}\nCaption: ${widget.caption}`,
-            mediaId: null,
-          });
-        continue;
-      }
-      if (widget.type === "markdown") {
-        for (const [index, markdown] of splitMarkdown(
-          widget.markdown,
-        ).entries())
-          chunks.push({
-            chunkKey: `markdown:${widget.id}:${index}`,
-            contentMarkdown: `${context}\nMarkdown:\n${markdown}`,
-            mediaId: null,
-          });
+        if (input.kind === "package" && widget.type === "service")
+          text.push(
+            [
+              context,
+              `Included service ID: ${widget.serviceId ?? "not specified"}`,
+              ...includedServiceTermsLines(widget.serviceTerms),
+              ...nonemptyLine("Caption", widget.caption),
+            ].join("\n"),
+          );
+        else if (widget.caption)
+          text.push(`${context}\nCaption: ${widget.caption}`);
+
         continue;
       }
 
-      chunks.push({
+      if (widget.type === "markdown") {
+        text.push(`${context}\nMarkdown:\n${widget.markdown}`);
+        continue;
+      }
+
+      photos.push({
         chunkKey: `photo:${widget.id}`,
         contentMarkdown: [
           context,
@@ -165,7 +137,8 @@ function prepareSections(
       });
     }
   }
-  return chunks;
+
+  return { text, photos };
 }
 
 export function prepareCatalogKnowledge(
@@ -181,16 +154,17 @@ export function prepareCatalogKnowledge(
 
   const overview =
     input.kind === "package"
-      ? packageOverview(input.record, input.services)
+      ? packageOverview(input.record)
       : serviceOverview(input.record);
 
+  const { text, photos } = prepareSections(input);
+
   return [
-    ...splitMarkdown(overview).map((content, index) => ({
-      chunkKey: index === 0 ? "overview" : `overview:${index}`,
-      contentMarkdown:
-        index === 0 ? content : `${listingLabel(input)}\n\n${content}`,
+    {
+      chunkKey: "text",
+      contentMarkdown: [overview, ...text].join("\n\n"),
       mediaId: null,
-    })),
-    ...prepareSections(input),
+    },
+    ...photos,
   ];
 }

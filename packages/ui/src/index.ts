@@ -9,11 +9,14 @@ export { Select } from "./atoms/Select";
 export { Badge } from "./atoms/Badge";
 export type { BadgeTone } from "./atoms/Badge";
 export { Avatar } from "./atoms/Avatar";
+export { CatalogThumbnail } from "./atoms/CatalogThumbnail";
 export { Wordmark } from "./atoms/Wordmark";
 export { ActionLink } from "./atoms/ActionLink";
 export { SectionCounter } from "./atoms/SectionCounter";
 
 // Molecules
+export { AssistantTyping } from "./molecules/AssistantTyping";
+export { Markdown } from "./molecules/Markdown";
 export { Pagination } from "./molecules/Pagination";
 export type { PaginationProps } from "./molecules/Pagination";
 export { Brand } from "./molecules/Brand";
@@ -26,6 +29,7 @@ export type { TabItem } from "./molecules/Tabs";
 export { FormField } from "./molecules/FormField";
 export type { FormFieldControlProps } from "./molecules/FormField";
 export { InputGroup } from "./molecules/InputGroup";
+export { InfoDisclosure } from "./molecules/InfoDisclosure";
 export { ActivityList } from "./molecules/ActivityList";
 export type { ActivityItem } from "./molecules/ActivityList";
 export { Toast } from "./molecules/Toast";
@@ -44,10 +48,10 @@ export {
   CatalogCanvas,
   CatalogSections,
   CatalogWidgetContent,
-  CatalogMarkdown,
   CatalogGridGuides,
   CatalogGridRuler,
   CATALOG_GRID,
+  catalogGridMetrics,
   catalogGridStyle,
 } from "./organisms/CatalogCanvas";
 export { DataTable } from "./organisms/DataTable";

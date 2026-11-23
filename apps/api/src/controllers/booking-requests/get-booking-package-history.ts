@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { jsonError } from "../../utils/service-result.js";
 import type { AppRouteHandler } from "../../types/hono.js";
-import { publicSchema } from "../packages/schemas.js";
+import { packageHistorySnapshotSchema } from "../packages/schemas.js";
 import { idParams } from "./schemas.js";
 import { errors, json } from "./http.js";
 import { paginationQuerySchema } from "../../utils/pagination.js";
@@ -19,9 +20,10 @@ export const getAdminBookingPackageHistoryRoute = createRoute({
             z.object({
               id: z.string().uuid(),
               actorId: z.string().uuid().nullable(),
+              actorName: z.string().nullable(),
               action: z.string(),
-              before: publicSchema.nullable(),
-              after: publicSchema,
+              before: packageHistorySnapshotSchema.nullable(),
+              after: packageHistorySnapshotSchema,
               createdAt: z.string(),
             }),
           ),
@@ -36,18 +38,24 @@ export const getAdminBookingPackageHistoryRoute = createRoute({
     404: errors[404],
   },
 });
+
 export const getAdminBookingPackageHistoryRouteHandler: AppRouteHandler<
   typeof getAdminBookingPackageHistoryRoute
 > = async (c) => {
   const user = c.get("session").user;
+
   if (user.role !== "admin")
-    return c.json({ error: "Booking request not found" }, 404);
+    return jsonError(c, "Booking request not found", 404);
+
   const history = await getBookingPackageHistoryService(
     c.get("db"),
     c.req.valid("param").id,
     c.req.valid("query"),
   );
-  if (!history) return c.json({ error: "Booking request not found" }, 404);
+
+  if (!history) return jsonError(c, "Booking request not found", 404);
+
   c.header("Cache-Control", "private, no-store");
+
   return c.json(history, 200);
 };

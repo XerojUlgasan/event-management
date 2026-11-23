@@ -14,15 +14,17 @@ export async function updateConversationAiService(
     aiEnabled,
     expectedAiVersion,
   );
+
   if (result.kind === "ok") return result;
+
   return {
     kind: "error" as const,
     status: result.kind === "not-found" ? (404 as const) : (409 as const),
     error:
       result.kind === "not-found"
         ? "Conversation not found"
-        : result.kind === "closed"
-          ? "Conversation is closed"
+        : result.kind === "expired"
+          ? "Guest conversation expired"
           : "Conversation changed. Refresh and try again.",
   };
 }
