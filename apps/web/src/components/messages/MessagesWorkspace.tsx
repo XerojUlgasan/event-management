@@ -529,7 +529,7 @@ export function MessagesWorkspace({
                 )}
                 <small>{preview(conversation)}</small>
                 {(drafts[conversation.id] ||
-                  fileDrafts[conversation.id]?.length) && (
+                  (fileDrafts[conversation.id]?.length ?? 0) > 0) && (
                   <small className="conversation-draft">Draft</small>
                 )}
               </span>
