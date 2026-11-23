@@ -2,6 +2,7 @@ import {
   reviewForComposition,
   reviewForSend,
 } from "../../lib/services/messages/booking-review";
+import { latestSuggestedReplyMessage } from "../../lib/services/messages/suggested-replies";
 import { navigateWorkspace } from "../../lib/navigation/workspace-navigation";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import {
@@ -12,7 +13,6 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type SubmitEvent,
 } from "react";
 import {
   AssistantTyping,
@@ -41,6 +41,7 @@ import {
 import "../../styles/messages/messages.css";
 import { MessageAttachments, MessageImages } from "./MessageImages";
 import { CatalogRecommendations } from "./CatalogRecommendations";
+import { SuggestedReplies } from "./SuggestedReplies";
 import { MessageProcessing } from "./MessageProcessing";
 import { useAgentProfile } from "./use-agent-profile";
 import { initialsFromName } from "../../lib/utils/formatting/name";
@@ -179,6 +180,7 @@ export function MessagesWorkspace({
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draft = activeId ? (drafts[activeId] ?? "") : "";
   const reviewPins = useRef<Record<string, string | null | undefined>>({});
+  const respondedToSuggestion = useRef<Record<string, string>>({});
 
   const setDraft = (value: string) => {
     if (!activeId) return;
@@ -227,6 +229,10 @@ export function MessagesWorkspace({
     (localAiReplyPending || !!active.aiReplyPending);
   const isTeam = viewerRole === "customer";
   const composerDisabled = !activeId || (!isTeam && sending) || sendDisabled;
+  const suggestedMessage =
+    isTeam && active?.aiEnabled && !composerDisabled && !aiReplyPending
+      ? latestSuggestedReplyMessage(messages)
+      : undefined;
   const singleConversation =
     isTeam &&
     conversations.length === 1 &&
@@ -398,43 +404,60 @@ export function MessagesWorkspace({
     conversationOpen,
   ]);
 
-  async function submit(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const body = draft.trim();
+  async function send(suggestion?: { messageId: string; body: string }) {
+    const body = suggestion?.body ?? draft.trim();
+    const sentFiles = suggestion ? [] : files;
 
     if (
-      (!body && !files.length) ||
-      (!isTeam && sending) ||
-      sendDisabled ||
+      (!body && !sentFiles.length) ||
+      composerDisabled ||
       !activeId ||
       (!isTeam && pendingSendIds.current.has(activeId))
+    )
+      return;
+
+    if (
+      suggestion &&
+      (suggestion.messageId !== suggestedMessage?.id ||
+        respondedToSuggestion.current[activeId] === suggestion.messageId ||
+        !suggestedMessage.replies.includes(body))
     )
       return;
 
     const request = generation.current();
     const conversationId = activeId;
     const sentDraft = draft;
-    const sentFiles = files;
     const previous = sendKeys.current[conversationId];
     const reviewMessageId = isTeam
-      ? reviewForSend(reviewPins.current[conversationId], files.length > 0)
+      ? reviewForSend(
+          suggestion?.messageId ?? reviewPins.current[conversationId],
+          sentFiles.length > 0,
+        )
       : undefined;
 
     const requestId =
+      !suggestion &&
       previous &&
       previous.body === body &&
-      previous.files.length === files.length &&
-      previous.files.every((file, i) => file === files[i])
+      previous.files.length === sentFiles.length &&
+      previous.files.every((file, i) => file === sentFiles[i])
         ? previous.requestId
         : crypto.randomUUID();
 
-    sendKeys.current[conversationId] = { body, files, requestId };
+    if (!suggestion)
+      sendKeys.current[conversationId] = { body, files, requestId };
 
     if (isTeam) {
-      setDrafts((previous) => ({ ...previous, [conversationId]: "" }));
-      delete reviewPins.current[conversationId];
-      setFileDrafts((previous) => ({ ...previous, [conversationId]: [] }));
-      delete sendKeys.current[conversationId];
+      if (suggestedMessage)
+        respondedToSuggestion.current[conversationId] = suggestedMessage.id;
+
+      if (!suggestion) {
+        setDrafts((previous) => ({ ...previous, [conversationId]: "" }));
+        delete reviewPins.current[conversationId];
+        setFileDrafts((previous) => ({ ...previous, [conversationId]: [] }));
+        delete sendKeys.current[conversationId];
+      }
+
       void onSend(body, sentFiles, requestId, reviewMessageId);
       composer.current?.focus();
 
@@ -903,6 +926,16 @@ export function MessagesWorkspace({
                     recommendations={message.catalogRecommendations}
                   />
                 )}
+                {suggestedMessage?.id === message.id &&
+                  activeId &&
+                  respondedToSuggestion.current[activeId] !== message.id && (
+                    <SuggestedReplies
+                      replies={suggestedMessage.replies}
+                      onSelect={(body) =>
+                        void send({ messageId: message.id, body })
+                      }
+                    />
+                  )}
               </Fragment>
             );
           })}
@@ -919,7 +952,13 @@ export function MessagesWorkspace({
           </p>
         )}
 
-        <form className="message-composer" onSubmit={submit}>
+        <form
+          className="message-composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void send();
+          }}
+        >
           <span id={composerShortcutId} className="sr-only">
             Enter to send. Shift plus Enter for a new line.
           </span>

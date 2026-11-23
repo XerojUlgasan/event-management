@@ -4,6 +4,7 @@ import {
 } from "@event-management/contracts/message-images";
 import {
   catalogRecommendationsSchema,
+  chatMessageSchema,
   type ChatMessage,
 } from "@event-management/contracts/messages";
 import type { MessageWithSender } from "../data/messages/types.js";
@@ -17,6 +18,9 @@ export function messageDto(row: MessageWithSender): ChatMessage {
         : "customer";
   const recommendations = catalogRecommendationsSchema.safeParse(
     row.catalog_recommendations,
+  );
+  const suggestedReplies = chatMessageSchema.shape.suggestedReplies.safeParse(
+    row.suggested_replies,
   );
 
   return {
@@ -45,6 +49,9 @@ export function messageDto(row: MessageWithSender): ChatMessage {
     quotationId: row.quotation_id,
     ...(role === "assistant" && recommendations.success
       ? { catalogRecommendations: recommendations.data }
+      : {}),
+    ...(role === "assistant" && suggestedReplies.success
+      ? { suggestedReplies: suggestedReplies.data }
       : {}),
     replyToMessageId: row.reply_to_message_id,
     senderId: row.sender_id,

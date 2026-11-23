@@ -63,6 +63,7 @@ model Message {
   guestOrigin Boolean @default(false) @map("guest_origin")
   quotationId    String?      @unique @map("quotation_id") @db.Uuid
   catalogRecommendations Json? @map("catalog_recommendations") @db.JsonB
+  suggestedReplies Json? @map("suggested_replies") @db.JsonB
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User?        @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   quotation      Quotation?   @relation(fields: [quotationId], references: [id], onDelete: Restrict, onUpdate: NoAction)

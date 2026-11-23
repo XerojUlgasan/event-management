@@ -210,6 +210,7 @@ export interface Messages {
   reply_to_message_id: string | null;
   sender_id: string | null;
   sender_role: Generated<string>;
+  suggested_replies: Json | null;
 }
 
 export interface Notifications {

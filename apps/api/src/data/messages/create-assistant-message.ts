@@ -14,6 +14,7 @@ type AssistantToolTurn = {
   turnId: string;
   customerMessageId: string;
   catalogRecommendations?: CatalogRecommendation[];
+  suggestedReplies?: string[];
 };
 
 export function createAssistantMessageData(
@@ -131,6 +132,9 @@ export async function createAssistantMessageInTransactionData(
       reply_to_message_id: toolTurn?.customerMessageId ?? null,
       catalog_recommendations: toolTurn?.catalogRecommendations
         ? sql`${JSON.stringify(toolTurn.catalogRecommendations)}::jsonb`
+        : null,
+      suggested_replies: toolTurn?.suggestedReplies
+        ? sql`${JSON.stringify(toolTurn.suggestedReplies)}::jsonb`
         : null,
     })
     .returningAll()

@@ -3,7 +3,10 @@ import {
   type ImageMessageJobLease,
 } from "../../data/messages/message-processing.js";
 import { messageImageInterpretationSchema } from "@event-management/contracts/message-images";
-import type { CatalogRecommendation } from "@event-management/contracts/messages";
+import {
+  suggestedReplySchema,
+  type CatalogRecommendation,
+} from "@event-management/contracts/messages";
 import { randomUUID } from "node:crypto";
 import type { ModelMessage } from "ai";
 import type { Kysely } from "kysely";
@@ -23,7 +26,10 @@ import {
   previousPackageBudget,
 } from "./assistant-context.js";
 import { getAgentSettingsService } from "../ai-agent-settings/get-agent-settings.js";
-import { createCustomerServiceAgent } from "./agents/create-customer-service-agent.js";
+import {
+  containsRawToolProtocol,
+  createCustomerServiceAgent,
+} from "./agents/create-customer-service-agent.js";
 import { maxConversationMemoryCharacters } from "./tools/update-conversation-memory.js";
 import { readBookingDraftData } from "../../data/messages/booking-draft-guard.js";
 import { finishToolCallData } from "../../data/ai/finish-tool-call.js";
@@ -583,14 +589,10 @@ export async function runAssistantTurnService({
 
   if (persistenceFailed) throw new Error("Tool-call tracking is unavailable");
 
-  const containsRawToolProtocol = (value: string) =>
-    /(?:DSML|<\|(?:tool_call|tool_calls|function_call)|<tool_call>)/iu.test(
-      value,
-    );
-
   if (
     containsRawToolProtocol(generated.text) &&
-    !generated.steps.some((step) => step.toolCalls.length)
+    !generated.steps.some((step) => step.toolCalls.length) &&
+    containsRawToolProtocol(generated.output?.message ?? "")
   ) {
     // Never execute text as a tool. Retrying after any native call could repeat
     // a mutation, so permit one retry only when the first attempt made none.
@@ -601,7 +603,7 @@ export async function runAssistantTurnService({
           {
             role: "user",
             content:
-              "Use only the provided native SDK tools for tool calls. Never output tool protocol markup as text. Answer normally after the tool result.",
+              "Use only the provided native SDK tools for tool calls. Never output tool protocol markup as text. Return the structured reply after the tool result.",
           },
         ],
         abortSignal: signal,
@@ -663,14 +665,28 @@ export async function runAssistantTurnService({
     if (review.status === "review_ready") return messageDto(review.message);
   }
 
-  if (containsRawToolProtocol(generated.text))
-    throw new Error("AI returned invalid tool protocol");
+  const { output, usage, steps } = generated;
 
-  const { text, usage, steps } = generated;
+  if (!output) throw new Error("AI returned an invalid structured reply");
 
-  const reply = text.trim();
+  const reply = output.message.trim();
 
   if (!reply) throw new Error("AI returned an empty reply");
+
+  if (containsRawToolProtocol(reply))
+    throw new Error("AI returned invalid tool protocol");
+
+  const suggestedReplies = [
+    ...new Set(
+      output.suggested_replies.flatMap((value) => {
+        const candidate = suggestedReplySchema.safeParse(value);
+
+        return candidate.success && !containsRawToolProtocol(candidate.data)
+          ? [candidate.data]
+          : [];
+      }),
+    ),
+  ];
 
   signal.throwIfAborted();
   const saved = await createAssistantMessageData(
@@ -680,7 +696,7 @@ export async function runAssistantTurnService({
     reply,
     aiVersion,
     guestIdentityId,
-    { turnId, customerMessageId, catalogRecommendations },
+    { turnId, customerMessageId, catalogRecommendations, suggestedReplies },
     jobLease,
     signal,
   );

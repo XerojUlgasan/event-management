@@ -36,6 +36,7 @@ import {
 } from "../../messages/MessageImages";
 import { MessageProcessing } from "../../messages/MessageProcessing";
 import { CatalogRecommendations } from "../../messages/CatalogRecommendations";
+import { SuggestedReplies } from "../../messages/SuggestedReplies";
 import {
   hasLocalReplyPending,
   hasObservedReply,
@@ -43,6 +44,7 @@ import {
 } from "../../../lib/services/messages/pending-replies";
 import { useAgentProfile } from "../../messages/use-agent-profile";
 import { assertCursorMoved } from "../../../lib/services/messages/older-page";
+import { latestSuggestedReplyMessage } from "../../../lib/services/messages/suggested-replies";
 
 export default function PublicChat() {
   const [open, setOpen] = useState(false);
@@ -87,6 +89,7 @@ export default function PublicChat() {
   const nearBottom = useRef(true);
   const scrollOnOpen = useRef(true);
   const lastMessageId = useRef<string | null>(null);
+  const respondedToSuggestion = useRef<string | null>(null);
   const olderAnchor = useRef<{ id: string; top: number } | null>(null);
   const threadRef = useRef(thread);
   threadRef.current = thread;
@@ -268,6 +271,20 @@ export default function PublicChat() {
     !!thread?.conversation.aiEnabled &&
     (!!thread.conversation.aiReplyPending ||
       hasLocalReplyPending(pendingReplies, thread.conversation));
+  const remainingMessages = guestRemaining(
+    thread?.guest.remainingMessages ?? 0,
+    guestReservedSends(outbox),
+  );
+
+  const suggestedMessage =
+    thread?.conversation.aiEnabled &&
+    !aiReplyPending &&
+    !expired &&
+    !thread.guest.loginRequired &&
+    remainingMessages > 0 &&
+    !Object.values(outbox).some((item) => !item.failed)
+      ? latestSuggestedReplyMessage(thread.messages)
+      : undefined;
 
   useLayoutEffect(() => {
     const element = messageList.current;
@@ -449,19 +466,11 @@ export default function PublicChat() {
     }
   };
 
-  const send = () => {
+  const send = (suggestion?: { messageId: string; body: string }) => {
     const current = threadRef.current;
-
-    const item = prepareGuestSend(
-      null,
-      draft,
-      () => crypto.randomUUID(),
-      files,
-    );
 
     if (
       !current ||
-      !item ||
       expired ||
       current.guest.loginRequired ||
       guestRemaining(
@@ -471,8 +480,35 @@ export default function PublicChat() {
     )
       return;
 
-    setDraft("");
-    setFiles([]);
+    const latest = latestSuggestedReplyMessage(current.messages);
+
+    if (
+      suggestion &&
+      (!current.conversation.aiEnabled ||
+        current.conversation.aiReplyPending ||
+        Object.values(outboxRef.current).some((item) => !item.failed) ||
+        suggestion.messageId !== latest?.id ||
+        respondedToSuggestion.current === suggestion.messageId ||
+        !latest.replies.includes(suggestion.body))
+    )
+      return;
+
+    const item = prepareGuestSend(
+      null,
+      suggestion?.body ?? draft,
+      () => crypto.randomUUID(),
+      suggestion ? [] : files,
+    );
+
+    if (!item) return;
+
+    if (latest) respondedToSuggestion.current = latest.id;
+
+    if (!suggestion) {
+      setDraft("");
+      setFiles([]);
+    }
+
     setError("");
     void deliver(current.conversation.id, {
       ...item,
@@ -758,6 +794,15 @@ export default function PublicChat() {
                           recommendations={message.catalogRecommendations}
                         />
                       )}
+                      {suggestedMessage?.id === message.id &&
+                        respondedToSuggestion.current !== message.id && (
+                          <SuggestedReplies
+                            replies={suggestedMessage.replies}
+                            onSelect={(body) =>
+                              send({ messageId: message.id, body })
+                            }
+                          />
+                        )}
                     </Fragment>
                   );
                 })}
@@ -854,11 +899,7 @@ export default function PublicChat() {
                 <Button
                   type="submit"
                   disabled={
-                    (!draft.trim() && !files.length) ||
-                    guestRemaining(
-                      thread.guest.remainingMessages,
-                      guestReservedSends(outbox),
-                    ) === 0
+                    (!draft.trim() && !files.length) || remainingMessages === 0
                   }
                   aria-label="Send message"
                   icon="arrow"
@@ -871,11 +912,7 @@ export default function PublicChat() {
             !thread.guest.loginRequired &&
             !expired && (
               <div className="handover">
-                {guestRemaining(
-                  thread.guest.remainingMessages,
-                  guestReservedSends(outbox),
-                )}{" "}
-                guest messages remaining
+                {remainingMessages} guest messages remaining
               </div>
             )}
         </section>

@@ -5,6 +5,18 @@ import {
 } from "./message-images.js";
 
 export const MAX_NEW_CATALOG_RECOMMENDATIONS = 3;
+export const MAX_SUGGESTED_REPLIES = 3;
+
+export const suggestedReplySchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(120)
+  .regex(/^[^\r\n]+$/u);
+
+const suggestedRepliesSchema = z
+  .array(suggestedReplySchema)
+  .max(MAX_SUGGESTED_REPLIES);
 
 const recommendationFields = {
   id: z.uuid(),
@@ -56,6 +68,7 @@ export const chatMessageSchema = z.object({
   processing: messageProcessingSchema.nullable(),
   quotationId: z.string().uuid().nullable(),
   catalogRecommendations: catalogRecommendationsSchema.optional(),
+  suggestedReplies: suggestedRepliesSchema.optional(),
   replyToMessageId: z.string().uuid().nullable(),
   senderId: z.string().uuid().nullable(),
   senderRole: z.enum(["admin", "customer", "assistant"]),

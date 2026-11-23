@@ -38,7 +38,17 @@ let team: { id: string; cookie: string };
 let model: MockLanguageModelV4;
 let packageId: string;
 
-function useReply(text: string) {
+function isAssistantPrompt(
+  prompt: MockLanguageModelV4["doGenerateCalls"][number]["prompt"],
+) {
+  return prompt.some(
+    (message) =>
+      message.role === "system" &&
+      message.content.includes("## Suggested customer replies"),
+  );
+}
+
+function useReply(text: string, suggestions: string[] = []) {
   model = new MockLanguageModelV4({
     doGenerate: async ({ prompt }) => ({
       content: [
@@ -52,7 +62,12 @@ function useReply(text: string) {
               ),
           )
             ? JSON.stringify({ style: "en", copy: null })
-            : text,
+            : isAssistantPrompt(prompt)
+              ? JSON.stringify({
+                  message: text,
+                  suggested_replies: suggestions,
+                })
+              : text,
         },
       ],
       finishReason: { unified: "stop", raw: undefined },
@@ -131,8 +146,9 @@ function useToolRounds(
   beforeAnswer?: () => Promise<void>,
   consent?: "continue",
   reply = "Catalog results are ready",
+  suggestions?: string[],
 ) {
-  useReply(reply);
+  useReply(reply, suggestions);
   const generate = model.doGenerate.bind(model);
   model.doGenerate = async (...args) => {
     const result = await generate(...args);
@@ -290,6 +306,95 @@ async function send(
 
   return customerMessageResultSchema.parse(await response.json());
 }
+
+test("generated customer choices persist beside their AMAC message and legacy replies remain readable", async () => {
+  const id = await conversation();
+  const legacy = await db
+    .insertInto("messages")
+    .values({
+      conversation_id: id,
+      body: "Mensaje anterior",
+      sender_role: "assistant",
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  useReply("**¿Qué tipo de evento prefieres?**", [
+    "Una reunión familiar",
+    " ",
+    "Una reunión familiar",
+  ]);
+  const first = await send(id, "Quiero organizar un evento.");
+  assert.equal(first.assistantError, null);
+  assert.equal(
+    first.assistantMessage?.body,
+    "**¿Qué tipo de evento prefieres?**",
+  );
+  assert.deepEqual(first.assistantMessage?.suggestedReplies, [
+    "Una reunión familiar",
+  ]);
+  const { prompt, tools } = model.doGenerateCalls[0];
+  assert.match(JSON.stringify(prompt), /suggested_replies/u);
+  assert.ok(tools?.some(({ name }) => name === "updateBookingDraft"));
+
+  useReply("¿Cómo te llamas?");
+  const second = await send(id, first.assistantMessage!.suggestedReplies![0]);
+  assert.equal(second.message.body, "Una reunión familiar");
+  assert.deepEqual(second.assistantMessage?.suggestedReplies, []);
+
+  const thread = threadSchema.parse(
+    await (await call(`/messages/conversations/${id}`, customer.cookie)).json(),
+  );
+  assert.equal(
+    thread.messages.find(({ id }) => id === legacy.id)?.suggestedReplies,
+    undefined,
+  );
+  assert.deepEqual(
+    thread.messages.find(({ id }) => id === first.assistantMessage?.id)
+      ?.suggestedReplies,
+    ["Una reunión familiar"],
+  );
+  assert.deepEqual(thread.messages.at(-1)?.suggestedReplies, []);
+});
+
+test("provider output never displays a prefaced reply envelope as raw text", async () => {
+  const id = await conversation();
+  const cases = [
+    {
+      output: "Which event would you prefer?",
+      body: "Which event would you prefer?",
+      suggestions: [],
+    },
+    {
+      output:
+        'Here is my response:\n{"message":"Which event?","suggested_replies":["A wedding"]}',
+      body: "Which event?",
+      suggestions: ["A wedding"],
+    },
+    {
+      output:
+        'Here is my response: {"message":"Which event?","suggested_replies":',
+      body: undefined,
+      suggestions: undefined,
+    },
+  ];
+
+  for (const [index, example] of cases.entries()) {
+    useReply("");
+    const generate = model.doGenerate.bind(model);
+    model.doGenerate = async (...args) => ({
+      ...(await generate(...args)),
+      content: [{ type: "text", text: example.output }],
+    });
+
+    const result = await send(id, `Question ${index + 1}`);
+    assert.equal(result.assistantMessage?.body, example.body);
+    assert.deepEqual(
+      result.assistantMessage?.suggestedReplies,
+      example.suggestions,
+    );
+    assert.equal(Boolean(result.assistantError), example.body === undefined);
+  }
+});
 
 test("published agent personality and switches shape the next assistant turn", async () => {
   const id = await conversation();
@@ -520,6 +625,18 @@ test("native tools collect, review and submit the same draft once", async () => 
       },
     },
   ]);
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+
+    return isAssistantPrompt(args[0].prompt) &&
+      result.finishReason.unified === "stop"
+      ? {
+          ...result,
+          content: [{ type: "text", text: '{"unexpected":true}' }],
+        }
+      : result;
+  };
   const review = await send(
     id,
     "Make it 90, on December 12, 2099, Manila time. Contact Test Person at 09123456789. Switch to the Private package marker, make the acoustic duo three hours, and remove face painting.",
@@ -528,6 +645,8 @@ test("native tools collect, review and submit the same draft once", async () => 
     review.assistantMessage?.body ?? "",
     /Should I send this request to AMAC for review\?/,
   );
+  assert.equal(review.assistantError, null);
+  assert.equal(review.assistantMessage?.suggestedReplies, undefined);
   const row = await db
     .selectFrom("conversations as c")
     .innerJoin("booking_requests as b", "b.id", "c.booking_request_id")
@@ -3206,12 +3325,14 @@ test("mixed recommendations save in the displayed order and ground ordinal follo
     undefined,
     undefined,
     "These are the options I recommend.",
+    ["Tell me about the first option"],
   );
   const id = await conversation();
   const result = await send(id, "Recommend a package and a sound service");
   assert.equal(result.assistantError, null);
   const reply = result.assistantMessage;
   assert.ok(reply?.catalogRecommendations);
+  assert.deepEqual(reply.suggestedReplies, ["Tell me about the first option"]);
   const [serviceCard, packageCard] = reply.catalogRecommendations;
   assert.ok(serviceCard.type === "service" && packageCard.type === "package");
   assert.equal(serviceCard.id, service.id);

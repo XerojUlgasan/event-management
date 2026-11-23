@@ -108,7 +108,12 @@ before(async () => {
           textCalls.push(options);
           await beforeTextReply?.();
 
-          return result("I can help with that arrangement.");
+          return result(
+            JSON.stringify({
+              message: "I can help with that arrangement.",
+              suggested_replies: [],
+            }),
+          );
         },
       }),
     },

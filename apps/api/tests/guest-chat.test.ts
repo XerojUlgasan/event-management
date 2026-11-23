@@ -23,10 +23,18 @@ let team: { id: string; cookie: string };
 let model: MockLanguageModelV4;
 let packageId: string;
 
-function useReply(text: string) {
+function useReply(text: string, suggestions: string[] = []) {
   model = new MockLanguageModelV4({
     doGenerate: async () => ({
-      content: [{ type: "text", text }],
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            message: text,
+            suggested_replies: suggestions,
+          }),
+        },
+      ],
       finishReason: { unified: "stop", raw: undefined },
       usage: {
         inputTokens: {
@@ -259,8 +267,8 @@ for (const operation of ["read", "bootstrap"] as const) {
   });
 }
 
-test("guest recommendations survive a thread read and replay without running tools twice", async () => {
-  useReply("Here are the catalog options");
+test("guest recommendations and suggested replies survive a thread read and replay without running tools twice", async () => {
+  useReply("Here are the catalog options", ["Tell me about the first option"]);
   const generate = model.doGenerate.bind(model);
   model.doGenerate = async (...args) => {
     const result = await generate(...args);
@@ -334,6 +342,17 @@ test("guest recommendations survive a thread read and replay without running too
   assert.deepEqual(
     restored.messages.at(-1)?.catalogRecommendations,
     response.assistantMessage.catalogRecommendations,
+  );
+  assert.deepEqual(response.assistantMessage.suggestedReplies, [
+    "Tell me about the first option",
+  ]);
+  assert.deepEqual(
+    replay.assistantMessage.suggestedReplies,
+    response.assistantMessage.suggestedReplies,
+  );
+  assert.deepEqual(
+    restored.messages.at(-1)?.suggestedReplies,
+    response.assistantMessage.suggestedReplies,
   );
   assert.equal(model.doGenerateCalls.length, 3);
   assert.equal(
@@ -460,7 +479,10 @@ test("guests can use current public business information in a reply", async () =
       content: [
         {
           type: "text",
-          text: `${value.information.name}: ${value.information.phone}`,
+          text: JSON.stringify({
+            message: `${value.information.name}: ${value.information.phone}`,
+            suggested_replies: [],
+          }),
         },
       ],
     };
@@ -1221,7 +1243,15 @@ test("in-flight guest AI remains guest-scoped after claim; takeover suppresses i
     await held;
 
     return {
-      content: [{ type: "text", text: "Delayed guest reply" }],
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            message: "Delayed guest reply",
+            suggested_replies: [],
+          }),
+        },
+      ],
       finishReason: { unified: "stop", raw: undefined },
       usage: {
         inputTokens: {
@@ -1290,7 +1320,15 @@ test("guest takeover invalidates a delayed AI reply through an off/on cycle with
     await held;
 
     return {
-      content: [{ type: "text", text: "Must not appear" }],
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            message: "Must not appear",
+            suggested_replies: [],
+          }),
+        },
+      ],
       finishReason: { unified: "stop", raw: undefined },
       usage: {
         inputTokens: {
