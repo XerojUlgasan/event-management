@@ -31,8 +31,6 @@ export type ShowcaseRecord = {
   updatedAt: string;
   cover: ShowcaseMediaItem;
   media: ShowcaseMediaItem[];
-  /** Optional video that plays when hovering the cover on the landing/list page. */
-  previewVideo?: ShowcaseMediaItem | null;
 };
 
 const SAMPLE_VIDEO =
@@ -87,7 +85,6 @@ export const showcases: ShowcaseRecord[] = [
       image("sc-2-3", photos.dessert),
       video("sc-2-4", photos.hero),
     ],
-    previewVideo: video("sc-2-preview", photos.hero),
   },
   {
     id: "sc-3",
@@ -138,7 +135,6 @@ export const showcases: ShowcaseRecord[] = [
       image("sc-5-3", photos.dinner),
       video("sc-5-4", photos.dessert),
     ],
-    previewVideo: video("sc-5-preview", photos.dessert),
   },
   {
     id: "sc-6",

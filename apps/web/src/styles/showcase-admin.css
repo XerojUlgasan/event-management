@@ -151,23 +151,6 @@
   justify-content: center;
 }
 
-/* Preview video field */
-.showcase-editor-preview-video {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-}
-.showcase-editor-preview-video-thumb {
-  width: 160px;
-  height: 94px;
-  object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid var(--border-subtle);
-  flex-shrink: 0;
-  background: #000;
-  cursor: pointer;
-}
-
 /* ── Gallery grid ─────────────────────────────────────────────────────── */
 
 .showcase-editor-gallery {

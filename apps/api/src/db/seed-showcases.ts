@@ -6,7 +6,7 @@ import type { DB } from "./types.js";
 /**
  * Seeds sample showcase records with published and draft states.
  * Uses fixed record IDs so the seed is idempotent — safe to run repeatedly.
- * Cover images reference the same sample photos used by the package seed.
+ * Cover and gallery assets use the checked-in sample photos.
  */
 export async function seedSampleShowcases(db: Transaction<DB>) {
   const samples: {
@@ -90,7 +90,6 @@ export async function seedSampleShowcases(db: Transaction<DB>) {
         title: sample.title,
         description: sample.description,
         cover_media_id: coverId,
-        preview_video_id: null,
         published_at: sample.publishedAt,
         created_at: sample.publishedAt ?? new Date(),
         updated_at: sample.publishedAt ?? new Date(),
@@ -98,32 +97,18 @@ export async function seedSampleShowcases(db: Transaction<DB>) {
       .onConflict((oc) => oc.column("id").doNothing())
       .execute();
 
-    // Insert gallery media and ordered link rows.
-    for (const [index, photoName] of sample.galleryPhotos.entries()) {
-      const mediaId = randomUUID();
-      await db
-        .insertInto("media_assets")
-        .values({
-          id: mediaId,
+    await db
+      .insertInto("media_assets")
+      .values(
+        sample.galleryPhotos.map((photoName, position) => ({
           kind: "image",
           source: "sample",
           url: `/images/${photoName}.jpg`,
-        })
-        .onConflict((oc) => oc.column("id").doNothing())
-        .execute();
-
-      await db
-        .insertInto("showcase_record_media")
-        .values({
-          record_id: sample.id,
-          media_id: mediaId,
-          sort_order: index,
-        })
-        .onConflict((oc) =>
-          oc.columns(["record_id", "media_id"]).doNothing(),
-        )
-        .execute();
-    }
+          showcase_record_id: sample.id,
+          gallery_position: position,
+        })),
+      )
+      .execute();
 
     count++;
   }

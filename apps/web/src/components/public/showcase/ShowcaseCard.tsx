@@ -1,6 +1,5 @@
 import type { ShowcaseRecord } from "@event-management/contracts/showcase";
 import { showcaseMediaSrc } from "../../../lib/data/showcases/showcases";
-import { HoverVideo } from "./HoverVideo";
 
 function countLabel(media: ShowcaseRecord["media"]): string {
   const photos = media.filter((m) => m.kind === "image").length;
@@ -30,25 +29,15 @@ export function ShowcaseCard({ item }: { item: ShowcaseRecord }) {
       href={`/showcases/${item.slug}`}
       aria-label={`View showcase: ${item.title}`}
     >
-      {item.previewVideoUrl ? (
-        <HoverVideo
-          className="showcase-card-media"
-          src={showcaseMediaSrc(item.previewVideoUrl)}
-          posterSrc={showcaseMediaSrc(item.coverUrl)}
-        >
-          {overlay}
-        </HoverVideo>
-      ) : (
-        <span className="showcase-card-media">
-          <img
-            className="hv-img"
-            src={showcaseMediaSrc(item.coverUrl)}
-            alt=""
-            loading="lazy"
-          />
-          {overlay}
-        </span>
-      )}
+      <span className="showcase-card-media">
+        <img
+          className="showcase-card-cover-img"
+          src={showcaseMediaSrc(item.coverUrl)}
+          alt=""
+          loading="lazy"
+        />
+        {overlay}
+      </span>
       <span className="showcase-card-title">{item.title}</span>
     </a>
   );

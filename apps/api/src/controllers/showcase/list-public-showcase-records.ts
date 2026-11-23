@@ -41,7 +41,10 @@ export const listPublicShowcaseRecordsRouteHandler: AppRouteHandler<
 
   // Fetch all gallery and asset rows in 2 queries total (not 2×N).
   const [galleryMap, assetMap] = await Promise.all([
-    findGalleryForRecordsData(db, page.map((r) => r.id)),
+    findGalleryForRecordsData(
+      db,
+      page.map((r) => r.id),
+    ),
     findAssetsForRecordsData(db, page),
   ]);
 
@@ -49,7 +52,6 @@ export const listPublicShowcaseRecordsRouteHandler: AppRouteHandler<
     buildShowcaseDto(
       r,
       assetMap.get(r.cover_media_id) ?? null,
-      r.preview_video_id ? (assetMap.get(r.preview_video_id) ?? null) : null,
       galleryMap.get(r.id) ?? [],
     ),
   );

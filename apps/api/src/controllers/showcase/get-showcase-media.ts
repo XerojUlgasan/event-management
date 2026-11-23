@@ -51,6 +51,10 @@ export const getShowcaseMediaRouteHandler: AppRouteHandler<
 
   if (!media) return c.json({ error: "Media not found." }, 404);
 
+  // Recheck publication before serving a URL that was public on a previous read.
+  const cacheControl = adminView ? "private, no-store" : "no-cache";
+  c.header("Cache-Control", cacheControl);
+
   // Sample assets have a plain url and no storage_key — redirect to it.
   if (!media.storage_key) {
     if (media.url) return c.redirect(media.url, 302);
@@ -64,9 +68,8 @@ export const getShowcaseMediaRouteHandler: AppRouteHandler<
     "Content-Type": media.mime_type,
     "X-Content-Type-Options": "nosniff",
     "Accept-Ranges": "bytes",
-    "Cache-Control": adminView ? "private, no-store" : "public, max-age=300",
+    "Cache-Control": cacheControl,
   };
-  c.header("Cache-Control", headers["Cache-Control"]!);
 
   const requested = c.req.header("range");
   let range: string | undefined;

@@ -21,8 +21,6 @@ export type AdminShowcase = {
   description: string;
   cover: ShowcaseMediaItemAdmin;
   media: ShowcaseMediaItemAdmin[];
-  /** Optional video that plays when hovering the cover on public pages. */
-  previewVideo: ShowcaseMediaItemAdmin | null;
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -60,7 +58,6 @@ export const adminShowcases: AdminShowcase[] = [
       img("sc-1-3", photos.dessert),
       img("sc-1-4", photos.hero),
     ],
-    previewVideo: null,
     publishedAt: "2025-11-08T10:00:00Z",
     createdAt: "2025-11-08T09:00:00Z",
     updatedAt: "2025-11-09T08:00:00Z",
@@ -77,7 +74,6 @@ export const adminShowcases: AdminShowcase[] = [
       img("sc-2-2", photos.hero),
       vid("sc-2-3", photos.hero),
     ],
-    previewVideo: vid("sc-2-preview", photos.hero),
     publishedAt: "2025-10-20T10:00:00Z",
     createdAt: "2025-10-20T09:00:00Z",
     updatedAt: "2025-10-21T08:00:00Z",
@@ -90,7 +86,6 @@ export const adminShowcases: AdminShowcase[] = [
       "A sunset ceremony on a Batangas cliffside, with candlelit tables and a dessert spread that ran late into the night.",
     cover: img("sc-3-cover", photos.hero),
     media: [img("sc-3-1", photos.hero), img("sc-3-2", photos.wedding)],
-    previewVideo: null,
     publishedAt: "2025-09-14T10:00:00Z",
     createdAt: "2025-09-14T09:00:00Z",
     updatedAt: "2025-09-15T08:00:00Z",
@@ -103,7 +98,6 @@ export const adminShowcases: AdminShowcase[] = [
       "An intimate eighteenth birthday with a pastel palette, a strings trio, and a family-style dessert table.",
     cover: img("sc-4-cover", photos.dessert),
     media: [img("sc-4-1", photos.dessert), img("sc-4-2", photos.dinner)],
-    previewVideo: null,
     publishedAt: null, // draft
     createdAt: "2025-08-02T09:00:00Z",
     updatedAt: "2025-08-03T08:00:00Z",
@@ -119,7 +113,6 @@ export const adminShowcases: AdminShowcase[] = [
       img("sc-5-1", photos.wedding),
       vid("sc-5-2", photos.dessert),
     ],
-    previewVideo: vid("sc-5-preview", photos.dessert),
     publishedAt: null, // draft
     createdAt: "2025-07-19T09:00:00Z",
     updatedAt: "2025-07-20T08:00:00Z",
@@ -132,7 +125,6 @@ export const adminShowcases: AdminShowcase[] = [
       "A black-tie recognition night with a plated three-course dinner, stage awards, and a closing toast.",
     cover: img("sc-6-cover", photos.dinner),
     media: [img("sc-6-1", photos.dinner), img("sc-6-2", photos.dessert)],
-    previewVideo: null,
     publishedAt: "2025-06-11T10:00:00Z",
     createdAt: "2025-06-11T09:00:00Z",
     updatedAt: "2025-06-12T08:00:00Z",

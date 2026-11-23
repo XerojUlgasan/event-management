@@ -8,7 +8,6 @@ export const updateShowcaseRecordData = (
     title: string;
     description: string;
     cover_media_id: string;
-    preview_video_id: string | null;
     updated_at: Date;
   },
 ) =>

@@ -132,6 +132,8 @@ test("photo coverage checks metadata and stored digest without fetching bytes", 
     byte_size: null,
     created_by: null,
     created_at: new Date(),
+    gallery_position: null,
+    showcase_record_id: null,
   };
   const photo = {
     chunkKey: "photo:1",

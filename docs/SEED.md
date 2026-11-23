@@ -30,6 +30,8 @@ The command runs `apps/api/src/db/seed.ts` in one PostgreSQL transaction. It doe
 
 The seeded packages and services remain flat catalog records without package-service assignments or private custom packages. Each owner stores its canvas as JSONB; `package_services` remains a separate relational link. The three named package samples are unchanged by the scenario. No venue-catalog or staff-account fixtures are created.
 
+The showcase seed adds three published records and one draft using the checked-in sample images. Each showcase has an image cover and its own ordered gallery assets. Existing sample showcase IDs and their saved content are preserved on repeat runs.
+
 ## Repeat runs and collisions
 
 Reference package, connected demo, and scenario IDs are stable. Catalog and scenario rows are insert-only and do not overwrite existing edits, archives, passwords, or sessions. A package sample's sample media row and canvas are created only when the seed inserts that package row. Scenario package/service canvases are initialized only when the seed inserts their owner. A later run preserves an existing owner's edits, including an intentionally empty canvas; it does not fill missing sections or widgets inside that canvas. Other scenario child records continue to use stable IDs and their seed-specific insert-if-new rules. Existing records with a reserved ID or email are preserved; a collision can leave the corresponding sample or dependent content incomplete. Inspect the target if a fixture is missing; do not use the seed to reconcile collisions or clean shared data.

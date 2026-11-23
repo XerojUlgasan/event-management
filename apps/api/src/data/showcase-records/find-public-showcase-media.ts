@@ -4,7 +4,7 @@ type Database = Kysely<DB> | Transaction<DB>;
 
 /**
  * Returns a media_assets row only when it is referenced by at least one
- * published showcase record (via cover, preview_video, or gallery link).
+ * published showcase record (as its cover or a gallery asset).
  * This enforces BR-06: unpublished-record media is not publicly accessible.
  */
 export const findPublicShowcaseMediaData = (db: Database, id: string) =>
@@ -22,22 +22,13 @@ export const findPublicShowcaseMediaData = (db: Database, id: string) =>
             .where("sr.published_at", "is not", null)
             .where("sr.cover_media_id", "=", eb.ref("m.id")),
         ),
-        // Referenced as preview video of a published record.
+        // Referenced in gallery of a published record.
         eb.exists(
           eb
             .selectFrom("showcase_records as sr")
             .select("sr.id")
             .where("sr.published_at", "is not", null)
-            .where("sr.preview_video_id", "=", eb.ref("m.id")),
-        ),
-        // Referenced in gallery of a published record.
-        eb.exists(
-          eb
-            .selectFrom("showcase_record_media as srm")
-            .innerJoin("showcase_records as sr", "sr.id", "srm.record_id")
-            .select("srm.id")
-            .where("sr.published_at", "is not", null)
-            .where("srm.media_id", "=", eb.ref("m.id")),
+            .whereRef("sr.id", "=", "m.showcase_record_id"),
         ),
       ]),
     )
@@ -64,18 +55,7 @@ export const findAdminShowcaseMediaData = (
             .select("sr.id")
             .where("sr.cover_media_id", "=", eb.ref("m.id")),
         ),
-        eb.exists(
-          eb
-            .selectFrom("showcase_records as sr")
-            .select("sr.id")
-            .where("sr.preview_video_id", "=", eb.ref("m.id")),
-        ),
-        eb.exists(
-          eb
-            .selectFrom("showcase_record_media as srm")
-            .select("srm.id")
-            .where("srm.media_id", "=", eb.ref("m.id")),
-        ),
+        eb("m.showcase_record_id", "is not", null),
       ]),
     )
     .executeTakeFirst();

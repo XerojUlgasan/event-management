@@ -1,11 +1,11 @@
 import type { Kysely, Selectable, Transaction } from "kysely";
 import type { DB, ShowcaseRecords } from "../../db/types.js";
-import type { ShowcaseRecord, ShowcaseMediaItem } from "@event-management/contracts/showcase";
-import {
-  findShowcaseRecordWithMediaData,
-  type AssetRow,
-  type MediaRow,
-} from "../../data/showcase-records/find-showcase-record-with-media.js";
+import type {
+  ShowcaseRecord,
+  ShowcaseMediaItem,
+} from "@event-management/contracts/showcase";
+import { findShowcaseRecordWithMediaData } from "../../data/showcase-records/find-showcase-record-with-media.js";
+import type { AssetRow } from "../../data/showcase-records/find-assets-for-records.js";
 type Database = Kysely<DB> | Transaction<DB>;
 
 /**
@@ -23,8 +23,7 @@ function assetUrl(id: string, asset: AssetRow | null): string {
 export function buildShowcaseDto(
   record: Selectable<ShowcaseRecords>,
   coverAsset: AssetRow | null,
-  previewAsset: AssetRow | null,
-  mediaRows: MediaRow[],
+  mediaRows: AssetRow[],
 ): ShowcaseRecord {
   const media: ShowcaseMediaItem[] = mediaRows.map((m) => ({
     id: m.id,
@@ -41,10 +40,6 @@ export function buildShowcaseDto(
     coverMediaId: record.cover_media_id,
     coverUrl: assetUrl(record.cover_media_id, coverAsset),
     coverMimeType: coverAsset?.mime_type ?? "image/jpeg",
-    previewVideoId: record.preview_video_id ?? null,
-    previewVideoUrl: record.preview_video_id
-      ? assetUrl(record.preview_video_id, previewAsset)
-      : null,
     publishedAt: record.published_at ? record.published_at.toISOString() : null,
     createdAt: record.created_at.toISOString(),
     updatedAt: record.updated_at.toISOString(),
@@ -59,10 +54,5 @@ export async function showcaseDto(
 ) {
   const result = await findShowcaseRecordWithMediaData(db, lookup);
   if (!result) return null;
-  return buildShowcaseDto(
-    result.record,
-    result.coverAsset,
-    result.previewAsset,
-    result.mediaRows,
-  );
+  return buildShowcaseDto(result.record, result.coverAsset, result.mediaRows);
 }

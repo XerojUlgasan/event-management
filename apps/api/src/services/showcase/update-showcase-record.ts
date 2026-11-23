@@ -3,16 +3,20 @@ import type { DB } from "../../db/types.js";
 import type { UpdateShowcaseRecord } from "@event-management/contracts/showcase";
 import { lockShowcaseRecordData } from "../../data/showcase-records/lock-showcase-record.js";
 import { updateShowcaseRecordData } from "../../data/showcase-records/update-showcase-record.js";
-import { replaceShowcaseRecordMediaData } from "../../data/showcase-record-media/replace-showcase-record-media.js";
+import { replaceShowcaseGalleryData } from "../../data/showcase-records/replace-showcase-gallery.js";
 import { cleanupCatalogMediaService } from "../catalog-media/cleanup-catalog-media.js";
 import { showcaseDto } from "./showcase-dto.js";
+import { lockAndValidateShowcaseMedia } from "./validate-showcase-media.js";
 import { duplicateTitle } from "../../utils/catalog-title.js";
 
 function notFound() {
   return { status: 404 as const, message: "Showcase not found." };
 }
 function stale() {
-  return { status: 409 as const, message: "Showcase changed. Refresh and try again." };
+  return {
+    status: 409 as const,
+    message: "Showcase changed. Refresh and try again.",
+  };
 }
 
 export async function updateShowcaseRecordService(
@@ -30,20 +34,24 @@ export async function updateShowcaseRecordService(
       if (current.updated_at.toISOString() !== content.expectedUpdatedAt)
         return stale();
 
+      const invalid = await lockAndValidateShowcaseMedia(trx, content, id);
+      if (invalid) return invalid;
+
       const now = new Date();
       await updateShowcaseRecordData(trx, id, {
         title: content.title.trim(),
         description: content.description.trim(),
         cover_media_id: content.coverMediaId,
-        preview_video_id: content.previewVideoId ?? null,
         updated_at: now,
       });
 
-      removedMediaIds = await replaceShowcaseRecordMediaData(
+      removedMediaIds = await replaceShowcaseGalleryData(
         trx,
         id,
         content.mediaIds,
       );
+      if (current.cover_media_id !== content.coverMediaId)
+        removedMediaIds.push(current.cover_media_id);
 
       return showcaseDto(trx, { id });
     });
@@ -56,7 +64,9 @@ export async function updateShowcaseRecordService(
       } catch (cleanupError) {
         console.warn(
           "[update-showcase] media cleanup failed, will retry later:",
-          cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+          cleanupError instanceof Error
+            ? cleanupError.message
+            : String(cleanupError),
         );
       }
     }

@@ -2,11 +2,6 @@ import type { ShowcaseRecord } from "@event-management/contracts/showcase";
 import { ShowcaseGallery } from "./ShowcaseGallery";
 import { showcaseMediaSrc } from "../../../lib/data/showcases/showcases";
 
-/** /showcases/{slug} detail page.
- *  - If the showcase has a preview video, the hero shows it as a click-to-play
- *    video with the cover image as poster.
- *  - Otherwise the hero is a static cover image.
- *  - Gallery images/videos are always click-to-play (no hover effect). */
 export function PublicShowcaseDetail({ item }: { item: ShowcaseRecord }) {
   return (
     <article className="showcase-detail">
@@ -17,18 +12,7 @@ export function PublicShowcaseDetail({ item }: { item: ShowcaseRecord }) {
       </div>
 
       <figure className="showcase-detail-hero">
-        {item.previewVideoUrl ? (
-          <video
-            src={showcaseMediaSrc(item.previewVideoUrl)}
-            poster={showcaseMediaSrc(item.coverUrl)}
-            controls
-            preload="metadata"
-            playsInline
-            aria-label={`Preview video for ${item.title}`}
-          />
-        ) : (
-          <img src={showcaseMediaSrc(item.coverUrl)} alt="" />
-        )}
+        <img src={showcaseMediaSrc(item.coverUrl)} alt="" />
       </figure>
 
       {item.media.length > 0 && (

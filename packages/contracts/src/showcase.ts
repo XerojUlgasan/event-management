@@ -13,8 +13,13 @@ const description = z
   .trim()
   .min(1)
   .max(MAX_SHOWCASE_DESCRIPTION_LENGTH);
-const uuid = z.string().uuid();
-const mediaIds = z.array(uuid).max(MAX_SHOWCASE_GALLERY);
+const mediaId = z.guid().toLowerCase();
+const mediaIds = z
+  .array(mediaId)
+  .max(MAX_SHOWCASE_GALLERY)
+  .refine((ids) => new Set(ids).size === ids.length, {
+    message: "Choose each gallery asset only once.",
+  });
 
 // ── Request schemas (used by both API validation and web forms) ────────────
 
@@ -23,9 +28,8 @@ export const createShowcaseRecordSchema = z
   .object({
     title,
     description,
-    coverMediaId: uuid,
+    coverMediaId: mediaId,
     mediaIds,
-    previewVideoId: uuid.nullable().optional(),
   })
   .strict();
 
@@ -34,9 +38,8 @@ export const updateShowcaseRecordSchema = z
   .object({
     title,
     description,
-    coverMediaId: uuid,
+    coverMediaId: mediaId,
     mediaIds,
-    previewVideoId: uuid.nullable().optional(),
     expectedUpdatedAt: z.string().datetime(),
   })
   .strict();
@@ -64,10 +67,6 @@ export type ShowcaseRecord = {
   coverUrl: string;
   /** MIME type of the cover asset, e.g. "image/jpeg", "image/png", "image/webp". */
   coverMimeType: string;
-  /** Media asset ID for the optional hover-preview video, or null. */
-  previewVideoId: string | null;
-  /** URL for the optional hover-preview video, or null. */
-  previewVideoUrl: string | null;
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;

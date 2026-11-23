@@ -1,6 +1,5 @@
 import type { ShowcaseRecord } from "@event-management/contracts/showcase";
 import { ShowcaseGallery } from "./ShowcaseGallery";
-import { HoverVideo } from "./HoverVideo";
 import { showcaseMediaSrc } from "../../../lib/data/showcases/showcases";
 
 export function ShowcaseExpanded({ item }: { item: ShowcaseRecord }) {
@@ -11,19 +10,12 @@ export function ShowcaseExpanded({ item }: { item: ShowcaseRecord }) {
         href={`/showcases/${item.slug}`}
         aria-label={`View showcase: ${item.title}`}
       >
-        {item.previewVideoUrl ? (
-          <HoverVideo
-            src={showcaseMediaSrc(item.previewVideoUrl)}
-            posterSrc={showcaseMediaSrc(item.coverUrl)}
-          />
-        ) : (
-          <img
-            className="showcase-expanded-cover-img"
-            src={showcaseMediaSrc(item.coverUrl)}
-            alt=""
-            loading="lazy"
-          />
-        )}
+        <img
+          className="showcase-expanded-cover-img"
+          src={showcaseMediaSrc(item.coverUrl)}
+          alt=""
+          loading="lazy"
+        />
       </a>
       <div className="showcase-expanded-body">
         <span className="showcase-kicker">Past event</span>
