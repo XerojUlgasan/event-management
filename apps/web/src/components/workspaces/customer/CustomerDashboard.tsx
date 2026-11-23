@@ -4,19 +4,15 @@ import {
 } from "../../../lib/services/messages/booking-review";
 import { ApiError } from "../../../lib/http/request";
 import { navigateWorkspace } from "../../../lib/navigation/workspace-navigation";
-import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
 import { useEffect, useRef, useState } from "react";
 import {
   Avatar,
   Brand,
   Button,
-  Dialog,
   Icon,
   type IconName,
   PageHeader,
   Panel,
-  Textarea,
-  FormField,
   useNotifications,
 } from "@event-management/ui";
 
@@ -24,6 +20,7 @@ import { NotificationBell } from "../../notifications/NotificationBell";
 import { photos } from "../../../demo/catalog/photos";
 import { BookingList } from "../../booking-requests/BookingList";
 import { CustomerCatalogPage } from "./catalog/CustomerCatalogPage";
+import { CustomerHomeNextStep } from "./home/CustomerHomeNextStep";
 import { BookingRequestDialog } from "../../booking-requests/BookingRequestDialog";
 import { initialsFromName } from "../../../lib/utils/formatting/name";
 import { SignInMethods } from "../../auth/SignInMethods";
@@ -56,7 +53,6 @@ import {
 import {
   createMyConversation,
   getMyConversations,
-  getMyConversation,
   getMyConversationById,
   sendMyMessage,
   retryMyMessageProcessing,
@@ -121,14 +117,10 @@ export function CustomerDashboard({
     navigateWorkspace(customerPaths[next]);
   };
 
-  const [messageOpen, setMessageOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const accountTriggerRef = useRef<HTMLButtonElement>(null);
   const [conversationOpen, setConversationOpen] = useState(false);
-  const [messageDraft, setMessageDraft] = useState("");
-  const messageInputRef = useRef<HTMLTextAreaElement>(null);
-  const [dialogSending, setDialogSending] = useState(false);
   const [outbox, setOutbox] = useState<
     Record<
       string,
@@ -140,7 +132,6 @@ export function CustomerDashboard({
       }
     >
   >({});
-  const [dialogError, setDialogError] = useState("");
   const [messageThread, setMessageThread] = useState<ChatThread | null>(null);
   const inbox = useConversationList(getMyConversations, tab === "Messages");
   const {
@@ -706,30 +697,6 @@ export function CustomerDashboard({
     setConversationOpen(true);
   };
 
-  const sendFromDialog = async () => {
-    const body = messageDraft.trim();
-
-    if (!body || dialogSending) return;
-
-    setDialogSending(true);
-    setDialogError("");
-
-    try {
-      const thread = messageThread ?? (await getMyConversation());
-      setSelectedConversationId(thread.conversation.id);
-      setMessageThread(thread);
-      setMessageDraft((current) => (current.trim() === body ? "" : current));
-      setMessageOpen(false);
-      setConversationOpen(true);
-      go("Messages");
-      void sendMessage(body, [], crypto.randomUUID(), undefined, thread);
-    } catch (cause) {
-      setDialogError(notifyError(cause, "Unable to open your conversation."));
-    } finally {
-      setDialogSending(false);
-    }
-  };
-
   useEffect(() => {
     if (!accountMenuOpen) return;
 
@@ -858,36 +825,7 @@ export function CustomerDashboard({
                 </div>
               </div>
             </section>
-            <section className="customer-grid">
-              <Panel
-                title="Your requests"
-                description="See the latest status of your event requests."
-              >
-                <p>
-                  Preferred dates and final prices are reviewed by our team.
-                </p>
-                <Button variant="secondary" onClick={() => go("My events")}>
-                  View my events
-                </Button>
-              </Panel>
-              <Panel
-                className="customer-manager-card"
-                title="Talk with our team"
-                description="Have a question about your plans?"
-              >
-                <p>
-                  Send us a message and we’ll continue the conversation in your
-                  workspace.
-                </p>
-                <Button
-                  variant="secondary"
-                  className="full-button"
-                  onClick={() => setMessageOpen(true)}
-                >
-                  Send a message
-                </Button>
-              </Panel>
-            </section>
+            <CustomerHomeNextStep key={profileId} />
           </div>
         )}
         {tab === "My events" && (
@@ -1115,59 +1053,6 @@ export function CustomerDashboard({
           </div>
         )}
       </main>
-
-      {messageOpen && (
-        <Dialog
-          onClose={() => setMessageOpen(false)}
-          initialFocus={messageInputRef}
-          className="compact-modal"
-          eyebrow="Message the Styled by AMAC team"
-          title="How can we help?"
-          intro="Send a message about your event, quotation, or booking. Our team will reply in Messages."
-          actions={
-            <>
-              <Button
-                variant="secondary"
-                onClick={() => setMessageOpen(false)}
-                disabled={dialogSending}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={sendFromDialog}
-                disabled={!messageDraft.trim() || dialogSending}
-              >
-                Send message
-              </Button>
-            </>
-          }
-        >
-          <FormField className="message-compose" label="Message">
-            <Textarea
-              value={messageDraft}
-              onChange={(event) => setMessageDraft(event.target.value)}
-              placeholder="Write a message"
-              maxLength={MAX_MESSAGE_BODY_LENGTH}
-              ref={messageInputRef}
-              onKeyDown={(event) => {
-                if (
-                  event.key === "Enter" &&
-                  !event.shiftKey &&
-                  !event.nativeEvent.isComposing
-                ) {
-                  event.preventDefault();
-                  void sendFromDialog();
-                }
-              }}
-            />
-          </FormField>
-          {dialogError && (
-            <p className="messages-send-error" role="alert">
-              {dialogError}
-            </p>
-          )}
-        </Dialog>
-      )}
 
       {bookingItem && (
         <BookingRequestDialog

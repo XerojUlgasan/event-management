@@ -61,6 +61,16 @@ export const conversationsSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
+export const customerConversationsSchema = conversationsSchema.extend({
+  latestBookingDraft: z
+    .object({
+      conversationId: z.string().uuid(),
+      eventType: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
+});
+
 export const adminConversationsPageSchema = conversationsSchema.extend({
   nextCursor: z.string().nullable(),
 });

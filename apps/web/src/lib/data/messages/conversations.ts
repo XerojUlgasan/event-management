@@ -84,6 +84,20 @@ export const getMyConversations = (cursor?: string, reference?: string) => {
   }>(`/messages/conversations${query.size ? `?${query}` : ""}`);
 };
 
+export const getMyLatestBookingDraft = async () => {
+  const { latestBookingDraft } = await request<{
+    latestBookingDraft: {
+      conversationId: string;
+      eventType: string | null;
+    } | null;
+  }>("/messages/conversations?includeLatestBookingDraft=1&limit=1");
+
+  if (latestBookingDraft === undefined)
+    throw new Error("The booking draft projection is unavailable.");
+
+  return latestBookingDraft;
+};
+
 export const getMyConversationById = (id: string, cursor?: string) =>
   request<ChatThread>(
     `/messages/conversations/${encodeURIComponent(id)}${cursorQuery(cursor)}`,

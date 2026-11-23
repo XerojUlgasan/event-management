@@ -13,7 +13,11 @@ import {
 } from "../../lib/data/notifications/notifications";
 import { ApiError } from "../../lib/http/request";
 import { env } from "../../lib/env/env";
-import { navigateWorkspace } from "../../lib/navigation/workspace-navigation";
+import {
+  customerBookingRequestPath,
+  customerConversationPath,
+  navigateWorkspace,
+} from "../../lib/navigation/workspace-navigation";
 import { createArrivalTracker } from "../../lib/services/notifications/arrivals";
 import {
   isPermanentTokenFailure,
@@ -44,17 +48,20 @@ function presentation(content: Notification): {
     case "booking_status_updated":
       return {
         label: `${eventType ? `${eventType} request` : "Booking request"} · ${bookingStatusLabels[content.payload.status]}${requestedDate}`,
-        path: `/app/events?bookingRequest=${encodeURIComponent(content.payload.bookingRequestId)}`,
+        path: customerBookingRequestPath(content.payload.bookingRequestId),
       };
     case "quotation_sent":
       return {
         label: `Quotation version ${content.payload.version} sent`,
-        path: `/app/messages?conversation=${encodeURIComponent(content.payload.conversationId)}&quotation=${encodeURIComponent(content.payload.quotationId)}`,
+        path: customerConversationPath(
+          content.payload.conversationId,
+          content.payload.quotationId,
+        ),
       };
     case "human_review_requested":
       return {
         label: "A conversation needs human review",
-        path: `/app/messages?conversation=${encodeURIComponent(content.payload.conversationId)}`,
+        path: customerConversationPath(content.payload.conversationId),
       };
     default: {
       const exhaustive: never = content;

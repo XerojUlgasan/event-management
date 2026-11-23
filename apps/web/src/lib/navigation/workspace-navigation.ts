@@ -2,6 +2,18 @@ import { useSyncExternalStore } from "react";
 
 const change = "clemora:navigation";
 
+export function customerConversationPath(id: string, quotationId?: string) {
+  const path = `/app/messages?conversation=${encodeURIComponent(id)}`;
+
+  return quotationId
+    ? `${path}&quotation=${encodeURIComponent(quotationId)}`
+    : path;
+}
+
+export function customerBookingRequestPath(id: string) {
+  return `/app/events?bookingRequest=${encodeURIComponent(id)}`;
+}
+
 export function navigateWorkspace(destination: string, replace = false) {
   const url = new URL(destination, window.location.href);
 

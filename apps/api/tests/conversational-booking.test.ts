@@ -899,6 +899,132 @@ test("explicit discard unlinks and removes the unsubmitted row, invalidating the
   assert.equal((await confirm(approval, summary.id)).status, "review_changed");
 });
 
+test("customer conversation listing can opt into the latest owned booking draft", async () => {
+  const customer = await session("customer");
+  const anotherCustomer = await session("customer");
+
+  async function createDraft(owner: Actor, eventType: string) {
+    const conversation = await thread(owner.id);
+    const scope = await beginTurn(
+      conversation.id,
+      owner.id,
+      "I am planning an event.",
+    );
+    await saveDraft(scope, { eventType });
+
+    return {
+      conversation,
+      scope,
+      booking: await linkedBooking(conversation.id),
+    };
+  }
+
+  const first = await createDraft(customer, "First event");
+  const second = await createDraft(customer, "Second event");
+  const submitted = await createDraft(customer, "Submitted event");
+  const discarded = await createDraft(customer, "Discarded event");
+  const otherDraft = await createDraft(anotherCustomer, "Another customer");
+
+  const tieTime = new Date("2099-01-01T00:00:00.000Z");
+  await db
+    .updateTable("booking_requests")
+    .set({ updated_at: tieTime })
+    .where("id", "in", [first.booking.id, second.booking.id])
+    .execute();
+  await db
+    .updateTable("booking_requests")
+    .set({ updated_at: new Date("2100-01-01T00:00:00.000Z") })
+    .where("id", "=", otherDraft.booking.id)
+    .execute();
+  await db
+    .updateTable("booking_requests")
+    .set({
+      preferred_date: "2099-07-11",
+      time_zone: "Asia/Manila",
+      contact_name: "Test Customer",
+      phone_number: "123",
+      submitted_at: new Date("2099-02-01T00:00:00.000Z"),
+      updated_at: new Date("2099-02-01T00:00:00.000Z"),
+    })
+    .where("id", "=", submitted.booking.id)
+    .execute();
+
+  const discardScope = await beginTurn(
+    discarded.conversation.id,
+    customer.id,
+    "Please discard that request.",
+  );
+  const draft = await readBookingDraftData(db, discarded.conversation.id);
+  discardScope.expectedRevision = draft?.revision ?? null;
+  const discardedResult = await discardBookingDraftData({
+    ...(await toolCall(discardScope, "updateBookingDraft")),
+  });
+  assert.equal(discardedResult.status, "discarded");
+
+  const regular = await read(
+    await call("/messages/conversations", customer),
+    200,
+  );
+  assert.equal("latestBookingDraft" in regular, false);
+  assert.equal(
+    regular.conversations.find(
+      ({ id }: { id: string }) => id === first.conversation.id,
+    ).bookingRequestId,
+    null,
+  );
+  const events = await read(
+    await call("/booking-requests/mine", customer),
+    200,
+  );
+  assert.deepEqual(
+    events.bookingRequests.map(({ id }: { id: string }) => id),
+    [submitted.booking.id],
+  );
+
+  const withDraft = await read(
+    await call("/messages/conversations?includeLatestBookingDraft=1", customer),
+    200,
+  );
+
+  const expected = [first, second].sort((a, b) =>
+    a.booking.id.localeCompare(b.booking.id),
+  )[1];
+
+  assert.deepEqual(withDraft.latestBookingDraft, {
+    conversationId: expected.conversation.id,
+    eventType: expected.booking.event_type,
+  });
+
+  const isolated = await read(
+    await call(
+      "/messages/conversations?includeLatestBookingDraft=1",
+      anotherCustomer,
+    ),
+    200,
+  );
+  assert.deepEqual(isolated.latestBookingDraft, {
+    conversationId: otherDraft.conversation.id,
+    eventType: "Another customer",
+  });
+  const emptyCustomer = await session("customer");
+  const withoutDraft = await read(
+    await call(
+      "/messages/conversations?includeLatestBookingDraft=1",
+      emptyCustomer,
+    ),
+    200,
+  );
+  assert.equal(withoutDraft.latestBookingDraft, null);
+  await read(
+    await call("/messages/conversations?includeLatestBookingDraft=1", admin),
+    403,
+  );
+  await read(
+    await call("/messages/conversations?includeLatestBookingDraft=1"),
+    401,
+  );
+});
+
 test(
   "configured AMAC model submits a reviewed draft and hands package or add-on changes to staff",
   { skip: process.env.AMAC_LIVE_TOOL_TESTS !== "1" },

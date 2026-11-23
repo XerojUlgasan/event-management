@@ -93,7 +93,7 @@ Source: [package creation](../apps/api/src/services/packages/create-package.ts),
 
 ## 4. Customer Home and Catalogs
 
-Customer **Home** provides entry points to explore catalogs, view My events, and send a message to the team. Its welcome panels are general content, rather than a calculated summary of the customer's next confirmed event.
+Customer **Home** retains the welcome, **Explore catalogs**, and **My events**. **Your next step** gives the customer one action based on their own activity. The card can open a request’s conversation when the team needs details, show a current sent quotation, resume an unfinished chat draft, or open an active request in My events. Customers with only closed requests can view their history. Customers just getting started can open the Messages composer with **Start planning**. A date on the card is labeled as requested.
 
 Inside **Catalogs**, customers switch between Packages and Services. They can filter packages by total price and required guest capacity, and services by hourly-rate ranges.
 
@@ -107,7 +107,7 @@ The customer journey is:
 
 The public package action passes the chosen package into the login/workspace journey. Where a visitor has already filled a signed-out request draft, the current tab retains it through sign-in and presents it for explicit review.
 
-Source: [customer workspace](../apps/web/src/components/workspaces/customer/CustomerDashboard.tsx), [customer catalog](../apps/web/src/components/workspaces/customer/catalog/CustomerCatalogPage.tsx), and [request draft storage](../apps/web/src/lib/services/booking-requests/booking-draft.ts).
+Source: [customer workspace](../apps/web/src/components/workspaces/customer/CustomerDashboard.tsx), [Home action selection](../apps/web/src/lib/services/customer-home/next-step.ts), [customer catalog](../apps/web/src/components/workspaces/customer/catalog/CustomerCatalogPage.tsx), and [request draft storage](../apps/web/src/lib/services/booking-requests/booking-draft.ts).
 
 ## 5. Customer booking request submission
 

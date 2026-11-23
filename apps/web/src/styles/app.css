@@ -10,6 +10,7 @@
 @import "./public/site.css";
 @import "./business-information/business-information.css";
 @import "./notifications/notifications.css";
+@import "./workspaces/customer/home.css";
 
 html:has(.public-site) {
   scrollbar-gutter: stable;
@@ -3706,15 +3707,6 @@ html:has(.public-site) {
   display: flex;
   gap: 8px;
 }
-.customer-grid {
-  display: grid;
-  grid-template-columns: 1.6fr 0.8fr;
-  gap: 15px;
-  align-items: start;
-}
-.customer-grid.lower {
-  grid-template-columns: 1.25fr 0.9fr;
-}
 .horizontal-steps {
   margin: 25px 8px;
   display: flex;
@@ -3821,14 +3813,6 @@ html:has(.public-site) {
 .manager-profile small {
   color: var(--muted);
   font-size: 8px;
-}
-.customer-manager-card > p {
-  padding: 12px;
-  color: var(--muted);
-  border-radius: 7px;
-  background: var(--canvas);
-  font-size: 9px;
-  line-height: 1.55;
 }
 .customer-action-list {
   margin: 12px -19px -19px;
@@ -4953,10 +4937,6 @@ html:has(.public-site) {
   }
   .customer-event-photo {
     min-height: 260px;
-  }
-  .customer-grid,
-  .customer-grid.lower {
-    grid-template-columns: 1fr;
   }
   .customer-messages {
     height: calc(100dvh - 115px);
