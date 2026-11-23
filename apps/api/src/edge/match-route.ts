@@ -6,6 +6,15 @@ export const routeFamilies = [
     id: "catalog-media",
     prefixes: ["/v1/admin/catalog-media", "/v1/catalog-media"],
   },
+  {
+    id: "showcase",
+    prefixes: [
+      "/v1/admin/showcase-media",
+      "/v1/admin/showcase-records",
+      "/v1/showcase-records",
+      "/v1/showcase-media",
+    ],
+  },
   { id: "services", prefixes: ["/v1/admin/services", "/v1/services"] },
   { id: "packages", prefixes: ["/v1/admin/packages", "/v1/packages"] },
   {

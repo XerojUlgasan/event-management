@@ -1,0 +1,29 @@
+---
+import PublicDocument from "../../layouts/PublicDocument.astro";
+import { PublicShowcaseDetail } from "../../components/public/showcase/PublicShowcaseDetail";
+import { loadShowcase } from "../../lib/server/catalog/load-showcases";
+
+const item = await loadShowcase(Astro.params.slug ?? "").catch(() => null);
+---
+
+<PublicDocument
+  title={
+    item
+      ? `${item.title} | Showcases | Styled by AMAC`
+      : "Showcase not found | Styled by AMAC"
+  }
+  description={item ? item.description : "Showcase not found."}
+>
+  <section class="section showcase-detail-page">
+    {
+      item ? (
+        <PublicShowcaseDetail item={item} client:load />
+      ) : (
+        <p class="catalog-status">
+          Showcase not found.{" "}
+          <a href="/showcases">Back to showcases</a>
+        </p>
+      )
+    }
+  </section>
+</PublicDocument>

@@ -21,6 +21,7 @@ import packageRoutes from "./controllers/packages/index.js";
 import healthRoutes from "./controllers/health/index.js";
 import userRoutes from "./controllers/users/index.js";
 import catalogMediaRoutes from "./controllers/catalog-media/index.js";
+import showcaseRoutes from "./controllers/showcase/index.js";
 import { MAX_VIDEO_SIZE_BYTES } from "@event-management/contracts/limits/videos";
 import type { HonoEnv } from "./types/hono.js";
 
@@ -82,6 +83,13 @@ app.use(
   }),
 );
 app.route("/v1", catalogMediaRoutes);
+app.use(
+  "/v1/admin/showcase-media",
+  bodyLimit({
+    maxSize: MAX_VIDEO_SIZE_BYTES + MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
+  }),
+);
+app.route("/v1", showcaseRoutes);
 app.use(
   "/v1/admin/services",
   bodyLimit({ maxSize: CATALOG_JSON_BODY_LIMIT_BYTES }),

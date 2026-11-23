@@ -9,6 +9,7 @@ export const adminPaths: Record<NavKey, string> = {
   Calendar: "/app/calendar",
   Packages: "/app/packages",
   Services: "/app/services",
+  Showcases: "/app/showcases",
   Inventory: "/app/inventory",
   Operations: "/app/operations",
   Reports: "/app/reports",

@@ -234,6 +234,26 @@ export interface Sessions {
   user_id: string;
 }
 
+export interface ShowcaseRecordMedia {
+  id: Generated<string>;
+  media_id: string;
+  record_id: string;
+  sort_order: number;
+}
+
+export interface ShowcaseRecords {
+  cover_media_id: string;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  description: string;
+  id: Generated<string>;
+  preview_video_id: string | null;
+  published_at: Timestamp | null;
+  slug: string;
+  title: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface Users {
   created_at: Generated<Timestamp>;
   display_name: string | null;
@@ -262,5 +282,7 @@ export interface DB {
   quotations: Quotations;
   services: Services;
   sessions: Sessions;
+  showcase_record_media: ShowcaseRecordMedia;
+  showcase_records: ShowcaseRecords;
   users: Users;
 }

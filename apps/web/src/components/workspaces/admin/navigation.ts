@@ -7,5 +7,6 @@ export const adminNav: NavKey[] = [
   "Customers",
   "Packages",
   "Services",
+  "Showcases",
   "AI",
 ];

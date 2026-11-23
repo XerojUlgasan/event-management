@@ -5,16 +5,24 @@ import {
   PackageCards,
   ServiceCards,
 } from "../components/public/catalog/CatalogCards";
+import { ShowcaseCards } from "../components/public/showcase/ShowcaseCards";
 import { ActionLink, Toast } from "@event-management/ui";
 import { loadPackages, loadServices } from "../lib/server/catalog/load-catalog";
+import { loadShowcases } from "../lib/server/catalog/load-showcases";
 import type { PublicPackage } from "../lib/data/catalog/packages";
 import type { PublicService } from "../lib/data/catalog/services";
+import type { ShowcaseRecord } from "@event-management/contracts/showcase";
 
 let packages: PublicPackage[] = [];
 let services: PublicService[] = [];
+let showcaseItems: ShowcaseRecord[] = [];
 let unavailable = false;
 try {
-  [packages, services] = await Promise.all([loadPackages(3), loadServices(3)]);
+  [packages, services, showcaseItems] = await Promise.all([
+    loadPackages(3),
+    loadServices(3),
+    loadShowcases(5),
+  ]);
 } catch {
   unavailable = true;
 }
@@ -106,6 +114,25 @@ const description =
     <a class="button button-secondary catalog-view-more" href="/services">
       View more services <span aria-hidden="true">↗</span>
     </a>
+  </section>
+
+  <section
+    class="showcases section"
+    id="showcases"
+    aria-labelledby="showcases-title"
+  >
+    <div class="section-heading">
+      <div>
+        <h2 class="section-title small" id="showcases-title">Past events</h2>
+      </div>
+      <p>A few celebrations we've styled.</p>
+    </div>
+    {showcaseItems.length > 0 && <ShowcaseCards items={showcaseItems} />}
+    <div class="showcase-cta-row">
+      <a class="catalog-view-more" href="/showcases">
+        View all showcases <span aria-hidden="true">↗</span>
+      </a>
+    </div>
   </section>
 
   <section class="intro section" id="intro">

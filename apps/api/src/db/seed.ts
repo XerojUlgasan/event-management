@@ -6,6 +6,7 @@ import { LOCAL_PASSWORD } from "./seed/context.js";
 import { seedScenario } from "./seed/scenario/index.js";
 import { seedDemo } from "./seed-demo.js";
 import { seedSamplePackages } from "./seed-packages.js";
+import { seedSampleShowcases } from "./seed-showcases.js";
 
 const legacyAccounts = [
   {
@@ -44,9 +45,10 @@ try {
       if (row) rows.push(row);
     }
     const packageCount = await seedSamplePackages(db);
+    const showcaseCount = await seedSampleShowcases(db);
     const demo = await seedDemo(db, passwordHash);
     const scenario = await seedScenario(db, passwordHash);
-    return { accounts: rows, packageCount, demo, scenario };
+    return { accounts: rows, packageCount, showcaseCount, demo, scenario };
   });
   console.table(
     seeded.accounts.map(({ email, role }) => ({
@@ -55,7 +57,7 @@ try {
     })),
   );
   console.log(
-    `Inserted ${seeded.accounts.length} local accounts and ${seeded.packageCount} sample canvas packages.`,
+    `Inserted ${seeded.accounts.length} local accounts, ${seeded.packageCount} sample packages, and ${seeded.showcaseCount} sample showcases.`,
   );
   console.log("Inserted connected demo rows:", seeded.demo);
   console.log("Inserted scenario rows:", seeded.scenario);

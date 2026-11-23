@@ -26,6 +26,7 @@ export function AdminSidebar({
     Calendar: "calendar",
     Packages: "box",
     Services: "spark",
+    Showcases: "camera",
     Inventory: "box",
     Operations: "clipboard",
     Reports: "chart",

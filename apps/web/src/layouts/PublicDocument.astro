@@ -1,6 +1,7 @@
 ---
 import "../styles/app.css";
 import "../styles/catalog/public-catalog.css";
+import "../styles/showcase.css";
 import { Brand, Icon } from "@event-management/ui";
 
 interface Props {
@@ -30,6 +31,7 @@ const { title, description } = Astro.props;
         <nav class="public-nav" aria-label="Primary">
           <a href="/packages">Packages</a>
           <a href="/services">Services</a>
+          <a href="/showcases">Showcases</a>
           <a href="/about">About us</a>
         </nav>
         <div class="header-actions">
@@ -43,6 +45,7 @@ const { title, description } = Astro.props;
             <nav aria-label="Mobile navigation">
               <a href="/packages">Packages</a>
               <a href="/services">Services</a>
+              <a href="/showcases">Showcases</a>
               <a href="/about">About us</a>
             </nav>
           </details>
@@ -60,6 +63,7 @@ const { title, description } = Astro.props;
         <div>
           <a href="/packages">Packages</a>
           <a href="/services">Services</a>
+          <a href="/showcases">Showcases</a>
           <a href="/about">About us</a>
         </div>
         <span>© {new Date().getFullYear()} Styled by AMAC</span>

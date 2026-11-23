@@ -24,6 +24,7 @@ const loaders = {
   ai: () => import("../controllers/ai/index.js"),
   health: () => import("../controllers/health/index.js"),
   "catalog-media": () => import("../controllers/catalog-media/index.js"),
+  showcase: () => import("../controllers/showcase/index.js"),
   services: () => import("../controllers/services/index.js"),
   packages: () => import("../controllers/packages/index.js"),
   "booking-requests": () => import("../controllers/booking-requests/index.js"),
@@ -68,6 +69,14 @@ const bodyLimits: Partial<
       path: "/admin/catalog-media",
       maxSize: MAX_VIDEO_SIZE_BYTES + MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
     },
+  ],
+  showcase: [
+    {
+      path: "/admin/showcase-media",
+      maxSize: MAX_VIDEO_SIZE_BYTES + MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
+    },
+    { path: "/admin/showcase-records", maxSize: CATALOG_JSON_BODY_LIMIT_BYTES },
+    { path: "/admin/showcase-records/*", maxSize: CATALOG_JSON_BODY_LIMIT_BYTES },
   ],
   "booking-requests": [
     { path: "/booking-requests", maxSize: SMALL_JSON_BODY_LIMIT_BYTES },
