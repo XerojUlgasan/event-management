@@ -79,6 +79,9 @@
 .messages-workspace .message-thread-title small {
   font-size: 12px;
 }
+.message-booking-action > svg {
+  display: none;
+}
 .messages-workspace .message-head-actions {
   flex-wrap: wrap;
   gap: 8px;
@@ -399,6 +402,18 @@
   }
   .messages-workspace .message-thread-title small {
     white-space: normal;
+  }
+  .messages-workspace .message-booking-action {
+    width: 44px;
+    min-height: 44px;
+    flex: none;
+    padding: 0;
+  }
+  .message-booking-action > svg {
+    display: block;
+  }
+  .message-booking-action > span {
+    display: none;
   }
   .messages-workspace .message-head-actions {
     gap: 7px;

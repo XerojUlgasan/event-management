@@ -2,40 +2,19 @@ import { CatalogThumbnail } from "@event-management/ui";
 import type { CatalogRecommendation } from "@event-management/contracts/messages";
 import { packageImageSrc } from "../../lib/data/catalog/packages";
 import {
-  bookingHoursLabel,
   priceLabel,
   servicePricingLabels,
 } from "../../lib/utils/formatting/money";
 import "../../styles/messages/catalog-recommendations.css";
 
-function inclusionsSummary(
-  recommendation: Extract<CatalogRecommendation, { type: "package" }>,
-) {
-  if (!recommendation.inclusions.length) return recommendation.description;
-
-  const names = recommendation.inclusions
-    .slice(0, 2)
-    .map((item) =>
-      item.includedHours == null
-        ? item.name
-        : `${item.name} (${bookingHoursLabel(item.includedHours)})`,
-    );
-
-  const hasMore = recommendation.inclusions.length > names.length;
-
-  return `Includes ${names.join(", ")}${hasMore ? ", and more" : ""}`;
-}
-
 function RecommendationLink({
   recommendation,
   price,
   detail,
-  summary,
 }: {
   recommendation: CatalogRecommendation;
   price: string;
   detail: string;
-  summary: string;
 }) {
   const kind = recommendation.type;
   const href = `/${kind === "package" ? "packages" : "services"}/${encodeURIComponent(recommendation.slug)}?catalogId=${encodeURIComponent(recommendation.id)}`;
@@ -50,17 +29,11 @@ function RecommendationLink({
     >
       <CatalogThumbnail src={packageImageSrc(recommendation.imageUrl)} />
       <span className="message-catalog-recommendation-copy">
-        <span className="message-catalog-recommendation-kind">{kind}</span>
         <strong>{recommendation.name}</strong>
         <span className="message-catalog-recommendation-terms">
           <span>{price}</span>
           {detail && <span>{detail}</span>}
         </span>
-        {summary && (
-          <span className="message-catalog-recommendation-summary">
-            {summary}
-          </span>
-        )}
       </span>
       <span className="message-catalog-recommendation-open" aria-hidden="true">
         ↗
@@ -89,7 +62,6 @@ export function CatalogRecommendations({
                 recommendation={recommendation}
                 price={priceLabel(recommendation.price)}
                 detail={`Up to ${recommendation.maxGuests} guests`}
-                summary={inclusionsSummary(recommendation)}
               />
             </li>
           );
@@ -103,7 +75,6 @@ export function CatalogRecommendations({
               recommendation={recommendation}
               price={pricing.price}
               detail={pricing.excess ?? ""}
-              summary={recommendation.description}
             />
           </li>
         );

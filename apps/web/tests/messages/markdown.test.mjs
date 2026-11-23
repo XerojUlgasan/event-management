@@ -454,7 +454,7 @@ test("event cards use human-readable accessible labels", () => {
   assert.doesNotMatch(html, /BR-RANDOM-REFERENCE/);
 });
 
-test("catalog recommendations render ordered snapshot terms with public links", () => {
+test("catalog recommendation cards keep historical options and terms in order", () => {
   const recommendations = [
     {
       type: "package",
@@ -483,17 +483,41 @@ test("catalog recommendations render ordered snapshot terms with public links", 
       includedHours: 3,
     },
   ];
+
+  const historicalRecommendations = [
+    ...recommendations,
+    ...["Ceremony", "Reception", "Anniversary"].map((name) => ({
+      ...recommendations[0],
+      id: `${name.toLowerCase()}-id`,
+      slug: name.toLowerCase(),
+      name,
+    })),
+  ];
+
   const html = renderToStaticMarkup(
-    createElement(CatalogRecommendations, { recommendations }),
+    createElement(CatalogRecommendations, {
+      recommendations: historicalRecommendations,
+    }),
   );
 
-  assert.ok(html.indexOf("Garden Celebration") < html.indexOf("Live Music"));
+  const titles = [...html.matchAll(/<strong>([^<]+)<\/strong>/g)].map(
+    ([, name]) => name,
+  );
+
+  assert.deepEqual(
+    titles,
+    historicalRecommendations.map(({ name }) => name),
+  );
   assert.match(html, /href="\/packages\/garden-package\?catalogId=package-id"/);
   assert.match(html, /href="\/services\/live-music\?catalogId=service-id"/);
   assert.match(html, /target="_blank"/);
-  assert.match(html, /includes Catering \(4 hours\), Styling, and more/i);
+  assert.match(html, /₱12,500 total/);
   assert.match(html, /Up to 80 guests/);
+  assert.match(html, /₱5,000 for 3 hours/);
+  assert.match(html, /₱1,200 \/ additional hour/);
   assert.match(html, /opens in a new tab/);
+  assert.doesNotMatch(html, />package<|>service</i);
+  assert.doesNotMatch(html, /Includes Catering|Acoustic music for your event/);
 
   assert.equal(
     renderToStaticMarkup(createElement(CatalogRecommendations, {})),
