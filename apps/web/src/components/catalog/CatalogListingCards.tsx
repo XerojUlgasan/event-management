@@ -1,4 +1,5 @@
 import { Button, CatalogThumbnail } from "@event-management/ui";
+import type { MouseEventHandler } from "react";
 import {
   packageImageSrc,
   type PublicPackage,
@@ -9,7 +10,8 @@ import {
   servicePricingLabels,
 } from "../../lib/utils/formatting/money";
 
-type CardAction = { href: string } | { onPreview: () => void };
+type CardAction =
+  { href: string } | { onPreview: MouseEventHandler<HTMLButtonElement> };
 
 function CatalogListingCard({
   kind,

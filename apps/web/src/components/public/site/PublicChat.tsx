@@ -4,6 +4,7 @@ import {
   Button,
   Icon,
   Markdown,
+  NotificationProvider,
   Textarea,
 } from "@event-management/ui";
 import { MAX_MESSAGE_BODY_LENGTH } from "@event-management/contracts/limits/messages";
@@ -36,6 +37,7 @@ import {
 } from "../../messages/MessageImages";
 import { MessageProcessing } from "../../messages/MessageProcessing";
 import { CatalogRecommendations } from "../../messages/CatalogRecommendations";
+import { CatalogBrowseActions } from "../../messages/CatalogBrowseActions";
 import { SuggestedReplies } from "../../messages/SuggestedReplies";
 import {
   hasLocalReplyPending,
@@ -47,6 +49,14 @@ import { assertCursorMoved } from "../../../lib/services/messages/older-page";
 import { latestSuggestedReplyMessage } from "../../../lib/services/messages/suggested-replies";
 
 export default function PublicChat() {
+  return (
+    <NotificationProvider>
+      <PublicChatPanel />
+    </NotificationProvider>
+  );
+}
+
+function PublicChatPanel() {
   const [open, setOpen] = useState(false);
   const agentProfile = useAgentProfile(open);
   const [thread, setThread] = useState<GuestThread | null>(null);
@@ -791,9 +801,15 @@ export default function PublicChat() {
                     <Fragment key={message.id}>
                       {bubble}
                       {message.senderRole === "assistant" && (
-                        <CatalogRecommendations
-                          recommendations={message.catalogRecommendations}
-                        />
+                        <>
+                          <CatalogRecommendations
+                            recommendations={message.catalogRecommendations}
+                          />
+                          <CatalogBrowseActions
+                            message={message}
+                            threadRef={messageList}
+                          />
+                        </>
                       )}
                       {suggestedMessage?.id === message.id &&
                         respondedToSuggestion.current !== message.id && (
