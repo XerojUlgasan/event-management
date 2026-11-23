@@ -131,13 +131,13 @@ After local or Firebase sign-in or registration, the explicit guest continuation
 
 ### In-app notifications
 
-The notification bell appears in both signed-in workspace headers. Each current System Administrator receives a separate alert when a customer submits a booking request or a conversation needs human review. Customers receive alerts for admin changes to their own request status and for sent quotations or revisions. The bell shows the timestamp and the signed-in user's unread count. Opening an alert marks that copy read and opens the request, conversation, or exact quotation version. Ordinary chat activity continues to use the Messages unread count.
+The notification bell appears in both signed-in workspace headers. Each current System Administrator receives a separate alert when a customer submits a booking request or a conversation needs human review. Customers receive alerts for admin changes to their own request status and for sent quotations or revisions. The bell shows the signed-in user's unread count. The drawer groups alerts by local day, shows the time on each row, and marks unread rows with a dot and heavier title. Opening an alert marks that copy read and opens the request, conversation, or exact quotation version. Ordinary chat activity continues to use the Messages unread count.
 
-New unread alerts show a small card beside the bell while the workspace is open. The card shows the latest arrival, with earlier alerts available in the bell. Choose **Open notification** to view the linked record and mark the alert read. **Dismiss notification** leaves it unread. Existing unread history stays in the bell when the workspace first loads.
+New unread alerts show a small card beside the bell while the workspace is open. The card shows the latest arrival, with earlier alerts available in the bell. Choose **View request**, **View quotation**, or **View conversation** to open the linked record and mark the alert read. **Dismiss notification** leaves it unread. Existing unread history stays in the bell when the workspace first loads.
 
 `GET /v1/notifications` returns the latest page, unread count, and a cursor for earlier activity. `POST /v1/notifications/{id}/read` marks one alert read. Both use the app session and the recipient's account ID. The API and web app validate the notification type, timestamps, and type-specific payload through `@event-management/contracts/notifications`. Realtime sends a refresh signal to the account's private channel. The bell reads saved notifications through the API and catches up on reconnect, focus, or polling.
 
-The bell requests `includeBookingDetails=1` so booking alerts can show the event type and requested date, including alerts saved before this display was introduced. When the booking is missing or inaccessible, the bell shows a generic booking request label and the saved status when applicable.
+The bell requests `includeBookingDetails=1` and `includeQuotationDetails=1` to show the event type and requested date when the linked booking is accessible. Quotation details come from the booking linked to the delivered version. Alerts with missing or inaccessible records still show the saved update and any quotation version.
 
 ### Private packages and quotations
 

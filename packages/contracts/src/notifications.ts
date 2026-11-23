@@ -59,7 +59,7 @@ const bookingNotificationFields = {
 export const notificationSchema = z.discriminatedUnion("type", [
   bookingRequestCreated.extend(bookingNotificationFields),
   bookingStatusUpdated.extend(bookingNotificationFields),
-  quotationSent.extend(notificationFields),
+  quotationSent.extend(bookingNotificationFields),
   humanReviewRequested.extend(notificationFields),
 ]);
 

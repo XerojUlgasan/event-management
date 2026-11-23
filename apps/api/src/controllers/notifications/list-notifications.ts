@@ -9,6 +9,7 @@ import {
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   listNotificationBookingsData,
+  listNotificationQuotationsData,
   listNotificationsData,
 } from "../../data/notifications/list-notifications.js";
 import type { AppRouteHandler } from "../../types/hono.js";
@@ -35,6 +36,7 @@ export const listNotificationsRoute = createRoute({
     query: z.object({
       cursor: z.string().min(1).max(MAX_CURSOR_LENGTH).optional(),
       includeBookingDetails: z.literal("1").optional(),
+      includeQuotationDetails: z.literal("1").optional(),
     }),
   },
   responses: {
@@ -66,48 +68,92 @@ export const listNotificationsRouteHandler: AppRouteHandler<
     encodePageCursor(scope, { createdAt: cursor_created_at, id }),
   );
 
-  const notifications = page.items.map(
-    ({ id, type, payload, cursor_created_at, read_at }) => ({
-      ...notificationContentSchema.parse({ type, payload }),
-      id,
-      createdAt: cursor_created_at,
-      readAt: read_at,
+  const items = page.items.map(
+    ({ id, type, payload, source_event_id, cursor_created_at, read_at }) => ({
+      notification: {
+        ...notificationContentSchema.parse({ type, payload }),
+        id,
+        createdAt: cursor_created_at,
+        readAt: read_at,
+      },
+      sourceEventId: source_event_id,
     }),
   );
 
-  const bookingIdFor = (item: (typeof notifications)[number]) => {
+  const bookingIds = new Set<string>();
+  const quotationIds = new Set<string>();
+
+  for (const { notification, sourceEventId } of items) {
     if (
       query.includeBookingDetails &&
-      (item.type === "booking_status_updated" ||
-        (item.type === "booking_request_created" && viewer.role === "admin"))
+      (notification.type === "booking_status_updated" ||
+        (notification.type === "booking_request_created" &&
+          viewer.role === "admin"))
     )
-      return item.payload.bookingRequestId.toLowerCase();
-  };
+      bookingIds.add(notification.payload.bookingRequestId.toLowerCase());
 
-  const items = notifications.map((notification) => ({
-    notification,
-    bookingId: bookingIdFor(notification),
-  }));
+    if (
+      query.includeQuotationDetails &&
+      notification.type === "quotation_sent" &&
+      notification.payload.quotationId.toLowerCase() === sourceEventId
+    )
+      quotationIds.add(sourceEventId);
+  }
 
-  const bookingIds = [
-    ...new Set(items.flatMap(({ bookingId }) => (bookingId ? [bookingId] : []))),
-  ];
+  const [bookingRows, quotationRows] = await Promise.all([
+    listNotificationBookingsData(db, [...bookingIds], viewer),
+    listNotificationQuotationsData(db, [...quotationIds], viewer.id),
+  ]);
 
-  const bookings = new Map(
-    (await listNotificationBookingsData(db, bookingIds, viewer)).map(
-      ({ id, event_type, preferred_date }) => [
-        id,
-        { eventType: event_type, preferredDate: preferred_date },
-      ],
-    ),
-  );
+  const bookings = new Map(bookingRows.map((row) => [row.id, row]));
+
+  const quotations = new Map(quotationRows.map((row) => [row.id, row]));
 
   return c.json(
     {
-      notifications: items.map(({ notification, bookingId }) => {
-        const booking = bookingId ? bookings.get(bookingId) : undefined;
+      notifications: items.map(({ notification, sourceEventId }) => {
+        if (notification.type === "human_review_requested") return notification;
 
-        return booking ? { ...notification, booking } : notification;
+        if (notification.type === "quotation_sent") {
+          const quotation = quotations.get(sourceEventId);
+          const { quotationId, conversationId, version } = notification.payload;
+
+          if (
+            !quotation ||
+            quotation.id !== quotationId.toLowerCase() ||
+            quotation.conversation_id !== conversationId.toLowerCase() ||
+            quotation.version !== version
+          )
+            return notification;
+
+          return {
+            ...notification,
+            booking: {
+              eventType: quotation.event_type,
+              preferredDate: quotation.preferred_date,
+            },
+          };
+        }
+
+        if (
+          notification.type === "booking_request_created" &&
+          viewer.role !== "admin"
+        )
+          return notification;
+
+        const booking = bookings.get(
+          notification.payload.bookingRequestId.toLowerCase(),
+        );
+
+        return booking
+          ? {
+              ...notification,
+              booking: {
+                eventType: booking.event_type,
+                preferredDate: booking.preferred_date,
+              },
+            }
+          : notification;
       }),
       unreadCount: Number(unread_count),
       nextCursor: page.nextCursor,

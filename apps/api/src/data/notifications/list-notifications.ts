@@ -13,7 +13,7 @@ export function listNotificationsData(
     .selectFrom("notifications")
     .where("recipient_user_id", "=", userId);
   let page = owned
-    .select(["id", "type", "payload"])
+    .select(["id", "type", "payload", "source_event_id"])
     .select(utcTimestampSql("created_at").as("cursor_created_at"))
     .select(utcTimestampSql("read_at").$castTo<string | null>().as("read_at"))
     .orderBy("created_at", "desc")
@@ -55,4 +55,38 @@ export function listNotificationBookingsData(
     query = query.where("customer_id", "=", viewer.id);
 
   return query.execute();
+}
+
+export function listNotificationQuotationsData(
+  db: Kysely<DB>,
+  ids: string[],
+  recipientId: string,
+) {
+  if (ids.length === 0) return [];
+
+  return db
+    .selectFrom("quotations")
+    .innerJoin(
+      "booking_requests",
+      "booking_requests.id",
+      "quotations.booking_request_id",
+    )
+    .innerJoin("messages", "messages.quotation_id", "quotations.id")
+    .innerJoin("conversations", "conversations.id", "messages.conversation_id")
+    .where("quotations.id", "in", ids)
+    .where("quotations.status", "in", ["sent", "superseded"])
+    .where("quotations.sent_at", "is not", null)
+    .whereRef("conversations.booking_request_id", "=", "booking_requests.id")
+    .where("conversations.customer_id", "=", recipientId)
+    .where("booking_requests.customer_id", "=", recipientId)
+    .where("booking_requests.submitted_at", "is not", null)
+    .select([
+      "quotations.id",
+      "quotations.version",
+      "conversations.id as conversation_id",
+      "booking_requests.event_type",
+      "booking_requests.preferred_date",
+    ])
+    .$narrowType<{ event_type: string; preferred_date: string }>()
+    .execute();
 }
