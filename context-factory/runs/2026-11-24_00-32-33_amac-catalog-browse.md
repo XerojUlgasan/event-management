@@ -1,7 +1,7 @@
 # AMAC catalog browse attachments
 
 Started: 2026-11-24T00:32:33+08:00
-Updated: 2026-11-24T00:57:18+08:00
+Updated: 2026-11-24T01:18:01+08:00
 Status: complete
 Scope: AMAC tool, API and shared message contract, migration, backend tests, and documentation in the assigned worktree.
 Checkout: `feat/amac-catalog-browse` on local base `16b404b3`.
@@ -23,6 +23,12 @@ API type checking and the Edge build passed. The targeted API, Edge, and worker 
 
 Main fast-forwarded to `8e349757`. Prisma applied the additive browse migration on local Supabase PostgreSQL at `54322`, bringing the completed count to 92. The site remained available at `http://localhost:4321` after the Edge rebuild and worker restart. A live guest text reply and a worker-processed image reply each saved both category labels, suggestions, and a linked browse audit. A fresh history read returned the saved fields. The audit recorded zero inventory calls. API type checking and the Edge bundle build passed.
 
+## Combined local browser verification
+
+Local main merged the reviewed viewer at `415f099a`. Chromium verified guest and signed-in chat at 1440 × 900 and 390 × 844 against Astro on `4321`, Edge on `54321`, and PostgreSQL on `54322`. Both live AMAC replies attached Packages and Services. PostgreSQL confirmed each saved attachment and its successful `attachCatalogBrowse` audit.
+
+The viewer loaded current public listings and details. Back restored filters, pagination, scroll, and focus. Close and Escape returned to the same chat and draft without a send. Reload restored the saved browse actions and suggestions. Selecting an ordinary suggestion sent its exact label and preserved the typed draft in both chats. All 116 web message and catalog tests passed. The running worker remained connected to the same local database.
+
 ## Resume here
 
-The head owns combined browser verification with the catalog overlay. The main stack remains running for that check. Hosted rollout remains unverified.
+Combined local verification is complete. The main stack remains available at `http://localhost:4321`. Hosted rollout remains unverified.
