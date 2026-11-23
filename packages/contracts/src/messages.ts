@@ -18,6 +18,8 @@ const suggestedRepliesSchema = z
   .array(suggestedReplySchema)
   .max(MAX_SUGGESTED_REPLIES);
 
+export const requiredSuggestedRepliesSchema = suggestedRepliesSchema.min(1);
+
 const recommendationFields = {
   id: z.uuid(),
   slug: z.string(),
@@ -69,6 +71,7 @@ export const chatMessageSchema = z.object({
   quotationId: z.string().uuid().nullable(),
   catalogRecommendations: catalogRecommendationsSchema.optional(),
   suggestedReplies: suggestedRepliesSchema.optional(),
+  handoffAcknowledgement: z.literal(true).optional(),
   replyToMessageId: z.string().uuid().nullable(),
   senderId: z.string().uuid().nullable(),
   senderRole: z.enum(["admin", "customer", "assistant"]),

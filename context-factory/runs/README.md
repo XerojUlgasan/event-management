@@ -14,6 +14,7 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Required AMAC reply suggestions](2026-11-24_00-11-29_required-amac-replies.md) | Guest and customer chat / feat/required-amac-reply-suggestions | in-progress | Await explicit merge authorization, then verify the root dev runtime. |
 | [AMAC suggested replies](2026-11-23_21-28-00_amac-suggested-replies.md) | Guest and customer chat / feat/amac-suggested-replies | complete | Await explicit instruction to integrate and verify on main. |
 | [Contextual customer Home preview](2026-11-23_16-52-15_customer-home-preview.md) | Signed-in Home next step / codex/customer-home-preview | complete | Review the isolated preview. The parent owns the room and tunnel. |
 | [Supporting Documents API structure](2026-11-22_22-47-07_supporting-documents-api-structure.md) | Document operations and background queue modules / main | complete | Review the document router and worker entry points. |

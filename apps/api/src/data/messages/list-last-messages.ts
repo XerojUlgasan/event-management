@@ -1,4 +1,5 @@
 import { messageProcessingSelection } from "./message-processing.js";
+import { handoffAcknowledgementSelection } from "./select-message-columns.js";
 import { messageImagesSelection } from "./message-images.js";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
@@ -18,6 +19,7 @@ export async function listLastMessagesData(
     .select((eb) => [
       messageImagesSelection(),
       messageProcessingSelection(),
+      handoffAcknowledgementSelection,
       "m.id",
       "m.guest_origin",
       "m.reply_to_message_id",

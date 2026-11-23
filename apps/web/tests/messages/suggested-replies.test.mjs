@@ -37,6 +37,19 @@ const conversation = {
   updatedAt: timestamp,
 };
 
+const handoff = {
+  ...prompt,
+  body: "I’ve handed this over to our team.",
+  handoffAcknowledgement: true,
+};
+
+const handedOffConversation = {
+  ...conversation,
+  lastMessage: handoff,
+  aiEnabled: false,
+  aiVersion: 2,
+};
+
 test("suggested replies in both customer contexts use the usual sends and keep composer content", async (t) => {
   const window = new Window();
   const cacheDir = await mkdtemp(join(tmpdir(), "clemora-suggested-replies-"));
@@ -125,7 +138,11 @@ test("suggested replies in both customer contexts use the usual sends and keep c
       const empty = { title: "Empty", body: "Start a conversation" };
       const sent = [];
 
-      const render = (messages, viewerRole = "customer") =>
+      const render = (
+        messages,
+        viewerRole = "customer",
+        { activeConversation = conversation, sendDisabled = false } = {},
+      ) =>
         act(async () =>
           root.render(
             createElement(
@@ -134,12 +151,13 @@ test("suggested replies in both customer contexts use the usual sends and keep c
               createElement(MessagesWorkspace, {
                 title: "Messages",
                 viewerRole,
-                conversations: [conversation],
+                conversations: [activeConversation],
                 activeId: conversation.id,
                 onSelect() {},
                 messages,
                 loading: false,
                 error: null,
+                sendDisabled,
                 async onSend(body, files, requestId, reviewMessageId) {
                   sent.push({ body, files, requestId, reviewMessageId });
                 },
@@ -153,6 +171,11 @@ test("suggested replies in both customer contexts use the usual sends and keep c
 
       try {
         await render([question, prompt], "admin");
+        assert.equal(choices().length, 0);
+        await render([question, handoff], "customer", {
+          activeConversation: handedOffConversation,
+          sendDisabled: true,
+        });
         assert.equal(choices().length, 0);
 
         const laterCustomer = message("new-input", "customer");
@@ -173,6 +196,12 @@ test("suggested replies in both customer contexts use the usual sends and keep c
             prompt,
           ],
           [question, prompt, message("legacy", "assistant")],
+          [question, prompt, message("team", "admin")],
+          [
+            question,
+            prompt,
+            message("invalid", "assistant", { suggestedReplies: [42] }),
+          ],
           [
             question,
             prompt,
@@ -196,7 +225,13 @@ test("suggested replies in both customer contexts use the usual sends and keep c
         const previousReview = message("older-review", "assistant");
         await render([previousReview]);
         const textarea = await fillComposer();
-        await render([previousReview, question, prompt]);
+        await render(
+          [previousReview, question, laterCustomer, handoff],
+          "customer",
+          {
+            activeConversation: handedOffConversation,
+          },
+        );
         const buttons = choices();
         assert.deepEqual(
           buttons.map((button) => button.textContent),
@@ -215,7 +250,7 @@ test("suggested replies in both customer contexts use the usual sends and keep c
             body: labels[0],
             files: [],
             requestId: sent[0]?.requestId,
-            reviewMessageId: prompt.id,
+            reviewMessageId: undefined,
           },
         ]);
         assert.ok(sent[0].requestId);
@@ -247,7 +282,7 @@ test("suggested replies in both customer contexts use the usual sends and keep c
   );
 
   await t.test(
-    "guest click sends a single text payload and spends the ordinary allowance",
+    "guest handoff choices send a single text payload and spend the ordinary allowance",
     async (t) => {
       const root = createRoot(container);
       const sends = [];
@@ -262,8 +297,8 @@ test("suggested replies in both customer contexts use the usual sends and keep c
 
         if (url.endsWith("/guest/conversation"))
           return Response.json({
-            conversation,
-            messages: [question, prompt],
+            conversation: handedOffConversation,
+            messages: [question, message("new-input", "customer"), handoff],
             nextCursor: null,
             guest: guest(2),
           });

@@ -495,11 +495,44 @@ test("a slow answer to an earlier message cannot displace the current booking su
     {
       turnId: randomUUID(),
       customerMessageId: older.customerMessageId,
+      suggestedReplies: ["Tell me about the services."],
     },
   );
   assert.equal(late, null);
   const consent = await beginTurn(chat.id, customer.id, "Yes, submit");
   assert.equal((await confirm(consent, summary.id)).status, "submitted");
+});
+
+test("a saved review reply cannot submit, and explicit approval after a fresh review gets a receipt with replies", async () => {
+  const { conversation, customer, summary } = await reviewedDraft();
+  assert.deepEqual(summary.suggested_replies, [
+    "I need to correct a detail.",
+    "Can you clarify the next step?",
+  ]);
+  const followup = await beginTurn(
+    conversation.id,
+    customer.id,
+    "I need to correct a detail.",
+  );
+  assert.equal(
+    (await confirm(followup, summary.id)).status,
+    "confirmation_required",
+  );
+  assert.equal((await linkedBooking(conversation.id)).submitted_at, null);
+
+  const fresh = await review(followup);
+  const approval = await beginTurn(
+    conversation.id,
+    customer.id,
+    "Yes, send it for review.",
+  );
+  const result = await confirm(approval, fresh.id);
+  assert.equal(result.status, "submitted");
+
+  if (result.status === "submitted")
+    assert.deepEqual(result.message.suggested_replies, [
+      "How can I update my request?",
+    ]);
 });
 
 test("a correction, unknown target, ordinary message, or attachment cannot submit", async () => {

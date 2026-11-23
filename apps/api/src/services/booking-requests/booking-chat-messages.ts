@@ -1,4 +1,5 @@
 import type { BookingDraftFields } from "@event-management/contracts/booking-draft";
+import { suggestedReplySchema } from "@event-management/contracts/messages";
 import { z } from "zod";
 import type { resolveBookingDraft } from "./resolve-booking-draft.js";
 
@@ -133,6 +134,7 @@ export const bookingReceiptModelCopySchema = z.object({
   style: bookingChatStyleSchema.optional(),
   receipt: z.string().nullable().optional(),
   changesGuidance: z.string().nullable().optional(),
+  nextReply: suggestedReplySchema.optional().catch(undefined),
 });
 
 export type BookingReceiptCopy = z.infer<typeof bookingReceiptModelCopySchema>;

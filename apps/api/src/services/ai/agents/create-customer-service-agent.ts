@@ -20,32 +20,41 @@ import {
 } from "../tools/get-my-booking-facts.js";
 import { createUpdateConversationMemoryTool } from "../tools/update-conversation-memory.js";
 import type { AssistantToolContext } from "../tools/assistant-tool-context.js";
+import { containsRawToolProtocol } from "../../messages/suggested-reply-copy.js";
+import { localizeHandoff } from "../suggested-replies.js";
+import type { bookingLanguageSamples } from "../localize-booking-chat.js";
 import { createBookingDraftTools } from "../tools/booking-draft.js";
 
 const maxStepTokens = 800;
 
 const suggestedReplyInstructions = `## Suggested customer replies
-- Use native tools for actions and lookups, then return a single JSON object with exactly two keys: "message" for the complete AMAC message and "suggested_replies" for an array of up to ${MAX_SUGGESTED_REPLIES} customer message strings. Write JSON only for the final answer, without a code fence or introductory text.
-- Offer short, distinct messages in the customer's conversation language when the reply presents a concrete choice or a natural next question. Each suggestion is sent verbatim from the customer's perspective. Keep each suggestion to one line and at most 120 characters.
-- Return an empty array for open-ended questions, personal details, or whenever free text fits better. Do not guess a person's details, invent options, or suggest agreeing to send or change a booking. Keep the AMAC message complete on its own.`;
-
-export function containsRawToolProtocol(value: string) {
-  return /(?:DSML|<\|(?:tool_call|tool_calls|function_call)|<tool_call>)/iu.test(
-    value,
-  );
-}
+- Use native tools for actions and lookups, then return a single JSON object with "message" for the complete AMAC message and "suggested_replies" for one to ${MAX_SUGGESTED_REPLIES} distinct customer messages. Write JSON only for the final answer.
+- Every message needs useful replies the customer can send verbatim. Match the conversation language, including code-switching. Use one line and at most 120 characters per choice. Offer the actual choices from any either/or question, useful follow-up questions, or the next step.
+- When asking for numbers, dates, times, or personal details, offer uncertainty or requests for clarification. Never guess an answer.
+- Never offer permission to submit or change a booking. The customer can type their own answer. Keep the AMAC message complete on its own.`;
 
 const structuredReply = Output.object({
   schema: z.object({
     message: z.string().describe("The complete customer-facing AMAC reply."),
-    suggested_replies: z
-      .array(z.string())
-      .max(MAX_SUGGESTED_REPLIES)
-      .describe(
-        "Short contextual replies the customer could send verbatim. Use [] when a free-text answer fits.",
-      ),
+    // The suggestions are validated separately so malformed metadata cannot
+    // invalidate a valid customer-facing message.
+    suggested_replies: z.unknown().optional(),
   }),
 });
+
+function readMessageBeforeBrokenSuggestions(text: string) {
+  const match = /\{\s*"message"\s*:\s*("(?:[^"\\]|\\.)*")(?=\s*(?:,|$))/su.exec(
+    text,
+  );
+
+  if (!match) return;
+
+  try {
+    return z.string().parse(JSON.parse(match[1]));
+  } catch {
+    return;
+  }
+}
 
 const replyOutput = {
   ...structuredReply,
@@ -72,7 +81,13 @@ const replyOutput = {
 
       // Keep raw tool markup visible to the turn's guarded recovery path.
       if (containsRawToolProtocol(text))
-        return { message: text, suggested_replies: [] };
+        return { message: text, suggested_replies: undefined };
+
+      const message = readMessageBeforeBrokenSuggestions(
+        fencedJson?.[1] ?? trailingEnvelope?.[1] ?? text,
+      );
+
+      if (message?.trim()) return { message, suggested_replies: undefined };
 
       // Preserve a plain-text provider reply when it omitted suggestions.
       if (
@@ -81,7 +96,7 @@ const replyOutput = {
         !/^(?:\{|\[\s*(?:\]|\{|")|```)/u.test(text) &&
         !/"(?:message|suggested_replies)"\s*:/u.test(text)
       )
-        return { message: text, suggested_replies: [] };
+        return { message: text, suggested_replies: undefined };
 
       // A completed tool can still supply a server-generated booking review.
       return null;
@@ -93,10 +108,14 @@ export function createCustomerServiceAgent({
   settings,
   answerOnlyAfter,
   onRecommendationsAttached,
+  history,
+  copyDeadline,
   ...options
 }: AssistantToolContext & {
   settings: AgentSettings;
   answerOnlyAfter: number;
+  history: Parameters<typeof bookingLanguageSamples>[0];
+  copyDeadline: AbortSignal;
   onRecommendationsAttached: (items: CatalogRecommendation[]) => void;
 }) {
   let proposedBatchSize = 0;
@@ -138,6 +157,13 @@ export function createCustomerServiceAgent({
             requestHumanHandoff: createRequestHumanHandoffTool({
               ...toolContext,
               handoffScope: options.handoffScope,
+              getHandoffCopy: (signal) =>
+                localizeHandoff(
+                  history,
+                  signal
+                    ? AbortSignal.any([signal, copyDeadline])
+                    : copyDeadline,
+                ),
             }),
           }
         : {}),

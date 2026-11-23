@@ -53,6 +53,9 @@ export function messageDto(row: MessageWithSender): ChatMessage {
     ...(role === "assistant" && suggestedReplies.success
       ? { suggestedReplies: suggestedReplies.data }
       : {}),
+    ...(role === "assistant" && row.handoff_acknowledgement
+      ? { handoffAcknowledgement: true as const }
+      : {}),
     replyToMessageId: row.reply_to_message_id,
     senderId: row.sender_id,
     senderRole: role,

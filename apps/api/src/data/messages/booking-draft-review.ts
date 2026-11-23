@@ -5,6 +5,7 @@ import {
   bookingReviewPresets,
   type BookingReviewCopy,
 } from "../../services/booking-requests/booking-chat-messages.js";
+import { suggestedReplyCopy } from "../../services/messages/suggested-reply-copy.js";
 import { resolveBookingDraft } from "../../services/booking-requests/resolve-booking-draft.js";
 import { finishToolCallData } from "../ai/finish-tool-call.js";
 import {
@@ -20,6 +21,7 @@ export function reviewBookingDraftData({
   callId,
   turnId,
   copy = bookingReviewPresets.en,
+  suggestedReplies = suggestedReplyCopy().review,
   abortSignal,
 }: {
   db: Kysely<DB>;
@@ -27,6 +29,7 @@ export function reviewBookingDraftData({
   callId: string;
   turnId: string;
   copy?: BookingReviewCopy;
+  suggestedReplies?: string[];
   abortSignal?: AbortSignal;
 }) {
   return db.transaction().execute(async (trx) => {
@@ -88,6 +91,7 @@ export function reviewBookingDraftData({
       conversationId: scope.conversationId,
       customerId: conversation.customer_id,
       toolTurn: { turnId, customerMessageId: scope.customerMessageId },
+      suggestedReplies,
       body: bookingReviewBody(
         draft.fields,
         resolved,

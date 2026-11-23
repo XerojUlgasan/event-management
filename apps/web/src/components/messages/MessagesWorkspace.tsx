@@ -230,7 +230,7 @@ export function MessagesWorkspace({
   const isTeam = viewerRole === "customer";
   const composerDisabled = !activeId || (!isTeam && sending) || sendDisabled;
   const suggestedMessage =
-    isTeam && active?.aiEnabled && !composerDisabled && !aiReplyPending
+    isTeam && active && !composerDisabled && !aiReplyPending
       ? latestSuggestedReplyMessage(messages)
       : undefined;
   const singleConversation =
@@ -428,12 +428,13 @@ export function MessagesWorkspace({
     const conversationId = activeId;
     const sentDraft = draft;
     const previous = sendKeys.current[conversationId];
-    const reviewMessageId = isTeam
-      ? reviewForSend(
-          suggestion?.messageId ?? reviewPins.current[conversationId],
-          sentFiles.length > 0,
-        )
-      : undefined;
+    const reviewMessageId =
+      isTeam && !suggestion
+        ? reviewForSend(
+            reviewPins.current[conversationId],
+            sentFiles.length > 0,
+          )
+        : undefined;
 
     const requestId =
       !suggestion &&

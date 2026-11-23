@@ -10,6 +10,7 @@ import type { DB } from "../../db/types.js";
 import {
   bookingLanguageSamples,
   bookingReceiptTranslationInstructions,
+  localizeServerSuggestedReply,
 } from "./localize-booking-chat.js";
 import { getTextModel } from "./models.js";
 
@@ -51,6 +52,7 @@ export async function completeBookingConsentAssessment({
   evidence,
   history,
   signal,
+  copyDeadline = signal,
 }: {
   db: Kysely<DB>;
   conversationId: string;
@@ -62,6 +64,7 @@ export async function completeBookingConsentAssessment({
   >;
   history: Parameters<typeof bookingLanguageSamples>[0];
   signal: AbortSignal;
+  copyDeadline?: AbortSignal;
 }) {
   const assessed = await assessBookingConsent(
     evidence.reply,
@@ -76,6 +79,19 @@ export async function completeBookingConsentAssessment({
     });
     throw error;
   });
+
+  if (assessed.intent === "submit" && assessed.receiptCopy.style === "other") {
+    const [nextReply] = await localizeServerSuggestedReply(
+      "receipt",
+      assessed.receiptCopy.nextReply,
+      history,
+      copyDeadline,
+    );
+    assessed.receiptCopy.nextReply = nextReply;
+  } else if (assessed.intent === "submit") {
+    // The server owns the receipt and reply copy for preset languages.
+    assessed.receiptCopy = { style: assessed.receiptCopy.style };
+  }
 
   return db.transaction().execute(async (trx) => {
     // Separate API workers can assess the same saved message concurrently.

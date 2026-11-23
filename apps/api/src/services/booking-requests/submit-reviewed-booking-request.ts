@@ -15,6 +15,11 @@ import { createAssistantMessageInTransactionData } from "../../data/messages/cre
 import type { DB } from "../../db/types.js";
 import { createBookingRequestInTransaction } from "./create-booking-request.js";
 import { bookingRequestReceipt } from "./booking-chat-messages.js";
+import {
+  fallbackReplyLanguage,
+  suggestedReplyCopy,
+  usableSuggestedReplies,
+} from "../messages/suggested-reply-copy.js";
 import { resolveBookingDraft } from "./resolve-booking-draft.js";
 
 export function submitReviewedBookingRequestService({
@@ -120,11 +125,21 @@ export function submitReviewedBookingRequestService({
       status: "succeeded",
       output: { status: "submitted", bookingId: booking.id },
     });
+    const receiptCopy = decision.data.receiptCopy;
+    const body = bookingRequestReceipt(booking.reference, receiptCopy);
+    const translatedReply = usableSuggestedReplies([receiptCopy.nextReply]);
+    const suggestedReplies =
+      receiptCopy.style === "other"
+        ? translatedReply.length
+          ? translatedReply
+          : suggestedReplyCopy(fallbackReplyLanguage([body])).receipt
+        : suggestedReplyCopy(receiptCopy.style).receipt;
     const message = await createAssistantMessageInTransactionData(trx, {
       conversationId: scope.conversationId,
       customerId,
       toolTurn: { turnId, customerMessageId: scope.customerMessageId },
-      body: bookingRequestReceipt(booking.reference, decision.data.receiptCopy ?? undefined),
+      body,
+      suggestedReplies,
     });
     abortSignal?.throwIfAborted();
 

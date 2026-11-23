@@ -23,7 +23,10 @@ let team: { id: string; cookie: string };
 let model: MockLanguageModelV4;
 let packageId: string;
 
-function useReply(text: string, suggestions: string[] = []) {
+function useReply(
+  text: string,
+  suggestions: string[] = ["What can I do next?"],
+) {
   model = new MockLanguageModelV4({
     doGenerate: async () => ({
       content: [
@@ -1248,7 +1251,7 @@ test("in-flight guest AI remains guest-scoped after claim; takeover suppresses i
           type: "text",
           text: JSON.stringify({
             message: "Delayed guest reply",
-            suggested_replies: [],
+            suggested_replies: ["Tell me more."],
           }),
         },
       ],
@@ -1325,7 +1328,7 @@ test("guest takeover invalidates a delayed AI reply through an off/on cycle with
           type: "text",
           text: JSON.stringify({
             message: "Must not appear",
-            suggested_replies: [],
+            suggested_replies: ["Tell me more."],
           }),
         },
       ],
@@ -1550,8 +1553,15 @@ test("guest handoff persists one acknowledgement, audit and private admin state 
     201,
   );
   assert.equal(sent.assistantMessage?.body, humanHandoffAcknowledgement);
+  assert.equal(sent.assistantMessage?.handoffAcknowledgement, true);
   assert.equal(sent.assistantError, null);
-  assert.equal(model.doGenerateCalls.length, 1);
+  assert.deepEqual(sent.assistantMessage?.suggestedReplies, [
+    "What information can I share with the team?",
+  ]);
+  assert.equal(
+    model.doGenerateCalls.filter(({ tools }) => tools?.length).length,
+    1,
+  );
   const state = await db
     .selectFrom("conversations")
     .select(["ai_handoff", "ai_enabled", "ai_version"])
@@ -1578,12 +1588,17 @@ test("guest handoff persists one acknowledgement, audit and private admin state 
     201,
   );
   assert.equal(replay.assistantMessage.id, sent.assistantMessage.id);
-  assert.equal(model.doGenerateCalls.length, 1);
+  assert.equal(replay.assistantMessage.handoffAcknowledgement, true);
+  assert.equal(
+    model.doGenerateCalls.filter(({ tools }) => tools?.length).length,
+    1,
+  );
   const visible = await read(
     await call(`/guest/conversations/${thread.conversation.id}`, thread.cookie),
     200,
   );
   assert.equal("aiHandoff" in visible.conversation, false);
+  assert.equal(visible.messages.at(-1).handoffAcknowledgement, true);
   assert.doesNotMatch(
     JSON.stringify(visible),
     /Guest requests an AMAC team reply/,

@@ -21,6 +21,7 @@ export type ConversationWithCustomer = ConversationRow & {
 
 export type MessageWithSender = Selectable<Messages> & {
   images?: unknown[];
+  handoff_acknowledgement?: boolean;
   processing?:
     | import("@event-management/contracts/message-images").MessageProcessing
     | null;

@@ -3,15 +3,13 @@ import {
   type ImageMessageJobLease,
 } from "../../data/messages/message-processing.js";
 import { messageImageInterpretationSchema } from "@event-management/contracts/message-images";
-import {
-  suggestedReplySchema,
-  type CatalogRecommendation,
-} from "@event-management/contracts/messages";
+import type { CatalogRecommendation } from "@event-management/contracts/messages";
 import { randomUUID } from "node:crypto";
 import type { ModelMessage } from "ai";
 import type { Kysely } from "kysely";
 import { assertGuestActive } from "../../data/guest-chat/guest-conversation.js";
 import type { DB } from "../../db/types.js";
+import { selectMessageColumnsData } from "../../data/messages/select-message-columns.js";
 import { findConversationData } from "../../data/messages/find-conversation.js";
 import { listConversationHistoryData } from "../../data/messages/list-conversation-history.js";
 import { readConversationMemoryData } from "../../data/messages/conversation-memory.js";
@@ -26,10 +24,8 @@ import {
   previousPackageBudget,
 } from "./assistant-context.js";
 import { getAgentSettingsService } from "../ai-agent-settings/get-agent-settings.js";
-import {
-  containsRawToolProtocol,
-  createCustomerServiceAgent,
-} from "./agents/create-customer-service-agent.js";
+import { createCustomerServiceAgent } from "./agents/create-customer-service-agent.js";
+import { containsRawToolProtocol } from "../messages/suggested-reply-copy.js";
 import { maxConversationMemoryCharacters } from "./tools/update-conversation-memory.js";
 import { readBookingDraftData } from "../../data/messages/booking-draft-guard.js";
 import { finishToolCallData } from "../../data/ai/finish-tool-call.js";
@@ -46,6 +42,7 @@ import {
 import { resolveBookingDraft } from "../booking-requests/resolve-booking-draft.js";
 import { submitReviewedBookingRequestService } from "../booking-requests/submit-reviewed-booking-request.js";
 import { completeBookingConsentAssessment } from "./assess-booking-consent.js";
+import { generatedSuggestedReplies } from "./suggested-replies.js";
 import { localizeBookingReview } from "./localize-booking-chat.js";
 
 const maxInputCharacters = 200_000;
@@ -92,6 +89,8 @@ export async function runAssistantTurnService({
     ...(abortSignal ? [abortSignal] : []),
   ]);
 
+  const copyDeadline = AbortSignal.any([signal, AbortSignal.timeout(27_500)]);
+
   if (jobLease)
     await db
       .transaction()
@@ -112,19 +111,11 @@ export async function runAssistantTurnService({
 
   if (conversation.guest_identity_id) assertGuestActive(conversation);
 
-  const previousReply = await db
-    .selectFrom("messages")
-    .selectAll()
-    .where("reply_to_message_id", "=", customerMessageId)
-    .where("conversation_id", "=", conversationId)
+  const previousReply = await selectMessageColumnsData(db, conversationId)
+    .where("m.reply_to_message_id", "=", customerMessageId)
     .executeTakeFirst();
 
-  if (previousReply)
-    return messageDto({
-      ...previousReply,
-      sender_display_name: null,
-      sender_email: null,
-    });
+  if (previousReply) return messageDto(previousReply);
 
   if (!conversation.ai_enabled || conversation.ai_version !== aiVersion)
     return null;
@@ -345,6 +336,7 @@ export async function runAssistantTurnService({
         evidence: consent.evidence,
         history,
         signal,
+        copyDeadline,
       }));
     bookingConsent = "continue";
 
@@ -503,6 +495,8 @@ export async function runAssistantTurnService({
 
   const agent = createCustomerServiceAgent({
     settings,
+    history,
+    copyDeadline,
     answerOnlyAfter: started + 20_000,
     db,
     customerMessageId,
@@ -637,7 +631,7 @@ export async function runAssistantTurnService({
     !waitingForServiceChoice &&
     (!researchingCatalog || selectionChanged)
   ) {
-    const copy = await localizeBookingReview(history, signal);
+    const copy = await localizeBookingReview(history, signal, copyDeadline);
     const call = await startToolCallData(db, {
       turnId,
       toolCallId: `automatic-review-${randomUUID()}`,
@@ -651,7 +645,7 @@ export async function runAssistantTurnService({
       scope: draftScope,
       callId: call.id,
       turnId,
-      copy,
+      ...copy,
       abortSignal: signal,
     }).catch(async (error: unknown) => {
       await finishToolCallData(db, {
@@ -676,17 +670,12 @@ export async function runAssistantTurnService({
   if (containsRawToolProtocol(reply))
     throw new Error("AI returned invalid tool protocol");
 
-  const suggestedReplies = [
-    ...new Set(
-      output.suggested_replies.flatMap((value) => {
-        const candidate = suggestedReplySchema.safeParse(value);
-
-        return candidate.success && !containsRawToolProtocol(candidate.data)
-          ? [candidate.data]
-          : [];
-      }),
-    ),
-  ];
+  const suggestedReplies = await generatedSuggestedReplies({
+    reply,
+    candidates: output.suggested_replies,
+    history,
+    signal: copyDeadline,
+  });
 
   signal.throwIfAborted();
   const saved = await createAssistantMessageData(

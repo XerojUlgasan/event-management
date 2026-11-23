@@ -8,6 +8,7 @@ import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 import { createMessageData } from "../../data/messages/create-message.js";
 import { ensureConversationData } from "../../data/messages/ensure-conversation.js";
+import { selectMessageColumnsData } from "../../data/messages/select-message-columns.js";
 import { findConversationData } from "../../data/messages/find-conversation.js";
 
 import { messageDto } from "./message-response.js";
@@ -120,22 +121,15 @@ async function sendCustomerMessageUnlocked(
   const message = messageDto(saved.message);
 
   if (saved.replayed && reviewMessageId) {
-    const reply = await db
-      .selectFrom("messages")
-      .selectAll()
-      .where("conversation_id", "=", conversation.id)
-      .where("reply_to_message_id", "=", message.id)
-      .where("sender_role", "=", "assistant")
+    const reply = await selectMessageColumnsData(db, conversation.id)
+      .where("m.reply_to_message_id", "=", message.id)
+      .where("m.sender_role", "=", "assistant")
       .executeTakeFirst();
 
     if (reply)
       return {
         message,
-        assistantMessage: messageDto({
-          ...reply,
-          sender_display_name: null,
-          sender_email: null,
-        }),
+        assistantMessage: messageDto(reply),
         assistantError: null,
       };
   }
@@ -165,22 +159,15 @@ async function sendCustomerMessageUnlocked(
     // A competing worker may have committed the same receipt while this turn
     // was running. Return it even if this execution lost the guarded race.
     if (reviewMessageId) {
-      const reply = await db
-        .selectFrom("messages")
-        .selectAll()
-        .where("conversation_id", "=", conversation.id)
-        .where("reply_to_message_id", "=", message.id)
-        .where("sender_role", "=", "assistant")
+      const reply = await selectMessageColumnsData(db, conversation.id)
+        .where("m.reply_to_message_id", "=", message.id)
+        .where("m.sender_role", "=", "assistant")
         .executeTakeFirst();
 
       if (reply)
         return {
           message,
-          assistantMessage: messageDto({
-            ...reply,
-            sender_display_name: null,
-            sender_email: null,
-          }),
+          assistantMessage: messageDto(reply),
           assistantError: null,
         };
     }

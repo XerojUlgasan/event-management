@@ -8,6 +8,10 @@ import type { AssistantToolContext } from "./assistant-tool-context.js";
 export function createRequestHumanHandoffTool(
   options: AssistantToolContext & {
     handoffScope: NonNullable<AssistantToolContext["handoffScope"]>;
+    getHandoffCopy: (signal?: AbortSignal) => Promise<{
+      acknowledgement: string;
+      suggestedReplies: string[];
+    }>;
   },
 ) {
   return tool({
@@ -54,6 +58,7 @@ export function createRequestHumanHandoffTool(
           callId: call.id,
           turnId: options.turnId,
           abortSignal,
+          ...(await options.getHandoffCopy(abortSignal)),
         });
         options.onHandoffCommitted?.(message);
 

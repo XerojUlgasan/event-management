@@ -1,9 +1,16 @@
 import { messageProcessingSelection } from "./message-processing.js";
 import { messageImagesSelection } from "./message-images.js";
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
 
 type Database = Kysely<DB>;
+
+export const handoffAcknowledgementSelection = sql<boolean>`exists (
+  select 1 from ai_tool_calls as handoff
+  where handoff.assistant_message_id = m.id
+    and handoff.tool_name = 'requestHumanHandoff'
+    and handoff.status = 'succeeded'
+)`.as("handoff_acknowledgement");
 
 export function selectMessageColumnsData(db: Database, conversationId: string) {
   return db
@@ -12,6 +19,7 @@ export function selectMessageColumnsData(db: Database, conversationId: string) {
     .select((eb) => [
       messageImagesSelection(),
       messageProcessingSelection(),
+      handoffAcknowledgementSelection,
       "m.id",
       "m.guest_origin",
       "m.reply_to_message_id",

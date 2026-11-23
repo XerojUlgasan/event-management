@@ -111,7 +111,7 @@ before(async () => {
           return result(
             JSON.stringify({
               message: "I can help with that arrangement.",
-              suggested_replies: [],
+              suggested_replies: ["Can you show me a similar arrangement?"],
             }),
           );
         },
@@ -366,6 +366,15 @@ test("send commits queued metadata and private bytes without vision; worker save
   assert.equal(JSON.stringify(audit).includes("storage_key"), false);
   const history = JSON.stringify(textCalls.at(-1).prompt);
   assert.ok(history.includes(observation.summary));
+  const savedReply = (
+    await pool.query(
+      "SELECT suggested_replies FROM messages WHERE reply_to_message_id = $1",
+      [saved.message.id],
+    )
+  ).rows[0];
+  assert.deepEqual(savedReply.suggested_replies, [
+    "Can you show me a similar arrangement?",
+  ]);
   assert.equal(history.includes("message-images/"), false);
   assert.equal(history.includes("storage_key"), false);
 });

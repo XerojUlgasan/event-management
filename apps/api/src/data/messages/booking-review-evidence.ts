@@ -29,9 +29,8 @@ const consentReceiptSchema = bookingReceiptModelCopySchema
   .extend({ style: bookingChatStyleSchema })
   .refine(
     (copy) =>
-      copy.style === "other"
-        ? bookingReceiptTemplateSchema.safeParse(copy.receipt).success
-        : copy.receipt == null,
+      copy.style !== "other" ||
+      bookingReceiptTemplateSchema.safeParse(copy.receipt).success,
     "A translated receipt is required for other languages",
   );
 
@@ -54,7 +53,13 @@ export async function readBookingReviewEvidenceData(
 ) {
   const [confirmation, summary] = await db
     .selectFrom("messages")
-    .select(["id", "body", "sender_role", "reply_to_message_id"])
+    .select([
+      "id",
+      "body",
+      "sender_role",
+      "reply_to_message_id",
+      "suggested_replies",
+    ])
     .where("conversation_id", "=", scope.conversationId)
     .orderBy("created_at", "desc")
     .orderBy("id", "desc")
@@ -95,6 +100,14 @@ export async function readBookingReviewEvidenceData(
     reviewed.data.aiVersion !== scope.aiVersion
   )
     return { status: "review_changed" as const };
+
+  // Review suggestions request clarification or corrections. Even malformed
+  // localized copy saved as a suggestion cannot authorize submission.
+  if (
+    Array.isArray(summary.suggested_replies) &&
+    summary.suggested_replies.includes(confirmation.body)
+  )
+    return { status: "confirmation_required" as const };
 
   const attachment = await db
     .selectFrom("message_images")

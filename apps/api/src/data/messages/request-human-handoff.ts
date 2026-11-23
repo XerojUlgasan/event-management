@@ -3,13 +3,15 @@ import {
   assertImageMessageJobLeaseData,
   type ImageMessageJobLease,
 } from "./message-processing.js";
-import { sql, type Kysely } from "kysely";
+import type { Kysely } from "kysely";
 import type { AiHandoff } from "@event-management/contracts/ai-handoff";
 import type { DB } from "../../db/types.js";
 import { assertGuestActive } from "../guest-chat/guest-conversation.js";
 import { finishToolCallData } from "../ai/finish-tool-call.js";
 import { linkToolCallsToReplyData } from "../ai/link-tool-calls-to-reply.js";
 import { publishConversationMessageData } from "./publish-conversation-message.js";
+import { suggestedReplyCopy } from "../../services/messages/suggested-reply-copy.js";
+import { insertAssistantMessageData } from "./create-assistant-message.js";
 import { createNotificationData } from "../notifications/create-notification.js";
 
 export type HumanHandoffScope = {
@@ -21,8 +23,7 @@ export type HumanHandoffScope = {
   jobLease?: ImageMessageJobLease;
 };
 
-export const humanHandoffAcknowledgement =
-  "I've passed this conversation to the AMAC team for review. You can continue messaging here while waiting for their reply.";
+export const humanHandoffAcknowledgement = suggestedReplyCopy().acknowledgement;
 
 // All mutation, acknowledgement and successful execution linkage commit together.
 export function requestHumanHandoffData({
@@ -32,6 +33,8 @@ export function requestHumanHandoffData({
   callId,
   turnId,
   abortSignal,
+  acknowledgement = humanHandoffAcknowledgement,
+  suggestedReplies = suggestedReplyCopy().handoff,
 }: {
   db: Kysely<DB>;
   scope: HumanHandoffScope;
@@ -39,6 +42,8 @@ export function requestHumanHandoffData({
   callId: string;
   turnId: string;
   abortSignal?: AbortSignal;
+  acknowledgement?: string;
+  suggestedReplies?: string[];
 }) {
   return db.transaction().execute(async (trx) => {
     const conversation = await trx
@@ -124,18 +129,12 @@ export function requestHumanHandoffData({
     abortSignal?.throwIfAborted();
     const message =
       previous ??
-      (await trx
-        .insertInto("messages")
-        .values({
-          conversation_id: scope.conversationId,
-          sender_id: null,
-          sender_role: "assistant",
-          body: humanHandoffAcknowledgement,
-          reply_to_message_id: scope.customerMessageId,
-          created_at: sql<Date>`clock_timestamp()`,
-        })
-        .returningAll()
-        .executeTakeFirstOrThrow());
+      (await insertAssistantMessageData(trx, {
+        conversationId: scope.conversationId,
+        customerMessageId: scope.customerMessageId,
+        body: acknowledgement,
+        suggestedReplies,
+      }));
 
     if (!previous)
       await trx
@@ -179,6 +178,11 @@ export function requestHumanHandoffData({
       });
     }
 
-    return { ...message, sender_display_name: null, sender_email: null };
+    return {
+      ...message,
+      handoff_acknowledgement: true,
+      sender_display_name: null,
+      sender_email: null,
+    };
   });
 }

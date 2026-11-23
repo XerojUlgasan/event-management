@@ -277,7 +277,7 @@ export default function PublicChat() {
   );
 
   const suggestedMessage =
-    thread?.conversation.aiEnabled &&
+    thread &&
     !aiReplyPending &&
     !expired &&
     !thread.guest.loginRequired &&
@@ -484,8 +484,9 @@ export default function PublicChat() {
 
     if (
       suggestion &&
-      (!current.conversation.aiEnabled ||
-        current.conversation.aiReplyPending ||
+      ((current.conversation.aiEnabled &&
+        (current.conversation.aiReplyPending ||
+          hasLocalReplyPending(pendingReplies, current.conversation))) ||
         Object.values(outboxRef.current).some((item) => !item.failed) ||
         suggestion.messageId !== latest?.id ||
         respondedToSuggestion.current === suggestion.messageId ||

@@ -122,7 +122,8 @@ test("a booking review keeps customer language and renders verified details", as
   assert.deepEqual(bookingLanguageSamples(history), [history[0].body]);
   const signal = AbortSignal.timeout(1000);
   const copy = await localizeBookingReview(history, signal);
-  assert.deepEqual(copy, spanishCopy);
+  assert.deepEqual(copy.copy, spanishCopy);
+  assert.ok(copy.suggestedReplies.length);
   await assert.rejects(localizeBookingReview(history, signal));
 
   const taglishCopy = await localizeBookingReview(
@@ -133,21 +134,24 @@ test("a booking review keeps customer language and renders verified details", as
     signal,
   );
   assert.equal(
-    taglishCopy.confirmation,
+    taglishCopy.copy.confirmation,
     "I-send ko na sa AMAC team para ma-review?",
   );
-  assert.equal(taglishCopy.corrections, "Sabihin mo lang kung may papalitan.");
+  assert.equal(
+    taglishCopy.copy.corrections,
+    "Sabihin mo lang kung may papalitan.",
+  );
   assert.deepEqual(
-    await localizeBookingReview(history, signal),
+    (await localizeBookingReview(history, signal)).copy,
     bookingReviewPresets.fil,
   );
   assert.deepEqual(
-    await localizeBookingReview(history, signal),
+    (await localizeBookingReview(history, signal)).copy,
     bookingReviewPresets.en,
   );
   await assert.rejects(localizeBookingReview(history, signal));
   assert.deepEqual(
-    await localizeBookingReview([history[2]], signal),
+    (await localizeBookingReview([history[2]], signal)).copy,
     bookingReviewPresets.en,
   );
   await assert.rejects(localizeBookingReview(history, signal));
@@ -186,7 +190,7 @@ test("a booking review keeps customer language and renders verified details", as
       outOfRange: true,
     },
     false,
-    copy,
+    copy.copy,
   );
   assert.match(body, /\*\*Teléfono\*\* · 09123456789/u);
   assert.match(body, /Birthday \\\*with karaoke\\\*/u);

@@ -48,7 +48,10 @@ function isAssistantPrompt(
   );
 }
 
-function useReply(text: string, suggestions: string[] = []) {
+function useReply(
+  text: string,
+  suggestions: string[] = ["What can I do next?"],
+) {
   model = new MockLanguageModelV4({
     doGenerate: async ({ prompt }) => ({
       content: [
@@ -336,10 +339,13 @@ test("generated customer choices persist beside their AMAC message and legacy re
   assert.match(JSON.stringify(prompt), /suggested_replies/u);
   assert.ok(tools?.some(({ name }) => name === "updateBookingDraft"));
 
-  useReply("¿Cómo te llamas?");
+  useReply("¿Cómo te llamas?", ["Me llamo Alex"]);
   const second = await send(id, first.assistantMessage!.suggestedReplies![0]);
   assert.equal(second.message.body, "Una reunión familiar");
-  assert.deepEqual(second.assistantMessage?.suggestedReplies, []);
+  assert.deepEqual(second.assistantMessage?.suggestedReplies, [
+    "Todavía no lo sé.",
+    "¿Puedes aclarar qué información necesitas?",
+  ]);
 
   const thread = threadSchema.parse(
     await (await call(`/messages/conversations/${id}`, customer.cookie)).json(),
@@ -353,7 +359,10 @@ test("generated customer choices persist beside their AMAC message and legacy re
       ?.suggestedReplies,
     ["Una reunión familiar"],
   );
-  assert.deepEqual(thread.messages.at(-1)?.suggestedReplies, []);
+  assert.deepEqual(
+    thread.messages.at(-1)?.suggestedReplies,
+    second.assistantMessage?.suggestedReplies,
+  );
 });
 
 test("provider output never displays a prefaced reply envelope as raw text", async () => {
@@ -362,7 +371,7 @@ test("provider output never displays a prefaced reply envelope as raw text", asy
     {
       output: "Which event would you prefer?",
       body: "Which event would you prefer?",
-      suggestions: [],
+      suggestions: ["What can I do next?"],
     },
     {
       output:
@@ -371,10 +380,31 @@ test("provider output never displays a prefaced reply envelope as raw text", asy
       suggestions: ["A wedding"],
     },
     {
+      output: '{"message":"Which event?","suggested_replies":{"bad":"value"}}',
+      body: "Which event?",
+      suggestions: ["What can I do next?"],
+    },
+    {
+      output:
+        '{"message":"Which event?","suggested_replies":[null,"A wedding","A party","A conference","A fourth"]}',
+      body: "Which event?",
+      suggestions: ["A wedding", "A party", "A conference"],
+    },
+    {
+      output: '{"message":"Which event?"',
+      body: "Which event?",
+      suggestions: ["What can I do next?"],
+    },
+    {
+      output: '{"message":"Which event?", "suggest',
+      body: "Which event?",
+      suggestions: ["What can I do next?"],
+    },
+    {
       output:
         'Here is my response: {"message":"Which event?","suggested_replies":',
-      body: undefined,
-      suggestions: undefined,
+      body: "Which event?",
+      suggestions: ["What can I do next?"],
     },
   ];
 
@@ -393,6 +423,127 @@ test("provider output never displays a prefaced reply envelope as raw text", asy
       example.suggestions,
     );
     assert.equal(Boolean(result.assistantError), example.body === undefined);
+  }
+});
+
+test("duration choices are repaired for the actual question and usable localized offers survive", async () => {
+  const id = await conversation();
+  const scenarios = [
+    {
+      output: {
+        message: "One day or multiple days?",
+        suggested_replies: ["One day"],
+      },
+      labels: ["One day", "Multiple days"],
+    },
+    {
+      output: {
+        message: "¿Será de un solo día o varios días?",
+        suggested_replies: ["De un solo día, por favor", "Serán varios días"],
+      },
+      labels: ["De un solo día, por favor", "Serán varios días"],
+    },
+    {
+      output: {
+        message:
+          "Puede durar un solo día o varios días. ¿Prefieres hablar del lugar o del menú?",
+        suggested_replies: ["Hablemos del lugar", "Prefiero ver el menú"],
+      },
+      labels: ["Hablemos del lugar", "Prefiero ver el menú"],
+    },
+    {
+      output: {
+        message: "What's your preference, an indoor or outdoor venue?",
+        suggested_replies: ["An indoor venue", "An outdoor venue"],
+      },
+      labels: ["An indoor venue", "An outdoor venue"],
+    },
+    {
+      output: {
+        message: "Will it be one or multiple days?",
+        suggested_replies: [],
+      },
+      labels: ["One day", "Multiple days"],
+    },
+    {
+      output: {
+        message:
+          "For an event lasting more than one day, would you prefer indoor or outdoor styling?",
+        suggested_replies: ["Indoor styling", "Outdoor styling"],
+      },
+      labels: ["Indoor styling", "Outdoor styling"],
+    },
+    {
+      output: {
+        message:
+          "Next question: what are the dates of your birthday celebration? You can give me a date range if it runs several days in a row.",
+        suggested_replies: [
+          "It runs from Dec 12 to Dec 14, 2026",
+          "I only know the start date for now",
+        ],
+      },
+      labels: ["I'm not sure yet.", "Can you clarify what you need?"],
+    },
+    {
+      output: {
+        message: "Could you share a contact number?",
+        suggested_replies: ["Please use 09123456789."],
+      },
+      labels: ["I'm not sure yet.", "Can you clarify what you need?"],
+    },
+    {
+      output: {
+        message:
+          "Whether your event lasts one day or multiple days, would you prefer indoor styling?",
+        suggested_replies: ["Indoor styling, please"],
+      },
+      labels: ["Indoor styling, please"],
+    },
+    {
+      output: {
+        message: "Where should we send the quote?",
+        suggested_replies: ["Use riley@example.test"],
+      },
+      labels: ["I'm not sure yet.", "Can you clarify what you need?"],
+    },
+    {
+      output: {
+        message: "When would you like to hold it?",
+        suggested_replies: ["Next Friday"],
+      },
+      labels: ["I'm not sure yet.", "Can you clarify what you need?"],
+    },
+    {
+      output: {
+        message: "¿Cuántos invitados esperas?",
+        suggested_replies: [20, {}, "Tal vez 50 invitados"],
+      },
+      labels: [
+        "Todavía no lo sé.",
+        "¿Puedes aclarar qué información necesitas?",
+      ],
+    },
+  ];
+
+  for (const { output, labels } of scenarios) {
+    useReply("");
+    const generate = model.doGenerate.bind(model);
+    model.doGenerate = async (...args) => ({
+      ...(await generate(...args)),
+      content: [{ type: "text", text: JSON.stringify(output) }],
+    });
+
+    const result = await send(id, "Help with this event");
+    assert.equal(result.assistantError, null);
+    assert.equal(result.assistantMessage?.body, output.message);
+    assert.deepEqual(result.assistantMessage?.suggestedReplies, labels);
+    assert.equal(model.doGenerateCalls.length, 1);
+    const thread = threadSchema.parse(
+      await (
+        await call(`/messages/conversations/${id}`, customer.cookie)
+      ).json(),
+    );
+    assert.deepEqual(thread.messages.at(-1)?.suggestedReplies, labels);
   }
 });
 
@@ -646,7 +797,10 @@ test("native tools collect, review and submit the same draft once", async () => 
     /Should I send this request to AMAC for review\?/,
   );
   assert.equal(review.assistantError, null);
-  assert.equal(review.assistantMessage?.suggestedReplies, undefined);
+  assert.deepEqual(review.assistantMessage?.suggestedReplies, [
+    "I need to correct a detail.",
+    "Can you clarify the next step?",
+  ]);
   const row = await db
     .selectFrom("conversations as c")
     .innerJoin("booking_requests as b", "b.id", "c.booking_request_id")
@@ -667,7 +821,18 @@ test("native tools collect, review and submit the same draft once", async () => 
     reviewMessageId: review.assistantMessage!.id,
     body: "Yep, go ahead!",
   };
-  useConsent();
+  useReply(
+    JSON.stringify({
+      intent: "submit",
+      receiptCopy: {
+        style: "en",
+        receipt:
+          "A provider-supplied receipt must never replace canonical copy.",
+        nextReply:
+          "A provider-supplied label must never replace canonical copy.",
+      },
+    }),
+  );
   const response = await call(
     "/messages/conversation/messages",
     customer.cookie,
@@ -676,6 +841,9 @@ test("native tools collect, review and submit the same draft once", async () => 
   assert.equal(response.status, 201);
   const submitted = customerMessageResultSchema.parse(await response.json());
   assert.match(submitted.assistantMessage?.body ?? "", /submitted/i);
+  assert.deepEqual(submitted.assistantMessage?.suggestedReplies, [
+    "How can I update my request?",
+  ]);
   assert.match(
     submitted.assistantMessage?.body ?? "",
     /message AMAC staff here in this chat/u,
@@ -4877,7 +5045,13 @@ test("handoff commits its acknowledgement and audit, stops the loop and keeps ad
   const result = await send(id, "Please let me talk to someone");
   assert.equal(result.assistantError, null);
   assert.equal(result.assistantMessage?.body, humanHandoffAcknowledgement);
-  assert.equal(model.doGenerateCalls.length, 1);
+  assert.deepEqual(result.assistantMessage?.suggestedReplies, [
+    "What information can I share with the team?",
+  ]);
+  assert.equal(
+    model.doGenerateCalls.filter(({ tools }) => tools?.length).length,
+    1,
+  );
   const state = await db
     .selectFrom("conversations")
     .select(["ai_handoff", "ai_enabled", "ai_version"])
