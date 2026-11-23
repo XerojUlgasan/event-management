@@ -1,10 +1,10 @@
 # Required AMAC reply suggestions
 
 Started: 2026-11-24T00:11:29+08:00
-Updated: 2026-11-24T00:40:02+08:00
-Status: in-progress
-Scope: Implement and verify one to three optional replies on every new customer-facing AMAC message. Integration into local main requires explicit authorization. Hosted changes and pushes are outside scope.
-Checkout: `feat/required-amac-reply-suggestions` from local main `04501fdf`
+Updated: 2026-11-24T00:46:10+08:00
+Status: complete
+Scope: Implement and verify one to three optional replies on every new customer-facing AMAC message in local development.
+Checkout: Integrated `16b404b3` into local `main` from `feat/required-amac-reply-suggestions`.
 Continues: [AMAC suggested replies](2026-11-23_21-28-00_amac-suggested-replies.md)
 
 ## Result
@@ -21,6 +21,10 @@ Guest browser reload restored both duration choices. Clicking **Multiple days** 
 
 Targeted API and Edge tests passed 181 cases with six opt-in provider cases skipped. The 80 web message tests and nine guidance tests passed. The full web type and structure checks and guidance links still report existing issues. Independent review covered writer, recovery, consent, handoff, and visibility behavior.
 
+## Local main verification
+
+At `http://localhost:4321`, both duration choices survived reload. Selecting the multiple-day option saved its exact text once with zero attachments. The API and PostgreSQL confirmed delivery. Both AMAC replies in that smoke test had saved suggestions. The synthetic conversation remains available locally. The root Edge build, API type check, 12 Edge tests, and focused web suggestion tests passed. The web process stayed up and the refreshed message worker runs separately from the dev launcher. Hosted rollout remains unverified.
+
 ## Resume here
 
-Wait for explicit merge authorization. Fast-forward the authorized local main only after checking its working tree and revision. Confirm its local database already has the suggestions column, restart the affected root dev processes, then verify runtime health and a saved customer chat response from the integrated code.
+Open **Messages** on local main and start a new conversation to retest. Previously saved replies keep their original suggestions.
