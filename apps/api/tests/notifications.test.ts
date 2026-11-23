@@ -117,7 +117,10 @@ async function expectStatus(response: Response, status: number) {
 }
 
 async function notifications(viewer: Account, cursor?: string, runtime = app) {
-  const query = new URLSearchParams({ includeBookingDetails: "1" });
+  const query = new URLSearchParams({
+    includeBookingDetails: "1",
+    includeQuotationDetails: "1",
+  });
 
   if (cursor) query.set("cursor", cursor);
 
@@ -423,6 +426,30 @@ test("quotation delivery alerts the customer to each saved version once and skip
   await expectStatus(await send(revision), 200);
   const page = await notifications(customer);
   assert.equal(page.unreadCount, 2);
+
+  for (const item of page.notifications) {
+    assert.equal(item.type, "quotation_sent");
+    assert.deepEqual(item.booking, {
+      eventType: bookingInput.eventType,
+      preferredDate: bookingInput.requestedDays[0].date,
+    });
+  }
+
+  const withoutDetails = notificationPageSchema.parse(
+    await (
+      await expectStatus(await call("/notifications", customer), 200)
+    ).json(),
+  );
+  assert.ok(withoutDetails.notifications.every((item) => !("booking" in item)));
+  const withLegacyOptIn = notificationPageSchema.parse(
+    await (
+      await expectStatus(
+        await call("/notifications?includeBookingDetails=1", customer),
+        200,
+      )
+    ).json(),
+  );
+  assert.deepEqual(withLegacyOptIn, withoutDetails);
   assert.deepEqual(
     page.notifications.map(({ type, payload }) => ({ type, payload })),
     [
@@ -486,6 +513,54 @@ test("quotation delivery alerts the customer to each saved version once and skip
     undefined,
   );
   assert.deepEqual(await notifications(customer), page);
+
+  const other = await account("customer");
+  const originalNotice = page.notifications[1];
+  assert.equal(originalNotice.type, "quotation_sent");
+  const mismatchedConversation = await db
+    .insertInto("conversations")
+    .values({ customer_id: customer.id })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  await db.transaction().execute((trx) =>
+    createNotificationData(trx, { userId: other.id }, quotation.id, {
+      type: originalNotice.type,
+      payload: originalNotice.payload,
+    }),
+  );
+  const foreignPage = await notifications(other, undefined, edge);
+  assert.equal("booking" in foreignPage.notifications[0], false);
+
+  await db
+    .updateTable("notifications")
+    .set("payload", {
+      ...originalNotice.payload,
+      conversationId: mismatchedConversation.id,
+    })
+    .where("id", "=", originalNotice.id)
+    .execute();
+  const mismatched = await notifications(customer);
+  assert.equal(mismatched.unreadCount, 2);
+  assert.equal(mismatched.notifications[1].id, originalNotice.id);
+  assert.equal("booking" in mismatched.notifications[1], false);
+  assert.deepEqual(mismatched.notifications[0], page.notifications[0]);
+
+  await db
+    .updateTable("notifications")
+    .set("payload", originalNotice.payload)
+    .where("id", "=", originalNotice.id)
+    .execute();
+  await db
+    .deleteFrom("messages")
+    .where("quotation_id", "=", quotation.id)
+    .execute();
+  const missingMessage = await notifications(customer, undefined, edge);
+  assert.equal(missingMessage.unreadCount, 2);
+  assert.equal("booking" in missingMessage.notifications[1], false);
+  assert.deepEqual(
+    missingMessage.notifications[1].payload,
+    originalNotice.payload,
+  );
 });
 
 test("successful customer and guest handoffs notify admins once and stale execution adds nothing", async () => {

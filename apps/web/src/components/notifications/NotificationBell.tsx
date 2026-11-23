@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Badge, Button, Drawer, Icon } from "@event-management/ui";
+import {
+  Badge,
+  Button,
+  Drawer,
+  Icon,
+  type IconName,
+} from "@event-management/ui";
 import {
   NOTIFICATIONS_CHANGED,
   notificationsChangedSchema,
   type Notification,
 } from "@event-management/contracts/notifications";
+import type { BookingStatus } from "@event-management/contracts/booking-requests";
 import {
   getNotifications,
   getNotificationRealtimeToken,
@@ -24,35 +31,60 @@ import {
   realtimeRefreshDelay,
 } from "../../lib/services/messages/realtime-event";
 import { adminBookingRequestPath } from "../app/routes";
-import {
-  bookingDate,
-  bookingStatusLabels,
-} from "../booking-requests/BookingRequestDisplay";
+import { bookingDate } from "../booking-requests/BookingRequestDisplay";
 
-function presentation(content: Notification): {
-  label: string;
+const statusTitles: Record<BookingStatus, string> = {
+  under_review: "Booking request under review",
+  needs_details: "More booking details requested",
+  accepted: "Booking request accepted for processing",
+  declined: "Booking request declined",
+  cancelled: "Booking request cancelled",
+};
+
+type NotificationPresentation = {
+  title: string;
+  details?: string;
+  icon: IconName;
+  action: string;
   path: string;
-} {
+};
+
+function presentation(content: Notification): NotificationPresentation {
   const booking = "booking" in content ? content.booking : undefined;
   const eventType = booking?.eventType.trim();
   const requestedDate = booking?.preferredDate
-    ? ` · Requested ${bookingDate(booking.preferredDate)}`
-    : "";
+    ? `Requested ${bookingDate(booking.preferredDate)}`
+    : undefined;
+  const eventDetails = [eventType, requestedDate].filter(Boolean);
 
   switch (content.type) {
     case "booking_request_created":
       return {
-        label: `${eventType ? `New ${eventType} request` : "New booking request"}${requestedDate}`,
+        title: "New booking request",
+        details: eventDetails.join(" · "),
+        icon: "calendar",
+        action: "View request",
         path: adminBookingRequestPath(content.payload.bookingRequestId),
       };
     case "booking_status_updated":
       return {
-        label: `${eventType ? `${eventType} request` : "Booking request"} · ${bookingStatusLabels[content.payload.status]}${requestedDate}`,
+        title: statusTitles[content.payload.status],
+        details: eventDetails.join(" · "),
+        icon: "refresh",
+        action: "View request",
         path: customerBookingRequestPath(content.payload.bookingRequestId),
       };
     case "quotation_sent":
       return {
-        label: `Quotation version ${content.payload.version} sent`,
+        title:
+          content.payload.version > 1
+            ? "Your quotation was updated"
+            : "Your quotation is ready",
+        details: [...eventDetails, `Version ${content.payload.version}`].join(
+          " · ",
+        ),
+        icon: "clipboard",
+        action: "View quotation",
         path: customerConversationPath(
           content.payload.conversationId,
           content.payload.quotationId,
@@ -60,7 +92,9 @@ function presentation(content: Notification): {
       };
     case "human_review_requested":
       return {
-        label: "A conversation needs human review",
+        title: "Human review requested",
+        icon: "message",
+        action: "View conversation",
         path: customerConversationPath(content.payload.conversationId),
       };
     default: {
@@ -69,6 +103,79 @@ function presentation(content: Notification): {
       return exhaustive;
     }
   }
+}
+
+function groupByLocalDay(items: Notification[]) {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const todayKey = today.toDateString();
+  const yesterdayKey = yesterday.toDateString();
+  const groups = new Map<string, { label: string; items: Notification[] }>();
+
+  for (const item of items) {
+    const date = new Date(item.createdAt);
+    const key = date.toDateString();
+    const group = groups.get(key);
+
+    if (group) {
+      group.items.push(item);
+      continue;
+    }
+
+    const label =
+      key === todayKey
+        ? "Today"
+        : key === yesterdayKey
+          ? "Yesterday"
+          : date.toLocaleDateString(undefined, {
+              weekday: "long",
+              month: "short",
+              day: "numeric",
+              year:
+                date.getFullYear() === today.getFullYear()
+                  ? undefined
+                  : "numeric",
+            });
+    groups.set(key, { label, items: [item] });
+  }
+
+  return groups;
+}
+
+const timeFormat = new Intl.DateTimeFormat(undefined, {
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+const notificationDetails = { includeQuotationDetails: true };
+
+function NotificationSummary({
+  content,
+  unread,
+}: {
+  content: NotificationPresentation;
+  unread: boolean;
+}) {
+  return (
+    <>
+      <span className="notification-type-icon" aria-hidden="true">
+        <Icon name={content.icon} />
+      </span>
+      <span className="notification-summary">
+        <span
+          className={
+            unread ? "notification-title is-unread" : "notification-title"
+          }
+        >
+          {content.title}
+        </span>
+        {content.details && (
+          <span className="notification-details">{content.details}</span>
+        )}
+      </span>
+    </>
+  );
 }
 
 export function NotificationBell({ profileId }: { profileId: string }) {
@@ -113,7 +220,7 @@ export function NotificationBell({ profileId }: { profileId: string }) {
 
         try {
           const updateList = !!start || drawerOpen.current;
-          let page = await getNotifications(start);
+          let page = await getNotifications(start, notificationDetails);
 
           if (!mounted.current) return;
 
@@ -142,7 +249,7 @@ export function NotificationBell({ profileId }: { profileId: string }) {
             mounted.current;
             index++
           ) {
-            page = await getNotifications(page.nextCursor);
+            page = await getNotifications(page.nextCursor, notificationDetails);
 
             if (!mounted.current) return;
 
@@ -352,6 +459,9 @@ export function NotificationBell({ profileId }: { profileId: string }) {
     }
   };
 
+  const arrivalContent = arrival ? presentation(arrival) : null;
+  const announcementContent = announcement ? presentation(announcement) : null;
+
   return (
     <div className="notification-bell">
       <Button
@@ -379,16 +489,17 @@ export function NotificationBell({ profileId }: { profileId: string }) {
         role="status"
         aria-atomic="true"
       >
-        {announcement && (
+        {announcement && announcementContent && (
           <span key={announcement.id}>
-            New notification: {presentation(announcement).label}
+            New notification. {announcementContent.title}.
+            {announcementContent.details && ` ${announcementContent.details}`}
           </span>
         )}
       </span>
-      {arrival && !open && (
+      {arrival && arrivalContent && !open && (
         <div className="notification-arrival" ref={cardRef}>
           <div className="notification-arrival-heading">
-            <strong>New notification</strong>
+            <NotificationSummary content={arrivalContent} unread />
             <Button
               variant="plain"
               className="notification-arrival-dismiss"
@@ -405,22 +516,26 @@ export function NotificationBell({ profileId }: { profileId: string }) {
               <Icon name="close" />
             </Button>
           </div>
-          <p>{presentation(arrival).label}</p>
           {actionError?.id === arrival.id && (
             <p role="alert">{actionError.message}</p>
           )}
           <Button
             variant="secondary"
             size="small"
+            className="notification-arrival-action"
             disabled={!!busy}
             onClick={() => void select(arrival)}
           >
-            Open notification
+            {arrivalContent.action}
           </Button>
         </div>
       )}
       {open && (
-        <Drawer title="Notifications" onClose={() => setDrawerOpen(false)}>
+        <Drawer
+          title="Notifications"
+          className="notification-drawer"
+          onClose={() => setDrawerOpen(false)}
+        >
           {error && (
             <p role="alert">
               {error}{" "}
@@ -434,29 +549,45 @@ export function NotificationBell({ profileId }: { profileId: string }) {
             <p role="status">Loading notifications…</p>
           )}
           {!loading && !error && !items.length && <p>No notifications yet.</p>}
-          <ul className="notification-list">
-            {items.map((item) => (
-              <li key={item.id}>
-                <Button
-                  variant="plain"
-                  className="notification-item"
-                  disabled={!!busy}
-                  onClick={() => void select(item)}
-                >
-                  <span>
-                    {presentation(item).label}
-                    {!item.readAt && <Badge tone="accent">Unread</Badge>}
-                  </span>
-                  <time dateTime={item.createdAt}>
-                    {new Date(item.createdAt).toLocaleString()}
-                  </time>
-                </Button>
-              </li>
-            ))}
-          </ul>
+          {Array.from(groupByLocalDay(items), ([day, group]) => (
+            <div className="notification-day" key={day}>
+              <h3>{group.label}</h3>
+              <ul className="notification-list">
+                {group.items.map((item) => (
+                  <li key={item.id}>
+                    <Button
+                      variant="plain"
+                      className="notification-item"
+                      disabled={!!busy}
+                      onClick={() => void select(item)}
+                    >
+                      <NotificationSummary
+                        content={presentation(item)}
+                        unread={!item.readAt}
+                      />
+                      <span className="notification-item-meta">
+                        <time dateTime={item.createdAt}>
+                          {timeFormat.format(new Date(item.createdAt))}
+                        </time>
+                        <span className="notification-sr-only">
+                          {item.readAt ? "Read" : "Unread"}
+                        </span>
+                        <span
+                          className="notification-unread-indicator"
+                          data-unread={item.readAt === null}
+                          aria-hidden="true"
+                        />
+                      </span>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
           {cursor && (
             <Button
               variant="secondary"
+              className="notification-more"
               pending={loading}
               onClick={() => void load(cursor)}
             >
