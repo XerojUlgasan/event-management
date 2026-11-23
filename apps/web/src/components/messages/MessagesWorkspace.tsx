@@ -632,9 +632,13 @@ export function MessagesWorkspace({
           {viewerRole === "customer" && active && !active.bookingRequestId && (
             <Button
               variant="secondary"
+              className="message-booking-action"
+              aria-label="Create booking request"
+              aria-haspopup="dialog"
               onClick={() => setBookingConversationId(active.id)}
             >
-              Create booking request
+              <Icon name="plus" size={20} />
+              <span>Create booking request</span>
             </Button>
           )}
           {active && (active.bookingRequestId || onToggleAi) && (
