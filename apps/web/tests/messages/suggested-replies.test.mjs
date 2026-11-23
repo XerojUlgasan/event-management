@@ -20,11 +20,19 @@ const message = (id, senderRole, fields = {}) => ({
   ...fields,
 });
 
-const question = message("question", "customer");
+const legacyReply = message("legacy-reply", "assistant", {
+  body: "View packages and View services",
+  createdAt: "2026-11-23T02:59:00.000Z",
+});
+
+const question = message("question", "customer", {
+  catalogBrowse: ["services"],
+});
 
 const prompt = message("prompt", "assistant", {
   replyToMessageId: question.id,
   suggestedReplies: labels,
+  catalogBrowse: ["packages", "services"],
 });
 
 const conversation = {
@@ -50,7 +58,7 @@ const handedOffConversation = {
   aiVersion: 2,
 };
 
-test("suggested replies in both customer contexts use the usual sends and keep composer content", async (t) => {
+test("catalog browse and suggested replies coexist in both customer chats", async (t) => {
   const window = new Window();
   const cacheDir = await mkdtemp(join(tmpdir(), "clemora-suggested-replies-"));
   const server = await createServer({
@@ -75,6 +83,7 @@ test("suggested replies in both customer contexts use the usual sends and keep c
   for (const [name, value] of Object.entries({
     window,
     document: window.document,
+    Element: window.Element,
     IS_REACT_ACT_ENVIRONMENT: true,
   })) {
     const original = Object.getOwnPropertyDescriptor(globalThis, name);
@@ -103,6 +112,21 @@ test("suggested replies in both customer contexts use the usual sends and keep c
     ...container.querySelectorAll('[aria-label="Suggested replies"] button'),
   ];
 
+  const browseButtons = () =>
+    [...container.querySelectorAll('button[aria-haspopup="dialog"]')].filter(
+      (button) => /^View (packages|services)\b/.test(button.textContent),
+    );
+
+  function catalogResponse(url, options) {
+    const kind = new URL(url).pathname.split("/").at(-1);
+
+    if (kind !== "packages" && kind !== "services") return;
+
+    assert.equal(options.method, "GET");
+
+    return Response.json({ [kind]: [], nextCursor: null });
+  }
+
   const draft = "This is my own reply.";
   const file = new File(["image"], "draft.png", { type: "image/png" });
 
@@ -126,13 +150,58 @@ test("suggested replies in both customer contexts use the usual sends and keep c
     return textarea;
   }
 
+  async function checkBrowseDialog(kind, textarea) {
+    const buttons = browseButtons();
+    assert.deepEqual(
+      buttons.map((button) =>
+        button.textContent.trim().split(/\s+/).slice(0, 2).join(" "),
+      ),
+      ["View packages", "View services"],
+    );
+    assert.equal(
+      buttons[0].parentElement.previousElementSibling.dataset.messageId,
+      prompt.id,
+    );
+
+    const opener = buttons.find((button) =>
+      button.textContent.startsWith(`View ${kind}`),
+    );
+
+    const thread = opener.closest(".message-thread, .chat-messages");
+
+    thread.scrollTop = 23;
+    await act(async () => opener.click());
+    const dialog = window.document.querySelector("dialog[open]");
+    assert.ok(dialog);
+    const title = window.document.getElementById(
+      dialog.getAttribute("aria-labelledby"),
+    );
+    assert.equal(title.textContent.toLowerCase(), kind);
+    assert.match(dialog.textContent, new RegExp(`Showing 0 ${kind}`));
+
+    const filters = dialog.querySelector('[aria-label="Show filters"]');
+    const close = dialog.querySelector('[aria-label="Close catalog"]');
+    assert.equal(window.document.activeElement, close);
+    await act(async () => filters.click());
+    assert.equal(filters.getAttribute("aria-expanded"), "true");
+
+    thread.scrollTop = 8;
+    await act(async () => close.click());
+    assert.equal(window.document.querySelector("dialog[open]"), null);
+    assert.equal(window.document.activeElement, opener);
+    assert.equal(thread.scrollTop, 23);
+    assert.equal(textarea.value, draft);
+    assert.ok(container.querySelector('[aria-label="Remove draft.png"]'));
+  }
+
   await t.test(
-    "signed-in choices belong to the latest current AMAC turn and are absent for admins",
+    "signed-in browse opens from an assistant reply while admins see no customer actions",
     async (t) => {
       t.mock.method(
         globalThis,
         "fetch",
-        async () => new Response(null, { status: 404 }),
+        async (url, options) =>
+          catalogResponse(url, options) ?? new Response(null, { status: 404 }),
       );
       const root = createRoot(container);
       const empty = { title: "Empty", body: "Start a conversation" };
@@ -170,8 +239,9 @@ test("suggested replies in both customer contexts use the usual sends and keep c
         );
 
       try {
-        await render([question, prompt], "admin");
+        await render([legacyReply, question, prompt], "admin");
         assert.equal(choices().length, 0);
+        assert.equal(browseButtons().length, 0);
         await render([question, handoff], "customer", {
           activeConversation: handedOffConversation,
           sendDisabled: true,
@@ -226,7 +296,7 @@ test("suggested replies in both customer contexts use the usual sends and keep c
         await render([previousReview]);
         const textarea = await fillComposer();
         await render(
-          [previousReview, question, laterCustomer, handoff],
+          [legacyReply, previousReview, question, laterCustomer, handoff],
           "customer",
           {
             activeConversation: handedOffConversation,
@@ -238,9 +308,11 @@ test("suggested replies in both customer contexts use the usual sends and keep c
           labels,
         );
         assert.equal(
-          buttons[0].parentElement.previousElementSibling.dataset.messageId,
-          prompt.id,
+          buttons[0].parentElement.previousElementSibling,
+          browseButtons()[0].parentElement,
         );
+        await checkBrowseDialog("packages", textarea);
+        assert.equal(sent.length, 0);
         await act(async () => {
           buttons[0].click();
           buttons[1].click();
@@ -282,7 +354,7 @@ test("suggested replies in both customer contexts use the usual sends and keep c
   );
 
   await t.test(
-    "guest handoff choices send a single text payload and spend the ordinary allowance",
+    "guest browse preserves the allowance and a handoff suggestion spends one message",
     async (t) => {
       const root = createRoot(container);
       const sends = [];
@@ -293,12 +365,21 @@ test("suggested replies in both customer contexts use the usual sends and keep c
       });
 
       t.mock.method(globalThis, "fetch", async (url, options) => {
+        const catalog = catalogResponse(url, options);
+
+        if (catalog) return catalog;
+
         if (url.endsWith("/me")) return new Response(null, { status: 401 });
 
         if (url.endsWith("/guest/conversation"))
           return Response.json({
             conversation: handedOffConversation,
-            messages: [question, message("new-input", "customer"), handoff],
+            messages: [
+              legacyReply,
+              question,
+              message("new-input", "customer"),
+              handoff,
+            ],
             nextCursor: null,
             guest: guest(2),
           });
@@ -342,6 +423,12 @@ test("suggested replies in both customer contexts use the usual sends and keep c
         assert.deepEqual(
           buttons.map((button) => button.textContent),
           labels,
+        );
+        await checkBrowseDialog("services", textarea);
+        assert.equal(sends.length, 0);
+        assert.match(
+          container.querySelector(".handover").textContent,
+          /2 guest messages remaining/,
         );
         await act(async () => {
           buttons[0].click();

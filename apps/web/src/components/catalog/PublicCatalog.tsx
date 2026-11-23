@@ -30,6 +30,7 @@ import { CatalogDetailPreview } from "./CatalogDetailPreview";
 import { ServiceCanvas } from "./CatalogContent";
 import { CatalogFiltersForm } from "./CatalogFiltersForm";
 import { PackageCard, ServiceCard } from "./CatalogListingCards";
+import type { CatalogSelection } from "./catalog-navigation-context";
 
 type Kind = CatalogKind;
 
@@ -140,12 +141,17 @@ export function PublicCatalog({
   allowBooking = true,
   onViewMore,
   showFilters = false,
+  onOpenDetail,
 }: {
   kind: Kind;
   mode?: "featured" | "overview";
   allowBooking?: boolean;
   onViewMore?: () => void;
   showFilters?: boolean;
+  onOpenDetail?: (
+    selection: CatalogSelection,
+    trigger: HTMLButtonElement,
+  ) => void;
 }) {
   const { notifyError } = useNotifications();
   const [filters, setFilters] = useState<CatalogFilters>({});
@@ -228,6 +234,19 @@ export function PublicCatalog({
     } else setSelected(null);
   };
 
+  const openListing = (id: string, trigger: HTMLButtonElement) => {
+    if (onOpenDetail) {
+      onOpenDetail(
+        { entity: kind === "packages" ? "package" : "service", id },
+        trigger,
+      );
+    } else if (kind === "packages") {
+      showPackage(id);
+    } else {
+      setSelected({ kind, id });
+    }
+  };
+
   const scrollToTop = () => {
     topRef.current?.focus({ preventScroll: true });
     topRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
@@ -298,15 +317,17 @@ export function PublicCatalog({
                 <PackageCard
                   key={item.id}
                   item={item}
-                  onPreview={() => showPackage(item.id)}
+                  onPreview={(event) =>
+                    openListing(item.id, event.currentTarget)
+                  }
                 />
               ))
             : (items as PublicService[]).map((item) => (
                 <ServiceCard
                   key={item.id}
                   item={item}
-                  onPreview={() =>
-                    setSelected({ kind: "services", id: item.id })
+                  onPreview={(event) =>
+                    openListing(item.id, event.currentTarget)
                   }
                 />
               ))}

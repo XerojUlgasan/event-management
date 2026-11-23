@@ -41,6 +41,7 @@ import {
 import "../../styles/messages/messages.css";
 import { MessageAttachments, MessageImages } from "./MessageImages";
 import { CatalogRecommendations } from "./CatalogRecommendations";
+import { CatalogBrowseActions } from "./CatalogBrowseActions";
 import { SuggestedReplies } from "./SuggestedReplies";
 import { MessageProcessing } from "./MessageProcessing";
 import { useAgentProfile } from "./use-agent-profile";
@@ -923,9 +924,17 @@ export function MessagesWorkspace({
                   </small>
                 </div>
                 {message.senderRole === "assistant" && (
-                  <CatalogRecommendations
-                    recommendations={message.catalogRecommendations}
-                  />
+                  <>
+                    <CatalogRecommendations
+                      recommendations={message.catalogRecommendations}
+                    />
+                    {viewerRole === "customer" && (
+                      <CatalogBrowseActions
+                        message={message}
+                        threadRef={thread}
+                      />
+                    )}
+                  </>
                 )}
                 {suggestedMessage?.id === message.id &&
                   activeId &&
