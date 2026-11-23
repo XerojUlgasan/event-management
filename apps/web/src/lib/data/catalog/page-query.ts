@@ -27,6 +27,8 @@ export function pageQuery(page?: CatalogPageQuery) {
   if (page?.pricingType !== undefined)
     params.set("pricingType", page.pricingType);
 
+  if (page?.eventType !== undefined) params.set("eventType", page.eventType);
+
   const query = params.toString();
 
   return query ? `?${query}` : "";

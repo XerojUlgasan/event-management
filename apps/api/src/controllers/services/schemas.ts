@@ -1,6 +1,9 @@
 import { sectionsSchema } from "../packages/schemas.js";
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
 import { z } from "@hono/zod-openapi";
+import { EVENT_TYPES } from "@event-management/contracts/catalog-filters";
+
+const eventTypeSchema = z.enum(EVENT_TYPES).nullable().optional();
 
 const text = z.string().trim().min(1).max(MAX_CATALOG_TEXT_LENGTH);
 
@@ -20,6 +23,7 @@ export const contentSchema = z.object({
     )
     .optional(),
   thumbnailMediaId: z.string().uuid().nullable().optional(),
+  eventType: eventTypeSchema,
 });
 
 export type ServiceContent = z.infer<typeof contentSchema>;
@@ -54,6 +58,7 @@ export const adminSchema = z.object({
   updatedAt: z.string(),
   archivedAt: z.string().nullable(),
   publishedAt: z.string(),
+  eventType: z.enum(EVENT_TYPES).nullable(),
 });
 
 export const publicSchema = adminSchema;

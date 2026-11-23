@@ -1,3 +1,5 @@
+import type { EventType } from "./catalog-filters.js";
+
 export const MAX_PACKAGE_ADDON_SERVICES = 100;
 
 export const MAX_CATALOG_SECTIONS = 20;
@@ -73,6 +75,7 @@ export type ServiceContent = ServicePricing & {
   name: string;
   description: string;
   sections: CatalogSection[];
+  eventType?: EventType | null;
 };
 
 export type PackagePrice = {
@@ -87,6 +90,7 @@ export type PackageContent = {
   maxGuests: number;
   price: PackagePrice;
   sections: CatalogSection[];
+  eventType?: EventType | null;
 };
 
 export type CatalogPackage = PackageContent & {
@@ -100,4 +104,5 @@ export type CatalogPackage = PackageContent & {
   createdAt: string;
   updatedAt: string;
   publishedAt: string | null;
+  eventType: EventType | null;
 };

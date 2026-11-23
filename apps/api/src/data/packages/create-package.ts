@@ -14,6 +14,9 @@ export const packageColumns = (content: Content, slug: string) => ({
   ...(content.thumbnailMediaId !== undefined
     ? { thumbnail_media_id: content.thumbnailMediaId ?? null }
     : {}),
+  ...(content.eventType !== undefined
+    ? { event_type: content.eventType ?? null }
+    : {}),
 });
 
 export function createPackageData(

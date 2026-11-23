@@ -1,12 +1,18 @@
 ---
 import { Pagination, Toast } from "@event-management/ui";
+import { PublicCatalogFilters } from "../../components/public/catalog/PublicCatalogFilters";
 import PublicDocument from "../../layouts/PublicDocument.astro";
 import { ServiceCards } from "../../components/public/catalog/CatalogCards";
 import {
   catalogPageLinks,
   loadServicesPage,
+  readCatalogFilters,
 } from "../../lib/server/catalog/load-catalog";
 import type { PublicService } from "../../lib/data/catalog/services";
+
+const q = Astro.url.searchParams;
+
+const filters = readCatalogFilters("services", q);
 
 let services: PublicService[] = [];
 
@@ -15,8 +21,9 @@ let nextCursor: string | null = null;
 
 try {
   const page = await loadServicesPage(
+    filters,
     undefined,
-    Astro.url.searchParams.get("cursor") ?? undefined,
+    q.get("cursor") ?? undefined,
   );
   services = page.items;
   nextCursor = page.nextCursor;
@@ -24,16 +31,26 @@ try {
   unavailable = true;
 }
 
-const links = catalogPageLinks(Astro.url, nextCursor);
+const links = catalogPageLinks(Astro.url, nextCursor, filters);
+
+const hasFilters = Object.values(filters).some((v) => v !== undefined);
 ---
 
 <PublicDocument
   title="Services | Styled by AMAC"
   description="Published event services from Styled by AMAC."
 >
-  <section class="section">
+  <section class="section catalog-page">
     <h1 class="section-title small">All services</h1>
-    <p>Explore services for your gathering.</p>
+    <p class="catalog-page-subtitle">Explore services for your gathering.</p>
+
+    <PublicCatalogFilters
+      kind="services"
+      filters={filters}
+      count={services.length}
+      client:load
+    />
+
     {unavailable && (
       <Toast tone="danger" placement="inline">
         <span>The catalog is unavailable right now.</span>
@@ -42,13 +59,15 @@ const links = catalogPageLinks(Astro.url, nextCursor);
     )}
     {!unavailable && services.length === 0 && (
       <p class="catalog-status">
-        Our service catalog is being prepared. Please check back soon.
+        {hasFilters
+          ? "No services match your filters. Try adjusting them or clear to see all services."
+          : "Our service catalog is being prepared. Please check back soon."}
       </p>
     )}
     {services.length > 0 && <ServiceCards items={services} />}
     {!unavailable && (
       <Pagination
-        page={Astro.url.searchParams.getAll("previous").length + 1}
+        page={q.getAll("previous").length + 1}
         hasNextPage={!!links.next}
         previousHref={links.previous ?? undefined}
         nextHref={links.next ?? undefined}

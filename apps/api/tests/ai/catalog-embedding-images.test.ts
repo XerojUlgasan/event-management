@@ -41,6 +41,8 @@ function asset(
     byte_size: null,
     created_at: new Date(),
     created_by: null,
+    gallery_position: null,
+    showcase_record_id: null,
     url: null,
     ...overrides,
   };

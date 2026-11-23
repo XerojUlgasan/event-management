@@ -25,9 +25,15 @@ Uploaded canvas images must be JPEG, PNG, or WebP and at most 10 MiB. Videos mus
 
 Photo and video widgets accept uploads only. External image/video URLs and hosted YouTube/Vimeo embeds are rejected. Sample image media uses the checked-in paths allowed by the catalog schema. Migration `20261102140000_upload_only_catalog_media` enforces this in PostgreSQL and refuses to proceed if external media rows remain, preserving those rows for deliberate replacement with uploads.
 
-When a catalog save removes or replaces uploaded media, the API deletes the Storage object and media row only if no current package/service canvas or dedicated thumbnail references it. Reference checks use JSONB containment against GIN-indexed owner canvases. Cleanup runs after the database save; a failed Storage deletion leaves the unreferenced record and does not undo the saved catalog record. Each new upload also retries cleanup for up to 10 unreferenced assets older than 24 hours. `pnpm --filter @event-management/api media:cleanup` retries up to 100 unreferenced catalog assets older than 24 hours. Upload row locks and ownership checks remain in place.
+When a save removes or replaces uploaded media, the API deletes the Storage object and media row only if there are no current references in package or service canvases, their thumbnails, or showcase covers and galleries. Canvas reference checks use JSONB containment against GIN-indexed owner canvases. Cleanup runs after the database save; a failed Storage deletion leaves the unreferenced record and does not undo the save. Each new upload also retries cleanup for up to 10 unreferenced assets older than 24 hours. `pnpm --filter @event-management/api media:cleanup` retries up to 100 unreferenced assets older than 24 hours. Upload row locks and ownership checks remain in place.
 
 Public requests can stream media referenced by the canvas or dedicated thumbnail of a published, non-archived catalog record. A signed-in System Administrator also has a private, no-store fallback for that administrator's pending uploads and uploads referenced by archived records.
+
+## Showcase media
+
+Showcases select an image with `cover_media_id`. Gallery images and videos each have one `showcase_record_id` and a unique `gallery_position` within that showcase. The API changes attachments and order in the same transaction as the showcase save. Deleting a showcase detaches the gallery before deleting the record, then runs shared media cleanup.
+
+Uploads use `POST /v1/admin/showcase-media` and the `showcase-media/<id>` key prefix in the private `event-management` bucket. `GET /v1/showcase-media/{id}` serves media referenced by published showcases, including video byte ranges. System Administrators can view saved draft media and their own pending uploads. The migration leaves the asset rows and objects for formerly separate preview videos in place. The usual stale media cleanup applies once those assets have no references.
 
 ## Private proposal and quotation media
 

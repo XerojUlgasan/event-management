@@ -21,7 +21,7 @@ function CatalogListingCard({
   action,
 }: {
   kind: "package" | "service";
-  item: Pick<PublicPackage, "name" | "description" | "imageUrl">;
+  item: Pick<PublicService, "name" | "description" | "imageUrl" | "eventType">;
   price: string;
   secondary?: string;
   action: CardAction;
@@ -36,6 +36,9 @@ function CatalogListingCard({
     <>
       <div className="catalog-card-image">
         <CatalogThumbnail src={packageImageSrc(item.imageUrl)} />
+        {item.eventType && (
+          <span className="catalog-card-event-badge">{item.eventType}</span>
+        )}
       </div>
       <div className="catalog-card-body">
         <span className="catalog-card-kicker">Event {kind}</span>

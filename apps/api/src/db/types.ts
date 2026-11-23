@@ -179,9 +179,11 @@ export interface MediaAssets {
   byte_size: number | null;
   created_at: Generated<Timestamp>;
   created_by: string | null;
+  gallery_position: number | null;
   id: Generated<string>;
   kind: string;
   mime_type: string | null;
+  showcase_record_id: string | null;
   source: string;
   storage_key: string | null;
   url: string | null;
@@ -230,6 +232,7 @@ export interface Packages {
   created_at: Generated<Timestamp>;
   custom_for_booking_request_id: string | null;
   description: Generated<string>;
+  event_type: string | null;
   id: Generated<string>;
   max_guests: number;
   name: string;
@@ -266,6 +269,7 @@ export interface Services {
   canvas: Generated<Json>;
   created_at: Generated<Timestamp>;
   description: string;
+  event_type: string | null;
   fixed_price_pesos: number | null;
   hourly_rate_pesos: number | null;
   id: Generated<string>;
@@ -283,6 +287,18 @@ export interface Sessions {
   id: Generated<string>;
   token_hash: string;
   user_id: string;
+}
+
+export interface ShowcaseRecords {
+  cover_media_id: string;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  description: string;
+  id: Generated<string>;
+  published_at: Timestamp | null;
+  slug: string;
+  title: string;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface SupportingDocumentChunks {
@@ -347,6 +363,7 @@ export interface DB {
   quotations: Quotations;
   services: Services;
   sessions: Sessions;
+  showcase_records: ShowcaseRecords;
   supporting_document_chunks: SupportingDocumentChunks;
   supporting_documents: SupportingDocuments;
   users: Users;

@@ -1,5 +1,7 @@
 ---
 import "../styles/app.css";
+import "../styles/catalog/public-catalog.css";
+import "../styles/showcases/public.css";
 import { Brand, Icon } from "@event-management/ui";
 import { BusinessInformationFooter } from "../components/public/site/BusinessInformationFooter";
 import { loadBusinessInformation } from "../lib/server/business-information/load-business-information";
@@ -64,6 +66,7 @@ try {
         <nav class="public-nav" aria-label="Primary">
           <a href="/packages">Packages</a>
           <a href="/services">Services</a>
+          <a href="/showcases">Showcases</a>
         </nav>
         <div class="header-actions">
           <a class="button button-link" href="/login">
@@ -76,6 +79,7 @@ try {
             <nav aria-label="Mobile navigation">
               <a href="/packages">Packages</a>
               <a href="/services">Services</a>
+              <a href="/showcases">Showcases</a>
             </nav>
           </details>
         </div>

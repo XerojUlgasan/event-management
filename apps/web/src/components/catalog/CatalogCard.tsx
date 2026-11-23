@@ -12,6 +12,7 @@ export function CatalogCard({
   description,
   metadata,
   action,
+  eventTypeBadge,
 }: {
   image?: string;
   eyebrow: string;
@@ -19,10 +20,16 @@ export function CatalogCard({
   description: string;
   metadata: { label: string; value: ReactNode }[];
   action?: ReactNode;
+  eventTypeBadge?: string | null;
 }) {
   return (
     <article className="pe-card">
-      <CatalogThumbnail src={image} />
+      <div className="pe-card-image-wrap">
+        <CatalogThumbnail src={image} />
+        {eventTypeBadge && (
+          <span className="pe-card-event-badge">{eventTypeBadge}</span>
+        )}
+      </div>
       <div className="pe-card-body">
         <span>{eyebrow}</span>
         <h2>{title}</h2>

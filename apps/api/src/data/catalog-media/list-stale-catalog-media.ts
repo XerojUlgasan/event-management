@@ -1,5 +1,4 @@
-import { sql } from "kysely";
-import { anyCatalogOwnerContainsMedia } from "./canvas-reference.js";
+import { catalogMediaHasReference } from "./has-catalog-media-reference.js";
 import type { Kysely, Transaction } from "kysely";
 import type { DB } from "../../db/types.js";
 
@@ -14,7 +13,7 @@ export const listStaleCatalogMediaData = (
     .selectFrom("media_assets as m")
     .select("m.id")
     .where("m.created_at", "<", before)
-    .where(sql<boolean>`NOT ${anyCatalogOwnerContainsMedia(sql.ref("m.id"))}`)
+    .where((eb) => eb.not(catalogMediaHasReference(eb)))
     .orderBy("m.created_at")
     .orderBy("m.id")
     .limit(limit)

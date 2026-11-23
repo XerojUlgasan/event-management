@@ -16,9 +16,7 @@ export function listPublicServicesPageData(
   let query = db
     .selectFrom("services")
     .selectAll()
-    .select(
-      utcTimestampSql("published_at").as("page_sort"),
-    );
+    .select(utcTimestampSql("published_at").as("page_sort"));
   query = query.where("archived_at", "is", null);
 
   if (options.pricingType === "fixed")
@@ -36,15 +34,12 @@ export function listPublicServicesPageData(
   if (options.maxPricePesos !== undefined)
     query = query.where(priceColumn, "<=", options.maxPricePesos);
 
+  if (options.eventType !== undefined)
+    query = query.where("event_type", "=", options.eventType);
+
   if (position)
     query = query.where(
-      keysetPredicate(
-        "published_at",
-        "id",
-        position.sort,
-        position.id,
-        "<",
-      ),
+      keysetPredicate("published_at", "id", position.sort, position.id, "<"),
     );
 
   return query

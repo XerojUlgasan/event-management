@@ -1,0 +1,34 @@
+---
+import PublicDocument from "../../layouts/PublicDocument.astro";
+import { PublicShowcaseDetail } from "../../components/public/site/PublicShowcaseDetail";
+import { loadShowcase } from "../../lib/server/catalog/load-showcases";
+
+let unavailable = false;
+
+const item = await loadShowcase(Astro.params.slug ?? "").catch(() => {
+  unavailable = true;
+
+  return null;
+});
+
+if (!item) Astro.response.status = unavailable ? 503 : 404;
+
+const message = unavailable
+  ? "Showcase unavailable right now."
+  : "Showcase not found.";
+---
+
+<PublicDocument
+  title={item ? `${item.title} | Showcases | Styled by AMAC` : message}
+  description={item ? item.description : message}
+>
+  <section class="section showcase-detail-page">
+    {item ? (
+      <PublicShowcaseDetail item={item} client:load />
+    ) : (
+      <p class="catalog-status">
+        {message} <a href="/showcases">Back to showcases</a>
+      </p>
+    )}
+  </section>
+</PublicDocument>

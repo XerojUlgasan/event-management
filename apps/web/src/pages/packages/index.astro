@@ -1,12 +1,18 @@
 ---
 import { Pagination, Toast } from "@event-management/ui";
+import { PublicCatalogFilters } from "../../components/public/catalog/PublicCatalogFilters";
 import PublicDocument from "../../layouts/PublicDocument.astro";
 import { PackageCards } from "../../components/public/catalog/CatalogCards";
 import {
   catalogPageLinks,
   loadPackagesPage,
+  readCatalogFilters,
 } from "../../lib/server/catalog/load-catalog";
 import type { PublicPackage } from "../../lib/data/catalog/packages";
+
+const q = Astro.url.searchParams;
+
+const filters = readCatalogFilters("packages", q);
 
 let packages: PublicPackage[] = [];
 
@@ -15,8 +21,9 @@ let nextCursor: string | null = null;
 
 try {
   const page = await loadPackagesPage(
+    filters,
     undefined,
-    Astro.url.searchParams.get("cursor") ?? undefined,
+    q.get("cursor") ?? undefined,
   );
   packages = page.items;
   nextCursor = page.nextCursor;
@@ -24,16 +31,26 @@ try {
   unavailable = true;
 }
 
-const links = catalogPageLinks(Astro.url, nextCursor);
+const links = catalogPageLinks(Astro.url, nextCursor, filters);
+
+const hasFilters = Object.values(filters).some((v) => v !== undefined);
 ---
 
 <PublicDocument
   title="Packages | Styled by AMAC"
   description="Published event packages from Styled by AMAC."
 >
-  <section class="section">
+  <section class="section catalog-page">
     <h1 class="section-title small">All packages</h1>
-    <p>Explore packages for your gathering.</p>
+    <p class="catalog-page-subtitle">Explore packages for your gathering.</p>
+
+    <PublicCatalogFilters
+      kind="packages"
+      filters={filters}
+      count={packages.length}
+      client:load
+    />
+
     {unavailable && (
       <Toast tone="danger" placement="inline">
         <span>The catalog is unavailable right now.</span>
@@ -41,12 +58,16 @@ const links = catalogPageLinks(Astro.url, nextCursor);
       </Toast>
     )}
     {!unavailable && packages.length === 0 && (
-      <p class="catalog-status">No packages are published yet.</p>
+      <p class="catalog-status">
+        {hasFilters
+          ? "No packages match your filters. Try adjusting them or clear to see all packages."
+          : "No packages are published yet."}
+      </p>
     )}
     {packages.length > 0 && <PackageCards items={packages} />}
     {!unavailable && (
       <Pagination
-        page={Astro.url.searchParams.getAll("previous").length + 1}
+        page={q.getAll("previous").length + 1}
         hasNextPage={!!links.next}
         previousHref={links.previous ?? undefined}
         nextHref={links.next ?? undefined}

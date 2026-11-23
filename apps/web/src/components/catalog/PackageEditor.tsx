@@ -23,6 +23,7 @@ const blank = (): PackageContent => ({
   maxGuests: 100,
   price: { kind: "fixed", currency: "PHP", amountMinor: 0 },
   sections: [newCatalogSection()],
+  eventType: null,
 });
 
 export function PackageCard({
@@ -45,6 +46,7 @@ export function PackageCard({
         },
         { label: "Maximum guests", value: `Up to ${item.maxGuests} guests` },
       ]}
+      eventTypeBadge={item.eventType ?? null}
       action={action}
     />
   );
@@ -103,6 +105,7 @@ export function PackageEditor({
 
   return (
     <CatalogEditor<PackageContent>
+      nameBadge={(c) => (c.eventType ? <span>{c.eventType}</span> : null)}
       initial={
         initial
           ? {
@@ -111,6 +114,7 @@ export function PackageEditor({
               maxGuests: initial.maxGuests,
               price: initial.price,
               sections: initial.sections,
+              eventType: initial.eventType ?? null,
             }
           : draft
       }

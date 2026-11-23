@@ -11,6 +11,9 @@ export {
 } from "@event-management/contracts/catalog-canvas";
 import { z } from "@hono/zod-openapi";
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
+import { EVENT_TYPES } from "@event-management/contracts/catalog-filters";
+
+const eventTypeSchema = z.enum(EVENT_TYPES).nullable().optional();
 
 import { packageAddonServicesSchema } from "@event-management/contracts/catalog-service-terms";
 
@@ -35,6 +38,7 @@ export const contentSchema = z
     price: packagePriceSchema,
     sections: sectionsSchema,
     thumbnailMediaId: z.string().uuid().nullable().optional(),
+    eventType: eventTypeSchema,
   })
   .strict();
 
@@ -56,6 +60,7 @@ export const publicSchema = z.object({
   publishedAt: z.string().nullable(),
   packageType: z.enum(["catalog", "custom"]),
   customForBookingRequestId: z.string().uuid().nullable(),
+  eventType: z.enum(EVENT_TYPES).nullable(),
 });
 
 export const adminSchema = publicSchema;

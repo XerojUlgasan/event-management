@@ -409,3 +409,83 @@
   color: var(--muted);
   line-height: 1.6;
 }
+
+/* ── Catalog listing pages (/packages, /services) ───────────────────────── */
+
+/* Override the homepage hero padding — listing pages need much less. */
+.catalog-page {
+  padding-top: 40px;
+  padding-bottom: 80px;
+}
+
+.catalog-page h1 {
+  margin: 0 0 8px;
+}
+.catalog-page-subtitle {
+  margin: 0 0 24px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* Gap between the toolbar/filter and the card grid below */
+.catalog-page .catalog-browser {
+  margin-bottom: 28px;
+}
+
+.public-catalog-filters {
+  position: relative;
+  gap: 0;
+}
+.public-catalog-filters .catalog-toolbar {
+  min-height: 44px;
+  padding-inline-end: 60px;
+}
+.public-catalog-filters details[open] {
+  margin-block-start: 22px;
+}
+.public-catalog-filters .catalog-filter-toggle {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  cursor: pointer;
+}
+.public-catalog-filters .catalog-filter-toggle::-webkit-details-marker {
+  display: none;
+}
+
+/* Align all filter fields and the Apply/Clear buttons to the bottom
+   of the row so varying label/description heights don't cause misalignment. */
+.catalog-page .catalog-filter-fields {
+  align-items: end;
+}
+.catalog-page .catalog-filter-actions {
+  padding-top: 0;
+}
+
+@media (max-width: 700px) {
+  .catalog-page {
+    padding-top: 28px;
+    padding-bottom: 48px;
+  }
+}
+
+.catalog-card-image {
+  position: relative;
+}
+.catalog-card-event-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--overlay-black) 48%, var(--transparent));
+  color: var(--surface-base);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  line-height: 1.6;
+}

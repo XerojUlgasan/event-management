@@ -41,10 +41,10 @@ export function bookingOfferAmountLabel(
 ) {
   if (offer.totalHours == null) return null;
 
-  const fixed = offer.includedHours != null;
-  const hours = fixed
-    ? Math.max(0, offer.totalHours - offer.includedHours)
-    : offer.totalHours;
+  const hours =
+    offer.includedHours != null
+      ? Math.max(0, offer.totalHours - offer.includedHours)
+      : offer.totalHours;
   const amount = calculateQuotationAddonAmount({
     source: {
       packageId: "booking",

@@ -170,6 +170,7 @@ export function BusinessInformationFooter({
         <nav className="business-information-footer-nav" aria-label="Footer">
           <a href="/packages">Packages</a>
           <a href="/services">Services</a>
+          <a href="/showcases">Showcases</a>
         </nav>
 
         <small className="business-information-footer-copy">

@@ -20,6 +20,7 @@ model User {
   supportingDocuments SupportingDocument[]
   quotations Quotation[]
   auditEvents AuditEvent[]
+  showcaseRecords ShowcaseRecord[]
   notifications Notification[]
 
   @@map("users")
@@ -188,6 +189,7 @@ model Package {
   knowledge CatalogKnowledge[]
   canvas          Json              @default("[]") @db.JsonB
   thumbnailMediaId String?          @map("thumbnail_media_id") @db.Uuid
+  eventType       String?           @map("event_type")
   thumbnailMedia MediaAsset? @relation("PackageThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@index([canvas(ops: JsonbPathOps)], type: Gin, map: "packages_canvas_idx")
@@ -209,6 +211,7 @@ model Service {
   publishedAt DateTime @default(now()) @map("published_at") @db.Timestamptz(6)
   canvas Json @default("[]") @db.JsonB
   thumbnailMediaId String? @map("thumbnail_media_id") @db.Uuid
+  eventType String? @map("event_type")
   thumbnailMedia MediaAsset? @relation("ServiceThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   knowledge CatalogKnowledge[]
   @@index([canvas(ops: JsonbPathOps)], type: Gin, map: "services_canvas_idx")
@@ -229,6 +232,11 @@ model MediaAsset {
   thumbnailPackages Package[] @relation("PackageThumbnail")
   thumbnailServices Service[] @relation("ServiceThumbnail")
   knowledge CatalogKnowledge[]
+  showcaseCover ShowcaseRecord[] @relation("ShowcaseCover")
+  showcaseRecordId String? @map("showcase_record_id") @db.Uuid
+  galleryPosition Int? @map("gallery_position")
+  showcaseRecord ShowcaseRecord? @relation("ShowcaseGallery", fields: [showcaseRecordId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  @@unique([showcaseRecordId, galleryPosition])
   @@map("media_assets")
 }
 
@@ -254,14 +262,14 @@ model CatalogKnowledge {
 }
 
 model SupportingDocument {
-  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   originalFilename    String   @map("original_filename")
   storageKey          String   @unique @map("storage_key")
   mimeType            String   @map("mime_type")
   byteSize            Int      @map("byte_size")
   fileSha256          String   @map("file_sha256")
   uploadedBy          String?  @map("uploaded_by") @db.Uuid
-  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   pipelineVersion     String   @map("pipeline_version")
   extractionStatus    String   @default("pending") @map("extraction_status")
   pageCount           Int?     @map("page_count")
@@ -451,4 +459,23 @@ model GuestMessageRequest {
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   @@id([conversationId, requestId])
   @@map("guest_message_requests")
+}
+
+model ShowcaseRecord {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug           String    @unique
+  title          String
+  description    String
+  coverMediaId   String    @map("cover_media_id") @db.Uuid
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz(6)
+  createdBy      String?   @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  creator User?        @relation(fields: [createdBy], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "showcase_records_created_by_fkey")
+  cover   MediaAsset   @relation("ShowcaseCover", fields: [coverMediaId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "showcase_records_cover_fkey")
+  media   MediaAsset[] @relation("ShowcaseGallery")
+
+  @@index([coverMediaId])
+  @@map("showcase_records")
 }

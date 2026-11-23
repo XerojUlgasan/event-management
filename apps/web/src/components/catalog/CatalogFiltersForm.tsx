@@ -1,23 +1,29 @@
-import { useState, type SubmitEvent } from "react";
+import { useEffect, useState, type SubmitEvent } from "react";
 import {
   MAX_CATALOG_FILTER_GUESTS,
   MAX_CATALOG_FILTER_PRICE_PESOS,
   type CatalogFilters,
   type CatalogKind,
+  type EventType,
   type ServicePricingType,
 } from "@event-management/contracts/catalog-filters";
 import { Button, FormField, Input, Select } from "@event-management/ui";
+import { pageQuery } from "../../lib/data/catalog/page-query";
+import { EventTypeField } from "./EventTypeField";
 
 /** Catalog-specific composition; shared controls own presentation and feedback. */
 export function CatalogFiltersForm({
   kind,
   filters,
+  action,
   onApply,
 }: {
   kind: CatalogKind;
   filters: CatalogFilters;
-  onApply: (filters: CatalogFilters) => void;
-}) {
+} & (
+  | { action: string; onApply?: never }
+  | { action?: never; onApply: (filters: CatalogFilters) => void }
+)) {
   const [minPrice, setMinPrice] = useState(
     filters.minPricePesos?.toString() ?? "",
   );
@@ -28,21 +34,50 @@ export function CatalogFiltersForm({
   const [pricingType, setPricingType] = useState<ServicePricingType | "">(
     filters.pricingType ?? "",
   );
+  const [eventType, setEventType] = useState<EventType | "">(
+    filters.eventType ?? "",
+  );
   const [error, setError] = useState("");
+  useEffect(() => {
+    if (!action) return;
+
+    // Back can restore the live page with a draft that no longer matches its URL.
+    const restoreAppliedFilters = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+
+      setMinPrice(filters.minPricePesos?.toString() ?? "");
+      setMaxPrice(filters.maxPricePesos?.toString() ?? "");
+      setGuests(filters.guests?.toString() ?? "");
+      setPricingType(filters.pricingType ?? "");
+      setEventType(filters.eventType ?? "");
+      setError("");
+    };
+
+    window.addEventListener("pageshow", restoreAppliedFilters);
+
+    return () => window.removeEventListener("pageshow", restoreAppliedFilters);
+  }, [action, filters]);
+
   const hasPrice = kind === "packages" || pricingType !== "";
   const hasGuests = kind !== "services";
 
   const apply = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (minPrice && maxPrice && Number(minPrice) > Number(maxPrice)) {
+    if (
+      hasPrice &&
+      minPrice &&
+      maxPrice &&
+      Number(minPrice) > Number(maxPrice)
+    ) {
       setError("Maximum price must be at least the minimum price.");
 
       return;
     }
 
     setError("");
-    onApply({
+    const next: CatalogFilters = {
+      ...(eventType !== "" ? { eventType } : {}),
       ...(kind === "services" && pricingType !== "" ? { pricingType } : {}),
       ...(hasPrice && minPrice !== ""
         ? { minPricePesos: Number(minPrice) }
@@ -51,32 +86,47 @@ export function CatalogFiltersForm({
         ? { maxPricePesos: Number(maxPrice) }
         : {}),
       ...(hasGuests && guests !== "" ? { guests: Number(guests) } : {}),
-    });
+    };
+
+    if (onApply) onApply(next);
+    else window.location.assign(action + pageQuery(next));
   };
 
   return (
     <form
       className="catalog-filters"
       aria-label={`Filter ${kind}`}
+      action={action}
+      method={action ? "get" : undefined}
+      autoComplete={action ? "off" : undefined}
       onSubmit={apply}
       onReset={() => {
         setMinPrice("");
         setMaxPrice("");
         setGuests("");
         setPricingType("");
+        setEventType("");
         setError("");
-        onApply({});
+        onApply?.({});
       }}
     >
       <div className="catalog-filter-fields">
+        <EventTypeField
+          name="eventType"
+          value={eventType}
+          onChange={setEventType}
+        />
         {kind === "services" && (
           <FormField
             label="Pricing type"
-            description="Choose a type to filter its price range."
+            description={
+              action ? undefined : "Choose a type to filter its price range."
+            }
           >
             {(field) => (
               <Select
                 {...field}
+                name="pricingType"
                 value={pricingType}
                 onChange={(event) => {
                   const value = event.target.value;
@@ -98,6 +148,9 @@ export function CatalogFiltersForm({
         )}
         {hasPrice && (
           <>
+            {action && kind === "services" && (
+              <Input type="hidden" name="priceRangeType" value={pricingType} />
+            )}
             <FormField
               label={
                 kind === "services"
@@ -110,6 +163,7 @@ export function CatalogFiltersForm({
               {(field) => (
                 <Input
                   {...field}
+                  name="minPricePesos"
                   type="number"
                   inputMode="numeric"
                   min={0}
@@ -137,6 +191,7 @@ export function CatalogFiltersForm({
               {(field) => (
                 <Input
                   {...field}
+                  name="maxPricePesos"
                   type="number"
                   inputMode="numeric"
                   min={0}
@@ -158,6 +213,7 @@ export function CatalogFiltersForm({
             {(field) => (
               <Input
                 {...field}
+                name="guests"
                 type="number"
                 inputMode="numeric"
                 min={1}
@@ -172,19 +228,26 @@ export function CatalogFiltersForm({
         )}
         <div className="catalog-filter-actions">
           <Button type="submit">Apply filters</Button>
-          <Button
-            type="reset"
-            variant="secondary"
-            disabled={
-              !minPrice &&
-              !maxPrice &&
-              !guests &&
-              !pricingType &&
-              !Object.keys(filters).length
-            }
-          >
-            Clear
-          </Button>
+          {action ? (
+            <a className="button button-secondary" href={action}>
+              Clear
+            </a>
+          ) : (
+            <Button
+              type="reset"
+              variant="secondary"
+              disabled={
+                !minPrice &&
+                !maxPrice &&
+                !guests &&
+                !pricingType &&
+                !eventType &&
+                !Object.keys(filters).length
+              }
+            >
+              Clear
+            </Button>
+          )}
         </div>
       </div>
       <p className="catalog-filter-hint">

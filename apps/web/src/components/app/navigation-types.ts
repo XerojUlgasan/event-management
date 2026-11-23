@@ -11,6 +11,7 @@ export type NavKey =
   | "Calendar"
   | "Packages"
   | "Services"
+  | "Showcases"
   | "BusinessInformation"
   | "Inventory"
   | "Operations"

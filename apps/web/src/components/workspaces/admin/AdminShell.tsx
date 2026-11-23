@@ -24,6 +24,7 @@ import { OperationsPage } from "./operations/OperationsPage";
 import { OverviewPage } from "./overview/OverviewPage";
 import { PackagesPage } from "./catalog/PackagesPage";
 import { ServicesPage } from "./catalog/ServicesPage";
+import { ShowcasesPage } from "./showcases/ShowcasesPage";
 import { ReportsPage } from "./reports/ReportsPage";
 import { CustomersPage } from "./users/CustomersPage";
 import { BusinessInformationPage } from "./business-information/BusinessInformationPage";
@@ -170,6 +171,8 @@ export function AdminShell({
 
     if (active === "Services") return <ServicesPage />;
 
+    if (active === "Showcases") return <ShowcasesPage />;
+
     if (active === "BusinessInformation") return null;
 
     if (active === "Inventory") return <InventoryPage />;
@@ -258,6 +261,7 @@ export function AdminShell({
         active !== "Bookings" &&
         active !== "Packages" &&
         active !== "Services" &&
+        active !== "Showcases" &&
         active !== "BusinessInformation" &&
         active !== "Administration" &&
         active !== "Messages" && (
