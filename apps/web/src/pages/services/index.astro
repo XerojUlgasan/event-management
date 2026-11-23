@@ -1,26 +1,17 @@
 ---
 import { Pagination, Toast } from "@event-management/ui";
+import { PublicCatalogFilters } from "../../components/public/catalog/PublicCatalogFilters";
 import PublicDocument from "../../layouts/PublicDocument.astro";
 import { ServiceCards } from "../../components/public/catalog/CatalogCards";
 import {
   catalogPageLinks,
   loadServicesPage,
+  readCatalogFilters,
 } from "../../lib/server/catalog/load-catalog";
-import { EVENT_TYPES } from "@event-management/contracts/catalog-filters";
 import type { PublicService } from "../../lib/data/catalog/services";
-import type { CatalogFilters } from "@event-management/contracts/catalog-filters";
 
 const q = Astro.url.searchParams;
-const pricingType = q.get("pricingType");
-const filters: CatalogFilters = {
-  eventType: EVENT_TYPES.includes(q.get("eventType") as any)
-    ? (q.get("eventType") as CatalogFilters["eventType"])
-    : undefined,
-  pricingType:
-    pricingType === "fixed" || pricingType === "hourly" ? pricingType : undefined,
-  minPricePesos: q.get("minPricePesos") ? Number(q.get("minPricePesos")) : undefined,
-  maxPricePesos: q.get("maxPricePesos") ? Number(q.get("maxPricePesos")) : undefined,
-};
+const filters = readCatalogFilters("services", q);
 
 let services: PublicService[] = [];
 let unavailable = false;
@@ -39,7 +30,6 @@ try {
 
 const links = catalogPageLinks(Astro.url, nextCursor, filters);
 const hasFilters = Object.values(filters).some((v) => v !== undefined);
-const hasPricingType = filters.pricingType !== undefined;
 ---
 
 <PublicDocument
@@ -50,80 +40,12 @@ const hasPricingType = filters.pricingType !== undefined;
     <h1 class="section-title small">All services</h1>
     <p class="catalog-page-subtitle">Explore services for your gathering.</p>
 
-    <div class="catalog-browser">
-      <div class="catalog-toolbar">
-        <p class="catalog-results-summary">
-          {services.length > 0
-            ? `Showing ${services.length} services${hasFilters ? " matching your filters" : ""}`
-            : ""}
-        </p>
-        <button
-          type="button"
-          class="button button-secondary button-size-icon catalog-filter-toggle"
-          aria-label={hasFilters ? "Hide filters" : "Show filters"}
-          aria-expanded={hasFilters ? "true" : "false"}
-          aria-controls="svc-filters"
-          data-active={hasFilters || undefined}
-          onclick="const p=document.getElementById('svc-filters');const hidden=p.hidden;p.hidden=!hidden;this.setAttribute('aria-expanded',hidden ? 'true' : 'false');"
-        >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-          </svg>
-        </button>
-      </div>
-
-      <div id="svc-filters" hidden={!hasFilters || undefined}>
-        <form method="get" action="/services" class="catalog-filters" aria-label="Filter services">
-          <div class="catalog-filter-fields">
-            <label class="ui-field" for="svc-event-type">
-              <span>Event type</span>
-              <select id="svc-event-type" name="eventType" class="ui-control">
-                <option value="">All event types</option>
-                {EVENT_TYPES.map((type) => (
-                  <option value={type} selected={filters.eventType === type}>{type}</option>
-                ))}
-              </select>
-            </label>
-            <label class="ui-field" for="svc-pricing-type">
-              <span>Pricing type</span>
-              <select id="svc-pricing-type" name="pricingType" class="ui-control">
-                <option value="">All service pricing</option>
-                <option value="fixed" selected={filters.pricingType === "fixed"}>Fixed price + excess hours</option>
-                <option value="hourly" selected={filters.pricingType === "hourly"}>Hourly only</option>
-              </select>
-            </label>
-            {hasPricingType && (
-              <>
-                <label class="ui-field" for="svc-min-price">
-                  <span>{filters.pricingType === "fixed" ? "Min fixed price (₱)" : "Min hourly rate (₱)"}</span>
-                  <input id="svc-min-price" class="ui-control" type="number" name="minPricePesos"
-                    min="0" step="1" value={filters.minPricePesos ?? ""} placeholder="No minimum" />
-                </label>
-                <label class="ui-field" for="svc-max-price">
-                  <span>{filters.pricingType === "fixed" ? "Max fixed price (₱)" : "Max hourly rate (₱)"}</span>
-                  <input id="svc-max-price" class="ui-control" type="number" name="maxPricePesos"
-                    min="0" step="1" value={filters.maxPricePesos ?? ""} placeholder="No maximum" />
-                </label>
-              </>
-            )}
-            <div class="catalog-filter-actions">
-              <button type="submit" class="button button-primary">Apply filters</button>
-              <button type="button" class="button button-secondary"
-                onclick="window.location.href='/services'" disabled={!hasFilters}>
-                Clear
-              </button>
-            </div>
-          </div>
-          <p class="catalog-filter-hint">
-            {filters.pricingType === "fixed"
-              ? "Filter the fixed price covering the listed hours. Excess hourly rates are shown separately."
-              : filters.pricingType === "hourly"
-                ? "Filter hourly-only services by their hourly rate. Services without a listed rate are excluded when filtering by price."
-                : "Choose fixed-price or hourly-only services to filter prices separately."}
-          </p>
-        </form>
-      </div>
-    </div>
+    <PublicCatalogFilters
+      kind="services"
+      filters={filters}
+      count={services.length}
+      client:load
+    />
 
     {unavailable && (
       <Toast tone="danger" placement="inline">

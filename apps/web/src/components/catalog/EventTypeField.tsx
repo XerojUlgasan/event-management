@@ -19,22 +19,29 @@ export function EventTypeField({
   onChange,
   allowNull = false,
   className,
-}: {
-  value: EventType | "";
-  onChange: (value: EventType | "") => void;
-  allowNull?: false;
-  className?: string;
-} | {
-  value: EventType | null;
-  onChange: (value: EventType | null) => void;
-  allowNull: true;
-  className?: string;
-}) {
+  name,
+}:
+  | {
+      value: EventType | "";
+      onChange: (value: EventType | "") => void;
+      allowNull?: false;
+      className?: string;
+      name?: string;
+    }
+  | {
+      value: EventType | null;
+      onChange: (value: EventType | null) => void;
+      allowNull: true;
+      className?: string;
+      name?: string;
+    }) {
   const displayValue = value ?? "";
   const handleChange = (v: string) => {
     if (v === "") {
       // Safe: allowNull determines which branch of the union is active.
-      (onChange as (value: EventType | "" | null) => void)(allowNull ? null : "");
+      (onChange as (value: EventType | "" | null) => void)(
+        allowNull ? null : "",
+      );
     } else if ((EVENT_TYPES as readonly string[]).includes(v)) {
       (onChange as (value: EventType) => void)(v as EventType);
     }
@@ -44,10 +51,13 @@ export function EventTypeField({
       {(field) => (
         <Select
           {...field}
+          name={name}
           value={displayValue}
           onChange={(event) => handleChange(event.target.value)}
         >
-          <option value="">{allowNull ? "No event type" : "All event types"}</option>
+          <option value="">
+            {allowNull ? "No event type" : "All event types"}
+          </option>
           {EVENT_TYPES.map((type) => (
             <option key={type} value={type}>
               {type}

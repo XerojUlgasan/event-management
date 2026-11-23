@@ -1,24 +1,17 @@
 ---
 import { Pagination, Toast } from "@event-management/ui";
+import { PublicCatalogFilters } from "../../components/public/catalog/PublicCatalogFilters";
 import PublicDocument from "../../layouts/PublicDocument.astro";
 import { PackageCards } from "../../components/public/catalog/CatalogCards";
 import {
   catalogPageLinks,
   loadPackagesPage,
+  readCatalogFilters,
 } from "../../lib/server/catalog/load-catalog";
-import { EVENT_TYPES } from "@event-management/contracts/catalog-filters";
 import type { PublicPackage } from "../../lib/data/catalog/packages";
-import type { CatalogFilters } from "@event-management/contracts/catalog-filters";
 
 const q = Astro.url.searchParams;
-const filters: CatalogFilters = {
-  eventType: EVENT_TYPES.includes(q.get("eventType") as any)
-    ? (q.get("eventType") as CatalogFilters["eventType"])
-    : undefined,
-  minPricePesos: q.get("minPricePesos") ? Number(q.get("minPricePesos")) : undefined,
-  maxPricePesos: q.get("maxPricePesos") ? Number(q.get("maxPricePesos")) : undefined,
-  guests: q.get("guests") ? Number(q.get("guests")) : undefined,
-};
+const filters = readCatalogFilters("packages", q);
 
 let packages: PublicPackage[] = [];
 let unavailable = false;
@@ -47,70 +40,12 @@ const hasFilters = Object.values(filters).some((v) => v !== undefined);
     <h1 class="section-title small">All packages</h1>
     <p class="catalog-page-subtitle">Explore packages for your gathering.</p>
 
-    <div class="catalog-browser">
-      <div class="catalog-toolbar">
-        <p class="catalog-results-summary">
-          {packages.length > 0
-            ? `Showing ${packages.length} packages${hasFilters ? " matching your filters" : ""}`
-            : ""}
-        </p>
-        <button
-          type="button"
-          class="button button-secondary button-size-icon catalog-filter-toggle"
-          aria-label={hasFilters ? "Hide filters" : "Show filters"}
-          aria-expanded={hasFilters ? "true" : "false"}
-          aria-controls="pkg-filters"
-          data-active={hasFilters || undefined}
-          onclick="const p=document.getElementById('pkg-filters');const hidden=p.hidden;p.hidden=!hidden;this.setAttribute('aria-expanded',hidden ? 'true' : 'false');"
-        >
-          <!-- Filter funnel icon — matches Icon name="filter" in the app catalog -->
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-          </svg>
-        </button>
-      </div>
-
-      <div id="pkg-filters" hidden={!hasFilters || undefined}>
-        <form method="get" action="/packages" class="catalog-filters" aria-label="Filter packages">
-          <div class="catalog-filter-fields">
-            <label class="ui-field" for="pkg-event-type">
-              <span>Event type</span>
-              <select id="pkg-event-type" name="eventType" class="ui-control">
-                <option value="">All event types</option>
-                {EVENT_TYPES.map((type) => (
-                  <option value={type} selected={filters.eventType === type}>{type}</option>
-                ))}
-              </select>
-            </label>
-            <label class="ui-field" for="pkg-min-price">
-              <span>Min price (₱)</span>
-              <input id="pkg-min-price" class="ui-control" type="number" name="minPricePesos"
-                min="0" step="1" value={filters.minPricePesos ?? ""} placeholder="No minimum" />
-            </label>
-            <label class="ui-field" for="pkg-max-price">
-              <span>Max price (₱)</span>
-              <input id="pkg-max-price" class="ui-control" type="number" name="maxPricePesos"
-                min="0" step="1" value={filters.maxPricePesos ?? ""} placeholder="No maximum" />
-            </label>
-            <label class="ui-field" for="pkg-guests">
-              <span>Number of guests</span>
-              <input id="pkg-guests" class="ui-control" type="number" name="guests"
-                min="1" step="1" value={filters.guests ?? ""} placeholder="Any guest count" />
-            </label>
-            <div class="catalog-filter-actions">
-              <button type="submit" class="button button-primary">Apply filters</button>
-              <button type="button" class="button button-secondary"
-                onclick="window.location.href='/packages'" disabled={!hasFilters}>
-                Clear
-              </button>
-            </div>
-          </div>
-          <p class="catalog-filter-hint">
-            Prices are package totals. Enter your guest count to see packages that can fit your event.
-          </p>
-        </form>
-      </div>
-    </div>
+    <PublicCatalogFilters
+      kind="packages"
+      filters={filters}
+      count={packages.length}
+      client:load
+    />
 
     {unavailable && (
       <Toast tone="danger" placement="inline">

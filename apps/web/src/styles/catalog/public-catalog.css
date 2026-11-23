@@ -433,6 +433,27 @@
   margin-bottom: 28px;
 }
 
+.public-catalog-filters {
+  position: relative;
+  gap: 0;
+}
+.public-catalog-filters .catalog-toolbar {
+  min-height: 44px;
+  padding-inline-end: 60px;
+}
+.public-catalog-filters details[open] {
+  margin-block-start: 22px;
+}
+.public-catalog-filters .catalog-filter-toggle {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  cursor: pointer;
+}
+.public-catalog-filters .catalog-filter-toggle::-webkit-details-marker {
+  display: none;
+}
+
 /* Align all filter fields and the Apply/Clear buttons to the bottom
    of the row so varying label/description heights don't cause misalignment. */
 .catalog-page .catalog-filter-fields {

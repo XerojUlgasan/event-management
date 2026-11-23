@@ -1,10 +1,41 @@
 import type { PublicPackage } from "../../data/catalog/packages";
 import type { PublicService } from "../../data/catalog/services";
-import type {
-  CatalogFilters,
-  ServicePricingType,
+import {
+  EVENT_TYPES,
+  type CatalogFilters,
+  type CatalogKind,
 } from "@event-management/contracts/catalog-filters";
 import { env } from "../config/env";
+
+export function readCatalogFilters(
+  kind: CatalogKind,
+  params: URLSearchParams,
+): CatalogFilters {
+  const eventType = params.get("eventType");
+  const requestedPricing = params.get("pricingType");
+  const pricingType =
+    kind === "services" &&
+    (requestedPricing === "fixed" || requestedPricing === "hourly")
+      ? requestedPricing
+      : undefined;
+  const priceRangeType = params.get("priceRangeType");
+  // Native GET can submit the old price fields after the pricing select changes.
+  const hasPrice =
+    kind === "packages" ||
+    (pricingType !== undefined &&
+      (priceRangeType === null || priceRangeType === pricingType));
+  const readNumber = (key: string) => {
+    const value = params.get(key);
+    return value ? Number(value) : undefined;
+  };
+  return {
+    eventType: EVENT_TYPES.find((type) => type === eventType),
+    pricingType,
+    minPricePesos: hasPrice ? readNumber("minPricePesos") : undefined,
+    maxPricePesos: hasPrice ? readNumber("maxPricePesos") : undefined,
+    guests: kind === "packages" ? readNumber("guests") : undefined,
+  };
+}
 
 async function serverGet<T>(path: string): Promise<T | null> {
   const response = await fetch(`${env.SERVER_API_URL}${path}`);

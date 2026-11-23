@@ -11,6 +11,7 @@ import { join } from "node:path";
 // Vite processes the real TSX and its CSS imports, as the Astro SSR build does.
 const root = fileURLToPath(new URL("../../", import.meta.url));
 let server, cacheDir, canvas, publicDetails, publicPackage, ui, scrollLock;
+let CatalogFiltersForm, readCatalogFilters, catalogPageLinks;
 before(async () => {
   cacheDir = await mkdtemp(join(tmpdir(), "clemora-catalog-ssr-"));
   server = await createServer({
@@ -38,6 +39,12 @@ before(async () => {
   publicPackage = await server.ssrLoadModule(
     "/src/components/public/catalog/PublicPackageDetail.tsx",
   );
+  ({ CatalogFiltersForm } = await server.ssrLoadModule(
+    "/src/components/catalog/CatalogFiltersForm.tsx",
+  ));
+  ({ readCatalogFilters, catalogPageLinks } = await server.ssrLoadModule(
+    "/src/lib/server/catalog/load-catalog.ts",
+  ));
   ui = await server.ssrLoadModule(
     "/@fs" +
       fileURLToPath(
@@ -57,6 +64,74 @@ after(async () => {
 });
 const render = (component, props) =>
   renderToStaticMarkup(createElement(component, props));
+
+test("the shared filter form renders native GET controls and keeps workspace submission", () => {
+  const packages = render(CatalogFiltersForm, {
+    kind: "packages",
+    action: "/packages",
+    filters: { eventType: "Wedding", minPricePesos: 0, guests: 150 },
+  });
+  assert.match(packages, /<form[^>]*action="\/packages"[^>]*method="get"/);
+  assert.match(packages, /name="eventType"/);
+  assert.match(packages, /<option value="Wedding" selected="">/);
+  assert.match(packages, /name="minPricePesos" value="0"/);
+  assert.match(packages, /name="guests" value="150"/);
+  assert.match(packages, /<a[^>]*href="\/packages">Clear<\/a>/);
+  assert.doesNotMatch(
+    packages,
+    /name="cursor"|name="previous"|name="pricingType"/,
+  );
+
+  const services = render(CatalogFiltersForm, {
+    kind: "services",
+    action: "/services",
+    filters: { pricingType: "fixed" },
+  });
+  assert.match(services, /name="priceRangeType" value="fixed"/);
+  assert.match(services, /Min fixed price/);
+  assert.doesNotMatch(services, /name="guests"/);
+
+  const workspace = render(CatalogFiltersForm, {
+    kind: "services",
+    filters: {},
+    onApply: () => {},
+  });
+  assert.doesNotMatch(workspace, /action=|method=|name="minPricePesos"/);
+  assert.match(
+    workspace,
+    /<button[^>]*type="reset"[^>]*disabled="">Clear<\/button>/,
+  );
+});
+
+test("native service GET drops stale bounds and cursor links retain only applied filters", () => {
+  const url = new URL("https://example.test/services");
+  const nativeFilters = (query) =>
+    readCatalogFilters("services", new URLSearchParams(query));
+  for (const type of ["", "hourly"]) {
+    const filters = nativeFilters(
+      `pricingType=${type}&priceRangeType=fixed&minPricePesos=0&maxPricePesos=5000`,
+    );
+    assert.equal(filters.minPricePesos, undefined);
+    assert.equal(filters.maxPricePesos, undefined);
+    assert.equal(filters.pricingType, type || undefined);
+  }
+  for (const marker of ["", "&priceRangeType=fixed"]) {
+    const filters = nativeFilters(
+      `pricingType=fixed&minPricePesos=0&maxPricePesos=5000${marker}`,
+    );
+    assert.equal(filters.minPricePesos, 0);
+    assert.equal(filters.maxPricePesos, 5000);
+    const { next } = catalogPageLinks(url, "opaque+/=", filters);
+    const params = new URL(next, url).searchParams;
+    assert.equal(params.get("pricingType"), "fixed");
+    assert.equal(params.get("minPricePesos"), "0");
+    assert.equal(params.get("maxPricePesos"), "5000");
+    assert.equal(params.get("cursor"), "opaque+/=");
+    assert.equal(params.get("previous"), "");
+    assert.equal(params.get("priceRangeType"), null);
+  }
+});
+
 const video = (id, autoplay) => ({
   id,
   type: "video",
