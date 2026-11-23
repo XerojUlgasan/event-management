@@ -3,23 +3,30 @@ import type {
   CreateShowcaseRecord,
   UpdateShowcaseRecord,
 } from "@event-management/contracts/showcase";
-import { apiBase, request } from "../../http/request";
+import { SHOWCASE_LIST_PAGE_SIZE } from "@event-management/contracts/limits/showcase";
+import { env } from "../../env/env";
+import { request } from "../../http/request";
 
-/** Resolves a /v1/showcase-media/{id} URL for use in <img>/<video> src.
- * Always returns a root-relative path so SSR and client output match,
- * avoiding React hydration mismatches. The browser resolves it correctly
- * against the current origin, which the Vite proxy forwards to the API. */
+/** Keep SSR and browser media URLs identical for both API origins and proxies. */
 export const showcaseMediaSrc = (url: string): string => {
-  // Already a plain path (sample assets like /images/wedding.jpg) — use as-is.
-  if (!url.startsWith("/v1/")) return url;
-  // Always return the root-relative path. The dev proxy and production
-  // reverse-proxy both forward /v1/* to the API, so this works in all envs.
-  return url;
+  if (!url.startsWith("/v1/showcase-media/")) return url;
+  const base = env.PUBLIC_API_URL.replace(/\/$/, "");
+  return `${base}${url.slice("/v1".length)}`;
 };
 
-type ShowcasePage = {
+export type ShowcasePage = {
   showcases: ShowcaseRecord[];
   nextCursor: string | null;
+};
+
+export const getPublicShowcasesPage = (
+  cursor: string,
+): Promise<ShowcasePage> => {
+  const params = new URLSearchParams({
+    cursor,
+    limit: String(SHOWCASE_LIST_PAGE_SIZE),
+  });
+  return request<ShowcasePage>(`/showcase-records?${params}`);
 };
 
 export const getAdminShowcases = (cursor?: string): Promise<ShowcasePage> => {
@@ -30,7 +37,9 @@ export const getAdminShowcases = (cursor?: string): Promise<ShowcasePage> => {
 export const getAdminShowcase = (id: string): Promise<ShowcaseRecord> =>
   request<ShowcaseRecord>(`/admin/showcase-records/${encodeURIComponent(id)}`);
 
-export const uploadShowcaseMedia = (file: File): Promise<{
+export const uploadShowcaseMedia = (
+  file: File,
+): Promise<{
   id: string;
   kind: "image" | "video";
   source: "upload";
