@@ -3,6 +3,7 @@ import {
   type MessageImage,
 } from "@event-management/contracts/message-images";
 import {
+  catalogBrowseSchema,
   catalogRecommendationsSchema,
   chatMessageSchema,
   type ChatMessage,
@@ -16,6 +17,7 @@ export function messageDto(row: MessageWithSender): ChatMessage {
       : row.sender_role === "admin"
         ? "admin"
         : "customer";
+  const browse = catalogBrowseSchema.safeParse(row.catalog_browse);
   const recommendations = catalogRecommendationsSchema.safeParse(
     row.catalog_recommendations,
   );
@@ -47,6 +49,9 @@ export function messageDto(row: MessageWithSender): ChatMessage {
     }),
     body: row.body,
     quotationId: row.quotation_id,
+    ...(role === "assistant" && browse.success
+      ? { catalogBrowse: browse.data }
+      : {}),
     ...(role === "assistant" && recommendations.success
       ? { catalogRecommendations: recommendations.data }
       : {}),

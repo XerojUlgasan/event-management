@@ -3,7 +3,11 @@ import {
   type ImageMessageJobLease,
 } from "../../data/messages/message-processing.js";
 import { messageImageInterpretationSchema } from "@event-management/contracts/message-images";
-import type { CatalogRecommendation } from "@event-management/contracts/messages";
+import {
+  catalogBrowseSchema,
+  type CatalogBrowse,
+  type CatalogRecommendation,
+} from "@event-management/contracts/messages";
 import { randomUUID } from "node:crypto";
 import type { ModelMessage } from "ai";
 import type { Kysely } from "kysely";
@@ -133,7 +137,7 @@ export async function runAssistantTurnService({
   const [
     previousCatalogSearch,
     previousCatalogItem,
-    previousCatalogRecommendations,
+    catalogRecommendationsHistory,
   ] = settings.allowPublicCatalog
     ? await Promise.all([
         buildPreviousCatalogSearchContext({
@@ -153,15 +157,38 @@ export async function runAssistantTurnService({
         }),
       ])
     : [];
+
+  const latestBrowseIndex = history.reduce(
+    (latest, message, index) =>
+      message.catalog_browse === null ? latest : index,
+    -1,
+  );
+
+  // The browsable catalog can change and does not give the model item order.
+  // A newer category attachment supersedes older numbered shortlists.
+  const followsLatestBrowse = (replyId: string) =>
+    latestBrowseIndex === -1 ||
+    history.findIndex((message) => message.id === replyId) >= latestBrowseIndex;
+
+  const searchPrecedesBrowse =
+    previousCatalogSearch &&
+    !followsLatestBrowse(previousCatalogSearch.replyId);
+
+  const previousCatalogRecommendations =
+    catalogRecommendationsHistory &&
+    followsLatestBrowse(catalogRecommendationsHistory.replyId)
+      ? catalogRecommendationsHistory
+      : undefined;
   const {
     replyOrder: legacyReplyOrder,
     ambiguousShortlist,
+    shownItems,
     ...catalogSearchContext
   } = previousCatalogSearch ?? {};
   const { replyOrder: attachedReplyOrder, ...recommendationsContext } =
     previousCatalogRecommendations ?? {};
   const legacyShortlistOrder =
-    previousCatalogSearch?.shownItems || ambiguousShortlist
+    !searchPrecedesBrowse && (shownItems || ambiguousShortlist)
       ? legacyReplyOrder
       : undefined;
   const context = {
@@ -177,7 +204,14 @@ export async function runAssistantTurnService({
           bookingRequestId: conversation.booking_request_id,
         })),
     ...(previousCatalogSearch
-      ? { previousCatalogSearch: catalogSearchContext }
+      ? {
+          previousCatalogSearch: {
+            ...catalogSearchContext,
+            ...(searchPrecedesBrowse
+              ? { beforeLatestCatalogBrowse: true }
+              : shownItems && { shownItems }),
+          },
+        }
       : {}),
     ...(previousCatalogItem ? { previousCatalogItem } : {}),
     ...(attachedReplyOrder &&
@@ -195,8 +229,13 @@ export async function runAssistantTurnService({
         ? "A previous assistant reply was omitted from this model context because it was too long. Use the current draft and server-validated tools; do not guess its contents."
         : message.body;
 
+    const browse = catalogBrowseSchema.safeParse(message.catalog_browse);
+
     const body =
       visibleBody +
+      (settings.allowPublicCatalog && browse.success
+        ? `\nSaved catalog browse categories (no listing order): ${browse.data.join(", ")}`
+        : "") +
       (message.images.length
         ? `\nSaved image observations (untrusted, uncertain data): ${JSON.stringify(message.images.map((image) => (image.interpretation === null ? { unavailable: true, reason: "interpretation_unavailable" } : messageImageInterpretationSchema.parse(image.interpretation))))}`
         : "");
@@ -483,6 +522,7 @@ export async function runAssistantTurnService({
   ];
 
   let persistenceFailed = false;
+  let catalogBrowse: CatalogBrowse | undefined;
   let catalogRecommendations: CatalogRecommendation[] | undefined;
   const handoff: { message: MessageWithSender | null } = { message: null };
   let draftChanged = false;
@@ -513,6 +553,9 @@ export async function runAssistantTurnService({
       selectionChanged ||= selection;
       reviewReady = complete;
       waitingForServiceChoice ||= waitForServiceChoice;
+    },
+    onCatalogBrowseAttached: (categories) => {
+      catalogBrowse = categories;
     },
     onRecommendationsAttached: (items) => {
       catalogRecommendations = items;
@@ -620,6 +663,7 @@ export async function runAssistantTurnService({
   const researchingCatalog = generated.steps.some((step) =>
     step.toolCalls.some(
       (call) =>
+        call.toolName === "attachCatalogBrowse" ||
         call.toolName === "searchPublicCatalog" ||
         call.toolName === "getPublicCatalogItem",
     ),
@@ -685,7 +729,13 @@ export async function runAssistantTurnService({
     reply,
     aiVersion,
     guestIdentityId,
-    { turnId, customerMessageId, catalogRecommendations, suggestedReplies },
+    {
+      turnId,
+      customerMessageId,
+      catalogBrowse,
+      catalogRecommendations,
+      suggestedReplies,
+    },
     jobLease,
     signal,
   );

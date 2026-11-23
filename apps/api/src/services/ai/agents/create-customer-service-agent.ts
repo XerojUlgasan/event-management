@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AgentSettings } from "@event-management/contracts/ai-agent-settings";
 import {
   MAX_SUGGESTED_REPLIES,
+  type CatalogBrowse,
   type CatalogRecommendation,
 } from "@event-management/contracts/messages";
 import { createRequestHumanHandoffTool } from "../tools/request-human-handoff.js";
@@ -13,6 +14,7 @@ import { createSearchSupportingDocumentsTool } from "../tools/search-supporting-
 import { createGetBusinessInformationTool } from "../tools/get-business-information.js";
 import { createGetPublicCatalogItemTool } from "../tools/get-public-catalog-item.js";
 import { createAttachCatalogRecommendationsTool } from "../tools/attach-catalog-recommendations.js";
+import { createAttachCatalogBrowseTool } from "../tools/attach-catalog-browse.js";
 import { createGetMyPackageTool } from "../tools/get-my-package.js";
 import {
   createGetBookingDetailsTool,
@@ -107,6 +109,7 @@ const replyOutput = {
 export function createCustomerServiceAgent({
   settings,
   answerOnlyAfter,
+  onCatalogBrowseAttached,
   onRecommendationsAttached,
   history,
   copyDeadline,
@@ -116,6 +119,7 @@ export function createCustomerServiceAgent({
   answerOnlyAfter: number;
   history: Parameters<typeof bookingLanguageSamples>[0];
   copyDeadline: AbortSignal;
+  onCatalogBrowseAttached: (categories: CatalogBrowse) => void;
   onRecommendationsAttached: (items: CatalogRecommendation[]) => void;
 }) {
   let proposedBatchSize = 0;
@@ -146,7 +150,7 @@ export function createCustomerServiceAgent({
   return new ToolLoopAgent({
     model: getTextModel(),
     instructions: `${buildCustomerServicePrompt(settings, {
-      catalogRecommendations: true,
+      catalogAttachments: true,
     })}\n\n${suggestedReplyInstructions}`,
     output: replyOutput,
     tools: {
@@ -175,6 +179,10 @@ export function createCustomerServiceAgent({
         : {}),
       ...(settings.allowPublicCatalog
         ? {
+            attachCatalogBrowse: createAttachCatalogBrowseTool({
+              ...toolContext,
+              onCatalogBrowseAttached,
+            }),
             searchPublicCatalog: createSearchPublicCatalogTool(toolContext),
             getPublicCatalogItem: createGetPublicCatalogItemTool(toolContext),
             attachCatalogRecommendations:

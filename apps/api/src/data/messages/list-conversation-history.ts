@@ -11,7 +11,13 @@ export function listConversationHistoryData(
   // Each turn sees all history through its own saved customer message.
   return db
     .selectFrom("messages as m")
-    .select(["m.id", "m.sender_role", "m.body", messageImagesSelection()])
+    .select([
+      "m.id",
+      "m.sender_role",
+      "m.body",
+      "m.catalog_browse",
+      messageImagesSelection(),
+    ])
     .where("m.conversation_id", "=", conversationId)
     .where(
       sql<boolean>`((m.created_at, m.id) <= (

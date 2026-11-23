@@ -10,12 +10,14 @@ import { linkToolCallsToReplyData } from "../ai/link-tool-calls-to-reply.js";
 import { publishConversationMessageData } from "./publish-conversation-message.js";
 import {
   requiredSuggestedRepliesSchema,
+  type CatalogBrowse,
   type CatalogRecommendation,
 } from "@event-management/contracts/messages";
 
 type AssistantToolTurn = {
   turnId: string;
   customerMessageId: string;
+  catalogBrowse?: CatalogBrowse;
   catalogRecommendations?: CatalogRecommendation[];
 };
 
@@ -128,6 +130,7 @@ export async function createAssistantMessageInTransactionData(
     conversationId,
     body,
     customerMessageId: toolTurn.customerMessageId,
+    catalogBrowse: toolTurn.catalogBrowse,
     catalogRecommendations: toolTurn.catalogRecommendations,
     suggestedReplies,
   });
@@ -167,12 +170,14 @@ export function insertAssistantMessageData(
     conversationId,
     body,
     customerMessageId,
+    catalogBrowse,
     catalogRecommendations,
     suggestedReplies,
   }: {
     conversationId: string;
     body: string;
     customerMessageId: string;
+    catalogBrowse?: CatalogBrowse;
     catalogRecommendations?: CatalogRecommendation[];
     suggestedReplies: string[];
   },
@@ -188,6 +193,9 @@ export function insertAssistantMessageData(
       sender_role: "assistant",
       body,
       reply_to_message_id: customerMessageId,
+      catalog_browse: catalogBrowse
+        ? sql`${JSON.stringify(catalogBrowse)}::jsonb`
+        : null,
       catalog_recommendations: catalogRecommendations
         ? sql`${JSON.stringify(catalogRecommendations)}::jsonb`
         : null,

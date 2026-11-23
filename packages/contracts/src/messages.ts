@@ -20,6 +20,21 @@ const suggestedRepliesSchema = z
 
 export const requiredSuggestedRepliesSchema = suggestedRepliesSchema.min(1);
 
+export const catalogBrowseCategorySchema = z.enum(["packages", "services"]);
+
+export const catalogBrowseSchema = z
+  .array(catalogBrowseCategorySchema)
+  .min(1)
+  .max(2)
+  .refine(
+    (categories) =>
+      categories.length === 1 ||
+      (categories[0] === "packages" && categories[1] === "services"),
+    "Send distinct catalog categories in packages, services order",
+  );
+
+export type CatalogBrowse = z.infer<typeof catalogBrowseSchema>;
+
 const recommendationFields = {
   id: z.uuid(),
   slug: z.string(),
@@ -69,6 +84,7 @@ export const chatMessageSchema = z.object({
   images: z.array(messageImageSchema),
   processing: messageProcessingSchema.nullable(),
   quotationId: z.string().uuid().nullable(),
+  catalogBrowse: catalogBrowseSchema.optional(),
   catalogRecommendations: catalogRecommendationsSchema.optional(),
   suggestedReplies: suggestedRepliesSchema.optional(),
   handoffAcknowledgement: z.literal(true).optional(),

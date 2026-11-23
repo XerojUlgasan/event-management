@@ -270,6 +270,77 @@ for (const operation of ["read", "bootstrap"] as const) {
   });
 }
 
+test("guest browse and suggested replies survive a thread read and replay without running tools twice", async () => {
+  useReply("Browse our packages and services below.", [
+    "Show me wedding packages",
+  ]);
+  const generate = model.doGenerate.bind(model);
+  model.doGenerate = async (...args) => {
+    const result = await generate(...args);
+
+    if (model.doGenerateCalls.length > 1) return result;
+
+    return {
+      ...result,
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "guest-catalog-browse",
+          toolName: "attachCatalogBrowse",
+          input: JSON.stringify({ categories: ["services", "packages"] }),
+        },
+      ],
+      finishReason: { unified: "tool-calls", raw: undefined },
+    };
+  };
+  const thread = await guest();
+  const requestId = randomUUID();
+  const prompt = "Can I browse your catalog?";
+  const response = await read(await send(thread, prompt, requestId), 201);
+  const reply = response.assistantMessage;
+  assert.ok(reply);
+  assert.deepEqual(reply.catalogBrowse, ["packages", "services"]);
+  assert.deepEqual(reply.suggestedReplies, ["Show me wedding packages"]);
+  assert.equal(reply.catalogRecommendations, undefined);
+  assert.equal(response.message.catalogBrowse, undefined);
+
+  const row = await db
+    .selectFrom("ai_tool_calls")
+    .selectAll()
+    .where("customer_message_id", "=", response.message.id)
+    .executeTakeFirstOrThrow();
+  assert.equal(row.tool_name, "attachCatalogBrowse");
+  assert.equal(row.status, "succeeded");
+  assert.equal(row.assistant_message_id, reply.id);
+  assert.deepEqual(row.output, {
+    status: "attached",
+    categories: ["packages", "services"],
+  });
+
+  const replay = await read(await send(thread, prompt, requestId), 201);
+  assert.deepEqual(replay.assistantMessage, reply);
+  const history = threadSchema.parse(
+    await read(
+      await call(
+        `/guest/conversations/${thread.conversation.id}`,
+        thread.cookie,
+      ),
+      200,
+    ),
+  );
+  const saved = history.messages.at(-1);
+  assert.equal(saved?.id, reply.id);
+  assert.deepEqual(saved?.catalogBrowse, reply.catalogBrowse);
+  assert.deepEqual(saved?.suggestedReplies, reply.suggestedReplies);
+  assert.equal(model.doGenerateCalls.length, 2);
+  const calls = await db
+    .selectFrom("ai_tool_calls")
+    .select("id")
+    .where("customer_message_id", "=", response.message.id)
+    .execute();
+  assert.equal(calls.length, 1);
+});
+
 test("guest recommendations and suggested replies survive a thread read and replay without running tools twice", async () => {
   useReply("Here are the catalog options", ["Tell me about the first option"]);
   const generate = model.doGenerate.bind(model);
@@ -301,11 +372,10 @@ test("guest recommendations and suggested replies survive a thread read and repl
   };
   const thread = await guest();
   const requestId = randomUUID();
-  const response = await read(
-    await send(thread, "Show your packages", requestId),
-    201,
-  );
+  const prompt = "Recommend a package under PHP 3,000 for 50 people";
+  const response = await read(await send(thread, prompt, requestId), 201);
   assert.ok(response.assistantMessage);
+  assert.equal(response.assistantMessage.catalogBrowse, undefined);
   assert.equal(
     response.assistantMessage.catalogRecommendations?.[0]?.id,
     packageId,
@@ -325,10 +395,7 @@ test("guest recommendations and suggested replies survive a thread read and repl
     .where("id", "=", row.customer_message_id)
     .executeTakeFirstOrThrow();
   assert.equal(message.sender_id, null);
-  const replay = await read(
-    await send(thread, "Show your packages", requestId),
-    201,
-  );
+  const replay = await read(await send(thread, prompt, requestId), 201);
   assert.deepEqual(
     replay.assistantMessage.catalogRecommendations,
     response.assistantMessage.catalogRecommendations,
@@ -573,6 +640,7 @@ test("guests can answer directly and receive public catalog and handoff tools", 
   assert.deepEqual(
     model.doGenerateCalls[0].tools?.map((entry) => entry.name).sort(),
     [
+      "attachCatalogBrowse",
       "attachCatalogRecommendations",
       "getBusinessInformation",
       "getPublicCatalogItem",

@@ -125,6 +125,7 @@ type FixtureToolCall = {
     | "searchSupportingDocuments"
     | "searchPublicCatalog"
     | "getPublicCatalogItem"
+    | "attachCatalogBrowse"
     | "attachCatalogRecommendations"
     | "getMyPackage"
     | "getLatestQuotation"
@@ -363,6 +364,108 @@ test("generated customer choices persist beside their AMAC message and legacy re
     thread.messages.at(-1)?.suggestedReplies,
     second.assistantMessage?.suggestedReplies,
   );
+  assert.ok(thread.messages.every((message) => !("catalogBrowse" in message)));
+});
+
+test("customer browse attaches only audited categories in canonical order", async () => {
+  const cases = [
+    {
+      body: "Show me your packages",
+      categories: ["packages"],
+      expected: ["packages"],
+    },
+    {
+      body: "What services do you offer?",
+      categories: ["services"],
+      expected: ["services"],
+    },
+    {
+      body: "Show me your packages and services",
+      categories: ["services", "packages"],
+      expected: ["packages", "services"],
+    },
+  ];
+
+  for (const { body, categories, expected } of cases) {
+    const id = await conversation();
+    const suggestions = ["Help me narrow my options"];
+    useToolRounds(
+      [[{ toolName: "attachCatalogBrowse", input: { categories } }]],
+      undefined,
+      undefined,
+      "Browse our catalog below.",
+      suggestions,
+    );
+    const result = await send(id, body);
+    const reply = result.assistantMessage;
+    assert.equal(result.assistantError, null);
+    assert.ok(reply);
+    assert.deepEqual(reply.catalogBrowse, expected);
+    assert.deepEqual(reply.suggestedReplies, suggestions);
+    assert.equal(reply.catalogRecommendations, undefined);
+    assert.equal(result.message.catalogBrowse, undefined);
+
+    const calls = await db
+      .selectFrom("ai_tool_calls")
+      .select([
+        "tool_name",
+        "status",
+        "input",
+        "output",
+        "assistant_message_id",
+      ])
+      .where("customer_message_id", "=", result.message.id)
+      .execute();
+    assert.deepEqual(calls, [
+      {
+        tool_name: "attachCatalogBrowse",
+        status: "succeeded",
+        input: { categories },
+        output: { status: "attached", categories: expected },
+        assistant_message_id: reply.id,
+      },
+    ]);
+    const path = `/messages/conversations/${id}`;
+    const thread = threadSchema.parse(
+      await (await call(path, customer.cookie)).json(),
+    );
+    assert.deepEqual(thread.messages.at(-1)?.catalogBrowse, expected);
+    assert.deepEqual(thread.messages.at(-1)?.suggestedReplies, suggestions);
+    const denied = await call(path, other.cookie);
+    assert.equal(denied.status, 404);
+  }
+});
+
+test("a catalog browse tool call cannot attach item IDs or replace a completed attachment", async () => {
+  const id = await conversation();
+  useToolRounds([
+    [
+      {
+        toolName: "attachCatalogBrowse",
+        input: { categories: [], id: packageId },
+      },
+    ],
+    [{ toolName: "attachCatalogBrowse", input: { categories: ["packages"] } }],
+    [{ toolName: "attachCatalogBrowse", input: { categories: ["services"] } }],
+  ]);
+  const { message, assistantMessage } = await send(id, "Show me packages");
+  assert.deepEqual(assistantMessage?.catalogBrowse, ["packages"]);
+  const calls = await db
+    .selectFrom("ai_tool_calls")
+    .select(["input", "output"])
+    .where("customer_message_id", "=", message.id)
+    .orderBy("started_at")
+    .execute();
+  assert.deepEqual(calls, [
+    {
+      input: { categories: ["packages"] },
+      output: { status: "attached", categories: ["packages"] },
+    },
+    {
+      input: { categories: ["services"] },
+      output: { status: "already_attached", categories: ["packages"] },
+    },
+  ]);
 });
 
 test("provider output never displays a prefaced reply envelope as raw text", async () => {
@@ -568,8 +671,9 @@ test("published agent personality and switches shape the next assistant turn", a
       .where("id", "=", 1)
       .execute();
     useReply("How can I help you plan your event?");
-    const result = await send(id, "How can you help?");
+    const result = await send(id, "Can I browse your packages and services?");
     assert.ok(result.assistantMessage);
+    assert.equal(result.assistantMessage.catalogBrowse, undefined);
 
     const call = model.doGenerateCalls[0];
     assert.ok(call);
@@ -577,6 +681,7 @@ test("published agent personality and switches shape the next assistant turn", a
     const toolNames = call.tools?.map(({ name }) => name) ?? [];
 
     for (const name of [
+      "attachCatalogBrowse",
       "attachCatalogRecommendations",
       "getBusinessInformation",
       "searchPublicCatalog",
@@ -3313,6 +3418,7 @@ test("the assistant can attach three cards but cannot attach a fourth verified i
   assert.equal(response.assistantError, null);
   const reply = response.assistantMessage;
   assert.ok(reply?.catalogRecommendations, "Expected three attached cards");
+  assert.equal(reply.catalogBrowse, undefined);
   assert.deepEqual(
     reply.catalogRecommendations.map((item) => item.id),
     shown.map((item) => item.id),
@@ -3362,6 +3468,35 @@ test("the assistant can attach three cards but cannot attach a fourth verified i
       .reverse()
       .map(({ id, name }) => ({ id, type: "package", name })),
   });
+
+  useToolCalls([
+    { toolName: "attachCatalogBrowse", input: { categories: ["services"] } },
+  ]);
+  const browse = await send(id, "Show me all the services");
+  assert.deepEqual(browse.assistantMessage?.catalogBrowse, ["services"]);
+
+  useReply("What is the name of the service you saw?");
+  await send(id, "I want the second one");
+  const afterBrowse = turnContext(0).context;
+  assert.ok(!("previousCatalogRecommendations" in afterBrowse));
+  assert.ok("previousCatalogSearch" in afterBrowse);
+  const earlierSearch = afterBrowse.previousCatalogSearch;
+  assert.ok(earlierSearch && typeof earlierSearch === "object");
+  assert.partialDeepStrictEqual(earlierSearch, {
+    input: {
+      catalogType: "package",
+      minPricePesos: price,
+      maxPricePesos: price,
+    },
+    beforeLatestCatalogBrowse: true,
+  });
+  assert.ok("nextCursor" in earlierSearch);
+  assert.equal(typeof earlierSearch.nextCursor, "string");
+  assert.ok(!("shownItems" in earlierSearch));
+  assert.match(
+    JSON.stringify(model.doGenerateCalls[0].prompt),
+    /Saved catalog browse categories \(no listing order\): services/u,
+  );
 });
 
 test("saved four- and five-card messages still reload and ground ordinal follow-ups", async () => {
@@ -4643,6 +4778,7 @@ test("the assistant can answer directly without calling a tool", async () => {
   assert.deepEqual(
     model.doGenerateCalls[0].tools?.map((entry) => entry.name).sort(),
     [
+      "attachCatalogBrowse",
       "attachCatalogRecommendations",
       "getBusinessInformation",
       "getMyPackage",

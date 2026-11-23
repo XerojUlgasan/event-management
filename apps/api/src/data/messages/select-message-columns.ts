@@ -28,6 +28,7 @@ export function selectMessageColumnsData(db: Database, conversationId: string) {
       "m.sender_role",
       "m.body",
       "m.quotation_id",
+      "m.catalog_browse",
       "m.catalog_recommendations",
       "m.suggested_replies",
       "m.created_at",
