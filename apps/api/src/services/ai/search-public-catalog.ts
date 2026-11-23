@@ -14,6 +14,8 @@ import { embedCatalogContent } from "./retrieval/embed-catalog-content.js";
 import { KnowledgeSearchUnavailable } from "./retrieval/search-catalog-knowledge.js";
 import { catalogKnowledgeDigest } from "./catalog-knowledge-hash.js";
 
+export const PUBLIC_CATALOG_SEARCH_PAGE_SIZE = 3;
+
 export const searchPublicCatalogInputSchema = z
   .strictObject({
     catalogType: z.enum(["package", "service"]),
@@ -214,7 +216,7 @@ export async function searchPublicCatalogService({
           )
         : ordered;
 
-      const page = after.slice(0, 5);
+      const page = after.slice(0, PUBLIC_CATALOG_SEARCH_PAGE_SIZE);
       const last = page.at(-1);
 
       return {
@@ -229,7 +231,7 @@ export async function searchPublicCatalogService({
           evidence,
         })),
         nextCursor:
-          after.length > 5 && last
+          after.length > PUBLIC_CATALOG_SEARCH_PAGE_SIZE && last
             ? encodePageCursor(scope, {
                 id: last.listing.id,
                 score: last.score,

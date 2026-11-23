@@ -3,6 +3,7 @@ import type { AssistantToolContext } from "./assistant-tool-context.js";
 import { startToolCallData } from "../../../data/ai/start-tool-call.js";
 import { finishToolCallData } from "../../../data/ai/finish-tool-call.js";
 import {
+  PUBLIC_CATALOG_SEARCH_PAGE_SIZE,
   searchPublicCatalogInputSchema,
   searchPublicCatalogService,
 } from "../search-public-catalog.js";
@@ -32,7 +33,7 @@ export function createSearchPublicCatalogTool({
       "For service price filters choose pricingType: fixed (price for includedHours, with possible excess-hour rate) " +
       "or hourly (hourly-only services). Pax does not apply to services. " +
       "Optional query ranks fresh indexed evidence semantically; omit query to browse by exact filters without embeddings. " +
-      "Return at most five unique listings. To continue, reuse the exact filters/query with the returned cursor. " +
+      `Returns up to ${PUBLIC_CATALOG_SEARCH_PAGE_SIZE} unique listings of the selected type per page. Pass nextCursor as cursor with the same catalogType, query, and filters to continue. ` +
       "Use only catalog keywords in query, without customer contact information. " +
       "Results are catalog terms, not quotations, availability checks or booking confirmation.",
     inputSchema: searchPublicCatalogInputSchema,

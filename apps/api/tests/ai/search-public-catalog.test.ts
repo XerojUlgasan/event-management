@@ -130,7 +130,7 @@ test("validates filters and never embeds queryless searches", async () => {
     false,
   );
 
-  for (let i = 0; i < 7; i++)
+  for (let i = 0; i < 6; i++)
     await db
       .insertInto("packages")
       .values({
@@ -171,16 +171,17 @@ test("validates filters and never embeds queryless searches", async () => {
     db,
     input: { catalogType: "package", pax: 40 },
   });
-  assert.equal(first.results.length, 5);
+  assert.equal(first.results.length, 3);
   assert.ok(first.nextCursor);
   const second = await searchPublicCatalogService({
     db,
     input: { catalogType: "package", pax: 40, cursor: first.nextCursor },
   });
-  assert.equal(second.results.length, 2);
+  assert.equal(second.results.length, 3);
+  assert.equal(second.nextCursor, null);
   assert.equal(
     new Set([...first.results, ...second.results].map((r) => r.id)).size,
-    7,
+    6,
   );
   await assert.rejects(
     searchPublicCatalogService({
@@ -391,15 +392,24 @@ test("semantic cursor paginates equal scores and is bound to the normalized quer
     minPricePesos: 200,
   };
   const first = await searchPublicCatalogService({ db, input });
-  assert.equal(first.results.length, 5);
+  assert.equal(first.results.length, 3);
   assert.ok(first.nextCursor);
   const second = await searchPublicCatalogService({
     db,
     input: { ...input, query: "garden", cursor: first.nextCursor },
   });
-  assert.equal(second.results.length, 2);
+  assert.equal(second.results.length, 3);
+  assert.ok(second.nextCursor);
+  const third = await searchPublicCatalogService({
+    db,
+    input: { ...input, cursor: second.nextCursor },
+  });
+  assert.equal(third.results.length, 1);
+  assert.equal(third.nextCursor, null);
   assert.equal(
-    new Set([...first.results, ...second.results].map((r) => r.id)).size,
+    new Set(
+      [...first.results, ...second.results, ...third.results].map((r) => r.id),
+    ).size,
     7,
   );
   await assert.rejects(

@@ -1,5 +1,5 @@
 import type { AgentSettings } from "@event-management/contracts/ai-agent-settings";
-import { MAX_CATALOG_RECOMMENDATIONS } from "@event-management/contracts/messages";
+import { MAX_NEW_CATALOG_RECOMMENDATIONS } from "@event-management/contracts/messages";
 
 import { customerServicePersonalityPrompts } from "./customer-service-personalities.js";
 
@@ -82,7 +82,7 @@ export function buildCustomerServicePrompt(
     settings.allowPublicCatalog &&
       catalogRecommendations &&
       `## Inline catalog recommendations
-- Search first. For a browse request like “What wedding packages do you have?”, show every relevant result on the current page, up to ${MAX_CATALOG_RECOMMENDATIONS}. When the customer gives preferences, shortlist the best fits. Read getPublicCatalogItem first when a recommendation depends on inclusions or details beyond the search summary.
+- Search first. Keep the shortlist to ${MAX_NEW_CATALOG_RECOMMENDATIONS} items total, including when combining packages and services. For a browse request like “What wedding packages do you have?”, show the relevant results on the current page. When the customer gives preferences, shortlist the best fits. Read getPublicCatalogItem first when a recommendation depends on inclusions or details beyond the search summary.
 - Call attachCatalogRecommendations once with the complete list you plan to present, in display order. After it succeeds, use the cards below as the only list of options. Give a brief introduction or a useful follow-up question. Do not repeat the list in text or recommend items outside the cards. Offer to show more when relevant search results remain.
 - If an attachment is unavailable, use verified facts and relevant catalog links. Attachments are informational and never change the customer's booking draft.`,
     `## Personality\n${customerServicePersonalityPrompts[settings.personality]}`,

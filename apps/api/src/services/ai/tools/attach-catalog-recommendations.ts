@@ -1,5 +1,5 @@
 import {
-  MAX_CATALOG_RECOMMENDATIONS,
+  MAX_NEW_CATALOG_RECOMMENDATIONS,
   type CatalogRecommendation,
 } from "@event-management/contracts/messages";
 import { tool } from "ai";
@@ -38,7 +38,7 @@ export function createAttachCatalogRecommendationsTool({
   return tool({
     description:
       "Attach an ordered shortlist of public packages and services below your next chat reply. " +
-      `Pass up to ${MAX_CATALOG_RECOMMENDATIONS} distinct {catalogType, id} pairs from successful catalog lookups in this turn. ` +
+      `Pass up to ${MAX_NEW_CATALOG_RECOMMENDATIONS} distinct {catalogType, id} pairs from successful catalog lookups in this turn. ` +
       "Before recommending an item based on its inclusions, read its catalog details. " +
       "Call once with the full list you are presenting. The resulting cards are the recommendation list. Then write a short reply that introduces the list without repeating it. Attaching is for browsing and does not select or book anything.",
     inputSchema: attachCatalogRecommendationsInputSchema,

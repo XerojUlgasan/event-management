@@ -4,7 +4,7 @@ import {
   messageProcessingSchema,
 } from "./message-images.js";
 
-export const MAX_CATALOG_RECOMMENDATIONS = 5;
+export const MAX_NEW_CATALOG_RECOMMENDATIONS = 3;
 
 const recommendationFields = {
   id: z.uuid(),
@@ -44,7 +44,8 @@ export const catalogRecommendationSchema = z.discriminatedUnion("type", [
 export const catalogRecommendationsSchema = z
   .array(catalogRecommendationSchema)
   .min(1)
-  .max(MAX_CATALOG_RECOMMENDATIONS);
+  // Saved messages can contain up to five cards.
+  .max(5);
 
 export type CatalogRecommendation = z.infer<typeof catalogRecommendationSchema>;
 

@@ -1,6 +1,6 @@
 import {
   catalogRecommendationsSchema,
-  MAX_CATALOG_RECOMMENDATIONS,
+  MAX_NEW_CATALOG_RECOMMENDATIONS,
   type CatalogRecommendation,
 } from "@event-management/contracts/messages";
 import { pesosToCentavos } from "@event-management/contracts/money";
@@ -21,7 +21,7 @@ const selectionSchema = z.strictObject({
 });
 
 export const attachCatalogRecommendationsInputSchema = z.strictObject({
-  items: z.array(selectionSchema).min(1).max(MAX_CATALOG_RECOMMENDATIONS),
+  items: z.array(selectionSchema).min(1).max(MAX_NEW_CATALOG_RECOMMENDATIONS),
 });
 
 const searchResultsSchema = z.object({

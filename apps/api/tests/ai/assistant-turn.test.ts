@@ -10,6 +10,7 @@ import type {
   Quotation,
   QuotationPreparation,
 } from "@event-management/contracts/quotations";
+import type { CatalogRecommendation } from "@event-management/contracts/messages";
 import {
   customerMessageResultSchema,
   threadSchema,
@@ -2968,22 +2969,26 @@ test("catalog detail reaches the model as Markdown and links its audit record to
   });
 });
 
-test("a full five-package search page can be attached, reloaded, and referenced in order", async () => {
+test("the assistant can attach three cards but cannot attach a fourth verified item", async () => {
   const price = 73919;
-  const names = ["Garden", "Coastal", "Ballroom", "Civil", "Grand"];
+  const names = ["Garden", "Coastal", "Ballroom", "Civil"];
 
-  const packages = names.map((name) => ({
-    id: randomUUID(),
-    name: `${name} wedding fixture`,
-    slug: `${name.toLowerCase()}-${randomUUID()}`,
-    description: "Public wedding package for a catalog browsing test",
-    price,
-    max_guests: 120,
-  }));
+  const packages = names
+    .map((name) => ({
+      id: randomUUID(),
+      name: `${name} wedding fixture`,
+      slug: `${name.toLowerCase()}-${randomUUID()}`,
+      description: "Public wedding package for a catalog browsing test",
+      price,
+      max_guests: 120,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
 
   await db.insertInto("packages").values(packages).execute();
 
   const selections = packages.map(({ id }) => ({ catalogType: "package", id }));
+
+  const shown = selections.slice(0, 3).reverse();
 
   useToolRounds(
     [
@@ -2996,6 +3001,7 @@ test("a full five-package search page can be attached, reloaded, and referenced 
             maxPricePesos: price,
           },
         },
+        { toolName: "getPublicCatalogItem", input: selections[3] },
       ],
       [
         {
@@ -3003,20 +3009,51 @@ test("a full five-package search page can be attached, reloaded, and referenced 
           input: { items: selections },
         },
       ],
+      [
+        {
+          toolName: "attachCatalogRecommendations",
+          input: { items: shown },
+        },
+      ],
     ],
     undefined,
     undefined,
-    "Here are five wedding packages you can browse. How many guests are you expecting?",
+    "Here are three wedding packages you can browse. How many guests are you expecting?",
   );
 
   const id = await conversation();
-  const response = await send(id, "Show me five wedding packages");
+  const response = await send(id, "Show me wedding packages");
   assert.equal(response.assistantError, null);
   const reply = response.assistantMessage;
-  assert.ok(reply?.catalogRecommendations, "Expected five attached cards");
+  assert.ok(reply?.catalogRecommendations, "Expected three attached cards");
   assert.deepEqual(
     reply.catalogRecommendations.map((item) => item.id),
-    packages.map((item) => item.id),
+    shown.map((item) => item.id),
+  );
+  const lookups = await db
+    .selectFrom("ai_tool_calls")
+    .select(["tool_name", "status", "input"])
+    .where("customer_message_id", "=", response.message.id)
+    .execute();
+  assert.ok(
+    lookups.some(
+      (call) =>
+        call.tool_name === "getPublicCatalogItem" &&
+        call.status === "succeeded",
+    ),
+    "Expected a verified fourth package",
+  );
+  assert.deepEqual(
+    lookups.filter(
+      ({ tool_name }) => tool_name === "attachCatalogRecommendations",
+    ),
+    [
+      {
+        tool_name: "attachCatalogRecommendations",
+        status: "succeeded",
+        input: { items: shown },
+      },
+    ],
   );
 
   const thread = threadSchema.parse(
@@ -3033,8 +3070,71 @@ test("a full five-package search page can be attached, reloaded, and referenced 
   assert.ok("previousCatalogRecommendations" in context);
   assert.deepEqual(context.previousCatalogRecommendations, {
     replyId: reply.id,
-    shownItems: packages.map(({ id, name }) => ({ id, type: "package", name })),
+    shownItems: packages
+      .slice(0, 3)
+      .reverse()
+      .map(({ id, name }) => ({ id, type: "package", name })),
   });
+});
+
+test("saved four- and five-card messages still reload and ground ordinal follow-ups", async () => {
+  for (const count of [4, 5]) {
+    const cards = Array.from({ length: count }, (_, index) => ({
+      id: randomUUID(),
+      type: "service" as const,
+      name: `Historical service ${index + 1}`,
+      slug: `historical-service-${index + 1}`,
+      description: "Saved catalog preview",
+      imageUrl: null,
+      fixedPricePesos: null,
+      hourlyRatePesos: 1200,
+      includedHours: null,
+    })) satisfies CatalogRecommendation[];
+
+    const id = await conversation();
+    useReply("Here are some options.");
+    const { message, assistantMessage } = await send(id, "Show me services");
+    assert.ok(assistantMessage);
+
+    const shownItems = cards.map(({ id, type, name }) => ({ id, type, name }));
+
+    await db
+      .updateTable("messages")
+      .set({ catalog_recommendations: sql`${JSON.stringify(cards)}::jsonb` })
+      .where("id", "=", assistantMessage.id)
+      .executeTakeFirstOrThrow();
+    await db
+      .insertInto("ai_tool_calls")
+      .values({
+        turn_id: randomUUID(),
+        tool_call_id: "historical-recommendations",
+        tool_name: "attachCatalogRecommendations",
+        customer_message_id: message.id,
+        assistant_message_id: assistantMessage.id,
+        status: "succeeded",
+        completed_at: sql`now()`,
+        input: sql`${JSON.stringify({ items: cards.map(({ id, type }) => ({ id, catalogType: type })) })}::jsonb`,
+        output: sql`${JSON.stringify({ status: "attached", items: shownItems })}::jsonb`,
+      })
+      .execute();
+
+    const thread = threadSchema.parse(
+      await (
+        await call(`/messages/conversations/${id}`, customer.cookie)
+      ).json(),
+    );
+    assert.deepEqual(thread.messages.at(-1)?.catalogRecommendations, cards);
+
+    useReply("I can tell you about that service.");
+    const followUp = await send(id, "Tell me about the last one.");
+    assert.equal(followUp.assistantError, null);
+    const { context } = turnContext(0);
+    assert.ok("previousCatalogRecommendations" in context);
+    assert.deepEqual(context.previousCatalogRecommendations, {
+      replyId: assistantMessage.id,
+      shownItems,
+    });
+  }
 });
 
 test("mixed recommendations save in the displayed order and ground ordinal follow-ups", async () => {
