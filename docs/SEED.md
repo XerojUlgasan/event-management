@@ -29,6 +29,8 @@ The seed runs in one PostgreSQL transaction. It inserts fixtures and uploads loc
 
 Fresh catalog canvases use varied openings, aligned photo and copy pairs, and Markdown heights sized for both the desktop grid and mobile stack. Showcase details use their cover and ordered gallery.
 
+Use the [catalog Markdown design brief](specs/catalog-markdown-design.md) when writing package and service widgets. It includes copy patterns, preview checks, and how to view the revised seed copy in a disposable catalog.
+
 ## Repeat runs and collisions
 
 Catalog and scenario fixtures use stable IDs. The seed initializes the canvas and thumbnail only for a newly inserted listing. Reruns preserve saved names, pricing, canvas edits, archive state, gallery order, account credentials and session hashes. An existing listing with a conflicting name or slug keeps its data. The refreshed 10/10 count applies to fresh databases. Older public listings, including the three legacy sample packages, stay in a previously seeded database. Use a fresh disposable database to see only the refreshed catalog.
