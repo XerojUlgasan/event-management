@@ -27,7 +27,10 @@ export async function signRealtimeToken(
 
   if (!jwk) throw new Error("Realtime token signer is unavailable");
 
-  const signingKey = signingKeySchema.parse(JSON.parse(jwk));
+  const parsed: unknown = JSON.parse(jwk);
+  const signingKey = Array.isArray(parsed)
+    ? z.tuple([signingKeySchema]).parse(parsed)[0]
+    : signingKeySchema.parse(parsed);
   const key = await importJWK(signingKey, "ES256");
   const scopeClaims =
     "conversationId" in target
