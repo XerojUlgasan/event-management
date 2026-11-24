@@ -68,7 +68,8 @@ function markdownRows(markdown: string, width: number) {
   // Size for the shortest public grid rows at the 580px canvas breakpoint
   // and the wrapping in a full-width stack on a 320px screen.
   const grid = markdownPixels(markdown, Math.floor(width * 3.1) - 4);
-  const stacked = markdownPixels(markdown, 34);
+  // Long words wrap sooner in the narrow stack after the widget padding.
+  const stacked = markdownPixels(markdown, 33);
 
   // A widget spans row pitches minus the final gutter.
   return Math.max(2, Math.ceil(Math.max((grid + 7) / 37, (stacked + 8) / 42)));
