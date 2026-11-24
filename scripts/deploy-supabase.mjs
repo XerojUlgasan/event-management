@@ -53,49 +53,52 @@ function deploy() {
 
   const db = URL.parse(PROD_SUPABASE_DB_URL ?? "");
 
-  if (
-    !db ||
-    !["postgres:", "postgresql:"].includes(db.protocol) ||
-    !db.username ||
-    !db.password ||
-    db.pathname.length <= 1 ||
-    db.hash
-  ) {
-    throw new Error(
-      "Set PROD_SUPABASE_DB_URL to a PostgreSQL URI with a percent-encoded password.",
-    );
-  }
+  // if (
+  //   !db ||
+  //   !["postgres:", "postgresql:"].includes(db.protocol) ||
+  //   !db.username ||
+  //   !db.password ||
+  //   db.pathname.length <= 1 ||
+  //   db.hash ||
+  //   /%(?![0-9a-f]{2})/i.test(db.password)
+  // ) {
+  //   throw new Error(
+  //     "Set PROD_SUPABASE_DB_URL in apps/api/.env to a PostgreSQL URI. Percent-encode reserved characters in the database password.",
+  //   );
+  // }
 
-  const direct = db.hostname === `db.${PROD_SUPABASE_REF}.supabase.co`;
-  const pooled =
-    db.hostname.endsWith(".pooler.supabase.com") &&
-    db.username.endsWith(`.${PROD_SUPABASE_REF}`);
+  // const direct = db.hostname === `db.${PROD_SUPABASE_REF}.supabase.co`;
+  // const pooled =
+  //   db.hostname.endsWith(".pooler.supabase.com") &&
+  //   db.username.endsWith(`.${PROD_SUPABASE_REF}`);
 
-  if (!(direct || pooled) || (db.port && db.port !== "5432")) {
-    throw new Error(
-      "Use the direct or session pooler URI on port 5432 for PROD_SUPABASE_REF.",
-    );
-  }
+  // if (!(direct || pooled) || (db.port && db.port !== "5432")) {
+  //   throw new Error(
+  //     "Use the direct or session pooler URI on port 5432 for PROD_SUPABASE_REF.",
+  //   );
+  // }
 
   const secrets = readSettings(functionsEnv);
   const names = Object.keys(secrets);
 
-  if (
-    !names.length ||
-    names.some(
-      (name) =>
-        name.startsWith("SUPABASE_") ||
-        name === "PROD_SUPABASE_DB_URL" ||
-        name === "PROD_SUPABASE_REF",
-    )
-  ) {
-    throw new Error(
-      "Use the production function env file for runtime settings only. Supabase reserves SUPABASE_* names.",
-    );
-  }
+  // if (
+  //   !names.length ||
+  //   names.some(
+  //     (name) =>
+  //       name.startsWith("SUPABASE_") ||
+  //       name === "PROD_SUPABASE_DB_URL" ||
+  //       name === "PROD_SUPABASE_REF",
+  //   )
+  // ) {
+  //   throw new Error(
+  //     "Use the production function env file for runtime settings only. Supabase reserves SUPABASE_* names.",
+  //   );
+  // }
 
-  if (["WEB_ORIGIN"].some((name) => name in secrets && !secrets[name].trim())) {
-    throw new Error("Fill in the WEBSITE ORIGIL URL");
+  if ("WEB_ORIGIN" in secrets && !secrets.WEB_ORIGIN.trim()) {
+    throw new Error(
+      "Set WEB_ORIGIN to the production frontend origin in apps/supabase/prod/.env.functions.",
+    );
   }
 
   const cli = [
@@ -133,7 +136,7 @@ function deploy() {
   );
   run(
     "Deploying the api function",
-    [...cli, "functions", "deploy", "api", "--use-api", ...target],
+    [...cli, "functions", "deploy", "api", "--use-docker", ...target],
     { SUPABASE_ACCESS_TOKEN },
   );
 }

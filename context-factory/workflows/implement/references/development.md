@@ -100,9 +100,9 @@ Use the checked-in [API environment example](../../../../apps/api/.env.example) 
 
 From the workspace root, `pnpm prod:supabase:deploy` builds the `api` Edge Function, applies pending Prisma migrations, uploads runtime secrets, and deploys the function to the selected project. Review [migration impact](#migration-impact) before deploying to a populated database.
 
-1. Set `SUPABASE_ACCESS_TOKEN`, `PROD_SUPABASE_REF`, and `PROD_SUPABASE_DB_URL` in `apps/api/.env`. The token needs permission to write functions and secrets. In the target project's **Connect** dialog, choose the direct connection or the IPv4 session pooler on port 5432. Percent-encode reserved characters in the password.
-2. Copy [the production function example](../../../../apps/supabase/prod/.env.functions.example) to `apps/supabase/prod/.env.functions`. Set the frontend's HTTPS origin and feature credentials there or in hosted Edge Function Secrets. Supabase injects the runtime database URL. The local development file remains at `apps/supabase/.env.functions`.
-3. Run `pnpm prod:supabase:deploy`. A failed step stops the command. Earlier successful steps take effect immediately. After correcting the failure, rerun the command to finish the release.
+1. Set `SUPABASE_ACCESS_TOKEN`, `PROD_SUPABASE_REF`, and `PROD_SUPABASE_DB_URL` in `apps/api/.env`. The token needs permission to write functions and secrets. In the target project's **Connect** dialog, choose **Direct connection** or **Session pooler** on port 5432. Percent-encode reserved characters in the password before placing the URI in the env file.
+2. Copy [the production function example](../../../../apps/supabase/prod/.env.functions.example) to `apps/supabase/prod/.env.functions` and set `WEB_ORIGIN` to the production frontend's HTTPS origin. Add feature settings that need to be uploaded. Supabase injects `SUPABASE_DB_URL` into the function. Use `apps/supabase/.env.functions` for local development.
+3. Start Docker and run `pnpm prod:supabase:deploy`. The Supabase CLI bundles the function locally to fit the deployment size limit. A failed step stops the command. Earlier successful steps take effect immediately. After correcting the failure, rerun the command to finish the release.
 
 ### Cloudflare Workers frontend
 
