@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { exportJWK, generateKeyPair, jwtVerify } from "jose";
 import { config } from "../src/env.js";
 import { getTextModel } from "../src/services/ai/models.js";
+import type { SessionContext } from "../src/types/hono.js";
+import { signRealtimeToken } from "../src/utils/auth/sign-realtime-token.js";
 import { getCatalogStorage } from "../src/utils/catalog-media-storage.js";
 
 async function withConfig(
@@ -58,3 +61,58 @@ test("AI model and key are required only when the model is used", () =>
     config.TEXT_MODEL = " model/id ";
     assert.equal(getTextModel(), "model/id");
   }));
+
+test("Realtime signs with one private ES256 JWK from the environment", async () => {
+  const { privateKey, publicKey } = await generateKeyPair("ES256", {
+    extractable: true,
+  });
+  const jwk = {
+    ...(await exportJWK(privateKey)),
+    kid: "realtime-fixture",
+    use: "sig",
+    alg: "ES256",
+    key_ops: ["sign", "verify"],
+  };
+  const session = {
+    sessionId: "fixture-session",
+    user: { id: "fixture-user" },
+  } as SessionContext;
+  const issuedAt = Math.floor(Date.now() / 1000);
+
+  const sign = () =>
+    signRealtimeToken({ scope: "notifications" }, session, {
+      issuedAt,
+      expiresAt: issuedAt + 60,
+    });
+
+  await withConfig(
+    {
+      SUP_JWT_KEY: JSON.stringify([jwk]),
+      REALTIME_JWT_SIGNING_JWK: "invalid-fallback",
+    },
+    async () => {
+      for (const value of [JSON.stringify([jwk]), JSON.stringify(jwk)]) {
+        config.SUP_JWT_KEY = value;
+        const { protectedHeader, payload } = await jwtVerify(
+          await sign(),
+          publicKey,
+          { algorithms: ["ES256"], audience: "authenticated" },
+        );
+        assert.equal(protectedHeader.kid, jwk.kid);
+        assert.equal(payload.sub, session.user.id);
+        assert.equal(payload.clemora_scope, "user_notifications");
+      }
+
+      config.REALTIME_JWT_SIGNING_JWK = JSON.stringify(jwk);
+      const publicJwk = { ...(await exportJWK(publicKey)), kid: jwk.kid };
+
+      for (const invalid of [[], [jwk, jwk], [publicJwk]]) {
+        config.SUP_JWT_KEY = JSON.stringify(invalid);
+        await assert.rejects(sign);
+      }
+
+      config.SUP_JWT_KEY = undefined;
+      await jwtVerify(await sign(), publicKey, { algorithms: ["ES256"] });
+    },
+  );
+});
