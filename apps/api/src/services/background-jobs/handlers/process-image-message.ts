@@ -3,9 +3,8 @@ import {
   guestExpiry,
 } from "../../../data/guest-chat/guest-conversation.js";
 import { MessageProcessingError } from "../../messages/message-processing-error.js";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { type Kysely } from "kysely";
-import { MAX_MESSAGE_IMAGE_PIXELS } from "@event-management/contracts/limits/messages";
 import { messageImageInterpretationSchema } from "@event-management/contracts/message-images";
 import type { DB } from "../../../db/types.js";
 import {
@@ -16,59 +15,9 @@ import {
   type ImageMessageJobPayload,
 } from "../../../data/messages/message-processing.js";
 import { findConversationData } from "../../../data/messages/find-conversation.js";
-import { getCatalogMedia } from "../../../utils/catalog-media-storage.js";
+import { readValidatedMessageImage } from "../../messages/read-validated-message-image.js";
 import { createInterpretMessageImageTool } from "../../ai/tools/interpret-message-image.js";
 import { runAssistantTurnService } from "../../ai/run-assistant-turn.js";
-
-async function readImage(
-  image: {
-    id: string;
-    storage_key: string;
-    byte_size: number;
-    content_hash: string;
-  },
-  signal: AbortSignal,
-) {
-  const stream = await getCatalogMedia(image.storage_key, undefined, signal);
-  const reader = stream.getReader();
-  const parts: Uint8Array[] = [];
-  let size = 0;
-
-  try {
-    while (true) {
-      signal.throwIfAborted();
-      const part = await reader.read();
-
-      if (part.done) break;
-
-      size += part.value.length;
-
-      if (size > image.byte_size)
-        throw new MessageProcessingError("invalid_image");
-
-      parts.push(part.value);
-    }
-  } finally {
-    await reader.cancel().catch(() => {});
-  }
-
-  const bytes = Buffer.concat(parts);
-
-  if (
-    size !== image.byte_size ||
-    createHash("sha256").update(bytes).digest("hex") !== image.content_hash
-  )
-    throw new MessageProcessingError("invalid_image");
-
-  try {
-    const { Image } = await import("imagescript");
-    await Image.decode(bytes, { maxPixels: MAX_MESSAGE_IMAGE_PIXELS });
-  } catch {
-    throw new MessageProcessingError("invalid_image");
-  }
-
-  return bytes;
-}
 
 export async function processImageMessageJob(
   db: Kysely<DB>,
@@ -127,10 +76,10 @@ export async function processImageMessageJob(
 
     if (image.interpretation !== null) continue;
 
-    let bytes;
+    let validated;
 
     try {
-      bytes = await readImage(image, signal);
+      validated = await readValidatedMessageImage(image, signal);
     } catch (error) {
       if (
         error instanceof MessageProcessingError &&
@@ -151,8 +100,7 @@ export async function processImageMessageJob(
         position: image.position,
         lease,
         image: {
-          bytes,
-          mimeType: image.mime_type,
+          ...validated,
           contentHash: image.content_hash,
         },
       });

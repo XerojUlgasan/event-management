@@ -11,6 +11,7 @@ import { searchCatalogKnowledgeData } from "../../data/ai/search-catalog-knowled
 import { encodePageCursor, parsePageCursor } from "../../utils/pagination.js";
 import { loadCatalogKnowledge } from "./load-catalog-knowledge.js";
 import { embedCatalogContent } from "./retrieval/embed-catalog-content.js";
+import { prepareCatalogEmbeddingImage } from "./retrieval/read-catalog-embedding-image.js";
 import { KnowledgeSearchUnavailable } from "./retrieval/search-catalog-knowledge.js";
 import { catalogKnowledgeDigest } from "./catalog-knowledge-hash.js";
 
@@ -19,7 +20,22 @@ export const PUBLIC_CATALOG_SEARCH_PAGE_SIZE = 3;
 export const searchPublicCatalogInputSchema = z
   .strictObject({
     catalogType: z.enum(["package", "service"]),
-    query: z.string().trim().min(1).max(500).optional(),
+    query: z
+      .string()
+      .trim()
+      .min(1)
+      .max(500)
+      .describe(
+        "Text search terms, or the customer's explicitly requested visual focus when a photo is selected.",
+      )
+      .optional(),
+    photoAttachmentId: z
+      .uuid()
+      .toLowerCase()
+      .describe(
+        "One eligible chat attachment ID for an explicitly requested visual match.",
+      )
+      .optional(),
     minPricePesos: z
       .number()
       .int()
@@ -71,6 +87,13 @@ export type SearchPublicCatalogInput = z.infer<
   typeof searchPublicCatalogInputSchema
 >;
 
+export type CatalogSearchPhotoReader = (
+  id: string,
+  abortSignal?: AbortSignal,
+) => Promise<{ bytes: Uint8Array; mimeType: string } | null>;
+
+export class CatalogSearchPhotoUnavailable extends Error {}
+
 const positionSchema = z.strictObject({
   id: z.string().uuid(),
   score: z.number().nullable(),
@@ -82,10 +105,12 @@ const short = (text: string, limit: number) =>
 export async function searchPublicCatalogService({
   db,
   input: rawInput,
+  readPhoto,
   abortSignal,
 }: {
   db: Kysely<DB>;
   input: SearchPublicCatalogInput;
+  readPhoto?: CatalogSearchPhotoReader;
   abortSignal?: AbortSignal;
 }) {
   const input = searchPublicCatalogInputSchema.parse(rawInput);
@@ -98,26 +123,48 @@ export async function searchPublicCatalogService({
       input.maxPricePesos ?? null,
       input.pax ?? null,
       input.pricingType ?? null,
+      ...(input.photoAttachmentId ? [input.photoAttachmentId] : []),
     ]),
   )}`;
   const position = parsePageCursor(input.cursor, positionSchema, scope);
+  const usesEmbedding = !!(input.query || input.photoAttachmentId);
 
   if (
     position &&
-    (input.query ? position.score === null : position.score !== null)
+    (usesEmbedding ? position.score === null : position.score !== null)
   )
     throw new Error("Invalid public catalog cursor");
 
   let vector: Awaited<ReturnType<typeof embedCatalogContent>> | undefined;
 
-  if (input.query) {
+  abortSignal?.throwIfAborted();
+
+  let image:
+    Awaited<ReturnType<typeof prepareCatalogEmbeddingImage>> | undefined;
+
+  if (input.photoAttachmentId) {
+    const original = await readPhoto?.(input.photoAttachmentId, abortSignal);
+
+    if (!original) throw new CatalogSearchPhotoUnavailable();
+
+    try {
+      image = await prepareCatalogEmbeddingImage(original.bytes, abortSignal);
+    } catch {
+      abortSignal?.throwIfAborted();
+      throw new CatalogSearchPhotoUnavailable();
+    }
+  }
+
+  if (usesEmbedding) {
     try {
       vector = await embedCatalogContent({
         contentMarkdown: input.query,
+        image,
         purpose: "search",
         abortSignal,
       });
     } catch {
+      abortSignal?.throwIfAborted();
       throw new KnowledgeSearchUnavailable();
     }
   }
@@ -136,7 +183,14 @@ export async function searchPublicCatalogService({
 
       const ranked = new Map<
         string,
-        { score: number; evidence: { kind: "text" | "photo"; excerpt: string } }
+        {
+          score: number;
+          evidence: {
+            kind: "text" | "photo";
+            excerpt: string;
+            similarity?: number;
+          };
+        }
       >();
 
       if (vector) {
@@ -151,7 +205,10 @@ export async function searchPublicCatalogService({
             .flatMap(({ listing, chunks }) =>
               chunks
                 .filter(
-                  (chunk) => chunk.status === "indexed" && !chunk.withdrawn,
+                  (chunk) =>
+                    chunk.status === "indexed" &&
+                    !chunk.withdrawn &&
+                    (!image || chunk.kind === "photo"),
                 )
                 .map((chunk) => [`${listing.id}:${chunk.key}`, chunk] as const),
             ),
@@ -178,6 +235,7 @@ export async function searchPublicCatalogService({
               evidence: {
                 kind: chunk.kind,
                 excerpt: short(chunk.contentMarkdown, 500),
+                ...(image && { similarity: row.similarity }),
               },
             });
         }
@@ -220,6 +278,9 @@ export async function searchPublicCatalogService({
       const last = page.at(-1);
 
       return {
+        ...(input.photoAttachmentId && {
+          photoAttachmentId: input.photoAttachmentId,
+        }),
         results: page.map(({ listing, evidence }) => ({
           id: listing.id,
           type: listing.type,

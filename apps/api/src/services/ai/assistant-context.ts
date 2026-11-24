@@ -7,6 +7,7 @@ import { catalogRecommendationsSchema } from "@event-management/contracts/messag
 import {
   getLastCatalogToolCallData,
   listDeliveredCatalogSearchesData,
+  listLatestDeliveredPhotoSearchesData,
 } from "../../data/ai/get-last-catalog-tool-call.js";
 import { searchPublicCatalogInputSchema } from "./search-public-catalog.js";
 import { getPublicCatalogItemInputSchema } from "./get-public-catalog-item.js";
@@ -16,6 +17,10 @@ const shownItemSchema = z.object({
   type: z.enum(["package", "service"]),
   name: z.string(),
   url: z.string(),
+});
+
+const searchCursorSchema = z.object({
+  nextCursor: z.string().min(1).max(MAX_CURSOR_LENGTH).nullable(),
 });
 
 async function deliveredShortlist(
@@ -68,9 +73,7 @@ export async function buildPreviousCatalogSearchContext({
   if (!previous) return undefined;
 
   const input = searchPublicCatalogInputSchema.safeParse(previous.input);
-  const output = z
-    .object({ nextCursor: z.string().min(1).max(MAX_CURSOR_LENGTH).nullable() })
-    .safeParse(previous.output);
+  const output = searchCursorSchema.safeParse(previous.output);
 
   if (!input.success || !output.success) return undefined;
 
@@ -85,6 +88,55 @@ export async function buildPreviousCatalogSearchContext({
     ambiguousShortlist: shownItems === null,
     ...(shownItems ? { shownItems } : {}),
   };
+}
+
+export async function buildPreviousCatalogPhotoSearchesContext({
+  db,
+  conversationId,
+  customerMessageId,
+  attachmentIds,
+}: {
+  db: Kysely<DB>;
+  conversationId: string;
+  customerMessageId: string;
+  attachmentIds: string[];
+}) {
+  if (!attachmentIds.length) return [];
+
+  const rows = await listLatestDeliveredPhotoSearchesData(
+    db,
+    { conversationId, customerMessageId },
+    attachmentIds,
+  );
+
+  const positions = new Map(attachmentIds.map((id, index) => [id, index]));
+
+  return rows
+    .flatMap((row) => {
+      const input = searchPublicCatalogInputSchema.safeParse(row.input);
+      const output = searchCursorSchema.safeParse(row.output);
+
+      if (!input.success || !input.data.photoAttachmentId || !output.success)
+        return [];
+
+      const { cursor: _cursor, ...criteria } = input.data;
+
+      return [
+        {
+          input: {
+            ...criteria,
+            photoAttachmentId: input.data.photoAttachmentId,
+          },
+          nextCursor: output.data.nextCursor,
+          replyId: row.replyId,
+        },
+      ];
+    })
+    .sort(
+      (a, b) =>
+        positions.get(a.input.photoAttachmentId)! -
+        positions.get(b.input.photoAttachmentId)!,
+    );
 }
 
 export async function buildPreviousCatalogRecommendationsContext({

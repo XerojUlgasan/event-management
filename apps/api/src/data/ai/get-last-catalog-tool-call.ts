@@ -5,7 +5,7 @@ import {
   type LastCatalogToolCallInput,
 } from "./tool-call-validation.js";
 
-export function getLastCatalogToolCallData(
+function deliveredCatalogCalls(
   db: Kysely<DB>,
   value: LastCatalogToolCallInput,
 ) {
@@ -63,13 +63,43 @@ export function getLastCatalogToolCallData(
     )
     .where(
       sql<boolean>`(reply.created_at, reply.id) < (current_message.created_at, current_message.id)`,
-    )
+    );
+}
+
+export function getLastCatalogToolCallData(
+  db: Kysely<DB>,
+  value: LastCatalogToolCallInput,
+) {
+  return deliveredCatalogCalls(db, value)
     .orderBy("trigger_message.created_at", "desc")
     .orderBy("trigger_message.id", "desc")
     .orderBy("tool_call.started_at", "desc")
     .orderBy("tool_call.id", "desc")
     .limit(1)
     .executeTakeFirst();
+}
+
+export function listLatestDeliveredPhotoSearchesData(
+  db: Kysely<DB>,
+  scope: { conversationId: string; customerMessageId: string },
+  attachmentIds: string[],
+) {
+  const photoId = sql<string>`tool_call.input ->> 'photoAttachmentId'`;
+  const catalogType = sql<string>`tool_call.input ->> 'catalogType'`;
+
+  return deliveredCatalogCalls(db, {
+    ...scope,
+    toolName: "searchPublicCatalog",
+  })
+    .where(photoId, "in", attachmentIds)
+    .distinctOn([photoId, catalogType])
+    .orderBy(photoId)
+    .orderBy(catalogType)
+    .orderBy("trigger_message.created_at", "desc")
+    .orderBy("trigger_message.id", "desc")
+    .orderBy("tool_call.started_at", "desc")
+    .orderBy("tool_call.id", "desc")
+    .execute();
 }
 
 /** Only executed searches attached to the exact assistant reply the customer saw. */

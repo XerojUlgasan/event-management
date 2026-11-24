@@ -1,8 +1,9 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
-import { after, before, test } from "node:test";
+import { after, before, test, type TestContext } from "node:test";
+import { Image } from "imagescript";
 import { Pool } from "pg";
 import { sql } from "kysely";
 import { MockLanguageModelV4, MockProviderV4 } from "ai/test";
@@ -3264,6 +3265,433 @@ test("multiple searches belong to one customer turn and one resulting reply with
     ).length,
     2,
   );
+});
+
+async function savePhotoReferences(
+  conversationId: string,
+  count: number,
+  options: { createdAt?: Date; guest?: boolean; pending?: boolean } = {},
+) {
+  const message = await db
+    .insertInto("messages")
+    .values({
+      conversation_id: conversationId,
+      sender_role: "customer",
+      sender_id: options.guest ? null : customer.id,
+      guest_origin: options.guest ?? false,
+      body: "Saved reference photos",
+      ...(options.createdAt ? { created_at: options.createdAt } : {}),
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+
+  const photos = await Promise.all(
+    Array.from({ length: count }, async (_, position) => {
+      const id = randomUUID();
+      const bytes = Buffer.from(
+        await new Image(12, 12)
+          .fill(0x102030ff + position * 0x1000000)
+          .encodePNG(),
+      );
+
+      return {
+        bytes,
+        row: {
+          id,
+          message_id: message.id,
+          position,
+          storage_key: `messages/${conversationId}/${id}.png`,
+          mime_type: "image/png",
+          byte_size: bytes.length,
+          content_hash: createHash("sha256").update(bytes).digest("hex"),
+          interpretation: options.pending
+            ? null
+            : JSON.stringify({
+                summary: `Reference photo observation ${position + 1}`,
+                objects: [],
+                colors: [],
+                styles: [],
+                visibleText: null,
+                uncertainty: [],
+              }),
+        },
+      };
+    }),
+  );
+
+  // The saved position, rather than insertion or ID order, controls attribution.
+  await db
+    .insertInto("message_images")
+    .values(photos.map(({ row }) => row).reverse())
+    .execute();
+
+  return photos;
+}
+
+type PhotoReference = Awaited<ReturnType<typeof savePhotoReferences>>[number];
+
+function mockPhotoBoundaries(
+  t: TestContext,
+  photos: PhotoReference[],
+  options: {
+    beforeStorage?: () => Promise<void>;
+    missing?: boolean;
+    providerDown?: boolean;
+  } = {},
+) {
+  const settings = {
+    SUPABASE_URL: "http://storage.example.test",
+    SUPABASE_SERVICE_ROLE_KEY: "test-storage-only",
+    EMBEDDING_MODEL: "google/gemini-embedding-2",
+  };
+
+  const before = Object.keys(settings).map(
+    (key) => [key, process.env[key]] as const,
+  );
+
+  Object.assign(process.env, settings);
+  t.after(() => {
+    for (const [key, value] of before) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
+  const storageKeys: string[] = [];
+  const embeddings: unknown[] = [];
+  t.mock.method(
+    globalThis,
+    "fetch",
+    async (input: unknown, init: RequestInit) => {
+      if (String(input).startsWith(settings.SUPABASE_URL)) {
+        const photo = photos.find(({ row }) =>
+          String(input).endsWith(row.storage_key),
+        );
+
+        assert.ok(photo, "Only known fixture objects may reach Storage");
+        storageKeys.push(photo.row.storage_key);
+        await options.beforeStorage?.();
+
+        return options.missing
+          ? new Response(null, { status: 404 })
+          : new Response(photo.bytes);
+      }
+
+      embeddings.push(JSON.parse(String(init.body)));
+
+      return options.providerDown
+        ? new Response("fixture provider error", { status: 503 })
+        : Response.json({
+            embeddings: [[1, ...Array(767).fill(0)]],
+            warnings: [],
+          });
+    },
+  );
+
+  return { storageKeys, embeddings };
+}
+
+function photoAudit(messageId: string) {
+  return db
+    .selectFrom("ai_tool_calls")
+    .select(["assistant_message_id", "input", "output", "status", "error_code"])
+    .where("customer_message_id", "=", messageId)
+    .where("tool_name", "=", "searchPublicCatalog")
+    .orderBy("tool_call_id")
+    .execute();
+}
+
+test("four photo searches execute in attachment order and each carries its own delivered continuation", async (t) => {
+  const id = await conversation();
+  const photos = await savePhotoReferences(id, 4);
+  const { storageKeys, embeddings } = mockPhotoBoundaries(t, photos);
+
+  const inputs = photos.map(({ row }, index) => ({
+    catalogType: "package",
+    photoAttachmentId: row.id,
+    ...(index === 1 && { query: "floral arch" }),
+  }));
+
+  useCatalogCalls(inputs);
+  const result = await send(
+    id,
+    "Find separate package matches for each of my four photos.",
+  );
+  assert.ok(result.assistantMessage);
+  assert.deepEqual(
+    storageKeys,
+    photos.map(({ row }) => row.storage_key),
+  );
+  assert.equal(embeddings.length, 4);
+  assert.deepEqual(
+    model.doGenerateCalls.map(({ maxOutputTokens }) => maxOutputTokens),
+    [800, 1600],
+  );
+  const audit = await photoAudit(result.message.id);
+  assert.deepEqual(
+    audit.map(({ input }) => input),
+    inputs,
+  );
+  assert.ok(
+    audit.every(
+      ({ status, assistant_message_id }) =>
+        status === "succeeded" &&
+        assistant_message_id === result.assistantMessage?.id,
+    ),
+  );
+  const prompt = JSON.stringify(model.doGenerateCalls[1].prompt);
+  let lastIndex = -1;
+
+  for (const { row, bytes } of photos) {
+    const index = prompt.indexOf(row.id);
+    assert.ok(index > lastIndex);
+    lastIndex = index;
+    assert.ok(!prompt.includes(row.storage_key));
+    assert.ok(!prompt.includes(row.content_hash));
+    assert.ok(!prompt.includes(bytes.toString("base64")));
+    assert.ok(!JSON.stringify(audit).includes(row.storage_key));
+  }
+
+  useCatalogCalls([inputs[1]!]);
+  const secondPhoto = await send(id, "Search again for the second photo only.");
+  assert.ok(secondPhoto.assistantMessage);
+  assert.deepEqual(
+    model.doGenerateCalls.map(({ maxOutputTokens }) => maxOutputTokens),
+    [800, 800],
+  );
+  assert.deepEqual(storageKeys.slice(4), [photos[1]!.row.storage_key]);
+
+  useReply("Which photo would you like me to use?");
+  const next = await send(id, "Show me more options for the photos");
+  const snapshot = turnContext(0).context;
+  assert.ok("previousCatalogPhotoSearches" in snapshot);
+  assert.deepEqual(
+    snapshot.previousCatalogPhotoSearches,
+    inputs.map((input, index) => ({
+      input,
+      nextCursor: null,
+      replyId:
+        index === 1
+          ? secondPhoto.assistantMessage?.id
+          : result.assistantMessage?.id,
+    })),
+  );
+  assert.equal((await photoAudit(next.message.id)).length, 0);
+  assert.equal(embeddings.length, 5);
+});
+
+test("foreign, future, pending, and unknown photo IDs are rejected before Storage", async (t) => {
+  const id = await conversation();
+  const [pending] = await savePhotoReferences(id, 1, { pending: true });
+  const [foreign] = await savePhotoReferences(await conversation(), 1);
+  const [future] = await savePhotoReferences(id, 1, {
+    createdAt: new Date(Date.now() + 60_000),
+  });
+  assert.ok(pending && foreign && future);
+
+  const { storageKeys, embeddings } = mockPhotoBoundaries(t, []);
+  useCatalogCalls(
+    [pending.row.id, foreign.row.id, future.row.id, randomUUID()].map(
+      (photoAttachmentId) => ({ catalogType: "package", photoAttachmentId }),
+    ),
+  );
+
+  const result = await send(id, "Please visually match my reference");
+  assert.ok(result.assistantMessage);
+  assert.equal(storageKeys.length, 0);
+  assert.equal(embeddings.length, 0);
+  assert.deepEqual(
+    (await photoAudit(result.message.id)).map(({ error_code, output }) => [
+      error_code,
+      output,
+    ]),
+    Array.from({ length: 4 }, () => ["photo_unavailable", null]),
+  );
+  const prompt = JSON.stringify(model.doGenerateCalls[0].prompt);
+  assert.doesNotMatch(
+    prompt,
+    new RegExp([foreign.row.id, future.row.id, pending.row.id].join("|"), "u"),
+  );
+});
+
+test("an unavailable private original allows a separate observation-text search", async (t) => {
+  const id = await conversation();
+  const photos = await savePhotoReferences(id, 1);
+  const { storageKeys, embeddings } = mockPhotoBoundaries(t, photos, {
+    missing: true,
+  });
+  useToolRounds([
+    [
+      {
+        toolName: "searchPublicCatalog",
+        input: { catalogType: "package", photoAttachmentId: photos[0]!.row.id },
+      },
+    ],
+    [
+      {
+        toolName: "searchPublicCatalog",
+        input: { catalogType: "package", query: "floral arch" },
+      },
+    ],
+  ]);
+
+  const result = await send(id, "Find a package like my photo");
+  assert.ok(result.assistantMessage);
+  assert.equal(storageKeys.length, 1);
+  assert.equal(embeddings.length, 1);
+  assert.doesNotMatch(JSON.stringify(embeddings), /inlineData/u);
+  const audit = await photoAudit(result.message.id);
+  assert.deepEqual(
+    audit.map(({ status, error_code }) => [status, error_code]),
+    [
+      ["failed", "photo_unavailable"],
+      ["succeeded", null],
+    ],
+  );
+  assert.match(
+    JSON.stringify(model.doGenerateCalls[1].prompt),
+    /reference photo is unavailable/u,
+  );
+});
+
+test("a photo provider failure is audited separately from an unavailable original", async (t) => {
+  const id = await conversation();
+  const photos = await savePhotoReferences(id, 1);
+  const { storageKeys, embeddings } = mockPhotoBoundaries(t, photos, {
+    providerDown: true,
+  });
+  useCatalogCalls([
+    { catalogType: "package", photoAttachmentId: photos[0]!.row.id },
+  ]);
+  const result = await send(id, "Find a package like my photo");
+  assert.ok(result.assistantMessage);
+  assert.equal(storageKeys.length, 1);
+  assert.equal(embeddings.length, 1);
+  assert.deepEqual(
+    (await photoAudit(result.message.id)).map(
+      ({ status, error_code, output }) => [status, error_code, output],
+    ),
+    [["failed", "search_unavailable", null]],
+  );
+  const prompt = JSON.stringify(model.doGenerateCalls[1].prompt);
+  assert.match(prompt, /Catalog search is unavailable/u);
+  assert.doesNotMatch(prompt, /fixture provider error/u);
+});
+
+test("takeover during the original photo read prevents embedding and suppresses the reply", async (t) => {
+  const id = await conversation();
+  const photos = await savePhotoReferences(id, 1);
+
+  const { storageKeys, embeddings } = mockPhotoBoundaries(t, photos, {
+    beforeStorage: async () => {
+      const teamReply = await call(
+        `/admin/conversations/${id}/messages`,
+        team.cookie,
+        {
+          body: "The team will help with this photo",
+        },
+      );
+      assert.equal(teamReply.status, 201);
+    },
+  });
+
+  useCatalogCalls([
+    { catalogType: "package", photoAttachmentId: photos[0]!.row.id },
+  ]);
+  const result = await send(id, "Find a package like my photo");
+  assert.equal(result.assistantMessage, null);
+  assert.equal(storageKeys.length, 1);
+  assert.equal(embeddings.length, 0);
+  assert.deepEqual(
+    (await photoAudit(result.message.id)).map(
+      ({ status, error_code, assistant_message_id }) => [
+        status,
+        error_code,
+        assistant_message_id,
+      ],
+    ),
+    [["failed", "turn_inactive", null]],
+  );
+});
+
+test("guest photo scope survives claim for the signed-in owner and respects guest expiry", async (t) => {
+  async function guest() {
+    const response = await call("/guest/conversation", "", {});
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as { conversation: { id: string } };
+
+    return {
+      id: body.conversation.id,
+      cookie: response.headers.get("set-cookie")!.split(";")[0]!,
+    };
+  }
+
+  const active = await guest();
+  const expired = await guest();
+  const photos = await savePhotoReferences(active.id, 1, { guest: true });
+  await savePhotoReferences(expired.id, 1, {
+    guest: true,
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+  });
+  await db
+    .updateTable("conversations")
+    .set({
+      created_at: new Date("2026-01-01T00:00:00Z"),
+    })
+    .where("id", "=", expired.id)
+    .execute();
+  const { storageKeys, embeddings } = mockPhotoBoundaries(t, photos);
+  const input = {
+    catalogType: "package",
+    photoAttachmentId: photos[0]!.row.id,
+  };
+
+  useCatalogCalls([input]);
+  const activeReply = await call(
+    `/guest/conversations/${active.id}/messages`,
+    active.cookie,
+    { body: "Match my photo", requestId: randomUUID() },
+  );
+  assert.equal(activeReply.status, 201);
+  const guestResult = (await activeReply.json()) as { message: { id: string } };
+  assert.equal(
+    (await photoAudit(guestResult.message.id))[0]?.status,
+    "succeeded",
+  );
+
+  const expiredReply = await call(
+    `/guest/conversations/${expired.id}/messages`,
+    expired.cookie,
+    { body: "Match my photo", requestId: randomUUID() },
+  );
+  assert.equal(expiredReply.status, 410);
+  assert.equal(embeddings.length, 1);
+
+  assert.equal(
+    (
+      await call(
+        `/guest/conversations/${active.id}/claim`,
+        `${customer.cookie}; ${active.cookie}`,
+        {},
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await call(`/guest/conversations/${active.id}/messages`, active.cookie, {
+        body: "Match my photo",
+        requestId: randomUUID(),
+      })
+    ).status,
+    404,
+  );
+
+  useCatalogCalls([input]);
+  const signedIn = await send(active.id, "Try matching the guest photo again");
+  assert.equal((await photoAudit(signedIn.message.id))[0]?.status, "succeeded");
+  assert.equal(storageKeys.length, 2);
+  assert.equal(embeddings.length, 2);
 });
 
 async function detailPackage() {

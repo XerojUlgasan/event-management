@@ -48,6 +48,15 @@ export async function readCatalogEmbeddingImage(
     }
   } else throw new Error("Catalog photo is unavailable");
 
+  return prepareCatalogEmbeddingImage(bytes, abortSignal);
+}
+
+export async function prepareCatalogEmbeddingImage(
+  bytes: Uint8Array,
+  abortSignal?: AbortSignal,
+) {
+  abortSignal?.throwIfAborted();
+
   if (!bytes.length || bytes.length > MAX_IMAGE_SIZE_BYTES)
     throw new Error("Catalog photo exceeds the image size limit");
 

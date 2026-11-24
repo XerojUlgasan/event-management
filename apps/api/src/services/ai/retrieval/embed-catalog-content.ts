@@ -5,12 +5,12 @@ const supportedModel = "google/gemini-embedding-2";
 const dimensions = 768;
 
 export async function embedCatalogContent({
-  contentMarkdown,
+  contentMarkdown = "",
   image,
   abortSignal,
   purpose = "document",
 }: {
-  contentMarkdown: string;
+  contentMarkdown?: string;
   image?: { bytes: Uint8Array; mimeType: string };
   abortSignal?: AbortSignal;
   purpose?: "document" | "search";
@@ -19,7 +19,8 @@ export async function embedCatalogContent({
 
   if (model !== supportedModel) throw new Error("Unsupported embedding model");
 
-  if (!contentMarkdown.trim()) throw new Error("Embedding content is empty");
+  if (!contentMarkdown.trim() && !(purpose === "search" && image))
+    throw new Error("Embedding content is empty");
 
   if (
     image &&
@@ -33,9 +34,11 @@ export async function embedCatalogContent({
   const { embedding } = await embed({
     model: createGateway({ apiKey }).embeddingModel(model),
     value:
-      purpose === "search"
-        ? `task: search result | query: ${contentMarkdown}`
-        : `title: none | text: ${contentMarkdown}`,
+      purpose === "document"
+        ? `title: none | text: ${contentMarkdown}`
+        : image
+          ? contentMarkdown
+          : `task: search result | query: ${contentMarkdown}`,
     dimensions,
     maxRetries: 0,
     abortSignal: abortSignal ? AbortSignal.any([signal, abortSignal]) : signal,

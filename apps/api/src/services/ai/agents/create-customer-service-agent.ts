@@ -26,8 +26,10 @@ import { containsRawToolProtocol } from "../../messages/suggested-reply-copy.js"
 import { localizeHandoff } from "../suggested-replies.js";
 import type { bookingLanguageSamples } from "../localize-booking-chat.js";
 import { createBookingDraftTools } from "../tools/booking-draft.js";
+import type { CatalogSearchPhotoReader } from "../search-public-catalog.js";
 
 const maxStepTokens = 800;
+const maxMultiPhotoReplyTokens = 1_600;
 
 const suggestedReplyInstructions = `## Suggested customer replies
 - Use native tools for actions and lookups, then return a single JSON object with "message" for the complete AMAC message and "suggested_replies" for one to ${MAX_SUGGESTED_REPLIES} distinct customer messages. Write JSON only for the final answer.
@@ -113,12 +115,14 @@ export function createCustomerServiceAgent({
   onRecommendationsAttached,
   history,
   copyDeadline,
+  readCatalogPhoto,
   ...options
 }: AssistantToolContext & {
   settings: AgentSettings;
   answerOnlyAfter: number;
   history: Parameters<typeof bookingLanguageSamples>[0];
   copyDeadline: AbortSignal;
+  readCatalogPhoto?: CatalogSearchPhotoReader;
   onCatalogBrowseAttached: (categories: CatalogBrowse) => void;
   onRecommendationsAttached: (items: CatalogRecommendation[]) => void;
 }) {
@@ -183,7 +187,10 @@ export function createCustomerServiceAgent({
               ...toolContext,
               onCatalogBrowseAttached,
             }),
-            searchPublicCatalog: createSearchPublicCatalogTool(toolContext),
+            searchPublicCatalog: createSearchPublicCatalogTool({
+              ...toolContext,
+              readPhoto: readCatalogPhoto,
+            }),
             getPublicCatalogItem: createGetPublicCatalogItemTool(toolContext),
             attachCatalogRecommendations:
               createAttachCatalogRecommendationsTool({
@@ -225,15 +232,33 @@ export function createCustomerServiceAgent({
     },
     stopWhen: () =>
       answerOnly || trackingUnavailable || !!options.isHandoffCommitted?.(),
-    prepareStep: () => {
+    prepareStep: ({ steps }) => {
       if (remainingOutputTokens <= 0)
         throw new Error("Assistant output budget exhausted");
 
-      stepTokenLimit = Math.min(maxStepTokens, remainingOutputTokens);
+      const matchedPhotos = new Set<string>();
+
+      for (const step of steps)
+        for (const { toolName, output } of step.toolResults)
+          if (
+            toolName === "searchPublicCatalog" &&
+            output &&
+            typeof output === "object" &&
+            "photoAttachmentId" in output &&
+            typeof output.photoAttachmentId === "string"
+          )
+            matchedPhotos.add(output.photoAttachmentId);
+
+      // A labeled answer for several photos needs room for each result.
+      const replyTokenLimit =
+        matchedPhotos.size > 1 ? maxMultiPhotoReplyTokens : maxStepTokens;
+
       // Start another tool round only while a full answer can still fit.
       answerOnly =
         Date.now() >= answerOnlyAfter ||
-        remainingOutputTokens < 2 * maxStepTokens;
+        remainingOutputTokens < maxStepTokens + replyTokenLimit;
+
+      stepTokenLimit = Math.min(replyTokenLimit, remainingOutputTokens);
 
       return {
         maxOutputTokens: stepTokenLimit,

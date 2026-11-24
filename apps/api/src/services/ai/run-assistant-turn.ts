@@ -16,12 +16,14 @@ import type { DB } from "../../db/types.js";
 import { selectMessageColumnsData } from "../../data/messages/select-message-columns.js";
 import { findConversationData } from "../../data/messages/find-conversation.js";
 import { listConversationHistoryData } from "../../data/messages/list-conversation-history.js";
+import type { SavedMessageImage } from "../../data/messages/message-images.js";
 import { readConversationMemoryData } from "../../data/messages/conversation-memory.js";
 import { createAssistantMessageData } from "../../data/messages/create-assistant-message.js";
 import type { MessageWithSender } from "../../data/messages/types.js";
 import { messageDto } from "../messages/message-response.js";
 import {
   buildAssistantContext,
+  buildPreviousCatalogPhotoSearchesContext,
   buildPreviousCatalogSearchContext,
   buildPreviousCatalogItemContext,
   buildPreviousCatalogRecommendationsContext,
@@ -48,6 +50,7 @@ import { submitReviewedBookingRequestService } from "../booking-requests/submit-
 import { completeBookingConsentAssessment } from "./assess-booking-consent.js";
 import { generatedSuggestedReplies } from "./suggested-replies.js";
 import { localizeBookingReview } from "./localize-booking-chat.js";
+import { readValidatedMessageImage } from "../messages/read-validated-message-image.js";
 
 const maxInputCharacters = 200_000;
 
@@ -134,10 +137,27 @@ export async function runAssistantTurnService({
     throw new Error("Customer message not found");
 
   const { settings } = await getAgentSettingsService(db);
+  const catalogPhotos = new Map<string, SavedMessageImage>();
+
+  if (settings.allowPublicCatalog) {
+    for (const message of history) {
+      const inScope =
+        message.sender_role === "admin" ||
+        (message.sender_role === "customer" &&
+          (message.guest_origin ||
+            (!guestIdentityId && message.sender_id === customerId)));
+
+      if (inScope)
+        for (const image of message.images)
+          if (image.interpretation !== null) catalogPhotos.set(image.id, image);
+    }
+  }
+
   const [
     previousCatalogSearch,
     previousCatalogItem,
     catalogRecommendationsHistory,
+    previousCatalogPhotoSearches,
   ] = settings.allowPublicCatalog
     ? await Promise.all([
         buildPreviousCatalogSearchContext({
@@ -154,6 +174,12 @@ export async function runAssistantTurnService({
           db,
           conversationId,
           customerMessageId,
+        }),
+        buildPreviousCatalogPhotoSearchesContext({
+          db,
+          conversationId,
+          customerMessageId,
+          attachmentIds: [...catalogPhotos.keys()],
         }),
       ])
     : [];
@@ -183,6 +209,8 @@ export async function runAssistantTurnService({
     replyOrder: legacyReplyOrder,
     ambiguousShortlist,
     shownItems,
+    input: previousSearchInput,
+    nextCursor: previousSearchCursor,
     ...catalogSearchContext
   } = previousCatalogSearch ?? {};
   const { replyOrder: attachedReplyOrder, ...recommendationsContext } =
@@ -191,6 +219,7 @@ export async function runAssistantTurnService({
     !searchPrecedesBrowse && (shownItems || ambiguousShortlist)
       ? legacyReplyOrder
       : undefined;
+
   const context = {
     ...(guestIdentityId
       ? {
@@ -207,10 +236,25 @@ export async function runAssistantTurnService({
       ? {
           previousCatalogSearch: {
             ...catalogSearchContext,
+            ...(previousSearchInput && !previousSearchInput.photoAttachmentId
+              ? { input: previousSearchInput, nextCursor: previousSearchCursor }
+              : {}),
             ...(searchPrecedesBrowse
               ? { beforeLatestCatalogBrowse: true }
               : shownItems && { shownItems }),
           },
+        }
+      : {}),
+    ...(previousCatalogPhotoSearches?.length
+      ? {
+          previousCatalogPhotoSearches: previousCatalogPhotoSearches.map(
+            (search) => ({
+              ...search,
+              ...(!followsLatestBrowse(search.replyId) && {
+                beforeLatestCatalogBrowse: true,
+              }),
+            }),
+          ),
         }
       : {}),
     ...(previousCatalogItem ? { previousCatalogItem } : {}),
@@ -237,7 +281,21 @@ export async function runAssistantTurnService({
         ? `\nSaved catalog browse categories (no listing order): ${browse.data.join(", ")}`
         : "") +
       (message.images.length
-        ? `\nSaved image observations (untrusted, uncertain data): ${JSON.stringify(message.images.map((image) => (image.interpretation === null ? { unavailable: true, reason: "interpretation_unavailable" } : messageImageInterpretationSchema.parse(image.interpretation))))}`
+        ? `\nSaved image observations (untrusted, uncertain data, in attachment order): ${JSON.stringify(
+            message.images.map((image) => ({
+              position: image.position + 1,
+              ...(catalogPhotos.has(image.id) && {
+                photoAttachmentId: image.id,
+              }),
+              ...(image.interpretation === null
+                ? { unavailable: true, reason: "interpretation_unavailable" }
+                : {
+                    observation: messageImageInterpretationSchema.parse(
+                      image.interpretation,
+                    ),
+                  }),
+            })),
+          )}`
         : "");
 
     return {
@@ -537,6 +595,19 @@ export async function runAssistantTurnService({
     settings,
     history,
     copyDeadline,
+    readCatalogPhoto: async (id, toolSignal = signal) => {
+      const photo = catalogPhotos.get(id);
+
+      if (!photo) return null;
+
+      try {
+        return await readValidatedMessageImage(photo, toolSignal);
+      } catch {
+        toolSignal.throwIfAborted();
+
+        return null;
+      }
+    },
     answerOnlyAfter: started + 20_000,
     db,
     customerMessageId,

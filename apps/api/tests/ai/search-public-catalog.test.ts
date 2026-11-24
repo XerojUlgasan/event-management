@@ -3,13 +3,16 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { after, before, test } from "node:test";
+import { Image } from "imagescript";
 import { Kysely, PostgresDialect, sql } from "kysely";
 import { Pool } from "pg";
 import type { DB } from "../../src/db/types.js";
 import {
+  CatalogSearchPhotoUnavailable,
   searchPublicCatalogInputSchema,
   searchPublicCatalogService,
 } from "../../src/services/ai/search-public-catalog.js";
+import { KnowledgeSearchUnavailable } from "../../src/services/ai/retrieval/search-catalog-knowledge.js";
 import { syncCatalogKnowledge } from "../../src/services/ai/workflows/sync-catalog-knowledge.js";
 import { catalogKnowledgeDigest } from "../../src/services/ai/catalog-knowledge-hash.js";
 import { saveCatalogKnowledgeEmbeddingData } from "../../src/data/ai/save-catalog-knowledge-embedding.js";
@@ -24,14 +27,16 @@ let admin: Pool | undefined;
 let db: Kysely<DB>;
 let calls = 0;
 let fail = false;
+let embeddingRequest: unknown;
 
 const vector = (x: number, y: number) => [x, y, ...Array(766).fill(0)];
 
 before(async () => {
   process.env.AI_GATEWAY_API_KEY = "fixture-key";
   process.env.EMBEDDING_MODEL = model;
-  globalThis.fetch = async () => {
+  globalThis.fetch = async (_input, init) => {
     calls++;
+    embeddingRequest = JSON.parse(String(init?.body));
 
     return fail
       ? new Response("failed", { status: 503 })
@@ -87,18 +92,23 @@ async function index(
     .transaction()
     .execute((trx) => syncCatalogKnowledge(trx, { kind, id }));
 
-  for (const row of rows) {
-    const hash = `${row.content_hash}:${catalogKnowledgeDigest(row.content_markdown)}`;
-    await db
-      .updateTable("catalog_knowledge")
-      .set({ content_hash: hash })
-      .where("id", "=", row.id)
-      .execute();
-    await saveCatalogKnowledgeEmbeddingData(db, row.id, hash, {
-      model,
-      embedding,
-    });
-  }
+  for (const row of rows) await saveIndexedChunk(row, embedding);
+}
+
+async function saveIndexedChunk(
+  row: Awaited<ReturnType<typeof syncCatalogKnowledge>>[number],
+  embedding: number[],
+) {
+  const hash = `${row.content_hash}:${catalogKnowledgeDigest(row.content_markdown)}`;
+  await db
+    .updateTable("catalog_knowledge")
+    .set({ content_hash: hash })
+    .where("id", "=", row.id)
+    .execute();
+  await saveCatalogKnowledgeEmbeddingData(db, row.id, hash, {
+    model,
+    embedding,
+  });
 }
 
 test("validates filters and never embeds queryless searches", async () => {
@@ -474,4 +484,326 @@ test("service price filters use the selected rate and return full rate units", a
     hourly.results.map((r) => r.name),
     ["Hourly"],
   );
+});
+
+async function photoCanvas(altLabels: string[]) {
+  const mediaId = randomUUID();
+
+  if (altLabels.length)
+    await db
+      .insertInto("media_assets")
+      .values({
+        id: mediaId,
+        kind: "image",
+        source: "upload",
+        url: null,
+        storage_key: `catalog-media/${mediaId}`,
+        mime_type: "image/png",
+        byte_size: 1,
+        created_by: null,
+      })
+      .execute();
+
+  const widgets = altLabels.map((alt, position) => ({
+    id: randomUUID(),
+    type: "photo",
+    x: 0,
+    y: position * 5,
+    w: 6,
+    h: 5,
+    markdown: "",
+    mediaId,
+    alt,
+    caption: "",
+    autoplay: false,
+  }));
+
+  const canvas = [{ id: randomUUID(), title: "Examples", widgets }];
+
+  return { canvas, widgets };
+}
+
+test("photo search embeds original PNG bytes and optional focus once, then selects the best fresh public photo per filtered package", async () => {
+  async function packageExample(
+    slug: string,
+    photos: number[][],
+    filters: { price?: number; guests?: number } = {},
+  ) {
+    const { canvas, widgets } = await photoCanvas(
+      photos.map((_, position) => `${slug} photo ${position + 1}`),
+    );
+
+    const { id } = await db
+      .insertInto("packages")
+      .values({
+        name: slug,
+        slug,
+        description: "Fixture",
+        max_guests: filters.guests ?? 60,
+        price: filters.price ?? 300,
+        canvas: sql`${JSON.stringify(canvas)}::jsonb`,
+      })
+      .returning("id")
+      .executeTakeFirstOrThrow();
+
+    const rows = await db
+      .transaction()
+      .execute((trx) => syncCatalogKnowledge(trx, { kind: "package", id }));
+
+    for (const row of rows) {
+      const position = widgets.findIndex(
+        (widget) => row.chunk_key === `photo:${widget.id}`,
+      );
+
+      await saveIndexedChunk(row, photos[position] ?? vector(1, 0));
+    }
+
+    return id;
+  }
+
+  await packageExample("photo-best", [vector(0.8, 0.6), vector(0.95, 0.31)]);
+  await packageExample("photo-second", [vector(0.6, 0.8)]);
+  await packageExample("photo-third", [vector(0.4, 0.92)]);
+  await packageExample("photo-fourth", [vector(0.2, 0.98)]);
+  await packageExample("photo-over-budget", [vector(1, 0)], { price: 301 });
+  await packageExample("photo-under-budget", [vector(1, 0)], { price: 299 });
+  await packageExample("photo-too-small", [vector(1, 0)], { guests: 49 });
+  await packageExample("photo-text-only", []);
+  const stale = await packageExample("photo-stale", [vector(1, 0)]);
+  const withdrawn = await packageExample("photo-withdrawn", [vector(1, 0)]);
+  const archived = await packageExample("photo-archived", [vector(1, 0)]);
+  const incompatible = await packageExample("photo-incompatible", [
+    vector(1, 0),
+  ]);
+
+  await db
+    .updateTable("catalog_knowledge")
+    .set({ content_hash: "stale" })
+    .where("package_id", "=", stale)
+    .where("chunk_key", "like", "photo:%")
+    .execute();
+  await db
+    .updateTable("packages")
+    .set({ canvas: sql`'[]'::jsonb` })
+    .where("id", "=", withdrawn)
+    .execute();
+  await db
+    .updateTable("packages")
+    .set({ archived_at: new Date() })
+    .where("id", "=", archived)
+    .execute();
+  await db
+    .updateTable("catalog_knowledge")
+    .set({ embedding_model: "incompatible" })
+    .where("package_id", "=", incompatible)
+    .where("chunk_key", "like", "photo:%")
+    .execute();
+
+  const bytes = await new Image(2, 2).fill(0xff0088ff).encodePNG();
+  const photoAttachmentId = randomUUID();
+  const input = {
+    catalogType: "package" as const,
+    photoAttachmentId: photoAttachmentId.toUpperCase(),
+    query: " floral arch ",
+    pax: 50,
+    minPricePesos: 300,
+    maxPricePesos: 300,
+  };
+  const controller = new AbortController();
+  let reads = 0;
+
+  const readPhoto = async (id: string, signal?: AbortSignal) => {
+    reads++;
+    assert.equal(id, photoAttachmentId);
+    assert.equal(signal, controller.signal);
+
+    return { bytes, mimeType: "image/png" };
+  };
+
+  const options = { db, readPhoto, abortSignal: controller.signal };
+  const priorCalls = calls;
+  const first = await searchPublicCatalogService({ ...options, input });
+  assert.equal(reads, 1);
+  assert.equal(calls, priorCalls + 1);
+  assert.deepEqual(embeddingRequest, {
+    values: ["floral arch"],
+    dimensions: 768,
+    providerOptions: {
+      google: {
+        content: [
+          [
+            {
+              inlineData: {
+                mimeType: "image/png",
+                data: Buffer.from(bytes).toString("base64"),
+              },
+            },
+          ],
+        ],
+      },
+    },
+  });
+  assert.equal(first.photoAttachmentId, photoAttachmentId);
+  assert.deepEqual(
+    first.results.map((result) => result.name),
+    ["photo-best", "photo-second", "photo-third"],
+  );
+  assert.equal(first.results[0]?.evidence[0]?.kind, "photo");
+  assert.match(
+    first.results[0]?.evidence[0]?.excerpt ?? "",
+    /photo-best photo 2/,
+  );
+  assert.ok(
+    (first.results[0]?.evidence[0]?.similarity ?? 0) >
+      (first.results[1]?.evidence[0]?.similarity ?? 1),
+  );
+  assert.ok(first.nextCursor);
+
+  for (const changed of [
+    { photoAttachmentId: randomUUID() },
+    { photoAttachmentId: undefined },
+    { query: "other detail" },
+    { maxPricePesos: 301 },
+  ])
+    await assert.rejects(
+      searchPublicCatalogService({
+        ...options,
+        input: { ...input, ...changed, cursor: first.nextCursor },
+      }),
+      /Invalid pagination cursor/,
+    );
+
+  assert.equal(reads, 1);
+  assert.equal(calls, priorCalls + 1);
+
+  const second = await searchPublicCatalogService({
+    ...options,
+    input: {
+      ...input,
+      photoAttachmentId,
+      query: "floral arch",
+      cursor: first.nextCursor,
+    },
+  });
+  assert.deepEqual(
+    second.results.map((result) => result.name),
+    ["photo-fourth"],
+  );
+  assert.equal(second.nextCursor, null);
+  assert.equal(reads, 2);
+  assert.equal(calls, priorCalls + 2);
+});
+
+test("photo-only service search preprocesses WebP, retains pricing type and filters, and permits an empty eligible corpus", async () => {
+  const { canvas } = await photoCanvas(["Fixture stage"]);
+
+  for (const [slug, fixed] of [
+    ["photo-fixed", 500],
+    ["photo-hourly", null],
+  ] as const) {
+    const { id } = await db
+      .insertInto("services")
+      .values({
+        name: slug,
+        slug,
+        description: "",
+        fixed_price_pesos: fixed,
+        included_hours: fixed ? 3 : null,
+        hourly_rate_pesos: 75,
+        canvas: sql`${JSON.stringify(canvas)}::jsonb`,
+      })
+      .returning("id")
+      .executeTakeFirstOrThrow();
+    await index("service", id, vector(1, 0));
+  }
+
+  const webp = await new Image(3, 2).fill(0xff0088ff).encodeWebP();
+  const photoAttachmentId = randomUUID();
+  const input = {
+    catalogType: "service" as const,
+    photoAttachmentId,
+    pricingType: "fixed" as const,
+    minPricePesos: 500,
+    maxPricePesos: 500,
+  };
+
+  const readPhoto = async () => ({ bytes: webp, mimeType: "image/webp" });
+
+  const priorCalls = calls;
+  const page = await searchPublicCatalogService({ db, input, readPhoto });
+  assert.equal(calls, priorCalls + 1);
+  assert.equal(page.photoAttachmentId, photoAttachmentId);
+  assert.deepEqual(
+    page.results.map((result) => result.name),
+    ["photo-fixed"],
+  );
+
+  const request = embeddingRequest as {
+    values: string[];
+    dimensions: number;
+    providerOptions: {
+      google: {
+        content: { inlineData: { mimeType: string; data: string } }[][];
+      };
+    };
+  };
+  assert.deepEqual(request.values, [""]);
+  assert.equal(request.dimensions, 768);
+  const image = request.providerOptions.google.content[0]![0]!.inlineData;
+  assert.equal(image.mimeType, "image/png");
+  const converted = await Image.decode(Buffer.from(image.data, "base64"));
+  assert.equal(converted.width, 3);
+  assert.equal(converted.height, 2);
+
+  const empty = await searchPublicCatalogService({
+    db,
+    input: { ...input, minPricePesos: 501, maxPricePesos: 501 },
+    readPhoto,
+  });
+  assert.deepEqual(empty, { photoAttachmentId, results: [], nextCursor: null });
+});
+
+test("photo search skips embedding on unavailable or invalid bytes and distinguishes provider failure", async () => {
+  const input = {
+    catalogType: "package" as const,
+    photoAttachmentId: randomUUID(),
+  };
+  const priorCalls = calls;
+  await assert.rejects(
+    searchPublicCatalogService({ db, input }),
+    CatalogSearchPhotoUnavailable,
+  );
+  await assert.rejects(
+    searchPublicCatalogService({ db, input, readPhoto: async () => null }),
+    CatalogSearchPhotoUnavailable,
+  );
+  await assert.rejects(
+    searchPublicCatalogService({
+      db,
+      input,
+      readPhoto: async () => ({
+        bytes: new Uint8Array([1, 2, 3]),
+        mimeType: "image/jpeg",
+      }),
+    }),
+    CatalogSearchPhotoUnavailable,
+  );
+  assert.equal(calls, priorCalls);
+
+  const bytes = await new Image(1, 1).encodePNG();
+  fail = true;
+
+  try {
+    await assert.rejects(
+      searchPublicCatalogService({
+        db,
+        input,
+        readPhoto: async () => ({ bytes, mimeType: "image/png" }),
+      }),
+      KnowledgeSearchUnavailable,
+    );
+    assert.equal(calls, priorCalls + 1);
+  } finally {
+    fail = false;
+  }
 });

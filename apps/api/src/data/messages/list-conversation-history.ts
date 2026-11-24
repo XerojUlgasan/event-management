@@ -14,6 +14,8 @@ export function listConversationHistoryData(
     .select([
       "m.id",
       "m.sender_role",
+      "m.sender_id",
+      "m.guest_origin",
       "m.body",
       "m.catalog_browse",
       messageImagesSelection(),
