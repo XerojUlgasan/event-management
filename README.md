@@ -415,7 +415,7 @@ Migration `20261116155140_anonymous_guest_chat` adds server-only guest identitie
 
 Migration `20261116061207_add_ai_message_replies` makes the message sender nullable only for the new `assistant` role; human sender IDs remain required. It preserves existing messages and conversation lifecycle. Deploy the matching API and browser contracts together.
 
-**`pnpm db:reset` deletes data without a confirmation prompt.** Its script forces a Prisma reset, reapplies migrations, and seeds the configured database. Check the target and use it only for a database whose contents may be discarded.
+**`pnpm db:reset` deletes data without a confirmation prompt.** It removes Clemora's Realtime helpers and policies, resets the `public` schema, replays committed migrations, and seeds the configured database. Check the target and use it only for a database whose contents may be discarded.
 
 ### Migration impact
 
