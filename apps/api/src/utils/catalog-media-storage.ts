@@ -1,4 +1,45 @@
-import { env } from "./env.js";
+import { config } from "../env.js";
+
+function storageKey() {
+  const direct =
+    config.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    config.SUPABASE_SECRET_KEY?.trim();
+
+  if (direct) return direct;
+
+  const raw = config.SUPABASE_SECRET_KEYS?.trim();
+
+  if (!raw) return undefined;
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+
+    // Object.values also accepts arrays and primitive JSON values, as before.
+    if (parsed === null || parsed === undefined) return undefined;
+
+    const entries = Object.values(parsed);
+    const candidate =
+      (typeof parsed === "object" && "default" in parsed
+        ? parsed.default
+        : undefined) ?? entries[0];
+
+    return typeof candidate === "string" && candidate.trim()
+      ? candidate.trim()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function getCatalogStorage() {
+  const url = config.SUPABASE_URL?.trim().replace(/\/$/, "");
+  const apiKey = storageKey();
+  const bucket = config.SUPABASE_STORAGE_BUCKET?.trim() || "event-management";
+
+  if (!url || !apiKey) throw new Error("Media storage is not configured");
+
+  return { url, apiKey, bucket };
+}
 
 export class CatalogMediaNotFound extends Error {}
 
@@ -73,7 +114,7 @@ export async function putCatalogMedia(
     bucket?: string;
   } = {},
 ) {
-  const { url, apiKey, bucket: defaultBucket } = env.STORAGE;
+  const { url, apiKey, bucket: defaultBucket } = getCatalogStorage();
   const bucket = options.bucket ?? defaultBucket;
   const response = await fetch(
     `${url}/storage/v1/object/${objectPath(bucket, key)}`,
@@ -95,7 +136,7 @@ export async function putCatalogMedia(
 }
 
 export async function deleteCatalogMedia(key: string, bucketOverride?: string) {
-  const { url, apiKey, bucket: defaultBucket } = env.STORAGE;
+  const { url, apiKey, bucket: defaultBucket } = getCatalogStorage();
   const bucket = bucketOverride ?? defaultBucket;
   const response = await fetch(`${url}/storage/v1/object/${bucket}`, {
     method: "DELETE",
@@ -115,7 +156,7 @@ export async function getCatalogMedia(
   abortSignal?: AbortSignal,
   bucketOverride?: string,
 ) {
-  const { url, apiKey, bucket: defaultBucket } = env.STORAGE;
+  const { url, apiKey, bucket: defaultBucket } = getCatalogStorage();
   const bucket = bucketOverride ?? defaultBucket;
   const response = await fetch(
     `${url}/storage/v1/object/${objectPath(bucket, key)}`,

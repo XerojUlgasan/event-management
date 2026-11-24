@@ -13,7 +13,7 @@ Give each app a discoverable owner for environment names, parsing, and fallback 
 
 ## Result
 
-API configuration is owned by [`src/utils/env.ts`](../../apps/api/src/utils/env.ts), reused by Node, the generated Edge bundle, Prisma/database configuration, seeds, and the standalone cleanup command. Web configuration has a public [`lib/env/env.ts`](../../apps/web/src/lib/env/env.ts) and server-only [`lib/server/config/env.ts`](../../apps/web/src/lib/server/config/env.ts); Astro config also imports the latter.
+API configuration is owned by [`src/utils/env.ts`](https://github.com/XerojUlgasan/event-management/blob/5da111cfe4b9bb383995c3e39a54f1977bd932b0/apps/api/src/utils/env.ts), reused by Node, the generated Edge bundle, Prisma/database configuration, seeds, and the standalone cleanup command. Web configuration has a public [`lib/env/env.ts`](https://github.com/XerojUlgasan/event-management/blob/5da111cfe4b9bb383995c3e39a54f1977bd932b0/apps/web/src/lib/env/env.ts) and server-only [`lib/server/config/env.ts`](https://github.com/XerojUlgasan/event-management/blob/5da111cfe4b9bb383995c3e39a54f1977bd932b0/apps/web/src/lib/server/config/env.ts); Astro config also imports the latter.
 
 ## Changes or findings
 

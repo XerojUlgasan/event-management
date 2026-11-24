@@ -8,6 +8,7 @@ import { Pool } from "pg";
 import { CATALOG_COLUMNS } from "@event-management/contracts/catalog";
 import { MAX_CATALOG_SEARCH_LENGTH } from "@event-management/contracts/limits/catalog";
 import { hashSessionToken } from "../src/utils/session.js";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const database = `em_packages_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -30,7 +31,7 @@ const storedImages = new Map<string, { bytes: Buffer; contentType: string }>();
 
 before(async () => {
   // Catalog regressions must not schedule requests to a live AI provider.
-  delete process.env.AI_GATEWAY_API_KEY;
+  setTestConfig({ AI_GATEWAY_API_KEY: undefined });
   assert.ok(
     ["localhost", "127.0.0.1", "::1"].includes(
       process.env.DB_HOST ?? "localhost",
@@ -158,10 +159,10 @@ before(async () => {
   );
   const address = storageServer.address();
   assert.ok(address && typeof address !== "string");
-  process.env.SUPABASE_URL = `http://127.0.0.1:${address.port}`;
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "test";
-  process.env.SUPABASE_STORAGE_BUCKET = "test";
-  process.env.DB_NAME = database;
+  setTestConfig({ SUPABASE_URL: `http://127.0.0.1:${address.port}` });
+  setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: "test" });
+  setTestConfig({ SUPABASE_STORAGE_BUCKET: "test" });
+  setTestConfig({ DB_NAME: database });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
   async function session(role: string) {

@@ -1,14 +1,25 @@
 import "dotenv/config";
 
-import { env } from "../utils/env.js";
+import { config } from "../env.js";
 
-const host = env.DB_HOST;
-const port = env.DB_PORT;
+const {
+  DB_HOST = "localhost",
+  DB_PORT = "5432",
+  DB_NAME,
+  DB_USER,
+  DB_PASSWORD,
+} = config;
 
-const database = encodeURIComponent(env.DB_NAME);
+if (!DB_NAME) throw new Error("DB_NAME is required");
 
-const user = encodeURIComponent(env.DB_USER);
+if (!DB_USER) throw new Error("DB_USER is required");
 
-const password = encodeURIComponent(env.DB_PASSWORD);
+if (!DB_PASSWORD) throw new Error("DB_PASSWORD is required");
 
-export const databaseUrl = `postgresql://${user}:${password}@${host}:${port}/${database}?schema=public`;
+const database = encodeURIComponent(DB_NAME);
+
+const user = encodeURIComponent(DB_USER);
+
+const password = encodeURIComponent(DB_PASSWORD);
+
+export const databaseUrl = `postgresql://${user}:${password}@${DB_HOST}:${DB_PORT}/${database}?schema=public`;

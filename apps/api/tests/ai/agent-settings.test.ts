@@ -11,6 +11,7 @@ import {
 } from "@event-management/contracts/ai-agent-settings";
 import { Pool } from "pg";
 import { hashSessionToken } from "../../src/utils/session.js";
+import { setTestConfig } from "../helpers/set-test-config.js";
 
 const database = `em_ai_agent_settings_${randomUUID().replaceAll("-", "")}`;
 
@@ -51,7 +52,7 @@ before(async () => {
       ),
     );
 
-  process.env.DB_NAME = database;
+  setTestConfig({ DB_NAME: database });
   ({ app } = await import("../../src/app.js"));
   ({ app: edge } = await import("../../src/edge/server.js"));
   ({ db } = await import("../../src/db/client.js"));

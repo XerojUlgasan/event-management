@@ -1,16 +1,18 @@
-import { env } from "../env/env";
+import { config } from "../../env";
 
-const configuredApiUrl = env.PUBLIC_API_URL;
+const { PUBLIC_API_URL = "http://localhost:3000/v1" } = config;
+
+export const publicApiUrl = PUBLIC_API_URL.replace(/\/$/, "");
 
 export function apiBase() {
-  const trimmed = configuredApiUrl.replace(/\/$/, "");
+  const base = publicApiUrl;
 
-  if (/^https?:\/\//.test(trimmed)) return trimmed;
+  if (/^https?:\/\//.test(base)) return base;
 
-  if (typeof window === "undefined") return trimmed;
+  if (typeof window === "undefined") return base;
 
   return new URL(
-    trimmed.replace(/^\//, ""),
+    base.replace(/^\//, ""),
     `${window.location.origin}/`,
   ).href.replace(/\/$/, "");
 }

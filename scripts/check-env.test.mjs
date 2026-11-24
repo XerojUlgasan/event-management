@@ -31,15 +31,15 @@ async function checkFixture(files) {
 
 test("allows owners, test setup, generated bundles and ordinary env utility imports", async () => {
   const result = await checkFixture({
-    "apps/api/src/utils/env.ts": "export const env = process.env;",
-    "apps/web/src/lib/env/env.ts":
-      "export const url = import.meta.env.PUBLIC_API_URL;",
-    "apps/web/src/lib/server/config/env.ts": "export const env = process.env;",
+    "apps/api/src/env.ts":
+      "export const config = { port: process.env.API_PORT };",
+    "apps/web/src/env.ts":
+      "export const config = { url: import.meta.env.PUBLIC_API_URL, proxy: process.env.API_PROXY_TARGET };",
     "apps/api/tests/setup.ts": "process.env.DB_NAME = 'disposable';",
     "apps/api/.secrets/private.ts": "process.env.PRIVATE_FIXTURE;",
     "apps/supabase/functions/api/_generated/app.js": "process.env.DB_HOST;",
     "apps/web/src/lib/http/request.ts":
-      "import { env } from '../env/env'; env.PUBLIC_API_URL; // process.env is a comment",
+      "import { config } from '../../env'; config.PUBLIC_API_URL; // process.env is a comment",
   });
   assert.equal(result.status, 0, result.output);
 });
@@ -47,6 +47,8 @@ test("allows owners, test setup, generated bundles and ordinary env utility impo
 test("rejects raw reads in app source, config, scripts and future apps", async () => {
   const result = await checkFixture({
     "apps/api/src/app.ts": "process.env.WEB_ORIGIN;",
+    "apps/api/src/utils/env.ts": "process.env.API_PORT;",
+    "apps/web/src/lib/server/config/env.ts": "process.env.API_PROXY_TARGET;",
     "apps/web/src/lib/http/request.ts": "import.meta.env?.PUBLIC_API_URL;",
     "apps/web/astro.config.mjs": "process['env'].API_PROXY_TARGET;",
     "apps/api/scripts/new-script.mjs": "const { env } = process;",
@@ -59,6 +61,8 @@ test("rejects raw reads in app source, config, scripts and future apps", async (
 
   for (const file of [
     "src/app.ts",
+    "src/utils/env.ts",
+    "src/lib/server/config/env.ts",
     "http/request.ts",
     "astro.config.mjs",
     "scripts/new-script.mjs",

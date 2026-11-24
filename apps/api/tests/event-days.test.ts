@@ -5,6 +5,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { after, before, test } from "node:test";
 import { Pool } from "pg";
 import { hashSessionToken } from "../src/utils/session.js";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const database = `em_days_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -38,7 +39,7 @@ before(async () => {
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
 
-  process.env.DB_NAME = database;
+  setTestConfig({ DB_NAME: database });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
   async function session(role: "admin" | "customer") {

@@ -25,6 +25,7 @@ import { readCatalogSectionsService } from "../src/services/catalog-canvas/read-
 import { prepareCatalogKnowledge } from "../src/services/ai/workflows/prepare-catalog-knowledge.js";
 import { searchPublicCatalogService } from "../src/services/ai/search-public-catalog.js";
 import { getPublicCatalogItemService } from "../src/services/ai/get-public-catalog-item.js";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const database = `em_seed_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -84,7 +85,7 @@ before(async () => {
   created = true;
   pool = new Pool({ ...connection, database });
   await applyMigrations(pool);
-  process.env.DB_NAME = database;
+  setTestConfig({ DB_NAME: database });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
 });

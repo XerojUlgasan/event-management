@@ -9,6 +9,7 @@ import { humanHandoffAcknowledgement } from "../src/data/messages/request-human-
 import { threadSchema } from "../src/controllers/messages/schemas.js";
 import { hashSessionToken } from "../src/utils/session.js";
 import { runAssistantTurnService } from "../src/services/ai/run-assistant-turn.js";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const database = `em_guest_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -78,9 +79,9 @@ before(async () => {
     );
   }
 
-  process.env.DB_NAME = database;
-  process.env.AI_GATEWAY_API_KEY = "fixture-key";
-  process.env.TEXT_MODEL = modelId;
+  setTestConfig({ DB_NAME: database });
+  setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
+  setTestConfig({ TEXT_MODEL: modelId });
   useReply("Hello from AMAC AI");
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
@@ -582,12 +583,15 @@ test("guest turns can select supporting document search and audit the result", a
       embeddings: [[1, ...Array<number>(767).fill(0)]],
       warnings: [],
     });
+
   try {
     useReply("I checked the supporting documents.");
     const generate = model.doGenerate.bind(model);
     model.doGenerate = async (...args) => {
       const result = await generate(...args);
+
       if (model.doGenerateCalls.length !== 1) return result;
+
       return {
         ...result,
         content: [

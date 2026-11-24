@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import type { Profile } from "../src/controllers/auth/profile.js";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const projectId = "demo-event-management";
 
@@ -37,7 +38,7 @@ before(async () => {
     ),
     "Tests require local PostgreSQL.",
   );
-  process.env.FIREBASE_PROJECT_ID = projectId;
+  setTestConfig({ FIREBASE_PROJECT_ID: projectId });
   const connection = {
     host: process.env.DB_HOST ?? "localhost",
     port: Number(process.env.DB_PORT ?? 5432),
@@ -58,7 +59,7 @@ before(async () => {
   }
 
   // Import configuration only after selecting the disposable database.
-  process.env.DB_NAME = database;
+  setTestConfig({ DB_NAME: database });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
   firebase = await (

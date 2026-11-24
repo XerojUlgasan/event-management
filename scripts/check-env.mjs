@@ -18,11 +18,7 @@ if (args.length && (args.length !== 2 || args[0] !== "--root")) {
 
 const root = args.length ? resolve(args[1]) : repository;
 
-const owners = new Set([
-  "apps/api/src/utils/env.ts",
-  "apps/web/src/lib/env/env.ts",
-  "apps/web/src/lib/server/config/env.ts",
-]);
+const owners = new Set(["apps/api/src/env.ts", "apps/web/src/env.ts"]);
 
 const ignored = new Set([
   ".secrets",
@@ -83,7 +79,7 @@ function inspect(path, source) {
     if (direct || destructured || imported) {
       const { line } = file.getLineAndCharacterOfPosition(node.getStart(file));
       failures.push(
-        `${path}:${line + 1}: Read environment variables through the app's env utility.`,
+        `${path}:${line + 1}: Read environment variables through config in the app's src/env.ts.`,
       );
     }
 
@@ -119,5 +115,5 @@ if (failures.length) {
   console.error(failures.join("\n"));
   process.exitCode = 1;
 } else {
-  console.log("Environment reads are centralized in app env utilities.");
+  console.log("Environment reads are centralized in each app's src/env.ts.");
 }

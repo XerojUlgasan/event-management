@@ -1,12 +1,12 @@
 import type { ShowcaseRecord } from "@event-management/contracts/showcase";
 import type { ShowcasePage } from "../../data/showcases/showcases";
-import { env } from "../config/env";
+import { getServerApiUrl } from "../http/api-url";
 
 async function serverGet<T>(
   path: string,
   allowMissing = false,
 ): Promise<T | null> {
-  const response = await fetch(`${env.SERVER_API_URL}${path}`);
+  const response = await fetch(`${getServerApiUrl()}${path}`);
 
   if (allowMissing && response.status === 404) return null;
 
