@@ -1,11 +1,11 @@
 import { messageBodyLimit } from "../constants/http.js";
-import { config } from "../env.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { MAX_VIDEO_SIZE_BYTES } from "@event-management/contracts/limits/videos";
 import {
   CATALOG_JSON_BODY_LIMIT_BYTES,
+  getAllowedWebOrigins,
   MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
   SMALL_JSON_BODY_LIMIT_BYTES,
   AGENT_PREVIEW_JSON_BODY_LIMIT_BYTES,
@@ -19,7 +19,7 @@ import {
   type RouteFamilyId,
 } from "./match-route.js";
 
-const allowedOrigins = config.WEB_ORIGINS;
+const allowedOrigins = getAllowedWebOrigins();
 
 const loaders = {
   "message-images": () => import("../controllers/message-images/index.js"),

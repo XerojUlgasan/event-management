@@ -6,27 +6,25 @@ import { Image } from "imagescript";
 import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images";
 import type { MediaAssets } from "../../src/db/types.js";
 import { readCatalogEmbeddingImage } from "../../src/services/ai/retrieval/read-catalog-embedding-image.js";
+import { setTestConfig } from "../helpers/set-test-config.js";
 
 const originalFetch = globalThis.fetch;
 const oldUrl = process.env.SUPABASE_URL;
 const oldKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const oldBucket = process.env.SUPABASE_STORAGE_BUCKET;
 
-process.env.SUPABASE_URL = "https://storage.invalid";
-process.env.SUPABASE_SERVICE_ROLE_KEY = "fixture-key";
-process.env.SUPABASE_STORAGE_BUCKET = "fixture-bucket";
+setTestConfig({ SUPABASE_URL: "https://storage.invalid" });
+setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: "fixture-key" });
+setTestConfig({ SUPABASE_STORAGE_BUCKET: "fixture-bucket" });
 
 after(() => {
   globalThis.fetch = originalFetch;
 
-  for (const [key, value] of Object.entries({
+  setTestConfig({
     SUPABASE_URL: oldUrl,
     SUPABASE_SERVICE_ROLE_KEY: oldKey,
     SUPABASE_STORAGE_BUCKET: oldBucket,
-  })) {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
+  });
 });
 
 function asset(

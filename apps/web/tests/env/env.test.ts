@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
+import { runInNewContext } from "node:vm";
 import { build } from "vite";
 import { config } from "../../src/env.ts";
+import { apiBase } from "../../src/lib/http/request.ts";
+import { getServerApiUrl } from "../../src/lib/server/http/api-url.ts";
 
 async function buildClientConfig(
   context: TestContext,
@@ -25,7 +28,8 @@ async function buildClientConfig(
     build: {
       lib: {
         entry: fileURLToPath(new URL("../../src/env.ts", import.meta.url)),
-        formats: ["es"],
+        formats: ["iife"],
+        name: "Fixture",
       },
       write: false,
     },
@@ -36,14 +40,11 @@ async function buildClientConfig(
   const chunk = bundle.output[0];
   assert.equal(chunk.type, "chunk");
   assert.ok(!chunk.code.includes("server-only-fixture"));
-  assert.ok(!chunk.code.includes("process.env"));
 
-  const code = Buffer.from(chunk.code).toString("base64");
-
-  return (await import(`data:text/javascript;base64,${code}`)).config;
+  return runInNewContext(`${chunk.code}\nFixture.config`);
 }
 
-test("browser config uses Vite public values and guards server settings", async (context) => {
+test("browser config contains raw Vite public values and no server settings", async (context) => {
   const browser = await buildClientConfig(context, {
     PUBLIC_API_URL: "/v1/",
     PUBLIC_FIREBASE_API_KEY: "test-key",
@@ -52,12 +53,12 @@ test("browser config uses Vite public values and guards server settings", async 
     PUBLIC_FIREBASE_APP_ID: undefined,
     API_PROXY_TARGET: "https://server-only-fixture.invalid",
   });
-  assert.equal(browser.PUBLIC_API_URL, "/v1");
-  assert.equal(browser.firebaseConfigured, true);
-  assert.equal(browser.firebaseConfig.projectId, "test-project");
-  assert.equal(browser.firebaseConfig.appId, undefined);
-  assert.throws(() => browser.API_PROXY_TARGET, /unavailable in the browser/);
-  assert.throws(() => browser.SERVER_API_URL, /unavailable in the browser/);
+  assert.equal(browser.PUBLIC_API_URL, "/v1/");
+  assert.equal(browser.PUBLIC_FIREBASE_API_KEY, "test-key");
+  assert.equal(browser.PUBLIC_FIREBASE_PROJECT_ID, "test-project");
+  assert.equal(browser.PUBLIC_FIREBASE_APP_ID, undefined);
+  assert.equal(browser.API_PROXY_TARGET, undefined);
+  assert.equal(browser.SERVER_PUBLIC_API_URL, undefined);
 });
 
 test("browser config preserves an explicitly empty public API URL", async (context) => {
@@ -65,27 +66,39 @@ test("browser config preserves an explicitly empty public API URL", async (conte
   assert.equal(browser.PUBLIC_API_URL, "");
 });
 
-test("source imports default browser settings before Vite initializes", () => {
-  assert.equal(config.PUBLIC_API_URL, "http://localhost:3000/v1");
-  assert.equal(config.firebaseConfigured, false);
+test("Node startup captures raw server settings and exposes the browser API default to callers", (context) => {
+  const initialProxy = process.env.API_PROXY_TARGET;
+  assert.equal(config.API_PROXY_TARGET, initialProxy);
+  assert.equal(config.PUBLIC_API_URL, undefined);
+  assert.equal(apiBase(), "http://localhost:3000/v1");
+  context.mock.property(process, "env", {
+    ...process.env,
+    API_PROXY_TARGET: initialProxy === "fixture" ? "" : "fixture",
+  });
+  assert.equal(config.API_PROXY_TARGET, initialProxy);
+
+  for (const descriptor of Object.values(
+    Object.getOwnPropertyDescriptors(config),
+  )) {
+    assert.ok("value" in descriptor);
+    assert.ok(
+      descriptor.value === undefined || typeof descriptor.value === "string",
+    );
+  }
 });
 
-test("server config reads runtime values and preserves proxy precedence", (context) => {
-  const source: NodeJS.ProcessEnv = {};
-  context.mock.property(process, "env", source);
+test("server URL resolution preserves proxy precedence", (context) => {
+  context.mock.property(config, "API_PROXY_TARGET", undefined);
+  context.mock.property(config, "SERVER_PUBLIC_API_URL", undefined);
 
-  assert.equal(config.SERVER_API_URL, "http://127.0.0.1:3000/v1");
-  source.PUBLIC_API_URL = "/v1";
-  assert.equal(config.SERVER_API_URL, "http://127.0.0.1:3000/v1");
-  source.PUBLIC_API_URL = "https://api.example.test/v1/";
-  assert.equal(config.SERVER_API_URL, "https://api.example.test/v1");
+  assert.equal(getServerApiUrl(), "http://127.0.0.1:3000/v1");
+  config.SERVER_PUBLIC_API_URL = "/v1";
+  assert.equal(getServerApiUrl(), "http://127.0.0.1:3000/v1");
+  config.SERVER_PUBLIC_API_URL = "https://api.example.test/v1/";
+  assert.equal(getServerApiUrl(), "https://api.example.test/v1");
 
-  source.API_PROXY_TARGET = "http://127.0.0.1:54321/";
-  assert.equal(config.API_PROXY_TARGET, source.API_PROXY_TARGET);
-  assert.equal(
-    config.SERVER_API_URL,
-    "http://127.0.0.1:54321/functions/v1/api/v1",
-  );
-  source.API_PROXY_TARGET = "";
-  assert.equal(config.SERVER_API_URL, "https://api.example.test/v1");
+  config.API_PROXY_TARGET = "http://127.0.0.1:54321/";
+  assert.equal(getServerApiUrl(), "http://127.0.0.1:54321/functions/v1/api/v1");
+  config.API_PROXY_TARGET = "";
+  assert.equal(getServerApiUrl(), "https://api.example.test/v1");
 });

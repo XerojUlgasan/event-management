@@ -13,6 +13,9 @@ import { config } from "../env.js";
 
 const apiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+const configurationError =
+  "Firebase Admin is not configured. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY (or GOOGLE_APPLICATION_CREDENTIALS) in apps/api/.env.";
+
 type ServiceAccount = {
   project_id?: string;
   client_email?: string;
@@ -20,30 +23,28 @@ type ServiceAccount = {
 };
 
 async function initialize() {
-  const firebase = config.FIREBASE_ADMIN;
-  const { projectId } = firebase;
+  const projectId = config.FIREBASE_PROJECT_ID?.trim();
+  const clientEmail = config.FIREBASE_CLIENT_EMAIL?.trim();
+  const privateKey = config.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n").trim();
 
-  if (firebase.kind === "emulator") {
+  if (config.FIREBASE_AUTH_EMULATOR_HOST && projectId) {
     initializeApp({ projectId });
 
     return;
   }
 
-  if (firebase.kind === "serviceAccount") {
+  if (projectId && clientEmail && privateKey) {
     initializeApp({
-      credential: cert({
-        projectId: firebase.projectId,
-        clientEmail: firebase.clientEmail,
-        privateKey: firebase.privateKey,
-      }),
-      projectId: firebase.projectId,
+      credential: cert({ projectId, clientEmail, privateKey }),
+      projectId,
     });
 
     return;
   }
 
-  if (firebase.kind === "file") {
-    const { credentialsPath } = firebase;
+  const credentialsPath = config.GOOGLE_APPLICATION_CREDENTIALS;
+
+  if (credentialsPath) {
     const credentialsFile = isAbsolute(credentialsPath)
       ? credentialsPath
       : resolve(apiRoot, credentialsPath);
@@ -70,10 +71,16 @@ async function initialize() {
     return;
   }
 
-  initializeApp({
-    credential: applicationDefault(),
-    ...(projectId ? { projectId } : {}),
-  });
+  if (config.GOOGLE_CLOUD_PROJECT || config.GCLOUD_PROJECT) {
+    initializeApp({
+      credential: applicationDefault(),
+      ...(projectId ? { projectId } : {}),
+    });
+
+    return;
+  }
+
+  throw new Error(configurationError);
 }
 
 let initialization: Promise<void> | undefined;

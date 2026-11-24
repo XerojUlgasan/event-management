@@ -45,7 +45,9 @@ export function seedClock() {
 }
 
 /** Deterministic unit interval. SEED_RANDOM_SEED changes the shuffle only. */
-export function seedRandom(seedText = config.SEED_RANDOM_SEED) {
+const { SEED_RANDOM_SEED = "clemora-scenario-v1" } = config;
+
+export function seedRandom(seedText = SEED_RANDOM_SEED) {
   let hash = 2166136261;
 
   for (let i = 0; i < seedText.length; i += 1)

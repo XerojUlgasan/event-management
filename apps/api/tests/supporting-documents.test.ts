@@ -21,6 +21,7 @@ import { runOneBackgroundJob } from "../src/services/background-jobs/run-one-bac
 import type { HonoEnv } from "../src/types/hono.js";
 import { hashSessionToken } from "../src/utils/session.js";
 import { buildPdf, textPage } from "./fixtures/supporting-pdf.js";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const database = `supporting_docs_${randomUUID().replaceAll("-", "")}`;
 
@@ -103,10 +104,10 @@ before(async () => {
       ),
     );
 
-  process.env.SUPABASE_URL = "http://storage.test";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "fixture-storage";
-  process.env.AI_GATEWAY_API_KEY = "fixture-embedding";
-  process.env.EMBEDDING_MODEL = "google/gemini-embedding-2";
+  setTestConfig({ SUPABASE_URL: "http://storage.test" });
+  setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: "fixture-storage" });
+  setTestConfig({ AI_GATEWAY_API_KEY: "fixture-embedding" });
+  setTestConfig({ EMBEDDING_MODEL: "google/gemini-embedding-2" });
   globalThis.fetch = async (input, init) => {
     const url = new URL(
       input instanceof Request ? input.url : input.toString(),

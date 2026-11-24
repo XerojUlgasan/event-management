@@ -5,6 +5,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { hashSessionToken } from "../src/utils/session.js";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const database = `em_booking_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -278,7 +279,7 @@ before(async () => {
     ).rowCount,
     0,
   );
-  process.env.DB_NAME = database;
+  setTestConfig({ DB_NAME: database });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
 
@@ -2426,16 +2427,20 @@ test("manual add-ons validate current catalog terms and persist an atomic snapsh
     contactName: "Customer",
     phoneNumber: "123",
   };
+
   const selection = (service: typeof fixed, hours: number) => ({
     serviceId: service.id,
     serviceUpdatedAt: service.updated_at.toISOString(),
     hours,
   });
+
   const post = (body: unknown) =>
     call("/booking-requests", "POST", body, customerCookie);
+
   const beforeCount = Number(
     (await pool.query("SELECT count(*) AS n FROM booking_requests")).rows[0].n,
   );
+
   for (const [addons, status, extra] of [
     [[selection(fixed, -1)], 400, {}],
     [
@@ -2469,11 +2474,13 @@ test("manual add-ons validate current catalog terms and persist an atomic snapsh
       await post({ ...base, ...extra, requestedAddons: addons }),
       status,
     );
+
     if (status === 409) {
       assert.equal(result.code, "requested_addon_conflict");
       assert.equal(result.resourceId, addons[0].serviceId);
     }
   }
+
   assert.equal(
     Number(
       (await pool.query("SELECT count(*) AS n FROM booking_requests")).rows[0]
@@ -2517,6 +2524,7 @@ test("manual add-ons validate current catalog terms and persist an atomic snapsh
   });
   assert.equal(created.requestedServices[0].included, false);
   assert.equal(created.requestedServices[0].notes, null);
+
   const moreServices = await db
     .insertInto("services")
     .values(
@@ -2529,11 +2537,13 @@ test("manual add-ons validate current catalog terms and persist an atomic snapsh
     )
     .returningAll()
     .execute();
+
   const largeRequest = {
     ...base,
     specialRequests: "あ".repeat(4000),
     requestedAddons: moreServices.map((service) => selection(service, 1)),
   };
+
   assert.ok(Buffer.byteLength(JSON.stringify(largeRequest)) > 16 * 1024);
   const largeBooking = (await read(await post(largeRequest), 201))
     .bookingRequest;

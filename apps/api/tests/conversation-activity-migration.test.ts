@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { test } from "node:test";
 import { Pool } from "pg";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const migration = "20261120124456_derive_conversation_activity";
 
@@ -127,7 +128,7 @@ test("derived conversation activity preserves history and makes a formerly close
       "INSERT INTO conversations(guest_identity_id) VALUES($1)",
       [identity],
     );
-    process.env.DB_NAME = name;
+    setTestConfig({ DB_NAME: name });
     ({ db: runtime } = await import("../src/db/client.js"));
     const { prepareQuotationService } =
       await import("../src/services/quotations/prepare-quotation.js");

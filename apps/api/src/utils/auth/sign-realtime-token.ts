@@ -14,6 +14,29 @@ const signingKeySchema = z.object({
   d: z.string().min(1),
 });
 
+function localRealtimeSecret() {
+  const secret = config.REALTIME_JWT_SECRET?.trim();
+  const target = config.SUPABASE_URL?.trim();
+
+  if (!secret || !target || config.NODE_ENV === "production")
+    return undefined;
+
+  try {
+    const url = new URL(target);
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+
+    const isLoopback = ["localhost", "127.0.0.1", "[::1]"].includes(
+      url.hostname,
+    );
+    const isLocalEdgeGateway = url.origin === "http://kong:8000";
+
+    return isLoopback || isLocalEdgeGateway ? secret : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export type RealtimeTokenTarget =
   { conversationId: string } | { scope: "notifications" };
 
@@ -22,7 +45,6 @@ export async function signRealtimeToken(
   session: SessionContext,
   { issuedAt, expiresAt }: { issuedAt: number; expiresAt: number },
 ) {
-  const signing = config.REALTIME_SIGNING;
   const scopeClaims =
     "conversationId" in target
       ? {
@@ -40,8 +62,10 @@ export async function signRealtimeToken(
     .setIssuedAt(issuedAt)
     .setExpirationTime(expiresAt);
 
-  if (signing?.algorithm === "ES256") {
-    const signingKey = signingKeySchema.parse(JSON.parse(signing.jwk));
+  const jwk = config.REALTIME_JWT_SIGNING_JWK?.trim();
+
+  if (jwk) {
+    const signingKey = signingKeySchema.parse(JSON.parse(jwk));
     const key = await importJWK(signingKey, "ES256");
 
     return payload
@@ -49,8 +73,10 @@ export async function signRealtimeToken(
       .sign(key);
   }
 
-  if (signing?.algorithm === "HS256") {
-    const key = new TextEncoder().encode(signing.secret);
+  const secret = localRealtimeSecret();
+
+  if (secret) {
+    const key = new TextEncoder().encode(secret);
 
     if (key.length >= 32)
       return payload.setProtectedHeader({ alg: "HS256", typ: "JWT" }).sign(key);

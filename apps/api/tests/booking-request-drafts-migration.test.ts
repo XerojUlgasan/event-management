@@ -8,6 +8,7 @@ import {
   bookingDraftFieldsSchema,
   reviewedServiceSchema,
 } from "@event-management/contracts/booking-draft";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const migration = "20261122010000_booking_request_drafts";
 
@@ -257,7 +258,7 @@ test("forward migration preserves submitted requests, active drafts and historic
       { code: "23514" },
     );
     // Exercise the actual draft reader and customer API against this database.
-    process.env.DB_NAME = name;
+    setTestConfig({ DB_NAME: name });
     ({ db: runtime } = await import("../src/db/client.js"));
     const { readBookingDraftData } =
       await import("../src/data/messages/booking-draft-guard.js");
@@ -381,8 +382,8 @@ test("forward migration preserves submitted requests, active drafts and historic
   } finally {
     await runtime?.destroy();
 
-    if (previousDbName === undefined) delete process.env.DB_NAME;
-    else process.env.DB_NAME = previousDbName;
+    if (previousDbName === undefined) setTestConfig({ DB_NAME: undefined });
+    else setTestConfig({ DB_NAME: previousDbName });
 
     await pool?.end();
     await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);

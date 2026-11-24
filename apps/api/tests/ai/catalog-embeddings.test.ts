@@ -37,6 +37,7 @@ import {
 import type { ServiceContent } from "../../src/controllers/services/schemas.js";
 import type { Selectable } from "kysely";
 import type { MediaAssets } from "../../src/db/types.js";
+import { setTestConfig } from "../helpers/set-test-config.js";
 
 const database = `em_catalog_embeddings_${randomUUID().replaceAll("-", "")}`;
 
@@ -482,11 +483,11 @@ before(async () => {
   );
   const address = storageServer.address();
   assert.ok(address && typeof address !== "string");
-  process.env.SUPABASE_URL = `http://127.0.0.1:${address.port}`;
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "fixture-storage-key";
-  process.env.SUPABASE_STORAGE_BUCKET = "event-management";
-  process.env.AI_GATEWAY_API_KEY = "fixture-gateway-key";
-  process.env.EMBEDDING_MODEL = embeddingModel;
+  setTestConfig({ SUPABASE_URL: `http://127.0.0.1:${address.port}` });
+  setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: "fixture-storage-key" });
+  setTestConfig({ SUPABASE_STORAGE_BUCKET: "event-management" });
+  setTestConfig({ AI_GATEWAY_API_KEY: "fixture-gateway-key" });
+  setTestConfig({ EMBEDDING_MODEL: embeddingModel });
   await installGatewayInterceptor();
 });
 
@@ -509,8 +510,7 @@ after(async () => {
   for (const name of environmentNames) {
     const value = originalEnvironment.get(name);
 
-    if (value === undefined) delete process.env[name];
-    else process.env[name] = value;
+    setTestConfig({ [name]: value });
   }
 });
 
@@ -703,8 +703,8 @@ test("admin submits all pending owners without provider configuration and worker
   ]);
   const apiKey = process.env.AI_GATEWAY_API_KEY;
   const storageKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  delete process.env.AI_GATEWAY_API_KEY;
-  delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  setTestConfig({ AI_GATEWAY_API_KEY: undefined });
+  setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: undefined });
   setGatewayHandler();
   storageRequests = 0;
 
@@ -736,8 +736,8 @@ test("admin submits all pending owners without provider configuration and worker
         .length,
       2,
     );
-    process.env.AI_GATEWAY_API_KEY = apiKey;
-    process.env.SUPABASE_SERVICE_ROLE_KEY = storageKey;
+    setTestConfig({ AI_GATEWAY_API_KEY: apiKey });
+    setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: storageKey });
 
     let releaseProvider = () => {};
 
@@ -801,11 +801,11 @@ test("admin submits all pending owners without provider configuration and worker
       failedListings: 0,
     });
   } finally {
-    if (apiKey === undefined) delete process.env.AI_GATEWAY_API_KEY;
-    else process.env.AI_GATEWAY_API_KEY = apiKey;
+    if (apiKey === undefined) setTestConfig({ AI_GATEWAY_API_KEY: undefined });
+    else setTestConfig({ AI_GATEWAY_API_KEY: apiKey });
 
-    if (storageKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-    else process.env.SUPABASE_SERVICE_ROLE_KEY = storageKey;
+    if (storageKey === undefined) setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: undefined });
+    else setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: storageKey });
 
     await getDb()
       .deleteFrom("services")
@@ -2027,7 +2027,7 @@ test("provider failures stay pending and a later refresh retries them", async ()
 
 test("automatic save stays successful with missing embedding config and manual refresh recovers", async () => {
   const previousApiKey = process.env.AI_GATEWAY_API_KEY;
-  delete process.env.AI_GATEWAY_API_KEY;
+  setTestConfig({ AI_GATEWAY_API_KEY: undefined });
   setGatewayHandler();
 
   try {
@@ -2053,7 +2053,7 @@ test("automatic save stays successful with missing embedding config and manual r
     );
     assert.equal(gatewayCalls.length, 0);
 
-    process.env.AI_GATEWAY_API_KEY = "fixture-gateway-key";
+    setTestConfig({ AI_GATEWAY_API_KEY: "fixture-gateway-key" });
     const recovered = await refreshCatalogEmbeddingsService({
       db: getDb(),
       owner,
@@ -2070,8 +2070,8 @@ test("automatic save stays successful with missing embedding config and manual r
       ),
     );
   } finally {
-    if (previousApiKey === undefined) delete process.env.AI_GATEWAY_API_KEY;
-    else process.env.AI_GATEWAY_API_KEY = previousApiKey;
+    if (previousApiKey === undefined) setTestConfig({ AI_GATEWAY_API_KEY: undefined });
+    else setTestConfig({ AI_GATEWAY_API_KEY: previousApiKey });
   }
 });
 

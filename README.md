@@ -280,10 +280,10 @@ The Node API, Prisma, seeds, and integration tests still use Compose PostgreSQL 
 
 ### Configuration
 
-Each app exports a single `config` object that owns its environment reads, parsing, and defaults.
+Each app exports a single `config` object of raw environment values. Config consumers validate and parse the settings they use.
 
-- [`apps/api/src/env.ts`](apps/api/src/env.ts) serves Node, the Edge bundle, and API commands. Getters read settings on demand, including optional Firebase, Storage, and AI settings. The existing runtime entry points load or inject the environment.
-- [`apps/web/src/env.ts`](apps/web/src/env.ts) serves the browser, the web server, and Astro config. Vite captures explicit `PUBLIC_*` settings at build time. Server-only getters read the runtime environment. Astro config can read shell-provided settings before Astro loads `.env` files.
+- [`apps/api/src/env.ts`](apps/api/src/env.ts) serves Node, the Edge bundle, and API commands. Values are captured when the module loads. Node entry points load dotenv first. Firebase, Storage, and AI settings are checked at use.
+- [`apps/web/src/env.ts`](apps/web/src/env.ts) serves the browser, the web server, and Astro config. Vite captures explicit `PUBLIC_*` settings at build time. Server settings are captured from the Node environment at module startup. Astro config can read shell-provided settings before Astro loads `.env` files.
 
 App consumers import `config` from their app's `src/env.ts`. `pnpm check:env` checks direct environment reads in app source and runs in `pnpm check`. Tests and generated Edge bundles are excluded. Compose and Supabase configuration use their native environment loading.
 
@@ -479,8 +479,8 @@ Run the checks matching the changed area:
 | `pnpm build`                                                     | Web production bundle and API types                                                                                                                                   |
 | `pnpm build:storybook`                                           | Shared UI rendering build                                                                                                                                             |
 | `pnpm db:validate`                                               | Prisma schema                                                                                                                                                         |
-| `pnpm check:env`                                                 | Raw environment reads remain in designated per-app utilities; excludes tests and generated bundles                                                                    |
-| `pnpm test:env`                                                  | Environment defaults, lazy reads, Firebase initialization, and deliberate env-check failures without a database                                                       |
+| `pnpm check:env`                                                 | Raw environment reads stay in each app’s src/env.ts. Tests and generated bundles are excluded                                                                    |
+| `pnpm test:env`                                                  | Raw environment snapshots, client and server settings, Firebase initialization, and env-check fixtures                                                       |
 | `pnpm check:web-structure`                                       | Web placement, naming, and runtime import rules; does not establish domain semantics or browser behavior                                                              |
 | `pnpm check:guidance`                                            | Context-factory links, anchors, skill metadata, registration, and reachability; does not verify agent compliance or application behavior                              |
 | `pnpm --filter @event-management/api test:auth`                  | Authentication and sessions with PostgreSQL and Firebase Auth emulator                                                                                                |

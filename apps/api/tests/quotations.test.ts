@@ -15,6 +15,7 @@ import {
 } from "@event-management/contracts/quotations";
 import { Pool } from "pg";
 import { hashSessionToken } from "../src/utils/session.js";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const database = `em_quote_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -32,7 +33,7 @@ let packageId: string;
 
 before(async () => {
   // Customer chat in this domain suite must not call the live AI provider.
-  delete process.env.AI_GATEWAY_API_KEY;
+  setTestConfig({ AI_GATEWAY_API_KEY: undefined });
   assert.ok(
     ["localhost", "127.0.0.1", "::1"].includes(
       process.env.DB_HOST ?? "localhost",
@@ -56,7 +57,7 @@ before(async () => {
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
 
-  process.env.DB_NAME = database;
+  setTestConfig({ DB_NAME: database });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
   async function session(role: string) {

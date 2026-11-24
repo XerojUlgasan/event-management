@@ -1,10 +1,10 @@
 import messageImageRoutes from "./controllers/message-images/index.js";
 import { messageBodyLimit } from "./constants/http.js";
-import { config } from "./env.js";
 import {
   SMALL_JSON_BODY_LIMIT_BYTES,
   AGENT_PREVIEW_JSON_BODY_LIMIT_BYTES,
   CATALOG_JSON_BODY_LIMIT_BYTES,
+  getAllowedWebOrigins,
   MEDIA_UPLOAD_BODY_OVERHEAD_BYTES,
   BUSINESS_INFORMATION_JSON_BODY_LIMIT_BYTES,
   bookingBodyLimit,
@@ -33,7 +33,7 @@ import type { HonoEnv } from "./types/hono.js";
 
 export const app = new OpenAPIHono<HonoEnv>();
 
-const allowedOrigins = config.WEB_ORIGINS;
+const allowedOrigins = getAllowedWebOrigins();
 
 app.use(
   "*",

@@ -22,6 +22,7 @@ import {
 } from "../src/data/messages/booking-draft-update.js";
 import { submitReviewedBookingRequestService } from "../src/services/booking-requests/submit-reviewed-booking-request.js";
 import { hashSessionToken } from "../src/utils/session.js";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const liveGatewayKey = process.env.AI_GATEWAY_API_KEY;
 
@@ -72,8 +73,8 @@ before(async () => {
     );
   }
 
-  delete process.env.AI_GATEWAY_API_KEY;
-  process.env.DB_NAME = database;
+  setTestConfig({ AI_GATEWAY_API_KEY: undefined });
+  setTestConfig({ DB_NAME: database });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
   admin = await session("admin");
@@ -1066,7 +1067,7 @@ test(
       liveGatewayKey && process.env.TEXT_MODEL,
       "Configure the Gateway model for this opt-in test",
     );
-    process.env.AI_GATEWAY_API_KEY = liveGatewayKey;
+    setTestConfig({ AI_GATEWAY_API_KEY: liveGatewayKey });
 
     try {
       const pkg = await db
@@ -1160,7 +1161,7 @@ test(
       assert.equal(staffThread.conversation.bookingRequestId, submitted.id);
       assert.deepEqual(await linkedBooking(conversation.id), submitted);
     } finally {
-      delete process.env.AI_GATEWAY_API_KEY;
+      setTestConfig({ AI_GATEWAY_API_KEY: undefined });
     }
   },
 );

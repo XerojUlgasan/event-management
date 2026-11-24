@@ -15,6 +15,7 @@ import { startToolCallData } from "../src/data/ai/start-tool-call.js";
 import { requestHumanHandoffData } from "../src/data/messages/request-human-handoff.js";
 import { createNotificationData } from "../src/data/notifications/create-notification.js";
 import { hashSessionToken } from "../src/utils/session.js";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const database = `em_notification_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -51,7 +52,7 @@ before(async () => {
       ),
     );
 
-  process.env.DB_NAME = database;
+  setTestConfig({ DB_NAME: database });
   ({ app } = await import("../src/app.js"));
   ({ app: edge } = await import("../src/edge/server.js"));
   ({ db } = await import("../src/db/client.js"));

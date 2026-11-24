@@ -1,7 +1,11 @@
 import { config } from "../../env";
 
+const { PUBLIC_API_URL = "http://localhost:3000/v1" } = config;
+
+export const publicApiUrl = PUBLIC_API_URL.replace(/\/$/, "");
+
 export function apiBase() {
-  const base = config.PUBLIC_API_URL;
+  const base = publicApiUrl;
 
   if (/^https?:\/\//.test(base)) return base;
 

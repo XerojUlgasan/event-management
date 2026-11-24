@@ -7,6 +7,7 @@ import { after, afterEach, before, test } from "node:test";
 import { promisify } from "node:util";
 import { deleteApp, getApps } from "firebase-admin/app";
 import { getFirebaseAuth } from "../src/utils/firebase-admin.js";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const variables = [
   "FIREBASE_PROJECT_ID",
@@ -16,7 +17,7 @@ const variables = [
   "GOOGLE_APPLICATION_CREDENTIALS",
   "GOOGLE_CLOUD_PROJECT",
   "GCLOUD_PROJECT",
-];
+] as const;
 
 const original = new Map(variables.map((name) => [name, process.env[name]]));
 
@@ -25,11 +26,11 @@ let credentialsFile: string;
 let credentials: string;
 
 before(async () => {
-  for (const name of variables) delete process.env[name];
+  for (const name of variables) setTestConfig({ [name]: undefined });
 
   directory = await mkdtemp(join(tmpdir(), "clemora-firebase-test-"));
   credentialsFile = join(directory, "service-account.json");
-  process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsFile;
+  setTestConfig({ GOOGLE_APPLICATION_CREDENTIALS: credentialsFile });
   const { privateKey } = await promisify(generateKeyPair)("rsa", {
     modulusLength: 2048,
     privateKeyEncoding: { type: "pkcs8", format: "pem" },
@@ -50,8 +51,7 @@ after(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 
   for (const [name, value] of original) {
-    if (value === undefined) delete process.env[name];
-    else process.env[name] = value;
+    setTestConfig({ [name]: value });
   }
 });
 

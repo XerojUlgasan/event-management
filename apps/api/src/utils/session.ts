@@ -6,7 +6,16 @@ import type { HonoEnv } from "../types/hono.js";
 
 export const SESSION_COOKIE = "em_session";
 
-export const SESSION_TTL_MS = config.SESSION_TTL_MS;
+const { SESSION_TTL_DAYS = "7" } = config;
+
+const sessionDays = Number(SESSION_TTL_DAYS);
+
+export const SESSION_TTL_MS =
+  (Number.isFinite(sessionDays) && sessionDays > 0 ? sessionDays : 7) *
+  24 *
+  60 *
+  60 *
+  1000;
 
 export function hashSessionToken(token: string) {
   return createHash("sha256").update(token).digest("hex");

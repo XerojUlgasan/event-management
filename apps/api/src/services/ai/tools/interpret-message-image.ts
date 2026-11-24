@@ -9,7 +9,7 @@ import type { Kysely } from "kysely";
 import type { DB } from "../../../db/types.js";
 import { finishToolCallData } from "../../../data/ai/finish-tool-call.js";
 import { startImageToolCallData } from "../../../data/ai/start-image-tool-call.js";
-import { config } from "../../../env.js";
+import { getVisionSettings } from "../models.js";
 import { interpretMessageImage } from "../interpret-message-image.js";
 
 export const interpretMessageImageInputSchema = z.object({}).strict();
@@ -35,7 +35,7 @@ export function createInterpretMessageImageTool(options: {
       let model: string | null = null;
 
       try {
-        model = config.AI_VISION.model;
+        model = getVisionSettings().model;
       } catch {
         /* Record missing configuration as a failed call. */
       }

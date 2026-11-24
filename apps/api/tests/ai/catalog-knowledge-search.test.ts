@@ -13,6 +13,7 @@ import { hashSessionToken } from "../../src/utils/session.js";
 import { catalogKnowledgeDigest } from "../../src/services/ai/catalog-knowledge-hash.js";
 import { syncCatalogKnowledge } from "../../src/services/ai/workflows/sync-catalog-knowledge.js";
 import { saveCatalogKnowledgeEmbeddingData } from "../../src/data/ai/save-catalog-knowledge-embedding.js";
+import { setTestConfig } from "../helpers/set-test-config.js";
 
 const database = `em_knowledge_search_${randomUUID().replaceAll("-", "")}`;
 
@@ -31,8 +32,8 @@ let providerFail = false;
 const vector = (x: number, y: number) => [x, y, ...Array(766).fill(0)];
 
 before(async () => {
-  process.env.AI_GATEWAY_API_KEY = "fixture-key";
-  process.env.EMBEDDING_MODEL = model;
+  setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
+  setTestConfig({ EMBEDDING_MODEL: model });
   globalThis.fetch = async (_input, init) => {
     calls++;
     assert.deepEqual(JSON.parse(String(init?.body)).values, [
@@ -102,11 +103,11 @@ before(async () => {
 after(async () => {
   globalThis.fetch = originalFetch;
 
-  if (originalKey === undefined) delete process.env.AI_GATEWAY_API_KEY;
-  else process.env.AI_GATEWAY_API_KEY = originalKey;
+  if (originalKey === undefined) setTestConfig({ AI_GATEWAY_API_KEY: undefined });
+  else setTestConfig({ AI_GATEWAY_API_KEY: originalKey });
 
-  if (originalModel === undefined) delete process.env.EMBEDDING_MODEL;
-  else process.env.EMBEDDING_MODEL = originalModel;
+  if (originalModel === undefined) setTestConfig({ EMBEDDING_MODEL: undefined });
+  else setTestConfig({ EMBEDDING_MODEL: originalModel });
 
   await db?.destroy();
 
@@ -446,12 +447,12 @@ test("maps provider failures to a sanitized 503", async () => {
     error: "Knowledge search is temporarily unavailable",
   });
   providerFail = false;
-  delete process.env.AI_GATEWAY_API_KEY;
+  setTestConfig({ AI_GATEWAY_API_KEY: undefined });
   const previousCalls = calls;
   const unconfigured = await request({ query: "garden" }, adminCookie);
   assert.equal(unconfigured.status, 503);
   assert.equal(calls, previousCalls);
-  process.env.AI_GATEWAY_API_KEY = "fixture-key";
+  setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
 });
 
 test("caps unique listings after removing stale high-scoring candidates", async () => {

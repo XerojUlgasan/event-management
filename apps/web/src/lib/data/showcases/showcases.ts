@@ -4,14 +4,13 @@ import type {
   UpdateShowcaseRecord,
 } from "@event-management/contracts/showcase";
 import { SHOWCASE_LIST_PAGE_SIZE } from "@event-management/contracts/limits/showcase";
-import { config } from "../../../env";
-import { request } from "../../http/request";
+import { publicApiUrl, request } from "../../http/request";
 
 /** Keep SSR and browser media URLs identical for both API origins and proxies. */
 export const showcaseMediaSrc = (url: string): string => {
   if (!url.startsWith("/v1/showcase-media/")) return url;
 
-  return `${config.PUBLIC_API_URL}${url.slice("/v1".length)}`;
+  return `${publicApiUrl}${url.slice("/v1".length)}`;
 };
 
 export type ShowcasePage = {
