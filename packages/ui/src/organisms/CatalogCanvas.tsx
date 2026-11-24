@@ -36,7 +36,7 @@ export function catalogGridMetrics(width: number, stacked: boolean) {
 
 // Scale both axes from the same canvas width to keep widget proportions.
 const scaled = (pixels: number) =>
-  `calc(${pixels} * var(--catalog-grid-width, 100cqi) / var(--catalog-grid-reference, ${CATALOG_GRID.referenceWidth}))`;
+  `calc(${pixels} * 100cqi / var(--catalog-grid-reference, ${CATALOG_GRID.referenceWidth}))`;
 
 export const catalogGridStyle = {
   "--catalog-columns": CATALOG_GRID.columns,
@@ -184,12 +184,8 @@ export function CatalogWidgetContent({
     );
   }
 
-  const Content =
-    widget.type === "photo" || widget.type === "video" ? "figure" : "div";
-  const Caption = Content === "figure" ? "figcaption" : "p";
-
   return (
-    <Content
+    <div
       className={`ui-catalog-widget-content ui-catalog-${widget.type === "service" || widget.type === "package" ? "reference" : widget.type}`}
     >
       {widget.type === "markdown" && (
@@ -237,48 +233,9 @@ export function CatalogWidgetContent({
             : "Choose a package"}
         </div>
       )}
-      {widget.caption && (
-        <Caption className="ui-catalog-caption">{widget.caption}</Caption>
-      )}
-    </Content>
+      {widget.caption && <p className="ui-catalog-caption">{widget.caption}</p>}
+    </div>
   );
-}
-
-// Keep shared start/end lines even when widgets span different sets of rows.
-// Empty runs and deliberately layered rectangles retain their authored spacing.
-function catalogReadingRows(widgets: CatalogWidget[]) {
-  const boundaries = Array.from(
-    new Set([0, ...widgets.flatMap(({ y, h }) => [y, y + h])]),
-  ).sort((a, b) => a - b);
-
-  const lines = new Map(boundaries.map((row, index) => [row, index + 1]));
-
-  const layered = widgets.filter((widget) =>
-    widgets.some(
-      (other) =>
-        other !== widget &&
-        widget.x < other.x + other.w &&
-        other.x < widget.x + widget.w &&
-        widget.y < other.y + other.h &&
-        other.y < widget.y + widget.h,
-    ),
-  );
-
-  const tracks = boundaries.slice(0, -1).map((start, index) => {
-    const end = boundaries[index + 1];
-
-    const coversRun = ({ y, h }: CatalogWidget) => y <= start && y + h >= end;
-
-    const authoredHeight = `calc(${end - start} * (var(--catalog-row-height) + var(--catalog-gap)))`;
-
-    if (!widgets.some(coversRun)) return authoredHeight;
-
-    const minimum = layered.some(coversRun) ? authoredHeight : "0.5rem";
-
-    return `minmax(${minimum}, auto)`;
-  });
-
-  return { lines, tracks: tracks.join(" ") };
 }
 
 export function CatalogSections({
@@ -294,31 +251,24 @@ export function CatalogSections({
 }) {
   return (
     <>
-      {sections.map((section) => {
-        const widgets = [...section.widgets].sort(
-          (a, b) => a.y - b.y || a.x - b.x,
-        );
-
-        const { lines, tracks } = catalogReadingRows(widgets);
-
-        return (
-          <section className="ui-catalog-section" key={section.id}>
-            {section.title && <h2>{section.title}</h2>}
-            <div
-              className="ui-catalog-grid"
-              style={
-                {
-                  ...catalogGridStyle,
-                  "--catalog-columns":
-                    section.columns ?? LEGACY_CATALOG_COLUMNS,
-                  gridTemplateRows: tracks,
-                } as CSSProperties
-              }
-            >
-              {widgets.map((widget) => {
+      {sections.map((section) => (
+        <section className="ui-catalog-section" key={section.id}>
+          {section.title && <h2>{section.title}</h2>}
+          <div
+            className="ui-catalog-grid"
+            style={
+              {
+                ...catalogGridStyle,
+                "--catalog-columns": section.columns ?? LEGACY_CATALOG_COLUMNS,
+              } as CSSProperties
+            }
+          >
+            {[...section.widgets]
+              .sort((a, b) => a.y - b.y || a.x - b.x)
+              .map((widget) => {
                 const style: WidgetStyle = {
                   gridColumn: `${widget.x + 1} / span ${widget.w}`,
-                  gridRow: `${lines.get(widget.y)} / ${lines.get(widget.y + widget.h)}`,
+                  gridRow: `${widget.y + 1} / span ${widget.h}`,
                   "--catalog-widget-h": widget.h,
                 };
 
@@ -337,10 +287,9 @@ export function CatalogSections({
                   </div>
                 );
               })}
-            </div>
-          </section>
-        );
-      })}
+          </div>
+        </section>
+      ))}
     </>
   );
 }

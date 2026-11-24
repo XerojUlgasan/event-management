@@ -345,32 +345,20 @@ export const EmptyMediaWithCaption: Story = {
   ),
 };
 
-export const ReadingLayout: Story = {
+export const OverflowClipped: Story = {
   args: {
     sections: [
       {
         id: "overflow",
-        title: "An evening in the garden",
+        title: "Content that exceeds its widget",
         widgets: [
           widget("overflow-text", "markdown", {
             w: 6,
-            h: 5,
-            markdown: [
-              "Guests can walk from the ceremony to dinner without leaving the garden.",
-              "### Order of events",
-              "1. Meet the officiant by the arch.\n2. Take portraits while guests find their tables.",
-              "- A microphone for the vows.\n- Lanterns along the path.",
-              "> **If it rains**, meet in the covered hall.",
-              "| Menu | Service |\n| --- | --- |\n| Appetizers | Passed trays |\n| Dessert | Served at the table |",
-              "[Ask about access](https://example.com).",
-              "\`\`\`\n" +
-                "A long line stays in the code block. ".repeat(12) +
-                "\n\`\`\`",
-            ].join("\n\n"),
+            h: 4,
+            markdown: `${Array(15).fill("A long paragraph with **details**.").join("\n\n")}\n\n\`\`\`\n${"wide content ".repeat(80)}\n\`\`\``,
           }),
           widget("contained-photo", "photo", {
             x: 6,
-            y: 1,
             w: 6,
             h: 4,
             media: {
