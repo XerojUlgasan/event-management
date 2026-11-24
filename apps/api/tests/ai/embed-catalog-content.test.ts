@@ -1,23 +1,22 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
+import { config } from "../../src/env.js";
 import { embedCatalogContent } from "../../src/services/ai/retrieval/embed-catalog-content.js";
 
 const originalFetch = globalThis.fetch;
-const originalKey = process.env.AI_GATEWAY_API_KEY;
-const originalModel = process.env.EMBEDDING_MODEL;
+const originalKey = config.AI_GATEWAY_API_KEY;
+const originalModel = config.EMBEDDING_MODEL;
 const model = "google/gemini-embedding-2";
 
-process.env.AI_GATEWAY_API_KEY = "fixture-key";
-process.env.EMBEDDING_MODEL = model;
+config.AI_GATEWAY_API_KEY = "fixture-key";
+config.EMBEDDING_MODEL = model;
 
 after(() => {
   globalThis.fetch = originalFetch;
 
-  if (originalKey === undefined) delete process.env.AI_GATEWAY_API_KEY;
-  else process.env.AI_GATEWAY_API_KEY = originalKey;
+  config.AI_GATEWAY_API_KEY = originalKey;
 
-  if (originalModel === undefined) delete process.env.EMBEDDING_MODEL;
-  else process.env.EMBEDDING_MODEL = originalModel;
+  config.EMBEDDING_MODEL = originalModel;
 });
 
 function gatewayResponse(vector: number[]) {
@@ -85,12 +84,12 @@ test("rejects invalid vectors, unsupported models and image formats", async () =
     embedCatalogContent({ contentMarkdown: "text" }),
     /Invalid embedding vector/,
   );
-  process.env.EMBEDDING_MODEL = "google/gemini-embedding-001";
+  config.EMBEDDING_MODEL = "google/gemini-embedding-001";
   await assert.rejects(
     embedCatalogContent({ contentMarkdown: "text" }),
     /Unsupported embedding model/,
   );
-  process.env.EMBEDDING_MODEL = model;
+  config.EMBEDDING_MODEL = model;
   await assert.rejects(
     embedCatalogContent({
       contentMarkdown: "text",

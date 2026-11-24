@@ -1,7 +1,15 @@
 import { config } from "../../env";
 
+export function publicApiUrl() {
+  const url = config.PUBLIC_API_URL;
+
+  if (!url) throw new Error("Missing environment variable: PUBLIC_API_URL");
+
+  return url.replace(/\/$/, "");
+}
+
 export function apiBase() {
-  const trimmed = config.PUBLIC_API_URL.replace(/\/$/, "");
+  const trimmed = publicApiUrl();
 
   if (/^https?:\/\//.test(trimmed)) return trimmed;
 

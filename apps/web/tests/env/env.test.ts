@@ -1,44 +1,40 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { config } from "../../src/env.ts";
+import { publicApiUrl } from "../../src/lib/http/request.ts";
+import {
+  apiProxyUrl,
+  serverApiUrl,
+} from "../../src/lib/server/http/api-url.ts";
 
-test("required API settings fail with the missing key and optional integrations stay disabled", () => {
-  const original = process.env.PUBLIC_API_URL;
-  delete process.env.PUBLIC_API_URL;
-  try {
-    assert.throws(() => config.PUBLIC_API_URL, /PUBLIC_API_URL/);
-    assert.equal(config.firebaseConfigured, false);
-    assert.equal(config.PUBLIC_SUPABASE_URL, undefined);
-    process.env.PUBLIC_API_URL = "/v1";
-    assert.equal(config.PUBLIC_API_URL, "/v1");
-  } finally {
-    if (original === undefined) delete process.env.PUBLIC_API_URL;
-    else process.env.PUBLIC_API_URL = original;
-  }
+test("config contains raw environment settings", () => {
+  assert.equal(config.PUBLIC_API_URL, process.env.PUBLIC_API_URL);
+  assert.equal(config.PUBLIC_SUPABASE_URL, process.env.PUBLIC_SUPABASE_URL);
+  assert.equal(config.API_PROXY_TARGET, process.env.API_PROXY_TARGET);
 });
 
-test("server URLs use the current proxy target or an absolute public URL", () => {
-  const originalTarget = process.env.API_PROXY_TARGET;
-  const originalPublic = process.env.PUBLIC_API_URL;
+test("API URL consumers normalize URLs and report missing settings", () => {
+  const original = { ...config };
+
   try {
-    process.env.PUBLIC_API_URL = "/v1";
-    delete process.env.API_PROXY_TARGET;
-    assert.throws(() => config.SERVER_API_URL, /API_PROXY_TARGET/);
-    process.env.API_PROXY_TARGET = "http://127.0.0.1:54321/functions/v1/api/";
-    assert.equal(
-      config.API_PROXY_URL,
-      "http://127.0.0.1:54321/functions/v1/api/v1",
-    );
-    assert.equal(config.SERVER_API_URL, config.API_PROXY_URL);
-    process.env.API_PROXY_TARGET = "https://example.test/functions/v1/api/v1";
-    assert.equal(config.API_PROXY_URL, process.env.API_PROXY_TARGET);
-    delete process.env.API_PROXY_TARGET;
-    process.env.PUBLIC_API_URL = "https://api.example.test/v1/";
-    assert.equal(config.SERVER_API_URL, "https://api.example.test/v1");
+    config.PUBLIC_API_URL = undefined;
+    assert.throws(publicApiUrl, /PUBLIC_API_URL/);
+
+    config.PUBLIC_API_URL = "/v1";
+    config.API_PROXY_TARGET = undefined;
+    assert.throws(serverApiUrl, /API_PROXY_TARGET/);
+
+    config.API_PROXY_TARGET = "http://127.0.0.1:54321/functions/v1/api/";
+    assert.equal(apiProxyUrl(), "http://127.0.0.1:54321/functions/v1/api/v1");
+    assert.equal(serverApiUrl(), apiProxyUrl());
+
+    config.API_PROXY_TARGET = "https://example.test/functions/v1/api/v1";
+    assert.equal(apiProxyUrl(), config.API_PROXY_TARGET);
+
+    config.API_PROXY_TARGET = undefined;
+    config.PUBLIC_API_URL = "https://api.example.test/v1/";
+    assert.equal(serverApiUrl(), "https://api.example.test/v1");
   } finally {
-    if (originalTarget === undefined) delete process.env.API_PROXY_TARGET;
-    else process.env.API_PROXY_TARGET = originalTarget;
-    if (originalPublic === undefined) delete process.env.PUBLIC_API_URL;
-    else process.env.PUBLIC_API_URL = originalPublic;
+    Object.assign(config, original);
   }
 });

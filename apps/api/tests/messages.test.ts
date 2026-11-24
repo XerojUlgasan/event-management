@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { setTestConfig } from "./helpers/set-test-config.js";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
@@ -121,8 +122,10 @@ before(async () => {
   }
 
   // This human-messaging suite must never make live provider requests.
-  delete process.env.AI_GATEWAY_API_KEY;
-  process.env.DB_NAME = database;
+  setTestConfig({
+    AI_GATEWAY_API_KEY: undefined,
+    DB_NAME: database,
+  });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
 
@@ -205,14 +208,14 @@ test("Realtime tokens are limited to the live session and requested receive scop
   const existingKey = process.env.REALTIME_JWT_SIGNING_JWK;
   const existingSecret = process.env.REALTIME_JWT_SECRET;
   t.after(() => {
-    if (existingKey === undefined) delete process.env.REALTIME_JWT_SIGNING_JWK;
-    else process.env.REALTIME_JWT_SIGNING_JWK = existingKey;
+    setTestConfig({ REALTIME_JWT_SIGNING_JWK: existingKey });
 
-    if (existingSecret === undefined) delete process.env.REALTIME_JWT_SECRET;
-    else process.env.REALTIME_JWT_SECRET = existingSecret;
+    setTestConfig({ REALTIME_JWT_SECRET: existingSecret });
   });
-  delete process.env.REALTIME_JWT_SIGNING_JWK;
-  delete process.env.REALTIME_JWT_SECRET;
+  setTestConfig({
+    REALTIME_JWT_SIGNING_JWK: undefined,
+    REALTIME_JWT_SECRET: undefined,
+  });
 
   const id = randomUUID();
   const guestConversationId = randomUUID();
@@ -267,9 +270,11 @@ test("Realtime tokens are limited to the live session and requested receive scop
 
   const kid = randomUUID();
   const pair = await generateKeyPair("ES256", { extractable: true });
-  process.env.REALTIME_JWT_SIGNING_JWK = JSON.stringify({
-    ...(await exportJWK(pair.privateKey)),
-    kid,
+  setTestConfig({
+    REALTIME_JWT_SIGNING_JWK: JSON.stringify({
+      ...(await exportJWK(pair.privateKey)),
+      kid,
+    }),
   });
 
   for (const cookie of [customerCookie, adminCookie]) {

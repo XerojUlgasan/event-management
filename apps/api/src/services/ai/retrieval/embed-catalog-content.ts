@@ -4,6 +4,19 @@ import { config } from "../../../env.js";
 const supportedModel = "google/gemini-embedding-2";
 const dimensions = 768;
 
+export function getCatalogEmbeddingModel() {
+  if (!config.AI_GATEWAY_API_KEY?.trim())
+    throw new Error("AI_GATEWAY_API_KEY is required");
+
+  const model = config.EMBEDDING_MODEL?.trim();
+
+  if (!model) throw new Error("EMBEDDING_MODEL is required");
+
+  if (model !== supportedModel) throw new Error("Unsupported embedding model");
+
+  return model;
+}
+
 export async function embedCatalogContent({
   contentMarkdown = "",
   image,
@@ -15,10 +28,8 @@ export async function embedCatalogContent({
   abortSignal?: AbortSignal;
   purpose?: "document" | "search";
 }): Promise<{ embedding: number[]; model: string }> {
-  const apiKey = config.AI_GATEWAY_API_KEY;
-  const model = config.EMBEDDING_MODEL;
-
-  if (model !== supportedModel) throw new Error("Unsupported embedding model");
+  const model = getCatalogEmbeddingModel();
+  const apiKey = config.AI_GATEWAY_API_KEY?.trim();
 
   if (!contentMarkdown.trim() && !(purpose === "search" && image))
     throw new Error("Embedding content is empty");

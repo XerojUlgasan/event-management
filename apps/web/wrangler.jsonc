@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "clemora-web",
+  "name": "event-management",
   "main": "@astrojs/cloudflare/entrypoints/server",
   "compatibility_date": "2026-11-17",
   "compatibility_flags": ["nodejs_compat"],

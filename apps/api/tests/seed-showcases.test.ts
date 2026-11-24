@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { setTestConfig } from "./helpers/set-test-config.js";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -9,6 +10,7 @@ import { seedSampleShowcases } from "../src/db/seed-showcases.js";
 import { LOCAL_PASSWORD } from "../src/db/seed/context.js";
 import { showcaseDto } from "../src/services/showcase/showcase-dto.js";
 import { config } from "../src/env.js";
+import { getCatalogStorageCredentials } from "../src/utils/catalog-media-storage.js";
 import { hashPassword } from "../src/utils/password.js";
 
 const fixtures = [
@@ -51,11 +53,11 @@ const fixtures = [
 ];
 
 test("showcase seed uploads ordered photos and preserves an edited fixture", async (t) => {
-  const storage = {
-    url: config.SUPABASE_URL,
-    apiKey: config.SUPABASE_STORAGE_KEY,
-  };
-  assert.ok(["localhost", "127.0.0.1", "::1"].includes(config.DB_HOST));
+  const storage = getCatalogStorageCredentials();
+  assert.ok(
+    config.DB_HOST &&
+      ["localhost", "127.0.0.1", "::1"].includes(config.DB_HOST),
+  );
   assert.ok(
     ["localhost", "127.0.0.1", "[::1]"].includes(new URL(storage.url).hostname),
   );
@@ -130,8 +132,10 @@ test("showcase seed uploads ordered photos and preserves an edited fixture", asy
     assert.ok(removed.ok, `Test bucket deletion returned ${removed.status}`);
   });
 
-  process.env.DB_NAME = database;
-  process.env.STORAGE_BUCKET = bucket;
+  setTestConfig({
+    DB_NAME: database,
+    STORAGE_BUCKET: bucket,
+  });
   const { db } = await import("../src/db/client.js");
   seedDb = db;
   const { app } = await import("../src/app.js");

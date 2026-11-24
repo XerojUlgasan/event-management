@@ -39,7 +39,7 @@ tests/<domain>/                  tests grouped by affected behavior
 
 `lib/data/catalog/{packages,services,media,page-query}.ts` and `lib/data/booking-requests/{requests,packages}.ts` illustrate cohesive responsibility groups. Multiple related operations may share one file; split when responsibilities meaningfully differ, not one file per endpoint. The HTTP wrapper is `lib/http/request.ts`. The `auth`, `http`, `navigation`, and `pagination` infrastructure modules are explicit exceptions to domain grouping inside `lib`. `styles/app.css` is the stylesheet entry exception. Place new app styles under their domain and import them from the appropriate entry. Shared presentation belongs in `packages/ui`, shared tokens in `packages/theme`, and established shared contracts in `packages/contracts`; follow the [reuse workflow](../../packages/references/reuse.md#required-workflow-for-every-ui-change).
 
-[`src/env.ts`](../../../../apps/web/src/env.ts) exports `config` for browser and server consumers. Keep `PUBLIC_*` reads explicit so Vite can supply them when it builds browser code. Read private bindings on the server. Run `pnpm check:env` to detect raw environment reads outside the app configuration files, excluding tests and generated bundles.
+[`src/env.ts`](../../../../apps/web/src/env.ts) exports `config` for browser and server consumers. The object contains raw environment reads. Astro config supplies the listed `PUBLIC_*` values to Vite and keeps the private proxy target in the server environment. Run `pnpm check:env` to detect raw environment reads outside the app configuration files, excluding tests and generated bundles.
 
 ## Names and dependencies
 

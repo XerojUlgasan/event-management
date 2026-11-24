@@ -5,7 +5,7 @@ import {
   type CatalogFilters,
   type CatalogKind,
 } from "@event-management/contracts/catalog-filters";
-import { config } from "../../../env";
+import { serverApiUrl } from "../http/api-url";
 
 export function readCatalogFilters(
   kind: CatalogKind,
@@ -41,7 +41,7 @@ export function readCatalogFilters(
 }
 
 async function serverGet<T>(path: string): Promise<T | null> {
-  const response = await fetch(`${config.SERVER_API_URL}${path}`);
+  const response = await fetch(`${serverApiUrl()}${path}`);
 
   if (response.status === 404) return null;
 

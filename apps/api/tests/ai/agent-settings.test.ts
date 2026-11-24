@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { setTestConfig } from "../helpers/set-test-config.js";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -51,7 +52,7 @@ before(async () => {
       ),
     );
 
-  process.env.DB_NAME = database;
+  setTestConfig({ DB_NAME: database });
   ({ app } = await import("../../src/app.js"));
   ({ app: edge } = await import("../../src/edge/server.js"));
   ({ db } = await import("../../src/db/client.js"));

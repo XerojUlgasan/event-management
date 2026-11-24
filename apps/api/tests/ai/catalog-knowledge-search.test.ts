@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { setTestConfig } from "../helpers/set-test-config.js";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -31,8 +32,10 @@ let providerFail = false;
 const vector = (x: number, y: number) => [x, y, ...Array(766).fill(0)];
 
 before(async () => {
-  process.env.AI_GATEWAY_API_KEY = "fixture-key";
-  process.env.EMBEDDING_MODEL = model;
+  setTestConfig({
+    AI_GATEWAY_API_KEY: "fixture-key",
+    EMBEDDING_MODEL: model,
+  });
   globalThis.fetch = async (_input, init) => {
     calls++;
     assert.deepEqual(JSON.parse(String(init?.body)).values, [
@@ -102,11 +105,9 @@ before(async () => {
 after(async () => {
   globalThis.fetch = originalFetch;
 
-  if (originalKey === undefined) delete process.env.AI_GATEWAY_API_KEY;
-  else process.env.AI_GATEWAY_API_KEY = originalKey;
+  setTestConfig({ AI_GATEWAY_API_KEY: originalKey });
 
-  if (originalModel === undefined) delete process.env.EMBEDDING_MODEL;
-  else process.env.EMBEDDING_MODEL = originalModel;
+  setTestConfig({ EMBEDDING_MODEL: originalModel });
 
   await db?.destroy();
 
@@ -446,12 +447,12 @@ test("maps provider failures to a sanitized 503", async () => {
     error: "Knowledge search is temporarily unavailable",
   });
   providerFail = false;
-  delete process.env.AI_GATEWAY_API_KEY;
+  setTestConfig({ AI_GATEWAY_API_KEY: undefined });
   const previousCalls = calls;
   const unconfigured = await request({ query: "garden" }, adminCookie);
   assert.equal(unconfigured.status, 503);
   assert.equal(calls, previousCalls);
-  process.env.AI_GATEWAY_API_KEY = "fixture-key";
+  setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
 });
 
 test("caps unique listings after removing stale high-scoring candidates", async () => {

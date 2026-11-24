@@ -1,3 +1,4 @@
+import { config } from "../../src/env.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -30,8 +31,8 @@ test("conversation refresh reports service outages and preserves actionable erro
 
 test("processing retries target the scoped saved message without resending files", async () => {
   const original = globalThis.fetch;
-  const originalApiUrl = process.env.PUBLIC_API_URL;
-  process.env.PUBLIC_API_URL = "/v1";
+  const originalApiUrl = config.PUBLIC_API_URL;
+  config.PUBLIC_API_URL = "/v1";
   const calls: { url: string; method: string | undefined; body: unknown }[] =
     [];
   globalThis.fetch = async (url, options) => {
@@ -72,7 +73,6 @@ test("processing retries target the scoped saved message without resending files
   } finally {
     globalThis.fetch = original;
 
-    if (originalApiUrl === undefined) delete process.env.PUBLIC_API_URL;
-    else process.env.PUBLIC_API_URL = originalApiUrl;
+    config.PUBLIC_API_URL = originalApiUrl;
   }
 });

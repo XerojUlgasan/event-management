@@ -14,6 +14,25 @@ const signingKeySchema = z.object({
   d: z.string().min(1),
 });
 
+function localRealtimeSecret() {
+  const secret = config.REALTIME_JWT_SECRET?.trim();
+  const target = config.SUPABASE_URL?.trim();
+
+  if (!secret || !target || config.NODE_ENV === "production") return undefined;
+
+  try {
+    const url = new URL(target);
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+
+    const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+
+    return local || url.origin === "http://kong:8000" ? secret : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export type RealtimeTokenTarget =
   { conversationId: string } | { scope: "notifications" };
 
@@ -22,8 +41,7 @@ export async function signRealtimeToken(
   session: SessionContext,
   { issuedAt, expiresAt }: { issuedAt: number; expiresAt: number },
 ) {
-  const jwk = config.REALTIME_JWT_SIGNING_JWK;
-  const localSecret = config.REALTIME_JWT_SECRET;
+  const jwk = config.REALTIME_JWT_SIGNING_JWK?.trim();
   const scopeClaims =
     "conversationId" in target
       ? {
@@ -49,6 +67,8 @@ export async function signRealtimeToken(
       .setProtectedHeader({ alg: "ES256", typ: "JWT", kid: signingKey.kid })
       .sign(key);
   }
+
+  const localSecret = localRealtimeSecret();
 
   if (localSecret) {
     const key = new TextEncoder().encode(localSecret);

@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { setTestConfig } from "./helpers/set-test-config.js";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -52,7 +53,7 @@ before(async () => {
   for (const entry of entries.slice(0, automaticCompletionIndex))
     await applyMigration(migrations, entry.name);
 
-  process.env.DB_NAME = database;
+  setTestConfig({ DB_NAME: database });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
   administrator = await account("admin");

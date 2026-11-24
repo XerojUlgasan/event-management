@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { config } from "../../src/env.js";
 import { MockLanguageModelV4, MockProviderV4 } from "ai/test";
 import {
   bookingLanguageSamples,
@@ -19,19 +20,17 @@ const history = [
 
 test("a booking review keeps customer language and renders verified details", async (t) => {
   const oldProvider = globalThis.AI_SDK_DEFAULT_PROVIDER;
-  const oldModel = process.env.TEXT_MODEL;
-  const oldKey = process.env.AI_GATEWAY_API_KEY;
+  const oldModel = config.TEXT_MODEL;
+  const oldKey = config.AI_GATEWAY_API_KEY;
   const modelId = "fixture/translation";
-  process.env.TEXT_MODEL = modelId;
-  process.env.AI_GATEWAY_API_KEY = "fixture-key";
+  config.TEXT_MODEL = modelId;
+  config.AI_GATEWAY_API_KEY = "fixture-key";
   t.after(() => {
     globalThis.AI_SDK_DEFAULT_PROVIDER = oldProvider;
 
-    if (oldModel === undefined) delete process.env.TEXT_MODEL;
-    else process.env.TEXT_MODEL = oldModel;
+    config.TEXT_MODEL = oldModel;
 
-    if (oldKey === undefined) delete process.env.AI_GATEWAY_API_KEY;
-    else process.env.AI_GATEWAY_API_KEY = oldKey;
+    config.AI_GATEWAY_API_KEY = oldKey;
   });
 
   const spanishCopy = {

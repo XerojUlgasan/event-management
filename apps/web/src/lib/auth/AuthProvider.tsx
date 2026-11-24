@@ -25,7 +25,11 @@ type Status = "loading" | "signed-out" | "signed-in";
 
 type FirebaseMethod = "google" | "password";
 
-export const firebaseConfigured = config.firebaseConfigured;
+export const firebaseConfigured = Boolean(
+  config.PUBLIC_FIREBASE_API_KEY &&
+  config.PUBLIC_FIREBASE_AUTH_DOMAIN &&
+  config.PUBLIC_FIREBASE_PROJECT_ID,
+);
 
 type AuthContextValue = {
   status: Status;

@@ -5,8 +5,10 @@ import { findCatalogKnowledgeMediaData } from "../../../data/ai/find-catalog-kno
 import { saveCatalogKnowledgeEmbeddingData } from "../../../data/ai/save-catalog-knowledge-embedding.js";
 import { setCatalogKnowledgeInputHashData } from "../../../data/ai/set-catalog-knowledge-input-hash.js";
 import type { CatalogKnowledgeOwner } from "../../../data/ai/catalog-knowledge-types.js";
-import { config } from "../../../env.js";
-import { embedCatalogContent } from "../retrieval/embed-catalog-content.js";
+import {
+  embedCatalogContent,
+  getCatalogEmbeddingModel,
+} from "../retrieval/embed-catalog-content.js";
 import { readCatalogEmbeddingImage } from "../retrieval/read-catalog-embedding-image.js";
 import { syncCatalogKnowledge } from "./sync-catalog-knowledge.js";
 import { catalogKnowledgeDigest } from "../catalog-knowledge-hash.js";
@@ -49,10 +51,7 @@ export async function refreshCatalogEmbeddingsService({
 
   if (!rows.length) return result;
 
-  const model = config.EMBEDDING_MODEL;
-
-  if (model !== "google/gemini-embedding-2")
-    throw new Error("Unsupported embedding model");
+  const model = getCatalogEmbeddingModel();
 
   for (const row of rows) {
     abortSignal?.throwIfAborted();

@@ -2,8 +2,16 @@ import { defineConfig } from "astro/config";
 import cloudflare from "@astrojs/cloudflare";
 import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
-import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { loadEnv } from "vite";
 import { config } from "./src/env.ts";
+
+const webRoot = fileURLToPath(new URL(".", import.meta.url));
+
+// Capture shell values before the Cloudflare adapter loads its env files.
+const publicSettings = Object.entries(config).filter(([name]) =>
+  name.startsWith("PUBLIC_"),
+);
 
 export default defineConfig({
   output: "server",
@@ -17,23 +25,35 @@ export default defineConfig({
     plugins: [
       tailwindcss(),
       {
-        name: "clemora-dev-proxy",
-        apply: "serve",
-        configEnvironment(name) {
-          if (name !== "ssr") return;
-
-          // Pass the local proxy setting to workerd. Shell values win.
-          if (existsSync(".env")) process.loadEnvFile(".env");
-
-          const target = config.API_PROXY_TARGET;
-
-          if (!target) return;
+        name: "clemora-env",
+        config(_config, { mode }) {
+          const values = loadEnv(mode, webRoot, "PUBLIC_");
 
           return {
-            define: {
-              __CLEMORA_DEV_PROXY_TARGET__: JSON.stringify(target),
-            },
+            define: Object.fromEntries(
+              publicSettings.map(([name, shellValue]) => [
+                `process.env.${name}`,
+                JSON.stringify(shellValue ?? values[name]) ?? "undefined",
+              ]),
+            ),
           };
+        },
+        configEnvironment(name, _config, { command, mode }) {
+          if (name === "client")
+            return { define: { "process.env.API_PROXY_TARGET": "undefined" } };
+
+          if (name === "ssr" && command === "serve") {
+            const target =
+              config.API_PROXY_TARGET ??
+              loadEnv(mode, webRoot, "API_PROXY_TARGET").API_PROXY_TARGET;
+
+            if (target !== undefined)
+              return {
+                define: {
+                  "process.env.API_PROXY_TARGET": JSON.stringify(target),
+                },
+              };
+          }
         },
       },
     ],

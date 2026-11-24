@@ -67,7 +67,7 @@ test("inherited provider, database, dotenv and executable injection settings are
     HOME: "/home/user",
     DB_PASSWORD: "main-secret",
     AI_GATEWAY_API_KEY: "main-provider",
-    FIREBASE_PRIVATE_KEY: "main-firebase",
+    FIREBASE_SERVICE_ACCOUNT_JSON: "main-firebase",
     NODE_OPTIONS: "--require malicious.js",
     DOTENV_CONFIG_PATH: "/main/.env",
     PUBLIC_API_URL: "https://main.example",
@@ -79,7 +79,7 @@ test("inherited provider, database, dotenv and executable injection settings are
   for (const name of [
     "DB_PASSWORD",
     "AI_GATEWAY_API_KEY",
-    "FIREBASE_PRIVATE_KEY",
+    "FIREBASE_SERVICE_ACCOUNT_JSON",
     "NODE_OPTIONS",
     "DOTENV_CONFIG_PATH",
     "PUBLIC_API_URL",
@@ -107,7 +107,11 @@ test("runtime targets use only CLI credentials at assigned room ports and explic
     },
     { AI_GATEWAY_API_KEY: "opt-in-key" },
     localStatus(plan),
-    { PATH: "/bin", DB_PORT: "5432", FIREBASE_PROJECT_ID: "main" },
+    {
+      PATH: "/bin",
+      DB_PORT: "5432",
+      FIREBASE_SERVICE_ACCOUNT_JSON: "main-firebase",
+    },
   );
   assert.equal(env.DB_HOST, "127.0.0.1");
   assert.equal(env.DB_PORT, String(plan.ports.db));
@@ -122,7 +126,7 @@ test("runtime targets use only CLI credentials at assigned room ports and explic
   assert.equal(env.SEED_RANDOM_SEED, "room-seed");
   assert.equal(env.AI_GATEWAY_API_KEY, "opt-in-key");
   assert.equal(env.DOTENV_CONFIG_PATH, "/repo/.room/.state/test/runtime.env");
-  assert.equal(env.FIREBASE_PROJECT_ID, "");
+  assert.equal(env.FIREBASE_SERVICE_ACCOUNT_JSON, "");
   assert.equal(env.PUBLIC_FIREBASE_API_KEY, "");
   assert.equal(
     runtimeEnvironment(plan, {}, {}, localStatus(plan), {
@@ -144,7 +148,7 @@ test("unsafe override names and CLI targets outside the room fail before deploym
     "WEB_ORIGIN",
     "DOTENV_CONFIG_PATH",
     "NODE_OPTIONS",
-    "GOOGLE_APPLICATION_CREDENTIALS",
+    "FIREBASE_SERVICE_ACCOUNT_JSON",
   ])
     assert.throws(
       () =>

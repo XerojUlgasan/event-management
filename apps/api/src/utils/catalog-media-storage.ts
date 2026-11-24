@@ -2,6 +2,55 @@ import { config } from "../env.js";
 
 export class CatalogMediaNotFound extends Error {}
 
+function storageKey() {
+  const key =
+    config.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    config.SUPABASE_SECRET_KEY?.trim();
+
+  if (key) return key;
+
+  const raw = config.SUPABASE_SECRET_KEYS?.trim();
+
+  if (raw) {
+    try {
+      const keys: unknown = JSON.parse(raw);
+
+      if (keys && typeof keys === "object") {
+        const candidate =
+          ("default" in keys ? keys.default : undefined) ??
+          Object.values(keys)[0];
+
+        if (typeof candidate === "string" && candidate.trim())
+          return candidate.trim();
+      }
+    } catch {
+      // Report the supported variable names without exposing the value.
+    }
+  }
+
+  throw new Error(
+    "SUPABASE_SERVICE_ROLE_KEY, SUPABASE_SECRET_KEY or SUPABASE_SECRET_KEYS is required",
+  );
+}
+
+export function getCatalogStorageCredentials() {
+  const url = config.SUPABASE_URL?.trim().replace(/\/$/, "");
+
+  if (!url) throw new Error("SUPABASE_URL is required");
+
+  return { url, apiKey: storageKey() };
+}
+
+function getStorageBucket(override?: string) {
+  if (override !== undefined) return override;
+
+  const bucket = config.STORAGE_BUCKET?.trim();
+
+  if (!bucket) throw new Error("STORAGE_BUCKET is required");
+
+  return bucket;
+}
+
 function objectPath(bucket: string, key: string) {
   return `${bucket}/${key
     .split("/")
@@ -73,10 +122,8 @@ export async function putCatalogMedia(
     bucket?: string;
   } = {},
 ) {
-  const url = config.SUPABASE_URL;
-  const apiKey = config.SUPABASE_STORAGE_KEY;
-  const bucket =
-    options.bucket === undefined ? config.STORAGE_BUCKET : options.bucket;
+  const { url, apiKey } = getCatalogStorageCredentials();
+  const bucket = getStorageBucket(options.bucket);
   const response = await fetch(
     `${url}/storage/v1/object/${objectPath(bucket, key)}`,
     {
@@ -97,10 +144,8 @@ export async function putCatalogMedia(
 }
 
 export async function deleteCatalogMedia(key: string, bucketOverride?: string) {
-  const url = config.SUPABASE_URL;
-  const apiKey = config.SUPABASE_STORAGE_KEY;
-  const bucket =
-    bucketOverride === undefined ? config.STORAGE_BUCKET : bucketOverride;
+  const { url, apiKey } = getCatalogStorageCredentials();
+  const bucket = getStorageBucket(bucketOverride);
   const response = await fetch(`${url}/storage/v1/object/${bucket}`, {
     method: "DELETE",
     headers: authHeaders(apiKey, { "Content-Type": "application/json" }),
@@ -119,10 +164,8 @@ export async function getCatalogMedia(
   abortSignal?: AbortSignal,
   bucketOverride?: string,
 ) {
-  const url = config.SUPABASE_URL;
-  const apiKey = config.SUPABASE_STORAGE_KEY;
-  const bucket =
-    bucketOverride === undefined ? config.STORAGE_BUCKET : bucketOverride;
+  const { url, apiKey } = getCatalogStorageCredentials();
+  const bucket = getStorageBucket(bucketOverride);
   const response = await fetch(
     `${url}/storage/v1/object/${objectPath(bucket, key)}`,
     {

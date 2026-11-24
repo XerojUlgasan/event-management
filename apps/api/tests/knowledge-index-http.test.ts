@@ -1,3 +1,4 @@
+import "dotenv/config";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { app as nodeApp } from "../src/app.js";

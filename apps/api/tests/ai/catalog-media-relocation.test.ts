@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { config } from "../../src/env.js";
 import { catalogKnowledgeSourceHash } from "../../src/services/ai/catalog-knowledge-hash.js";
 import {
   getCatalogMedia,
@@ -49,11 +50,13 @@ test("filing preserves uploaded photo freshness across folders", () => {
 test("Storage missing-key detection accepts both response formats without hiding other failures", async () => {
   const oldFetch = globalThis.fetch;
   const oldEnv = {
-    SUPABASE_URL: process.env.SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    SUPABASE_URL: config.SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: config.SUPABASE_SERVICE_ROLE_KEY,
+    STORAGE_BUCKET: config.STORAGE_BUCKET,
   };
-  process.env.SUPABASE_URL = "http://storage.invalid";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "synthetic-fixture";
+  config.SUPABASE_URL = "http://storage.invalid";
+  config.SUPABASE_SERVICE_ROLE_KEY = "synthetic-fixture";
+  config.STORAGE_BUCKET = "fixture-bucket";
 
   try {
     for (const response of [
@@ -74,10 +77,7 @@ test("Storage missing-key detection accepts both response formats without hiding
   } finally {
     globalThis.fetch = oldFetch;
 
-    for (const [key, value] of Object.entries(oldEnv)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
+    Object.assign(config, oldEnv);
   }
 });
 

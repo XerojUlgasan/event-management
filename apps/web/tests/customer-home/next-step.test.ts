@@ -1,16 +1,16 @@
+import { config } from "../../src/env.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { loadCustomerHomeStep } from "../../src/lib/services/customer-home/next-step.ts";
 
-const originalApiUrl = process.env.PUBLIC_API_URL;
+const originalApiUrl = config.PUBLIC_API_URL;
 
 test.before(() => {
-  process.env.PUBLIC_API_URL = "https://api.example.test/v1";
+  config.PUBLIC_API_URL = "https://api.example.test/v1";
 });
 
 test.after(() => {
-  if (originalApiUrl === undefined) delete process.env.PUBLIC_API_URL;
-  else process.env.PUBLIC_API_URL = originalApiUrl;
+  config.PUBLIC_API_URL = originalApiUrl;
 });
 
 const uuid = (value: string) =>

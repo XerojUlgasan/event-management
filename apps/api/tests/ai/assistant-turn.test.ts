@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { setTestConfig } from "../helpers/set-test-config.js";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -219,9 +220,11 @@ before(async () => {
     );
   }
 
-  process.env.DB_NAME = database;
-  process.env.AI_GATEWAY_API_KEY = "fixture-key";
-  process.env.TEXT_MODEL = modelId;
+  setTestConfig({
+    DB_NAME: database,
+    AI_GATEWAY_API_KEY: "fixture-key",
+    TEXT_MODEL: modelId,
+  });
   useReply("Hello from AMAC AI");
   ({ app } = await import("../../src/app.js"));
   ({ db } = await import("../../src/db/client.js"));
@@ -1347,8 +1350,10 @@ for (const sample of [
         "Configure the live AMAC text model and Gateway key",
       );
       const previousProvider = globalThis.AI_SDK_DEFAULT_PROVIDER;
-      process.env.TEXT_MODEL = liveModelId;
-      process.env.AI_GATEWAY_API_KEY = liveGatewayKey;
+      setTestConfig({
+        TEXT_MODEL: liveModelId,
+        AI_GATEWAY_API_KEY: liveGatewayKey,
+      });
       delete globalThis.AI_SDK_DEFAULT_PROVIDER;
 
       try {
@@ -1383,8 +1388,10 @@ for (const sample of [
         );
       } finally {
         globalThis.AI_SDK_DEFAULT_PROVIDER = previousProvider;
-        process.env.TEXT_MODEL = modelId;
-        process.env.AI_GATEWAY_API_KEY = "fixture-key";
+        setTestConfig({
+          TEXT_MODEL: modelId,
+          AI_GATEWAY_API_KEY: "fixture-key",
+        });
       }
     },
   );
@@ -2639,8 +2646,10 @@ test(
       "Configure the live AMAC text model and Gateway key",
     );
     const previousProvider = globalThis.AI_SDK_DEFAULT_PROVIDER;
-    process.env.TEXT_MODEL = liveModelId;
-    process.env.AI_GATEWAY_API_KEY = liveGatewayKey;
+    setTestConfig({
+      TEXT_MODEL: liveModelId,
+      AI_GATEWAY_API_KEY: liveGatewayKey,
+    });
     delete globalThis.AI_SDK_DEFAULT_PROVIDER;
 
     try {
@@ -2800,8 +2809,10 @@ test(
       assert.match(updatedReply, /venue layout/i);
       assert.doesNotMatch(updatedReply, /reception start time/i);
     } finally {
-      process.env.TEXT_MODEL = modelId;
-      process.env.AI_GATEWAY_API_KEY = "fixture-key";
+      setTestConfig({
+        TEXT_MODEL: modelId,
+        AI_GATEWAY_API_KEY: "fixture-key",
+      });
       globalThis.AI_SDK_DEFAULT_PROVIDER = previousProvider;
     }
   },
@@ -2816,8 +2827,10 @@ test(
       "Configure the live AMAC text model and Gateway key",
     );
     const previousProvider = globalThis.AI_SDK_DEFAULT_PROVIDER;
-    process.env.TEXT_MODEL = liveModelId;
-    process.env.AI_GATEWAY_API_KEY = liveGatewayKey;
+    setTestConfig({
+      TEXT_MODEL: liveModelId,
+      AI_GATEWAY_API_KEY: liveGatewayKey,
+    });
     delete globalThis.AI_SDK_DEFAULT_PROVIDER;
 
     const firstEmail = `first-${randomUUID()}@example.test`;
@@ -2874,8 +2887,10 @@ test(
         `Removed emails must not appear in reply: ${missingReply}`,
       );
     } finally {
-      process.env.TEXT_MODEL = modelId;
-      process.env.AI_GATEWAY_API_KEY = "fixture-key";
+      setTestConfig({
+        TEXT_MODEL: modelId,
+        AI_GATEWAY_API_KEY: "fixture-key",
+      });
       globalThis.AI_SDK_DEFAULT_PROVIDER = previousProvider;
     }
   },
@@ -3134,11 +3149,11 @@ test("provider failure, missing configuration, and empty output preserve the cus
         throw new Error("private-provider-payload");
       };
 
-    if (failure === "config") delete process.env.AI_GATEWAY_API_KEY;
+    if (failure === "config") setTestConfig({ AI_GATEWAY_API_KEY: undefined });
 
     const id = await conversation();
     const result = await send(id, "Save this message");
-    process.env.AI_GATEWAY_API_KEY = "fixture-key";
+    setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
     assert.equal(result.assistantMessage, null);
     assert.match(result.assistantError ?? "", /message was saved/);
     assert.doesNotMatch(JSON.stringify(result), /private-provider-payload/);
@@ -3468,17 +3483,14 @@ function mockPhotoBoundaries(
     EMBEDDING_MODEL: "google/gemini-embedding-2",
   };
 
-  const before = Object.keys(settings).map(
-    (key) => [key, process.env[key]] as const,
-  );
+  const before = {
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    EMBEDDING_MODEL: process.env.EMBEDDING_MODEL,
+  };
 
-  Object.assign(process.env, settings);
-  t.after(() => {
-    for (const [key, value] of before) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  });
+  setTestConfig(settings);
+  t.after(() => setTestConfig(before));
 
   const storageKeys: string[] = [];
   const embeddings: unknown[] = [];
@@ -4941,7 +4953,7 @@ test("takeover during search prevents its result from entering the answer", asyn
   const originalFetch = globalThis.fetch;
   const originalEmbeddingModel = process.env.EMBEDDING_MODEL;
   const id = await conversation();
-  process.env.EMBEDDING_MODEL = "google/gemini-embedding-2";
+  setTestConfig({ EMBEDDING_MODEL: "google/gemini-embedding-2" });
   globalThis.fetch = async () => {
     assert.equal(
       (
@@ -4978,9 +4990,7 @@ test("takeover during search prevents its result from entering the answer", asyn
   } finally {
     globalThis.fetch = originalFetch;
 
-    if (originalEmbeddingModel === undefined)
-      delete process.env.EMBEDDING_MODEL;
-    else process.env.EMBEDDING_MODEL = originalEmbeddingModel;
+    setTestConfig({ EMBEDDING_MODEL: originalEmbeddingModel });
   }
 });
 
@@ -6205,8 +6215,10 @@ test(
   async () => {
     assert.ok(liveModelId && liveGatewayKey);
     const previousProvider = globalThis.AI_SDK_DEFAULT_PROVIDER;
-    process.env.TEXT_MODEL = liveModelId;
-    process.env.AI_GATEWAY_API_KEY = liveGatewayKey;
+    setTestConfig({
+      TEXT_MODEL: liveModelId,
+      AI_GATEWAY_API_KEY: liveGatewayKey,
+    });
     delete globalThis.AI_SDK_DEFAULT_PROVIDER;
 
     try {
@@ -6323,8 +6335,10 @@ test(
       assert.equal(history.length, 1);
     } finally {
       globalThis.AI_SDK_DEFAULT_PROVIDER = previousProvider;
-      process.env.TEXT_MODEL = modelId;
-      process.env.AI_GATEWAY_API_KEY = "fixture-key";
+      setTestConfig({
+        TEXT_MODEL: modelId,
+        AI_GATEWAY_API_KEY: "fixture-key",
+      });
     }
   },
 );

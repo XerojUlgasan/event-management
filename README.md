@@ -284,8 +284,8 @@ The Node API, Prisma, seeds, and integration tests still use Compose PostgreSQL 
 
 Each app exports one `config` object from its `src/env.ts`:
 
-- [`apps/api/src/env.ts`](apps/api/src/env.ts) serves Node, the Edge bundle, and API commands. Getters validate required settings when callers read them. Node entry points load `apps/api/.env` and local Edge uses `apps/supabase/.env.functions`.
-- [`apps/web/src/env.ts`](apps/web/src/env.ts) serves the browser and web server. Astro loads `apps/web/.env` and supplies explicit `PUBLIC_*` settings at build time. The Cloudflare Worker reads its private proxy target at request time.
+- [`apps/api/src/env.ts`](apps/api/src/env.ts) serves Node, the Edge bundle, and API commands. The config lists raw environment values and captures them when the module loads. Consumers handle parsing and feature-specific checks. Node entry points load `apps/api/.env` and local Edge uses `apps/supabase/.env.functions`.
+- [`apps/web/src/env.ts`](apps/web/src/env.ts) serves the browser and web server. Astro loads `apps/web/.env` and supplies explicit `PUBLIC_*` settings at build time. The Cloudflare Worker gets its private proxy target from its runtime environment.
 
 Read settings through `config`, for example `config.PUBLIC_API_URL`. `pnpm check:env` enforces the source boundary and runs in `pnpm check`. Compose and Supabase load their environment files through their own tooling.
 
@@ -353,7 +353,7 @@ Password attempts are limited in memory per account; multiple API processes requ
 
 1. Enable Google and retain Email/Password for existing accounts in Firebase Authentication. Add `localhost` to authorized domains for local development.
 2. Fill in the `PUBLIC_FIREBASE_*` fields in `apps/web/.env` using the web app configuration.
-3. Configure `FIREBASE_PROJECT_ID` on the API and either `GOOGLE_APPLICATION_CREDENTIALS` pointing to a gitignored service-account JSON or `FIREBASE_CLIENT_EMAIL` plus `FIREBASE_PRIVATE_KEY`. Relative credential paths resolve from `apps/api`.
+3. Set `FIREBASE_SERVICE_ACCOUNT_JSON` to the contents of the downloaded service-account JSON. Its `project_id` must match the frontend Firebase project. For local Node development, store the single-line JSON inside single quotes in `apps/api/.env`. For hosted Supabase, paste the JSON directly under **Edge Function Secrets**.
 4. For a Firebase-backed admin, run `pnpm db:seed-admin admin@example.com` after configuring Firebase. The command finds the Firebase user or creates one when `ADMIN_PASSWORD` is supplied, then assigns the database System Administrator role. For local-only fixtures, use `pnpm db:seed` instead.
 
 The API verifies Firebase ID tokens, including revocation/disabled-user checks, before identity exchange or linking. A Firebase token alone does not grant catalog administration.

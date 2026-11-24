@@ -24,7 +24,7 @@ before(async () => {
     cacheDir,
     configFile: false,
     define: {
-      "import.meta.env.PUBLIC_API_URL": JSON.stringify(
+      "process.env.PUBLIC_API_URL": JSON.stringify(
         "https://api.example.test/v1",
       ),
     },

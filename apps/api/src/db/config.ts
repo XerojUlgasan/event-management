@@ -2,13 +2,15 @@ import "dotenv/config";
 
 import { config } from "../env.js";
 
-const host = config.DB_HOST;
-const port = config.DB_PORT;
+const { DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD } = config;
 
-const database = encodeURIComponent(config.DB_NAME);
+if (!DB_HOST || !DB_PORT || !DB_NAME || !DB_USER || !DB_PASSWORD)
+  throw new Error("Set DB_HOST, DB_PORT, DB_NAME, DB_USER, and DB_PASSWORD");
 
-const user = encodeURIComponent(config.DB_USER);
+const database = encodeURIComponent(DB_NAME);
 
-const password = encodeURIComponent(config.DB_PASSWORD);
+const user = encodeURIComponent(DB_USER);
 
-export const databaseUrl = `postgresql://${user}:${password}@${host}:${port}/${database}?schema=public`;
+const password = encodeURIComponent(DB_PASSWORD);
+
+export const databaseUrl = `postgresql://${user}:${password}@${DB_HOST}:${DB_PORT}/${database}?schema=public`;

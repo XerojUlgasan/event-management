@@ -1,99 +1,109 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { config } from "../src/env.js";
+import { getTextModel } from "../src/services/ai/models.js";
+import { signRealtimeToken } from "../src/utils/auth/sign-realtime-token.js";
+import { getCatalogStorageCredentials } from "../src/utils/catalog-media-storage.js";
 
-function withEnv(
-  settings: Record<string, string | undefined>,
-  run: () => void,
+async function withConfig(
+  settings: Partial<typeof config>,
+  run: () => void | Promise<void>,
 ) {
-  const previous = Object.fromEntries(
-    Object.keys(settings).map((key) => [key, process.env[key]]),
-  );
+  const previous = { ...config };
+  Object.assign(config, settings);
+
   try {
-    for (const [key, value] of Object.entries(settings)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-    run();
+    await run();
   } finally {
-    for (const [key, value] of Object.entries(previous)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
+    Object.assign(config, previous);
   }
 }
 
-test("required values are lazy, named, and read on access", () => {
-  withEnv(
-    {
-      DB_HOST: undefined,
-      SESSION_TTL_DAYS: "0",
-      WEB_ORIGIN: "https://one.example, https://two.example",
-    },
-    () => {
-      assert.throws(() => config.DB_HOST, /DB_HOST is required/);
-      assert.throws(() => config.SESSION_TTL_DAYS, /SESSION_TTL_DAYS/);
-      assert.deepEqual(config.WEB_ORIGIN, [
-        "https://one.example",
-        "https://two.example",
-      ]);
-      process.env.DB_HOST = "localhost";
-      assert.equal(config.DB_HOST, "localhost");
-    },
-  );
+test("config captures raw values when imported", () => {
+  const original = process.env.DB_HOST;
+
+  assert.equal(config.DB_HOST, original);
+
+  try {
+    process.env.DB_HOST = " host ";
+    assert.equal(config.DB_HOST, original);
+  } finally {
+    if (original === undefined) delete process.env.DB_HOST;
+    else process.env.DB_HOST = original;
+  }
 });
 
-test("storage credentials retain supported source precedence", () => {
-  withEnv(
+test("storage credentials retain supported source precedence", () =>
+  withConfig(
     {
+      SUPABASE_URL: " http://localhost:54321/ ",
       SUPABASE_SERVICE_ROLE_KEY: undefined,
       SUPABASE_SECRET_KEY: undefined,
       SUPABASE_SECRET_KEYS: undefined,
-      STORAGE_BUCKET: undefined,
     },
     () => {
-      assert.throws(() => config.SUPABASE_STORAGE_KEY, /SUPABASE_SECRET_KEYS/);
-      assert.throws(
-        () => config.STORAGE_BUCKET,
-        /STORAGE_BUCKET/,
-      );
-      process.env.SUPABASE_SECRET_KEYS = '{"default":" json ","other":"other"}';
-      assert.equal(config.SUPABASE_STORAGE_KEY, "json");
-      process.env.SUPABASE_SECRET_KEY = "secret";
-      process.env.SUPABASE_SERVICE_ROLE_KEY = "role";
-      assert.equal(config.SUPABASE_STORAGE_KEY, "role");
-      delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-      assert.equal(config.SUPABASE_STORAGE_KEY, "secret");
-      delete process.env.SUPABASE_SECRET_KEY;
-      process.env.SUPABASE_SECRET_KEYS = '{"other":"first"}';
-      assert.equal(config.SUPABASE_STORAGE_KEY, "first");
+      assert.throws(getCatalogStorageCredentials, /SUPABASE_SECRET_KEYS/);
+      config.SUPABASE_SECRET_KEYS = '{"default":" json ","other":"other"}';
+      assert.deepEqual(getCatalogStorageCredentials(), {
+        url: "http://localhost:54321",
+        apiKey: "json",
+      });
+      config.SUPABASE_SECRET_KEY = "secret";
+      config.SUPABASE_SERVICE_ROLE_KEY = "role";
+      assert.equal(getCatalogStorageCredentials().apiKey, "role");
+      config.SUPABASE_SERVICE_ROLE_KEY = undefined;
+      assert.equal(getCatalogStorageCredentials().apiKey, "secret");
+      config.SUPABASE_SECRET_KEY = undefined;
+      config.SUPABASE_SECRET_KEYS = '{"other":"first"}';
+      assert.equal(getCatalogStorageCredentials().apiKey, "first");
     },
-  );
-});
+  ));
 
-test("Realtime legacy signing is restricted to local non-production targets", () => {
-  withEnv(
+test("Realtime legacy signing is restricted to local non-production targets", () =>
+  withConfig(
     {
-      REALTIME_JWT_SECRET: "secret",
+      REALTIME_JWT_SIGNING_JWK: undefined,
+      REALTIME_JWT_SECRET: "test-legacy-secret-at-least-32-bytes",
       NODE_ENV: "development",
       SUPABASE_URL: "https://example.supabase.co",
     },
-    () => {
-      assert.equal(config.REALTIME_JWT_SECRET, undefined);
-      process.env.SUPABASE_URL = "http://kong:8000";
-      assert.equal(config.REALTIME_JWT_SECRET, "secret");
-      process.env.NODE_ENV = "production";
-      assert.equal(config.REALTIME_JWT_SECRET, undefined);
-    },
-  );
-});
+    async () => {
+      const date = new Date();
+      const issuedAt = Math.floor(date.getTime() / 1000);
 
-test("AI model and key are required only when the model is used", () => {
-  withEnv({ AI_GATEWAY_API_KEY: undefined, TEXT_MODEL: undefined }, () => {
-    assert.throws(() => config.TEXT_MODEL, /AI_GATEWAY_API_KEY/);
-    process.env.AI_GATEWAY_API_KEY = "key";
-    assert.throws(() => config.TEXT_MODEL, /TEXT_MODEL/);
-    process.env.TEXT_MODEL = " model/id ";
-    assert.equal(config.TEXT_MODEL, "model/id");
-  });
-});
+      const sign = () =>
+        signRealtimeToken(
+          { scope: "notifications" },
+          {
+            sessionId: "test-session",
+            expiresAt: date,
+            user: {
+              id: "test-user",
+              created_at: date,
+              updated_at: date,
+              email: "user@example.test",
+              display_name: null,
+              firebase_uid: null,
+              password_hash: null,
+              role: "customer",
+            },
+          },
+          { issuedAt, expiresAt: issuedAt + 60 },
+        );
+
+      await assert.rejects(sign, /signer is unavailable/);
+      config.SUPABASE_URL = "http://kong:8000";
+      assert.match(await sign(), /^[^.]+\.[^.]+\.[^.]+$/);
+      config.NODE_ENV = "production";
+      await assert.rejects(sign, /signer is unavailable/);
+    },
+  ));
+
+test("AI model and key are required only when the model is used", () =>
+  withConfig({ AI_GATEWAY_API_KEY: undefined, TEXT_MODEL: undefined }, () => {
+    assert.throws(getTextModel, /AI_GATEWAY_API_KEY/);
+    config.AI_GATEWAY_API_KEY = "key";
+    assert.throws(getTextModel, /TEXT_MODEL/);
+    config.TEXT_MODEL = " model/id ";
+    assert.equal(getTextModel(), "model/id");
+  }));

@@ -4,29 +4,27 @@ import { after, test } from "node:test";
 import type { Selectable } from "kysely";
 import { Image } from "imagescript";
 import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images";
+import { config } from "../../src/env.js";
 import type { MediaAssets } from "../../src/db/types.js";
 import { readCatalogEmbeddingImage } from "../../src/services/ai/retrieval/read-catalog-embedding-image.js";
 
 const originalFetch = globalThis.fetch;
-const oldUrl = process.env.SUPABASE_URL;
-const oldKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const oldBucket = process.env.STORAGE_BUCKET;
+const oldUrl = config.SUPABASE_URL;
+const oldKey = config.SUPABASE_SERVICE_ROLE_KEY;
+const oldBucket = config.STORAGE_BUCKET;
 
-process.env.SUPABASE_URL = "https://storage.invalid";
-process.env.SUPABASE_SERVICE_ROLE_KEY = "fixture-key";
-process.env.STORAGE_BUCKET = "fixture-bucket";
+config.SUPABASE_URL = "https://storage.invalid";
+config.SUPABASE_SERVICE_ROLE_KEY = "fixture-key";
+config.STORAGE_BUCKET = "fixture-bucket";
 
 after(() => {
   globalThis.fetch = originalFetch;
 
-  for (const [key, value] of Object.entries({
+  Object.assign(config, {
     SUPABASE_URL: oldUrl,
     SUPABASE_SERVICE_ROLE_KEY: oldKey,
     STORAGE_BUCKET: oldBucket,
-  })) {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
+  });
 });
 
 function asset(

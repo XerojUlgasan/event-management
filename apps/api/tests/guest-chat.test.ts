@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { setTestConfig } from "./helpers/set-test-config.js";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -78,9 +79,11 @@ before(async () => {
     );
   }
 
-  process.env.DB_NAME = database;
-  process.env.AI_GATEWAY_API_KEY = "fixture-key";
-  process.env.TEXT_MODEL = modelId;
+  setTestConfig({
+    DB_NAME: database,
+    AI_GATEWAY_API_KEY: "fixture-key",
+    TEXT_MODEL: modelId,
+  });
   useReply("Hello from AMAC AI");
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));

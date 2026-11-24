@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { setTestConfig } from "./helpers/set-test-config.js";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -81,7 +82,7 @@ before(async () => {
   pool = new Pool({ ...connection, database });
   await applyMigrations(pool);
   storage = await startSeedStorage();
-  Object.assign(process.env, storage.env, { DB_NAME: database });
+  setTestConfig({ ...storage.env, DB_NAME: database });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
 });
@@ -125,10 +126,7 @@ async function runSeed(target = database) {
       DB_NAME: target,
       SEED_RANDOM_SEED: "seed-integration",
       SEED_CLOCK: "2026-10-31T00:00:00Z",
-      FIREBASE_PROJECT_ID: "",
-      FIREBASE_CLIENT_EMAIL: "",
-      FIREBASE_PRIVATE_KEY: "",
-      GOOGLE_APPLICATION_CREDENTIALS: "",
+      FIREBASE_SERVICE_ACCOUNT_JSON: "",
       FIREBASE_AUTH_EMULATOR_HOST: "",
     },
   });

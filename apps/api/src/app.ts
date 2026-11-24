@@ -33,7 +33,14 @@ import type { HonoEnv } from "./types/hono.js";
 
 export const app = new OpenAPIHono<HonoEnv>();
 
-const allowedOrigins = config.WEB_ORIGIN;
+const webOrigin = config.WEB_ORIGIN;
+
+if (!webOrigin?.trim()) throw new Error("WEB_ORIGIN is required");
+
+const allowedOrigins = webOrigin
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 app.use(
   "*",

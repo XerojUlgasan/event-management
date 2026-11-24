@@ -7,6 +7,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
+import { firebaseServiceAccountJson } from "./helpers/firebase-service-account.js";
 import { startSeedStorage } from "./helpers/seed-storage.js";
 import type { Profile } from "../src/controllers/auth/profile.js";
 
@@ -38,7 +39,8 @@ before(async () => {
     ),
     "Tests require local PostgreSQL.",
   );
-  process.env.FIREBASE_PROJECT_ID = projectId;
+  process.env.FIREBASE_SERVICE_ACCOUNT_JSON =
+    firebaseServiceAccountJson(projectId);
   const connection = {
     host: process.env.DB_HOST ?? "localhost",
     port: Number(process.env.DB_PORT ?? 5432),
@@ -827,10 +829,7 @@ test("db:seed inserts fixtures without changing existing accounts or sessions", 
         env: {
           ...process.env,
           ...storage.env,
-          FIREBASE_PROJECT_ID: "",
-          FIREBASE_CLIENT_EMAIL: "",
-          FIREBASE_PRIVATE_KEY: "",
-          GOOGLE_APPLICATION_CREDENTIALS: "",
+          FIREBASE_SERVICE_ACCOUNT_JSON: "",
           FIREBASE_AUTH_EMULATOR_HOST: "",
         },
       },

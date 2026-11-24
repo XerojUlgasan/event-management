@@ -49,7 +49,7 @@ test("admin status history appends, retries, and resets on a new revision", asyn
     root: fileURLToPath(new URL("../../", import.meta.url)),
     cacheDir,
     configFile: false,
-    define: { "import.meta.env.PUBLIC_API_URL": JSON.stringify("/v1") },
+    define: { "process.env.PUBLIC_API_URL": JSON.stringify("/v1") },
     appType: "custom",
     server: { middlewareMode: true, hmr: false },
     esbuild: { jsx: "automatic" },

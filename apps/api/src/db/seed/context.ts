@@ -46,6 +46,8 @@ export function seedClock() {
 
 /** Deterministic unit interval. SEED_RANDOM_SEED changes the shuffle only. */
 export function seedRandom(seedText = config.SEED_RANDOM_SEED) {
+  if (!seedText?.trim()) throw new Error("SEED_RANDOM_SEED is required");
+
   let hash = 2166136261;
 
   for (let i = 0; i < seedText.length; i += 1)

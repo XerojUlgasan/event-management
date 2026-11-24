@@ -1,8 +1,8 @@
 import "dotenv/config";
 import { db } from "./client.js";
-import { config } from "../env.js";
 import { listCatalogKnowledgeOwnersData } from "../data/ai/list-catalog-knowledge-owners.js";
 import { pruneIneligibleCatalogKnowledgeData } from "../data/ai/prune-ineligible-catalog-knowledge.js";
+import { getCatalogEmbeddingModel } from "../services/ai/retrieval/embed-catalog-content.js";
 import { refreshCatalogEmbeddingsService } from "../services/ai/workflows/refresh-catalog-embeddings.js";
 
 const controller = new AbortController();
@@ -13,8 +13,7 @@ process.once("SIGINT", stop);
 process.once("SIGTERM", stop);
 
 try {
-  if (config.EMBEDDING_MODEL !== "google/gemini-embedding-2")
-    throw new Error("Catalog embedding requires google/gemini-embedding-2");
+  getCatalogEmbeddingModel();
 
   await pruneIneligibleCatalogKnowledgeData(db);
   const owners = await listCatalogKnowledgeOwnersData(db);

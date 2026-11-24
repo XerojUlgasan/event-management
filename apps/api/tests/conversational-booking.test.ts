@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { setTestConfig } from "./helpers/set-test-config.js";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -72,8 +73,10 @@ before(async () => {
     );
   }
 
-  delete process.env.AI_GATEWAY_API_KEY;
-  process.env.DB_NAME = database;
+  setTestConfig({
+    AI_GATEWAY_API_KEY: undefined,
+    DB_NAME: database,
+  });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
   admin = await session("admin");
@@ -1066,7 +1069,7 @@ test(
       liveGatewayKey && process.env.TEXT_MODEL,
       "Configure the Gateway model for this opt-in test",
     );
-    process.env.AI_GATEWAY_API_KEY = liveGatewayKey;
+    setTestConfig({ AI_GATEWAY_API_KEY: liveGatewayKey });
 
     try {
       const pkg = await db
@@ -1160,7 +1163,7 @@ test(
       assert.equal(staffThread.conversation.bookingRequestId, submitted.id);
       assert.deepEqual(await linkedBooking(conversation.id), submitted);
     } finally {
-      delete process.env.AI_GATEWAY_API_KEY;
+      setTestConfig({ AI_GATEWAY_API_KEY: undefined });
     }
   },
 );

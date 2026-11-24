@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { setTestConfig } from "./helpers/set-test-config.js";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
@@ -103,10 +104,12 @@ before(async () => {
       ),
     );
 
-  process.env.SUPABASE_URL = "http://storage.test";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "fixture-storage";
-  process.env.AI_GATEWAY_API_KEY = "fixture-embedding";
-  process.env.EMBEDDING_MODEL = "google/gemini-embedding-2";
+  setTestConfig({
+    SUPABASE_URL: "http://storage.test",
+    SUPABASE_SERVICE_ROLE_KEY: "fixture-storage",
+    AI_GATEWAY_API_KEY: "fixture-embedding",
+    EMBEDDING_MODEL: "google/gemini-embedding-2",
+  });
   globalThis.fetch = async (input, init) => {
     const url = new URL(
       input instanceof Request ? input.url : input.toString(),

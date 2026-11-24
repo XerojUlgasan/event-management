@@ -1,8 +1,9 @@
+import "dotenv/config";
+import { setTestConfig } from "./helpers/set-test-config.js";
 import { assertImageMessageJobLeaseData } from "../src/data/messages/message-processing.js";
 import { runOneBackgroundJob } from "../src/services/background-jobs/run-one-background-job.js";
 import { claimJobData } from "../src/data/background-jobs/claim-job.js";
 import { backgroundJobPolicies } from "../src/services/background-jobs/job-definitions.js";
-import "dotenv/config";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -65,13 +66,15 @@ before(async () => {
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
 
-  process.env.DB_NAME = database;
-  process.env.AI_GATEWAY_API_KEY = "fixture-key";
-  process.env.TEXT_MODEL = "fixture/text";
-  process.env.VISION_MODEL = "fixture/vision";
-  process.env.SUPABASE_URL = "https://storage.invalid";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "fixture-key";
-  process.env.STORAGE_BUCKET = "test";
+  setTestConfig({
+    DB_NAME: database,
+    AI_GATEWAY_API_KEY: "fixture-key",
+    TEXT_MODEL: "fixture/text",
+    VISION_MODEL: "fixture/vision",
+    SUPABASE_URL: "https://storage.invalid",
+    SUPABASE_SERVICE_ROLE_KEY: "fixture-key",
+    STORAGE_BUCKET: "test",
+  });
   const { Image } = await import("imagescript");
   bytes = await new Image(1, 1).fill(0x0000ffff).encodePNG();
   alternate = await new Image(1, 1).fill(0xff0000ff).encodePNG();
