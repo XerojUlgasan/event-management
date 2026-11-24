@@ -27,6 +27,8 @@ The seed runs in one PostgreSQL transaction. It inserts fixtures and uploads loc
 
 [Package copy](../apps/api/src/db/seed/package-collection.ts) and [service copy](../apps/api/src/db/seed/service-collection.ts) define each listing's metadata, Markdown and images. The [canvas builder](../apps/api/src/db/seed/curated-catalog.ts) uses the same widget format as the admin editor and public detail pages. Assets belong under [the seed asset directory](../apps/api/src/db/seed/assets) and are uploaded using the [catalog and showcase Storage conventions](../context-factory/areas/api/references/external-image-urls.md#storage-filing-and-recovery).
 
+Fresh catalog canvases use varied openings, aligned photo and copy pairs, and Markdown heights sized for both the desktop grid and mobile stack. Showcase details use their cover and ordered gallery.
+
 ## Repeat runs and collisions
 
 Catalog and scenario fixtures use stable IDs. The seed initializes the canvas and thumbnail only for a newly inserted listing. Reruns preserve saved names, pricing, canvas edits, archive state, gallery order, account credentials and session hashes. An existing listing with a conflicting name or slug keeps its data. The refreshed 10/10 count applies to fresh databases. Older public listings, including the three legacy sample packages, stay in a previously seeded database. Use a fresh disposable database to see only the refreshed catalog.

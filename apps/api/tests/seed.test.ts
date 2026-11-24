@@ -246,6 +246,31 @@ function assertNoWidgetOverlaps(
       }
 }
 
+function assertCompactWidgetLayout(sections: CatalogSection[], name: string) {
+  for (const section of sections) {
+    const label = `${name}: ${section.title}`;
+
+    const widgets = [...section.widgets].sort((a, b) => a.y - b.y);
+
+    let nextRow = 0;
+
+    for (const widget of widgets) {
+      assert.ok(widget.y <= nextRow, `${label} has no skipped grid rows`);
+      nextRow = Math.max(nextRow, widget.y + widget.h);
+    }
+
+    const [first, second] = widgets;
+
+    if (widgets.length === 2 && first && second) {
+      const sideBySide =
+        first.x + first.w <= second.x || second.x + second.w <= first.x;
+
+      if (sideBySide)
+        assert.equal(first.y, second.y, `${label} aligns paired widgets`);
+    }
+  }
+}
+
 function assertSubstantialEditorial(sections: CatalogSection[], name: string) {
   const bodies = sections.flatMap((section) =>
     section.widgets
@@ -395,7 +420,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
   const serviceById = new Map(seededServices.rows.map((row) => [row.id, row]));
 
   const activeMarkdownBodies: string[] = [];
-  const layoutSignatures = new Set<string>();
+  const openingLayouts = new Set<string>();
   let resolvedCatalogPhotos = 0;
   let activeListingsWithPhotos = 0;
 
@@ -413,6 +438,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
     assert.equal(sections.length, stored.length);
     assert.ok(sections.length >= 2);
     assertNoWidgetOverlaps(sections);
+    assertCompactWidgetLayout(sections, record.name);
 
     if (page.index % 5 === 3) {
       const [lead, intro] = stored[0].widgets;
@@ -430,20 +456,12 @@ test("seed creates demo users and conversations while preserving unrelated data 
     }
 
     const sourceMarkdown = assertSubstantialEditorial(sections, record.name);
-    layoutSignatures.add(
-      JSON.stringify(
-        sections.map((section) =>
-          section.widgets
-            .map((widget) => [
-              widget.type,
-              widget.x,
-              widget.y,
-              widget.w,
-              widget.h,
-            ])
-            .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
-        ),
-      ),
+    assert.deepEqual(sourceMarkdown, [
+      page.copy.intro,
+      ...page.copy.sections.map(({ markdown }) => markdown),
+    ]);
+    openingLayouts.add(
+      JSON.stringify(stored[0].widgets.map(({ type, x, w }) => [type, x, w])),
     );
 
     const photos = sections.flatMap((section) =>
@@ -551,7 +569,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
 
   assert.equal(resolvedCatalogPhotos, catalogMediaIds.length);
   assert.equal(activeListingsWithPhotos, 20);
-  assert.ok(layoutSignatures.size >= 5, "seed canvases exercise five layouts");
+  assert.ok(openingLayouts.size >= 5, "seed canvases exercise five openings");
   assert.ok(
     new Set(activeMarkdownBodies).size >= activeListingsWithPhotos * 2,
     "active catalog text varies beyond listing IDs and headings",

@@ -9,14 +9,12 @@ export type CatalogCopy = {
   images: readonly { file: string; alt: string }[];
 };
 
-// Estimate wrapping at the narrowest public canvas widths in both grid modes.
-function markdownRows(markdown: string, width: number) {
-  const charactersPerLine = Math.min(34, Math.round(width * 2.6));
-  let pixels = 12;
+function markdownPixels(markdown: string, charactersPerLine: number) {
+  let pixels = 8;
 
   for (const line of markdown.split("\n")) {
     if (!line.trim()) {
-      pixels += 12;
+      pixels += 16;
       continue;
     }
 
@@ -47,7 +45,7 @@ function markdownRows(markdown: string, width: number) {
       .replace(/^(?:[-*] |\d+\. |#{1,3} )|[*_`]/g, "")
       .trim()
       .split(/\s+/);
-    const lineWidth = charactersPerLine - (listItem ? 3 : 0);
+    const lineWidth = charactersPerLine - (listItem ? 5 : 0);
     let used = 0;
     let wrappedLines = 1;
 
@@ -60,13 +58,20 @@ function markdownRows(markdown: string, width: number) {
       }
     }
 
-    pixels += wrappedLines * 24 + (listItem ? 2 : heading ? 18 : 0);
+    pixels += wrappedLines * 24 + (listItem ? 4 : heading ? 18 : 0);
   }
 
-  // Split columns get their shortest rows as the desktop grid starts.
-  const rowPixels = width <= 13 ? 36 : 40;
+  return pixels;
+}
 
-  return Math.max(2, Math.ceil((pixels + 6) / rowPixels));
+function markdownRows(markdown: string, width: number) {
+  // Size for the shortest public grid rows at the 580px canvas breakpoint
+  // and the wrapping in a full-width stack on a 320px screen.
+  const grid = markdownPixels(markdown, Math.floor(width * 3.1) - 4);
+  const stacked = markdownPixels(markdown, 34);
+
+  // A widget spans row pitches minus the final gutter.
+  return Math.max(2, Math.ceil(Math.max((grid + 7) / 37, (stacked + 8) / 42)));
 }
 
 type StoredWidget = ReturnType<
@@ -76,12 +81,11 @@ type StoredWidget = ReturnType<
 const openingLayouts: ReadonlyArray<{
   photoWidth: number;
   photoFirst: boolean;
-  introOffset?: number;
 }> = [
   { photoWidth: 11, photoFirst: true },
   { photoWidth: 10, photoFirst: false },
   { photoWidth: CATALOG_COLUMNS, photoFirst: true },
-  { photoWidth: 13, photoFirst: true, introOffset: 1 },
+  { photoWidth: 12, photoFirst: true },
   { photoWidth: 9, photoFirst: true },
 ];
 
@@ -127,7 +131,7 @@ export function buildCatalogCanvas(
     w: number,
     y = 0,
   ): StoredWidget => ({
-    ...widget(`photo-${position}`, x, y, w, Math.max(4, Math.round(w / 3))),
+    ...widget(`photo-${position}`, x, y, w, w === CATALOG_COLUMNS ? 7 : 4),
     type: "photo",
     mediaId: mediaIds[position],
     alt: copy.images[position].alt,
@@ -140,11 +144,8 @@ export function buildCatalogCanvas(
     widgets,
   });
 
-  const {
-    photoWidth,
-    photoFirst,
-    introOffset = 0,
-  } = openingLayouts[options.index % openingLayouts.length];
+  const { photoWidth, photoFirst } =
+    openingLayouts[options.index % openingLayouts.length];
   const stacked = photoWidth === CATALOG_COLUMNS;
   const introWidth = stacked ? CATALOG_COLUMNS : CATALOG_COLUMNS - photoWidth;
   const intro = text(
@@ -158,7 +159,7 @@ export function buildCatalogCanvas(
     caption: "Illustrative photo",
   };
 
-  intro.y = stacked ? lead.h : introOffset;
+  if (stacked) intro.y = lead.h;
 
   const sections = [
     section(
@@ -176,7 +177,9 @@ export function buildCatalogCanvas(
         ]);
 
       const detailFirst = (options.index + index) % 3 === 0;
-      const photoWidth = (options.index + index) % 2 === 0 ? 10 : 11;
+      // Give longer copy more of the paired row, keeping the photo alongside it.
+      const photoWidth =
+        markdown.length > 300 ? 9 : (options.index + index) % 2 === 0 ? 10 : 11;
       const textWidth = CATALOG_COLUMNS - photoWidth;
       const detail = photo(photoIndex, detailFirst ? 0 : textWidth, photoWidth);
       const body = text(
@@ -212,7 +215,7 @@ export function buildCatalogCanvas(
 
   if (options.relatedServiceId) {
     const related: StoredWidget = {
-      ...widget("related-service", 0, 0, 12, 6),
+      ...widget("related-service", 0, 0, 16, 9),
       type: "service",
       serviceId: options.relatedServiceId,
       caption: "Available as a separate service.",
