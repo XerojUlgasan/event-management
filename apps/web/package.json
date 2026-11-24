@@ -6,6 +6,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "build:workers": "cross-env ASTRO_ADAPTER=cloudflare PUBLIC_API_URL=/v1 CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false astro build",
+    "deploy:workers": "pnpm run build:workers && wrangler deploy",
     "preview": "astro preview",
     "check": "astro check",
     "test:catalog": "node --test tests/catalog/catalog-ssr.test.mjs tests/catalog/package-service-dom.test.mjs tests/catalog/details-validation.test.ts tests/catalog/canvas-validation.test.ts",

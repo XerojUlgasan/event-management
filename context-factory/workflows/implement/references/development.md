@@ -107,15 +107,15 @@ Connect Workers Builds to the `event-management` Worker named in [Wrangler confi
 | Deploy command | `pnpm exec wrangler deploy` |
 | Build variables | `NODE_VERSION=24.15.0`, `PNPM_VERSION=11.21.0` |
 
+`build:workers` generates `dist/server/wrangler.json` and its `.wrangler/deploy/config.json` redirect. Both paths are ignored by Git. A fresh checkout needs the Workers build before Wrangler can deploy the frontend. If you only deploy the production branch, you can leave the Build command empty and set the Deploy command to `pnpm run deploy:workers` to run both steps in order.
+
 The Workers build sets the browser's API URL to `/v1`. Set `API_PROXY_TARGET` in the Worker's runtime variables to the hosted Supabase gateway origin, such as `https://<project-ref>.supabase.co`. The Worker forwards `/v1/health` to `/functions/v1/api/v1/health` on that gateway and uses the same API for server-rendered catalog pages.
 
 The target needs the Clemora `api` Edge Function and matching database schema. Include the frontend's exact HTTPS origin in the function's `WEB_ORIGIN` and set `NODE_ENV=production` for secure session cookies. For Realtime, add `PUBLIC_SUPABASE_URL` and `PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the build variables. Optional Firebase sign-in also needs its `PUBLIC_FIREBASE_*` build variables and the Worker hostname authorized in Firebase.
 
-With the local Edge API running, run this from `apps/web`:
+From `apps/web`, verify the build and deployment bundle with `pnpm run deploy:workers --dry-run`. With the local Edge API running, use this command to serve the bundle.
 
 ```sh
-pnpm run build:workers
-pnpm exec wrangler deploy --dry-run
 pnpm exec wrangler dev --ip 127.0.0.1 --port 8787 --var API_PROXY_TARGET:http://127.0.0.1:54321
 ```
 
