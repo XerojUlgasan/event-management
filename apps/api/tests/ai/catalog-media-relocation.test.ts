@@ -9,6 +9,7 @@ import {
   ownedCatalogMediaKey,
   pendingCatalogMediaKey,
 } from "../../src/utils/catalog-media-paths.js";
+import { setTestConfig } from "../helpers/set-test-config.js";
 
 test("filing preserves uploaded photo freshness across folders", () => {
   const media = {
@@ -52,8 +53,8 @@ test("Storage missing-key detection accepts both response formats without hiding
     SUPABASE_URL: process.env.SUPABASE_URL,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   };
-  process.env.SUPABASE_URL = "http://storage.invalid";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "synthetic-fixture";
+  setTestConfig({ SUPABASE_URL: "http://storage.invalid" });
+  setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: "synthetic-fixture" });
 
   try {
     for (const response of [
@@ -74,10 +75,7 @@ test("Storage missing-key detection accepts both response formats without hiding
   } finally {
     globalThis.fetch = oldFetch;
 
-    for (const [key, value] of Object.entries(oldEnv)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
+    setTestConfig(oldEnv);
   }
 });
 

@@ -102,7 +102,7 @@ function checkPlacement(path) {
 
   if (layer === "pages") return; // Astro owns URL filenames, including dynamic routes.
 
-  if (layer === "middleware.ts" && parts.length === 2) return;
+  if (["env.ts", "middleware.ts"].includes(layer) && parts.length === 2) return;
 
   if (layer === "layouts") {
     if (parts.length !== 3 || extension !== ".astro" || !pascal.test(base))
@@ -181,9 +181,7 @@ function checkPlacement(path) {
           path,
           "Place library files in lib/<layer>/<domain>/<responsibility>.",
         );
-    } else if (
-      ["auth", "env", "http", "navigation", "pagination"].includes(group)
-    ) {
+    } else if (["auth", "http", "navigation", "pagination"].includes(group)) {
       if (tail.length !== 2)
         report(
           path,

@@ -1,5 +1,5 @@
 import { createGateway, embed } from "ai";
-import { env } from "../../../utils/env.js";
+import { getEmbeddingSettings } from "../models.js";
 
 const supportedModel = "google/gemini-embedding-2";
 const dimensions = 768;
@@ -15,7 +15,7 @@ export async function embedCatalogContent({
   abortSignal?: AbortSignal;
   purpose?: "document" | "search";
 }): Promise<{ embedding: number[]; model: string }> {
-  const { apiKey, model } = env.AI_EMBEDDING;
+  const { apiKey, model } = getEmbeddingSettings();
 
   if (model !== supportedModel) throw new Error("Unsupported embedding model");
 

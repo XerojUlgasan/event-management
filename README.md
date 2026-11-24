@@ -280,13 +280,12 @@ The Node API, Prisma, seeds, and integration tests still use Compose PostgreSQL 
 
 ### Configuration
 
-Environment access, parsing, and defaults are centralized per app:
+Each app exports a single `config` object of raw environment values. Config consumers validate and parse the settings they use.
 
-- API, including the Edge bundle and API commands: [`apps/api/src/utils/env.ts`](apps/api/src/utils/env.ts). Getters preserve on-demand reads; importing the utility does not require database, Firebase, or Storage configuration. Existing entry points still load dotenv.
-- Browser: [`apps/web/src/lib/env/env.ts`](apps/web/src/lib/env/env.ts). Only explicit `PUBLIC_*` settings enter this module; they are captured at build time. Firebase setup stays optional.
-- Web server and Astro config: [`apps/web/src/lib/server/config/env.ts`](apps/web/src/lib/server/config/env.ts). Server getters read the runtime environment. Astro config reads shell-provided variables before Astro loads `.env` files.
+- [`apps/api/src/env.ts`](apps/api/src/env.ts) serves Node, the Edge bundle, and API commands. Values are captured when the module loads. Node entry points load dotenv first. Firebase, Storage, and AI settings are checked at use.
+- [`apps/web/src/env.ts`](apps/web/src/env.ts) serves the browser, the web server, and Astro config. Vite captures explicit `PUBLIC_*` settings at build time. Server settings are captured from the Node environment at module startup. Astro config can read shell-provided settings before Astro loads `.env` files.
 
-Use these utilities instead of reading `process.env` or `import.meta.env` in consumers. `pnpm check:env` enforces the source boundary and runs in `pnpm check`; tests and generated Edge bundles are excluded. Compose and Supabase configuration still use their native environment loading. The standalone cleanup script uses the API utility with Node's built-in TypeScript support, keeping its own dotenv path and local-only guards.
+App consumers import `config` from their app's `src/env.ts`. `pnpm check:env` checks direct environment reads in app source and runs in `pnpm check`. Tests and generated Edge bundles are excluded. Compose and Supabase configuration use their native environment loading.
 
 Use the checked-in [API environment example](apps/api/.env.example) and [web environment example](apps/web/.env.example) for variable names. Keep `.env`, `.secrets/`, database values, session tokens, and service-account contents out of chat and commits.
 
@@ -442,7 +441,7 @@ Migration `20261116155140_anonymous_guest_chat` adds server-only guest identitie
 
 Migration `20261116061207_add_ai_message_replies` makes the message sender nullable only for the new `assistant` role; human sender IDs remain required. It preserves existing messages and conversation lifecycle. Deploy the matching API and browser contracts together.
 
-**`pnpm db:reset` deletes data without a confirmation prompt.** Its script forces a Prisma reset, reapplies migrations, and seeds the configured database. Check the target and use it only for a database whose contents may be discarded.
+**`pnpm db:reset` deletes data without a confirmation prompt.** It removes Clemora's Realtime helpers and policies, resets the `public` schema, replays committed migrations, and seeds the configured database. Check the target and use it only for a database whose contents may be discarded.
 
 ### Migration impact
 
@@ -507,8 +506,8 @@ Run the checks matching the changed area:
 | `pnpm build`                                                     | Web production bundle and API types                                                                                                                                   |
 | `pnpm build:storybook`                                           | Shared UI rendering build                                                                                                                                             |
 | `pnpm db:validate`                                               | Prisma schema                                                                                                                                                         |
-| `pnpm check:env`                                                 | Raw environment reads remain in designated per-app utilities; excludes tests and generated bundles                                                                    |
-| `pnpm test:env`                                                  | Environment defaults, lazy reads, Firebase initialization, and deliberate env-check failures without a database                                                       |
+| `pnpm check:env`                                                 | Raw environment reads stay in each app’s src/env.ts. Tests and generated bundles are excluded                                                                    |
+| `pnpm test:env`                                                  | Raw environment snapshots, client and server settings, Firebase initialization, and env-check fixtures                                                       |
 | `pnpm check:web-structure`                                       | Web placement, naming, and runtime import rules; does not establish domain semantics or browser behavior                                                              |
 | `pnpm check:guidance`                                            | Context-factory links, anchors, skill metadata, registration, and reachability; does not verify agent compliance or application behavior                              |
 | `pnpm --filter @event-management/api test:auth`                  | Authentication and sessions with PostgreSQL and Firebase Auth emulator                                                                                                |

@@ -10,6 +10,7 @@ import {
   bookingReviewBody,
   bookingReviewPresets,
 } from "../../src/services/booking-requests/booking-chat-messages.js";
+import { setTestConfig } from "../helpers/set-test-config.js";
 
 const history = [
   { sender_role: "customer", body: "Quiero organizar una fiesta." },
@@ -22,16 +23,16 @@ test("a booking review keeps customer language and renders verified details", as
   const oldModel = process.env.TEXT_MODEL;
   const oldKey = process.env.AI_GATEWAY_API_KEY;
   const modelId = "fixture/translation";
-  process.env.TEXT_MODEL = modelId;
-  process.env.AI_GATEWAY_API_KEY = "fixture-key";
+  setTestConfig({ TEXT_MODEL: modelId });
+  setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
   t.after(() => {
     globalThis.AI_SDK_DEFAULT_PROVIDER = oldProvider;
 
-    if (oldModel === undefined) delete process.env.TEXT_MODEL;
-    else process.env.TEXT_MODEL = oldModel;
+    if (oldModel === undefined) setTestConfig({ TEXT_MODEL: undefined });
+    else setTestConfig({ TEXT_MODEL: oldModel });
 
-    if (oldKey === undefined) delete process.env.AI_GATEWAY_API_KEY;
-    else process.env.AI_GATEWAY_API_KEY = oldKey;
+    if (oldKey === undefined) setTestConfig({ AI_GATEWAY_API_KEY: undefined });
+    else setTestConfig({ AI_GATEWAY_API_KEY: oldKey });
   });
 
   const spanishCopy = {

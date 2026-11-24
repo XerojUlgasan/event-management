@@ -14,7 +14,7 @@ import {
   markConversationRead,
   type ChatMessage,
 } from "../../data/messages/conversations";
-import { env } from "../../env/env";
+import { config } from "../../../env";
 
 // Desktop keeps the selected thread visible; on narrow screens the inbox can cover it.
 export function useThreadVisible(open: boolean) {
@@ -57,8 +57,8 @@ export function useRealtimeThread({
     if (
       !id ||
       !enabled ||
-      !env.PUBLIC_SUPABASE_URL ||
-      !env.PUBLIC_SUPABASE_PUBLISHABLE_KEY
+      !config.PUBLIC_SUPABASE_URL ||
+      !config.PUBLIC_SUPABASE_PUBLISHABLE_KEY
     )
       return;
 
@@ -66,8 +66,8 @@ export function useRealtimeThread({
 
     try {
       client = createClient(
-        env.PUBLIC_SUPABASE_URL,
-        env.PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+        config.PUBLIC_SUPABASE_URL,
+        config.PUBLIC_SUPABASE_PUBLISHABLE_KEY,
         {
           auth: {
             persistSession: false,

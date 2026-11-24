@@ -18,7 +18,7 @@
     "build": "pnpm --filter @event-management/web build && pnpm --filter @event-management/api build",
     "check": "pnpm lint && pnpm check:env && pnpm check:web-structure && pnpm --filter @event-management/web check && pnpm --filter @event-management/api check && pnpm --filter @event-management/ui check",
     "check:env": "node scripts/check-env.mjs",
-    "test:env": "node --test scripts/check-env.test.mjs apps/web/tests/env/env.test.ts && pnpm --filter @event-management/api exec tsx --test tests/env.test.ts tests/firebase-admin.test.ts ../web/tests/auth/session-check.test.ts",
+    "test:env": "node --test scripts/check-env.test.mjs && pnpm --filter @event-management/api exec tsx --test tests/env.test.ts tests/firebase-admin.test.ts ../web/tests/env/env.test.ts ../web/tests/auth/session-check.test.ts",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix --max-warnings 0",
     "format": "prettier --write . && pnpm lint:fix",
