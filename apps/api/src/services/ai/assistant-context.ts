@@ -4,11 +4,9 @@ import { getBookingRequestService } from "../booking-requests/get-booking-reques
 import { z } from "@hono/zod-openapi";
 import { MAX_CURSOR_LENGTH } from "@event-management/contracts/pagination";
 import { catalogRecommendationsSchema } from "@event-management/contracts/messages";
-import {
-  getLastCatalogToolCallData,
-  listDeliveredCatalogSearchesData,
-  listLatestDeliveredPhotoSearchesData,
-} from "../../data/ai/get-last-catalog-tool-call.js";
+import { getLastCatalogToolCallData } from "../../data/ai/get-last-catalog-tool-call.js";
+import { listDeliveredCatalogSearchesData } from "../../data/ai/list-delivered-catalog-searches.js";
+import { listLatestDeliveredPhotoSearchesData } from "../../data/ai/list-latest-delivered-photo-searches.js";
 import { searchPublicCatalogInputSchema } from "./search-public-catalog.js";
 import { getPublicCatalogItemInputSchema } from "./get-public-catalog-item.js";
 

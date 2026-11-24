@@ -18,11 +18,14 @@ import {
   conversationsSchema,
 } from "../../src/controllers/messages/schemas.js";
 import { hashSessionToken } from "../../src/utils/session.js";
+import { saveCatalogKnowledgeEmbeddingData } from "../../src/data/ai/save-catalog-knowledge-embedding.js";
 import { startToolCallData } from "../../src/data/ai/start-tool-call.js";
+import { catalogKnowledgeDigest } from "../../src/services/ai/catalog-knowledge-hash.js";
 import { requestHumanHandoffService } from "../../src/services/ai/request-human-handoff.js";
 import { humanHandoffAcknowledgement } from "../../src/data/messages/request-human-handoff.js";
 import { runAssistantTurnService } from "../../src/services/ai/run-assistant-turn.js";
 import { getMyPackageService } from "../../src/services/ai/get-my-package.js";
+import { syncCatalogKnowledge } from "../../src/services/ai/workflows/sync-catalog-knowledge.js";
 
 const database = `em_ai_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -3400,6 +3403,242 @@ function photoAudit(messageId: string) {
     .orderBy("tool_call_id")
     .execute();
 }
+
+async function seedPhotoRecommendationPackage(t: TestContext) {
+  const { id: mediaId } = await db
+    .insertInto("media_assets")
+    .values({
+      kind: "image",
+      source: "upload",
+      storage_key: `catalog-media/${randomUUID()}`,
+      mime_type: "image/png",
+      byte_size: 1,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  t.after(async () => {
+    await db.deleteFrom("media_assets").where("id", "=", mediaId).execute();
+  });
+
+  const canvas = [
+    {
+      id: randomUUID(),
+      title: "Styling",
+      widgets: [
+        {
+          id: randomUUID(),
+          type: "photo",
+          x: 0,
+          y: 0,
+          w: 6,
+          h: 5,
+          mediaId,
+          markdown: "",
+          alt: "Garden backdrop",
+          caption: "",
+          autoplay: false,
+        },
+      ],
+    },
+  ];
+  const listing = await db
+    .insertInto("packages")
+    .values({
+      name: "Garden Styling",
+      slug: `photo-recommendation-${randomUUID()}`,
+      max_guests: 60,
+      price: 89491,
+      canvas: sql`${JSON.stringify(canvas)}::jsonb`,
+    })
+    .returning(["id", "name", "slug", "price"])
+    .executeTakeFirstOrThrow();
+  t.after(async () => {
+    await db.deleteFrom("packages").where("id", "=", listing.id).execute();
+  });
+  const chunks = await db
+    .transaction()
+    .execute((trx) =>
+      syncCatalogKnowledge(trx, { kind: "package", id: listing.id }),
+    );
+  const photo = chunks.find(({ chunk_key }) => chunk_key.startsWith("photo:"));
+  assert.ok(photo);
+  const hash = `${photo.content_hash}:${catalogKnowledgeDigest(photo.content_markdown)}`;
+  await db
+    .updateTable("catalog_knowledge")
+    .set({ content_hash: hash })
+    .where("id", "=", photo.id)
+    .execute();
+  assert.equal(
+    await saveCatalogKnowledgeEmbeddingData(db, photo.id, hash, {
+      model: "google/gemini-embedding-2",
+      embedding: [1, ...Array(767).fill(0)],
+    }),
+    true,
+  );
+
+  return {
+    id: listing.id,
+    link: `[${listing.name}](/packages/${listing.slug})`,
+    filter: { minPricePesos: listing.price, maxPricePesos: listing.price },
+  };
+}
+
+test("two catalog searches of a single photo recover verified recommendation cards omitted by the model", async (t) => {
+  const listing = await seedPhotoRecommendationPackage(t);
+  const id = await conversation();
+  const photos = await savePhotoReferences(id, 1);
+  mockPhotoBoundaries(t, photos);
+  const [photo] = photos;
+  const photoAttachmentId = photo.row.id;
+  const caveat =
+    "The floral styling is similar, but the display in your photo is custom.";
+  const unverifiedLink = "[Other setup](/services/unverified-photo-match)";
+
+  useToolCalls(
+    [
+      {
+        toolName: "searchPublicCatalog",
+        input: { catalogType: "package", photoAttachmentId, ...listing.filter },
+      },
+      {
+        toolName: "searchPublicCatalog",
+        input: { catalogType: "service", photoAttachmentId },
+      },
+    ],
+    undefined,
+    undefined,
+    `${listing.link} is the closest option. ${caveat} ${unverifiedLink}`,
+  );
+  const result = await send(id, "Do we have something like this?");
+  assert.equal(result.assistantError, null);
+  assert.ok(result.assistantMessage);
+  const reply = result.assistantMessage;
+  assert.deepEqual(
+    reply.catalogRecommendations?.map(({ id }) => id),
+    [listing.id],
+  );
+  assert.equal(
+    reply.body,
+    `Garden Styling is the closest option. ${caveat} ${unverifiedLink}`,
+  );
+  assert.deepEqual(
+    (await photoAudit(result.message.id)).map(({ status }) => status),
+    ["succeeded", "succeeded"],
+  );
+  const attachment = await db
+    .selectFrom("ai_tool_calls")
+    .select(["assistant_message_id", "input", "status"])
+    .where("customer_message_id", "=", result.message.id)
+    .where("tool_name", "=", "attachCatalogRecommendations")
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(attachment, {
+    assistant_message_id: reply.id,
+    input: { items: [{ catalogType: "package", id: listing.id }] },
+    status: "succeeded",
+  });
+});
+
+test("separate matches for distinct photos reject a shared card list and preserve labeled links", async (t) => {
+  const listing = await seedPhotoRecommendationPackage(t);
+  const id = await conversation();
+  const photos = await savePhotoReferences(id, 2);
+  mockPhotoBoundaries(t, photos);
+  const body = `Photo 1: ${listing.link} has similar florals.\nPhoto 2: ${listing.link} has a similar backdrop.`;
+
+  useToolRounds(
+    [
+      photos.map(({ row }) => ({
+        toolName: "searchPublicCatalog",
+        input: {
+          catalogType: "package",
+          photoAttachmentId: row.id,
+          ...listing.filter,
+        },
+      })),
+      [
+        {
+          toolName: "attachCatalogRecommendations",
+          input: { items: [{ catalogType: "package", id: listing.id }] },
+        },
+      ],
+    ],
+    undefined,
+    undefined,
+    body,
+  );
+  const result = await send(
+    id,
+    "Find a separate option for each of these photos.",
+  );
+  assert.equal(result.assistantError, null);
+  assert.ok(result.assistantMessage);
+  assert.equal(result.assistantMessage.body, body);
+  assert.equal(result.assistantMessage.catalogRecommendations, undefined);
+  const searches = await photoAudit(result.message.id);
+  assert.deepEqual(
+    searches.map(({ status }) => status),
+    ["succeeded", "succeeded"],
+  );
+
+  for (const search of searches)
+    assert.match(JSON.stringify(search.output), new RegExp(listing.id));
+
+  const attachment = await db
+    .selectFrom("ai_tool_calls")
+    .select(["assistant_message_id", "status", "error_code"])
+    .where("customer_message_id", "=", result.message.id)
+    .where("tool_name", "=", "attachCatalogRecommendations")
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(attachment, {
+    assistant_message_id: result.assistantMessage.id,
+    status: "failed",
+    error_code: "invalid_recommendations",
+  });
+});
+
+test("a second photo search supersedes cards attached earlier in the same reply", async (t) => {
+  const listing = await seedPhotoRecommendationPackage(t);
+  const id = await conversation();
+  const photos = await savePhotoReferences(id, 2);
+  mockPhotoBoundaries(t, photos);
+  const searchCalls = photos.map(({ row }) => ({
+    toolName: "searchPublicCatalog" as const,
+    input: {
+      catalogType: "package",
+      photoAttachmentId: row.id,
+      ...listing.filter,
+    },
+  }));
+  const [first, second] = searchCalls;
+  assert.ok(first && second);
+  const body = `Photo 1: ${listing.link}\nPhoto 2: ${listing.link}`;
+
+  useToolRounds(
+    [
+      [first],
+      [
+        {
+          toolName: "attachCatalogRecommendations",
+          input: { items: [{ catalogType: "package", id: listing.id }] },
+        },
+      ],
+      [second],
+    ],
+    undefined,
+    undefined,
+    body,
+  );
+  const result = await send(id, "Find a separate option for each photo.");
+  assert.equal(result.assistantMessage?.body, body);
+  assert.equal(result.assistantMessage?.catalogRecommendations, undefined);
+  const attachment = await db
+    .selectFrom("ai_tool_calls")
+    .select("status")
+    .where("customer_message_id", "=", result.message.id)
+    .where("tool_name", "=", "attachCatalogRecommendations")
+    .executeTakeFirstOrThrow();
+  assert.equal(attachment.status, "succeeded");
+});
 
 test("four photo searches execute in attachment order and each carries its own delivered continuation", async (t) => {
   const id = await conversation();

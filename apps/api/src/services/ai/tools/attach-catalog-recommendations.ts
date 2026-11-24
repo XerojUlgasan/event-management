@@ -39,6 +39,8 @@ export function createAttachCatalogRecommendationsTool({
     description:
       "Attach an ordered shortlist of public packages and services below your next chat reply. " +
       `Pass up to ${MAX_NEW_CATALOG_RECOMMENDATIONS} distinct {catalogType, id} pairs from successful catalog lookups in this turn. ` +
+      "Use this for relevant options for a single reference photo, including approximate matches from either catalog type. " +
+      "When matches come from multiple reference photos, use catalog links labeled by photo. " +
       "Before recommending an item based on its inclusions, read its catalog details. " +
       "Call once with the full list you are presenting. The resulting cards are the recommendation list. Then write a short reply that introduces the list without repeating it. Attaching is for browsing and does not select or book anything.",
     inputSchema: attachCatalogRecommendationsInputSchema,
@@ -127,7 +129,7 @@ export function createAttachCatalogRecommendationsTool({
           }),
         );
         throw new Error(
-          "Catalog recommendations were not attached. Use distinct public items from successful catalog lookups in the current turn, or answer with the verified facts you have.",
+          "Catalog recommendations were not attached. Use distinct public items from successful catalog lookups in the current turn, or answer with the verified facts you have. For multiple reference photos, use labeled catalog links.",
         );
       }
     },

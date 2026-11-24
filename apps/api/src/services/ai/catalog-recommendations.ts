@@ -24,8 +24,11 @@ export const attachCatalogRecommendationsInputSchema = z.strictObject({
   items: z.array(selectionSchema).min(1).max(MAX_NEW_CATALOG_RECOMMENDATIONS),
 });
 
-const searchResultsSchema = z.object({
-  results: z.array(z.object({ type: listingType, id: z.uuid() })),
+export const recommendationSearchResultsSchema = z.object({
+  photoAttachmentId: z.uuid().optional(),
+  results: z.array(
+    z.object({ type: listingType, id: z.uuid(), url: z.string().optional() }),
+  ),
 });
 
 type Selection = z.infer<typeof selectionSchema>;
@@ -109,14 +112,21 @@ export async function buildCatalogRecommendations({
     customerMessageId,
   );
   const eligible = new Set<string>();
+  const photoReferences = new Set<string>();
 
   for (const lookup of lookups) {
     if (lookup.tool_name === "searchPublicCatalog") {
-      const parsed = searchResultsSchema.safeParse(lookup.search_output);
+      const parsed = recommendationSearchResultsSchema.safeParse(
+        lookup.search_output,
+      );
 
-      if (parsed.success)
+      if (parsed.success) {
+        if (parsed.data.photoAttachmentId)
+          photoReferences.add(parsed.data.photoAttachmentId);
+
         for (const { type, id } of parsed.data.results)
           eligible.add(listingKey(type, id));
+      }
     } else {
       const parsed = selectionSchema.passthrough().safeParse(lookup.input);
 
@@ -125,7 +135,9 @@ export async function buildCatalogRecommendations({
     }
   }
 
-  if (!keys.every((key) => eligible.has(key))) return null;
+  // The flat cards cannot identify which reference photo matched each item.
+  if (photoReferences.size > 1 || !keys.every((key) => eligible.has(key)))
+    return null;
 
   return db
     .transaction()

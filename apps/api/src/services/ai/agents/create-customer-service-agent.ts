@@ -27,6 +27,7 @@ import { localizeHandoff } from "../suggested-replies.js";
 import type { bookingLanguageSamples } from "../localize-booking-chat.js";
 import { createBookingDraftTools } from "../tools/booking-draft.js";
 import type { CatalogSearchPhotoReader } from "../search-public-catalog.js";
+import { searchedCatalogPhotoIds } from "../searched-catalog-photo-ids.js";
 
 const maxStepTokens = 800;
 const maxMultiPhotoReplyTokens = 1_600;
@@ -132,6 +133,9 @@ export function createCustomerServiceAgent({
   let stepTokenLimit = maxStepTokens;
   let answerOnly = false;
   let resultCharactersRemaining = options.resultCharacterBudget ?? 200_000;
+  const instructions = `${buildCustomerServicePrompt(settings, {
+    catalogAttachments: true,
+  })}\n\n${suggestedReplyInstructions}`;
 
   const toolContext = {
     ...options,
@@ -153,9 +157,7 @@ export function createCustomerServiceAgent({
 
   return new ToolLoopAgent({
     model: getTextModel(),
-    instructions: `${buildCustomerServicePrompt(settings, {
-      catalogAttachments: true,
-    })}\n\n${suggestedReplyInstructions}`,
+    instructions,
     output: replyOutput,
     tools: {
       searchSupportingDocuments:
@@ -236,22 +238,12 @@ export function createCustomerServiceAgent({
       if (remainingOutputTokens <= 0)
         throw new Error("Assistant output budget exhausted");
 
-      const matchedPhotos = new Set<string>();
-
-      for (const step of steps)
-        for (const { toolName, output } of step.toolResults)
-          if (
-            toolName === "searchPublicCatalog" &&
-            output &&
-            typeof output === "object" &&
-            "photoAttachmentId" in output &&
-            typeof output.photoAttachmentId === "string"
-          )
-            matchedPhotos.add(output.photoAttachmentId);
+      const multiplePhotos = searchedCatalogPhotoIds(steps).size > 1;
 
       // A labeled answer for several photos needs room for each result.
-      const replyTokenLimit =
-        matchedPhotos.size > 1 ? maxMultiPhotoReplyTokens : maxStepTokens;
+      const replyTokenLimit = multiplePhotos
+        ? maxMultiPhotoReplyTokens
+        : maxStepTokens;
 
       // Start another tool round only while a full answer can still fit.
       answerOnly =
@@ -262,6 +254,9 @@ export function createCustomerServiceAgent({
 
       return {
         maxOutputTokens: stepTokenLimit,
+        ...(multiplePhotos && {
+          instructions: `${instructions}\n\nYour current search results refer to multiple distinct photos. For each photo, write a label and link each recommendation as [listing name](/catalog-path) using the exact URL in that photo's search result. Use those clickable links even if you attempted to attach cards earlier. Keep the results attributed to their photos.`,
+        }),
         ...(answerOnly && { toolChoice: "none" as const }),
       };
     },

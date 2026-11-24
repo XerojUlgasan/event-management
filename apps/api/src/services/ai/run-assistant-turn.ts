@@ -51,6 +51,8 @@ import { completeBookingConsentAssessment } from "./assess-booking-consent.js";
 import { generatedSuggestedReplies } from "./suggested-replies.js";
 import { localizeBookingReview } from "./localize-booking-chat.js";
 import { readValidatedMessageImage } from "../messages/read-validated-message-image.js";
+import { attachLinkedPhotoRecommendations } from "./attach-linked-photo-recommendations.js";
+import { searchedCatalogPhotoIds } from "./searched-catalog-photo-ids.js";
 
 const maxInputCharacters = 200_000;
 
@@ -778,12 +780,36 @@ export async function runAssistantTurnService({
 
   if (!output) throw new Error("AI returned an invalid structured reply");
 
-  const reply = output.message.trim();
+  let reply = output.message.trim();
 
   if (!reply) throw new Error("AI returned an empty reply");
 
   if (containsRawToolProtocol(reply))
     throw new Error("AI returned invalid tool protocol");
+
+  const searchedPhotos = searchedCatalogPhotoIds(steps);
+
+  if (searchedPhotos.size > 1) catalogRecommendations = undefined;
+
+  const attach = agent.tools.attachCatalogRecommendations?.execute;
+
+  if (
+    attach &&
+    searchedPhotos.size === 1 &&
+    !catalogRecommendations &&
+    !catalogBrowse
+  ) {
+    reply = await attachLinkedPhotoRecommendations({
+      db,
+      turnId,
+      customerMessageId,
+      reply,
+      attach,
+      signal,
+    });
+
+    if (persistenceFailed) throw new Error("Tool-call tracking is unavailable");
+  }
 
   const suggestedReplies = await generatedSuggestedReplies({
     reply,
