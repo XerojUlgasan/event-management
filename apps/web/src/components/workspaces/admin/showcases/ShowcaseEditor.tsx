@@ -21,6 +21,10 @@ import {
   updateShowcase,
   showcaseMediaSrc,
 } from "../../../../lib/data/showcases/showcases";
+import {
+  validateShowcaseCover,
+  validateShowcaseGallery,
+} from "../../../../lib/utils/showcases/media-validation";
 
 export function ShowcaseEditor({
   initial,
@@ -79,11 +83,37 @@ export function ShowcaseEditor({
     return Object.keys(e).length === 0;
   }
 
+  function setFieldError(field: string, message: string) {
+    setErrors((current) => ({ ...current, [field]: message }));
+  }
+
+  function clearFieldError(field: string) {
+    setErrors((current) => {
+      if (!(field in current)) return current;
+
+      const next = { ...current };
+      delete next[field];
+
+      return next;
+    });
+  }
+
   async function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
 
     if (!file) return;
 
+    e.target.value = "";
+
+    const invalid = validateShowcaseCover(file);
+
+    if (invalid) {
+      setFieldError("cover", invalid);
+
+      return;
+    }
+
+    clearFieldError("cover");
     setUploadingCover(true);
 
     try {
@@ -93,18 +123,25 @@ export function ShowcaseEditor({
       notifyError(err, "Cover upload failed. Try again.");
     } finally {
       setUploadingCover(false);
-      e.target.value = "";
     }
   }
 
   async function handleGalleryChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []).slice(
-      0,
-      MAX_SHOWCASE_GALLERY - gallery.length,
-    );
+    const files = Array.from(e.target.files ?? []);
 
     if (!files.length) return;
 
+    e.target.value = "";
+
+    const invalid = validateShowcaseGallery(files, gallery.length);
+
+    if (invalid) {
+      setFieldError("gallery", invalid);
+
+      return;
+    }
+
+    clearFieldError("gallery");
     setUploadingGallery(true);
 
     try {
@@ -123,12 +160,12 @@ export function ShowcaseEditor({
       notifyError(err, "One or more uploads failed.");
     } finally {
       setUploadingGallery(false);
-      e.target.value = "";
     }
   }
 
   function removeGalleryItem(id: string) {
     setGallery((prev) => prev.filter((m) => m.id !== id));
+    clearFieldError("gallery");
   }
 
   function moveGalleryItem(id: string, direction: "up" | "down") {
@@ -353,10 +390,16 @@ export function ShowcaseEditor({
                   </Button>
                 )}
               </div>
-              <span className="pe-field-hint">
-                Images and videos. Up to {MAX_SHOWCASE_GALLERY} items. Reorder
-                with ↑ ↓.
-              </span>
+              {errors.gallery ? (
+                <span className="pe-field-error" role="alert">
+                  {errors.gallery}
+                </span>
+              ) : (
+                <span className="pe-field-hint">
+                  Images and videos. Up to {MAX_SHOWCASE_GALLERY} items. Reorder
+                  with ↑ ↓.
+                </span>
+              )}
             </div>
           </div>
 

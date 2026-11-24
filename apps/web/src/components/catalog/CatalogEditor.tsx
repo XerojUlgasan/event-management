@@ -25,7 +25,6 @@ import {
   MAX_CATALOG_WIDGET_ROWS,
   MAX_CATALOG_WIDGET_Y,
 } from "@event-management/contracts/limits/catalog";
-import { MAX_VIDEO_SIZE_BYTES } from "@event-management/contracts/limits/videos";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { createPortal } from "react-dom";
@@ -37,7 +36,10 @@ import type {
 } from "@event-management/contracts/catalog";
 import { deleteCatalogMedia } from "../../lib/data/catalog/media";
 import { validateCatalogCanvas } from "../../lib/utils/catalog/canvas-validation";
-import { validateImageFile } from "../../lib/utils/catalog/media-validation";
+import {
+  validateImageFile,
+  validateVideoFile,
+} from "../../lib/utils/catalog/media-validation";
 import {
   unreferencedUploadIds,
   uploadPendingCatalogMedia,
@@ -793,13 +795,9 @@ export function CatalogEditor<T extends CanvasContent>({
 
       if (photoError) return photoError;
     } else {
-      const max = MAX_VIDEO_SIZE_BYTES;
-      const types = ["video/mp4", "video/webm"];
+      const videoError = validateVideoFile(file);
 
-      if (!types.includes(file.type)) return "Choose an MP4 or WebM video.";
-
-      if (!file.size || file.size > max)
-        return `File must be ${Math.floor(max / 1024 / 1024)} MiB or smaller.`;
+      if (videoError) return videoError;
     }
 
     const url = URL.createObjectURL(file);
