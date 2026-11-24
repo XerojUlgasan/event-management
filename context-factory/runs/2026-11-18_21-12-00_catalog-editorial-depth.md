@@ -17,9 +17,9 @@ All 23 package and 20 service canvases now contain an authored introduction and 
 
 ## Changes or findings
 
-- [Package editorial](../../apps/api/src/db/seed/package-editorial.ts) describes occasion-specific layouts, program timing, inclusions, exclusions and preparation. Civil wedding FAQs, conference responsibilities, launch cues and family accessibility briefs vary the structure.
-- [Service editorial](../../apps/api/src/db/seed/service-editorial.ts) distinguishes deliverables, equipment quantities, working windows, site needs and suitable alternatives. Fixed windows include setup and packdown; hourly services retain their pricing model.
-- [Composition](../../apps/api/src/db/seed/curated-catalog.ts) separates metadata from authored prose and estimates Markdown/table heights. Narrow rendering exposed four clipping cases, corrected before the final audit.
+- [Package editorial](https://github.com/XerojUlgasan/event-management/blob/5da111cf/apps/api/src/db/seed/package-editorial.ts) describes occasion-specific layouts, program timing, inclusions, exclusions and preparation. Civil wedding FAQs, conference responsibilities, launch cues and family accessibility briefs vary the structure.
+- [Service editorial](https://github.com/XerojUlgasan/event-management/blob/5da111cf/apps/api/src/db/seed/service-editorial.ts) distinguishes deliverables, equipment quantities, working windows, site needs and suitable alternatives. Fixed windows include setup and packdown; hourly services retain their pricing model.
+- [Composition](https://github.com/XerojUlgasan/event-management/blob/5da111cf/apps/api/src/db/seed/curated-catalog.ts) separates metadata from authored prose and estimates Markdown/table heights. Narrow rendering exposed four clipping cases, corrected before the final audit.
 - [Seed guide](../../docs/SEED.md) identifies content owners and preserves the fresh-database boundary. Existing catalog rows remain untouched on rerun.
 
 ## Decisions

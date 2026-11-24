@@ -25,6 +25,15 @@ export async function seedScenario(db: SeedDb, passwordHash: string) {
     users: persistedUsers.users,
     now,
   });
+  const inserted = {
+    users: persistedUsers.inserted,
+    sessions: sessions.inserted,
+    ...catalog.inserted,
+  };
+
+  // A rerun may find that an administrator has archived every seed package.
+  if (!catalog.packages.some((pkg) => !pkg.archived)) return inserted;
+
   const activity = await seedScenarioActivity(db, {
     plan: planScenarioActivity({
       users: persistedUsers.users,
@@ -47,9 +56,7 @@ export async function seedScenario(db: SeedDb, passwordHash: string) {
   });
 
   return {
-    users: persistedUsers.inserted,
-    sessions: sessions.inserted,
-    ...catalog.inserted,
+    ...inserted,
     ...activity.inserted,
     ...operations.inserted,
     ...quotations.inserted,
