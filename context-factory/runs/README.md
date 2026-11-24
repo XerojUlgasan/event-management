@@ -14,7 +14,8 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
-| [Event completion](2026-11-24_19-14-30_event-completion.md) | Scheduled readiness and admin-confirmed finish / codex/event-completion | complete | Await explicit merge authorization. |
+| [Event completion on main](2026-11-24_19-29-40_event-completion-main.md) | Local integration and live Realtime / main | complete | Replay the root workflow at localhost:4321. |
+| [Event completion](2026-11-24_19-14-30_event-completion.md) | Scheduled readiness and admin-confirmed finish / codex/event-completion | complete | See the main integration run. |
 | [Catalog widget redesign](2026-11-24_19-10-59_catalog-widget-redesign.md) | Responsive detail layout and authored Markdown / main | complete | Refresh port 4321 or browse the fresh seed preview. |
 | [Expanded catalog Markdown](2026-11-24_18-14-00_catalog-markdown-integration.md) | Curated seed copy and verified retrieval / main | complete | Browse the corrected integrated preview or replay search with its indexed corpus. |
 | [Compact catalog widgets](2026-11-24_18-01-00_compact-catalog-widgets.md) | Admin resize limits and seed spacing / main | complete | Try resizing in the admin editor and browse the fresh seed preview. |
