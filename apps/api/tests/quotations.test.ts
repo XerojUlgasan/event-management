@@ -15,7 +15,7 @@ import {
 } from "@event-management/contracts/quotations";
 import { Pool } from "pg";
 import { hashSessionToken } from "../src/utils/session.js";
-import { setTestConfig } from "./helpers/set-test-config.js";
+import { setTestConfig, testDatabaseUrl } from "./helpers/set-test-config.js";
 
 const database = `em_quote_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -57,7 +57,7 @@ before(async () => {
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
 
-  setTestConfig({ DB_NAME: database });
+  setTestConfig({ SUPABASE_DB_URL: testDatabaseUrl(database) });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
   async function session(role: string) {

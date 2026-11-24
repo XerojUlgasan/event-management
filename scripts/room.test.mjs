@@ -66,6 +66,7 @@ test("inherited provider, database, dotenv and executable injection settings are
     PATH: "/bin",
     HOME: "/home/user",
     DB_PASSWORD: "main-secret",
+    SUPABASE_DB_URL: "postgresql://main",
     AI_GATEWAY_API_KEY: "main-provider",
     FIREBASE_PRIVATE_KEY: "main-firebase",
     NODE_OPTIONS: "--require malicious.js",
@@ -78,6 +79,7 @@ test("inherited provider, database, dotenv and executable injection settings are
 
   for (const name of [
     "DB_PASSWORD",
+    "SUPABASE_DB_URL",
     "AI_GATEWAY_API_KEY",
     "FIREBASE_PRIVATE_KEY",
     "NODE_OPTIONS",
@@ -109,6 +111,7 @@ test("runtime targets use only CLI credentials at assigned room ports and explic
     { PATH: "/bin", DB_PORT: "5432", FIREBASE_PROJECT_ID: "main" },
   );
   assert.equal(env.DB_HOST, "127.0.0.1");
+  assert.equal(env.SUPABASE_DB_URL, localStatus(plan).DB_URL);
   assert.equal(env.DB_PORT, String(plan.ports.db));
   assert.equal(env.DB_PASSWORD, "local-password");
   assert.equal(env.DB_NAME, "postgres");
@@ -146,6 +149,7 @@ test("unsafe override names and CLI targets outside the room fail before deploym
     "DB_HOST",
     "DB_PORT",
     "DB_PASSWORD",
+    "SUPABASE_DB_URL",
     "SUPABASE_URL",
     "PUBLIC_API_URL",
     "WEB_ORIGIN",

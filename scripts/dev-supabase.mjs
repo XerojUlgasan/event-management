@@ -37,18 +37,10 @@ const envFile = join(root, "apps", "supabase", ".env.functions");
 if (!existsSync(envFile)) {
   writeFileSync(
     envFile,
-    [
-      "DB_HOST=db",
-      "DB_PORT=5432",
-      "DB_NAME=postgres",
-      "DB_USER=postgres",
-      "DB_PASSWORD=postgres",
-      "WEB_ORIGIN=http://localhost:4321,http://127.0.0.1:4321",
-      "",
-    ].join("\n"),
+    ["WEB_ORIGIN=http://localhost:4321,http://127.0.0.1:4321", ""].join("\n"),
   );
   console.log(
-    "[dev] Created apps/supabase/.env.functions for the local Supabase database.",
+    "[dev] Created apps/supabase/.env.functions for the local Edge function.",
   );
 }
 

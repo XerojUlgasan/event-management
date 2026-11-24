@@ -8,7 +8,7 @@ import { Pool } from "pg";
 import { sql } from "kysely";
 import { hashSessionToken } from "../src/utils/session.js";
 import { encodePageCursor } from "../src/utils/pagination.js";
-import { setTestConfig } from "./helpers/set-test-config.js";
+import { setTestConfig, testDatabaseUrl } from "./helpers/set-test-config.js";
 
 const database = `em_messages_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -123,7 +123,7 @@ before(async () => {
 
   // This human-messaging suite must never make live provider requests.
   setTestConfig({ AI_GATEWAY_API_KEY: undefined });
-  setTestConfig({ DB_NAME: database });
+  setTestConfig({ SUPABASE_DB_URL: testDatabaseUrl(database) });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
 

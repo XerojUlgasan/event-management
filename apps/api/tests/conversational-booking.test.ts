@@ -22,7 +22,7 @@ import {
 } from "../src/data/messages/booking-draft-update.js";
 import { submitReviewedBookingRequestService } from "../src/services/booking-requests/submit-reviewed-booking-request.js";
 import { hashSessionToken } from "../src/utils/session.js";
-import { setTestConfig } from "./helpers/set-test-config.js";
+import { setTestConfig, testDatabaseUrl } from "./helpers/set-test-config.js";
 
 const liveGatewayKey = process.env.AI_GATEWAY_API_KEY;
 
@@ -74,7 +74,7 @@ before(async () => {
   }
 
   setTestConfig({ AI_GATEWAY_API_KEY: undefined });
-  setTestConfig({ DB_NAME: database });
+  setTestConfig({ SUPABASE_DB_URL: testDatabaseUrl(database) });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
   admin = await session("admin");

@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import type { Profile } from "../src/controllers/auth/profile.js";
-import { setTestConfig } from "./helpers/set-test-config.js";
+import { setTestConfig, testDatabaseUrl } from "./helpers/set-test-config.js";
 
 const projectId = "demo-event-management";
 
@@ -59,7 +59,7 @@ before(async () => {
   }
 
   // Import configuration only after selecting the disposable database.
-  setTestConfig({ DB_NAME: database });
+  setTestConfig({ SUPABASE_DB_URL: testDatabaseUrl(database) });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
   firebase = await (

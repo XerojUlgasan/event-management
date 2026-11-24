@@ -39,6 +39,7 @@
     "supabase:start": "pnpm --filter @event-management/supabase start",
     "supabase:stop": "pnpm --filter @event-management/supabase stop",
     "supabase:status": "pnpm --filter @event-management/supabase status",
+    "prod:supabase:deploy": "node scripts/deploy-supabase.mjs",
     "build:edge": "pnpm --filter @event-management/api build:edge",
     "check:web-structure": "node scripts/check-web-structure.mjs",
     "test:guidance": "node --test context-factory/tools/check-guidance.test.mjs",

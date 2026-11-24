@@ -1,9 +1,5 @@
 export const config = {
-  DB_HOST: process.env.DB_HOST,
-  DB_PORT: process.env.DB_PORT,
-  DB_NAME: process.env.DB_NAME,
-  DB_USER: process.env.DB_USER,
-  DB_PASSWORD: process.env.DB_PASSWORD,
+  SUPABASE_DB_URL: process.env.SUPABASE_DB_URL,
   API_PORT: process.env.API_PORT,
   WEB_ORIGIN: process.env.WEB_ORIGIN,
   SESSION_TTL_DAYS: process.env.SESSION_TTL_DAYS,

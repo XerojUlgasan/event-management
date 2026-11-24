@@ -9,7 +9,7 @@ import { humanHandoffAcknowledgement } from "../src/data/messages/request-human-
 import { threadSchema } from "../src/controllers/messages/schemas.js";
 import { hashSessionToken } from "../src/utils/session.js";
 import { runAssistantTurnService } from "../src/services/ai/run-assistant-turn.js";
-import { setTestConfig } from "./helpers/set-test-config.js";
+import { setTestConfig, testDatabaseUrl } from "./helpers/set-test-config.js";
 
 const database = `em_guest_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -79,7 +79,7 @@ before(async () => {
     );
   }
 
-  setTestConfig({ DB_NAME: database });
+  setTestConfig({ SUPABASE_DB_URL: testDatabaseUrl(database) });
   setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
   setTestConfig({ TEXT_MODEL: modelId });
   useReply("Hello from AMAC AI");

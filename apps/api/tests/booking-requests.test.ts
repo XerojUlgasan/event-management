@@ -5,7 +5,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { hashSessionToken } from "../src/utils/session.js";
-import { setTestConfig } from "./helpers/set-test-config.js";
+import { setTestConfig, testDatabaseUrl } from "./helpers/set-test-config.js";
 
 const database = `em_booking_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -279,7 +279,7 @@ before(async () => {
     ).rowCount,
     0,
   );
-  setTestConfig({ DB_NAME: database });
+  setTestConfig({ SUPABASE_DB_URL: testDatabaseUrl(database) });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
 

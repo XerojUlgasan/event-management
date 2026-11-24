@@ -25,7 +25,7 @@ import { readCatalogSectionsService } from "../src/services/catalog-canvas/read-
 import { prepareCatalogKnowledge } from "../src/services/ai/workflows/prepare-catalog-knowledge.js";
 import { searchPublicCatalogService } from "../src/services/ai/search-public-catalog.js";
 import { getPublicCatalogItemService } from "../src/services/ai/get-public-catalog-item.js";
-import { setTestConfig } from "./helpers/set-test-config.js";
+import { setTestConfig, testDatabaseUrl } from "./helpers/set-test-config.js";
 
 const database = `em_seed_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -82,7 +82,7 @@ before(async () => {
   pool = new Pool({ ...connection, database });
   await applyMigrations(pool);
   storage = await startSeedStorage();
-  setTestConfig({ ...storage.env, DB_NAME: database });
+  setTestConfig({ ...storage.env, SUPABASE_DB_URL: testDatabaseUrl(database) });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
 });
@@ -123,7 +123,7 @@ async function runSeed(target = database) {
     env: {
       ...process.env,
       ...storage.env,
-      DB_NAME: target,
+      SUPABASE_DB_URL: testDatabaseUrl(target),
       SEED_RANDOM_SEED: "seed-integration",
       SEED_CLOCK: "2026-10-31T00:00:00Z",
       FIREBASE_PROJECT_ID: "",

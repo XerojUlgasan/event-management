@@ -183,6 +183,8 @@ export function runtimeEnvironment(
     ...cleanEnvironment(os),
     ...values,
     ...overrides,
+    SUPABASE_DB_URL: `postgresql://postgres:${db.password}@127.0.0.1:${plan.ports.db}/postgres`,
+    // Older room revisions and integration fixtures still read the split settings.
     DB_HOST: "127.0.0.1",
     DB_PORT: String(plan.ports.db),
     DB_NAME: "postgres",

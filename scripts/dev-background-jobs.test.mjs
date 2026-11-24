@@ -11,46 +11,25 @@ const status = {
 test("Edge worker uses local Supabase host connections and function model settings", () => {
   const result = localWorkerEnvironment(
     {
-      DB_HOST: "db",
-      DB_PORT: "5432",
+      SUPABASE_DB_URL: "postgresql://fixture:fixture@db:5432/postgres",
       SUPABASE_URL: "http://kong:8000",
       AI_GATEWAY_API_KEY: "fixture-function-key",
       EMBEDDING_MODEL: "fixture/model",
     },
     status,
     {
-      DB_NAME: "compose",
+      SUPABASE_DB_URL: "postgresql://fixture:fixture@localhost:5432/compose",
       AI_GATEWAY_API_KEY: "fixture-parent-key",
       PATH: "/fixture",
     },
   );
-  assert.equal(result.DB_HOST, "127.0.0.1");
-  assert.equal(result.DB_PORT, "54322");
-  assert.equal(result.DB_NAME, "postgres");
-  assert.equal(result.DB_USER, "fixture");
-  assert.equal(result.DB_PASSWORD, "fixture/password");
+  assert.equal(result.SUPABASE_DB_URL, status.DB_URL);
   assert.equal(result.SUPABASE_URL, status.API_URL);
   assert.equal(result.SUPABASE_SERVICE_ROLE_KEY, status.SERVICE_ROLE_KEY);
   assert.equal(result.AI_GATEWAY_API_KEY, "fixture-function-key");
   assert.equal(result.EMBEDDING_MODEL, "fixture/model");
   assert.equal(result.PATH, "/fixture");
   assert.match(result.DOTENV_CONFIG_PATH, /apps\/supabase\/\.env\.functions$/);
-});
-
-test("Edge worker preserves the function's configured database and database role", () => {
-  const result = localWorkerEnvironment(
-    {
-      DB_NAME: "fixture_catalog",
-      DB_USER: "fixture_worker",
-      DB_PASSWORD: "fixture-worker-password",
-    },
-    status,
-  );
-  assert.equal(result.DB_HOST, "127.0.0.1");
-  assert.equal(result.DB_PORT, "54322");
-  assert.equal(result.DB_NAME, "fixture_catalog");
-  assert.equal(result.DB_USER, "fixture_worker");
-  assert.equal(result.DB_PASSWORD, "fixture-worker-password");
 });
 
 test("local worker prefers the Storage secret key and accepts secret-only status", () => {

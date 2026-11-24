@@ -10,7 +10,7 @@ import { seedSampleShowcases } from "../src/db/seed-showcases.js";
 import { LOCAL_PASSWORD } from "../src/db/seed/context.js";
 import { showcaseDto } from "../src/services/showcase/showcase-dto.js";
 import { hashPassword } from "../src/utils/password.js";
-import { setTestConfig } from "./helpers/set-test-config.js";
+import { setTestConfig, testDatabaseUrl } from "./helpers/set-test-config.js";
 
 const fixtures = [
   {
@@ -105,7 +105,7 @@ test("showcase seed uploads ordered photos and preserves an edited fixture", asy
     await target.end();
   }
 
-  setTestConfig({ ...storage.env, DB_NAME: database });
+  setTestConfig({ ...storage.env, SUPABASE_DB_URL: testDatabaseUrl(database) });
   const { db } = await import("../src/db/client.js");
   seedDb = db;
   const { app } = await import("../src/app.js");

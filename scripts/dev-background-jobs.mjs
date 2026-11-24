@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
 const apiRoot = join(root, "apps/api");
 
 const functionEnvPath = join(root, "apps/supabase/.env.functions");
@@ -33,13 +34,7 @@ export function localWorkerEnvironment(functionEnv, status, parentEnv = {}) {
   return {
     ...parentEnv,
     ...functionEnv,
-    DB_HOST: database.hostname === "[::1]" ? "::1" : database.hostname,
-    DB_PORT: database.port || "5432",
-    DB_NAME:
-      functionEnv.DB_NAME ?? decodeURIComponent(database.pathname.slice(1)),
-    DB_USER: functionEnv.DB_USER ?? decodeURIComponent(database.username),
-    DB_PASSWORD:
-      functionEnv.DB_PASSWORD ?? decodeURIComponent(database.password),
+    SUPABASE_DB_URL: status.DB_URL,
     SUPABASE_URL: status.API_URL,
     SUPABASE_SERVICE_ROLE_KEY: storageKey,
     DOTENV_CONFIG_PATH: functionEnvPath,

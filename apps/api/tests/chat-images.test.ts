@@ -11,7 +11,7 @@ import { Pool } from "pg";
 import { MockLanguageModelV4, MockProviderV4 } from "ai/test";
 import { hashSessionToken } from "../src/utils/session.js";
 import { messageImageInterpretationSchema } from "@event-management/contracts/message-images";
-import { setTestConfig } from "./helpers/set-test-config.js";
+import { setTestConfig, testDatabaseUrl } from "./helpers/set-test-config.js";
 
 const database = `em_chat_images_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -66,7 +66,7 @@ before(async () => {
       await readFile(new URL(`${entry.name}/migration.sql`, root), "utf8"),
     );
 
-  setTestConfig({ DB_NAME: database });
+  setTestConfig({ SUPABASE_DB_URL: testDatabaseUrl(database) });
   setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
   setTestConfig({ TEXT_MODEL: "fixture/text" });
   setTestConfig({ VISION_MODEL: "fixture/vision" });

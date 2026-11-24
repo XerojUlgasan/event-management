@@ -7,6 +7,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import { test } from "node:test";
 import { Pool } from "pg";
+import { testDatabaseUrl } from "./helpers/set-test-config.js";
 
 test("standalone worker resumes after an idle database disconnect and exits on SIGTERM", async () => {
   const host = process.env.DB_HOST ?? "localhost";
@@ -54,7 +55,7 @@ test("standalone worker resumes after an idle database disconnect and exits on S
         cwd: new URL("../", import.meta.url),
         env: {
           ...process.env,
-          DB_NAME: database,
+          SUPABASE_DB_URL: testDatabaseUrl(database),
           AI_GATEWAY_API_KEY: "",
           EMBEDDING_MODEL: "",
         },

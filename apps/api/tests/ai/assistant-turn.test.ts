@@ -26,7 +26,7 @@ import { humanHandoffAcknowledgement } from "../../src/data/messages/request-hum
 import { runAssistantTurnService } from "../../src/services/ai/run-assistant-turn.js";
 import { getMyPackageService } from "../../src/services/ai/get-my-package.js";
 import { syncCatalogKnowledge } from "../../src/services/ai/workflows/sync-catalog-knowledge.js";
-import { setTestConfig } from "../helpers/set-test-config.js";
+import { setTestConfig, testDatabaseUrl } from "../helpers/set-test-config.js";
 
 const database = `em_ai_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -217,7 +217,7 @@ before(async () => {
     );
   }
 
-  setTestConfig({ DB_NAME: database });
+  setTestConfig({ SUPABASE_DB_URL: testDatabaseUrl(database) });
   setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
   setTestConfig({ TEXT_MODEL: modelId });
   useReply("Hello from AMAC AI");

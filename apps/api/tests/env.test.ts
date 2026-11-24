@@ -21,13 +21,13 @@ function useConfig(context: TestContext, settings: Partial<typeof config>) {
 }
 
 test("API config is a plain snapshot of raw environment values", (context) => {
-  const original = process.env.DB_HOST;
-  assert.equal(config.DB_HOST, original);
+  const original = process.env.SUPABASE_DB_URL;
+  assert.equal(config.SUPABASE_DB_URL, original);
   context.mock.property(process, "env", {
     ...process.env,
-    DB_HOST: original === "fixture" ? "" : "fixture",
+    SUPABASE_DB_URL: original === "fixture" ? "" : "fixture",
   });
-  assert.equal(config.DB_HOST, original);
+  assert.equal(config.SUPABASE_DB_URL, original);
 
   for (const descriptor of Object.values(
     Object.getOwnPropertyDescriptors(config),

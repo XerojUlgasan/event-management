@@ -81,12 +81,12 @@ The focused integration suite creates a disposable local PostgreSQL database and
 pnpm --filter @event-management/api exec tsx --test tests/seed.test.ts tests/seed-showcases.test.ts tests/catalog-sample-photos-migration.test.ts
 ```
 
-For a real Storage check, point the command at a fresh disposable database and its isolated local Supabase Storage endpoint. With the matching Storage environment in place, run:
+For a real Storage check, set `SUPABASE_DB_URL` to a fresh disposable database and configure its isolated local Supabase Storage endpoint. Run the migration, then run the seed twice to check reruns.
 
 ```sh
-DB_NAME=clemora_seed_check pnpm db:deploy
-DB_NAME=clemora_seed_check SEED_CLOCK=2026-10-31T00:00:00Z pnpm db:seed
-DB_NAME=clemora_seed_check SEED_CLOCK=2026-10-31T00:00:00Z pnpm db:seed
+pnpm db:deploy
+SEED_CLOCK=2026-10-31T00:00:00Z pnpm db:seed
+SEED_CLOCK=2026-10-31T00:00:00Z pnpm db:seed
 ```
 
-Use the read-only `context-factory/tools/qa/pg-query.mjs` helper with `DB_NAME` pointed at the disposable database if SQL inspection is useful. Remove only the disposable database when finished; never point this procedure at a shared or production database.
+Use the read-only `context-factory/tools/qa/pg-query.mjs` helper with the same `SUPABASE_DB_URL` if SQL inspection is useful. Remove the disposable database when finished.

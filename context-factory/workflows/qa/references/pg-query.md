@@ -2,7 +2,7 @@
 
 ## Connection and execution
 
-The helper loads `apps/api/.env` without printing its values and uses the API's installed `pg` driver. Shell environment variables take precedence, as in the API. Connection variables are `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD`; defaults for host and port match `apps/api/src/db/config.ts`.
+The helper loads `SUPABASE_DB_URL` from `apps/api/.env` and uses the API's installed `pg` driver. A shell-provided URL takes precedence.
 
 ```sh
 node context-factory/tools/qa/pg-query.mjs 'SELECT current_database() AS database, current_user AS db_role'
