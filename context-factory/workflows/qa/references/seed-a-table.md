@@ -6,7 +6,7 @@ Use this when the task adds seeded rows for one database table. [Database seed](
 
 ## 1. Choose the layer
 
-Required fixtures are the named accounts, three canvas packages, and `demo.*` conversations in `seed.ts`, `seed-packages.ts`, and `seed-demo.ts`. Add a row there when a current test or the [QA account table](accounts.md) depends on that exact email, name, or id.
+Required account fixtures and `demo.*` conversations are in `seed.ts` and `seed-demo.ts`. The catalog is planned in `seed/scenario/catalog.ts` and uses the two curated collection modules. Add a named account fixture when a current test or the [QA account table](accounts.md) depends on that email or ID.
 
 Everything else belongs in `apps/api/src/db/seed/scenario/`. `scenario/index.ts` is the orchestrator. Its current order is users, sessions, catalog, activity, operations, then quotations. Check the current schema before assuming a table exists or is seeded. Quotations and their delivery/audit records are seeded by `scenario/quotations.ts`. Read the orchestrator before assuming a table already has rows.
 
