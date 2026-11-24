@@ -19,6 +19,16 @@ const bookingStatusUpdated = z.strictObject({
   }),
 });
 
+const eventReadyToFinish = z.strictObject({
+  type: z.literal("event_ready_to_finish"),
+  payload: z.strictObject(bookingPayload),
+});
+
+const eventFinished = z.strictObject({
+  type: z.literal("event_finished"),
+  payload: z.strictObject(bookingPayload),
+});
+
 const quotationSent = z.strictObject({
   type: z.literal("quotation_sent"),
   payload: z.strictObject({
@@ -36,6 +46,8 @@ const humanReviewRequested = z.strictObject({
 export const notificationContentSchema = z.discriminatedUnion("type", [
   bookingRequestCreated,
   bookingStatusUpdated,
+  eventReadyToFinish,
+  eventFinished,
   quotationSent,
   humanReviewRequested,
 ]);
@@ -59,6 +71,8 @@ const bookingNotificationFields = {
 export const notificationSchema = z.discriminatedUnion("type", [
   bookingRequestCreated.extend(bookingNotificationFields),
   bookingStatusUpdated.extend(bookingNotificationFields),
+  eventReadyToFinish.extend(bookingNotificationFields),
+  eventFinished.extend(bookingNotificationFields),
   quotationSent.extend(bookingNotificationFields),
   humanReviewRequested.extend(notificationFields),
 ]);

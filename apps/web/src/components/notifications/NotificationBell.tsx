@@ -74,6 +74,22 @@ function presentation(content: Notification): NotificationPresentation {
         action: "View request",
         path: customerBookingRequestPath(content.payload.bookingRequestId),
       };
+    case "event_ready_to_finish":
+      return {
+        title: "Event ready to finish",
+        details: eventDetails.join(" · "),
+        icon: "calendar",
+        action: "View event",
+        path: adminBookingRequestPath(content.payload.bookingRequestId),
+      };
+    case "event_finished":
+      return {
+        title: "Your event was marked finished",
+        details: eventDetails.join(" · "),
+        icon: "check",
+        action: "View event",
+        path: customerBookingRequestPath(content.payload.bookingRequestId),
+      };
     case "quotation_sent":
       return {
         title:

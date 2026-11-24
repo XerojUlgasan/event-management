@@ -7,6 +7,8 @@ export function latestCustomerEvent(
   updated: BookingRequest,
 ) {
   return current.updatedAt > updated.updatedAt ||
+    (current.eventCompletion?.status === "finished" &&
+      updated.eventCompletion?.status !== "finished") ||
     (["declined", "cancelled"].includes(current.status) &&
       current.status !== updated.status)
     ? current
@@ -31,6 +33,11 @@ export const customerEventGroups = [
     description: "Previous requested dates, most recent first.",
   },
   {
+    key: "finished",
+    label: "Finished events",
+    description: "Dates show when the team marked each event finished.",
+  },
+  {
     key: "closed",
     label: "Closed requests",
     description: "Cancelled and declined requests.",
@@ -41,6 +48,16 @@ type CustomerEventGroup = (typeof customerEventGroups)[number]["key"];
 
 // Requested dates stay separate from operational schedules, which can move.
 export function customerEventPosition(item: BookingRequest, now = new Date()) {
+  if (item.eventCompletion?.status === "finished")
+    return {
+      group: "finished" as const,
+      date: calendarDateInTimeZone(
+        new Date(item.eventCompletion.finishedAt),
+        item.timeZone,
+      ),
+      dayCount: 0,
+    };
+
   const today = calendarDateInTimeZone(now, item.timeZone);
 
   const dates = (
@@ -82,7 +99,7 @@ export function groupCustomerEvents(items: BookingRequest[], now = new Date()) {
         const order = (a.date ?? "").localeCompare(b.date ?? "");
 
         return (
-          (group.key === "past" ? -order : order) ||
+          (group.key === "past" || group.key === "finished" ? -order : order) ||
           b.item.createdAt.localeCompare(a.item.createdAt)
         );
       }),

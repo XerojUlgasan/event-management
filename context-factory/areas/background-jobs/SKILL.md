@@ -13,6 +13,7 @@ Use this guide with [API](../api/SKILL.md) and the selected task workflow. Inspe
 - `apps/api/src/services/background-jobs/job-definitions.ts` registers payload schemas, handlers, and retry and timeout policy, and owns worker settings. `enqueue-job.ts` validates jobs and schedules them within the caller's transaction. `run-worker.ts` owns polling and concurrency, and `run-one-background-job.ts` claims, executes, heartbeats, and finishes one job.
 - Job handlers live under `apps/api/src/services/background-jobs/handlers/`; the embedding workflow owns catalog preparation and provider operations. Package and service photos are chunks of their owner's embedding job. `process-image-message.ts` handles private-image validation/interpretation and the eligible conversation-scoped assistant turn for image-containing messages; text-only customer/guest replies stay in the synchronous send flow. Message data owns image-job projection, atomic enqueue and reply identity.
 - `apps/api/src/workers/background-jobs.ts` is the supervised Node entry point. The HTTP Edge function does not host persistent polling. The [README](../../../README.md#configuration) describes local and hosted setup; consult package scripts before running them.
+- The same entry point runs the [event completion check](../../business/event-days.md#event-completion) once per minute and on startup. It scans for due bookings and writes readiness with in-app alerts under the booking lock. Completion uses current schedule data and needs no queue entry per booking.
 
 ## Queue behavior
 

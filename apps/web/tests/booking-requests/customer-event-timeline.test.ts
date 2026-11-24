@@ -43,6 +43,7 @@ function makeRequest(overrides: Partial<BookingRequest> = {}): BookingRequest {
     packagePrice: { kind: "fixed", currency: "PHP", amountMinor: 0 },
     packageMaxGuests: 1,
     status: "under_review",
+    eventCompletion: null,
     outOfRange: false,
     submittedAt: "2026-11-10T00:00:00.000Z",
     createdAt: "2026-11-10T00:00:00.000Z",
@@ -208,6 +209,38 @@ test("a moved operational schedule does not change requested-date grouping", () 
     date: "2026-11-13",
     dayCount: 1,
   });
+});
+
+test("a finished event with a cancelled future day uses its confirmation date", () => {
+  const item = makeRequest({
+    status: "accepted",
+    requestedDays: [
+      requestedDay("2026-11-13"),
+      {
+        ...requestedDay("2026-11-15"),
+        eventDayId: "cancelled-day-id",
+        operationalSchedule: {
+          id: "cancelled-day-id",
+          day: "2026-11-15",
+          startsAt: "2026-11-15T09:00:00.000Z",
+          endsAt: "2026-11-15T17:00:00.000Z",
+          timeZone: "Asia/Manila",
+          status: "cancelled",
+        },
+      },
+    ],
+    eventCompletion: {
+      status: "finished",
+      finishedAt: "2026-11-13T16:01:00.000Z",
+    },
+  });
+
+  const groups = groupCustomerEvents([item], now);
+  assert.deepEqual(eventIds(groups.find(({ key }) => key === "upcoming")), []);
+  assert.deepEqual(eventIds(groups.find(({ key }) => key === "today")), []);
+  assert.deepEqual(groups.find(({ key }) => key === "finished")?.events, [
+    { item, group: "finished", date: "2026-11-14", dayCount: 0 },
+  ]);
 });
 
 test("an older time-save response cannot replace a cancellation, including an equal revision", () => {
