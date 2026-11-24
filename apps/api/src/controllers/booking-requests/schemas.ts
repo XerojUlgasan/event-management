@@ -1,5 +1,8 @@
 import { reviewedServiceSchema } from "@event-management/contracts/booking-draft";
-import { bookingStatusSchema } from "@event-management/contracts/booking-requests";
+import {
+  bookingStatusSchema,
+  eventCompletionSchema,
+} from "@event-management/contracts/booking-requests";
 import {
   BOOKING_ESTIMATED_DURATIONS,
   MAX_BOOKING_ADDON_HOURS,
@@ -216,6 +219,7 @@ export const bookingSchema = z.object({
   requestedServices: z.array(reviewedServiceSchema),
   budget: z.string().nullable(),
   status: statusSchema,
+  eventCompletion: eventCompletionSchema.nullable(),
   outOfRange: z.boolean(),
   submittedAt: z.string(),
   createdAt: z.string(),

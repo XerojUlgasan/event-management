@@ -55,6 +55,7 @@ import {
   bookingDate as preferredDateLabel,
   bookingRequestLabel,
   BookingStatusBadge,
+  EventCompletionBadge,
 } from "./BookingRequestDisplay";
 import { CustomerEventTimeline } from "./CustomerEventTimeline";
 import { latestCustomerEvent } from "../../lib/services/booking-requests/customer-event-timeline";
@@ -397,14 +398,15 @@ function BookingCards({
           requestActions={
             <>
               {cancelError && <p role="alert">{cancelError}</p>}
-              {!["declined", "cancelled"].includes(selected.status) && (
-                <CancelForm
-                  key={selected.id}
-                  item={selected}
-                  busy={busy === selected.id}
-                  onCancel={cancel}
-                />
-              )}
+              {selected.eventCompletion?.status !== "finished" &&
+                !["declined", "cancelled"].includes(selected.status) && (
+                  <CancelForm
+                    key={selected.id}
+                    item={selected}
+                    busy={busy === selected.id}
+                    onCancel={cancel}
+                  />
+                )}
             </>
           }
         />
@@ -699,6 +701,11 @@ function AdminBookingList() {
                     <td>{item.contactName}</td>
                     <td>
                       <BookingStatusBadge status={item.status} />
+                      {item.eventCompletion && (
+                        <EventCompletionBadge
+                          status={item.eventCompletion.status}
+                        />
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -788,7 +795,12 @@ export function BookingDetails({
         <h2 id="booking-details-title">
           {bookingRequestLabel(item.eventType, item.preferredDate)}
         </h2>
-        <BookingStatusBadge status={item.status} />
+        <div className="booking-request-status-row">
+          <BookingStatusBadge status={item.status} />
+          {item.eventCompletion?.status === "finished" && (
+            <EventCompletionBadge status="finished" />
+          )}
+        </div>
         <Tabs
           role="tablist"
           variant="underline"
@@ -937,6 +949,7 @@ export function BookingDetails({
                     day={day}
                     editable={
                       customerCanEditTimes &&
+                      item.eventCompletion?.status !== "finished" &&
                       !["declined", "cancelled"].includes(item.status) &&
                       !day.eventDayId
                     }

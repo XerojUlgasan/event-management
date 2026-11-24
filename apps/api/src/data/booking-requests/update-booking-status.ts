@@ -9,7 +9,13 @@ export const updateBookingStatusData = (
 ) =>
   db
     .updateTable("booking_requests")
-    .set({ status, updated_at: nextBookingRevision })
+    .set({
+      status,
+      updated_at: nextBookingRevision,
+      ...(["declined", "cancelled"].includes(status) && {
+        event_ready_at: null,
+      }),
+    })
     .where("id", "=", id)
     .returningAll()
     .returning(bookingRevision.as("revision"))

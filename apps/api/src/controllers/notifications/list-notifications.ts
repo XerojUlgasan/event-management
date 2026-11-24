@@ -87,7 +87,9 @@ export const listNotificationsRouteHandler: AppRouteHandler<
     if (
       query.includeBookingDetails &&
       (notification.type === "booking_status_updated" ||
-        (notification.type === "booking_request_created" &&
+        notification.type === "event_finished" ||
+        ((notification.type === "booking_request_created" ||
+          notification.type === "event_ready_to_finish") &&
           viewer.role === "admin"))
     )
       bookingIds.add(notification.payload.bookingRequestId.toLowerCase());
@@ -136,7 +138,8 @@ export const listNotificationsRouteHandler: AppRouteHandler<
         }
 
         if (
-          notification.type === "booking_request_created" &&
+          (notification.type === "booking_request_created" ||
+            notification.type === "event_ready_to_finish") &&
           viewer.role !== "admin"
         )
           return notification;

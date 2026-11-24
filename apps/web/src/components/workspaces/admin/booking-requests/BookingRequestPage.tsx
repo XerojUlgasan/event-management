@@ -10,6 +10,7 @@ import {
   useNotifications,
 } from "@event-management/ui";
 import {
+  finishEvent,
   getAdminBookingRequest,
   type BookingRequest,
   type BookingStatus,
@@ -23,10 +24,29 @@ import {
   bookingDate,
   bookingDateTime,
   BookingStatusBadge,
+  EventCompletionBadge,
 } from "../../../booking-requests/BookingRequestDisplay";
 import { BookingPackage } from "../../../booking-requests/BookingPackage";
 import { Quotations } from "../../../quotations/Quotations";
 import { AdminEventDays } from "../event-days/AdminEventDays";
+
+function latestBooking(
+  current: BookingRequest | null,
+  incoming: BookingRequest,
+) {
+  if (current?.id !== incoming.id) return incoming;
+
+  const latest = current.updatedAt > incoming.updatedAt ? current : incoming;
+  const completion =
+    current.eventCompletion?.status === "finished"
+      ? current.eventCompletion
+      : incoming.eventCompletion;
+
+  return completion?.status === "finished" &&
+    latest.eventCompletion !== completion
+    ? { ...latest, eventCompletion: completion }
+    : latest;
+}
 
 function BookingQuotations({
   bookingId,
@@ -88,7 +108,7 @@ export function BookingRequestPage({
 }: {
   bookingRequestId: string;
 }) {
-  const { notifyError } = useNotifications();
+  const { notify, notifyError } = useNotifications();
   const [item, setItem] = useState<BookingRequest | null>(null);
   const [refreshing, setRefreshing] = useState(true);
   const [error, setError] = useState("");
@@ -96,6 +116,8 @@ export function BookingRequestPage({
   const [editStatus, setEditStatus] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [savingDay, setSavingDay] = useState(false);
+  const [savingAddons, setSavingAddons] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [proposalRevision, setProposalRevision] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -109,6 +131,7 @@ export function BookingRequestPage({
   const canChangeStatus =
     pageTab === "details" &&
     item &&
+    item.eventCompletion?.status !== "finished" &&
     item.status !== "declined" &&
     item.status !== "cancelled";
 
@@ -127,11 +150,7 @@ export function BookingRequestPage({
         );
 
       const next = result.bookingRequest;
-      setItem((current) =>
-        current?.id === next.id && current.updatedAt > next.updatedAt
-          ? current
-          : next,
-      );
+      setItem((current) => latestBooking(current, next));
       setRefreshKey((value) => value + 1);
     } catch (cause) {
       if (generation.isCurrent(current)) {
@@ -157,6 +176,32 @@ export function BookingRequestPage({
     void pending.catch((cause) => {
       if (generation.isCurrent(current)) notifyError(cause, fallback);
     });
+  };
+
+  const markFinished = async (booking: BookingRequest) => {
+    const current = generation.bump();
+    setFinishing(true);
+
+    try {
+      const { bookingRequest } = await finishEvent(
+        booking.id,
+        booking.updatedAt,
+      );
+
+      if (generation.isCurrent(current)) {
+        setItem((item) => latestBooking(item, bookingRequest));
+        notify("Event marked as finished.");
+      }
+    } catch (cause) {
+      if (!generation.isCurrent(current)) return;
+
+      notifyError(cause, "Unable to finish the event.");
+
+      if (cause instanceof ApiError && cause.status === 409)
+        refreshWithNotice("Unable to refresh this booking request.");
+    } finally {
+      setFinishing(false);
+    }
   };
 
   useEffect(() => {
@@ -185,7 +230,7 @@ export function BookingRequestPage({
         </a>
         <Button
           variant="link"
-          disabled={refreshing || savingStatus || savingDay}
+          disabled={refreshing || savingStatus || savingDay || finishing}
           onClick={() => {
             setEditStatus(false);
             refreshWithNotice("Unable to refresh this booking request.");
@@ -227,12 +272,31 @@ export function BookingRequestPage({
             />
             <div className="booking-request-status-row">
               <BookingStatusBadge status={item.status} />
+              {item.eventCompletion && (
+                <EventCompletionBadge status={item.eventCompletion.status} />
+              )}
+              {pageTab === "details" &&
+                item.eventCompletion?.status === "ready" &&
+                !editStatus && (
+                  <Button
+                    size="small"
+                    pending={finishing}
+                    disabled={
+                      refreshing || savingStatus || savingDay || savingAddons
+                    }
+                    onClick={() => void markFinished(item)}
+                  >
+                    Mark as finished
+                  </Button>
+                )}
               {canChangeStatus && !editStatus && (
                 <Button
                   ref={changeStatusButton}
                   variant="secondary"
                   size="small"
-                  disabled={savingStatus || refreshing || savingDay}
+                  disabled={
+                    savingStatus || refreshing || savingDay || finishing
+                  }
                   onClick={() => setEditStatus(true)}
                 >
                   Change status
@@ -298,14 +362,18 @@ export function BookingRequestPage({
                 label: "Details",
                 id: "booking-tab-details",
                 panelId: detailsPanelId,
-                disabled: (savingDay || savingStatus) && pageTab !== "details",
+                disabled:
+                  (savingDay || savingStatus || finishing) &&
+                  pageTab !== "details",
               },
               {
                 value: "package",
                 label: "Package",
                 id: "booking-tab-package",
                 panelId: packagePanelId,
-                disabled: (savingDay || savingStatus) && pageTab !== "package",
+                disabled:
+                  (savingDay || savingStatus || finishing) &&
+                  pageTab !== "package",
               },
               {
                 value: "quotation",
@@ -313,7 +381,8 @@ export function BookingRequestPage({
                 id: "booking-tab-quotation",
                 panelId: quotationPanelId,
                 disabled:
-                  (savingDay || savingStatus) && pageTab !== "quotation",
+                  (savingDay || savingStatus || finishing) &&
+                  pageTab !== "quotation",
               },
             ]}
           />
@@ -428,8 +497,17 @@ export function BookingRequestPage({
                 </div>
                 <BookingOfferAddons
                   booking={item}
-                  disabled={refreshing || savingStatus || savingDay}
-                  onChanged={setItem}
+                  disabled={
+                    refreshing || savingStatus || savingDay || finishing
+                  }
+                  onBusyChange={setSavingAddons}
+                  onChanged={(updated) =>
+                    setItem((current) =>
+                      current?.id === updated.id
+                        ? latestBooking(current, updated)
+                        : current,
+                    )
+                  }
                 />
                 <p className="booking-request-overview-note">
                   Dates are not reserved. Processing does not confirm the
@@ -437,8 +515,8 @@ export function BookingRequestPage({
                 </p>
               </section>
               <div
-                inert={savingStatus || refreshing || undefined}
-                aria-busy={savingStatus || refreshing}
+                inert={savingStatus || refreshing || finishing || undefined}
+                aria-busy={savingStatus || refreshing || finishing}
               >
                 <AdminEventDays
                   key={item.id}
@@ -484,7 +562,7 @@ export function BookingRequestPage({
                   setItem((current) =>
                     current?.id === booking.id &&
                     current.updatedAt < booking.updatedAt
-                      ? booking
+                      ? latestBooking(current, booking)
                       : current,
                   );
                 }}

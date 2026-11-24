@@ -2,6 +2,7 @@ import type { Kysely } from "kysely";
 import { requestedDaysSchema } from "../../controllers/booking-requests/schemas.js";
 import type { ScheduleRequestedDaysInput } from "../../controllers/event-days/schedule-requested-days.js";
 import { updateRequestedDaysData } from "../../data/booking-requests/update-requested-days.js";
+import { clearEventReadinessData } from "../../data/booking-requests/event-completion.js";
 import { createEventDayData } from "../../data/event-days/create-event-day.js";
 import { listEventDaysData } from "../../data/event-days/list-event-days.js";
 import { lockBookingRequestData } from "../../data/event-days/lock-booking-request.js";
@@ -16,6 +17,8 @@ export function scheduleRequestedDaysService(
     const booking = await lockBookingRequestData(trx, input.bookingRequestId);
 
     if (!booking) return fail("Booking request not found", 404);
+
+    if (booking.event_finished_at) return fail("The event is finished", 409);
 
     if (booking.status !== "accepted")
       return fail("Booking request must be accepted", 409);
@@ -47,7 +50,8 @@ export function scheduleRequestedDaysService(
         await createEventDayData(trx, booking.id, schedule),
       );
 
-    if (links.size)
+    if (links.size) {
+      await clearEventReadinessData(trx, booking.id);
       await updateRequestedDaysData(
         trx,
         booking.id,
@@ -57,6 +61,7 @@ export function scheduleRequestedDaysService(
           return eventDayId ? { ...day, eventDayId } : day;
         }),
       );
+    }
 
     return responses(trx, await listEventDaysData(trx, booking.id));
   });

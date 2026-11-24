@@ -24,3 +24,11 @@ Admin means a designated System Administrator, as defined in [identity and respo
 - Moving a scheduled day preserves its history and creates a replacement day. Cancelling a day preserves its record as cancelled.
 - Event-day scheduling does not reserve a date, establish a final price, or confirm or complete the booking.
 - The [product scope](../../README.md#product-scope) governs confirmation, cancellation, event changes, and other commitments beyond this workflow.
+
+## Event completion
+
+The supervised worker checks submitted events once a minute and at startup. It uses the database clock and the latest end time across live scheduled days. Moved originals and cancelled days are ignored. A moved replacement contributes its current scheduled end. A booking needs at least one live day, and every requested date must link to a scheduled or explicitly cancelled day through its schedule history. Legacy requests with no requested-day list use their actual operational days. Declined and cancelled requests are ineligible.
+
+Readiness and its alerts commit together. Each current System Administrator can receive one readiness alert per event. A schedule change clears readiness. If the event becomes ready again, the existing alert remains in history and opens the current booking details. The **Mark as finished** action requires the current booking revision and rechecks readiness under the booking lock. The successful action records the administrator and the database time and writes one in-app alert to the booking owner in the same transaction.
+
+Finished events retain their operational and inquiry history. Schedule edits and inquiry status changes are closed once the event is finished. Package and quotation permissions still follow the inquiry status. Customers can see **Finished** on their own event details and in **My events → Finished events**, where the date reflects the administrator's confirmation.

@@ -295,7 +295,8 @@ export function AdminEventDays({
   };
 
   const locked = busy || loading || stale || loadedRevision !== revision;
-  const accepted = booking.status === "accepted";
+  const finished = booking.eventCompletion?.status === "finished";
+  const accepted = booking.status === "accepted" && !finished;
   const entries: DayEntry[] = [];
 
   for (const requested of booking.requestedDays ?? []) {
@@ -373,7 +374,7 @@ export function AdminEventDays({
           Refresh request and days
         </Button>
       )}
-      {!accepted && (
+      {!accepted && !finished && (
         <p>Accept this request before scheduling its event days.</p>
       )}
       {accepted &&
@@ -447,7 +448,7 @@ export function AdminEventDays({
                 </Badge>
               </div>
             </div>
-            {day?.status === "scheduled" && (
+            {day?.status === "scheduled" && !finished && (
               <div className="admin-event-actions">
                 {accepted && (
                   <Button
@@ -538,7 +539,7 @@ export function AdminEventDays({
             )}
         </Panel>
       )}
-      {cancelDayId && (
+      {cancelDayId && !finished && (
         <Dialog
           title="Cancel event day?"
           intro="This marks the event day as cancelled."

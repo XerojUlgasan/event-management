@@ -127,6 +127,7 @@
   font-weight: 600;
 }
 .event-timeline-closed .event-timeline-date,
+.event-timeline-finished .event-timeline-date,
 .event-timeline-past .event-timeline-date {
   background: var(--surface-muted);
   color: var(--text-secondary);

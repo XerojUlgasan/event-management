@@ -1,4 +1,5 @@
 import { Badge } from "@event-management/ui";
+import type { EventCompletion } from "@event-management/contracts/booking-requests";
 import {
   formatEnPhDate,
   formatEnPhDateTime,
@@ -54,6 +55,18 @@ export function BookingStatusBadge({ status }: { status: BookingStatus }) {
       }
     >
       {bookingStatusLabels[status]}
+    </Badge>
+  );
+}
+
+export function EventCompletionBadge({
+  status,
+}: {
+  status: EventCompletion["status"];
+}) {
+  return (
+    <Badge tone={status === "finished" ? "success" : "info"}>
+      {status === "finished" ? "Finished" : "Ready to finish"}
     </Badge>
   );
 }

@@ -26,7 +26,10 @@ export async function saveRequestedDayTimesService(
     if (!row || row.customer_id !== customerId)
       return error("Booking request not found", 404);
 
-    if (!["under_review", "needs_details", "accepted"].includes(row.status))
+    if (
+      row.event_finished_at ||
+      !["under_review", "needs_details", "accepted"].includes(row.status)
+    )
       return error("This request is read-only", 409);
 
     if (row.revision !== input.expectedUpdatedAt)

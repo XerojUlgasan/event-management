@@ -128,6 +128,17 @@ export async function bookingRequestDtos(
         .parse(r.requested_services ?? []),
       budget: r.budget,
       status: r.status as Status,
+      eventCompletion: r.event_finished_at
+        ? {
+            status: "finished" as const,
+            finishedAt: r.event_finished_at.toISOString(),
+          }
+        : r.event_ready_at
+          ? {
+              status: "ready" as const,
+              readyAt: r.event_ready_at.toISOString(),
+            }
+          : null,
       outOfRange: r.out_of_range,
       submittedAt: r.submitted_at.toISOString(),
       createdAt: r.created_at.toISOString(),
