@@ -225,7 +225,7 @@ docs/                  Seed guide and interview summary
 transcriptions/        Individual and combined interview transcripts
 ```
 
-Astro runs as a Node server. Public pages under `apps/web/src/pages` are rendered on each request. `/login` and `/app/*` mount `components/app/App.tsx` with `client:only="react"`. The app keeps its React and authentication providers mounted while same-origin `/app` navigation updates the URL with the History API; public and login routes remain document navigations. `GET /me` chooses the admin or customer shell, and each role keeps only its own `/app` paths. Shared UI uses atomic layers and exports from `packages/ui/src/index.ts`. Theme tokens live in `packages/theme/src/theme.css`; app styles live in `apps/web/src/styles/`. Web files follow the [frontend structure contract](context-factory/areas/frontend/references/project-structure.md), organized by layer, domain, and responsibility.
+Astro renders public pages under `apps/web/src/pages` on each request. The standard build targets Node, and `build:workers` targets Cloudflare Workers. `/login` and `/app/*` mount `components/app/App.tsx` with `client:only="react"`. The app keeps its React and authentication providers mounted while same-origin `/app` navigation updates the URL with the History API; public and login routes remain document navigations. `GET /me` chooses the admin or customer shell, and each role keeps only its own `/app` paths. Shared UI uses atomic layers and exports from `packages/ui/src/index.ts`. Theme tokens live in `packages/theme/src/theme.css`; app styles live in `apps/web/src/styles/`. Web files follow the [frontend structure contract](context-factory/areas/frontend/references/project-structure.md), organized by layer, domain, and responsibility.
 
 API routes are mounted under `/v1` in `apps/api/src/app.ts`. HTTP contracts and handlers belong in `controllers/<domain>/`, business operations in `services/<domain>/`, and Kysely queries in `data/<domain>/`. Shared helpers belong in `utils/`. The running API exposes its OpenAPI contract at `/openapi.json`.
 
@@ -301,6 +301,33 @@ Use the checked-in [API environment example](apps/api/.env.example) and [web env
 - Image processing: the Node worker handles mandatory interpretation and image-triggered customer/guest replies. Configure server-only `AI_GATEWAY_API_KEY`, `VISION_MODEL`, `TEXT_MODEL` and Storage settings for that worker; Edge send routes accept uploads and enqueue image jobs. Starting this worker may process pending image jobs and incur model usage.
 - Catalog media: set the Supabase Storage variables in the API example before testing Node API uploads. Legacy built-in package photos are served directly from the application. Existing stored files are left in place.
 - Database clients such as DBeaver: use PostgreSQL on `localhost:5432` with the configured database name/user/password. The local defaults use no SSL. A containerized client may require `host.docker.internal` instead of `localhost`.
+
+### Cloudflare Workers frontend
+
+Connect Workers Builds to the `event-management` Worker named in [Wrangler config](apps/web/wrangler.jsonc).
+
+| Workers Builds setting | Value |
+| --- | --- |
+| Root directory | `apps/web` |
+| Build command | `pnpm run build:workers` |
+| Deploy command | `pnpm exec wrangler deploy` |
+| Build variables | `NODE_VERSION=24.15.0`, `PNPM_VERSION=11.21.0` |
+
+The Workers build sets the browser's API URL to `/v1`. Set `API_PROXY_TARGET` in the Worker's runtime variables to the hosted Supabase gateway origin, such as `https://<project-ref>.supabase.co`. The Worker forwards `/v1/health` to `/functions/v1/api/v1/health` on that gateway and uses the same API for server-rendered catalog pages.
+
+The target needs the Clemora `api` Edge Function and matching database schema. Include the frontend's exact HTTPS origin in the function's `WEB_ORIGIN` and set `NODE_ENV=production` for secure session cookies. For Realtime, add `PUBLIC_SUPABASE_URL` and `PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the build variables. Optional Firebase sign-in also needs its `PUBLIC_FIREBASE_*` build variables and the Worker hostname authorized in Firebase.
+
+With the local Edge API running, run this from `apps/web`:
+
+```sh
+pnpm run build:workers
+pnpm exec wrangler deploy --dry-run
+pnpm exec wrangler dev --ip 127.0.0.1 --port 8787 --var API_PROXY_TARGET:http://127.0.0.1:54321
+```
+
+Open `http://127.0.0.1:8787/v1/health` and expect HTTP 200 with `{"status":"ok"}`. Open `/packages` to check catalog rendering. For local sign-in, add `http://127.0.0.1:8787` to the local Edge function's `WEB_ORIGIN` and restart that function.
+
+See the [Astro Cloudflare adapter](https://docs.astro.build/en/guides/integrations-guide/cloudflare/) and [Workers Builds setup](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/).
 
 ## Authentication
 
