@@ -1,4 +1,5 @@
 import { defineConfig } from "astro/config";
+import cloudflare from "@astrojs/cloudflare";
 import node from "@astrojs/node";
 import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
@@ -8,23 +9,28 @@ import { env } from "./src/lib/server/config/env.ts";
 // reject when the page sends cookies. pnpm dev sets API_PROXY_TARGET so browser
 // calls stay on the website origin and this server forwards them to the gateway.
 const apiProxyTarget = env.API_PROXY_TARGET;
+const useCloudflare = env.ASTRO_ADAPTER === "cloudflare";
 
 export default defineConfig({
   output: "server",
   server: {
     allowedHosts: ["localhost:4322", "amac.zxero.dev"],
   },
-  adapter: node({ mode: "standalone" }),
+  adapter: useCloudflare
+    ? cloudflare({ imageService: "passthrough" })
+    : node({ mode: "standalone" }),
+  // Clemora sessions belong to the API, and the website serves images as-is.
+  ...(useCloudflare ? { session: false } : {}),
   integrations: [react()],
   vite: {
     plugins: [tailwindcss()],
     // Bundle the Markdown renderer so its stylesheet is handled during SSR.
     resolve: {
       noExternal: ["@uiw/react-markdown-preview"],
-      // React's integration inlines Babel helpers by default; these are CJS.
-      external: ["@babel/runtime"],
+      // Keep these CJS helpers external for Node. Workers bundle dependencies.
+      ...(!useCloudflare ? { external: ["@babel/runtime"] } : {}),
     },
-    ...(apiProxyTarget
+    ...(!useCloudflare && apiProxyTarget
       ? {
           server: {
             proxy: {
