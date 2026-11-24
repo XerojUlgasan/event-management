@@ -1,6 +1,6 @@
 # AI standards and verification
 
-Use [structure and naming](structure-and-naming.md) for ownership and the [code walkthrough](code-examples.md) for composition. The root [README](../../../../README.md#current-implementation) owns capability status and configuration; the matching [business references](../../../business/README.md) own intended business rules.
+Use [structure and naming](structure-and-naming.md) for ownership and the [code walkthrough](code-examples.md) for composition. Consult [implementation status](../../../business/product.md#current-implementation) for current capabilities, [configuration](../../../workflows/implement/references/development.md#configuration) for setup, and the [business references](../../../business/README.md) for intended behavior.
 
 ## Trusted context and access
 
@@ -53,7 +53,7 @@ For a new mutation or handoff, first define authorization/consent, ownership, pe
 
 Enforce audience visibility in the query/adapter before evidence enters model context. Catalog ingestion and admin inspection include records that customers cannot see; their eligibility rules cannot authorize public search. The [public search service](../../../../apps/api/src/services/ai/search-public-catalog.ts) and its data query enforce the customer-facing policy while reusing compatible embedding and freshness operations.
 
-Retain source identity and freshness; exclude withdrawn, stale, pending, or incompatible evidence. Model, dimension, or preprocessing changes need an explicit reindex/query transition. Bound excerpts and deduplicate listing results. For durable scheduling, read [background jobs](../../background-jobs/SKILL.md). Read the root README and [ingestion decision](../../../history/decisions/2026-11-16_catalog-embedding-ingestion.md) when changing source preparation or scheduling. New business-information sources require an approved content owner and visibility policy before use.
+Retain source identity and freshness; exclude withdrawn, stale, pending, or incompatible evidence. Model, dimension, or preprocessing changes need an explicit reindex/query transition. Bound excerpts and deduplicate listing results. For durable scheduling, read [background jobs](../../background-jobs/SKILL.md). Read the [catalog implementation](../../../business/product.md#admin-knowledge-catalog) and [ingestion decision](../../../history/decisions/2026-11-16_catalog-embedding-ingestion.md) when changing source preparation or scheduling. New business-information sources require an approved content owner and visibility policy before use.
 
 ## Verification
 

@@ -1,6 +1,6 @@
 # Client data and authentication
 
-Use [client layers](client-layers.md) for request placement and [API and type synchronization](../../contracts/references/api-type-sync.md) for payload changes. Trace affected data and permissions through current API schemas and consumers; the [root README](../../../../README.md#current-implementation) owns implementation status.
+Use [client layers](client-layers.md) for request placement and [API and type synchronization](../../contracts/references/api-type-sync.md) for payload changes. Trace affected data and permissions through current API schemas and consumers; the [product reference](../../../business/product.md#current-implementation) owns implementation status.
 
 ## Session lifecycle
 

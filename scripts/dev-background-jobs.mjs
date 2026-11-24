@@ -15,6 +15,7 @@ const functionEnvPath = join(root, "apps/supabase/.env.functions");
 export function localWorkerEnvironment(functionEnv, status, parentEnv = {}) {
   const database = new URL(status.DB_URL);
   const api = new URL(status.API_URL);
+  const storageKey = status.SECRET_KEY || status.SERVICE_ROLE_KEY;
   const localHosts = ["localhost", "127.0.0.1", "[::1]"];
 
   if (
@@ -22,7 +23,7 @@ export function localWorkerEnvironment(functionEnv, status, parentEnv = {}) {
     !localHosts.includes(database.hostname) ||
     !["http:", "https:"].includes(api.protocol) ||
     !localHosts.includes(api.hostname) ||
-    !status.SERVICE_ROLE_KEY
+    !storageKey
   ) {
     throw new Error(
       "Background development worker requires local Supabase status.",
@@ -40,7 +41,7 @@ export function localWorkerEnvironment(functionEnv, status, parentEnv = {}) {
     DB_PASSWORD:
       functionEnv.DB_PASSWORD ?? decodeURIComponent(database.password),
     SUPABASE_URL: status.API_URL,
-    SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
+    SUPABASE_SERVICE_ROLE_KEY: storageKey,
     DOTENV_CONFIG_PATH: functionEnvPath,
   };
 }

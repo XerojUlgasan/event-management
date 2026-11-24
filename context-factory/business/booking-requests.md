@@ -2,7 +2,7 @@
 
 Booking requests cover the handoff from a customer's event needs to admin review and event-day planning. A customer may select a catalog package or ask the admin to prepare a custom package later. An event day is an operational schedule for part of the requested event; one request can have several event days.
 
-This reference describes intended business behavior. The [current implementation](../../README.md#current-implementation) records what is available today; describing a workflow here does not mean it is already implemented.
+This reference describes intended business behavior. The [current implementation](product.md#current-implementation) records what is available today; describing a workflow here does not mean it is already implemented.
 
 ## People and responsibilities
 
@@ -32,4 +32,4 @@ A guest or customer can give event details over several messages, select a publi
 - Requested dates and times express the customer's preferences until the admin creates operational schedules. A schedule does not change the customer's requested details.
 - The preferred location describes the physical event location; it is not selected from a location catalog.
 - Submitting or accepting a request, or scheduling an event day, does not reserve a date, establish a final price, or confirm a booking.
-- The [product scope](../../README.md#product-scope) governs quotation, confirmation, cancellation, and other decisions beyond this workflow. Do not infer missing business rules from request acceptance or scheduling.
+- The [product scope](product.md#product-scope) governs quotation, confirmation, cancellation, and other decisions beyond this workflow. Do not infer missing business rules from request acceptance or scheduling.

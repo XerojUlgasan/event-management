@@ -20,6 +20,6 @@ For an isolated test environment, follow [test worktrees in .room](worktrees.md)
 
 `pnpm all` runs preparation that applies migrations. Do not start it for a read-only review or document check. Never reset a database to conceal drift. Confirm the actual process, checkout, API target, database, and migration state before interpreting results.
 
-Local Supabase configuration is under `apps/supabase`; Compose PostgreSQL remains the API migration/seed/integration-test target. The README's [local development](../../../../README.md#local-development) owns current setup. A healthy shell, Studio page, or listening port does not prove the intended target is active.
+Local Supabase configuration is under `apps/supabase`; Compose PostgreSQL remains the API migration/seed/integration-test target. See [local development](development.md#local-development) for setup. A healthy shell, Studio page, or listening port does not prove the intended target is active.
 
 Discover available browser, connector, CLI, and model capabilities rather than assuming imported tooling exists. Use the inherited model unless instructed otherwise. Resolve the actual requested/default Git base; new agent branches use `codex/` unless the user specifies otherwise. Delegation and external actions follow root authorization rules.

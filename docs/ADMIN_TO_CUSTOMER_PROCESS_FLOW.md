@@ -6,7 +6,7 @@ Styled by AMAC, still named Clemora internally, supports this overall journey:
 
 An accepted request, a sent quotation, and an operational schedule are separate records. **None currently confirms a booking or reserves a date.**
 
-This document's original process investigation inspected source on 2026-11-15, on `main` at `311c4cf`, including the local files present during the investigation. The quotation section below reflects the Send and Cancel flow. The [root README](../README.md) owns product scope, implementation status, and setup. This is a process explanation, not a new business-policy decision.
+This document's original process investigation inspected source on 2026-11-15, on `main` at `311c4cf`, including the local files present during the investigation. The quotation section below reflects the Send and Cancel flow. See the [product reference](../context-factory/business/product.md) for scope and current implementation. This is a process explanation, not a new business-policy decision.
 
 ## Overall flow
 
@@ -357,7 +357,7 @@ Some demo labels mention confirmed bookings, completed events, or expiring quota
 
 The implemented journey currently covers inquiry review, communication, current proposals, quotation history, and operational scheduling. It does not provide the complete confirmation, event-completion, or reporting lifecycle.
 
-Source: [admin sidebar navigation](../apps/web/src/components/workspaces/admin/navigation.ts), [workspace route mapping](../apps/web/src/components/app/routes.ts), [Overview](../apps/web/src/components/workspaces/admin/overview/OverviewPage.tsx), [Calendar](../apps/web/src/components/workspaces/admin/calendar/CalendarPage.tsx), [Operations](../apps/web/src/components/workspaces/admin/operations/OperationsPage.tsx), [Reports](../apps/web/src/components/workspaces/admin/reports/ReportsPage.tsx), and [approved product scope](../README.md#product-scope).
+Source: [admin sidebar navigation](../apps/web/src/components/workspaces/admin/navigation.ts), [workspace route mapping](../apps/web/src/components/app/routes.ts), [Overview](../apps/web/src/components/workspaces/admin/overview/OverviewPage.tsx), [Calendar](../apps/web/src/components/workspaces/admin/calendar/CalendarPage.tsx), [Operations](../apps/web/src/components/workspaces/admin/operations/OperationsPage.tsx), [Reports](../apps/web/src/components/workspaces/admin/reports/ReportsPage.tsx), and [approved product scope](../context-factory/business/product.md#product-scope).
 
 ## Evidence and verification limits
 

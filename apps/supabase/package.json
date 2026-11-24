@@ -5,7 +5,7 @@
     "start": "supabase start",
     "stop": "supabase stop",
     "status": "supabase status",
-    "functions:serve": "supabase functions serve api --env-file .env.functions"
+    "functions:serve": "node ../../scripts/dev.mjs --edge-only"
   },
   "devDependencies": {
     "supabase": "3.0.0"

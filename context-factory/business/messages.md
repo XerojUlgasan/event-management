@@ -2,7 +2,7 @@
 
 Messages include general inquiries and conversations about a specific booking request. A customer can create a request from an existing general conversation and keep its history, or receive a new linked conversation when submitting a request separately. A public visitor can start an anonymous, bookingless inquiry through Chat with us.
 
-This reference describes intended business behavior. The [current implementation](../../README.md#current-implementation) records what is available today; describing a workflow here does not mean it is already implemented.
+This reference describes intended business behavior. The [current implementation](product.md#current-implementation) records what is available today; describing a workflow here does not mean it is already implemented.
 
 ## People and responsibilities
 
@@ -25,7 +25,7 @@ The customer and admin use the conversation to communicate and create transactio
 - Signed-in general and booking-linked conversations do not expire automatically, including after the event ends. Anonymous conversations follow the inactivity policy below.
 - Conversations have no stored open/closed state. Previously closed signed-in conversations are available; all history and AI preferences are retained.
 - Submitting a request and creating its conversation do not reserve a date, establish a final price, or confirm a booking.
-- Quotations are an implemented transaction type; this does not define a payment workflow. The [product scope](../../README.md#product-scope) still governs payment exclusions and other commitments; define transaction details before implementing them.
+- Quotations are an implemented transaction type; this does not define a payment workflow. The [product scope](product.md#product-scope) still governs payment exclusions and other commitments; define transaction details before implementing them.
 
 ## Anonymous inquiries and account claim
 

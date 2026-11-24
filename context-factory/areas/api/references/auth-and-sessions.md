@@ -12,4 +12,4 @@ Current paths are registered in `apps/api/src/controllers/auth/index.ts`. Read t
 
 Auth field bounds are shared through `@event-management/contracts/limits/auth`; consult the [shared limits guidance](../../contracts/SKILL.md) when changing API schemas or client hints.
 
-The root README's [Authentication section](../../../../README.md#authentication) documents sign-in and session behavior; the running API's `/openapi.json` provides route contracts. Verify any changed claim against code and tests before updating that documentation.
+The [authentication setup](../../../workflows/implement/references/development.md#authentication) documents sign-in and sessions. The running API provides route contracts at `/openapi.json`. Verify any changed claim against code and tests before updating that documentation.

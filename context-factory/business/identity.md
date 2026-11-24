@@ -2,7 +2,7 @@
 
 Clemora has two account roles: customer and admin. Registration creates a customer account. Admin accounts are reserved for designated System Administrators.
 
-This reference describes how the roles should work. Some workflows are still planned; the [current implementation](../../README.md#current-implementation) records what is available today.
+This reference describes how the roles should work. Some workflows are still planned; the [current implementation](product.md#current-implementation) records what is available today.
 
 ## Admin
 
@@ -20,4 +20,4 @@ Customers browse packages and services. They discuss their event with the admin,
 
 Signing in proves who a person is; the saved account role determines what they may do. An optional sign-in provider does not grant business permissions. Connecting another sign-in method preserves the same account and role; matching email addresses do not automatically combine accounts. Public registration creates customers; only designated System Administrators have admin access. The application provides no customer role-change feature.
 
-The [product scope](../../README.md#product-scope) governs quotation, confirmation, and other business rules beyond these responsibilities.
+The [product scope](product.md#product-scope) governs quotation, confirmation, and other business rules beyond these responsibilities.

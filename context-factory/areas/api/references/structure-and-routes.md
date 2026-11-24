@@ -1,6 +1,6 @@
 # API structure and routes
 
-Inspect the affected route, service, data query, tests, and callers for the current contract. The business references and root README describe product behavior; `/openapi.json` and source establish current HTTP behavior.
+Inspect the affected route, service, data query, tests, and callers for the current contract. See the [business rules](../../../business/README.md) for intended behavior and the [product reference](../../../business/product.md) for implementation status. Check `/openapi.json` and source for current HTTP behavior.
 
 ## Ownership
 

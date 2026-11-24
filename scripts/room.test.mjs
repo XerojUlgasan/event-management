@@ -113,6 +113,16 @@ test("runtime targets use only CLI credentials at assigned room ports and explic
   assert.equal(env.DB_PASSWORD, "local-password");
   assert.equal(env.DB_NAME, "postgres");
   assert.equal(env.SUPABASE_SERVICE_ROLE_KEY, "local-service-key");
+  const modern = runtimeEnvironment(
+    plan,
+    {},
+    {},
+    {
+      ...localStatus(plan),
+      SECRET_KEY: "local-secret-key",
+    },
+  );
+  assert.equal(modern.SUPABASE_SERVICE_ROLE_KEY, "local-secret-key");
   assert.equal(env.PUBLIC_API_URL, plan.apiUrl);
   assert.equal(env.WEB_ORIGIN, plan.webUrl);
   assert.equal(env.API_PROXY_TARGET, "");

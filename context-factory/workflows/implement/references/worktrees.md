@@ -10,7 +10,7 @@ Inspect `git status --short`, `git rev-parse HEAD`, and `git worktree list` firs
 
 ## Create, start, and inspect
 
-The runner requires Linux for process ownership checks, plus the [local development prerequisites](../../../../README.md#local-development). Run from the primary checkout:
+The runner requires Linux for process ownership checks, plus the [local development prerequisites](development.md#local-development). Run from the primary checkout:
 
 ```sh
 # Create a detached test checkout at the selected commit or branch, then prepare it.

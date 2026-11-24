@@ -26,6 +26,7 @@ Follow the standing rules in [AGENTS.md](../AGENTS.md). Select all rows that mat
 | Task | Workflow |
 | --- | --- |
 | Explore, explain, plan a design, debug before editing, recover context, review lessons, sharpen a prompt | [Investigate](workflows/investigate/SKILL.md) |
+| Set up a local stack, configure a runtime, or find verification commands | [Development setup and verification](workflows/implement/references/development.md) |
 | Implement, refactor, fix a bug, change contracts, use TDD | [Implement](workflows/implement/SKILL.md) |
 | Create, test in, or remove a Git worktree | [Test worktrees in .room](workflows/implement/references/worktrees.md) |
 | Review a diff, branch, PR, or proposed design | [Review](workflows/review/SKILL.md) |

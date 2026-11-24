@@ -5,7 +5,7 @@ description: Create or rewrite implementation, bug, spike, and Epic tickets with
 
 # Tickets
 
-Establish scope from approved requirements, the root README, matching business rules, and current source. Trace actual screen/API/persistence before claiming an implemented capability. Use [QA](../qa/SKILL.md) for authorized reproduction evidence.
+Establish scope from approved requirements, the [product reference](../../business/product.md), matching business rules, and current source. Trace actual screen/API/persistence before claiming an implemented capability. Use [QA](../qa/SKILL.md) for authorized reproduction evidence.
 
 ## Choose one format
 

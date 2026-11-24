@@ -53,6 +53,20 @@ test("Edge worker preserves the function's configured database and database role
   assert.equal(result.DB_PASSWORD, "fixture-worker-password");
 });
 
+test("local worker prefers the Storage secret key and accepts secret-only status", () => {
+  for (const legacyKey of [status.SERVICE_ROLE_KEY, undefined]) {
+    const result = localWorkerEnvironment(
+      { SUPABASE_SERVICE_ROLE_KEY: "fixture-function-key" },
+      {
+        ...status,
+        SERVICE_ROLE_KEY: legacyKey,
+        SECRET_KEY: "fixture-local-secret",
+      },
+    );
+    assert.equal(result.SUPABASE_SERVICE_ROLE_KEY, "fixture-local-secret");
+  }
+});
+
 test("Edge development worker rejects remote or incomplete status", () => {
   assert.throws(() =>
     localWorkerEnvironment(

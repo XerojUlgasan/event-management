@@ -108,7 +108,7 @@ A browser fetch-and-enqueue loop keeps submission dependent on the page and can 
 
 1. Replace `services/ai/workflows/index-pending-catalog-knowledge.ts` with provider-free discovery and sequential submission, reusing existing data/freshness owners. Keep SQL in `data/ai/` if another focused query is needed.
 2. Update `controllers/ai/index-pending-catalog-knowledge.ts`, the shared `KnowledgeIndexResponse` in [contracts](../../packages/contracts/src/catalog-knowledge.ts), the [browser API call](../../apps/web/src/lib/data/ai/knowledge.ts), and `KnowledgePage` together. Inspect existing Node/Edge route matching, method/body limits, and response handling for the 202 contract. Remove obsolete cursor-only code/tests if no callers remain; retain the CLI backfill.
-3. Extend existing catalog-indexing and queue tests. Update the root README's current behavior and the background-jobs area's manual-action description only when implementation lands. Preserve historical runs and decisions.
+3. Extend existing catalog-indexing and queue tests. Update the [catalog implementation reference](../../context-factory/business/product.md#admin-knowledge-catalog) and the background-jobs area's manual-action description only when implementation lands. Preserve historical runs and decisions.
 
 ## Acceptance and verification plan
 

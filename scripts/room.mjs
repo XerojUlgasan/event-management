@@ -162,7 +162,7 @@ export function runtimeEnvironment(
   )
     throw new Error("Supabase reported an API outside this room.");
 
-  const key = status.SERVICE_ROLE_KEY || status.SECRET_KEY;
+  const key = status.SECRET_KEY || status.SERVICE_ROLE_KEY;
 
   if (!key || !db.password)
     throw new Error("Supabase did not report local runtime credentials.");

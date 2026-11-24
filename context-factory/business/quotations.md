@@ -1,6 +1,6 @@
 # Quotations
 
-A quotation is the admin's price offer for a customer's booking inquiry. It sets out the package price, add-on charges, manual fees or discounts, and the total for the customer to review. The [root README](../../README.md#private-packages-and-quotations) records the current implementation.
+A quotation is the admin's price offer for a customer's booking inquiry. It sets out the package price, add-on charges, manual fees or discounts, and the total for the customer to review. The [product reference](product.md#private-packages-and-quotations) records the current implementation.
 
 ## People and responsibilities
 
@@ -21,4 +21,4 @@ A quotation is the admin's price offer for a customer's booking inquiry. It sets
 - The server validates all current add-ons and calculates the total. Send requires complete pricing, a nonnegative total, current booking and proposal data, and the linked conversation. Resolve an unavailable add-on on the booking before sending. Refresh and review if the package or current offer has changed. Repeating the same send request should produce one offer and one message.
 - Sent and superseded versions retain their financial history as packages and services change. A revision creates a new version. Legacy unsent records are retained without a draft workflow.
 - Declined and cancelled requests are read-only. Quotations have no automatic expiry. A signed-in booking conversation remains available for delivery.
-- Quotations and chat replies do not confirm a booking, reserve dates, create event schedules, or establish a payment workflow. The [product scope](../../README.md#product-scope) governs these commitments.
+- Quotations and chat replies do not confirm a booking, reserve dates, create event schedules, or establish a payment workflow. The [product scope](product.md#product-scope) governs these commitments.

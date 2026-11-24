@@ -2,7 +2,7 @@
 
 The catalog presents the packages and services available from Clemora. It helps customers explore their options, start a booking request for a package, and discuss requirements that call for a custom package.
 
-This reference describes intended business behavior. The [current implementation](../../README.md#current-implementation) records what is available today; describing a workflow here does not mean it is already implemented.
+This reference describes intended business behavior. The [current implementation](product.md#current-implementation) records what is available today; describing a workflow here does not mean it is already implemented.
 
 ## Admin
 
@@ -29,4 +29,4 @@ Customers browse the available packages and services. They can start a booking r
 - A service widget inside a package represents an included service; its base fee is covered by the package's fixed total. Its canvas JSONB stores package-local included hours and excess hourly rate. Defaults are copied when selected or explicitly reset; edits never change the global service or package total. Existing widgets without terms remain readable with unspecified coverage/rate.
 - Add-on offers belong to the booking request and do not change the package base total. Requested services without an admin offer remain requests. Current offered add-ons become separate charges in a new [quotation](quotations.md), including a revision.
 - Service-page service widgets and existing package-reference widgets remain linked catalog previews. Private custom packages are not selectable linked listings. No widget establishes availability. See the [service-terms decision](../history/decisions/2026-11-20_package-service-terms.md).
-- Browsing or submitting a booking request does not reserve a date, establish a final price, or confirm a booking. The [product scope](../../README.md#product-scope) governs those later decisions.
+- Browsing or submitting a booking request does not reserve a date, establish a final price, or confirm a booking. The [product scope](product.md#product-scope) governs those later decisions.

@@ -2,7 +2,7 @@
 
 Event days are operational schedules for accepted booking requests. One request can have several days, each with its own date, start and end time, and timezone. Customers request dates and supply times; a System Administrator turns ready requested days into operational schedules.
 
-This reference describes intended business behavior. The [current implementation](../../README.md#current-implementation) records what is available today; describing a workflow here does not mean it is already implemented.
+This reference describes intended business behavior. The [current implementation](product.md#current-implementation) records what is available today; describing a workflow here does not mean it is already implemented.
 
 ## People and responsibilities
 
@@ -23,4 +23,4 @@ Admin means a designated System Administrator, as defined in [identity and respo
 - A requested date and its saved times are customer preferences until the admin creates the operational schedule.
 - Moving a scheduled day preserves its history and creates a replacement day. Cancelling a day preserves its record as cancelled.
 - Event-day scheduling does not reserve a date, establish a final price, or confirm or complete the booking.
-- The [product scope](../../README.md#product-scope) governs confirmation, cancellation, event changes, and other commitments beyond this workflow.
+- The [product scope](product.md#product-scope) governs confirmation, cancellation, event changes, and other commitments beyond this workflow.

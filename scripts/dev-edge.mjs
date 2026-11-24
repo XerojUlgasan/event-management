@@ -6,13 +6,27 @@
 import { spawn } from "node:child_process";
 
 const isWindows = process.platform === "win32";
+
+const serveOnce = process.argv.includes("--once");
+
 let child;
 let stopping = false;
 
 function serve() {
   child = spawn(
     "pnpm",
-    ["--filter", "@event-management/supabase", "functions:serve"],
+    [
+      "--filter",
+      "@event-management/supabase",
+      "exec",
+      "--", // Keep Node from reading Supabase's --env-file at startup.
+      "supabase",
+      "functions",
+      "serve",
+      "api",
+      "--env-file",
+      ".env.functions",
+    ],
     {
       stdio: "inherit",
       shell: isWindows,
@@ -23,6 +37,12 @@ function serve() {
 
     if (stopping) {
       process.exit(0);
+    }
+
+    if (serveOnce) {
+      process.exitCode = code ?? 1;
+
+      return;
     }
 
     const status = signal ? `signal ${signal}` : `exit ${code ?? 0}`;

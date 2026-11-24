@@ -5,7 +5,7 @@ description: Design, implement, investigate, or review AI agents, tools, prompts
 
 # AI
 
-The assistant uses Vercel AI SDK and AI Gateway in `apps/api/src/services/ai/`. This area explains how to extend that implementation. The root [README](../../../README.md#product-scope) owns product scope, open decisions, implementation status, and setup; this guide grants no new business actions.
+The assistant uses Vercel AI SDK and AI Gateway in `apps/api/src/services/ai/`. This area explains how to extend that implementation. Check the [product reference](../../business/product.md) for approved scope and current capabilities. For setup, see [AI configuration](../../workflows/implement/references/development.md#configuration).
 
 ## Read for the task
 
