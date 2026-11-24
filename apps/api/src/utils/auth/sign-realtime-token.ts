@@ -1,41 +1,8 @@
-import { z } from "@hono/zod-openapi";
-import { importJWK, SignJWT } from "jose";
+import { SignJWT } from "jose";
 import type { SessionContext } from "../../types/hono.js";
 import { config } from "../../env.js";
 
 const MAX_TOKEN_LIFETIME_SECONDS = 5 * 60;
-
-const signingKeySchema = z.object({
-  kty: z.literal("EC"),
-  crv: z.literal("P-256"),
-  kid: z.string().min(1),
-  x: z.string().min(1),
-  y: z.string().min(1),
-  d: z.string().min(1),
-});
-
-function localRealtimeSecret() {
-  const secret = config.REALTIME_JWT_SECRET?.trim();
-  const target = config.SUPABASE_URL?.trim();
-
-  if (!secret || !target || config.NODE_ENV === "production")
-    return undefined;
-
-  try {
-    const url = new URL(target);
-
-    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
-
-    const isLoopback = ["localhost", "127.0.0.1", "[::1]"].includes(
-      url.hostname,
-    );
-    const isLocalEdgeGateway = url.origin === "http://kong:8000";
-
-    return isLoopback || isLocalEdgeGateway ? secret : undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 export type RealtimeTokenTarget =
   { conversationId: string } | { scope: "notifications" };
@@ -45,6 +12,12 @@ export async function signRealtimeToken(
   session: SessionContext,
   { issuedAt, expiresAt }: { issuedAt: number; expiresAt: number },
 ) {
+  const secret = config.SUP_JWT_KEY;
+  const key = new TextEncoder().encode(secret);
+
+  if (!secret?.trim() || key.length < 32)
+    throw new Error("Realtime token signer is unavailable");
+
   const scopeClaims =
     "conversationId" in target
       ? {
@@ -52,7 +25,8 @@ export async function signRealtimeToken(
           conversation_id: target.conversationId,
         }
       : { clemora_scope: "user_notifications" };
-  const payload = new SignJWT({
+
+  return new SignJWT({
     role: "authenticated",
     clemora_session_id: session.sessionId,
     ...scopeClaims,
@@ -60,29 +34,9 @@ export async function signRealtimeToken(
     .setSubject(session.user.id)
     .setAudience("authenticated")
     .setIssuedAt(issuedAt)
-    .setExpirationTime(expiresAt);
-
-  const jwk = config.REALTIME_JWT_SIGNING_JWK?.trim();
-
-  if (jwk) {
-    const signingKey = signingKeySchema.parse(JSON.parse(jwk));
-    const key = await importJWK(signingKey, "ES256");
-
-    return payload
-      .setProtectedHeader({ alg: "ES256", typ: "JWT", kid: signingKey.kid })
-      .sign(key);
-  }
-
-  const secret = localRealtimeSecret();
-
-  if (secret) {
-    const key = new TextEncoder().encode(secret);
-
-    if (key.length >= 32)
-      return payload.setProtectedHeader({ alg: "HS256", typ: "JWT" }).sign(key);
-  }
-
-  throw new Error("Realtime token signer is unavailable");
+    .setExpirationTime(expiresAt)
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .sign(key);
 }
 
 export function getRealtimeTokenLifetime(

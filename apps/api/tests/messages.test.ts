@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { exportJWK, generateKeyPair, jwtVerify } from "jose";
+import { jwtVerify } from "jose";
 import { Pool } from "pg";
 import { sql } from "kysely";
 import { hashSessionToken } from "../src/utils/session.js";
@@ -203,17 +203,9 @@ async function read(response: Response, status: number): Promise<any> {
 }
 
 test("Realtime tokens are limited to the live session and requested receive scope", async (t) => {
-  const existingKey = process.env.REALTIME_JWT_SIGNING_JWK;
-  const existingSecret = process.env.REALTIME_JWT_SECRET;
-  t.after(() => {
-    if (existingKey === undefined) setTestConfig({ REALTIME_JWT_SIGNING_JWK: undefined });
-    else setTestConfig({ REALTIME_JWT_SIGNING_JWK: existingKey });
-
-    if (existingSecret === undefined) setTestConfig({ REALTIME_JWT_SECRET: undefined });
-    else setTestConfig({ REALTIME_JWT_SECRET: existingSecret });
-  });
-  setTestConfig({ REALTIME_JWT_SIGNING_JWK: undefined });
-  setTestConfig({ REALTIME_JWT_SECRET: undefined });
+  const originalKey = process.env.SUP_JWT_KEY;
+  t.after(() => setTestConfig({ SUP_JWT_KEY: originalKey }));
+  setTestConfig({ SUP_JWT_KEY: undefined });
 
   const id = randomUUID();
   const guestConversationId = randomUUID();
@@ -266,22 +258,19 @@ test("Realtime tokens are limited to the live session and requested receive scop
   await read(await issue(id, customerCookie), 503);
   await read(await issueNotifications(customerCookie), 503);
 
-  const kid = randomUUID();
-  const pair = await generateKeyPair("ES256", { extractable: true });
-  setTestConfig({ REALTIME_JWT_SIGNING_JWK: JSON.stringify({
-    ...(await exportJWK(pair.privateKey)),
-    kid,
-  }) });
+  const secret = randomUUID();
+  const key = new TextEncoder().encode(secret);
+  setTestConfig({ SUP_JWT_KEY: secret });
 
   for (const cookie of [customerCookie, adminCookie]) {
     const response = await issue(id, cookie);
     assert.equal(response.headers.get("cache-control"), "no-store");
     const result = await read(response, 200);
-    const { payload, protectedHeader } = await jwtVerify(
+    const { payload } = await jwtVerify(
       result.token,
-      pair.publicKey,
+      key,
       {
-        algorithms: ["ES256"],
+        algorithms: ["HS256"],
         audience: "authenticated",
       },
     );
@@ -295,7 +284,6 @@ test("Realtime tokens are limited to the live session and requested receive scop
       )
       .executeTakeFirstOrThrow();
 
-    assert.equal(protectedHeader.kid, kid);
     assert.equal(payload.sub, session.user_id);
     assert.equal(payload.role, "authenticated");
     assert.equal(payload.clemora_scope, "conversation_messages");
@@ -310,8 +298,8 @@ test("Realtime tokens are limited to the live session and requested receive scop
     const notificationResult = await read(notificationResponse, 200);
     const { payload: notificationPayload } = await jwtVerify(
       notificationResult.token,
-      pair.publicKey,
-      { algorithms: ["ES256"], audience: "authenticated" },
+      key,
+      { algorithms: ["HS256"], audience: "authenticated" },
     );
     assert.equal(notificationPayload.sub, session.user_id);
     assert.equal(notificationPayload.role, "authenticated");
@@ -345,7 +333,7 @@ test("Realtime tokens are limited to the live session and requested receive scop
   );
   const { payload: shortPayload } = await jwtVerify(
     shortResult.token,
-    pair.publicKey,
+    key,
   );
   assert.equal(shortPayload.exp, expiration);
 

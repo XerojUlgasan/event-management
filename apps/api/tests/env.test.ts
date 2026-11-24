@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
 import { generateText } from "ai";
-import { decodeProtectedHeader } from "jose";
+import { jwtVerify } from "jose";
 import { config } from "../src/env.js";
 import {
   getEmbeddingSettings,
@@ -66,13 +66,9 @@ test("storage selects supported keys when used", (context) => {
   assert.throws(getCatalogStorage, /Media storage is not configured/);
 });
 
-test("Realtime prefers JWK signing and restricts legacy signing to local Supabase", async (context) => {
-  useConfig(context, {
-    NODE_ENV: "test",
-    REALTIME_JWT_SIGNING_JWK: "invalid-jwk",
-    REALTIME_JWT_SECRET: "1234567890-fixture-only-1234567890",
-    SUPABASE_URL: "http://127.0.0.1:54321",
-  });
+test("Realtime signs with SUP_JWT_KEY on local and hosted Edge", async (context) => {
+  const secret = "1234567890-fixture-only-1234567890";
+  useConfig(context, { SUP_JWT_KEY: secret });
   const session = {
     sessionId: "fixture-session",
     user: { id: "fixture-user" },
@@ -84,30 +80,23 @@ test("Realtime prefers JWK signing and restricts legacy signing to local Supabas
       expiresAt: 60,
     });
 
-  await assert.rejects(sign, SyntaxError);
-  config.REALTIME_JWT_SIGNING_JWK = undefined;
-
-  for (const target of [
-    "https://project.supabase.co",
-    "http://localhost.example",
-    "ftp://localhost",
-    "invalid",
+  for (const settings of [
+    { NODE_ENV: "development", SUPABASE_URL: "http://kong:8000" },
+    { NODE_ENV: "production", SUPABASE_URL: "https://project.supabase.co" },
   ]) {
-    config.SUPABASE_URL = target;
+    Object.assign(config, settings);
+    const { payload } = await jwtVerify(await sign(), new TextEncoder().encode(secret), {
+      algorithms: ["HS256"],
+      audience: "authenticated",
+      currentDate: new Date(30_000),
+    });
+    assert.equal(payload.clemora_scope, "user_notifications");
+  }
+
+  for (const invalid of [undefined, " ".repeat(32), "x".repeat(31)]) {
+    config.SUP_JWT_KEY = invalid;
     await assert.rejects(sign, /Realtime token signer is unavailable/);
   }
-
-  for (const target of [
-    "http://127.0.0.1:54321",
-    "http://kong:8000",
-    "http://[::1]:54321",
-  ]) {
-    config.SUPABASE_URL = target;
-    assert.equal(decodeProtectedHeader(await sign()).alg, "HS256");
-  }
-
-  config.NODE_ENV = "production";
-  await assert.rejects(sign, /Realtime token signer is unavailable/);
 });
 
 test("AI text and embedding settings are validated independently on use", (context) => {

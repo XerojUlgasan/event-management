@@ -307,17 +307,14 @@ export function NotificationBell({ profileId }: { profileId: string }) {
       return;
 
     let client: ReturnType<typeof createClient>;
+    let accessToken: string | null = null;
 
     try {
       client = createClient(
         config.PUBLIC_SUPABASE_URL,
         config.PUBLIC_SUPABASE_PUBLISHABLE_KEY,
         {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-          },
+          accessToken: async () => accessToken,
         },
       );
     } catch {
@@ -353,7 +350,8 @@ export function NotificationBell({ profileId }: { profileId: string }) {
         if (!Number.isFinite(expiry) || expiry <= Date.now())
           throw new Error("Expired token");
 
-        await client.realtime.setAuth(credentials.token);
+        accessToken = credentials.token;
+        await client.realtime.setAuth(accessToken);
 
         if (stopped) return;
 

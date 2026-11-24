@@ -63,17 +63,14 @@ export function useRealtimeThread({
       return;
 
     let client: ReturnType<typeof createClient>;
+    let accessToken: string | null = null;
 
     try {
       client = createClient(
         config.PUBLIC_SUPABASE_URL,
         config.PUBLIC_SUPABASE_PUBLISHABLE_KEY,
         {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-          },
+          accessToken: async () => accessToken,
         },
       );
     } catch {
@@ -130,7 +127,8 @@ export function useRealtimeThread({
         if (!Number.isFinite(expires) || expires <= Date.now())
           throw new Error("Expired realtime token");
 
-        await client.realtime.setAuth(credentials.token);
+        accessToken = credentials.token;
+        await client.realtime.setAuth(accessToken);
 
         if (!isCurrent()) return;
 
