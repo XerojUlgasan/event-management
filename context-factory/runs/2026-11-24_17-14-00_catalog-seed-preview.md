@@ -9,7 +9,7 @@ Continues: [Catalog editorial work](2026-11-18_21-12-00_catalog-editorial-depth.
 
 ## Result
 
-A fresh seed creates ten public packages, ten public services, three published showcases and one showcase draft. The 75 JPEGs are stored in [seed assets](../../apps/api/db/seed/assets), with credits in each collection. The business profile and AMAC defaults are persisted through their existing settings tables. [Seed guide](../../docs/SEED.md)
+A fresh seed creates ten public packages, ten public services, three published showcases and one showcase draft. The 75 JPEGs are stored in [seed assets](../../apps/api/src/db/seed/assets), with credits in each collection. The business profile and AMAC defaults are persisted through their existing settings tables. [Seed guide](../../docs/SEED.md)
 
 ## Verification
 

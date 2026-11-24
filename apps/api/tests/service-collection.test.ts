@@ -7,7 +7,7 @@ import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/cata
 import { serviceInputSchema } from "../src/controllers/services/schemas.js";
 import { curatedServices } from "../src/db/seed/service-collection.js";
 
-const assetRoot = new URL("../db/seed/assets/", import.meta.url);
+const assetRoot = new URL("../src/db/seed/assets/", import.meta.url);
 
 const serviceAssets = new URL("services/", assetRoot);
 

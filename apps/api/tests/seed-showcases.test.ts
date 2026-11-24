@@ -191,7 +191,7 @@ test("showcase seed uploads ordered photos and preserves an edited fixture", asy
       assert.equal(photo.status, 200);
       assert.equal(photo.headers.get("content-type"), "image/jpeg");
       const expected = await readFile(
-        new URL(`../db/seed/assets/showcases/${file}.jpg`, import.meta.url),
+        new URL(`../src/db/seed/assets/showcases/${file}.jpg`, import.meta.url),
       );
       assert.deepEqual(Buffer.from(await photo.arrayBuffer()), expected);
     }

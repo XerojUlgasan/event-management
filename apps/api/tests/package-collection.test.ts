@@ -11,7 +11,7 @@ import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images"
 import { contentSchema } from "../src/controllers/packages/schemas.js";
 import { curatedPackages } from "../src/db/seed/package-collection.js";
 
-const assets = new URL("../db/seed/assets/", import.meta.url);
+const assets = new URL("../src/db/seed/assets/", import.meta.url);
 
 test("curated packages have ten unique listings with valid fixed prices and editorial sections", () => {
   assert.equal(curatedPackages.length, 10);

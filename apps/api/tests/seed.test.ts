@@ -477,7 +477,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
         new RegExp(`^${page.kind}s/${page.ownerId}/images/${id}\\.`),
       );
       const bytes = await readFile(
-        resolve(workspaceDirectory, "apps/api/db/seed/assets", file),
+        resolve(workspaceDirectory, "apps/api/src/db/seed/assets", file),
       );
       assert.equal(media.byte_size, bytes.length);
       assert.equal(media.url, null);

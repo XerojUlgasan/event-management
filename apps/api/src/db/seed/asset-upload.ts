@@ -11,9 +11,7 @@ import {
 } from "../../utils/catalog-media-storage.js";
 import { insertIfNew, type SeedDb } from "./context.js";
 
-const assetDirectory = fileURLToPath(
-  new URL("../../../db/seed/assets/", import.meta.url),
-);
+const assetDirectory = fileURLToPath(new URL("./assets/", import.meta.url));
 
 type SeedAsset = { file: string; id: string; createdBy: string | null };
 
