@@ -304,6 +304,36 @@ Use the checked-in [API environment example](apps/api/.env.example) and [web env
 - Catalog media: configure the Supabase Storage variables in the API example before running `pnpm db:seed` or testing Node API uploads. The seed uploads its checked-in photos to the private bucket.
 - Database clients such as DBeaver: use PostgreSQL on `localhost:5432` with the configured database name/user/password. The local defaults use no SSL. A containerized client may require `host.docker.internal` instead of `localhost`.
 
+### Cloudflare Workers frontend
+
+In Workers Builds, connect the repository to the `clemora-web` Worker, matching the name in [Wrangler config](apps/web/wrangler.jsonc).
+
+| Workers Builds setting | Value |
+| --- | --- |
+| Root directory | `apps/web` |
+| Build command | `pnpm run build` |
+| Deploy command | `pnpm exec wrangler deploy` |
+| Build variables | `NODE_VERSION=24.15.0`, `PNPM_VERSION=11.21.0`, `ASTRO_ADAPTER=cloudflare`, `PUBLIC_API_URL=/v1` |
+
+Set `PUBLIC_SUPABASE_URL` and `PUBLIC_SUPABASE_PUBLISHABLE_KEY` as build variables for Realtime. If using [Firebase sign-in](#optional-firebase-setup), also set its `PUBLIC_FIREBASE_*` build variables and authorize the frontend hostname in Firebase. Changes to public settings require a rebuild.
+
+In the Worker's **Settings → Variables and Secrets**, set `API_PROXY_TARGET` to the Supabase gateway origin, for example `https://<project-ref>.supabase.co`. The build does not need this variable. The Worker uses it at request time for server-rendered catalog data and proxies browser requests from `/v1` to the Edge function's `/functions/v1/api/v1` path. The browser keeps its session cookie on the frontend origin.
+
+The target Supabase project must already serve the Clemora `api` Edge function, use the current application schema, and allow the frontend's exact HTTPS origin in the function's `WEB_ORIGIN`. The function uses Clemora's session authentication with gateway JWT verification disabled, as in the local Supabase config. Set production cookie mode (`NODE_ENV=production`) and any API credentials in the Edge function's environment.
+
+To run the Worker locally, start the local Edge stack described above. For an isolated test stack, use the Edge function's Supabase database and Storage as the target for `pnpm db:deploy` and `pnpm db:seed` before testing catalog and sign-in. Verify the local database and Storage targets first. Run these commands from `apps/web`:
+
+```sh
+CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false ASTRO_ADAPTER=cloudflare PUBLIC_API_URL=/v1 pnpm run build
+pnpm exec wrangler dev --ip 127.0.0.1 --port 8787 --var API_PROXY_TARGET:http://127.0.0.1:54321
+```
+
+The Cloudflare flag keeps Wrangler from importing the existing local `.env` during the build, so the browser API URL stays on the Worker origin at `/v1`.
+
+For local sign-in, include `http://127.0.0.1:8787` in the local function's `WEB_ORIGIN` and restart its server. Use `pnpm exec wrangler deploy --dry-run` from `apps/web` to check the Worker bundle. The usual Node-based commands (`pnpm dev`, `pnpm all`, and a web build without `ASTRO_ADAPTER`) still use the Node adapter.
+
+See the [Astro Cloudflare adapter](https://docs.astro.build/en/guides/integrations-guide/cloudflare/) and [Workers Builds configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/).
+
 ## Authentication
 
 New registrations create local customer accounts with Argon2id password hashes; passwords must contain 8–128 characters. Password hashing uses WebAssembly through `hash-wasm` in both Node and the Edge Function, with 19 MiB of memory, two passes, and parallelism one. Existing Argon2id hashes remain valid; no password reset or database migration is needed. Google sign-in and existing Firebase email/password accounts are optional identity methods. Application roles always come from PostgreSQL.
@@ -348,7 +378,7 @@ The package and service editors share a 24-column canvas. Drag a photo, Markdown
 
 Saves retain widget positions and spans, including intentional gaps. Sections with `columns: 24` use the finer grid. Sections saved before this change use 12-column coordinates. The editor doubles their horizontal units and records the column count when saving. This needs no database migration. Deploy the matching API and web app together.
 
-The editor, customer preview, and public detail page scale widget dimensions with the available canvas width. Photos and videos fit without cropping. Select a Markdown widget to edit its source in place. The formatted text returns when the widget loses focus. Text overflow is clipped in the rendered view. A widget can span at most 100 rows. Shared schemas validate the canvas in the editor, API, stored reads and writes, and seeds. Invalid canvas saves identify the affected section and widget. Pending file selections are validated before upload and require a saved media ID afterward.
+The editor scales its authoring grid with the available canvas width. Public details and full previews fit Markdown to its content, preserve saved placement on wide canvases, and stack widgets in reading order on narrow canvases. Photos and videos fit without cropping. Select a Markdown widget to edit its source in place. The formatted text returns when the widget loses focus. The editor clips content to the selected widget’s bounds. A widget can span at most 100 rows. Shared schemas validate the canvas in the editor, API, stored reads and writes, and seeds. Invalid canvas saves identify the affected section and widget. Pending file selections are validated before upload and require a saved media ID afterward.
 
 Media uploads go through `POST /v1/admin/catalog-media`, remain pending until a catalog save references them, and stream through `/v1/catalog-media/{id}`. JPEG/PNG/WebP images allow up to 10 MiB; MP4/WebM videos allow up to 25 MiB. Photo/video widgets accept uploads only, with built-in sample photos retained for older saved fixtures. External URLs and hosted-player embeds are rejected. Video autoplay is opt-in and uses muted inline playback on customer previews and public pages.
 
