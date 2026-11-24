@@ -2,7 +2,7 @@
 
 ## Shared catalog canvas media
 
-Packages and services store their canvas as ordered section/widget arrays in the owner's `canvas` JSONB column. A widget stores its `mediaId`; `media_assets` remains the authoritative media record for source, kind, optional URL, MIME type, and storage metadata. Uploaded bytes are stored in the private Supabase Storage bucket `event-management`, using the owner paths below. Migration `20261116072801_embed_catalog_canvas` does not copy or delete media records or Storage objects. The shared editor uploads one file at a time to `POST /v1/admin/catalog-media`. An upload remains pending until a catalog save references its media ID. The owning administrator can discard an unreferenced upload through `DELETE /v1/admin/catalog-media/{id}`. Saved uploads stream through `GET /v1/catalog-media/{id}`.
+Packages and services store their canvas as ordered section/widget arrays in the owner's `canvas` JSONB column. A widget stores its `mediaId`; `media_assets` remains the authoritative media record for source, kind, optional URL, MIME type, and storage metadata. Uploaded bytes are stored in the private S3 bucket configured by `R2_BUCKET_NAME`, using the owner paths below. Hosted deployments use Cloudflare R2. Local development can use the Supabase S3 endpoint with the existing `event-management` bucket. Migration `20261116072801_embed_catalog_canvas` does not copy or delete media records or Storage objects. The shared editor uploads one file at a time to `POST /v1/admin/catalog-media`. An upload remains pending until a catalog save references its media ID. The owning administrator can discard an unreferenced upload through `DELETE /v1/admin/catalog-media/{id}`. Saved uploads stream through `GET /v1/catalog-media/{id}`.
 
 ## Storage filing and recovery
 
@@ -33,7 +33,7 @@ Public requests can stream media referenced by the canvas or dedicated thumbnail
 
 Showcases select an image with `cover_media_id`. Gallery images and videos each have one `showcase_record_id` and a unique `gallery_position` within that showcase. The API changes attachments and order in the same transaction as the showcase save. Deleting a showcase detaches the gallery before deleting the record, then runs shared media cleanup.
 
-Uploads use `POST /v1/admin/showcase-media` and the `showcase-media/<id>` key prefix in the private `event-management` bucket. `GET /v1/showcase-media/{id}` serves media referenced by published showcases, including video byte ranges. System Administrators can view saved draft media and their own pending uploads. The migration leaves the asset rows and objects for formerly separate preview videos in place. The usual stale media cleanup applies once those assets have no references.
+Uploads use `POST /v1/admin/showcase-media` and the `showcase-media/<id>` key prefix in the configured private media bucket. `GET /v1/showcase-media/{id}` serves media referenced by published showcases, including video byte ranges. System Administrators can view saved draft media and their own pending uploads. The migration leaves the asset rows and objects for formerly separate preview videos in place. The usual stale media cleanup applies once those assets have no references.
 
 ## Private proposal and quotation media
 
@@ -41,7 +41,7 @@ Uploaded catalog media, including a dedicated uploaded thumbnail, is copied to i
 
 Public streaming requires a catalog package, not merely a nonarchived package row. The owner can stream uploads currently referenced by its custom proposal canvas or thumbnail; System Administrators have the protected preview path. Private streams use `private, no-store`, including byte ranges. Quotations neither retain media snapshots nor grant customer media access.
 
-Reference checks and stale cleanup use current canvas and thumbnail references. Removing or replacing the last widget reference makes an upload eligible for cleanup, even when an old quotation referred to that package. A fake Storage API test establishes local copy/cleanup behavior, not live Supabase Storage success.
+Reference checks and stale cleanup use current canvas and thumbnail references. Removing or replacing the last widget reference makes an upload eligible for cleanup, even when an old quotation referred to that package. A fake Storage API test establishes local copy/cleanup behavior, not live R2 success.
 
 ## Service media
 

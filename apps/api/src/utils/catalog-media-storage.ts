@@ -1,65 +1,77 @@
+import { AwsClient } from "aws4fetch";
 import { config } from "../env.js";
 
 export class CatalogMediaNotFound extends Error {}
 
-function storageKey() {
-  const key =
-    config.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    config.SUPABASE_SECRET_KEY?.trim();
+type StorageArea = "supporting-documents";
 
-  if (key) return key;
+export function getCatalogStorage() {
+  const endpointValue = config.R2_ENDPOINT?.trim();
+  const accessKeyId = config.R2_ACCESS_KEY_ID?.trim();
+  const secretAccessKey = config.R2_SECRET_ACCESS_KEY?.trim();
+  const bucket = config.R2_BUCKET_NAME?.trim();
 
-  const raw = config.SUPABASE_SECRET_KEYS?.trim();
+  if (!endpointValue || !accessKeyId || !secretAccessKey || !bucket)
+    throw new Error(
+      "Set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME",
+    );
 
-  if (raw) {
-    try {
-      const keys: unknown = JSON.parse(raw);
+  const endpoint = URL.parse(endpointValue);
 
-      if (keys && typeof keys === "object") {
-        const candidate =
-          ("default" in keys ? keys.default : undefined) ??
-          Object.values(keys)[0];
+  if (
+    !endpoint ||
+    !["https:", "http:"].includes(endpoint.protocol) ||
+    endpoint.username ||
+    endpoint.password ||
+    endpoint.search ||
+    endpoint.hash
+  )
+    throw new Error(
+      "R2_ENDPOINT must be an HTTP(S) endpoint without credentials or query parameters",
+    );
 
-        if (typeof candidate === "string" && candidate.trim())
-          return candidate.trim();
-      }
-    } catch {
-      // Report the supported variable names without exposing the value.
-    }
-  }
-
-  throw new Error(
-    "SUPABASE_SERVICE_ROLE_KEY, SUPABASE_SECRET_KEY or SUPABASE_SECRET_KEYS is required",
-  );
+  return {
+    endpoint: endpoint.href.replace(/\/+$/, ""),
+    bucket,
+    client: new AwsClient({
+      accessKeyId,
+      secretAccessKey,
+      region: config.R2_REGION?.trim() || "auto",
+      service: "s3",
+      retries: 0,
+    }),
+  };
 }
 
-export function getCatalogStorageCredentials() {
-  const url = config.SUPABASE_URL?.trim().replace(/\/$/, "");
+function storageObject(key: string, area?: StorageArea) {
+  const { endpoint, bucket, client } = getCatalogStorage();
+  const documentBucket = area && config.R2_DOCUMENTS_BUCKET_NAME?.trim();
+  const objectKey = area && !documentBucket ? `${area}/${key}` : key;
+  const path = objectKey.split("/").map(encodeURIComponent).join("/");
 
-  if (!url) throw new Error("SUPABASE_URL is required");
-
-  return { url, apiKey: storageKey() };
+  return {
+    client,
+    url: `${endpoint}/${encodeURIComponent(documentBucket || bucket)}/${path}`,
+    // The local Supabase S3 endpoint ignores If-None-Match on PutObject.
+    needsExistenceCheck: endpoint.endsWith("/storage/v1/s3"),
+  };
 }
 
-function getStorageBucket(override?: string) {
-  if (override !== undefined) return override;
+async function fetchObject(client: AwsClient, url: string, init: RequestInit) {
+  const signingUrl = new URL(url);
+  const localSigningHost = config.R2_LOCAL_SIGNING_HOST?.trim();
+  const useLocalHost = signingUrl.hostname === "kong" && localSigningHost;
 
-  const bucket = config.STORAGE_BUCKET?.trim();
+  // Local Kong forwards its internal hostname with the published API port.
+  if (useLocalHost) signingUrl.host = useLocalHost;
 
-  if (!bucket) throw new Error("STORAGE_BUCKET is required");
+  const signed = await client.sign(signingUrl, init);
 
-  return bucket;
-}
-
-function objectPath(bucket: string, key: string) {
-  return `${bucket}/${key
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/")}`;
-}
-
-function authHeaders(apiKey: string, extra?: Record<string, string>) {
-  return { apikey: apiKey, Authorization: `Bearer ${apiKey}`, ...extra };
+  return fetch(url, {
+    ...init,
+    headers: signed.headers,
+    redirect: "error",
+  });
 }
 
 export function detectCatalogMediaType(bytes: Uint8Array) {
@@ -119,81 +131,67 @@ export async function putCatalogMedia(
   options: {
     upsert?: boolean;
     abortSignal?: AbortSignal;
-    bucket?: string;
+    area?: StorageArea;
   } = {},
 ) {
-  const { url, apiKey } = getCatalogStorageCredentials();
-  const bucket = getStorageBucket(options.bucket);
-  const response = await fetch(
-    `${url}/storage/v1/object/${objectPath(bucket, key)}`,
-    {
-      method: "POST",
-      headers: authHeaders(apiKey, {
-        "Content-Type": contentType,
-        "x-upsert": options.upsert ? "true" : "false",
-      }),
-      body: Buffer.from(bytes),
-      signal: AbortSignal.any([
-        AbortSignal.timeout(30_000),
-        ...(options.abortSignal ? [options.abortSignal] : []),
-      ]),
+  const { client, url, needsExistenceCheck } = storageObject(key, options.area);
+  const signal = AbortSignal.any([
+    AbortSignal.timeout(30_000),
+    ...(options.abortSignal ? [options.abortSignal] : []),
+  ]);
+
+  if (needsExistenceCheck && !options.upsert) {
+    const existing = await fetchObject(client, url, { method: "HEAD", signal });
+
+    if (existing.status !== 404) throw new Error("Media storage write failed");
+  }
+
+  const response = await fetchObject(client, url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": contentType,
+      ...(options.upsert ? {} : { "If-None-Match": "*" }),
     },
-  );
+    body: Buffer.from(bytes),
+    signal,
+  });
+  await response.body?.cancel();
 
   if (!response.ok) throw new Error("Media storage write failed");
 }
 
-export async function deleteCatalogMedia(key: string, bucketOverride?: string) {
-  const { url, apiKey } = getCatalogStorageCredentials();
-  const bucket = getStorageBucket(bucketOverride);
-  const response = await fetch(`${url}/storage/v1/object/${bucket}`, {
+export async function deleteCatalogMedia(key: string, area?: StorageArea) {
+  const { client, url } = storageObject(key, area);
+  const response = await fetchObject(client, url, {
     method: "DELETE",
-    headers: authHeaders(apiKey, { "Content-Type": "application/json" }),
-    body: JSON.stringify({ prefixes: [key] }),
     signal: AbortSignal.timeout(30_000),
   });
+  await response.body?.cancel();
 
-  if (response.status === 404) return;
-
-  if (!response.ok) throw new Error("Media storage delete failed");
+  if (!response.ok && response.status !== 404)
+    throw new Error("Media storage delete failed");
 }
 
 export async function getCatalogMedia(
   key: string,
   range?: string,
   abortSignal?: AbortSignal,
-  bucketOverride?: string,
+  area?: StorageArea,
 ) {
-  const { url, apiKey } = getCatalogStorageCredentials();
-  const bucket = getStorageBucket(bucketOverride);
-  const response = await fetch(
-    `${url}/storage/v1/object/${objectPath(bucket, key)}`,
-    {
-      headers: authHeaders(apiKey, range ? { Range: range } : {}),
-      signal: abortSignal,
-    },
-  );
+  const { client, url } = storageObject(key, area);
+  const response = await fetchObject(client, url, {
+    headers: range ? { Range: range } : {},
+    signal: abortSignal,
+  });
 
-  if (response.status === 400) {
-    const error: unknown = await response.json().catch(() => null);
-
-    // Some Storage versions wrap NoSuchKey (404) in an HTTP 400 response.
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "NoSuchKey"
-    )
-      throw new CatalogMediaNotFound("Media object not found");
-  }
-
-  if (response.status === 404) {
+  if (!response.ok || !response.body) {
     await response.body?.cancel();
-    throw new CatalogMediaNotFound("Media object not found");
-  }
 
-  if (!response.ok || !response.body)
+    if (response.status === 404)
+      throw new CatalogMediaNotFound("Media object not found");
+
     throw new Error("Media storage read failed");
+  }
 
   return response.body;
 }

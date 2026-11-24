@@ -5,7 +5,10 @@ import { localWorkerEnvironment } from "./dev-background-jobs.mjs";
 const status = {
   DB_URL: "postgresql://fixture:fixture%2Fpassword@127.0.0.1:54322/postgres",
   API_URL: "http://127.0.0.1:54321",
-  SERVICE_ROLE_KEY: "fixture-local-key",
+  STORAGE_S3_URL: "http://127.0.0.1:54321/storage/v1/s3",
+  S3_PROTOCOL_ACCESS_KEY_ID: "fixture-access-key",
+  S3_PROTOCOL_ACCESS_KEY_SECRET: "fixture-secret-key",
+  S3_PROTOCOL_REGION: "local",
 };
 
 test("Edge worker uses local Supabase host connections and function model settings", () => {
@@ -13,7 +16,7 @@ test("Edge worker uses local Supabase host connections and function model settin
     {
       DB_HOST: "db",
       DB_PORT: "5432",
-      SUPABASE_URL: "http://kong:8000",
+      R2_ENDPOINT: "http://kong:8000/storage/v1/s3",
       AI_GATEWAY_API_KEY: "fixture-function-key",
       EMBEDDING_MODEL: "fixture/model",
     },
@@ -29,8 +32,14 @@ test("Edge worker uses local Supabase host connections and function model settin
   assert.equal(result.DB_NAME, "postgres");
   assert.equal(result.DB_USER, "fixture");
   assert.equal(result.DB_PASSWORD, "fixture/password");
-  assert.equal(result.SUPABASE_URL, status.API_URL);
-  assert.equal(result.SUPABASE_SERVICE_ROLE_KEY, status.SERVICE_ROLE_KEY);
+  assert.equal(result.R2_ENDPOINT, status.STORAGE_S3_URL);
+  assert.equal(result.R2_ACCESS_KEY_ID, status.S3_PROTOCOL_ACCESS_KEY_ID);
+  assert.equal(
+    result.R2_SECRET_ACCESS_KEY,
+    status.S3_PROTOCOL_ACCESS_KEY_SECRET,
+  );
+  assert.equal(result.R2_BUCKET_NAME, "event-management");
+  assert.equal(result.R2_DOCUMENTS_BUCKET_NAME, "supporting-documents");
   assert.equal(result.AI_GATEWAY_API_KEY, "fixture-function-key");
   assert.equal(result.EMBEDDING_MODEL, "fixture/model");
   assert.equal(result.PATH, "/fixture");
@@ -70,6 +79,6 @@ test("Edge development worker rejects remote or incomplete status", () => {
     ),
   );
   assert.throws(() =>
-    localWorkerEnvironment({}, { ...status, SERVICE_ROLE_KEY: "" }),
+    localWorkerEnvironment({}, { ...status, S3_PROTOCOL_ACCESS_KEY_ID: "" }),
   );
 });

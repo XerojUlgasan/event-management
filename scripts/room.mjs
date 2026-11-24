@@ -19,6 +19,7 @@ import {
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
+import { localObjectStorageEnvironment } from "./local-object-storage.mjs";
 
 const runner = fileURLToPath(import.meta.url);
 
@@ -161,11 +162,19 @@ export function runtimeEnvironment(
   )
     throw new Error("Supabase reported an API outside this room.");
 
-  const key = status.SERVICE_ROLE_KEY || status.SECRET_KEY;
+  const legacyKey = status.SERVICE_ROLE_KEY || status.SECRET_KEY;
+  const usesS3 = Object.hasOwn(defaults, "R2_ENDPOINT");
 
-  if (!key || !db.password)
+  if ((!usesS3 && !legacyKey) || !db.password)
     throw new Error("Supabase did not report local runtime credentials.");
 
+  const storage = usesS3
+    ? localObjectStorageEnvironment(status)
+    : {
+        SUPABASE_URL: api.origin,
+        SUPABASE_SERVICE_ROLE_KEY: legacyKey,
+        STORAGE_BUCKET: "event-management",
+      };
   const values = {};
 
   for (const name of [
@@ -182,6 +191,7 @@ export function runtimeEnvironment(
     ...cleanEnvironment(os),
     ...values,
     ...overrides,
+    ...storage,
     DB_HOST: "127.0.0.1",
     DB_PORT: String(plan.ports.db),
     DB_NAME: "postgres",
@@ -192,9 +202,6 @@ export function runtimeEnvironment(
     PUBLIC_API_URL: plan.apiUrl,
     API_PROXY_TARGET: "",
     NODE_ENV: "development",
-    SUPABASE_URL: api.origin,
-    SUPABASE_SERVICE_ROLE_KEY: key,
-    STORAGE_BUCKET: "event-management",
     FIREBASE_SERVICE_ACCOUNT_JSON: "",
     PUBLIC_FIREBASE_API_KEY: "",
     PUBLIC_FIREBASE_AUTH_DOMAIN: "",

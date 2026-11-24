@@ -205,16 +205,17 @@ async function read(response: Response, status: number): Promise<any> {
 }
 
 test("Realtime tokens are limited to the live session and requested receive scope", async (t) => {
+  const existingSupKey = process.env.SUP_JWT_KEY;
   const existingKey = process.env.REALTIME_JWT_SIGNING_JWK;
-  const existingSecret = process.env.REALTIME_JWT_SECRET;
   t.after(() => {
-    setTestConfig({ REALTIME_JWT_SIGNING_JWK: existingKey });
-
-    setTestConfig({ REALTIME_JWT_SECRET: existingSecret });
+    setTestConfig({
+      SUP_JWT_KEY: existingSupKey,
+      REALTIME_JWT_SIGNING_JWK: existingKey,
+    });
   });
   setTestConfig({
+    SUP_JWT_KEY: undefined,
     REALTIME_JWT_SIGNING_JWK: undefined,
-    REALTIME_JWT_SECRET: undefined,
   });
 
   const id = randomUUID();
@@ -271,7 +272,7 @@ test("Realtime tokens are limited to the live session and requested receive scop
   const kid = randomUUID();
   const pair = await generateKeyPair("ES256", { extractable: true });
   setTestConfig({
-    REALTIME_JWT_SIGNING_JWK: JSON.stringify({
+    SUP_JWT_KEY: JSON.stringify({
       ...(await exportJWK(pair.privateKey)),
       kid,
     }),

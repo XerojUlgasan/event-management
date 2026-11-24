@@ -4,8 +4,13 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  localEdgeS3Endpoint,
+  localObjectStorageEnvironment,
+} from "./local-object-storage.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
 const apiRoot = join(root, "apps/api");
 
 const functionEnvPath = join(root, "apps/supabase/.env.functions");
@@ -21,17 +26,23 @@ export function localWorkerEnvironment(functionEnv, status, parentEnv = {}) {
     !["postgres:", "postgresql:"].includes(database.protocol) ||
     !localHosts.includes(database.hostname) ||
     !["http:", "https:"].includes(api.protocol) ||
-    !localHosts.includes(api.hostname) ||
-    !status.SERVICE_ROLE_KEY
+    !localHosts.includes(api.hostname)
   ) {
     throw new Error(
       "Background development worker requires local Supabase status.",
     );
   }
 
+  const endpoint = functionEnv.R2_ENDPOINT?.trim();
+  const storage =
+    !endpoint || endpoint === localEdgeS3Endpoint
+      ? localObjectStorageEnvironment(status)
+      : {};
+
   return {
     ...parentEnv,
     ...functionEnv,
+    ...storage,
     DB_HOST: database.hostname === "[::1]" ? "::1" : database.hostname,
     DB_PORT: database.port || "5432",
     DB_NAME:
@@ -39,8 +50,6 @@ export function localWorkerEnvironment(functionEnv, status, parentEnv = {}) {
     DB_USER: functionEnv.DB_USER ?? decodeURIComponent(database.username),
     DB_PASSWORD:
       functionEnv.DB_PASSWORD ?? decodeURIComponent(database.password),
-    SUPABASE_URL: status.API_URL,
-    SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
     DOTENV_CONFIG_PATH: functionEnvPath,
   };
 }

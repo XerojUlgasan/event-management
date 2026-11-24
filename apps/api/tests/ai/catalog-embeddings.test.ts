@@ -53,11 +53,11 @@ const originalFetch = globalThis.fetch;
 const environmentNames = [
   "AI_GATEWAY_API_KEY",
   "EMBEDDING_MODEL",
-  "SUPABASE_URL",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "SUPABASE_SECRET_KEY",
-  "SUPABASE_SECRET_KEYS",
-  "STORAGE_BUCKET",
+  "R2_ENDPOINT",
+  "R2_SECRET_ACCESS_KEY",
+  "R2_ACCESS_KEY_ID",
+  "R2_REGION",
+  "R2_BUCKET_NAME",
 ] as const;
 
 const originalEnvironment = new Map(
@@ -464,9 +464,7 @@ before(async () => {
   storageServer = createServer((request, response) => {
     if (
       request.method !== "GET" ||
-      !request.url?.startsWith(
-        "/storage/v1/object/event-management/catalog-media/",
-      )
+      !request.url?.startsWith("/event-management/catalog-media/")
     ) {
       response.writeHead(404).end();
 
@@ -483,10 +481,11 @@ before(async () => {
   );
   const address = storageServer.address();
   assert.ok(address && typeof address !== "string");
-  setTestConfig({ SUPABASE_URL: `http://127.0.0.1:${address.port}` });
+  setTestConfig({ R2_ENDPOINT: `http://127.0.0.1:${address.port}` });
   setTestConfig({
-    SUPABASE_SERVICE_ROLE_KEY: "fixture-storage-key",
-    STORAGE_BUCKET: "event-management",
+    R2_ACCESS_KEY_ID: "fixture-access-key",
+    R2_SECRET_ACCESS_KEY: "fixture-storage-key",
+    R2_BUCKET_NAME: "event-management",
     AI_GATEWAY_API_KEY: "fixture-gateway-key",
     EMBEDDING_MODEL: embeddingModel,
   });
@@ -704,10 +703,10 @@ test("admin submits all pending owners without provider configuration and worker
     section("Photos", [mediaWidget(randomUUID(), media, { alt: "Fixture" })]),
   ]);
   const apiKey = process.env.AI_GATEWAY_API_KEY;
-  const storageKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const storageKey = process.env.R2_SECRET_ACCESS_KEY;
   setTestConfig({
     AI_GATEWAY_API_KEY: undefined,
-    SUPABASE_SERVICE_ROLE_KEY: undefined,
+    R2_SECRET_ACCESS_KEY: undefined,
   });
   setGatewayHandler();
   storageRequests = 0;
@@ -742,7 +741,7 @@ test("admin submits all pending owners without provider configuration and worker
     );
     setTestConfig({
       AI_GATEWAY_API_KEY: apiKey,
-      SUPABASE_SERVICE_ROLE_KEY: storageKey,
+      R2_SECRET_ACCESS_KEY: storageKey,
     });
 
     let releaseProvider = () => {};
@@ -809,7 +808,7 @@ test("admin submits all pending owners without provider configuration and worker
   } finally {
     setTestConfig({ AI_GATEWAY_API_KEY: apiKey });
 
-    setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: storageKey });
+    setTestConfig({ R2_SECRET_ACCESS_KEY: storageKey });
 
     await getDb()
       .deleteFrom("services")

@@ -47,28 +47,24 @@ test("filing preserves uploaded photo freshness across folders", () => {
   );
 });
 
-test("Storage missing-key detection accepts both response formats without hiding other failures", async () => {
+test("Storage missing-key detection preserves other S3 errors", async () => {
   const oldFetch = globalThis.fetch;
   const oldEnv = {
-    SUPABASE_URL: config.SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY: config.SUPABASE_SERVICE_ROLE_KEY,
-    STORAGE_BUCKET: config.STORAGE_BUCKET,
+    R2_ENDPOINT: config.R2_ENDPOINT,
+    R2_ACCESS_KEY_ID: config.R2_ACCESS_KEY_ID,
+    R2_SECRET_ACCESS_KEY: config.R2_SECRET_ACCESS_KEY,
+    R2_BUCKET_NAME: config.R2_BUCKET_NAME,
   };
-  config.SUPABASE_URL = "http://storage.invalid";
-  config.SUPABASE_SERVICE_ROLE_KEY = "synthetic-fixture";
-  config.STORAGE_BUCKET = "fixture-bucket";
+  config.R2_ENDPOINT = "http://storage.invalid";
+  config.R2_ACCESS_KEY_ID = "fixture-access-key";
+  config.R2_SECRET_ACCESS_KEY = "synthetic-fixture";
+  config.R2_BUCKET_NAME = "fixture-bucket";
 
   try {
-    for (const response of [
-      new Response(null, { status: 404 }),
-      Response.json({ code: "NoSuchKey", statusCode: "404" }, { status: 400 }),
-    ]) {
-      globalThis.fetch = async () => response;
-      await assert.rejects(getCatalogMedia("old-key"), CatalogMediaNotFound);
-    }
+    globalThis.fetch = async () => new Response(null, { status: 404 });
+    await assert.rejects(getCatalogMedia("old-key"), CatalogMediaNotFound);
 
-    globalThis.fetch = async () =>
-      Response.json({ code: "InvalidJWT" }, { status: 400 });
+    globalThis.fetch = async () => new Response(null, { status: 403 });
     await assert.rejects(
       getCatalogMedia("old-key"),
       (cause: unknown) =>

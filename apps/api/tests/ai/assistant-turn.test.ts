@@ -3478,14 +3478,16 @@ function mockPhotoBoundaries(
   } = {},
 ) {
   const settings = {
-    SUPABASE_URL: "http://storage.example.test",
-    SUPABASE_SERVICE_ROLE_KEY: "test-storage-only",
+    R2_ENDPOINT: "http://storage.example.test",
+    R2_ACCESS_KEY_ID: "fixture-access-key",
+    R2_SECRET_ACCESS_KEY: "test-storage-only",
     EMBEDDING_MODEL: "google/gemini-embedding-2",
   };
 
   const before = {
-    SUPABASE_URL: process.env.SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    R2_ENDPOINT: process.env.R2_ENDPOINT,
+    R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID,
+    R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
     EMBEDDING_MODEL: process.env.EMBEDDING_MODEL,
   };
 
@@ -3498,7 +3500,7 @@ function mockPhotoBoundaries(
     globalThis,
     "fetch",
     async (input: unknown, init: RequestInit) => {
-      if (String(input).startsWith(settings.SUPABASE_URL)) {
+      if (String(input).startsWith(settings.R2_ENDPOINT)) {
         const photo = photos.find(({ row }) =>
           String(input).endsWith(row.storage_key),
         );

@@ -10,7 +10,7 @@ import { seedSampleShowcases } from "../src/db/seed-showcases.js";
 import { LOCAL_PASSWORD } from "../src/db/seed/context.js";
 import { showcaseDto } from "../src/services/showcase/showcase-dto.js";
 import { config } from "../src/env.js";
-import { getCatalogStorageCredentials } from "../src/utils/catalog-media-storage.js";
+import { getCatalogStorage } from "../src/utils/catalog-media-storage.js";
 import { hashPassword } from "../src/utils/password.js";
 
 const fixtures = [
@@ -53,29 +53,26 @@ const fixtures = [
 ];
 
 test("showcase seed uploads ordered photos and preserves an edited fixture", async (t) => {
-  const storage = getCatalogStorageCredentials();
+  const storage = getCatalogStorage();
   assert.ok(
     config.DB_HOST &&
       ["localhost", "127.0.0.1", "::1"].includes(config.DB_HOST),
   );
   assert.ok(
-    ["localhost", "127.0.0.1", "[::1]"].includes(new URL(storage.url).hostname),
+    ["localhost", "127.0.0.1", "[::1]"].includes(
+      new URL(storage.endpoint).hostname,
+    ),
   );
 
   const suffix = randomUUID().replaceAll("-", "");
   const database = `em_showcase_seed_${suffix}`;
   const bucket = `showcase-seed-${suffix}`;
 
-  const bucketRequest = (path: string, method: string, body?: unknown) =>
-    fetch(`${storage.url}/storage/v1/bucket${path}`, {
+  const bucketRequest = (path: string, method: string) =>
+    storage.client.fetch(`${storage.endpoint}/${bucket}${path}`, {
       method,
-      headers: {
-        apikey: storage.apiKey,
-        Authorization: `Bearer ${storage.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(10_000),
+      redirect: "error",
     });
 
   const connection = {
@@ -120,21 +117,34 @@ test("showcase seed uploads ordered photos and preserves an edited fixture", asy
     await target.end();
   }
 
-  const created = await bucketRequest("", "POST", {
-    name: bucket,
-    public: false,
-  });
+  const created = await bucketRequest("", "PUT");
   assert.ok(created.ok, `Test bucket creation returned ${created.status}`);
   t.after(async () => {
-    const emptied = await bucketRequest(`/${bucket}/empty`, "POST");
-    assert.ok(emptied.ok, `Test bucket cleanup returned ${emptied.status}`);
-    const removed = await bucketRequest(`/${bucket}`, "DELETE");
+    const contents = await bucketRequest(
+      "?list-type=2&encoding-type=url",
+      "GET",
+    );
+    assert.ok(contents.ok, `Test bucket listing returned ${contents.status}`);
+
+    for (const [, key] of (await contents.text()).matchAll(
+      /<Key>([^<]+)<\/Key>/g,
+    )) {
+      const path = decodeURIComponent(key!)
+        .split("/")
+        .map(encodeURIComponent)
+        .join("/");
+      const deleted = await bucketRequest(`/${path}`, "DELETE");
+
+      assert.ok(deleted.ok, `Test object cleanup returned ${deleted.status}`);
+    }
+
+    const removed = await bucketRequest("", "DELETE");
     assert.ok(removed.ok, `Test bucket deletion returned ${removed.status}`);
   });
 
   setTestConfig({
     DB_NAME: database,
-    STORAGE_BUCKET: bucket,
+    R2_BUCKET_NAME: bucket,
   });
   const { db } = await import("../src/db/client.js");
   seedDb = db;

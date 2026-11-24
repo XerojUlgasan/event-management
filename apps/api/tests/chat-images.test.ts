@@ -71,9 +71,10 @@ before(async () => {
     AI_GATEWAY_API_KEY: "fixture-key",
     TEXT_MODEL: "fixture/text",
     VISION_MODEL: "fixture/vision",
-    SUPABASE_URL: "https://storage.invalid",
-    SUPABASE_SERVICE_ROLE_KEY: "fixture-key",
-    STORAGE_BUCKET: "test",
+    R2_ENDPOINT: "https://storage.invalid",
+    R2_ACCESS_KEY_ID: "fixture-access-key",
+    R2_SECRET_ACCESS_KEY: "fixture-key",
+    R2_BUCKET_NAME: "test",
   });
   const { Image } = await import("imagescript");
   bytes = await new Image(1, 1).fill(0x0000ffff).encodePNG();
@@ -124,11 +125,9 @@ before(async () => {
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
     assert.equal(url.hostname, "storage.invalid", "No external calls in tests");
-    const key = decodeURIComponent(
-      url.pathname.replace("/storage/v1/object/test/", ""),
-    );
+    const key = decodeURIComponent(url.pathname.replace("/test/", ""));
 
-    if (init?.method === "POST") {
+    if (init?.method === "PUT") {
       if (storageFailure) return new Response("unavailable", { status: 503 });
 
       objects.set(key, new Uint8Array(init.body as Buffer));
@@ -143,8 +142,7 @@ before(async () => {
     }
 
     if (init?.method === "DELETE") {
-      for (const prefix of JSON.parse(String(init.body)).prefixes)
-        objects.delete(prefix);
+      objects.delete(key);
 
       return new Response("{}", { status: 200 });
     }

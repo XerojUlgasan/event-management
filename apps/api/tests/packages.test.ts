@@ -22,7 +22,6 @@ let customerCookie: string;
 let storageServer: Server;
 let failStorageDeletes = false;
 let failStorageWrites = false;
-let missingStorageGetAs400 = false;
 
 let beforeStorageGet:
   { path: string; callback: () => Promise<void> } | undefined;
@@ -60,7 +59,7 @@ before(async () => {
   storageServer = createServer(async (req, res) => {
     const path = req.url!.split("?")[0]!;
 
-    if (req.method === "POST" || req.method === "PUT") {
+    if (req.method === "PUT") {
       const chunks: Buffer[] = [];
 
       for await (const chunk of req) chunks.push(Buffer.from(chunk));
@@ -72,11 +71,8 @@ before(async () => {
         return;
       }
 
-      if (
-        storedImages.has(path) &&
-        String(req.headers["x-upsert"]).toLowerCase() !== "true"
-      ) {
-        res.statusCode = 409;
+      if (storedImages.has(path) && req.headers["if-none-match"] === "*") {
+        res.statusCode = 412;
         res.end();
 
         return;
@@ -92,25 +88,7 @@ before(async () => {
         res.statusCode = 403;
         res.end();
       } else {
-        const chunks: Buffer[] = [];
-
-        for await (const chunk of req) chunks.push(Buffer.from(chunk));
-
-        const payload = Buffer.concat(chunks).toString();
-
-        if (payload) {
-          const prefixes =
-            (JSON.parse(payload) as { prefixes?: string[] }).prefixes ?? [];
-
-          for (const prefix of prefixes) {
-            const encoded = prefix
-              .split("/")
-              .map((segment) => encodeURIComponent(segment))
-              .join("/");
-
-            storedImages.delete(`${path}/${encoded}`);
-          }
-        } else storedImages.delete(path);
+        storedImages.delete(path);
 
         res.statusCode = 204;
         res.end();
@@ -125,14 +103,8 @@ before(async () => {
       const image = storedImages.get(path);
 
       if (!image) {
-        if (missingStorageGetAs400) {
-          res.statusCode = 400;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ code: "NoSuchKey", statusCode: "404" }));
-        } else {
-          res.statusCode = 404;
-          res.end();
-        }
+        res.statusCode = 404;
+        res.end();
       } else {
         res.setHeader("Content-Type", image.contentType);
         const range = req.headers.range?.match(/^bytes=(\d+)-(\d+)$/);
@@ -159,10 +131,11 @@ before(async () => {
   );
   const address = storageServer.address();
   assert.ok(address && typeof address !== "string");
-  setTestConfig({ SUPABASE_URL: `http://127.0.0.1:${address.port}` });
+  setTestConfig({ R2_ENDPOINT: `http://127.0.0.1:${address.port}` });
   setTestConfig({
-    SUPABASE_SERVICE_ROLE_KEY: "test",
-    STORAGE_BUCKET: "test",
+    R2_ACCESS_KEY_ID: "fixture-access-key",
+    R2_SECRET_ACCESS_KEY: "test",
+    R2_BUCKET_NAME: "test",
     DB_NAME: database,
   });
   ({ app } = await import("../src/app.js"));
@@ -1560,7 +1533,7 @@ async function uploadCanvas(
 }
 
 function storageObjectPath(key: string) {
-  return `/storage/v1/object/test/${key
+  return `/test/${key
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/")}`;
@@ -2172,18 +2145,11 @@ test("catalog media promotion retries failed copies and reads through relocation
         id: noSuchKeyPackage.id,
       }).then(() => undefined),
   };
-  let noSuchKeyRead: Response;
-  missingStorageGetAs400 = true;
-
-  try {
-    noSuchKeyRead = await app.request(noSuchKeyMedia.url);
-  } finally {
-    missingStorageGetAs400 = false;
-  }
+  const noSuchKeyRead = await app.request(noSuchKeyMedia.url);
 
   assert.equal(beforeStorageGet, undefined);
-  assert.equal(noSuchKeyRead!.status, 200);
-  assert.deepEqual(new Uint8Array(await noSuchKeyRead!.arrayBuffer()), png);
+  assert.equal(noSuchKeyRead.status, 200);
+  assert.deepEqual(new Uint8Array(await noSuchKeyRead.arrayBuffer()), png);
   assert.equal(
     (await mediaStorageRecord(noSuchKeyMedia.id)).storage_key,
     noSuchKeyDestinationKey,

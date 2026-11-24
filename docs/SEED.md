@@ -1,13 +1,13 @@
 # Database seed
 
-Start the local PostgreSQL database and Supabase Storage:
+Start the local PostgreSQL database and S3-compatible storage:
 
 ```sh
 pnpm db:up
 pnpm supabase:start
 ```
 
-Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env` or the command environment using the values from `pnpm supabase:status`. Set `STORAGE_BUCKET` to the existing private bucket. The local stack creates `event-management`, which is the value in the API environment example. Verify the database and Storage targets before seeding. Isolated `pnpm room` environments pass their own settings automatically.
+Configure `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and `R2_REGION` in `apps/api/.env` or the command environment from `STORAGE_S3_URL`, `S3_PROTOCOL_ACCESS_KEY_ID`, `S3_PROTOCOL_ACCESS_KEY_SECRET`, and `S3_PROTOCOL_REGION` reported by `pnpm supabase:status`. Set `R2_BUCKET_NAME=event-management` and `R2_DOCUMENTS_BUCKET_NAME=supporting-documents` for the local stack. Verify both targets before seeding. Isolated `pnpm room` environments supply these settings automatically.
 
 ```sh
 pnpm db:deploy
@@ -83,7 +83,7 @@ The focused integration suite creates a disposable local PostgreSQL database and
 pnpm --filter @event-management/api exec tsx --test tests/seed.test.ts tests/catalog-sample-photos-migration.test.ts
 ```
 
-For a real Storage check, point the command at a fresh disposable database and its isolated local Supabase Storage. With the matching Storage environment in place, run:
+For a real Storage check, point the command at a fresh disposable database and its isolated local S3 endpoint. With the matching Storage environment in place, run:
 
 ```sh
 DB_NAME=clemora_seed_check pnpm db:deploy

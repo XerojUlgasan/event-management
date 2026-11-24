@@ -6,19 +6,19 @@ import {
   putCatalogMedia,
 } from "../../utils/catalog-media-storage.js";
 
-const bucket = "supporting-documents";
+const area = "supporting-documents";
 
 export const documentSha256 = (bytes: Uint8Array | string) =>
   createHash("sha256").update(bytes).digest("hex");
 
 export const putSupportingDocument = (key: string, bytes: Uint8Array) =>
-  putCatalogMedia(key, bytes, "application/pdf", { bucket });
+  putCatalogMedia(key, bytes, "application/pdf", { area });
 
 export const deleteSupportingDocument = (key: string) =>
-  deleteCatalogMedia(key, bucket);
+  deleteCatalogMedia(key, area);
 
 export async function readSupportingDocument(key: string, signal: AbortSignal) {
-  const stream = await getCatalogMedia(key, undefined, signal, bucket);
+  const stream = await getCatalogMedia(key, undefined, signal, area);
   let size = 0;
 
   const bounded = stream.pipeThrough(

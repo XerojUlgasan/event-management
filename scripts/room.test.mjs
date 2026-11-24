@@ -92,6 +92,10 @@ function localStatus(plan) {
     DB_URL: `postgresql://postgres:local-password@127.0.0.1:${plan.ports.db}/postgres`,
     API_URL: `http://127.0.0.1:${plan.ports.supabase}`,
     SERVICE_ROLE_KEY: "local-service-key",
+    STORAGE_S3_URL: `http://127.0.0.1:${plan.ports.supabase}/storage/v1/s3`,
+    S3_PROTOCOL_ACCESS_KEY_ID: "local-s3-id",
+    S3_PROTOCOL_ACCESS_KEY_SECRET: "local-s3-secret",
+    S3_PROTOCOL_REGION: "local",
   };
 }
 
@@ -104,6 +108,7 @@ test("runtime targets use only CLI credentials at assigned room ports and explic
       SEED_RANDOM_SEED: "room-seed",
       AI_GATEWAY_API_KEY: "example-must-not-be-used",
       DB_PASSWORD: "example-password",
+      R2_ENDPOINT: "",
     },
     { AI_GATEWAY_API_KEY: "opt-in-key" },
     localStatus(plan),
@@ -117,8 +122,10 @@ test("runtime targets use only CLI credentials at assigned room ports and explic
   assert.equal(env.DB_PORT, String(plan.ports.db));
   assert.equal(env.DB_PASSWORD, "local-password");
   assert.equal(env.DB_NAME, "postgres");
-  assert.equal(env.SUPABASE_SERVICE_ROLE_KEY, "local-service-key");
-  assert.equal(env.STORAGE_BUCKET, "event-management");
+  assert.equal(env.R2_ENDPOINT, localStatus(plan).STORAGE_S3_URL);
+  assert.equal(env.R2_ACCESS_KEY_ID, "local-s3-id");
+  assert.equal(env.R2_BUCKET_NAME, "event-management");
+  assert.equal(env.R2_DOCUMENTS_BUCKET_NAME, "supporting-documents");
   assert.equal(env.PUBLIC_API_URL, plan.apiUrl);
   assert.equal(env.WEB_ORIGIN, plan.webUrl);
   assert.equal(env.API_PROXY_TARGET, "");

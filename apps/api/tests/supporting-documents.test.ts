@@ -105,8 +105,11 @@ before(async () => {
     );
 
   setTestConfig({
-    SUPABASE_URL: "http://storage.test",
-    SUPABASE_SERVICE_ROLE_KEY: "fixture-storage",
+    R2_ENDPOINT: "http://storage.test",
+    R2_ACCESS_KEY_ID: "fixture-access-key",
+    R2_SECRET_ACCESS_KEY: "fixture-storage",
+    R2_BUCKET_NAME: "fixture-bucket",
+    R2_DOCUMENTS_BUCKET_NAME: undefined,
     AI_GATEWAY_API_KEY: "fixture-embedding",
     EMBEDDING_MODEL: "google/gemini-embedding-2",
   });
@@ -116,26 +119,17 @@ before(async () => {
     );
 
     if (url.hostname === "storage.test") {
-      if (init?.method === "DELETE") {
-        assert.equal(url.pathname, "/storage/v1/object/supporting-documents");
+      assert.match(url.pathname, /^\/fixture-bucket\/supporting-documents\//);
 
+      if (init?.method === "DELETE") {
         if (failStorageDelete) return new Response(null, { status: 502 });
 
-        const { prefixes } = JSON.parse(String(init.body)) as {
-          prefixes: string[];
-        };
+        objects.delete(url.pathname);
 
-        for (const key of prefixes) objects.delete(`${url.pathname}/${key}`);
-
-        return Response.json([]);
+        return new Response(null, { status: 204 });
       }
 
-      assert.match(
-        url.pathname,
-        /^\/storage\/v1\/object\/supporting-documents\//,
-      );
-
-      if (init?.method === "POST") {
+      if (init?.method === "PUT") {
         objects.set(url.pathname, Uint8Array.from(init.body as Uint8Array));
 
         return new Response(null, { status: 201 });

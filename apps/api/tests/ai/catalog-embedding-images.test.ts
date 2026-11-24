@@ -9,21 +9,24 @@ import type { MediaAssets } from "../../src/db/types.js";
 import { readCatalogEmbeddingImage } from "../../src/services/ai/retrieval/read-catalog-embedding-image.js";
 
 const originalFetch = globalThis.fetch;
-const oldUrl = config.SUPABASE_URL;
-const oldKey = config.SUPABASE_SERVICE_ROLE_KEY;
-const oldBucket = config.STORAGE_BUCKET;
+const oldUrl = config.R2_ENDPOINT;
+const oldAccessKey = config.R2_ACCESS_KEY_ID;
+const oldKey = config.R2_SECRET_ACCESS_KEY;
+const oldBucket = config.R2_BUCKET_NAME;
 
-config.SUPABASE_URL = "https://storage.invalid";
-config.SUPABASE_SERVICE_ROLE_KEY = "fixture-key";
-config.STORAGE_BUCKET = "fixture-bucket";
+config.R2_ENDPOINT = "https://storage.invalid";
+config.R2_ACCESS_KEY_ID = "fixture-access-key";
+config.R2_SECRET_ACCESS_KEY = "fixture-key";
+config.R2_BUCKET_NAME = "fixture-bucket";
 
 after(() => {
   globalThis.fetch = originalFetch;
 
   Object.assign(config, {
-    SUPABASE_URL: oldUrl,
-    SUPABASE_SERVICE_ROLE_KEY: oldKey,
-    STORAGE_BUCKET: oldBucket,
+    R2_ENDPOINT: oldUrl,
+    R2_ACCESS_KEY_ID: oldAccessKey,
+    R2_SECRET_ACCESS_KEY: oldKey,
+    R2_BUCKET_NAME: oldBucket,
   });
 });
 
@@ -50,7 +53,7 @@ function serve(bytes: Uint8Array) {
   globalThis.fetch = async (input) => {
     assert.equal(
       String(input),
-      "https://storage.invalid/storage/v1/object/fixture-bucket/catalog-media/fixture-id",
+      "https://storage.invalid/fixture-bucket/catalog-media/fixture-id",
     );
 
     return new Response(
@@ -139,6 +142,7 @@ test("cancels an upload read and forwards the signal to Storage", async () => {
   const controller = new AbortController();
   globalThis.fetch = async (_input, init) => {
     assert.equal(init?.signal, controller.signal);
+    init?.signal?.throwIfAborted();
 
     return await new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener(

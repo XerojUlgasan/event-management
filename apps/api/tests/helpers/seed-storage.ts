@@ -7,7 +7,7 @@ export async function startSeedStorage() {
   let writes = 0;
 
   const server = createServer(async (req, res) => {
-    const prefix = `/storage/v1/object/${bucket}/`;
+    const prefix = `/${bucket}/`;
 
     if (!req.url?.startsWith(prefix)) {
       res.writeHead(404).end();
@@ -17,15 +17,15 @@ export async function startSeedStorage() {
 
     const key = decodeURIComponent(req.url.slice(prefix.length));
 
-    if (req.method === "POST") {
+    if (req.method === "PUT") {
       const chunks: Buffer[] = [];
 
       for await (const chunk of req) chunks.push(chunk);
 
       writes++;
 
-      if (objects.has(key) && req.headers["x-upsert"] !== "true") {
-        res.writeHead(409).end();
+      if (objects.has(key) && req.headers["if-none-match"] === "*") {
+        res.writeHead(412).end();
 
         return;
       }
@@ -63,9 +63,10 @@ export async function startSeedStorage() {
       return writes;
     },
     env: {
-      SUPABASE_URL: `http://127.0.0.1:${address.port}`,
-      SUPABASE_SERVICE_ROLE_KEY: "local-seed-test",
-      STORAGE_BUCKET: bucket,
+      R2_ENDPOINT: `http://127.0.0.1:${address.port}`,
+      R2_ACCESS_KEY_ID: "fixture-access-key",
+      R2_SECRET_ACCESS_KEY: "local-seed-test",
+      R2_BUCKET_NAME: bucket,
     },
     close: () =>
       new Promise<void>((resolve, reject) =>
