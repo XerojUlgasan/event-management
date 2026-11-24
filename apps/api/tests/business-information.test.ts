@@ -15,6 +15,7 @@ import {
   type BusinessInformationResponse,
 } from "@event-management/contracts/business-information";
 import { Pool } from "pg";
+import { seedBusinessInformation } from "../src/db/seed/business-information.js";
 import { matchRouteFamily } from "../src/edge/match-route.js";
 import {
   buildMaximalValidBusinessInformationSaveBody,
@@ -665,4 +666,125 @@ test("migration keeps singleton row, RLS, and direct client grants closed", asyn
     );
     assert.equal(privileges.rows[0]?.has_table_privilege, false, rolname);
   }
+});
+
+for (const state of ["migration placeholder", "missing row"] as const) {
+  test(`seed fills a ${state} once and serves the persisted profile`, async () => {
+    await pool.query("DELETE FROM business_information WHERE id = 1");
+
+    if (state === "migration placeholder")
+      await pool.query("INSERT INTO business_information (id) VALUES (1)");
+
+    const blank = await read(
+      await request(app, adminPath, "GET", undefined, adminCookie),
+    );
+
+    assert.equal(await db.transaction().execute(seedBusinessInformation), true);
+
+    const row = await db
+      .selectFrom("business_information")
+      .selectAll()
+      .executeTakeFirstOrThrow();
+    const published = await read(await request(app, publicPath));
+    const { about, contact, location, hours, inquiries, policies, faqs } =
+      published.information;
+
+    assert.equal(row.id, 1);
+    assert.deepEqual(row.information, published.information);
+    assert.equal(row.updated_at.toISOString(), published.updatedAt);
+    assert.notEqual(published.updatedAt, blank.updatedAt);
+    assert.equal(about.name, "Styled by AMAC");
+    assert.match(about.introduction, /demo profile uses illustrative/);
+    assert.ok(contact.phone);
+    assert.doesNotMatch(contact.phone, /\d/);
+    assert.match(contact.email, /\.example\.test$/);
+
+    for (const url of [contact.facebook, contact.instagram])
+      assert.match(new URL(url).hostname, /\.example\.test$/);
+
+    assert.equal(
+      new URL(location.mapUrl).searchParams.get("query"),
+      "Quezon City",
+    );
+    assert.match(location.address, /Quezon City, Metro Manila, Philippines/);
+    assert.match(location.serviceAreas, /Metro Manila/);
+    assert.equal(hours.timeZone, "Asia/Manila");
+    assert.match(hours.supportHours, /Philippine time/);
+    assert.match(inquiries.inquiryProcess, /booking request/);
+    assert.match(inquiries.bookingConfirmation, /do not confirm a booking/);
+    assert.match(policies.requirementChanges, /booking conversation/);
+    assert.ok(
+      faqs.some(
+        ({ question, answer }) =>
+          /reserve/.test(question) && /^No\./.test(answer),
+      ),
+    );
+
+    assert.deepEqual(await read(await request(edge, publicPath)), published);
+    assert.deepEqual(
+      await read(await request(edge, adminPath, "GET", undefined, adminCookie)),
+      published,
+    );
+    assert.equal(
+      (
+        await request(
+          app,
+          adminPath,
+          "PUT",
+          {
+            information: sampleInformation(),
+            expectedUpdatedAt: blank.updatedAt,
+          },
+          adminCookie,
+        )
+      ).status,
+      409,
+    );
+    assert.equal(
+      await db.transaction().execute(seedBusinessInformation),
+      false,
+    );
+    assert.deepEqual(await read(await request(app, publicPath)), published);
+  });
+}
+
+test("seed preserves administrator edits including a deliberately cleared profile", async () => {
+  const editedProfile = sampleInformation();
+  const blankProfile = emptyBusinessInformation();
+
+  for (const information of [editedProfile, blankProfile]) {
+    const current = await read(
+      await request(app, adminPath, "GET", undefined, adminCookie),
+    );
+    const saved = await read(
+      await request(
+        app,
+        adminPath,
+        "PUT",
+        { information, expectedUpdatedAt: current.updatedAt },
+        adminCookie,
+      ),
+    );
+
+    assert.equal(
+      await db.transaction().execute(seedBusinessInformation),
+      false,
+    );
+    assert.deepEqual(await read(await request(edge, publicPath)), saved);
+  }
+
+  const legacyProfile = {
+    inquiries: { humanContact: "Ask for the coordinator." },
+  };
+  await pool.query(
+    "UPDATE business_information SET information = $1 WHERE id = 1",
+    [JSON.stringify(legacyProfile)],
+  );
+
+  assert.equal(await db.transaction().execute(seedBusinessInformation), false);
+  const persisted = await db
+    .selectFrom("business_information")
+    .select("information")
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(persisted.information, legacyProfile);
 });
