@@ -1432,6 +1432,7 @@ textarea.ui-control {
 /* Shared author and public catalog canvas. The container, not the viewport,
    determines when the authored grid stacks. */
 .ui-catalog-canvas {
+  --catalog-frame-width: 1220px;
   container: catalog-canvas / inline-size;
   width: 100%;
   min-width: 0;
@@ -1443,21 +1444,30 @@ textarea.ui-control {
 .ui-catalog-frame {
   box-sizing: border-box;
   width: 100%;
+  max-width: var(--catalog-frame-width);
   margin: 0 auto;
-  padding: 30px 0 60px;
+  padding: clamp(24px, 4cqi, 52px) clamp(20px, 4cqi, 48px)
+    clamp(40px, 6cqi, 80px);
 }
 .ui-catalog-section {
-  margin: 30px 0;
+  margin-block-start: clamp(24px, 4cqi, 52px);
+  padding-block-start: clamp(20px, 3cqi, 36px);
+  border-block-start: 1px solid var(--border-subtle);
 }
 .ui-catalog-section > h2 {
-  font: 28px var(--font-serif);
+  margin: 0 0 clamp(16px, 2.3cqi, 28px);
+  font: 500 clamp(24px, 3.25cqi, 38px)/1.17 var(--font-serif);
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 .ui-catalog-grid {
+  --catalog-grid-width: min(100cqi, var(--catalog-frame-width));
+  --catalog-reading-gap: clamp(16px, 2.5cqi, 32px);
   display: grid;
   grid-template-columns: repeat(var(--catalog-columns), minmax(0, 1fr));
-  grid-auto-rows: var(--catalog-row-height);
-  gap: var(--catalog-gap);
-  padding: var(--catalog-padding);
+  column-gap: clamp(2px, 1.4cqi, 18px);
+  align-items: start;
 }
 .ui-catalog-guides {
   --catalog-guide-ink: color-mix(
@@ -1555,6 +1565,9 @@ textarea.ui-control {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+.ui-catalog-widget-content:is(figure) {
+  margin: 0;
 }
 .ui-catalog-photo img,
 .ui-catalog-video video {
@@ -1662,8 +1675,159 @@ textarea.ui-control {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
+/* Intrinsic presentation for published details and full previews. */
+.ui-catalog-grid > .ui-catalog-widget {
+  --catalog-media-height: calc(
+    var(--catalog-widget-h) * (var(--catalog-row-height) + var(--catalog-gap)) -
+      var(--catalog-gap)
+  );
+  overflow: visible;
+  margin-block-end: var(--catalog-reading-gap);
+}
+.ui-catalog-grid > .ui-catalog-widget > .ui-catalog-widget-content {
+  height: auto;
+  padding: 0;
+  overflow: visible;
+}
+.ui-catalog-grid .ui-catalog-caption {
+  max-height: none;
+  margin: 8px 0 0;
+  overflow: visible;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+.ui-catalog-grid :is(.ui-catalog-photo img, .ui-catalog-video video) {
+  flex: none;
+  height: var(--catalog-media-height);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+}
+.ui-catalog-grid .ui-catalog-video video {
+  min-height: 4rem;
+}
+.ui-catalog-grid .ui-catalog-empty {
+  min-height: 4rem;
+  padding: 8px min(8px, 5%);
+  border-radius: var(--radius-control);
+  overflow-wrap: anywhere;
+}
+.ui-catalog-grid .ui-catalog-reference-card {
+  flex-flow: row wrap;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+}
+.ui-catalog-grid .ui-catalog-reference-card > .ui-catalog-thumbnail {
+  width: auto;
+  flex: 1 1 9rem;
+  height: auto;
+  min-height: 8rem;
+  background: var(--surface-subtle);
+}
+.ui-catalog-grid .ui-catalog-reference-details {
+  flex: 2 1 12rem;
+  min-width: 0;
+  gap: 8px;
+  padding: clamp(12px, 2cqi, 24px) min(5%, 24px);
+  overflow: visible;
+}
+.ui-catalog-grid .ui-catalog-reference-name {
+  font: 500 1.25rem/1.25 var(--font-serif);
+}
+.ui-catalog-grid .ui-catalog-reference-description {
+  overflow: visible;
+}
+.ui-catalog-grid .ui-catalog-reference-link {
+  margin-top: 4px;
+}
+.ui-catalog-grid .ui-catalog-reference-card > .ui-catalog-caption {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 8px min(5%, 24px);
+  border-block-start: 1px solid var(--border-subtle);
+  background: var(--surface-subtle);
+}
+.ui-catalog-grid .ui-catalog-reference-action:focus-visible {
+  outline-offset: -2px;
+}
+
+.ui-catalog-grid .ui-catalog-markdown .wmde-markdown {
+  max-width: 68ch;
+  overflow: visible;
+  font-size: clamp(0.9375rem, 1.32cqi, 1.0625rem);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.ui-catalog-grid .ui-catalog-markdown .wmde-markdown > :last-child {
+  margin-block-end: 0;
+}
+.ui-catalog-grid .ui-catalog-markdown :is(h1, h2, h3, h4, h5, h6) {
+  margin-block: 1.25em 0.5em;
+  padding: 0;
+  border: 0;
+  font: 500 1.25em/1.25 var(--font-serif);
+  letter-spacing: -0.015em;
+}
+.ui-catalog-grid .ui-catalog-markdown :is(h1, h2) {
+  font-size: 1.45em;
+}
+.ui-catalog-grid .ui-catalog-markdown .wmde-markdown > :first-child {
+  margin-block-start: 0;
+}
+.ui-catalog-grid .ui-catalog-markdown :is(ul, ol) {
+  padding-inline-start: min(1.4em, 25%);
+}
+.ui-catalog-grid .ui-catalog-markdown ul {
+  list-style-type: disc;
+}
+.ui-catalog-grid .ui-catalog-markdown ol {
+  list-style-type: decimal;
+}
+.ui-catalog-grid .ui-catalog-markdown li::marker {
+  color: var(--brand-taupe-text);
+}
+.ui-catalog-grid .ui-catalog-markdown blockquote {
+  padding: 0.75em min(1em, 5%);
+  border-inline-start: 1px solid var(--brand-taupe-text);
+  border-left-width: 1px;
+  background: var(--surface-warm);
+  color: var(--text-primary);
+}
+.ui-catalog-grid .ui-catalog-markdown a {
+  color: var(--brand-taupe-text);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+.ui-catalog-grid .ui-catalog-markdown :is(a, pre, table):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ui-catalog-grid .ui-catalog-markdown .wmde-markdown :is(table, pre) {
+  overflow: auto;
+}
+.ui-catalog-grid .ui-catalog-markdown table {
+  font-size: 0.9em;
+}
+.ui-catalog-grid .ui-catalog-markdown table :is(th, td) {
+  padding: 0.5em 0.7em;
+  border-color: var(--border-default);
+  overflow-wrap: break-word;
+  vertical-align: top;
+}
+.ui-catalog-grid
+  .ui-catalog-markdown
+  table
+  :is(thead tr, tbody tr:nth-child(even)) {
+  background: var(--surface-muted);
+}
+.ui-catalog-grid .ui-catalog-markdown pre {
+  background: var(--surface-muted);
+}
+.ui-catalog-grid .ui-catalog-markdown .wmde-markdown pre > code {
+  max-width: none;
+  overflow: visible;
+}
 @container catalog-canvas (width < 580px) {
-  .ui-catalog-grid,
   .ui-catalog-ruler,
   .ui-catalog-guides {
     --catalog-grid-reference: var(--catalog-stacked-reference);
@@ -1671,14 +1835,16 @@ textarea.ui-control {
   .ui-catalog-grid {
     display: flex;
     flex-direction: column;
+    gap: var(--catalog-reading-gap);
   }
-  .ui-catalog-widget {
-    width: 100%;
-    height: calc(
-      var(--catalog-widget-h, 5) *
-        (var(--catalog-row-height) + var(--catalog-gap)) - var(--catalog-gap)
+  .ui-catalog-grid > .ui-catalog-widget {
+    --catalog-media-height: min(
+      calc(var(--catalog-widget-h) * 3.25rem),
+      60cqi,
+      19rem
     );
-    flex: none;
+    width: 100%;
+    margin: 0;
   }
 }
 
