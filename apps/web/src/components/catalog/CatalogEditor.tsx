@@ -64,7 +64,8 @@ const newSection = newCatalogSection;
 
 const NEW_WIDGET_WIDTH = CATALOG_COLUMNS / 2;
 const NEW_WIDGET_HEIGHT = 5;
-const MIN_WIDGET_WIDTH = CATALOG_COLUMNS / 4;
+const MIN_WIDGET_WIDTH = 3;
+const MIN_WIDGET_HEIGHT = 2;
 const MAX_GRID_ROWS = MAX_CATALOG_WIDGET_Y + MAX_CATALOG_WIDGET_ROWS;
 
 const widget = (type: PaletteWidget, x: number, y: number): CatalogWidget => ({
@@ -694,7 +695,7 @@ export function CatalogEditor<T extends CanvasContent>({
       next.y < 0 ||
       next.y > MAX_CATALOG_WIDGET_Y ||
       next.w < Math.min(MIN_WIDGET_WIDTH, current.w) ||
-      next.h < Math.min(4, current.h) ||
+      next.h < Math.min(MIN_WIDGET_HEIGHT, current.h) ||
       next.h > MAX_CATALOG_WIDGET_ROWS ||
       next.x + next.w > CATALOG_COLUMNS
     )
@@ -1234,7 +1235,7 @@ export function CatalogEditor<T extends CanvasContent>({
                                   h: w.h,
                                   minW: CATALOG_COLUMNS,
                                   maxW: CATALOG_COLUMNS,
-                                  minH: Math.min(4, w.h),
+                                  minH: Math.min(MIN_WIDGET_HEIGHT, w.h),
                                   maxH: MAX_CATALOG_WIDGET_ROWS,
                                 }))
                             : section.widgets.map((w) => ({
@@ -1244,7 +1245,7 @@ export function CatalogEditor<T extends CanvasContent>({
                                 w: w.w,
                                 h: w.h,
                                 minW: Math.min(MIN_WIDGET_WIDTH, w.w),
-                                minH: Math.min(4, w.h),
+                                minH: Math.min(MIN_WIDGET_HEIGHT, w.h),
                                 maxH: MAX_CATALOG_WIDGET_ROWS,
                               }))
                         }

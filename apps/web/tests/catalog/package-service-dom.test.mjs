@@ -519,6 +519,79 @@ test("catalog editor does not show private add-on controls", async () => {
   assert.doesNotMatch(document.body.textContent, /Add-on services/);
 });
 
+test("catalog editor keyboard resize stops at three columns and two rows", async (t) => {
+  t.mock.getter(window.HTMLElement.prototype, "clientWidth", () => 950);
+  t.mock.getter(window.HTMLElement.prototype, "offsetWidth", () => 950);
+
+  let saved;
+  await render(PackageEditor, {
+    initial: packageItem,
+    onClose: () => {},
+    onSaved: () => {},
+    saveCustom: async (content) => {
+      saved = content;
+    },
+  });
+
+  const handle = document.querySelector(".pe-widget-move");
+  assert.ok(handle);
+
+  // The legacy 12-column section opens with a 12×5 widget on the 24-column grid.
+  for (const key of [
+    ...Array(10).fill("ArrowLeft"),
+    ...Array(4).fill("ArrowUp"),
+  ]) {
+    await act(async () =>
+      handle.dispatchEvent(
+        new window.KeyboardEvent("keydown", {
+          key,
+          shiftKey: true,
+          bubbles: true,
+        }),
+      ),
+    );
+  }
+
+  await click("Save private package");
+  const { w, h } = saved.sections[0].widgets[0];
+  assert.deepEqual({ w, h }, { w: 3, h: 2 });
+});
+
+test("catalog editor can move and save a legacy widget below the resize minimum", async (t) => {
+  t.mock.getter(window.HTMLElement.prototype, "clientWidth", () => 950);
+  t.mock.getter(window.HTMLElement.prototype, "offsetWidth", () => 950);
+
+  let saved;
+  await render(PackageEditor, {
+    initial: {
+      ...packageItem,
+      sections: [
+        {
+          ...packageItem.sections[0],
+          widgets: [{ ...widget, x: 1, w: 1, h: 1 }],
+        },
+      ],
+    },
+    onClose: () => {},
+    onSaved: () => {},
+    saveCustom: async (content) => {
+      saved = content;
+    },
+  });
+
+  const handle = document.querySelector(".pe-widget-move");
+  assert.ok(handle);
+  await act(async () =>
+    handle.dispatchEvent(
+      new window.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+    ),
+  );
+
+  await click("Save private package");
+  const { x, w, h } = saved.sections[0].widgets[0];
+  assert.deepEqual({ x, w, h }, { x: 3, w: 2, h: 1 });
+});
+
 test("the private package palette adds widgets without a section dropdown", async () => {
   await render(PackageEditor, {
     initial: {
