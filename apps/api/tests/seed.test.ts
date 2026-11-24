@@ -413,6 +413,22 @@ test("seed creates demo users and conversations while preserving unrelated data 
     assert.equal(sections.length, stored.length);
     assert.ok(sections.length >= 2);
     assertNoWidgetOverlaps(sections);
+
+    if (page.index % 5 === 3) {
+      const [lead, intro] = stored[0].widgets;
+      assert.equal(
+        lead.type,
+        "photo",
+        `${record.name} opens with its lead photo`,
+      );
+      assert.equal(lead.y, 0);
+      assert.equal(intro.type, "markdown");
+      assert.ok(
+        lead.x + lead.w <= intro.x,
+        `${record.name} pairs its intro beside the lead photo`,
+      );
+    }
+
     const sourceMarkdown = assertSubstantialEditorial(sections, record.name);
     layoutSignatures.add(
       JSON.stringify(
