@@ -12,12 +12,15 @@ import type {
   QuotationPreparation,
 } from "@event-management/contracts/quotations";
 import type { CatalogRecommendation } from "@event-management/contracts/messages";
+import { agentSettingsResponseSchema } from "@event-management/contracts/ai-agent-settings";
 import {
   customerMessageResultSchema,
   threadSchema,
   conversationsSchema,
 } from "../../src/controllers/messages/schemas.js";
 import { hashSessionToken } from "../../src/utils/session.js";
+import { getAgentSettingsData } from "../../src/data/ai-agent-settings/get-agent-settings.js";
+import { seedAgentSettings } from "../../src/db/seed/agent-settings.js";
 import { saveCatalogKnowledgeEmbeddingData } from "../../src/data/ai/save-catalog-knowledge-embedding.js";
 import { startToolCallData } from "../../src/data/ai/start-tool-call.js";
 import { catalogKnowledgeDigest } from "../../src/services/ai/catalog-knowledge-hash.js";
@@ -651,6 +654,123 @@ test("duration choices are repaired for the actual question and usable localized
       ).json(),
     );
     assert.deepEqual(thread.messages.at(-1)?.suggestedReplies, labels);
+  }
+});
+
+test("seed agent settings fills the migration default once and reaches the customer model", async () => {
+  const original = await getAgentSettingsData(db);
+
+  try {
+    await Promise.all([
+      db.transaction().execute(seedAgentSettings),
+      db.transaction().execute(seedAgentSettings),
+    ]);
+    const seeded = await getAgentSettingsData(db);
+    const guidance = seeded.additional_instructions;
+
+    assert.equal(seeded.revision, original.revision + 1);
+    assert.match(guidance, /warm welcome.*Default to English/);
+    assert.match(guidance, /use or request another language, match it/);
+    assert.match(guidance, /Review the tools available for this turn/);
+    assert.match(
+      guidance,
+      /browsing without criteria, use attachCatalogBrowse/,
+    );
+    assert.match(
+      guidance,
+      /verify current public options and use attachCatalogRecommendations/,
+    );
+    assert.match(guidance, /as many relevant tool calls as needed/);
+    assert.match(guidance, /booking review and consent/);
+    assert.match(guidance, /verified facts and outcomes confirmed/);
+
+    await db.transaction().execute(seedAgentSettings);
+    assert.deepEqual(await getAgentSettingsData(db), seeded);
+
+    useReply("Welcome! How can I help with your event?");
+    const result = await send(await conversation(), "Hello");
+    assert.ok(result.assistantMessage);
+
+    const turn = model.doGenerateCalls[0];
+
+    const system = turn.prompt.find((message) => message.role === "system");
+
+    assert.ok(system?.content.includes(JSON.stringify(guidance)));
+
+    const toolNames = turn.tools?.map(({ name }) => name) ?? [];
+
+    for (const name of [
+      "attachCatalogBrowse",
+      "attachCatalogRecommendations",
+      "searchPublicCatalog",
+      "getPublicCatalogItem",
+    ])
+      assert.ok(toolNames.includes(name), name);
+  } finally {
+    await db
+      .updateTable("ai_agent_settings")
+      .set(original)
+      .where("id", "=", 1)
+      .execute();
+  }
+});
+
+test("seed agent settings preserves published admin settings even with blank guidance", async () => {
+  const original = await getAgentSettingsData(db);
+  const path = "/admin/ai/agent-settings";
+
+  try {
+    const initial = agentSettingsResponseSchema.parse(
+      await (await call(path, team.cookie)).json(),
+    );
+    const response = await app.request(`/v1${path}`, {
+      method: "PUT",
+      headers: { Cookie: team.cookie, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        settings: {
+          ...initial.settings,
+          displayName: "Room Assistant",
+          greeting: "Welcome to our event desk.",
+          personality: "professional",
+          additionalInstructions: "",
+          allowBusinessInformation: false,
+          allowPublicCatalog: false,
+        },
+        expectedRevision: initial.revision,
+      }),
+    });
+    assert.equal(response.status, 200);
+    const published = agentSettingsResponseSchema.parse(await response.json());
+    assert.equal(published.revision, initial.revision + 1);
+
+    await db.transaction().execute(seedAgentSettings);
+    const current = agentSettingsResponseSchema.parse(
+      await (await call(path, team.cookie)).json(),
+    );
+    assert.deepEqual(current, published);
+  } finally {
+    await db
+      .updateTable("ai_agent_settings")
+      .set(original)
+      .where("id", "=", 1)
+      .execute();
+  }
+});
+
+test("seed agent settings initializes a missing singleton", async () => {
+  const transaction = await db.startTransaction().execute();
+
+  try {
+    await transaction
+      .deleteFrom("ai_agent_settings")
+      .where("id", "=", 1)
+      .execute();
+    await seedAgentSettings(transaction);
+    const seeded = await getAgentSettingsData(transaction);
+    assert.equal(seeded.revision, 1);
+    assert.match(seeded.additional_instructions, /Default to English/);
+  } finally {
+    await transaction.rollback().execute();
   }
 });
 
