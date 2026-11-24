@@ -1,4 +1,4 @@
-import { env } from "../utils/env.js";
+import { config } from "../env.js";
 import { createHash } from "node:crypto";
 import type { Transaction } from "kysely";
 import type { DB } from "./types.js";
@@ -19,7 +19,7 @@ function seedId(key: string) {
 }
 
 function seedClock() {
-  const value = env.SEED_CLOCK;
+  const value = config.SEED_CLOCK;
 
   if (!value) return new Date();
 

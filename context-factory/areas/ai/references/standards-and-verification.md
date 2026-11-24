@@ -39,7 +39,7 @@ For pagination context, reuse only validated inputs and a cursor from a successf
 
 ## Execution and model configuration
 
-Read the installed `ai` package's version-matched `docs/` and `src/` before changing SDK use. Inspect [package.json](../../../../apps/api/package.json), [models.ts](../../../../apps/api/src/services/ai/models.ts), and [env.ts](../../../../apps/api/src/utils/env.ts); validate optional configuration on use so unrelated routes still load. When introducing/changing a model, verify its exact ID and capabilities in the live Gateway catalog and honor the user's selection.
+Read the installed `ai` package's version-matched `docs/` and `src/` before changing SDK use. Inspect [package.json](../../../../apps/api/package.json), [models.ts](../../../../apps/api/src/services/ai/models.ts), and [env.ts](../../../../apps/api/src/env.ts); validate optional configuration on use so unrelated routes still load. When introducing/changing a model, verify its exact ID and capabilities in the live Gateway catalog and honor the user's selection.
 
 Bound rendered history, results, generated tokens, and elapsed time. Forward cancellation to model and tool operations. The model chooses the calls needed for a reply. Reserve time and output tokens for the answer and reject oversized provider batches before execution. A successful handoff commits its own acknowledgement and stops the turn. The [entry](../../../../apps/api/src/services/ai/run-assistant-turn.ts) owns the deadline. The [agent](../../../../apps/api/src/services/ai/agents/create-customer-service-agent.ts) enforces the shared output budget and per-batch limit.
 

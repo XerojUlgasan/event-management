@@ -11,7 +11,7 @@ Inspect the affected route, service, data query, tests, and callers for the curr
 
 ## Environment configuration
 
-[`src/utils/env.ts`](../../../../apps/api/src/utils/env.ts) owns typed environment reads, defaults, and configuration parsing for Node, Edge, Prisma, seeds, and the local cleanup script. Consumers import `env`; retain existing initialization timing when choosing when to read its getters. Optional Firebase and Storage settings are checked when used. Keep dotenv loading at the existing entry points; the Edge build replaces `dotenv/config` with an empty module. `pnpm check:env` detects raw env reads outside designated app owners, excluding tests and generated bundles.
+[`src/env.ts`](../../../../apps/api/src/env.ts) exports `config` and owns environment reads, defaults, and parsing for Node, Edge, Prisma, and seeds. Read getters at the point where each setting is needed to preserve initialization timing. Optional Firebase, Storage, and AI settings are checked when used. Node entry points load dotenv. Supabase injects the Edge environment, and the Edge build replaces `dotenv/config` with an empty module. `pnpm check:env` checks direct environment reads in app source, excluding tests and generated bundles.
 
 ## Cross-domain safeguards
 

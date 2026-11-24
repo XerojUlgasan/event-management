@@ -19,7 +19,7 @@ import {
   markNotificationRead,
 } from "../../lib/data/notifications/notifications";
 import { ApiError } from "../../lib/http/request";
-import { env } from "../../lib/env/env";
+import { config } from "../../env";
 import {
   customerBookingRequestPath,
   customerConversationPath,
@@ -303,15 +303,15 @@ export function NotificationBell({ profileId }: { profileId: string }) {
     };
   }, [load, profileId]);
   useEffect(() => {
-    if (!env.PUBLIC_SUPABASE_URL || !env.PUBLIC_SUPABASE_PUBLISHABLE_KEY)
+    if (!config.PUBLIC_SUPABASE_URL || !config.PUBLIC_SUPABASE_PUBLISHABLE_KEY)
       return;
 
     let client: ReturnType<typeof createClient>;
 
     try {
       client = createClient(
-        env.PUBLIC_SUPABASE_URL,
-        env.PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+        config.PUBLIC_SUPABASE_URL,
+        config.PUBLIC_SUPABASE_PUBLISHABLE_KEY,
         {
           auth: {
             persistSession: false,

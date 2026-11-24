@@ -1,16 +1,14 @@
-import { env } from "../env/env";
-
-const configuredApiUrl = env.PUBLIC_API_URL;
+import { config } from "../../env";
 
 export function apiBase() {
-  const trimmed = configuredApiUrl.replace(/\/$/, "");
+  const base = config.PUBLIC_API_URL;
 
-  if (/^https?:\/\//.test(trimmed)) return trimmed;
+  if (/^https?:\/\//.test(base)) return base;
 
-  if (typeof window === "undefined") return trimmed;
+  if (typeof window === "undefined") return base;
 
   return new URL(
-    trimmed.replace(/^\//, ""),
+    base.replace(/^\//, ""),
     `${window.location.origin}/`,
   ).href.replace(/\/$/, "");
 }

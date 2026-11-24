@@ -1,48 +1,91 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
-import { createPublicEnv } from "../../src/lib/env/env.ts";
-import { createServerEnv } from "../../src/lib/server/config/env.ts";
+import { test, type TestContext } from "node:test";
+import { fileURLToPath } from "node:url";
+import { build } from "vite";
+import { config } from "../../src/env.ts";
 
-test("public settings retain API defaults, relative URLs and optional Firebase", () => {
-  assert.equal(createPublicEnv({}).PUBLIC_API_URL, "http://localhost:3000/v1");
-  assert.equal(
-    createPublicEnv({ PUBLIC_API_URL: "/v1" }).PUBLIC_API_URL,
-    "/v1",
-  );
-  assert.equal(createPublicEnv({ PUBLIC_API_URL: "" }).PUBLIC_API_URL, "");
-  assert.equal(createPublicEnv({}).firebaseConfigured, false);
-  const env = createPublicEnv({
+async function buildClientConfig(
+  context: TestContext,
+  settings: NodeJS.ProcessEnv,
+): Promise<typeof config> {
+  const source = { ...process.env };
+
+  for (const [name, value] of Object.entries(settings)) {
+    if (value === undefined) delete source[name];
+    else source[name] = value;
+  }
+
+  context.mock.property(process, "env", source);
+
+  const result = await build({
+    configFile: false,
+    envFile: false,
+    envPrefix: "PUBLIC_",
+    logLevel: "silent",
+    build: {
+      lib: {
+        entry: fileURLToPath(new URL("../../src/env.ts", import.meta.url)),
+        formats: ["es"],
+      },
+      write: false,
+    },
+  });
+  assert.ok(!Array.isArray(result) || result.length === 1);
+  const bundle = Array.isArray(result) ? result[0] : result;
+  assert.ok("output" in bundle);
+  const chunk = bundle.output[0];
+  assert.equal(chunk.type, "chunk");
+  assert.ok(!chunk.code.includes("server-only-fixture"));
+  assert.ok(!chunk.code.includes("process.env"));
+
+  const code = Buffer.from(chunk.code).toString("base64");
+
+  return (await import(`data:text/javascript;base64,${code}`)).config;
+}
+
+test("browser config uses Vite public values and guards server settings", async (context) => {
+  const browser = await buildClientConfig(context, {
+    PUBLIC_API_URL: "/v1/",
     PUBLIC_FIREBASE_API_KEY: "test-key",
     PUBLIC_FIREBASE_AUTH_DOMAIN: "example.test",
     PUBLIC_FIREBASE_PROJECT_ID: "test-project",
+    PUBLIC_FIREBASE_APP_ID: undefined,
+    API_PROXY_TARGET: "https://server-only-fixture.invalid",
   });
-  assert.equal(env.firebaseConfigured, true);
-  assert.equal(env.firebaseConfig.projectId, "test-project");
-  assert.equal(env.firebaseConfig.appId, undefined);
+  assert.equal(browser.PUBLIC_API_URL, "/v1");
+  assert.equal(browser.firebaseConfigured, true);
+  assert.equal(browser.firebaseConfig.projectId, "test-project");
+  assert.equal(browser.firebaseConfig.appId, undefined);
+  assert.throws(() => browser.API_PROXY_TARGET, /unavailable in the browser/);
+  assert.throws(() => browser.SERVER_API_URL, /unavailable in the browser/);
 });
 
-test("server API URLs preserve proxy precedence, slash handling and relative fallback", () => {
-  assert.equal(createServerEnv({}).SERVER_API_URL, "http://127.0.0.1:3000/v1");
+test("browser config preserves an explicitly empty public API URL", async (context) => {
+  const browser = await buildClientConfig(context, { PUBLIC_API_URL: "" });
+  assert.equal(browser.PUBLIC_API_URL, "");
+});
+
+test("source imports default browser settings before Vite initializes", () => {
+  assert.equal(config.PUBLIC_API_URL, "http://localhost:3000/v1");
+  assert.equal(config.firebaseConfigured, false);
+});
+
+test("server config reads runtime values and preserves proxy precedence", (context) => {
+  const source: NodeJS.ProcessEnv = {};
+  context.mock.property(process, "env", source);
+
+  assert.equal(config.SERVER_API_URL, "http://127.0.0.1:3000/v1");
+  source.PUBLIC_API_URL = "/v1";
+  assert.equal(config.SERVER_API_URL, "http://127.0.0.1:3000/v1");
+  source.PUBLIC_API_URL = "https://api.example.test/v1/";
+  assert.equal(config.SERVER_API_URL, "https://api.example.test/v1");
+
+  source.API_PROXY_TARGET = "http://127.0.0.1:54321/";
+  assert.equal(config.API_PROXY_TARGET, source.API_PROXY_TARGET);
   assert.equal(
-    createServerEnv({ PUBLIC_API_URL: "/v1" }).SERVER_API_URL,
-    "http://127.0.0.1:3000/v1",
-  );
-  assert.equal(
-    createServerEnv({ PUBLIC_API_URL: "https://api.example.test/v1/" })
-      .SERVER_API_URL,
-    "https://api.example.test/v1",
-  );
-  const source = {
-    API_PROXY_TARGET: "http://127.0.0.1:54321/",
-    PUBLIC_API_URL: "/v1",
-  };
-  const env = createServerEnv(source);
-  assert.equal(env.API_PROXY_TARGET, source.API_PROXY_TARGET);
-  assert.equal(
-    env.SERVER_API_URL,
+    config.SERVER_API_URL,
     "http://127.0.0.1:54321/functions/v1/api/v1",
   );
   source.API_PROXY_TARGET = "";
-  source.PUBLIC_API_URL = "https://api.example.test/v1";
-  assert.equal(env.SERVER_API_URL, source.PUBLIC_API_URL);
+  assert.equal(config.SERVER_API_URL, "https://api.example.test/v1");
 });

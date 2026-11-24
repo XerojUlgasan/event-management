@@ -280,13 +280,12 @@ The Node API, Prisma, seeds, and integration tests still use Compose PostgreSQL 
 
 ### Configuration
 
-Environment access, parsing, and defaults are centralized per app:
+Each app exports a single `config` object that owns its environment reads, parsing, and defaults.
 
-- API, including the Edge bundle and API commands: [`apps/api/src/utils/env.ts`](apps/api/src/utils/env.ts). Getters preserve on-demand reads; importing the utility does not require database, Firebase, or Storage configuration. Existing entry points still load dotenv.
-- Browser: [`apps/web/src/lib/env/env.ts`](apps/web/src/lib/env/env.ts). Only explicit `PUBLIC_*` settings enter this module; they are captured at build time. Firebase setup stays optional.
-- Web server and Astro config: [`apps/web/src/lib/server/config/env.ts`](apps/web/src/lib/server/config/env.ts). Server getters read the runtime environment. Astro config reads shell-provided variables before Astro loads `.env` files.
+- [`apps/api/src/env.ts`](apps/api/src/env.ts) serves Node, the Edge bundle, and API commands. Getters read settings on demand, including optional Firebase, Storage, and AI settings. The existing runtime entry points load or inject the environment.
+- [`apps/web/src/env.ts`](apps/web/src/env.ts) serves the browser, the web server, and Astro config. Vite captures explicit `PUBLIC_*` settings at build time. Server-only getters read the runtime environment. Astro config can read shell-provided settings before Astro loads `.env` files.
 
-Use these utilities instead of reading `process.env` or `import.meta.env` in consumers. `pnpm check:env` enforces the source boundary and runs in `pnpm check`; tests and generated Edge bundles are excluded. Compose and Supabase configuration still use their native environment loading. The standalone cleanup script uses the API utility with Node's built-in TypeScript support, keeping its own dotenv path and local-only guards.
+App consumers import `config` from their app's `src/env.ts`. `pnpm check:env` checks direct environment reads in app source and runs in `pnpm check`. Tests and generated Edge bundles are excluded. Compose and Supabase configuration use their native environment loading.
 
 Use the checked-in [API environment example](apps/api/.env.example) and [web environment example](apps/web/.env.example) for variable names. Keep `.env`, `.secrets/`, database values, session tokens, and service-account contents out of chat and commits.
 

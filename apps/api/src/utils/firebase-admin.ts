@@ -9,12 +9,9 @@ import {
 } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
-import { env } from "./env.js";
+import { config } from "../env.js";
 
 const apiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-
-const configurationError =
-  "Firebase Admin is not configured. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY (or GOOGLE_APPLICATION_CREDENTIALS) in apps/api/.env.";
 
 type ServiceAccount = {
   project_id?: string;
@@ -23,28 +20,30 @@ type ServiceAccount = {
 };
 
 async function initialize() {
-  const projectId = env.FIREBASE_PROJECT_ID;
-  const clientEmail = env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = env.FIREBASE_PRIVATE_KEY;
+  const firebase = config.FIREBASE_ADMIN;
+  const { projectId } = firebase;
 
-  if (env.FIREBASE_AUTH_EMULATOR_HOST && projectId) {
+  if (firebase.kind === "emulator") {
     initializeApp({ projectId });
 
     return;
   }
 
-  if (projectId && clientEmail && privateKey) {
+  if (firebase.kind === "serviceAccount") {
     initializeApp({
-      credential: cert({ projectId, clientEmail, privateKey }),
-      projectId,
+      credential: cert({
+        projectId: firebase.projectId,
+        clientEmail: firebase.clientEmail,
+        privateKey: firebase.privateKey,
+      }),
+      projectId: firebase.projectId,
     });
 
     return;
   }
 
-  const credentialsPath = env.GOOGLE_APPLICATION_CREDENTIALS;
-
-  if (credentialsPath) {
+  if (firebase.kind === "file") {
+    const { credentialsPath } = firebase;
     const credentialsFile = isAbsolute(credentialsPath)
       ? credentialsPath
       : resolve(apiRoot, credentialsPath);
@@ -57,28 +56,24 @@ async function initialize() {
       throw new Error(`Invalid service account file at ${credentialsFile}`);
     }
 
+    const accountProjectId = serviceAccount.project_id ?? projectId;
+
     initializeApp({
       credential: cert({
-        projectId: serviceAccount.project_id ?? projectId,
+        projectId: accountProjectId,
         clientEmail: serviceAccount.client_email,
         privateKey: serviceAccount.private_key,
       }),
-      projectId: serviceAccount.project_id ?? projectId,
+      projectId: accountProjectId,
     });
 
     return;
   }
 
-  if (env.GOOGLE_CLOUD_PROJECT || env.GCLOUD_PROJECT) {
-    initializeApp({
-      credential: applicationDefault(),
-      ...(projectId ? { projectId } : {}),
-    });
-
-    return;
-  }
-
-  throw new Error(configurationError);
+  initializeApp({
+    credential: applicationDefault(),
+    ...(projectId ? { projectId } : {}),
+  });
 }
 
 let initialization: Promise<void> | undefined;

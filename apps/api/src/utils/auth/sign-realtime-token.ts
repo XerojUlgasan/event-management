@@ -1,7 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import { importJWK, SignJWT } from "jose";
 import type { SessionContext } from "../../types/hono.js";
-import { env } from "../env.js";
+import { config } from "../../env.js";
 
 const MAX_TOKEN_LIFETIME_SECONDS = 5 * 60;
 
@@ -22,7 +22,7 @@ export async function signRealtimeToken(
   session: SessionContext,
   { issuedAt, expiresAt }: { issuedAt: number; expiresAt: number },
 ) {
-  const { jwk, localSecret } = env.REALTIME_SIGNING;
+  const signing = config.REALTIME_SIGNING;
   const scopeClaims =
     "conversationId" in target
       ? {
@@ -40,8 +40,8 @@ export async function signRealtimeToken(
     .setIssuedAt(issuedAt)
     .setExpirationTime(expiresAt);
 
-  if (jwk) {
-    const signingKey = signingKeySchema.parse(JSON.parse(jwk));
+  if (signing?.algorithm === "ES256") {
+    const signingKey = signingKeySchema.parse(JSON.parse(signing.jwk));
     const key = await importJWK(signingKey, "ES256");
 
     return payload
@@ -49,8 +49,8 @@ export async function signRealtimeToken(
       .sign(key);
   }
 
-  if (localSecret) {
-    const key = new TextEncoder().encode(localSecret);
+  if (signing?.algorithm === "HS256") {
+    const key = new TextEncoder().encode(signing.secret);
 
     if (key.length >= 32)
       return payload.setProtectedHeader({ alg: "HS256", typ: "JWT" }).sign(key);

@@ -1,4 +1,4 @@
-import { env } from "./env.js";
+import { config } from "../env.js";
 
 export class CatalogMediaNotFound extends Error {}
 
@@ -73,7 +73,7 @@ export async function putCatalogMedia(
     bucket?: string;
   } = {},
 ) {
-  const { url, apiKey, bucket: defaultBucket } = env.STORAGE;
+  const { url, apiKey, bucket: defaultBucket } = config.STORAGE;
   const bucket = options.bucket ?? defaultBucket;
   const response = await fetch(
     `${url}/storage/v1/object/${objectPath(bucket, key)}`,
@@ -95,7 +95,7 @@ export async function putCatalogMedia(
 }
 
 export async function deleteCatalogMedia(key: string, bucketOverride?: string) {
-  const { url, apiKey, bucket: defaultBucket } = env.STORAGE;
+  const { url, apiKey, bucket: defaultBucket } = config.STORAGE;
   const bucket = bucketOverride ?? defaultBucket;
   const response = await fetch(`${url}/storage/v1/object/${bucket}`, {
     method: "DELETE",
@@ -115,7 +115,7 @@ export async function getCatalogMedia(
   abortSignal?: AbortSignal,
   bucketOverride?: string,
 ) {
-  const { url, apiKey, bucket: defaultBucket } = env.STORAGE;
+  const { url, apiKey, bucket: defaultBucket } = config.STORAGE;
   const bucket = bucketOverride ?? defaultBucket;
   const response = await fetch(
     `${url}/storage/v1/object/${objectPath(bucket, key)}`,

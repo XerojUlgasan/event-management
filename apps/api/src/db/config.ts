@@ -1,14 +1,14 @@
 import "dotenv/config";
 
-import { env } from "../utils/env.js";
+import { config } from "../env.js";
 
-const host = env.DB_HOST;
-const port = env.DB_PORT;
+const host = config.DB_HOST;
+const port = config.DB_PORT;
 
-const database = encodeURIComponent(env.DB_NAME);
+const database = encodeURIComponent(config.DB_NAME);
 
-const user = encodeURIComponent(env.DB_USER);
+const user = encodeURIComponent(config.DB_USER);
 
-const password = encodeURIComponent(env.DB_PASSWORD);
+const password = encodeURIComponent(config.DB_PASSWORD);
 
 export const databaseUrl = `postgresql://${user}:${password}@${host}:${port}/${database}?schema=public`;

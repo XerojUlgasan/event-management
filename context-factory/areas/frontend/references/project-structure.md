@@ -8,6 +8,7 @@ Organize by **layer → domain → responsibility**. A domain is a product conce
 
 ```text
 src/
+  env.ts                         environment configuration
   pages/                         Astro routes and route-owned handlers
   layouts/                       Astro document layouts
   components/
@@ -21,7 +22,7 @@ src/
       booking-requests/ catalog/ event-days/ ... role-specific screens
     workspaces/customer/         CustomerDashboard role entry
   lib/
-    auth/ env/ http/ navigation/ pagination/  named infrastructure
+    auth/ http/ navigation/ pagination/  named infrastructure
     data/<domain>/               direct API calls and their data helpers
     services/<domain>/           client sequences, storage, response combination
     utils/<domain>/              pure transformations
@@ -36,9 +37,9 @@ tests/<domain>/                  tests grouped by affected behavior
 
 `components/workspaces/<role>/` owns the admin or customer shell and navigation, with domain screens in named subfolders. The customer role entry `CustomerDashboard.tsx` is also permitted directly under its role. A component used across roles or by public and workspace views belongs in its domain folder, not a role folder. `components/public/` owns public-only compositions. `components/app/` is limited to the three entry and navigation files above. Keep public URLs in `pages/`; do not invent a parallel route framework or browser controllers. Sample photos and bookings belong under `demo/catalog/` and `demo/booking-requests/`; admin navigation belongs to the admin workspace, not demo data.
 
-`lib/data/catalog/{packages,services,media,page-query}.ts` and `lib/data/booking-requests/{requests,packages}.ts` illustrate cohesive responsibility groups. Multiple related operations may share one file; split when responsibilities meaningfully differ, not one file per endpoint. The HTTP wrapper is `lib/http/request.ts`. The `auth`, `env`, `http`, `navigation`, and `pagination` infrastructure modules are explicit exceptions to domain grouping inside `lib`. `styles/app.css` is the stylesheet entry exception. Place new app styles under their domain and import them from the appropriate entry. Shared presentation belongs in `packages/ui`, shared tokens in `packages/theme`, and established shared contracts in `packages/contracts`; follow the [reuse workflow](../../packages/references/reuse.md#required-workflow-for-every-ui-change).
+`lib/data/catalog/{packages,services,media,page-query}.ts` and `lib/data/booking-requests/{requests,packages}.ts` illustrate cohesive responsibility groups. Multiple related operations may share one file; split when responsibilities meaningfully differ, not one file per endpoint. The HTTP wrapper is `lib/http/request.ts`. The `auth`, `http`, `navigation`, and `pagination` infrastructure modules are explicit exceptions to domain grouping inside `lib`. `styles/app.css` is the stylesheet entry exception. Place new app styles under their domain and import them from the appropriate entry. Shared presentation belongs in `packages/ui`, shared tokens in `packages/theme`, and established shared contracts in `packages/contracts`; follow the [reuse workflow](../../packages/references/reuse.md#required-workflow-for-every-ui-change).
 
-Environment reads and browser defaults belong in [`lib/env/env.ts`](../../../../apps/web/src/lib/env/env.ts). Server settings and the server API URL belong in [`lib/server/config/env.ts`](../../../../apps/web/src/lib/server/config/env.ts), also used by Astro configuration before its env loading. Browser modules import only the public utility. Run `pnpm check:env` to detect raw env reads outside the designated app owners; tests and generated bundles are excluded.
+[`src/env.ts`](../../../../apps/web/src/env.ts) exports `config` for the browser, web server, and Astro config. Browser consumers use its public settings, which Vite supplies at build time. Server-only getters read the runtime environment and are guarded in client builds. Astro config can read shell settings before Vite initializes. `pnpm check:env` checks direct environment reads in app source, excluding tests and generated bundles.
 
 ## Names and dependencies
 

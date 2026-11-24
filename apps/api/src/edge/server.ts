@@ -1,5 +1,5 @@
 import { messageBodyLimit } from "../constants/http.js";
-import { env } from "../utils/env.js";
+import { config } from "../env.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
@@ -19,7 +19,7 @@ import {
   type RouteFamilyId,
 } from "./match-route.js";
 
-const allowedOrigins = env.WEB_ORIGINS;
+const allowedOrigins = config.WEB_ORIGINS;
 
 const loaders = {
   "message-images": () => import("../controllers/message-images/index.js"),

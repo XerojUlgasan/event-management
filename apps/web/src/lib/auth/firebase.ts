@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { env } from "../env/env";
+import { config } from "../../env";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -7,7 +7,7 @@ import {
   setPersistence,
 } from "firebase/auth";
 
-const firebaseConfig = env.firebaseConfig;
+const firebaseConfig = config.firebaseConfig;
 
 // Imported only when the user chooses a Firebase sign-in method.
 const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
