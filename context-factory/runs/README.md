@@ -14,6 +14,7 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [Catalog and showcase seed preview](2026-11-24_17-14-00_catalog-seed-preview.md) | Photo-backed catalog, showcases, and settings / main | complete | Open the local preview or reproduce with the seed guide. |
 | [AMAC reference-photo search](2026-11-24_15-04-19_amac-reference-photo-search.md) | Guest and signed-in chat / feat/catalog-search-chat-photo | complete | Await explicit instruction to integrate and verify on main. |
 | [AMAC catalog browse attachments](2026-11-24_00-32-33_amac-catalog-browse.md) | Guest and signed-in chat / main | complete | Combined live desktop and mobile browser flows verified on the local main stack. |
 | [Required AMAC reply suggestions](2026-11-24_00-11-29_required-amac-replies.md) | Guest and customer chat / main | complete | Integrated locally. Duration choices, reload, selection, and persistence verified on the root stack. |
