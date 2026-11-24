@@ -6,9 +6,9 @@ Use this when the task adds seeded rows for one database table. [Database seed](
 
 ## 1. Choose the layer
 
-Required fixtures are the named accounts, three canvas packages, and `demo.*` conversations in `seed.ts`, `seed-packages.ts`, and `seed-demo.ts`. Add a row there when a current test or the [QA account table](accounts.md) depends on that exact email, name, or id.
+The seed entry point calls the named-account, business-profile, agent-settings, showcase, and connected-demo fixtures before the scenario. Use the existing fixture module when a test or the [QA account table](accounts.md) depends on a particular record.
 
-Everything else belongs in `apps/api/src/db/seed/scenario/`. `scenario/index.ts` is the orchestrator. Its current order is users, sessions, catalog, activity, operations, then quotations. Check the current schema before assuming a table exists or is seeded. Quotations and their delivery/audit records are seeded by `scenario/quotations.ts`. Read the orchestrator before assuming a table already has rows.
+Connected scenario records belong in `apps/api/src/db/seed/scenario/`. `scenario/index.ts` is the orchestrator. Its current order is users, sessions, catalog, activity, operations, then quotations. Check the current schema before assuming a table exists or is seeded. Quotations and their delivery/audit records are seeded by `scenario/quotations.ts`. Read the orchestrator before assuming a table already has rows.
 
 Done when you can name the file that will insert the table and the parent rows that file must receive.
 
@@ -39,7 +39,7 @@ Done when a missing parent stops the seed with a clear error, and a present pare
 
 ## 4. Keep a second run from rewriting rows
 
-The seed inserts missing ids. It does not update email, price, status, archive time, password, or session hash. A scenario session token is random on each attempt; the stored hash remains the first one because the id already exists. Login uses the shared fixture password. The stored session hash is not a cookie.
+The scenario seed inserts missing IDs and preserves existing emails, prices, statuses, archive times, passwords, and session hashes. A scenario session token is random on each attempt; the stored hash remains the first one because the id already exists. Login uses the shared fixture password. The stored session hash is not a cookie.
 
 Done when you can point to the `onConflict` path and to the test assertion that an edited fixture survives a second seed.
 

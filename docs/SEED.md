@@ -1,75 +1,57 @@
 # Database seed
 
-After applying the API migrations to a local database, run:
+Start the local PostgreSQL database and Supabase Storage:
 
 ```sh
+pnpm db:up
+pnpm supabase:start
+```
+
+Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env` or the command environment using the local values from `pnpm supabase:status`. The seed uses the private `event-management` bucket by default. Set `SUPABASE_STORAGE_BUCKET` if your development setup uses a different bucket. Verify both targets before seeding. Isolated `pnpm room` environments supply these settings automatically.
+
+```sh
+pnpm db:deploy
 pnpm db:seed
 ```
 
-The command runs `apps/api/src/db/seed.ts` in one PostgreSQL transaction. It does not reset or truncate the database, create Firebase users, send outbound messages, or call payment or quote services.
+The seed runs in one PostgreSQL transaction. It inserts fixtures and uploads local media without provisioning Firebase accounts, sending outbound messages, or calling an AI provider.
 
 ## What it inserts
 
-- **Local account fixtures:** the designated `admin1@gmail.com` System Administrator account and `user1@gmail.com`–`user5@gmail.com`, plus up to 10 `customerN@example.test` accounts. Newly inserted local accounts use the password defined in the seed source; credentials are not repeated here.
-- **Package samples:** three directly published packages, each with a complete canvas containing a photo, an occasion concept, program timing, and scope/practical details:
-  - The Grand Celebration — ₱185,000; maximum 150 guests.
-  - The Intimate Gathering — ₱68,000; maximum 50 guests.
-  - The Sweet Soirée — ₱95,000; maximum 80 guests.
+- **Local accounts and conversations** include the designated System Administrator, five named user fixtures, ten demo customers, and five connected demo conversations with two messages each. New accounts use the shared local fixture password defined in the seed source.
+- **Public catalog** includes exactly 10 packages and 10 services on a fresh database. Each has composed canvas sections, at least three distinct illustrative photographs with alt text, and a dedicated thumbnail using its lead photo. Packages describe capacity, schedule and scope. Services cover distinct workflows and offer both fixed-price and hourly-only options. Several connect to complementary standalone services. The photos and catalog terms are illustrative demo content.
+- **Showcases** include three published records and one draft. Each uses its own uploaded cover and ordered gallery.
+- **Business information and agent settings** supply the Styled by AMAC demo profile and default AMAC instructions. The settings seed fills the untouched defaults and preserves administrator changes on rerun.
+- **Connected scenario** keeps 100 users, sessions, booking requests, status-history rows, linked conversations, messages, event days, and quotation versions. Users are `scenario.user001@clemora.example.test` through `scenario.user100@clemora.example.test`; users 001–004 are System Administrators. Booking references run from `SCN-001` to `SCN-100`. Requested and operational dates reach both edges of the 30-day window before and after the seed clock. Forty accepted requests own the 100 event days.
+- **Quotations** cover 50 eligible scenario bookings with a superseded first version and a sent replacement. Twenty-six versions are base-only. The remainder include an addition and a deduction. Totals use the stored proposal price and the API's centavo calculation. Each version has its own delivery message and send audit event.
 
-  These are synthetic demonstration records, not business-approved prices or content. Their photo widgets reference checked-in sample images; the seed does not upload files to Supabase Storage.
-- **Connected demo conversations:** one demo administrator and five customers under `demo.*@clemora.example.test`, with one general conversation and two messages per customer.
-- **Interconnected scenario:** 100 users, sessions, booking requests, status-history rows, linked conversations, messages, and event days, plus 100 quotations and their delivery/audit records. The smaller curated catalog has **20 packages and 20 services**, each with its own complete canvas and dedicated thumbnail. Packages include civil weddings, Filipiniana and coastal receptions, debuts, birthdays, baptisms, workshops, conferences, launches, reunions, and anniversaries. Services cover styling, florals, sound/lighting, hosting, photography, booths, and coordination; both fixed-price services with included hours and excess rates, and hourly-only services are represented. Accounts are `scenario.user001@clemora.example.test` through `scenario.user100@clemora.example.test` and use the same local fixture password as the accounts above. `user001`–`user004` are System Administrators; `user005`–`user100` are customers.
+[Package copy](../apps/api/src/db/seed/package-collection.ts) and [service copy](../apps/api/src/db/seed/service-collection.ts) define each listing's metadata, Markdown and images. The [canvas builder](../apps/api/src/db/seed/curated-catalog.ts) uses the same widget format as the admin editor and public detail pages. Assets belong under [the seed asset directory](../apps/api/src/db/seed/assets) and are uploaded using the [catalog and showcase Storage conventions](../context-factory/areas/api/references/external-image-urls.md#storage-filing-and-recovery).
 
-  The scenario links those accounts to catalog rows, booking requests, conversations, messages, sessions, and event days. References use `SCN-001` through `SCN-100`. Status, archive, and guest-count values vary across legal combinations: 18 curated packages and 18 services stay public; two of each are archived. Together with the three named sample packages, a fresh seed has 23 packages, 20 services, and 43 nonempty canvases. Public browsing exposes 21 packages and 18 services. Requested dates, preferred dates, and operational event days stay inside the 30 days before and the 30 days after the seed clock, and the set reaches both edges. A clock of 30 October therefore fills 30 September through 29 November. Forty accepted requests own the 100 event days. Moved days point to scheduled replacements on the same request. Declined and cancelled requests have no operational days.
-
-  Scenario media includes 40 attached package/service photos and 20 unreferenced sample images. Each canvas has distinctive Markdown, an illustrative photograph with literal alt text, and practical constraints. Five layouts vary photo/text placement; selected linked widgets describe optional or contextual ideas without implying inclusion. The attributed real photographs are stored locally alongside the original sample photos; see [photo sources and license](../apps/web/public/images/catalog-demo-assets.md). The seed neither hotlinks Google results nor uploads images to Storage. Scenario sessions mix current and expired rows; the raw session tokens are not stored or printed. The scenario does not create payments or Firebase users.
-
-All 43 canvases have an authored introduction and four detailed sections. [Package editorial](../apps/api/src/db/seed/package-editorial.ts) includes occasion-specific seating plans, program flow, access considerations and scope boundaries. Examples include the civil wedding's decision FAQ, conference responsibility matrix and product launch cue sheet. [Service editorial](../apps/api/src/db/seed/service-editorial.ts) describes quantities, deliverables, working windows, setup requirements and exclusions; photography coverage differs from a booth's digital output, and speech audio differs from a reception DJ set. Fixed service windows explicitly include setup and packdown. These remain fictional demo terms, not approved business commitments. [Catalog metadata and composition](../apps/api/src/db/seed/curated-catalog.ts) retain prices, capacities and service rates separately from prose, and estimate widget heights for narrow-screen reading.
-
-- **Quotations:** `seed/scenario/quotations.ts` adds two PHP versions to 50 scenario bookings. Each booking has a superseded first offer and a sent replacement. Twenty-six versions are base-only. The others include a ₱2,500.50 addition and a ₱500.25 deduction. Base prices come from the stored current proposal and totals use the API's integer-centavo calculation. Each revision points to its superseded predecessor.
-
-  All 100 versions have exact-version messages and send audit events. Initial selection requires 50 customer bookings with a linked conversation and excludes declined and cancelled requests. The seed reads stored parents and preserves previous inserts, including any legacy unsent records. Quotations do not change booking statuses or create event days.
-
-The seeded packages and services remain flat catalog records without private custom packages. Each owner stores its canvas as JSONB, including any linked-listing widgets; there is no relational package-service assignment table. The three named package samples keep their IDs, names, capacities, and prices and receive richer content only when first inserted; the scenario does not rewrite them. No venue-catalog or staff-account fixtures are created.
-
-The showcase seed adds three published records and one draft using the checked-in sample images. Each showcase has an image cover and its own ordered gallery assets. Existing sample showcase IDs and their saved content are preserved on repeat runs.
+Fresh catalog canvases use five opening layouts and a three-row height for photos, Markdown, and related-service widgets. The renderer clips overflow at the saved height. Showcase details use their cover and ordered gallery.
 
 ## Repeat runs and collisions
 
-Reference package, connected demo, and scenario IDs are stable. Catalog and scenario rows are insert-only and do not overwrite existing edits, archives, passwords, or sessions. A package sample's sample media row and canvas are created only when the seed inserts that package row. Scenario package/service canvases are initialized only when the seed inserts their owner. A later run preserves an existing owner's edits, including an intentionally empty canvas; it does not fill missing sections or widgets inside that canvas. Other scenario child records continue to use stable IDs and their seed-specific insert-if-new rules. Existing records with a reserved ID or email are preserved; a collision can leave the corresponding sample or dependent content incomplete. Inspect the target if a fixture is missing; do not use the seed to reconcile collisions or clean shared data.
+Catalog and scenario fixtures use stable IDs. The seed initializes the canvas and thumbnail only for a newly inserted listing. Reruns preserve saved names, pricing, canvas edits, archive state, gallery order, account credentials and session hashes. An existing listing with a conflicting name or slug keeps its data. The refreshed 10/10 count applies to fresh databases. Older public listings, including the three legacy sample packages, stay in a previously seeded database. Use a fresh disposable database to see only the refreshed catalog.
 
-The demo conversation and scenario IDs are derived from stable keys. Existing catalog rows are not upgraded or republished on rerun. In particular, older `Scenario Celebration` and `Scenario Service` records retain their names and content: rerunning the seed does not replace the old catalog or remove surplus rows. The smaller curated catalog requires a fresh disposable/demo database. Do not reset a populated database just to refresh fixtures. Missing booking scenarios use the actual persisted catalog capacity, price, and archive state; custom/unpublished package collisions are excluded. New curated photo IDs have a separate stable namespace so recreating an owner cannot accidentally bind its new alt text to an older orphaned sample image. A second run does not rotate scenario session token hashes. Quotation IDs and `(booking_request_id, version)` keys stay stable. Previously selected bookings remain selected after later closure. Rerunning the seed leaves existing quotation versions and lifecycle rows untouched; delivery/audit records are inserted only with a newly inserted quotation. The seed does not reconstruct deleted delivery/audit history for an existing quotation. Fresh-seed counts describe newly inserted scenario rows, not reconciliation of an existing database's fixture contents.
+Missing scenario bookings use persisted public package capacity and pricing. If all seeded packages have been archived or unpublished, existing activity is preserved and the seed skips creating further scenario activity. Quotation versions retain their IDs, totals and delivery history. Previously selected booking requests remain selected after closure.
 
-`SEED_CLOCK` optionally fixes connected demo and scenario timestamps. Supply a UTC timestamp such as `2026-10-31T00:00:00Z`; when it is omitted, current time is used. Existing rows are not retimestamped on rerun. Sample package timestamps use database defaults and are not controlled by `SEED_CLOCK`. `SEED_RANDOM_SEED` changes which scenario request receives each status. The status counts stay the same, and a new seed value does not rewrite rows inserted earlier.
+Each photo uses a stable media ID and private object key. An interruption can leave objects behind if PostgreSQL rolls back. A retry reuses an exact byte match and rejects conflicts without replacing existing media. Files are served to customers through the current catalog and showcase API media endpoints.
+
+Set `SEED_RANDOM_SEED` to configure the deterministic assignment of scenario statuses while preserving status counts. `SEED_CLOCK` optionally fixes connected demo and scenario timestamps to a UTC instant such as `2026-10-31T00:00:00Z`. These variables apply when rows are first inserted.
 
 ## AI catalog demo
 
-The current assistant uses `searchPublicCatalog` for exact catalog filters and optional semantic ranking, then `getPublicCatalogItem` for current facts and ordered canvas Markdown. Recommendations are composed by the assistant from those results. Package filters use total PHP price and guest capacity. Service filters distinguish fixed base prices from hourly-only rates; excess-hour charges are separate.
+AMAC uses `searchPublicCatalog` for catalog filters and optional semantic ranking, then `getPublicCatalogItem` for current facts and ordered Markdown. Package filters use price and capacity. Service price filters distinguish fixed base prices from hourly rates.
 
-Knowledge preparation emits one combined text entry per listing containing its overview, all original Markdown across sections in reading order, and linked-listing captions. It does not split text by widget or length. Photo widgets remain separate chunks with alt/caption context. Linked canvases are not expanded into their parent, and video is not embedded. Gemini Embedding 2 indexes text and actual photo bytes into normalized 768-dimensional vectors, subject to its input limit; see the [combined-text decision](../context-factory/history/decisions/2026-11-19_combined-catalog-text.md). Distinct text, pricing, constraints, and appropriate images give the demo useful differences to retrieve; a semantic score alone does not guarantee suitability.
-
-Direct seed SQL does **not** schedule embedding refresh. On the intended fresh demo database, apply the migrations and seed first. After checking the target and server-only embedding configuration, the existing backfill command is:
+Knowledge preparation emits one combined text entry per listing, plus a separate chunk for each photo with its alt text and caption. Seed writes do not schedule indexing. After checking the target and configuring the embedding worker, use the existing backfill command when you need semantic ranking:
 
 ```sh
 pnpm --filter @event-management/api catalog:embed
 ```
 
-This makes paid provider calls and processes **all eligible catalog owners** in the configured database, not only seeded rows. Confirm readiness in the admin Knowledge Catalog before a semantic-search demo. Queryless catalog filters and the detail tool do not need embeddings. Changing database fixtures or passing synthetic-provider tests does not establish live model ranking.
+Backfill processes all eligible catalog owners in the configured database and makes paid provider calls. Confirm readiness in the admin Knowledge Catalog. Catalog filters and detail reads work without embeddings.
 
-Representative prompts to try after indexing:
-
-| Prompt | Useful evidence to inspect |
-| --- | --- |
-| A civil wedding and merienda for 30 guests under PHP 50,000 | Civil Vows and Merienda; capacity, price, three-hour program, excluded meals/venue |
-| Compare a coastal sunset wedding with a formal ballroom wedding | Different palettes, program scope, weather/access constraints, and illustrative photos |
-| A first birthday with pastel decorations and a short program | Pastel First Birthday and child-focused timing/safety details |
-| A conference for 180 delegates with registration and networking | Industry Conference Forum capacity, eight-hour flow, internet and power requirements |
-| An hourly DJ for a reception | Reception DJ Set hourly terms and equipment exclusions |
-| Table styling with a fixed budget and extra time | Intimate Table Styling fixed base, included hours, excess rate, furniture/food exclusions |
-
-These are fictional offers and sample demo questions, not asserted live ranking results.
-
-Migration `20261118123813_expand_catalog_sample_photos` adds the attributed local photo paths to the database allowlist while retaining the existing upload restrictions. The shared contract validator, Node photo reader, and Edge bundle use the same application allowlist. Deploy the matching assets/contracts/API with that migration before seeding.
+Examples include a civil wedding for 30 guests under PHP 80,000, a workshop for 60 attendees, a fixed-price coffee cart, and an hourly reception emcee.
 
 ## Catalog and account cleanup migration impact
 
@@ -93,13 +75,13 @@ Migration `20261102130000_package_canvas` intentionally removes existing package
 
 ## Verify with a disposable database
 
-The focused integration test creates a UUID-named local PostgreSQL database, applies checked-in migrations, runs the seed twice, checks the required fixtures, all 43 canvases, catalog filters/details, the 100-row booking scenario, quotation totals/revisions/delivery/audits, customer visibility of sent history, and rerun preservation after price edits and booking closure. It guards against the former short placeholder copy and checks that knowledge preparation preserves the curated Markdown. Length checks do not establish editorial quality; source review and rendered checks cover relevance and clipping separately. The media migration test checks populated-data preservation, accepted sample paths and rejection of untrusted media. Both suites drop only their disposable databases:
+The focused integration suite creates a disposable local PostgreSQL database and a loopback Storage fake. It verifies public 10/10 counts, uploaded photo bytes and thumbnails, catalog details and filters, connected booking and quotation records, rerun preservation, and Storage retry after a rolled-back transaction. The separate migration test covers legacy sample media paths. Run both with:
 
 ```sh
-pnpm --filter @event-management/api exec tsx --test tests/seed.test.ts tests/catalog-sample-photos-migration.test.ts
+pnpm --filter @event-management/api exec tsx --test tests/seed.test.ts tests/seed-showcases.test.ts tests/catalog-sample-photos-migration.test.ts
 ```
 
-For manual verification, create a separate local database, apply migrations, and point each seed command at it:
+For a real Storage check, point the command at a fresh disposable database and its isolated local Supabase Storage endpoint. With the matching Storage environment in place, run:
 
 ```sh
 DB_NAME=clemora_seed_check pnpm db:deploy

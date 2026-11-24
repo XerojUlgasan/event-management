@@ -1,21 +1,12 @@
+import type { EventType } from "@event-management/contracts/catalog-filters";
 import { catalogSlug } from "@event-management/contracts/catalog-slug";
 import { sql } from "kysely";
-import type { SeedDb } from "../context.js";
-import { insertIfNew, scenarioId } from "../context.js";
-import {
-  buildCatalogCanvas,
-  curatedPackages,
-  curatedServices,
-} from "../curated-catalog.js";
-import type { CatalogCopy } from "../curated-catalog.js";
+import { seedAssetUpload } from "../asset-upload.js";
+import { expectCount, scenarioId, type SeedDb } from "../context.js";
+import { buildCatalogCanvas, type CatalogCopy } from "../curated-catalog.js";
+import { curatedPackages } from "../package-collection.js";
+import { curatedServices } from "../service-collection.js";
 import type { ScenarioUser } from "./users.js";
-
-const SAMPLE_PHOTOS = [
-  "/images/wedding.jpg",
-  "/images/dinner.jpg",
-  "/images/dessert.jpg",
-  "/images/hero.jpg",
-];
 
 export type ScenarioPackage = {
   id: string;
@@ -33,51 +24,61 @@ export type ScenarioService = {
   archived: boolean;
 };
 
-export type ScenarioCatalog = {
-  packages: ScenarioPackage[];
-  services: ScenarioService[];
+const COLLECTION_SIZE = 10;
+const LEGACY_PACKAGE_COUNT = 20;
+
+const packageEventTypes: Readonly<Partial<Record<string, EventType>>> = {
+  "Civil Wedding Family Table": "Wedding",
+  "Garden Wedding Under the Lights": "Wedding",
+  "Eighteen in the Spotlight": "Debut",
+  "Birthday Playroom Party": "Birthday",
+  "Team Workshop and Breakouts": "Corporate",
+  "Recognition Night and Awards": "Corporate",
+  "First Look Product Launch": "Corporate",
 };
 
-type CanvasPlan = {
-  key: string;
-  kind: "package" | "service";
-  ownerId: string;
-  copy: CatalogCopy;
-  index: number;
+const relatedServices: Readonly<Record<string, string>> = {
+  "Reception Grazing Table": "Mini Dessert Station",
+  "Mini Dessert Station": "Espresso Coffee Cart",
+  "Reception Emcee": "Speech and PA Support",
+  "Reception Table Florals": "Floral Portrait Backdrop",
 };
 
-export function planScenarioCatalog(): ScenarioCatalog & {
-  canvases: CanvasPlan[];
-} {
+export function catalogPhotoId(pageKey: string, file: string) {
+  return scenarioId(`media:seed-catalog:${pageKey}:${file}`);
+}
+
+export function planScenarioCatalog() {
+  expectCount("catalog packages", curatedPackages.length, COLLECTION_SIZE);
+  expectCount("catalog services", curatedServices.length, COLLECTION_SIZE);
+
   const packages = curatedPackages.map((copy, index) => ({
     id: scenarioId(`package:${index}`),
     name: copy.name,
     slug: catalogSlug(copy.name),
     price: copy.price,
     maxGuests: copy.guests,
-    archived: index >= 18,
   }));
 
   const services = curatedServices.map((copy, index) => ({
     id: scenarioId(`service:${index}`),
     name: copy.name,
     hourlyRatePesos: copy.rate,
-    archived: index >= 18,
   }));
 
-  const canvases: CanvasPlan[] = [
+  const canvases = [
     ...packages.map((owner, index) => ({
       key: `package:${index}`,
       kind: "package" as const,
       ownerId: owner.id,
-      copy: curatedPackages[index],
+      copy: curatedPackages[index] satisfies CatalogCopy,
       index,
     })),
     ...services.map((owner, index) => ({
       key: `service:${index}`,
       kind: "service" as const,
       ownerId: owner.id,
-      copy: curatedServices[index],
+      copy: curatedServices[index] satisfies CatalogCopy,
       index,
     })),
   ];
@@ -97,39 +98,45 @@ export async function seedScenarioCatalog(
 
   if (!admin) throw new Error("Scenario catalog requires an administrator");
 
-  let packages = 0,
-    services = 0,
-    media = 0,
-    canvases = 0;
+  let packages = 0;
+  let services = 0;
+  let media = 0;
+  let canvases = 0;
   const insertedOwners = new Set<string>();
 
   for (const [index, pkg] of input.catalog.packages.entries()) {
-    const copy = curatedPackages[index];
+    const { description } = curatedPackages[index];
 
-    if (
-      await insertIfNew(db, "packages", {
+    const row = await db
+      .insertInto("packages")
+      .values({
         id: pkg.id,
         name: pkg.name,
         slug: pkg.slug,
-        description: copy.description,
+        description,
         max_guests: pkg.maxGuests,
         price: pkg.price,
+        event_type: packageEventTypes[pkg.name] ?? null,
         published_at: input.now,
-        archived_at: pkg.archived ? input.now : null,
         created_at: input.now,
         updated_at: input.now,
       })
-    ) {
+      .onConflict((conflict) => conflict.doNothing())
+      .returning("id")
+      .executeTakeFirst();
+
+    if (row) {
       packages++;
-      insertedOwners.add(pkg.id);
+      insertedOwners.add(row.id);
     }
   }
 
   for (const [index, service] of input.catalog.services.entries()) {
     const copy = curatedServices[index];
 
-    if (
-      await insertIfNew(db, "services", {
+    const row = await db
+      .insertInto("services")
+      .values({
         id: service.id,
         name: service.name,
         slug: catalogSlug(service.name),
@@ -138,91 +145,99 @@ export async function seedScenarioCatalog(
         fixed_price_pesos: copy.fixed,
         included_hours: copy.hours,
         published_at: input.now,
-        archived_at: service.archived ? input.now : null,
         created_at: input.now,
         updated_at: input.now,
       })
-    ) {
+      .onConflict((conflict) => conflict.doNothing())
+      .returning("id")
+      .executeTakeFirst();
+
+    if (row) {
       services++;
-      insertedOwners.add(service.id);
+      insertedOwners.add(row.id);
     }
   }
+
+  const serviceRows = await db
+    .selectFrom("services")
+    .select(["id", "name", "hourly_rate_pesos", "archived_at", "published_at"])
+    .where(
+      "id",
+      "in",
+      input.catalog.services.map((item) => item.id),
+    )
+    .execute();
+
+  const activeServicesByName = new Map(
+    serviceRows
+      .filter((item) => item.published_at !== null && item.archived_at === null)
+      .map((item) => [item.name, item.id]),
+  );
 
   for (const page of input.catalog.canvases) {
     if (!insertedOwners.has(page.ownerId)) continue;
 
-    const mediaId = scenarioId(`media:curated-catalog-v2:${page.key}`);
+    const { images } = page.copy;
 
     if (
-      await insertIfNew(db, "media_assets", {
-        id: mediaId,
-        kind: "image",
-        source: "sample",
-        url: page.copy.photo,
-        storage_key: null,
-        mime_type: null,
-        byte_size: null,
-        created_by: admin.id,
-        created_at: input.now,
-      })
+      images.length < 3 ||
+      new Set(images.map(({ file }) => file)).size !== images.length ||
+      images.some(({ alt }) => !alt.trim())
     )
-      media++;
+      throw new Error(
+        `Seed listing needs at least three distinct photos with alt text: ${page.copy.name}`,
+      );
 
-    const link =
-      page.kind === "package" && page.index < 3
-        ? {
-            kind: "service" as const,
-            id: input.catalog.services[page.index].id,
-            caption:
-              "Explore this separately priced service as an optional idea; it is not included in this package.",
-          }
-        : page.kind === "service" && page.index === 0
-          ? {
-              kind: "package" as const,
-              id: input.catalog.packages[0].id,
-              caption:
-                "Explore this related package; this link does not include the service or establish availability.",
-            }
-          : undefined;
+    const mediaIds = images.map(({ file }) => catalogPhotoId(page.key, file));
 
     const content = buildCatalogCanvas(
       page.copy,
-      mediaId,
+      mediaIds,
       (part) => scenarioId(`${page.key}:${part}`),
-      page.index,
-      link,
+      {
+        index: page.index,
+        title: page.kind === "package" ? "The concept" : "Service overview",
+        relatedServiceId:
+          page.kind === "service"
+            ? activeServicesByName.get(relatedServices[page.copy.name])
+            : undefined,
+      },
     );
+
+    for (const [index, { file }] of images.entries()) {
+      await seedAssetUpload(
+        db,
+        {
+          file,
+          id: mediaIds[index],
+          createdBy: admin.id,
+        },
+        { kind: page.kind, id: page.ownerId },
+      );
+      media++;
+    }
 
     await db
       .updateTable(page.kind === "package" ? "packages" : "services")
       .set({
         canvas: sql`${JSON.stringify(content)}::jsonb`,
-        thumbnail_media_id: mediaId,
+        thumbnail_media_id: mediaIds[0],
       })
       .where("id", "=", page.ownerId)
       .execute();
     canvases++;
   }
 
-  for (let index = 0; index < 20; index++) {
-    if (
-      await insertIfNew(db, "media_assets", {
-        id: scenarioId(`media:extra:${index}`),
-        kind: "image",
-        source: "sample",
-        url: SAMPLE_PHOTOS[index % SAMPLE_PHOTOS.length],
-        storage_key: null,
-        mime_type: null,
-        byte_size: null,
-        created_by: admin.id,
-        created_at: input.now,
-      })
-    )
-      media++;
-  }
+  // Earlier seed databases can still have additional published listings.
+  // Keep those available for missing scenario bookings without recreating them.
+  const packageOrder = [
+    ...input.catalog.packages.map((item) => item.id),
+    ...Array.from(
+      { length: LEGACY_PACKAGE_COUNT - COLLECTION_SIZE },
+      (_, index) => scenarioId(`package:${COLLECTION_SIZE + index}`),
+    ),
+  ];
 
-  // Existing scenario rows are intentionally left untouched. Plan dependent
-  // bookings from their stored state, in the same stable order as the plan.
   const packageRows = await db
     .selectFrom("packages")
     .select([
@@ -235,21 +250,7 @@ export async function seedScenarioCatalog(
       "published_at",
       "package_type",
     ])
-    .where(
-      "id",
-      "in",
-      input.catalog.packages.map((item) => item.id),
-    )
-    .execute();
-
-  const serviceRows = await db
-    .selectFrom("services")
-    .select(["id", "name", "hourly_rate_pesos", "archived_at"])
-    .where(
-      "id",
-      "in",
-      input.catalog.services.map((item) => item.id),
-    )
+    .where("id", "in", packageOrder)
     .execute();
 
   const packageById = new Map(packageRows.map((row) => [row.id, row]));
@@ -258,8 +259,8 @@ export async function seedScenarioCatalog(
 
   const persistedPackages: ScenarioPackage[] = [];
 
-  for (const item of input.catalog.packages) {
-    const row = packageById.get(item.id);
+  for (const id of packageOrder) {
+    const row = packageById.get(id);
 
     if (!row || row.package_type !== "catalog" || row.published_at === null)
       continue;
