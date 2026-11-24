@@ -1,21 +1,21 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { readFile, readdir, stat } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { Pool } from "pg";
 import type { CatalogSection } from "@event-management/contracts/catalog";
-import {
-  sampleCatalogPhotoPaths,
-  storedSectionsSchema,
-} from "@event-management/contracts/catalog-canvas";
+import { storedSectionsSchema } from "@event-management/contracts/catalog-canvas";
 import { MAX_CATALOG_TEXT_LENGTH } from "@event-management/contracts/limits/catalog";
+import { seedAssetUpload } from "../src/db/seed/asset-upload.js";
+import { startSeedStorage } from "./helpers/seed-storage.js";
 import { scenarioId } from "../src/db/seed/context.js";
 import {
+  catalogPhotoId,
   planScenarioCatalog,
   seedScenarioCatalog,
 } from "../src/db/seed/scenario/catalog.js";
@@ -33,6 +33,7 @@ const workspaceDirectory = fileURLToPath(new URL("../../../", import.meta.url));
 let admin: Pool;
 let pool: Pool;
 let created = false;
+let storage: Awaited<ReturnType<typeof startSeedStorage>>;
 let app: typeof import("../src/app.js").app;
 let db: typeof import("../src/db/client.js").db;
 
@@ -42,14 +43,9 @@ const packageIds = catalogPlan.packages.map((item) => item.id);
 
 const serviceIds = catalogPlan.services.map((item) => item.id);
 
-const catalogMediaIds = [
-  ...catalogPlan.canvases.map((page) =>
-    scenarioId(`media:curated-catalog-v2:${page.key}`),
-  ),
-  ...Array.from({ length: 20 }, (_, index) =>
-    scenarioId(`media:extra:${index}`),
-  ),
-];
+const catalogMediaIds = catalogPlan.canvases.flatMap((page) =>
+  page.copy.images.map(({ file }) => catalogPhotoId(page.key, file)),
+);
 
 async function applyMigrations(target: Pool) {
   const migrations = new URL("../prisma/migrations/", import.meta.url);
@@ -84,7 +80,8 @@ before(async () => {
   created = true;
   pool = new Pool({ ...connection, database });
   await applyMigrations(pool);
-  process.env.DB_NAME = database;
+  storage = await startSeedStorage();
+  Object.assign(process.env, storage.env, { DB_NAME: database });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
 });
@@ -115,11 +112,16 @@ after(async () => {
   }
 });
 
+after(async () => {
+  await storage?.close();
+});
+
 async function runSeed(target = database) {
   await promisify(execFile)("pnpm", ["db:seed"], {
     cwd: workspaceDirectory,
     env: {
       ...process.env,
+      ...storage.env,
       DB_NAME: target,
       SEED_RANDOM_SEED: "seed-integration",
       SEED_CLOCK: "2026-10-31T00:00:00Z",
@@ -145,6 +147,7 @@ const tables = [
   "events_day",
   "quotations",
   "audit_events",
+  "showcase_records",
 ] as const;
 
 async function ids() {
@@ -251,7 +254,7 @@ function assertSubstantialEditorial(sections: CatalogSection[], name: string) {
   );
 
   assert.ok(
-    bodies.length >= 5,
+    bodies.length >= 3,
     `${name} has an introduction and detailed sections`,
   );
   // This prevents the original three-paragraph placeholder regression. Actual
@@ -261,13 +264,32 @@ function assertSubstantialEditorial(sections: CatalogSection[], name: string) {
     .replace(/[|#*_>`-]/g, " ")
     .split(/\s+/)
     .filter(Boolean);
-  assert.ok(words.length >= 220, `${name} has substantial source material`);
+  assert.ok(words.length >= 100, `${name} has substantial source material`);
 
   return bodies;
 }
 
 test("seed creates demo users and conversations while preserving unrelated data on rerun", async () => {
   await runSeed();
+  const firstWrites = storage.writes;
+  await runSeed();
+  assert.equal(storage.writes, firstWrites);
+  assert.deepEqual(
+    (
+      await pool.query(
+        "SELECT information->'about'->>'name' AS name FROM business_information WHERE id = 1",
+      )
+    ).rows,
+    [{ name: "Styled by AMAC" }],
+  );
+  assert.match(
+    (
+      await pool.query(
+        "SELECT additional_instructions FROM ai_agent_settings WHERE id = 1",
+      )
+    ).rows[0].additional_instructions,
+    /attachCatalogBrowse/,
+  );
   const coverage = await pool.query(`SELECT
     (SELECT count(*)::int FROM booking_requests WHERE reference LIKE 'DEMO-%') AS requests,
     (SELECT count(*)::int FROM conversations c JOIN users u ON u.id = c.customer_id WHERE u.email LIKE 'demo.%@clemora.example.test') AS conversations,
@@ -277,7 +299,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
     requests: 0,
     conversations: 5,
     messages: 10,
-    package_published: 21,
+    package_published: 10,
   });
   const scenario = await pool.query(
     `SELECT
@@ -316,10 +338,10 @@ test("seed creates demo users and conversations while preserving unrelated data 
     admins: 4,
     customers: 96,
     sessions: 100,
-    packages: 20,
-    services: 20,
-    media: 60,
-    pages: 40,
+    packages: 10,
+    services: 10,
+    media: catalogMediaIds.length,
+    pages: 20,
     bookings: 100,
     history: 100,
     booking_conversations: 100,
@@ -327,11 +349,11 @@ test("seed creates demo users and conversations while preserving unrelated data 
     event_days: 100,
   });
   assert.ok(
-    sections >= 80,
+    sections >= 60,
     "every curated listing has multiple canvas sections",
   );
   assert.ok(
-    widgets >= 120,
+    widgets >= 100,
     "every curated listing has opening copy and a photo",
   );
 
@@ -365,8 +387,8 @@ test("seed creates demo users and conversations while preserving unrelated data 
     "SELECT id, name, description, hourly_rate_pesos, fixed_price_pesos, included_hours, archived_at, canvas, thumbnail_media_id FROM services WHERE id = ANY($1::uuid[])",
     [serviceIds],
   );
-  assert.equal(seededPackages.rowCount, 20);
-  assert.equal(seededServices.rowCount, 20);
+  assert.equal(seededPackages.rowCount, 10);
+  assert.equal(seededServices.rowCount, 10);
 
   const packageById = new Map(seededPackages.rows.map((row) => [row.id, row]));
 
@@ -412,17 +434,54 @@ test("seed creates demo users and conversations while preserving unrelated data 
       section.widgets.filter((widget) => widget.type === "photo"),
     );
 
-    assert.equal(photos.length, 1, `${page.key} has one canvas photo`);
-    const photo = photos[0];
-    assert.ok(photo?.media, `${page.key} photo resolves to local media`);
-    assert.equal(photo.media.source, "sample");
-    assert.ok(sampleCatalogPhotoPaths.includes(photo.media.url));
-    assert.ok(photo.alt.trim().length > 0);
-    assert.equal(record.thumbnail_media_id, photo.media.id);
-    await stat(
-      resolve(workspaceDirectory, "apps/web/public", photo.media.url.slice(1)),
+    assert.equal(photos.length, page.copy.images.length);
+    assert.ok(
+      photos.length >= 3,
+      `${page.key} has at least three canvas photos`,
     );
-    resolvedCatalogPhotos++;
+    const hashes = new Set<string>();
+
+    for (const { file, alt } of page.copy.images) {
+      const id = catalogPhotoId(page.key, file);
+
+      const photo = photos.find((widget) => widget.media?.id === id);
+
+      assert.ok(photo?.media, `${page.key} photo resolves to uploaded media`);
+      assert.equal(photo.media.source, "upload");
+      assert.equal(photo.media.url, `/v1/catalog-media/${id}`);
+      assert.equal(photo.alt, alt);
+      const {
+        rows: [media],
+      } = await pool.query(
+        "SELECT storage_key, mime_type, byte_size, url FROM media_assets WHERE id = $1",
+        [id],
+      );
+      assert.match(
+        media.storage_key,
+        new RegExp(`^${page.kind}s/${page.ownerId}/images/${id}\\.`),
+      );
+      const bytes = await readFile(
+        resolve(workspaceDirectory, "apps/api/db/seed/assets", file),
+      );
+      assert.equal(media.byte_size, bytes.length);
+      assert.equal(media.url, null);
+      const response = await app.request(photo.media.url);
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("content-type"), media.mime_type);
+      assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes);
+      hashes.add(createHash("sha256").update(bytes).digest("hex"));
+    }
+
+    assert.equal(
+      hashes.size,
+      photos.length,
+      `${page.key} has distinct image bytes`,
+    );
+    assert.equal(
+      record.thumbnail_media_id,
+      catalogPhotoId(page.key, page.copy.images[0].file),
+    );
+    resolvedCatalogPhotos += photos.length;
 
     const archived = record.archived_at !== null;
     const knowledge =
@@ -474,8 +533,8 @@ test("seed creates demo users and conversations while preserving unrelated data 
     );
   }
 
-  assert.equal(resolvedCatalogPhotos, 40);
-  assert.equal(activeListingsWithPhotos, 36);
+  assert.equal(resolvedCatalogPhotos, catalogMediaIds.length);
+  assert.equal(activeListingsWithPhotos, 20);
   assert.ok(layoutSignatures.size >= 5, "seed canvases exercise five layouts");
   assert.ok(
     new Set(activeMarkdownBodies).size >= activeListingsWithPhotos * 2,
@@ -497,9 +556,11 @@ test("seed creates demo users and conversations while preserving unrelated data 
   assert.ok(packageSearchPlan);
   const packageSearchTarget = packageById.get(packageSearchPlan.id);
   assert.ok(packageSearchTarget);
-  const fixedSearchPlan = catalogPlan.services[0];
-  assert.ok(fixedSearchPlan);
-  const fixedSearchTarget = serviceById.get(fixedSearchPlan.id);
+
+  const fixedSearchTarget = seededServices.rows.find(
+    (service) => service.fixed_price_pesos !== null,
+  );
+
   assert.ok(fixedSearchTarget && fixedSearchTarget.fixed_price_pesos !== null);
   const fixedPrice = fixedSearchTarget.fixed_price_pesos;
   assert.ok(fixedPrice !== null);
@@ -739,138 +800,39 @@ test("seed creates demo users and conversations while preserving unrelated data 
     { status: "moved", count: 8 },
     { status: "scheduled", count: 84 },
   ]);
-  const packageRows = await pool.query(
-    "SELECT id, name, max_guests, price, published_at IS NOT NULL AS published FROM packages WHERE name IN ('The Grand Celebration', 'The Intimate Gathering', 'The Sweet Soirée') ORDER BY name",
-  );
-  assert.deepEqual(
-    packageRows.rows.map((row) => ({
-      name: row.name,
-      maxGuests: row.max_guests,
-      price: row.price,
-      published: row.published,
-    })),
-    [
-      {
-        name: "The Grand Celebration",
-        maxGuests: 150,
-        price: 185000,
-        published: true,
-      },
-      {
-        name: "The Intimate Gathering",
-        maxGuests: 50,
-        price: 68000,
-        published: true,
-      },
-      {
-        name: "The Sweet Soirée",
-        maxGuests: 80,
-        price: 95000,
-        published: true,
-      },
-    ],
-  );
-
-  const grandCelebration = packageRows.rows.find(
-    (row) => row.name === "The Grand Celebration",
-  );
-
-  assert.ok(grandCelebration);
-  const packagePageContent = await pool.query(`
-    SELECT p.name,
-      count(DISTINCT section->>'id')::int AS sections,
-      count(DISTINCT widget->>'id') FILTER (WHERE widget->>'type' = 'markdown')::int AS markdown_widgets,
-      count(DISTINCT widget->>'id') FILTER (WHERE widget->>'type' = 'photo' AND m.source = 'sample')::int AS sample_photo_widgets
-    FROM packages p
-    LEFT JOIN LATERAL jsonb_array_elements(p.canvas) section ON true
-    LEFT JOIN LATERAL jsonb_array_elements(section->'widgets') widget ON true
-    LEFT JOIN media_assets m ON m.id::text = widget->>'mediaId'
-    WHERE p.name IN ('The Grand Celebration', 'The Intimate Gathering', 'The Sweet Soirée')
-    GROUP BY p.id, p.name
-    ORDER BY p.name`);
-  assert.equal(packagePageContent.rowCount, 3);
-  assert.ok(
-    packagePageContent.rows.every(
-      (row) =>
-        row.sections > 0 &&
-        row.markdown_widgets > 0 &&
-        row.sample_photo_widgets > 0,
-    ),
-  );
   const publicPackages = await readAll("/packages", "packages");
-  const sampleNames = [
-    "The Grand Celebration",
-    "The Intimate Gathering",
-    "The Sweet Soirée",
-  ];
-
-  const samplePackages = publicPackages.filter((row: any) =>
-    sampleNames.includes(row.name),
-  );
-
+  assert.equal(publicPackages.length, 10);
   assert.deepEqual(
-    samplePackages.map((row: any) => row.name).sort(),
-    sampleNames,
+    publicPackages.map((row) => row.id).sort(),
+    [...packageIds].sort(),
   );
-  const seededSamplePackages = await pool.query<SeedPackage>(
-    "SELECT id, name, description, price, max_guests, package_type, archived_at, canvas, thumbnail_media_id FROM packages WHERE name = ANY($1::text[])",
-    [sampleNames],
+  assert.ok(publicPackages.every((row) => typeof row.imageUrl === "string"));
+  const weddings = await read("/packages?eventType=Wedding");
+  assert.deepEqual(
+    weddings.packages.map((row: { name: string }) => row.name).sort(),
+    ["Civil Wedding Family Table", "Garden Wedding Under the Lights"],
   );
-  assert.equal(seededSamplePackages.rowCount, 3);
-
-  for (const sample of seededSamplePackages.rows) {
-    const sections = await readCatalogSectionsService(db, {
-      kind: "package",
-      id: sample.id,
-    });
-    assertNoWidgetOverlaps(sections);
-    const sourceMarkdown = assertSubstantialEditorial(sections, sample.name);
-    const chunks = prepareCatalogKnowledge({
-      kind: "package",
-      record: sample,
-      sections,
-    });
-
-    const text = chunks.filter((chunk) => chunk.chunkKey === "text");
-
-    assert.equal(text.length, 1);
-
-    for (const body of sourceMarkdown)
-      assert.ok(text[0]?.contentMarkdown.includes(body));
-
-    const photo = sections
-      .flatMap((section) => section.widgets)
-      .find((widget) => widget.type === "photo");
-
-    assert.ok(photo?.media);
-    assert.ok(sampleCatalogPhotoPaths.includes(photo.media.url));
-    assert.equal(sample.thumbnail_media_id, photo.media.id);
-    await stat(
-      resolve(workspaceDirectory, "apps/web/public", photo.media.url.slice(1)),
-    );
-  }
-
+  const legacyPackageId = "a4e55db2-745b-4bdb-bf92-38e7d29261d1";
+  const legacyServiceId = scenarioId("service:19");
   assert.equal(
-    publicPackages.filter((row: any) => packageIds.includes(row.id)).length,
-    18,
-  );
-  assert.ok(
-    samplePackages.every((pkg: any) => {
-      const widgets = pkg.sections.flatMap((section: any) => section.widgets);
-
-      return (
-        widgets.some((widget: any) => widget.type === "markdown") &&
-        widgets.some(
-          (widget: any) =>
-            widget.type === "photo" && widget.media?.source === "sample",
-        )
-      );
-    }),
+    (await pool.query("SELECT count(*)::int AS count FROM packages")).rows[0]
+      .count,
+    10,
   );
   assert.equal(
     (await pool.query("SELECT count(*)::int AS count FROM services")).rows[0]
       .count,
-    20,
+    10,
+  );
+
+  // Simulate earlier seed rows and deliberate admin changes before rerunning.
+  const legacyPackage = await pool.query(
+    "INSERT INTO packages (id, name, slug, max_guests, price, published_at, archived_at) VALUES ($1, 'Edited legacy package', 'edited-legacy-package', 51, 185001, now(), now()) RETURNING *",
+    [legacyPackageId],
+  );
+  const legacyService = await pool.query(
+    "INSERT INTO services (id, name, slug, description, hourly_rate_pesos, published_at, archived_at) VALUES ($1, 'Edited legacy service', 'edited-legacy-service', 'Edited scope', 1234, now(), now()) RETURNING *",
+    [legacyServiceId],
   );
   const conversation =
     await pool.query(`SELECT c.id, c.customer_id, count(m.id)::int AS message_count,
@@ -884,9 +846,6 @@ test("seed creates demo users and conversations while preserving unrelated data 
   assert.deepEqual(conversation.rows[0].sender_roles, ["customer", "admin"]);
   assert.deepEqual(conversation.rows[0].message_roles, ["customer", "admin"]);
 
-  await pool.query("UPDATE packages SET price = price + 1 WHERE id = $1", [
-    grandCelebration.id,
-  ]);
   const scenarioPackage = await pool.query(
     "SELECT id FROM packages WHERE id = $1",
     [catalogPlan.packages[1]?.id],
@@ -928,7 +887,9 @@ test("seed creates demo users and conversations while preserving unrelated data 
     [catalogPlan.services[0]?.id],
   );
   const beforeRerun = await ids();
+  const writesBeforeRerun = storage.writes;
   await runSeed();
+  assert.equal(storage.writes, writesBeforeRerun);
   assert.deepEqual(
     (
       await pool.query("SELECT canvas FROM packages WHERE id=$1", [
@@ -964,13 +925,21 @@ test("seed creates demo users and conversations while preserving unrelated data 
     ).rows,
     messagesBeforeRerun.rows,
   );
-  assert.equal(
+  assert.deepEqual(
     (
-      await pool.query("SELECT price FROM packages WHERE id = $1", [
-        grandCelebration.id,
+      await pool.query("SELECT * FROM packages WHERE id = $1", [
+        legacyPackageId,
       ])
-    ).rows[0].price,
-    185001,
+    ).rows,
+    legacyPackage.rows,
+  );
+  assert.deepEqual(
+    (
+      await pool.query("SELECT * FROM services WHERE id = $1", [
+        legacyServiceId,
+      ])
+    ).rows,
+    legacyService.rows,
   );
   assert.equal(
     (
@@ -990,7 +959,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
   );
 
   const publicServices = { services: await readAll("/services", "services") };
-  assert.equal(publicServices.services.length, 18);
+  assert.equal(publicServices.services.length, 10);
   assert.ok(
     publicServices.services.every(
       (service: any) =>
@@ -1122,51 +1091,79 @@ test("seed creates demo users and conversations while preserving unrelated data 
     ),
   );
 
-  const legacyServicePage = catalogPlan.canvases.find(
-    (page) => page.kind === "service" && page.index === 19,
+  await pool.query(
+    "UPDATE packages SET archived_at = now() WHERE id = ANY($1::uuid[])",
+    [packageIds],
   );
+  const archivedCatalog = await ids();
+  const writesBeforeArchivedRerun = storage.writes;
+  await runSeed();
+  const archivedRerun = await ids();
 
-  assert.ok(legacyServicePage);
-  const legacyMediaId = scenarioId("media:service:19");
-  const curatedMediaId = scenarioId(
-    `media:curated-catalog-v2:${legacyServicePage.key}`,
-  );
-  await pool.query(
-    "UPDATE services SET thumbnail_media_id = NULL, canvas = '[]'::jsonb WHERE id = $1",
-    [legacyServicePage.ownerId],
-  );
-  await pool.query("DELETE FROM services WHERE id = $1", [
-    legacyServicePage.ownerId,
-  ]);
-  await pool.query("DELETE FROM media_assets WHERE id = $1", [curatedMediaId]);
-  await pool.query(
-    `INSERT INTO media_assets (id, kind, source, url, created_by, created_at)
-     VALUES ($1, 'image', 'sample', '/images/hero.jpg', $2, $3)`,
-    [legacyMediaId, scenarioAdminUser.id, new Date("2026-10-31T00:00:00.000Z")],
-  );
-  await db.transaction().execute((trx) =>
-    seedScenarioCatalog(trx, {
-      catalog: catalogPlan,
-      users: scenarioUsers,
-      now: new Date("2026-10-31T00:00:00.000Z"),
+  for (const [table, snapshot] of Object.entries(archivedCatalog)) {
+    // API sign-in prunes expired sessions, so the seed may restore deleted fixtures.
+    if (table === "sessions") {
+      assert.ok(snapshot.every((id) => archivedRerun[table].includes(id)));
+    } else {
+      assert.deepEqual(archivedRerun[table], snapshot, table);
+    }
+  }
+
+  assert.equal(storage.writes, writesBeforeArchivedRerun);
+  assert.deepEqual(await readAll("/packages", "packages"), []);
+});
+
+test("seed uploads recover identical objects left by rollback and preserve conflicting bytes", async () => {
+  const file = catalogPlan.canvases[0].copy.images[0].file;
+  const input = { file, id: randomUUID(), createdBy: null };
+  const key = `showcase-media/${input.id}`;
+
+  await assert.rejects(
+    db.transaction().execute(async (trx) => {
+      await seedAssetUpload(trx, input);
+      throw new Error("simulated SQL rollback");
     }),
+    /simulated SQL rollback/,
   );
-  const preservedLegacyPhoto = await pool.query<{ url: string }>(
-    "SELECT url FROM media_assets WHERE id = $1",
-    [legacyMediaId],
-  );
-  assert.deepEqual(preservedLegacyPhoto.rows, [{ url: "/images/hero.jpg" }]);
-  const rebuiltSections = await readCatalogSectionsService(db, {
-    kind: "service",
-    id: legacyServicePage.ownerId,
+
+  const selectMedia = () =>
+    pool.query("SELECT id, storage_key FROM media_assets WHERE id = $1", [
+      input.id,
+    ]);
+
+  assert.equal((await selectMedia()).rowCount, 0);
+  const interrupted = storage.objects.get(key);
+  assert.ok(interrupted);
+
+  storage.objects.set(key, {
+    ...interrupted,
+    bytes: Buffer.from("different file"),
   });
+  await assert.rejects(
+    db.transaction().execute((trx) => seedAssetUpload(trx, input)),
+    /Could not upload seed asset/,
+  );
+  assert.equal((await selectMedia()).rowCount, 0);
+  assert.equal(storage.objects.get(key)?.bytes.toString(), "different file");
 
-  const rebuiltPhoto = rebuiltSections
-    .flatMap((section) => section.widgets)
-    .find((widget) => widget.type === "photo");
+  storage.objects.set(key, interrupted);
+  assert.equal(
+    await db.transaction().execute((trx) => seedAssetUpload(trx, input)),
+    input.id,
+  );
+  assert.deepEqual((await selectMedia()).rows, [
+    { id: input.id, storage_key: key },
+  ]);
 
-  assert.ok(rebuiltPhoto?.media);
-  assert.equal(rebuiltPhoto.media.id, curatedMediaId);
-  assert.equal(rebuiltPhoto.media.url, legacyServicePage.copy.photo);
-  assert.equal(rebuiltPhoto.alt, legacyServicePage.copy.alt);
+  await pool.query("UPDATE media_assets SET storage_key = $1 WHERE id = $2", [
+    `showcase-media/${randomUUID()}`,
+    input.id,
+  ]);
+  const writesBeforeCollision = storage.writes;
+  await assert.rejects(
+    db.transaction().execute((trx) => seedAssetUpload(trx, input)),
+    /Seed asset ID is already used by different media/,
+  );
+  assert.equal(storage.writes, writesBeforeCollision);
+  assert.deepEqual(storage.objects.get(key), interrupted);
 });

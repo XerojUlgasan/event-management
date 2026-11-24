@@ -7,6 +7,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
+import { startSeedStorage } from "./helpers/seed-storage.js";
 import type { Profile } from "../src/controllers/auth/profile.js";
 
 const projectId = "demo-event-management";
@@ -782,7 +783,9 @@ test("OpenAPI describes both account methods and never exposes the password hash
   assert.equal(JSON.stringify(spec).includes("password_hash"), false);
 });
 
-test("db:seed inserts fixtures without changing existing accounts or sessions", async () => {
+test("db:seed inserts fixtures without changing existing accounts or sessions", async (t) => {
+  const storage = await startSeedStorage();
+  t.after(storage.close);
   const unrelated = await register("unrelated-seed@example.com");
   const collision = await db
     .insertInto("users")
@@ -823,6 +826,7 @@ test("db:seed inserts fixtures without changing existing accounts or sessions", 
         cwd: fileURLToPath(new URL("../", import.meta.url)),
         env: {
           ...process.env,
+          ...storage.env,
           FIREBASE_PROJECT_ID: "",
           FIREBASE_CLIENT_EMAIL: "",
           FIREBASE_PRIVATE_KEY: "",

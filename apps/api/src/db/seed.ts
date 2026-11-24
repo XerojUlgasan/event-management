@@ -5,7 +5,8 @@ import { hashPassword } from "../utils/password.js";
 import { LOCAL_PASSWORD } from "./seed/context.js";
 import { seedScenario } from "./seed/scenario/index.js";
 import { seedDemo } from "./seed-demo.js";
-import { seedSamplePackages } from "./seed-packages.js";
+import { seedAgentSettings } from "./seed/agent-settings.js";
+import { seedBusinessInformation } from "./seed/business-information.js";
 import { seedSampleShowcases } from "./seed-showcases.js";
 
 const legacyAccounts = [
@@ -49,12 +50,13 @@ try {
       if (row) rows.push(row);
     }
 
-    const packageCount = await seedSamplePackages(db);
+    await seedBusinessInformation(db);
+    await seedAgentSettings(db);
     const showcaseCount = await seedSampleShowcases(db);
     const demo = await seedDemo(db, passwordHash);
     const scenario = await seedScenario(db, passwordHash);
 
-    return { accounts: rows, packageCount, showcaseCount, demo, scenario };
+    return { accounts: rows, showcaseCount, demo, scenario };
   });
 
   console.table(
@@ -64,7 +66,7 @@ try {
     })),
   );
   console.log(
-    `Inserted ${seeded.accounts.length} local accounts, ${seeded.packageCount} sample packages, and ${seeded.showcaseCount} sample showcases.`,
+    `Inserted ${seeded.accounts.length} local accounts and ${seeded.showcaseCount} showcases.`,
   );
   console.log("Inserted connected demo rows:", seeded.demo);
   console.log("Inserted scenario rows:", seeded.scenario);
