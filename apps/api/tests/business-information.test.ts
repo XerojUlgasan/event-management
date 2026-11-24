@@ -22,6 +22,7 @@ import {
 } from "./fixtures/business-information.js";
 import { BUSINESS_INFORMATION_JSON_BODY_LIMIT_BYTES } from "../src/constants/http.js";
 import { hashSessionToken } from "../src/utils/session.js";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const database = `em_business_info_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -61,7 +62,7 @@ before(async () => {
       ),
     );
 
-  process.env.DB_NAME = database;
+  setTestConfig({ DB_NAME: database });
   ({ app } = await import("../src/app.js"));
   ({ app: edge } = await import("../src/edge/server.js"));
   ({ db } = await import("../src/db/client.js"));

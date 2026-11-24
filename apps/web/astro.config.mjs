@@ -3,13 +3,13 @@ import cloudflare from "@astrojs/cloudflare";
 import node from "@astrojs/node";
 import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
-import { env } from "./src/lib/server/config/env.ts";
+import { config } from "./src/env.ts";
 
 // The local Supabase gateway forces Access-Control-Allow-Origin: *, which browsers
 // reject when the page sends cookies. pnpm dev sets API_PROXY_TARGET so browser
 // calls stay on the website origin and this server forwards them to the gateway.
-const apiProxyTarget = env.API_PROXY_TARGET;
-const useCloudflare = env.ASTRO_ADAPTER === "cloudflare";
+const apiProxyTarget = config.API_PROXY_TARGET;
+const useCloudflare = config.ASTRO_ADAPTER === "cloudflare";
 
 export default defineConfig({
   output: "server",

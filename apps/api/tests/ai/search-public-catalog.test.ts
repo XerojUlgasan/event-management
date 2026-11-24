@@ -16,6 +16,7 @@ import { KnowledgeSearchUnavailable } from "../../src/services/ai/retrieval/sear
 import { syncCatalogKnowledge } from "../../src/services/ai/workflows/sync-catalog-knowledge.js";
 import { catalogKnowledgeDigest } from "../../src/services/ai/catalog-knowledge-hash.js";
 import { saveCatalogKnowledgeEmbeddingData } from "../../src/data/ai/save-catalog-knowledge-embedding.js";
+import { setTestConfig } from "../helpers/set-test-config.js";
 
 const database = `em_public_search_${randomUUID().replaceAll("-", "")}`;
 
@@ -32,8 +33,8 @@ let embeddingRequest: unknown;
 const vector = (x: number, y: number) => [x, y, ...Array(766).fill(0)];
 
 before(async () => {
-  process.env.AI_GATEWAY_API_KEY = "fixture-key";
-  process.env.EMBEDDING_MODEL = model;
+  setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
+  setTestConfig({ EMBEDDING_MODEL: model });
   globalThis.fetch = async (_input, init) => {
     calls++;
     embeddingRequest = JSON.parse(String(init?.body));
@@ -69,11 +70,11 @@ before(async () => {
 after(async () => {
   globalThis.fetch = originalFetch;
 
-  if (originalKey === undefined) delete process.env.AI_GATEWAY_API_KEY;
-  else process.env.AI_GATEWAY_API_KEY = originalKey;
+  if (originalKey === undefined) setTestConfig({ AI_GATEWAY_API_KEY: undefined });
+  else setTestConfig({ AI_GATEWAY_API_KEY: originalKey });
 
-  if (originalModel === undefined) delete process.env.EMBEDDING_MODEL;
-  else process.env.EMBEDDING_MODEL = originalModel;
+  if (originalModel === undefined) setTestConfig({ EMBEDDING_MODEL: undefined });
+  else setTestConfig({ EMBEDDING_MODEL: originalModel });
 
   await db?.destroy();
 

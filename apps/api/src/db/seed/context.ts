@@ -1,4 +1,4 @@
-import { env } from "../../utils/env.js";
+import { config } from "../../env.js";
 import { createHash } from "node:crypto";
 import type { Insertable, Transaction } from "kysely";
 import type { DB } from "../types.js";
@@ -26,7 +26,7 @@ export function scenarioIndex(index: number) {
 }
 
 export function seedClock() {
-  const value = env.SEED_CLOCK;
+  const value = config.SEED_CLOCK;
 
   if (!value) return new Date();
 
@@ -45,7 +45,9 @@ export function seedClock() {
 }
 
 /** Deterministic unit interval. SEED_RANDOM_SEED changes the shuffle only. */
-export function seedRandom(seedText = env.SEED_RANDOM_SEED) {
+const { SEED_RANDOM_SEED = "clemora-scenario-v1" } = config;
+
+export function seedRandom(seedText = SEED_RANDOM_SEED) {
   let hash = 2166136261;
 
   for (let i = 0; i < seedText.length; i += 1)

@@ -2,10 +2,10 @@ import {
   businessInformationResponseSchema,
   type BusinessInformationResponse,
 } from "@event-management/contracts/business-information";
-import { env } from "../config/env";
+import { getServerApiUrl } from "../http/api-url";
 
 export async function loadBusinessInformation(): Promise<BusinessInformationResponse> {
-  const response = await fetch(`${env.SERVER_API_URL}/business-information`, {
+  const response = await fetch(`${getServerApiUrl()}/business-information`, {
     cache: "no-store",
     signal: AbortSignal.timeout(3000),
   });

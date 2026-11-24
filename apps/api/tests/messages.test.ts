@@ -8,6 +8,7 @@ import { Pool } from "pg";
 import { sql } from "kysely";
 import { hashSessionToken } from "../src/utils/session.js";
 import { encodePageCursor } from "../src/utils/pagination.js";
+import { setTestConfig } from "./helpers/set-test-config.js";
 
 const database = `em_messages_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -121,8 +122,8 @@ before(async () => {
   }
 
   // This human-messaging suite must never make live provider requests.
-  delete process.env.AI_GATEWAY_API_KEY;
-  process.env.DB_NAME = database;
+  setTestConfig({ AI_GATEWAY_API_KEY: undefined });
+  setTestConfig({ DB_NAME: database });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
 
@@ -205,14 +206,14 @@ test("Realtime tokens are limited to the live session and requested receive scop
   const existingKey = process.env.REALTIME_JWT_SIGNING_JWK;
   const existingSecret = process.env.REALTIME_JWT_SECRET;
   t.after(() => {
-    if (existingKey === undefined) delete process.env.REALTIME_JWT_SIGNING_JWK;
-    else process.env.REALTIME_JWT_SIGNING_JWK = existingKey;
+    if (existingKey === undefined) setTestConfig({ REALTIME_JWT_SIGNING_JWK: undefined });
+    else setTestConfig({ REALTIME_JWT_SIGNING_JWK: existingKey });
 
-    if (existingSecret === undefined) delete process.env.REALTIME_JWT_SECRET;
-    else process.env.REALTIME_JWT_SECRET = existingSecret;
+    if (existingSecret === undefined) setTestConfig({ REALTIME_JWT_SECRET: undefined });
+    else setTestConfig({ REALTIME_JWT_SECRET: existingSecret });
   });
-  delete process.env.REALTIME_JWT_SIGNING_JWK;
-  delete process.env.REALTIME_JWT_SECRET;
+  setTestConfig({ REALTIME_JWT_SIGNING_JWK: undefined });
+  setTestConfig({ REALTIME_JWT_SECRET: undefined });
 
   const id = randomUUID();
   const guestConversationId = randomUUID();
@@ -267,10 +268,10 @@ test("Realtime tokens are limited to the live session and requested receive scop
 
   const kid = randomUUID();
   const pair = await generateKeyPair("ES256", { extractable: true });
-  process.env.REALTIME_JWT_SIGNING_JWK = JSON.stringify({
+  setTestConfig({ REALTIME_JWT_SIGNING_JWK: JSON.stringify({
     ...(await exportJWK(pair.privateKey)),
     kid,
-  });
+  }) });
 
   for (const cookie of [customerCookie, adminCookie]) {
     const response = await issue(id, cookie);

@@ -26,6 +26,7 @@ import { humanHandoffAcknowledgement } from "../../src/data/messages/request-hum
 import { runAssistantTurnService } from "../../src/services/ai/run-assistant-turn.js";
 import { getMyPackageService } from "../../src/services/ai/get-my-package.js";
 import { syncCatalogKnowledge } from "../../src/services/ai/workflows/sync-catalog-knowledge.js";
+import { setTestConfig } from "../helpers/set-test-config.js";
 
 const database = `em_ai_test_${randomUUID().replaceAll("-", "")}`;
 
@@ -216,9 +217,9 @@ before(async () => {
     );
   }
 
-  process.env.DB_NAME = database;
-  process.env.AI_GATEWAY_API_KEY = "fixture-key";
-  process.env.TEXT_MODEL = modelId;
+  setTestConfig({ DB_NAME: database });
+  setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
+  setTestConfig({ TEXT_MODEL: modelId });
   useReply("Hello from AMAC AI");
   ({ app } = await import("../../src/app.js"));
   ({ db } = await import("../../src/db/client.js"));
@@ -1227,8 +1228,8 @@ for (const sample of [
         "Configure the live AMAC text model and Gateway key",
       );
       const previousProvider = globalThis.AI_SDK_DEFAULT_PROVIDER;
-      process.env.TEXT_MODEL = liveModelId;
-      process.env.AI_GATEWAY_API_KEY = liveGatewayKey;
+      setTestConfig({ TEXT_MODEL: liveModelId });
+      setTestConfig({ AI_GATEWAY_API_KEY: liveGatewayKey });
       delete globalThis.AI_SDK_DEFAULT_PROVIDER;
 
       try {
@@ -1263,8 +1264,8 @@ for (const sample of [
         );
       } finally {
         globalThis.AI_SDK_DEFAULT_PROVIDER = previousProvider;
-        process.env.TEXT_MODEL = modelId;
-        process.env.AI_GATEWAY_API_KEY = "fixture-key";
+        setTestConfig({ TEXT_MODEL: modelId });
+        setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
       }
     },
   );
@@ -2519,8 +2520,8 @@ test(
       "Configure the live AMAC text model and Gateway key",
     );
     const previousProvider = globalThis.AI_SDK_DEFAULT_PROVIDER;
-    process.env.TEXT_MODEL = liveModelId;
-    process.env.AI_GATEWAY_API_KEY = liveGatewayKey;
+    setTestConfig({ TEXT_MODEL: liveModelId });
+    setTestConfig({ AI_GATEWAY_API_KEY: liveGatewayKey });
     delete globalThis.AI_SDK_DEFAULT_PROVIDER;
 
     try {
@@ -2680,8 +2681,8 @@ test(
       assert.match(updatedReply, /venue layout/i);
       assert.doesNotMatch(updatedReply, /reception start time/i);
     } finally {
-      process.env.TEXT_MODEL = modelId;
-      process.env.AI_GATEWAY_API_KEY = "fixture-key";
+      setTestConfig({ TEXT_MODEL: modelId });
+      setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
       globalThis.AI_SDK_DEFAULT_PROVIDER = previousProvider;
     }
   },
@@ -2696,8 +2697,8 @@ test(
       "Configure the live AMAC text model and Gateway key",
     );
     const previousProvider = globalThis.AI_SDK_DEFAULT_PROVIDER;
-    process.env.TEXT_MODEL = liveModelId;
-    process.env.AI_GATEWAY_API_KEY = liveGatewayKey;
+    setTestConfig({ TEXT_MODEL: liveModelId });
+    setTestConfig({ AI_GATEWAY_API_KEY: liveGatewayKey });
     delete globalThis.AI_SDK_DEFAULT_PROVIDER;
 
     const firstEmail = `first-${randomUUID()}@example.test`;
@@ -2754,8 +2755,8 @@ test(
         `Removed emails must not appear in reply: ${missingReply}`,
       );
     } finally {
-      process.env.TEXT_MODEL = modelId;
-      process.env.AI_GATEWAY_API_KEY = "fixture-key";
+      setTestConfig({ TEXT_MODEL: modelId });
+      setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
       globalThis.AI_SDK_DEFAULT_PROVIDER = previousProvider;
     }
   },
@@ -3014,11 +3015,11 @@ test("provider failure, missing configuration, and empty output preserve the cus
         throw new Error("private-provider-payload");
       };
 
-    if (failure === "config") delete process.env.AI_GATEWAY_API_KEY;
+    if (failure === "config") setTestConfig({ AI_GATEWAY_API_KEY: undefined });
 
     const id = await conversation();
     const result = await send(id, "Save this message");
-    process.env.AI_GATEWAY_API_KEY = "fixture-key";
+    setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
     assert.equal(result.assistantMessage, null);
     assert.match(result.assistantError ?? "", /message was saved/);
     assert.doesNotMatch(JSON.stringify(result), /private-provider-payload/);
@@ -3352,11 +3353,10 @@ function mockPhotoBoundaries(
     (key) => [key, process.env[key]] as const,
   );
 
-  Object.assign(process.env, settings);
+  setTestConfig(settings);
   t.after(() => {
     for (const [key, value] of before) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
+      setTestConfig({ [key]: value });
     }
   });
 
@@ -3455,12 +3455,15 @@ async function seedPhotoRecommendationPackage(t: TestContext) {
   t.after(async () => {
     await db.deleteFrom("packages").where("id", "=", listing.id).execute();
   });
+
   const chunks = await db
     .transaction()
     .execute((trx) =>
       syncCatalogKnowledge(trx, { kind: "package", id: listing.id }),
     );
+
   const photo = chunks.find(({ chunk_key }) => chunk_key.startsWith("photo:"));
+
   assert.ok(photo);
   const hash = `${photo.content_hash}:${catalogKnowledgeDigest(photo.content_markdown)}`;
   await db
@@ -3601,6 +3604,7 @@ test("a second photo search supersedes cards attached earlier in the same reply"
   const id = await conversation();
   const photos = await savePhotoReferences(id, 2);
   mockPhotoBoundaries(t, photos);
+
   const searchCalls = photos.map(({ row }) => ({
     toolName: "searchPublicCatalog" as const,
     input: {
@@ -3609,6 +3613,7 @@ test("a second photo search supersedes cards attached earlier in the same reply"
       ...listing.filter,
     },
   }));
+
   const [first, second] = searchCalls;
   assert.ok(first && second);
   const body = `Photo 1: ${listing.link}\nPhoto 2: ${listing.link}`;
@@ -4560,6 +4565,7 @@ for (const { name, outputTokens, expectedCalls } of [
     model.doGenerate = async (...args) => {
       const result = await generate(...args);
       const round = model.doGenerateCalls.length;
+
       if (round > 7 || args[0].toolChoice?.type === "none") return result;
 
       return {
@@ -4613,6 +4619,7 @@ test("the agent reserves time for a final answer after a slow lookup", async (t)
   model.doGenerate = async (...args) => {
     const result = await generate(...args);
     elapsed = 21_000;
+
     return result;
   };
   const result = await send(await conversation(), "Find packages");
@@ -4821,7 +4828,7 @@ test("takeover during search prevents its result from entering the answer", asyn
   const originalFetch = globalThis.fetch;
   const originalEmbeddingModel = process.env.EMBEDDING_MODEL;
   const id = await conversation();
-  process.env.EMBEDDING_MODEL = "google/gemini-embedding-2";
+  setTestConfig({ EMBEDDING_MODEL: "google/gemini-embedding-2" });
   globalThis.fetch = async () => {
     assert.equal(
       (
@@ -4859,8 +4866,8 @@ test("takeover during search prevents its result from entering the answer", asyn
     globalThis.fetch = originalFetch;
 
     if (originalEmbeddingModel === undefined)
-      delete process.env.EMBEDDING_MODEL;
-    else process.env.EMBEDDING_MODEL = originalEmbeddingModel;
+      setTestConfig({ EMBEDDING_MODEL: undefined });
+    else setTestConfig({ EMBEDDING_MODEL: originalEmbeddingModel });
   }
 });
 
@@ -6085,8 +6092,8 @@ test(
   async () => {
     assert.ok(liveModelId && liveGatewayKey);
     const previousProvider = globalThis.AI_SDK_DEFAULT_PROVIDER;
-    process.env.TEXT_MODEL = liveModelId;
-    process.env.AI_GATEWAY_API_KEY = liveGatewayKey;
+    setTestConfig({ TEXT_MODEL: liveModelId });
+    setTestConfig({ AI_GATEWAY_API_KEY: liveGatewayKey });
     delete globalThis.AI_SDK_DEFAULT_PROVIDER;
 
     try {
@@ -6203,8 +6210,8 @@ test(
       assert.equal(history.length, 1);
     } finally {
       globalThis.AI_SDK_DEFAULT_PROVIDER = previousProvider;
-      process.env.TEXT_MODEL = modelId;
-      process.env.AI_GATEWAY_API_KEY = "fixture-key";
+      setTestConfig({ TEXT_MODEL: modelId });
+      setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
     }
   },
 );
@@ -6245,6 +6252,7 @@ test("supporting document and business lookups reach the customer model and reta
     .execute();
   globalThis.fetch = async () =>
     Response.json({ embeddings: [JSON.parse(vector)], warnings: [] });
+
   try {
     useToolCalls([
       {
@@ -6263,14 +6271,17 @@ test("supporting document and business lookups reach the customer model and reta
         ({ name }) => name === "searchSupportingDocuments",
       ),
     );
+
     const parts = model.doGenerateCalls[1].prompt.flatMap((message) =>
       message.role === "tool" ? message.content : [],
     );
+
     const documentPart = parts.find(
       (part) =>
         part.type === "tool-result" &&
         part.toolName === "searchSupportingDocuments",
     );
+
     assert.ok(
       documentPart &&
         documentPart.type === "tool-result" &&
@@ -6286,6 +6297,7 @@ test("supporting document and business lookups reach the customer model and reta
       }[];
     };
     assert.equal(output.results.length, 5);
+
     for (const passage of output.results) {
       assert.deepEqual(Object.keys(passage).sort(), [
         "filename",
@@ -6302,6 +6314,7 @@ test("supporting document and business lookups reach the customer model and reta
       ]);
       assert.equal(passage.text, `Passage ${passage.pageStart}`);
     }
+
     assert.ok(
       parts.some(
         (part) =>
@@ -6325,9 +6338,11 @@ test("supporting document and business lookups reach the customer model and reta
           call.assistant_message_id === result.assistantMessage?.id,
       ),
     );
+
     const audit = calls.find(
       (call) => call.tool_name === "searchSupportingDocuments",
     )!;
+
     assert.deepEqual(audit.input, { query: "venue access" });
     assert.equal((audit.output as { matches: unknown[] }).matches.length, 5);
     assert.doesNotMatch(JSON.stringify(audit.output), /Passage|Venue handbook/);
@@ -6343,6 +6358,7 @@ test("supporting document and business lookups reach the customer model and reta
 test("supporting document lookup distinguishes no matches from an unavailable provider", async () => {
   const originalFetch = globalThis.fetch;
   const vector = [1, ...Array<number>(767).fill(0)];
+
   try {
     globalThis.fetch = async () =>
       Response.json({ embeddings: [vector], warnings: [] });
@@ -6428,6 +6444,7 @@ test("a completed booking draft uses the standard review after a supporting docu
     .execute();
   globalThis.fetch = async () =>
     Response.json({ embeddings: [JSON.parse(vector)], warnings: [] });
+
   try {
     useToolCalls(
       [
