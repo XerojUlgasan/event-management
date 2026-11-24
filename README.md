@@ -322,9 +322,11 @@ The target Supabase project must already serve the Clemora `api` Edge function, 
 To run the Worker locally, start the local Edge stack described above. For an isolated test stack, use the Edge function's Supabase database and Storage as the target for `pnpm db:deploy` and `pnpm db:seed` before testing catalog and sign-in. Verify the local database and Storage targets first. Run these commands from `apps/web`:
 
 ```sh
-ASTRO_ADAPTER=cloudflare PUBLIC_API_URL=/v1 pnpm run build
+CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false ASTRO_ADAPTER=cloudflare PUBLIC_API_URL=/v1 pnpm run build
 pnpm exec wrangler dev --ip 127.0.0.1 --port 8787 --var API_PROXY_TARGET:http://127.0.0.1:54321
 ```
+
+The Cloudflare flag keeps Wrangler from importing the existing local `.env` during the build, so the browser API URL stays on the Worker origin at `/v1`.
 
 For local sign-in, include `http://127.0.0.1:8787` in the local function's `WEB_ORIGIN` and restart its server. Use `pnpm exec wrangler deploy --dry-run` from `apps/web` to check the Worker bundle. The usual Node-based commands (`pnpm dev`, `pnpm all`, and a web build without `ASTRO_ADAPTER`) still use the Node adapter.
 
