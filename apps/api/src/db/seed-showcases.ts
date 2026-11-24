@@ -1,115 +1,116 @@
 import { catalogSlug } from "@event-management/contracts/catalog-slug";
-import { randomUUID } from "node:crypto";
-import type { Transaction } from "kysely";
+import { sql, type Transaction } from "kysely";
+import { replaceShowcaseGalleryData } from "../data/showcase-records/replace-showcase-gallery.js";
+import { lockAndValidateShowcaseMedia } from "../services/showcase/validate-showcase-media.js";
+import { seedAssetUpload } from "./seed/asset-upload.js";
+import { scenarioId } from "./seed/context.js";
 import type { DB } from "./types.js";
 
-/**
- * Seeds sample showcase records with published and draft states.
- * Uses fixed record IDs so the seed is idempotent — safe to run repeatedly.
- * Cover and gallery assets use the checked-in sample photos.
- */
+const samples = [
+  {
+    id: "b5f66ec3-856c-5cec-cf03-49f8e3a37262",
+    title: "Mara & Liam's Garden Wedding",
+    description:
+      "White flowers framed the garden aisle for Mara and Liam's late-afternoon vows. After the ceremony, guests followed the covered arcade to a long reception table, where low flowers left room for conversation across the table. A few sprigs from the bouquet carried the ceremony palette through to dinner.",
+    cover: "garden-ceremony.jpg",
+    gallery: [
+      "garden-bouquet.jpg",
+      "garden-reception.jpg",
+      "garden-place-settings.jpg",
+    ],
+    publishedAt: new Date("2025-11-08T10:00:00Z"),
+  },
+  {
+    id: "b5f66ec3-856c-5cec-cf03-49f8e3a37263",
+    title: "The Studio Sessions",
+    description:
+      "Local creative teams came together for an afternoon of short talks and audience-led discussion. A single stage and a shared screen kept the presentations easy to follow. Participants had time to write down ideas between sessions before the floor opened for questions.",
+    cover: "studio-audience.jpg",
+    gallery: ["studio-stage.jpg", "studio-notes.jpg", "studio-discussion.jpg"],
+    publishedAt: new Date("2025-10-20T10:00:00Z"),
+  },
+  {
+    id: "b5f66ec3-856c-5cec-cf03-49f8e3a37264",
+    title: "A Candlelit Anniversary Dinner",
+    description:
+      "Twenty-four guests marked an anniversary around one long table. Place cards brought both sides of the family together, while candlelight and hanging greenery softened the room. Small plates were served first so guests could settle in before the couple's toast.",
+    cover: "anniversary-long-table.jpg",
+    gallery: [
+      "anniversary-dining-room.jpg",
+      "anniversary-place-card.jpg",
+      "anniversary-first-course.jpg",
+    ],
+    publishedAt: new Date("2025-09-14T10:00:00Z"),
+  },
+  {
+    id: "b5f66ec3-856c-5cec-cf03-49f8e3a37265",
+    title: "Sofia's Eighteenth Birthday Dinner",
+    description:
+      "Sofia's family planned an eighteenth-birthday dinner with round tables and garden-style arrangements in a warm brick dining room. A table near the entrance held the evening's flowers and place details, while the open floor made it easy to move between family tables.",
+    cover: "birthday-dining-room.jpg",
+    gallery: ["birthday-round-table.jpg", "birthday-floral-detail.jpg"],
+    publishedAt: null,
+  },
+];
+
+/** Seed missing showcases and leave existing records and media untouched. */
 export async function seedSampleShowcases(db: Transaction<DB>) {
-  const samples: {
-    id: string;
-    title: string;
-    description: string;
-    photo: "wedding" | "dinner" | "dessert" | "hero";
-    galleryPhotos: ("wedding" | "dinner" | "dessert" | "hero")[];
-    publishedAt: Date | null;
-  }[] = [
-    {
-      id: "b5f66ec3-856c-5cec-cf03-49f8e3a37262",
-      title: "Mara & Liam's Wedding",
-      description:
-        "A garden celebration in Tagaytay with a warm tent reception, string lights, and a long family-style dinner.",
-      photo: "wedding",
-      galleryPhotos: ["dinner", "dessert", "hero"],
-      publishedAt: new Date("2025-11-08T10:00:00Z"),
-    },
-    {
-      id: "b5f66ec3-856c-5cec-cf03-49f8e3a37263",
-      title: "AMAC Corporate Gala 2025",
-      description:
-        "A formal evening for 220 guests — plated dinner, a stage program, and a quiet lounge for late-night conversations.",
-      photo: "dinner",
-      galleryPhotos: ["hero", "dessert"],
-      publishedAt: new Date("2025-10-20T10:00:00Z"),
-    },
-    {
-      id: "b5f66ec3-856c-5cec-cf03-49f8e3a37264",
-      title: "The Vega Wedding",
-      description:
-        "A sunset ceremony on a Batangas cliffside, with candlelit tables and a dessert spread that ran late into the night.",
-      photo: "hero",
-      galleryPhotos: ["wedding", "dessert"],
-      publishedAt: new Date("2025-09-14T10:00:00Z"),
-    },
-    {
-      id: "b5f66ec3-856c-5cec-cf03-49f8e3a37265",
-      title: "Sofia's Debutante Dinner",
-      description:
-        "An intimate eighteenth birthday with a pastel palette, a strings trio, and a family-style dessert table.",
-      photo: "dessert",
-      galleryPhotos: ["dinner", "wedding"],
-      publishedAt: null, // draft
-    },
-  ];
+  // The cover is required at insert time. Serialize seed runs before any upload.
+  await sql`select pg_advisory_xact_lock(hashtextextended('seed:sample-showcases', 0))`.execute(
+    db,
+  );
 
   let count = 0;
 
   for (const sample of samples) {
-    // Skip entirely if the record already exists — keeps the seed idempotent
-    // and avoids inserting orphaned media_assets on repeated runs.
+    const slug = catalogSlug(sample.title);
+
     const existing = await db
       .selectFrom("showcase_records")
       .select("id")
-      .where("id", "=", sample.id)
+      .where((eb) => eb.or([eb("id", "=", sample.id), eb("slug", "=", slug)]))
       .executeTakeFirst();
 
     if (existing) continue;
 
-    // Insert cover media asset.
-    const coverId = randomUUID();
-    await db
-      .insertInto("media_assets")
-      .values({
-        id: coverId,
-        kind: "image",
-        source: "sample",
-        url: `/images/${sample.photo}.jpg`,
-      })
-      .onConflict((oc) => oc.column("id").doNothing())
-      .execute();
+    const uploadPhoto = (file: string) =>
+      seedAssetUpload(db, {
+        file: `showcases/${file}`,
+        id: scenarioId(`showcase-photo:${sample.id}:${file}`),
+        createdBy: null,
+      });
 
-    // Insert showcase record.
+    const coverMediaId = await uploadPhoto(sample.cover);
+    const timestamp = sample.publishedAt ?? new Date();
+    const description = `Demo event. ${sample.description} Photography is illustrative.`;
+
     await db
       .insertInto("showcase_records")
       .values({
         id: sample.id,
-        slug: catalogSlug(sample.title),
+        slug,
         title: sample.title,
-        description: sample.description,
-        cover_media_id: coverId,
+        description,
+        cover_media_id: coverMediaId,
         published_at: sample.publishedAt,
-        created_at: sample.publishedAt ?? new Date(),
-        updated_at: sample.publishedAt ?? new Date(),
+        created_at: timestamp,
+        updated_at: timestamp,
       })
-      .onConflict((oc) => oc.column("id").doNothing())
       .execute();
 
-    await db
-      .insertInto("media_assets")
-      .values(
-        sample.galleryPhotos.map((photoName, position) => ({
-          kind: "image",
-          source: "sample",
-          url: `/images/${photoName}.jpg`,
-          showcase_record_id: sample.id,
-          gallery_position: position,
-        })),
-      )
-      .execute();
+    const mediaIds = [];
 
+    for (const file of sample.gallery) mediaIds.push(await uploadPhoto(file));
+
+    const invalid = await lockAndValidateShowcaseMedia(
+      db,
+      { title: sample.title, description, coverMediaId, mediaIds },
+      sample.id,
+    );
+
+    if (invalid) throw new Error(`${sample.title}: ${invalid.message}`);
+
+    await replaceShowcaseGalleryData(db, sample.id, mediaIds);
     count++;
   }
 
