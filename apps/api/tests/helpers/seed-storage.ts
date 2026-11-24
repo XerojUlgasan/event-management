@@ -65,7 +65,7 @@ export async function startSeedStorage() {
     env: {
       SUPABASE_URL: `http://127.0.0.1:${address.port}`,
       SUPABASE_SERVICE_ROLE_KEY: "local-seed-test",
-      SUPABASE_STORAGE_BUCKET: bucket,
+      STORAGE_BUCKET: bucket,
     },
     close: () =>
       new Promise<void>((resolve, reject) =>

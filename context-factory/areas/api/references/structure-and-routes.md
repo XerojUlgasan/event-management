@@ -11,7 +11,7 @@ Inspect the affected route, service, data query, tests, and callers for the curr
 
 ## Environment configuration
 
-[`src/utils/env.ts`](../../../../apps/api/src/utils/env.ts) owns typed environment reads, defaults, and configuration parsing for Node, Edge, Prisma, seeds, and the local cleanup script. Consumers import `env`; retain existing initialization timing when choosing when to read its getters. Optional Firebase and Storage settings are checked when used. Keep dotenv loading at the existing entry points; the Edge build replaces `dotenv/config` with an empty module. `pnpm check:env` detects raw env reads outside designated app owners, excluding tests and generated bundles.
+[`src/env.ts`](../../../../apps/api/src/env.ts) exports `config` for Node, Edge, Prisma, seeds, and the local cleanup script. Consumers read settings through its getters. Supply required values in the runtime environment and validate integration settings when the feature is used. Keep dotenv loading at the existing entry points. The Edge build replaces `dotenv/config` with an empty module. `pnpm check:env` detects raw environment reads outside the app configuration files, excluding tests and generated bundles.
 
 ## Cross-domain safeguards
 

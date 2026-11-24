@@ -101,6 +101,7 @@ test("runtime targets use only CLI credentials at assigned room ports and explic
     plan,
     {
       TEXT_MODEL: "default-model",
+      SEED_RANDOM_SEED: "room-seed",
       AI_GATEWAY_API_KEY: "example-must-not-be-used",
       DB_PASSWORD: "example-password",
     },
@@ -113,10 +114,12 @@ test("runtime targets use only CLI credentials at assigned room ports and explic
   assert.equal(env.DB_PASSWORD, "local-password");
   assert.equal(env.DB_NAME, "postgres");
   assert.equal(env.SUPABASE_SERVICE_ROLE_KEY, "local-service-key");
+  assert.equal(env.STORAGE_BUCKET, "event-management");
   assert.equal(env.PUBLIC_API_URL, plan.apiUrl);
   assert.equal(env.WEB_ORIGIN, plan.webUrl);
   assert.equal(env.API_PROXY_TARGET, "");
   assert.equal(env.TEXT_MODEL, "default-model");
+  assert.equal(env.SEED_RANDOM_SEED, "room-seed");
   assert.equal(env.AI_GATEWAY_API_KEY, "opt-in-key");
   assert.equal(env.DOTENV_CONFIG_PATH, "/repo/.room/.state/test/runtime.env");
   assert.equal(env.FIREBASE_PROJECT_ID, "");

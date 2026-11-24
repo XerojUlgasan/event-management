@@ -216,7 +216,8 @@ function QuotationsView({
     loadedStatus && loadedStatus.previous === bookingStatus
       ? loadedStatus.value
       : bookingStatus;
-  const closed = status === "declined" || status === "cancelled";
+  const closed =
+    status === "declined" || status === "cancelled" || status === "finished";
   const canWrite =
     admin &&
     !!bookingId &&

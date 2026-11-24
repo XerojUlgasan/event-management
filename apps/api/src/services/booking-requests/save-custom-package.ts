@@ -146,7 +146,7 @@ export async function saveCustomPackageService(
 
     if (!create && !source) return error("Package not found", 404);
 
-    if (["declined", "cancelled"].includes(booking.status))
+    if (["declined", "cancelled", "finished"].includes(booking.status))
       return error("Closed booking requests cannot be customized", 409);
 
     if (
@@ -208,7 +208,7 @@ export async function saveCustomPackageService(
       )
         return error("Booking or package changed. Refresh and try again", 409);
 
-      if (["declined", "cancelled"].includes(currentBooking.status))
+      if (["declined", "cancelled", "finished"].includes(currentBooking.status))
         return error("Closed booking requests cannot be customized", 409);
 
       if (

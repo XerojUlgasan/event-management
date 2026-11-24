@@ -295,7 +295,7 @@ export function AdminEventDays({
   };
 
   const locked = busy || loading || stale || loadedRevision !== revision;
-  const finished = booking.eventCompletion?.status === "finished";
+  const finished = booking.status === "finished";
   const accepted = booking.status === "accepted" && !finished;
   const entries: DayEntry[] = [];
 

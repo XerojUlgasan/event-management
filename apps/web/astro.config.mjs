@@ -1,48 +1,45 @@
 import { defineConfig } from "astro/config";
 import cloudflare from "@astrojs/cloudflare";
-import node from "@astrojs/node";
 import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
-import { env } from "./src/lib/server/config/env.ts";
-
-// The local Supabase gateway forces Access-Control-Allow-Origin: *, which browsers
-// reject when the page sends cookies. pnpm dev sets API_PROXY_TARGET so browser
-// calls stay on the website origin and this server forwards them to the gateway.
-const apiProxyTarget = env.API_PROXY_TARGET;
-const useCloudflare = env.ASTRO_ADAPTER === "cloudflare";
+import { existsSync } from "node:fs";
+import { config } from "./src/env.ts";
 
 export default defineConfig({
   output: "server",
   server: {
     allowedHosts: ["localhost:4322", "amac.zxero.dev"],
   },
-  adapter: useCloudflare
-    ? cloudflare({ imageService: "passthrough" })
-    : node({ mode: "standalone" }),
-  // Clemora sessions belong to the API, and the website serves images as-is.
-  ...(useCloudflare ? { session: false } : {}),
+  adapter: cloudflare({ imageService: "passthrough" }),
+  session: false,
   integrations: [react()],
   vite: {
-    plugins: [tailwindcss()],
+    plugins: [
+      tailwindcss(),
+      {
+        name: "clemora-dev-proxy",
+        apply: "serve",
+        configEnvironment(name) {
+          if (name !== "ssr") return;
+
+          // Pass the local proxy setting to workerd. Shell values win.
+          if (existsSync(".env")) process.loadEnvFile(".env");
+
+          const target = config.API_PROXY_TARGET;
+
+          if (!target) return;
+
+          return {
+            define: {
+              __CLEMORA_DEV_PROXY_TARGET__: JSON.stringify(target),
+            },
+          };
+        },
+      },
+    ],
     // Bundle the Markdown renderer so its stylesheet is handled during SSR.
     resolve: {
       noExternal: ["@uiw/react-markdown-preview"],
-      // Keep these CJS helpers external for Node. Workers bundle dependencies.
-      ...(!useCloudflare ? { external: ["@babel/runtime"] } : {}),
     },
-    ...(!useCloudflare && apiProxyTarget
-      ? {
-          server: {
-            proxy: {
-              "/v1": {
-                target: apiProxyTarget,
-                changeOrigin: true,
-                rewrite: (path) =>
-                  path.replace(/^\/v1(?=\/|\?|$)/, "/functions/v1/api/v1"),
-              },
-            },
-          },
-        }
-      : {}),
   },
 });

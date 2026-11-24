@@ -12,9 +12,6 @@ export const updateBookingStatusData = (
     .set({
       status,
       updated_at: nextBookingRevision,
-      ...(["declined", "cancelled"].includes(status) && {
-        event_ready_at: null,
-      }),
     })
     .where("id", "=", id)
     .returningAll()

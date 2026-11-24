@@ -1,5 +1,6 @@
 import MarkdownPreview from "@uiw/react-markdown-preview";
 import rehypeSanitize from "rehype-sanitize";
+import remarkBreaks from "remark-breaks";
 import type { ComponentProps } from "react";
 
 const normalizeMessageBreaks: NonNullable<
@@ -30,12 +31,13 @@ export function Markdown({
   variant = "document",
 }: {
   source: string;
-  variant?: "document" | "message";
+  variant?: "catalog-widget" | "document" | "message";
 }) {
   return (
     <MarkdownPreview
       source={source}
       className={`ui-markdown${variant === "message" ? " ui-markdown-message" : ""}`}
+      remarkPlugins={variant === "catalog-widget" ? [remarkBreaks] : undefined}
       rehypePlugins={[rehypeSanitize]}
       rehypeRewrite={variant === "message" ? normalizeMessageBreaks : undefined}
       components={variant === "message" ? messageComponents : undefined}

@@ -1,8 +1,5 @@
 import type { ReviewedBookingService } from "@event-management/contracts/booking-draft";
-import type {
-  BookingStatus,
-  EventCompletion,
-} from "@event-management/contracts/booking-requests";
+import type { BookingStatus } from "@event-management/contracts/booking-requests";
 import type {
   PackagePrice,
   ServicePricing,
@@ -84,7 +81,6 @@ export type BookingRequest = Omit<
   packagePrice: PackagePrice | null;
   packageMaxGuests: number | null;
   status: BookingStatus;
-  eventCompletion: EventCompletion | null;
   outOfRange: boolean;
   submittedAt: string;
   createdAt: string;
@@ -166,12 +162,6 @@ export const cancelMyBookingRequest = (id: string, reason: string) =>
     "PATCH",
   );
 
-export const finishEvent = (id: string, expectedUpdatedAt: string) =>
-  request<{ bookingRequest: BookingRequest }>(
-    `/admin/booking-requests/${encodeURIComponent(id)}/finish`,
-    { expectedUpdatedAt },
-  );
-
 export const updateRequestedDayTimes = (
   id: string,
   date: string,
@@ -188,7 +178,7 @@ export type BookingStatusHistoryEntry = {
   id: string;
   status: BookingStatus;
   reason: string | null;
-  changedBy: string;
+  changedBy: string | null;
   createdAt: string;
 };
 

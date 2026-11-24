@@ -13,7 +13,7 @@ Give each app a discoverable owner for environment names, parsing, and fallback 
 
 ## Result
 
-API configuration is owned by [`src/utils/env.ts`](../../apps/api/src/utils/env.ts), reused by Node, the generated Edge bundle, Prisma/database configuration, seeds, and the standalone cleanup command. Web configuration has a public [`lib/env/env.ts`](../../apps/web/src/lib/env/env.ts) and server-only [`lib/server/config/env.ts`](../../apps/web/src/lib/server/config/env.ts); Astro config also imports the latter.
+At this revision, API configuration was owned by `src/utils/env.ts`, reused by Node, the generated Edge bundle, Prisma/database configuration, seeds, and the standalone cleanup command. Web configuration used `lib/env/env.ts` for public settings and `lib/server/config/env.ts` for server settings and Astro config. See the [current configuration](../../README.md#configuration) for the paths used today.
 
 ## Changes or findings
 

@@ -1,9 +1,7 @@
-import { env } from "../env/env";
-
-const configuredApiUrl = env.PUBLIC_API_URL;
+import { config } from "../../env";
 
 export function apiBase() {
-  const trimmed = configuredApiUrl.replace(/\/$/, "");
+  const trimmed = config.PUBLIC_API_URL.replace(/\/$/, "");
 
   if (/^https?:\/\//.test(trimmed)) return trimmed;
 

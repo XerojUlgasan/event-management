@@ -2,7 +2,7 @@
 /**
  * One-time/pre-flight setup for `pnpm all`.
  *
- * - creates apps/api/.env from the example when missing
+ * - creates app .env files from their examples when missing
  * - starts PostgreSQL with Docker Compose and waits for its healthcheck
  * - applies any pending Prisma migrations
  */
@@ -33,13 +33,14 @@ function run(command, args, label) {
   }
 }
 
-const envPath = join(root, "apps", "api", ".env");
+for (const app of ["api", "web"]) {
+  const directory = join(root, "apps", app);
+  const envPath = join(directory, ".env");
 
-const envExamplePath = join(root, "apps", "api", ".env.example");
-
-if (!existsSync(envPath)) {
-  copyFileSync(envExamplePath, envPath);
-  console.log("[setup] Created apps/api/.env from apps/api/.env.example");
+  if (!existsSync(envPath)) {
+    copyFileSync(join(directory, ".env.example"), envPath);
+    console.log(`[setup] Created apps/${app}/.env from its example`);
+  }
 }
 
 const docker = spawnSync("docker", ["--version"], {

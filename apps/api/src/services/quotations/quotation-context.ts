@@ -134,4 +134,4 @@ export function customerDto(row: Quote): Quotation {
 }
 
 export const closed = (booking: Pick<Selectable<BookingRequests>, "status">) =>
-  ["declined", "cancelled"].includes(booking.status);
+  ["declined", "cancelled", "finished"].includes(booking.status);

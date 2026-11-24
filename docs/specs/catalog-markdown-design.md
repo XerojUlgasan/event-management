@@ -22,12 +22,9 @@ Put the most decision-relevant sentence early in each widget. Use short paragrap
 Use the section title **The concept**.
 
 ```md
-After the civil signing, gather up to 36 relatives for a family merienda.
-The three-hour reception leaves time for travel from the ceremony, a shared
-meal and portraits with both sides of the family.
+After the civil signing, gather up to 36 relatives for a family merienda. The three-hour reception leaves time for travel from the ceremony, a shared meal and portraits with both sides of the family.
 
-If only a few relatives attend the signing, share the reception address and
-arrival time with everyone else so they can join you at the table.
+If only a few relatives attend the signing, share the reception address and arrival time with everyone else so they can join you at the table.
 ```
 
 ### A short program with an actionable constraint
@@ -36,24 +33,19 @@ Use the section title **Five hours together**.
 
 ```md
 1. **Vows.** Open with the procession and outdoor ceremony.
-2. **Portraits and refreshments.** Take group portraits while guests move
-   from the lawn to their tables.
-3. **Dinner and speeches.** Serve the Filipino buffet before speeches,
-   then cue the first dance.
-4. **Dancing and farewells.** Leave the last hour open for dancing and
-   farewells.
+2. **Portraits and refreshments.** Take group portraits while guests move from the lawn to their tables.
+3. **Dinner and speeches.** Serve the Filipino buffet before speeches, then cue the first dance.
+4. **Dancing and farewells.** Leave the last hour open for dancing and farewells.
 ```
 
 Use the section title **Make the rain plan first**.
 
 ```md
-> **Covered fallback.** Choose a covered space at the same venue that can
-> hold all 100 guests.
+> **Covered fallback.** Choose a covered space at the same venue that can hold all 100 guests.
 
 ### Access in either layout
 
-Confirm who makes the weather decision. Check the guest routes, the aisle
-between the tables and the power for sound and lights.
+Confirm who makes the weather decision. Check the guest routes, the aisle between the tables and the power for sound and lights.
 ```
 
 ### A service menu with two genuine choices
@@ -61,16 +53,14 @@ between the tables and the power for sound and lights.
 Use the section title **Choose four drinks**.
 
 ```md
-Plan up to **100 serves for 50 guests** across four drinks. Here is an
-example menu.
+Plan up to **100 serves for 50 guests** across four drinks. Here is an example menu.
 
 | Cocktail | Alcohol-free |
 | --- | --- |
 | Calamansi gin fizz | Cucumber lime soda |
 | Pineapple rum cooler | Ginger citrus spritz |
 
-The service includes a portable counter, two staff, ice, garnishes, cups
-and a printed menu. Confirm substitutions before printing.
+The service includes a portable counter, two staff, ice, garnishes, cups and a printed menu. Confirm substitutions before printing.
 ```
 
 ### A handoff the client can prepare
@@ -80,15 +70,14 @@ Use the section title **Send the details that are hard to improvise**.
 ```md
 Send the emcee the latest run sheet and mark anything that may still change.
 
-- **Entrances and speakers.** Include names, roles and running order. A short
-  voice recording can help with unfamiliar names.
+- **Entrances and speakers.** Include names, roles and running order. A short voice recording can help with unfamiliar names.
 - **Customs and surprises.** Flag details the host should handle carefully.
-- **Day-of contact.** Name the person who can move or skip an item and share
-  their contact details.
+- **Day-of contact.** Name the person who can move or skip an item and share their contact details.
 ```
 
 ## Write for the preview
 
+- Press Enter once for a visible line break. Leave a blank line between paragraphs. Keep each paragraph on one source line when you want it to wrap naturally in the preview.
 - Enter the section title in its own field. It renders as a level-two heading below the listing name. Use `###` for a genuine subdivision, with `####` only beneath it. Start directly with prose or a list when the section title already gives enough context.
 - Let wording carry meaning. Use bold for a short lead-in or a critical quantity, and reserve a short blockquote for conditions a customer might otherwise miss. Use ordinary Markdown. Keep custom markup, embeds and manual spacing out of the widget.
 - Use a table only when the column headers make a genuine comparison easier to read. Prefer two short columns and a few rows, and put qualifiers in nearby prose. Write descriptive text for any link. Use the photo widget and its alt field for images so the picture has a clear description.
@@ -107,4 +96,4 @@ A fresh disposable database seeded with the current [package collection](../../a
 
 On an existing catalog the seed preserves saved Markdown, widget sizes and administrator edits. Open a listing in its editor to adopt a pattern selectively, then save and check the public detail.
 
-The authoring editor uses saved rows. If you need more room to read a widget while editing, adjust its height there. With the catalog layout redesign, the public canvas and full preview let Markdown take the height its content needs. Older renderers use saved heights in those views too, so check for clipping or large gaps when previewing the seed on its own. Saved placement, width and order still shape the redesigned wide layout.
+The editor and full preview size widgets using saved rows. Resize a widget if its rendered text is clipped, then check the preview at narrow and desktop widths.

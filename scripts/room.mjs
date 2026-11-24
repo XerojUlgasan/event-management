@@ -29,7 +29,6 @@ const overrideNames = new Set([
   "AI_GATEWAY_API_KEY",
   "TEXT_MODEL",
   "VISION_MODEL",
-  "DECISION_MODEL",
   "EMBEDDING_MODEL",
 ]);
 
@@ -171,9 +170,9 @@ export function runtimeEnvironment(
 
   for (const name of [
     "SESSION_TTL_DAYS",
+    "SEED_RANDOM_SEED",
     "TEXT_MODEL",
     "VISION_MODEL",
-    "DECISION_MODEL",
     "EMBEDDING_MODEL",
   ]) {
     if (defaults[name] !== undefined) values[name] = defaults[name];
@@ -195,7 +194,7 @@ export function runtimeEnvironment(
     NODE_ENV: "development",
     SUPABASE_URL: api.origin,
     SUPABASE_SERVICE_ROLE_KEY: key,
-    SUPABASE_STORAGE_BUCKET: "event-management",
+    STORAGE_BUCKET: "event-management",
     FIREBASE_PROJECT_ID: "",
     FIREBASE_CLIENT_EMAIL: "",
     FIREBASE_PRIVATE_KEY: "",

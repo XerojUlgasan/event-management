@@ -27,6 +27,14 @@ type Story = StoryObj<typeof meta>;
 
 export const Document: Story = {};
 
+export const CatalogWidget: Story = {
+  args: {
+    variant: "catalog-widget",
+    source:
+      "**Reception program**\nFamily portraits\nDinner\n\nMeet by the welcome board.",
+  },
+};
+
 export const Message: Story = {
   args: { variant: "message" },
   decorators: [

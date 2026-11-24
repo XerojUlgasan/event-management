@@ -86,9 +86,6 @@ export interface BookingRequests {
   ends_at: Timestamp | null;
   estimated_duration: Generated<string>;
   estimated_duration_days: number | null;
-  event_finished_at: Timestamp | null;
-  event_finished_by: string | null;
-  event_ready_at: Timestamp | null;
   event_type: string | null;
   guest_count: number | null;
   id: Generated<string>;
@@ -110,7 +107,7 @@ export interface BookingRequests {
 
 export interface BookingRequestStatusHistory {
   booking_request_id: string;
-  changed_by: string;
+  changed_by: string | null;
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   reason: string | null;

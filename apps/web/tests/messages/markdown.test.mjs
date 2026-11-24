@@ -23,6 +23,11 @@ before(async () => {
     root: fileURLToPath(new URL("../../", import.meta.url)),
     cacheDir,
     configFile: false,
+    define: {
+      "import.meta.env.PUBLIC_API_URL": JSON.stringify(
+        "https://api.example.test/v1",
+      ),
+    },
     appType: "custom",
     server: { middlewareMode: true },
     esbuild: { jsx: "automatic" },

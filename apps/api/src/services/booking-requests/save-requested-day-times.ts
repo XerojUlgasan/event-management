@@ -27,7 +27,6 @@ export async function saveRequestedDayTimesService(
       return error("Booking request not found", 404);
 
     if (
-      row.event_finished_at ||
       !["under_review", "needs_details", "accepted"].includes(row.status)
     )
       return error("This request is read-only", 409);

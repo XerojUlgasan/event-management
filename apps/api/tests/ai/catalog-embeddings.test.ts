@@ -56,7 +56,7 @@ const environmentNames = [
   "SUPABASE_SERVICE_ROLE_KEY",
   "SUPABASE_SECRET_KEY",
   "SUPABASE_SECRET_KEYS",
-  "SUPABASE_STORAGE_BUCKET",
+  "STORAGE_BUCKET",
 ] as const;
 
 const originalEnvironment = new Map(
@@ -484,7 +484,7 @@ before(async () => {
   assert.ok(address && typeof address !== "string");
   process.env.SUPABASE_URL = `http://127.0.0.1:${address.port}`;
   process.env.SUPABASE_SERVICE_ROLE_KEY = "fixture-storage-key";
-  process.env.SUPABASE_STORAGE_BUCKET = "event-management";
+  process.env.STORAGE_BUCKET = "event-management";
   process.env.AI_GATEWAY_API_KEY = "fixture-gateway-key";
   process.env.EMBEDDING_MODEL = embeddingModel;
   await installGatewayInterceptor();

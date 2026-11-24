@@ -8,72 +8,7 @@ export type CatalogCopy = {
   sections: readonly { title: string; markdown: string }[];
   images: readonly { file: string; alt: string }[];
 };
-
-function markdownPixels(markdown: string, charactersPerLine: number) {
-  let pixels = 8;
-
-  for (const line of markdown.split("\n")) {
-    if (!line.trim()) {
-      pixels += 16;
-      continue;
-    }
-
-    if (/^\s*\|/.test(line)) {
-      if (/^[\s|:-]+$/.test(line)) continue;
-
-      const cells = line
-        .trim()
-        .replace(/^\||\|$/g, "")
-        .split("|");
-      const cellWidth = Math.max(
-        6,
-        Math.floor((charactersPerLine - 8) / cells.length),
-      );
-
-      const lines = Math.max(
-        1,
-        ...cells.map((cell) => Math.ceil(cell.trim().length / cellWidth)),
-      );
-
-      pixels += lines * 24 + 14;
-      continue;
-    }
-
-    const listItem = /^[-*] |^\d+\. /.test(line);
-    const heading = /^#{1,3} /.test(line);
-    const words = line
-      .replace(/^(?:[-*] |\d+\. |#{1,3} )|[*_`]/g, "")
-      .trim()
-      .split(/\s+/);
-    const lineWidth = charactersPerLine - (listItem ? 5 : 0);
-    let used = 0;
-    let wrappedLines = 1;
-
-    for (const word of words) {
-      if (used && used + 1 + word.length > lineWidth) {
-        used = word.length;
-        wrappedLines++;
-      } else {
-        used += used ? word.length + 1 : word.length;
-      }
-    }
-
-    pixels += wrappedLines * 24 + (listItem ? 4 : heading ? 18 : 0);
-  }
-
-  return pixels;
-}
-
-function markdownRows(markdown: string, width: number) {
-  // Size for the shortest public grid rows at the 580px canvas breakpoint
-  // and the wrapping in a full-width stack on a 320px screen.
-  const grid = markdownPixels(markdown, Math.floor(width * 3.1) - 4);
-  // Long words wrap sooner in the narrow stack after the widget padding.
-  const stacked = markdownPixels(markdown, 33);
-
-  // A widget spans row pitches minus the final gutter.
-  return Math.max(2, Math.ceil(Math.max((grid + 7) / 37, (stacked + 8) / 42)));
-}
+const SEED_WIDGET_ROWS = 3;
 
 type StoredWidget = ReturnType<
   typeof storedSectionsSchema.parse
@@ -121,7 +56,7 @@ export function buildCatalogCanvas(
     x: number,
     w: number,
   ): StoredWidget => ({
-    ...widget(part, x, 0, w, markdownRows(markdown, w)),
+    ...widget(part, x, 0, w, SEED_WIDGET_ROWS),
     type: "markdown",
     markdown,
   });
@@ -132,7 +67,7 @@ export function buildCatalogCanvas(
     w: number,
     y = 0,
   ): StoredWidget => ({
-    ...widget(`photo-${position}`, x, y, w, w === CATALOG_COLUMNS ? 7 : 4),
+    ...widget(`photo-${position}`, x, y, w, SEED_WIDGET_ROWS),
     type: "photo",
     mediaId: mediaIds[position],
     alt: copy.images[position].alt,
@@ -207,7 +142,7 @@ export function buildCatalogCanvas(
         firstGalleryPhoto + index,
         (index % 2) * 12,
         12,
-        Math.floor(index / 2) * 4,
+        Math.floor(index / 2) * SEED_WIDGET_ROWS,
       ),
     );
 
@@ -216,7 +151,7 @@ export function buildCatalogCanvas(
 
   if (options.relatedServiceId) {
     const related: StoredWidget = {
-      ...widget("related-service", 0, 0, 16, 9),
+      ...widget("related-service", 0, 0, 16, SEED_WIDGET_ROWS),
       type: "service",
       serviceId: options.relatedServiceId,
       caption: "Available as a separate service.",

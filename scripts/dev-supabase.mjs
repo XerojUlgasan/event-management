@@ -44,6 +44,8 @@ if (!existsSync(envFile)) {
       "DB_USER=postgres",
       "DB_PASSWORD=postgres",
       "WEB_ORIGIN=http://localhost:4321,http://127.0.0.1:4321",
+      "SESSION_TTL_DAYS=7",
+      "STORAGE_BUCKET=event-management",
       "",
     ].join("\n"),
   );

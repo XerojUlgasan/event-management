@@ -31,7 +31,8 @@ export function BookingStatusEditor({
   const [status, setStatus] = useState<BookingStatus | "">("");
 
   const choices = bookingStatusSchema.options.filter(
-    (value) => value !== "under_review" && value !== item.status,
+    (value) =>
+      value !== "under_review" && value !== "finished" && value !== item.status,
   );
 
   const [reason, setReason] = useState("");

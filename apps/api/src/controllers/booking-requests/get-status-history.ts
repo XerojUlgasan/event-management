@@ -15,7 +15,7 @@ const responses = {
             id: z.string().uuid(),
             status: statusSchema,
             reason: z.string().nullable(),
-            changedBy: z.string().uuid(),
+            changedBy: z.string().uuid().nullable(),
             createdAt: z.string(),
           }),
         ),

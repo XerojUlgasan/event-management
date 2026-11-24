@@ -4,7 +4,7 @@ Date: 2026-11-19 (Asia/Manila)
 Status: implemented and locally verified; hosted rollout remains unverified  
 Baseline: clean `main` at `e4ff29442ab7ca112ef0a203b87bf04a03f5416c` before the specification work; implementation remains uncommitted
 
-This is a historical implementation record. The [Send and Cancel decision](../../context-factory/history/decisions/2026-11-21_direct-quotation-send.md) replaces the draft workflow below. The booking status rules still apply.
+This is a historical implementation record. The [Send and Cancel decision](../../context-factory/history/decisions/2026-11-21_direct-quotation-send.md) replaces the draft workflow below. The [booking request rules](../../context-factory/business/booking-requests.md#rules-and-boundaries) describe current status eligibility.
 
 ## Outcome and interpretation
 

@@ -25,7 +25,7 @@ let root, container, requests, scenario;
 
 const openStatuses = ["under_review", "needs_details", "accepted"];
 
-const closedStatuses = ["declined", "cancelled"];
+const closedStatuses = ["declined", "cancelled", "finished"];
 
 const time = "2026-11-19T00:00:00.000Z";
 const laterRevision = "2026-11-19T01:00:00.000Z";
@@ -276,6 +276,7 @@ before(async () => {
     root: webRoot,
     cacheDir,
     configFile: false,
+    define: { "import.meta.env.PUBLIC_API_URL": JSON.stringify("/v1") },
     appType: "custom",
     server: { middlewareMode: true },
     esbuild: { jsx: "automatic" },

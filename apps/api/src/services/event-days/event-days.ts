@@ -78,10 +78,12 @@ export async function lockExisting(
 
   const booking = await lockBookingRequestData(trx, ref.booking_request_id);
 
-  if (!booking || (requireAccepted && booking.status !== "accepted"))
-    return fail("Booking request must be accepted", 409);
+  if (!booking) return fail("Booking request must be accepted", 409);
 
-  if (booking.event_finished_at) return fail("The event is finished", 409);
+  if (booking.status === "finished") return fail("The event is finished", 409);
+
+  if (requireAccepted && booking.status !== "accepted")
+    return fail("Booking request must be accepted", 409);
 
   const day = await lockEventDayData(trx, id);
 

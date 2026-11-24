@@ -1,4 +1,4 @@
-import { env } from "./env.js";
+import { config } from "../env.js";
 
 export class CatalogMediaNotFound extends Error {}
 
@@ -73,8 +73,10 @@ export async function putCatalogMedia(
     bucket?: string;
   } = {},
 ) {
-  const { url, apiKey, bucket: defaultBucket } = env.STORAGE;
-  const bucket = options.bucket ?? defaultBucket;
+  const url = config.SUPABASE_URL;
+  const apiKey = config.SUPABASE_STORAGE_KEY;
+  const bucket =
+    options.bucket === undefined ? config.STORAGE_BUCKET : options.bucket;
   const response = await fetch(
     `${url}/storage/v1/object/${objectPath(bucket, key)}`,
     {
@@ -95,8 +97,10 @@ export async function putCatalogMedia(
 }
 
 export async function deleteCatalogMedia(key: string, bucketOverride?: string) {
-  const { url, apiKey, bucket: defaultBucket } = env.STORAGE;
-  const bucket = bucketOverride ?? defaultBucket;
+  const url = config.SUPABASE_URL;
+  const apiKey = config.SUPABASE_STORAGE_KEY;
+  const bucket =
+    bucketOverride === undefined ? config.STORAGE_BUCKET : bucketOverride;
   const response = await fetch(`${url}/storage/v1/object/${bucket}`, {
     method: "DELETE",
     headers: authHeaders(apiKey, { "Content-Type": "application/json" }),
@@ -115,8 +119,10 @@ export async function getCatalogMedia(
   abortSignal?: AbortSignal,
   bucketOverride?: string,
 ) {
-  const { url, apiKey, bucket: defaultBucket } = env.STORAGE;
-  const bucket = bucketOverride ?? defaultBucket;
+  const url = config.SUPABASE_URL;
+  const apiKey = config.SUPABASE_STORAGE_KEY;
+  const bucket =
+    bucketOverride === undefined ? config.STORAGE_BUCKET : bucketOverride;
   const response = await fetch(
     `${url}/storage/v1/object/${objectPath(bucket, key)}`,
     {

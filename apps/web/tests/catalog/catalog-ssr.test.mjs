@@ -29,6 +29,7 @@ before(async () => {
     root,
     cacheDir,
     configFile: false,
+    define: { "import.meta.env.PUBLIC_API_URL": JSON.stringify("/v1") },
     appType: "custom",
     server: { middlewareMode: true },
     esbuild: { jsx: "automatic" },
@@ -200,7 +201,7 @@ const markdown = {
   caption: "",
   autoplay: false,
   markdown:
-    "# Heading\n\n*italic* and **bold**\n\n- First item\n- Second item\n\n[Safe link](https://example.com)\n\n| Name | Value |\n| --- | --- |\n| One | Two |\n\n<script>alert(1)</script>\n\n[bad](javascript:alert(1))",
+    "# Heading\n\n*italic* and **bold**\n\n- First item\n- Second item\n\n[Safe link](https://example.com)\n\n| Name | Value |\n| --- | --- |\n| One | Two |\n\n<script>alert(1)</script>\n\n[bad](javascript:alert(1))\n\nCatalog line one\nCatalog line two\n\nNew paragraph\n\nExplicit break one  \nExplicit break two",
 };
 
 const sections = [
@@ -278,6 +279,8 @@ test("SSR renders complete sanitized Markdown and media on every catalog", () =>
       /href="https:\/\/example.com"/,
       /<table>/,
       /<td>Two<\/td>/,
+      /<p>Catalog line one<br\s*\/?>(?:\s*)Catalog line two<\/p>/,
+      /<p>New paragraph<\/p>\s*<p>Explicit break one<br\s*\/?>(?:\s*)Explicit break two<\/p>/,
       /alt="Table setting"/,
       /Photo caption/,
       /Film caption/,

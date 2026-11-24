@@ -2,6 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { loadCustomerHomeStep } from "../../src/lib/services/customer-home/next-step.ts";
 
+const originalApiUrl = process.env.PUBLIC_API_URL;
+
+test.before(() => {
+  process.env.PUBLIC_API_URL = "https://api.example.test/v1";
+});
+
+test.after(() => {
+  if (originalApiUrl === undefined) delete process.env.PUBLIC_API_URL;
+  else process.env.PUBLIC_API_URL = originalApiUrl;
+});
+
 const uuid = (value: string) =>
   `10000000-0000-4000-8000-${String([...value].reduce((sum, char) => sum + char.charCodeAt(0), 0)).padStart(12, "0")}`;
 
@@ -128,6 +139,7 @@ test("latest open needs-details request takes priority and links its own convers
     "/v1/booking-requests/mine": {
       bookingRequests: [
         booking("closed", "cancelled"),
+        booking("finished", "finished"),
         booking("needs", "needs_details", "REQ-NEEDS"),
       ],
       nextCursor: null,
@@ -219,7 +231,7 @@ test("seen, wrong-version, superseded and closed-request quotation alerts fall b
       quotation: quotation("quote-closed", "sent", 1, "booking-closed"),
     },
     [`/v1/booking-requests/${uuid("booking-closed")}`]: {
-      bookingRequest: booking("booking-closed", "cancelled"),
+      bookingRequest: booking("booking-closed", "finished"),
     },
     "/v1/messages/conversations": { latestBookingDraft: null },
   });
@@ -240,7 +252,10 @@ test("seen, wrong-version, superseded and closed-request quotation alerts fall b
 test("closed history has no current request", async (t) => {
   const paths = installApi(t, {
     "/v1/booking-requests/mine": {
-      bookingRequests: [booking("closed", "declined")],
+      bookingRequests: [
+        booking("finished", "finished"),
+        booking("closed", "declined"),
+      ],
       nextCursor: null,
     },
     "/v1/messages/conversations": { latestBookingDraft: null },

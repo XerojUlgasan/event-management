@@ -1,7 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import { importJWK, SignJWT } from "jose";
 import type { SessionContext } from "../../types/hono.js";
-import { env } from "../env.js";
+import { config } from "../../env.js";
 
 const MAX_TOKEN_LIFETIME_SECONDS = 5 * 60;
 
@@ -22,7 +22,8 @@ export async function signRealtimeToken(
   session: SessionContext,
   { issuedAt, expiresAt }: { issuedAt: number; expiresAt: number },
 ) {
-  const { jwk, localSecret } = env.REALTIME_SIGNING;
+  const jwk = config.REALTIME_JWT_SIGNING_JWK;
+  const localSecret = config.REALTIME_JWT_SECRET;
   const scopeClaims =
     "conversationId" in target
       ? {

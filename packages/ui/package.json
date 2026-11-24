@@ -14,7 +14,8 @@
     "@event-management/theme": "workspace:*",
     "@event-management/contracts": "workspace:*",
     "@uiw/react-markdown-preview": "5.2.1",
-    "rehype-sanitize": "^6.0.0"
+    "rehype-sanitize": "^6.0.0",
+    "remark-breaks": "4.0.0"
   },
   "scripts": {
     "check": "tsc --noEmit",

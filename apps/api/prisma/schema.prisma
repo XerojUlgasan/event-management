@@ -13,7 +13,6 @@ model User {
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   bookingRequests BookingRequest[]
   bookingStatusChanges BookingRequestStatusHistory[]
-  finishedEvents BookingRequest[] @relation("EventFinisher")
   sessions     Session[]
   conversations Conversation[] @relation("CustomerConversations")
   sentMessages Message[]     @relation("MessageSender")
@@ -349,9 +348,6 @@ model AuditEvent {
 
 model BookingRequest {
   submittedAt DateTime? @default(now()) @map("submitted_at") @db.Timestamptz(6)
-  eventReadyAt DateTime? @map("event_ready_at") @db.Timestamptz(6)
-  eventFinishedAt DateTime? @map("event_finished_at") @db.Timestamptz(6)
-  eventFinishedBy String? @map("event_finished_by") @db.Uuid
   durationMode String? @map("duration_mode")
   requestedServices Json? @map("requested_services") @db.JsonB
   budget String?
@@ -377,7 +373,6 @@ model BookingRequest {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   customer User? @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  eventFinisher User? @relation("EventFinisher", fields: [eventFinishedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
   package Package? @relation("InquiryPackage", fields: [packageId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   customPackage Package? @relation("CustomBookingPackage")
   quotations Quotation[]
@@ -394,10 +389,10 @@ model BookingRequestStatusHistory {
   bookingRequestId String @map("booking_request_id") @db.Uuid
   status String
   reason String?
-  changedBy String @map("changed_by") @db.Uuid
+  changedBy String? @map("changed_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   bookingRequest BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  actor User @relation(fields: [changedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  actor User? @relation(fields: [changedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
   @@index([bookingRequestId, createdAt])
   @@map("booking_request_status_history")
 }

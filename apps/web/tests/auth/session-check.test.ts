@@ -2,6 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ApiError, request } from "../../src/lib/http/request";
 
+const originalApiUrl = process.env.PUBLIC_API_URL;
+
+process.env.PUBLIC_API_URL = "https://api.example.test/v1";
+test.after(() => {
+  if (originalApiUrl === undefined) delete process.env.PUBLIC_API_URL;
+  else process.env.PUBLIC_API_URL = originalApiUrl;
+});
+
 const browser = new EventTarget();
 
 Object.assign(globalThis, { window: browser });

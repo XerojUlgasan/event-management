@@ -3,7 +3,7 @@ import { db } from "../db/client.js";
 import { backgroundJobSettings } from "../services/background-jobs/job-definitions.js";
 import { runBackgroundJobsWorker } from "../services/background-jobs/run-worker.js";
 import { waitForWorkerDelay } from "../services/background-jobs/wait-for-worker-delay.js";
-import { checkEventCompletionReadiness } from "../services/booking-requests/check-event-completion-readiness.js";
+import { completeEndedBookings } from "../services/booking-requests/complete-ended-bookings.js";
 
 const controller = new AbortController();
 
@@ -17,9 +17,9 @@ async function runEventCompletionChecks(signal: AbortSignal) {
     const startedAt = performance.now();
 
     try {
-      await checkEventCompletionReadiness(db, signal);
+      await completeEndedBookings(db, signal);
     } catch {
-      console.error("Event completion readiness check failed.");
+      console.error("Booking completion check failed.");
     }
 
     await waitForWorkerDelay(

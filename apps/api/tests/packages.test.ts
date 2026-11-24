@@ -160,7 +160,7 @@ before(async () => {
   assert.ok(address && typeof address !== "string");
   process.env.SUPABASE_URL = `http://127.0.0.1:${address.port}`;
   process.env.SUPABASE_SERVICE_ROLE_KEY = "test";
-  process.env.SUPABASE_STORAGE_BUCKET = "test";
+  process.env.STORAGE_BUCKET = "test";
   process.env.DB_NAME = database;
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));

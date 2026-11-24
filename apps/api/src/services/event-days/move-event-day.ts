@@ -1,5 +1,5 @@
-import { touchEventScheduleRevisionData } from "../../data/booking-requests/event-completion.js";
 import type { Kysely } from "kysely";
+import { touchBookingRevisionData } from "../../data/booking-requests/booking-revision.js";
 import { createEventDayData } from "../../data/event-days/create-event-day.js";
 import { endEventDayData } from "../../data/event-days/end-event-day.js";
 import type { DB } from "../../db/types.js";
@@ -24,7 +24,7 @@ export async function moveEventDayService(
       schedule,
     );
     await endEventDayData(trx, id, "moved", replacement);
-    await touchEventScheduleRevisionData(trx, day.booking_request_id);
+    await touchBookingRevisionData(trx, day.booking_request_id);
 
     return one(trx, replacement);
   });

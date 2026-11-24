@@ -247,7 +247,7 @@ export function AdminShell({
             <Icon name="menu" />
           </Button>
           <div className="app-header-actions">
-            <NotificationBell key={profile.id} profileId={profile.id} />
+            <NotificationBell key={profile.id} profileId={profile.id} admin />
             <AccountMenu
               name={name}
               onSettings={() => go("Administration")}

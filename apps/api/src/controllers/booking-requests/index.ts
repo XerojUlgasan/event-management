@@ -13,7 +13,6 @@ import {
   saveRequestedDayTimesRouteHandler,
 } from "./save-requested-day-times.js";
 import quotationRoutes from "../quotations/index.js";
-import { finishEventRoute, finishEventRouteHandler } from "./finish-event.js";
 import { jsonError } from "../../utils/service-result.js";
 import {
   getMyBookingPackageRoute,
@@ -113,7 +112,6 @@ routes.openapi(getAdminStatusHistoryRoute, getAdminStatusHistoryRouteHandler);
 routes.openapi(getMyBookingRequestRoute, getMyBookingRequestRouteHandler);
 routes.openapi(getAdminBookingRequestRoute, getAdminBookingRequestRouteHandler);
 routes.openapi(updateBookingStatusRoute, updateBookingStatusRouteHandler);
-routes.openapi(finishEventRoute, finishEventRouteHandler);
 routes.openapi(getMyBookingPackageRoute, getMyBookingPackageRouteHandler);
 routes.openapi(getAdminBookingPackageRoute, getAdminBookingPackageRouteHandler);
 routes.openapi(attachBookingPackageRoute, attachBookingPackageRouteHandler);

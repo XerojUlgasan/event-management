@@ -33,7 +33,7 @@ export type CustomerHomeStep = {
 };
 
 const isOpenRequest = ({ status }: BookingRequest) =>
-  status !== "declined" && status !== "cancelled";
+  status !== "declined" && status !== "cancelled" && status !== "finished";
 
 const bookingContext = (booking: BookingRequest) => ({
   eventType: booking.eventType,

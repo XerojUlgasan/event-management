@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { db } from "./client.js";
-import { env } from "../utils/env.js";
+import { config } from "../env.js";
 import { listCatalogKnowledgeOwnersData } from "../data/ai/list-catalog-knowledge-owners.js";
 import { pruneIneligibleCatalogKnowledgeData } from "../data/ai/prune-ineligible-catalog-knowledge.js";
 import { refreshCatalogEmbeddingsService } from "../services/ai/workflows/refresh-catalog-embeddings.js";
@@ -13,7 +13,7 @@ process.once("SIGINT", stop);
 process.once("SIGTERM", stop);
 
 try {
-  if (env.AI_EMBEDDING.model !== "google/gemini-embedding-2")
+  if (config.EMBEDDING_MODEL !== "google/gemini-embedding-2")
     throw new Error("Catalog embedding requires google/gemini-embedding-2");
 
   await pruneIneligibleCatalogKnowledgeData(db);

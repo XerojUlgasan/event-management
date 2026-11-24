@@ -39,7 +39,7 @@ export async function changeBookingAddonService(
 
     if (!booking) return error("Booking request not found", 404);
 
-    if (booking.status === "declined" || booking.status === "cancelled")
+    if (["declined", "cancelled", "finished"].includes(booking.status))
       return error("Closed booking requests cannot be edited", 409);
 
     if (booking.revision !== expectedBookingUpdatedAt)

@@ -10,11 +10,11 @@ import { readCatalogEmbeddingImage } from "../../src/services/ai/retrieval/read-
 const originalFetch = globalThis.fetch;
 const oldUrl = process.env.SUPABASE_URL;
 const oldKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const oldBucket = process.env.SUPABASE_STORAGE_BUCKET;
+const oldBucket = process.env.STORAGE_BUCKET;
 
 process.env.SUPABASE_URL = "https://storage.invalid";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "fixture-key";
-process.env.SUPABASE_STORAGE_BUCKET = "fixture-bucket";
+process.env.STORAGE_BUCKET = "fixture-bucket";
 
 after(() => {
   globalThis.fetch = originalFetch;
@@ -22,7 +22,7 @@ after(() => {
   for (const [key, value] of Object.entries({
     SUPABASE_URL: oldUrl,
     SUPABASE_SERVICE_ROLE_KEY: oldKey,
-    SUPABASE_STORAGE_BUCKET: oldBucket,
+    STORAGE_BUCKET: oldBucket,
   })) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;

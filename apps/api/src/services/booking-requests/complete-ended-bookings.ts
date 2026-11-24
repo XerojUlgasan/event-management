@@ -1,16 +1,17 @@
 import type { Kysely } from "kysely";
+import { addStatusHistoryData } from "../../data/booking-requests/add-status-history.js";
 import {
   listDueEventCompletionCandidatesData,
-  markEventReadyData,
+  liveEventDaysHaveEndedData,
 } from "../../data/booking-requests/event-completion.js";
 import { lockBookingRequestData } from "../../data/booking-requests/lock-booking-request.js";
+import { updateBookingStatusData } from "../../data/booking-requests/update-booking-status.js";
 import { createNotificationData } from "../../data/notifications/create-notification.js";
 import type { DB } from "../../db/types.js";
-import { isEventCompletionEligible } from "./event-completion-eligibility.js";
 
 const candidatePageSize = 100;
 
-export async function checkEventCompletionReadiness(
+export async function completeEndedBookings(
   db: Kysely<DB>,
   signal?: AbortSignal,
 ) {
@@ -32,25 +33,31 @@ export async function checkEventCompletionReadiness(
 
           if (
             signal?.aborted ||
-            !booking ||
-            booking.event_ready_at ||
-            booking.event_finished_at ||
-            !(await isEventCompletionEligible(trx, booking))
+            booking?.status !== "accepted" ||
+            !(await liveEventDaysHaveEndedData(trx, id))
           )
             return;
 
-          await markEventReadyData(trx, id);
-          await createNotificationData(trx, { role: "admin" }, id, {
-            type: "event_ready_to_finish",
+          await updateBookingStatusData(trx, id, "finished");
+          await addStatusHistoryData(trx, id, "finished", null, null);
+          const notification = {
+            type: "event_finished",
             payload: {
               bookingRequestId: id,
               bookingReference: booking.reference,
             },
-          });
+          } as const;
+          await createNotificationData(trx, { role: "admin" }, id, notification);
+          await createNotificationData(
+            trx,
+            { userId: booking.customer_id },
+            id,
+            notification,
+          );
         });
       } catch {
         // Continue the sweep. This booking stays eligible for the next attempt.
-        console.error("Unable to save event completion readiness.");
+        console.error("Unable to finish booking.");
       }
     }
 

@@ -19,7 +19,7 @@ export async function cancelBookingRequestService(
     if (!row || row.customer_id !== customerId)
       return error("Booking request not found", 404);
 
-    if (row.event_finished_at) return error("The event is finished", 409);
+    if (row.status === "finished") return error("The event is finished", 409);
 
     if (!["under_review", "needs_details", "accepted"].includes(row.status))
       return error("Invalid status transition", 409);

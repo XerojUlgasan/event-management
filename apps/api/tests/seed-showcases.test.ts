@@ -8,7 +8,7 @@ import { replaceShowcaseGalleryData } from "../src/data/showcase-records/replace
 import { seedSampleShowcases } from "../src/db/seed-showcases.js";
 import { LOCAL_PASSWORD } from "../src/db/seed/context.js";
 import { showcaseDto } from "../src/services/showcase/showcase-dto.js";
-import { env } from "../src/utils/env.js";
+import { config } from "../src/env.js";
 import { hashPassword } from "../src/utils/password.js";
 
 const fixtures = [
@@ -51,8 +51,11 @@ const fixtures = [
 ];
 
 test("showcase seed uploads ordered photos and preserves an edited fixture", async (t) => {
-  const storage = env.STORAGE;
-  assert.ok(["localhost", "127.0.0.1", "::1"].includes(env.DB_HOST));
+  const storage = {
+    url: config.SUPABASE_URL,
+    apiKey: config.SUPABASE_STORAGE_KEY,
+  };
+  assert.ok(["localhost", "127.0.0.1", "::1"].includes(config.DB_HOST));
   assert.ok(
     ["localhost", "127.0.0.1", "[::1]"].includes(new URL(storage.url).hostname),
   );
@@ -74,12 +77,12 @@ test("showcase seed uploads ordered photos and preserves an edited fixture", asy
     });
 
   const connection = {
-    host: env.DB_HOST,
-    port: Number(env.DB_PORT),
-    user: env.DB_USER,
-    password: env.DB_PASSWORD,
+    host: config.DB_HOST,
+    port: Number(config.DB_PORT),
+    user: config.DB_USER,
+    password: config.DB_PASSWORD,
   };
-  const admin = new Pool({ ...connection, database: env.DB_NAME });
+  const admin = new Pool({ ...connection, database: config.DB_NAME });
   let databaseCreated = false;
   let seedDb: typeof import("../src/db/client.js").db | undefined;
   t.after(async () => {
@@ -128,7 +131,7 @@ test("showcase seed uploads ordered photos and preserves an edited fixture", asy
   });
 
   process.env.DB_NAME = database;
-  process.env.SUPABASE_STORAGE_BUCKET = bucket;
+  process.env.STORAGE_BUCKET = bucket;
   const { db } = await import("../src/db/client.js");
   seedDb = db;
   const { app } = await import("../src/app.js");

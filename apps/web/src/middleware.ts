@@ -1,5 +1,5 @@
 import { defineMiddleware } from "astro:middleware";
-import { env } from "./lib/server/config/env";
+import { config } from "./env";
 
 const dropped = [
   "connection",
@@ -14,15 +14,13 @@ const dropped = [
 ];
 
 export const onRequest = defineMiddleware(async (context, next) => {
-  const target = env.API_PROXY_TARGET;
+  const path = context.url.pathname;
+  if (path !== "/v1" && !path.startsWith("/v1/")) return next();
 
-  if (!target || !context.url.pathname.startsWith("/v1")) return next();
+  const target = config.API_PROXY_URL;
+  if (!target) return next();
 
-  const path = context.url.pathname.replace(
-    /^\/v1(?=\/|$)/,
-    "/functions/v1/api/v1",
-  );
-  const upstream = new URL(`${path}${context.url.search}`, target);
+  const upstream = `${target}${path.slice("/v1".length)}${context.url.search}`;
   const headers = new Headers(context.request.headers);
   headers.delete("host");
   const hasBody =

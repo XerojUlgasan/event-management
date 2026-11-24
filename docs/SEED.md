@@ -7,7 +7,7 @@ pnpm db:up
 pnpm supabase:start
 ```
 
-Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env` or the command environment using the values from `pnpm supabase:status`. The local stack creates the private `event-management` bucket. If you set `SUPABASE_STORAGE_BUCKET`, that bucket must already exist. Verify the database and Storage targets before seeding. Isolated `pnpm room` environments pass their own settings automatically.
+Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env` or the command environment using the values from `pnpm supabase:status`. Set `STORAGE_BUCKET` to the existing private bucket. The local stack creates `event-management`, which is the value in the API environment example. Verify the database and Storage targets before seeding. Isolated `pnpm room` environments pass their own settings automatically.
 
 ```sh
 pnpm db:deploy
@@ -39,7 +39,7 @@ Missing scenario bookings use persisted public package capacity and pricing. If 
 
 Each photo uses a stable media ID and private object key. An interruption can leave objects behind if PostgreSQL rolls back. A retry reuses an exact byte match and rejects conflicts without replacing existing media. Files are served to customers through the current catalog and showcase API media endpoints.
 
-`SEED_CLOCK` optionally fixes connected demo and scenario timestamps to a UTC instant such as `2026-10-31T00:00:00Z`. `SEED_RANDOM_SEED` changes the assignment of scenario statuses while preserving status counts. These variables apply when rows are first inserted.
+Set `SEED_RANDOM_SEED` to configure the deterministic assignment of scenario statuses while preserving status counts. `SEED_CLOCK` optionally fixes connected demo and scenario timestamps to a UTC instant such as `2026-10-31T00:00:00Z`. These variables apply when rows are first inserted.
 
 ## AI catalog demo
 

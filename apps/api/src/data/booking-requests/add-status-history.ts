@@ -5,7 +5,7 @@ export const addStatusHistoryData = (
   db: Transaction<DB>,
   bookingRequestId: string,
   status: string,
-  changedBy: string,
+  changedBy: string | null,
   reason: string | null,
 ) =>
   db

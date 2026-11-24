@@ -27,8 +27,8 @@ Admin means a designated System Administrator, as defined in [identity and respo
 
 ## Event completion
 
-The supervised worker checks submitted events once a minute and at startup. It uses the database clock and the latest end time across live scheduled days. Moved originals and cancelled days are ignored. A moved replacement contributes its current scheduled end. A booking needs at least one live day, and every requested date must link to a scheduled or explicitly cancelled day through its schedule history. Legacy requests with no requested-day list use their actual operational days. Declined and cancelled requests are ineligible.
+The supervised worker checks accepted bookings at startup and once a minute. Once the database clock is past the latest end time of their scheduled event days, it changes the booking status to `finished`. The check needs at least one scheduled day. It uses current replacement days for moves and skips cancelled days.
 
-Readiness and its alerts commit together. Each current System Administrator can receive one readiness alert per event. A schedule change clears readiness. If the event becomes ready again, the existing alert remains in history and opens the current booking details. The **Mark as finished** action requires the current booking revision and rechecks readiness under the booking lock. The successful action records the administrator and the database time and writes one in-app alert to the booking owner in the same transaction.
+The worker rechecks the status and schedule under the booking lock. The status change, status history entry, and in-app notifications to each System Administrator and the booking owner commit together.
 
-Finished events retain their operational and inquiry history. Schedule edits and inquiry status changes are closed once the event is finished. Package and quotation permissions still follow the inquiry status. Customers can see **Finished** on their own event details and in **My events → Finished events**, where the date reflects the administrator's confirmation.
+Finished events retain their operational and inquiry history. Customers can see **Finished** on their own event details and in **My events → Finished events**.

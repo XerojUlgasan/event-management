@@ -139,6 +139,7 @@ before(async () => {
     root: rootDir,
     cacheDir: cache,
     configFile: false,
+    define: { "import.meta.env.PUBLIC_API_URL": JSON.stringify("/v1") },
     appType: "custom",
     server: { middlewareMode: true },
     esbuild: { jsx: "automatic" },
@@ -647,7 +648,8 @@ test("Markdown widgets edit in place, render on blur, and save the source", asyn
   const source = widgetBody.querySelector(
     'textarea[aria-label="Markdown content"]',
   );
-  const markdown = "## New heading\n\nSome **bold text**.";
+  const markdown =
+    "## New heading\n\nSome **bold text**.\nSingle Enter line\n\nNew paragraph\n\nExplicit break one  \nExplicit break two.";
   assert.equal(document.activeElement, source);
   assert.match(source.value, /^## Your heading/);
   assert.equal(widgetBody.querySelector("h2"), null);
@@ -665,6 +667,8 @@ test("Markdown widgets edit in place, render on blur, and save the source", asyn
   assert.equal(widgetBody.querySelector("textarea"), null);
   assert.equal(widgetBody.querySelector("h2")?.textContent, "New heading");
   assert.equal(widgetBody.querySelector("strong")?.textContent, "bold text");
+  assert.equal(widgetBody.querySelectorAll(".wmde-markdown p").length, 3);
+  assert.equal(widgetBody.querySelectorAll(".wmde-markdown br").length, 2);
 
   await click("Edit Markdown");
   const reopened = widgetBody.querySelector("textarea");

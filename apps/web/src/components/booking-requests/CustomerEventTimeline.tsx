@@ -5,7 +5,6 @@ import {
   bookingDate,
   bookingRequestLabel,
   BookingStatusBadge,
-  EventCompletionBadge,
 } from "./BookingRequestDisplay";
 import { localInput } from "../../lib/utils/event-days/event-day-time";
 import { formatEnPh } from "../../lib/utils/formatting/dates";
@@ -111,18 +110,12 @@ export function CustomerEventTimeline({
                                 "No catalog package selected"}
                             </h3>
                           </div>
-                          {item.eventCompletion?.status === "finished" ? (
-                            <EventCompletionBadge status="finished" />
-                          ) : (
-                            <BookingStatusBadge status={item.status} />
-                          )}
+                          <BookingStatusBadge status={item.status} />
                         </div>
                         <p className="event-timeline-schedule">
                           <Icon name="calendar" size={15} />
                           <span>
-                            {group.key === "finished" ? (
-                              <>Marked finished {bookingDate(date)}</>
-                            ) : date ? (
+                            {date ? (
                               <>
                                 {dayCount > 1 &&
                                 (group.key === "upcoming" ||
@@ -137,11 +130,9 @@ export function CustomerEventTimeline({
                             ) : (
                               "Date to be arranged"
                             )}
-                            {group.key !== "finished" && (
-                              <span className="event-timeline-zone">
-                                {requestedTime(item, date)} · {item.timeZone}
-                              </span>
-                            )}
+                            <span className="event-timeline-zone">
+                              {requestedTime(item, date)} · {item.timeZone}
+                            </span>
                           </span>
                         </p>
                         {item.status === "needs_details" && (

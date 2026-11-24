@@ -189,7 +189,7 @@ export function CatalogWidgetContent({
       className={`ui-catalog-widget-content ui-catalog-${widget.type === "service" || widget.type === "package" ? "reference" : widget.type}`}
     >
       {widget.type === "markdown" && (
-        <Markdown source={widget.markdown || ""} />
+        <Markdown source={widget.markdown || ""} variant="catalog-widget" />
       )}
       {widget.type === "photo" &&
         (url ? (

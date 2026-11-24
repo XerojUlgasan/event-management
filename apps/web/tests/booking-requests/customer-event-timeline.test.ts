@@ -43,7 +43,6 @@ function makeRequest(overrides: Partial<BookingRequest> = {}): BookingRequest {
     packagePrice: { kind: "fixed", currency: "PHP", amountMinor: 0 },
     packageMaxGuests: 1,
     status: "under_review",
-    eventCompletion: null,
     outOfRange: false,
     submittedAt: "2026-11-10T00:00:00.000Z",
     createdAt: "2026-11-10T00:00:00.000Z",
@@ -211,9 +210,10 @@ test("a moved operational schedule does not change requested-date grouping", () 
   });
 });
 
-test("a finished event with a cancelled future day uses its confirmation date", () => {
+test("a finished event with a cancelled future day shows the requested date without becoming upcoming", () => {
   const item = makeRequest({
-    status: "accepted",
+    status: "finished",
+    updatedAt: "2026-11-13T16:01:00.000Z",
     requestedDays: [
       requestedDay("2026-11-13"),
       {
@@ -229,17 +229,13 @@ test("a finished event with a cancelled future day uses its confirmation date", 
         },
       },
     ],
-    eventCompletion: {
-      status: "finished",
-      finishedAt: "2026-11-13T16:01:00.000Z",
-    },
   });
 
   const groups = groupCustomerEvents([item], now);
   assert.deepEqual(eventIds(groups.find(({ key }) => key === "upcoming")), []);
   assert.deepEqual(eventIds(groups.find(({ key }) => key === "today")), []);
   assert.deepEqual(groups.find(({ key }) => key === "finished")?.events, [
-    { item, group: "finished", date: "2026-11-14", dayCount: 0 },
+    { item, group: "finished", date: "2026-11-15", dayCount: 2 },
   ]);
 });
 
@@ -302,4 +298,16 @@ test("a newer valid time save replaces the current request", () => {
   });
 
   assert.strictEqual(latestCustomerEvent(current, saved), saved);
+});
+
+test("an older time-save response cannot reopen a finished event", () => {
+  const finished = makeRequest({
+    status: "finished",
+    updatedAt: "2026-11-14T12:00:00.000Z",
+  });
+  const saved = makeRequest({
+    status: "accepted",
+    updatedAt: "2026-11-14T12:00:00.000Z",
+  });
+  assert.equal(latestCustomerEvent(finished, saved), finished);
 });

@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { ApiError } from "../http/request";
-import { env } from "../env/env";
+import { config } from "../../env";
 import {
   addPassword,
   endSession,
@@ -25,7 +25,7 @@ type Status = "loading" | "signed-out" | "signed-in";
 
 type FirebaseMethod = "google" | "password";
 
-export const firebaseConfigured = env.firebaseConfigured;
+export const firebaseConfigured = config.firebaseConfigured;
 
 type AuthContextValue = {
   status: Status;

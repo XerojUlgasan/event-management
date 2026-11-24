@@ -21,12 +21,13 @@ export async function updateBookingStatusService(
 
     if (!row) return error("Booking request not found", 404);
 
-    if (row.event_finished_at) return error("The event is finished", 409);
+    if (row.status === "finished") return error("The event is finished", 409);
 
     if (
       ["declined", "cancelled"].includes(row.status) ||
       row.status === status ||
-      status === "under_review"
+      status === "under_review" ||
+      status === "finished"
     )
       return error("Invalid status transition", 409);
 

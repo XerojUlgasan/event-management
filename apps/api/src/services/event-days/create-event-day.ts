@@ -1,5 +1,5 @@
-import { touchEventScheduleRevisionData } from "../../data/booking-requests/event-completion.js";
 import type { Kysely } from "kysely";
+import { touchBookingRevisionData } from "../../data/booking-requests/booking-revision.js";
 import { lockBookingRequestData } from "../../data/event-days/lock-booking-request.js";
 import { createEventDayData } from "../../data/event-days/create-event-day.js";
 import type { DB } from "../../db/types.js";
@@ -15,7 +15,7 @@ export async function createEventDayService(
 
     if (!booking) return fail("Booking request not found", 404);
 
-    if (booking.event_finished_at) return fail("The event is finished", 409);
+    if (booking.status === "finished") return fail("The event is finished", 409);
 
     if (booking.status !== "accepted")
       return fail("Booking request must be accepted", 409);
@@ -24,7 +24,7 @@ export async function createEventDayService(
       return fail("This booking uses requested days for scheduling", 409);
 
     const schedule = validateSchedule(input, booking.time_zone);
-    await touchEventScheduleRevisionData(trx, bookingId);
+    await touchBookingRevisionData(trx, bookingId);
 
     return one(trx, await createEventDayData(trx, bookingId, schedule));
   });

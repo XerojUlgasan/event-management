@@ -28,7 +28,7 @@ export async function attachBookingPackageService(
       booking.revision !== input.expectedBookingUpdatedAt ||
       booking.package_id ||
       (await findCustomPackageData(trx, id)) ||
-      ["declined", "cancelled"].includes(booking.status)
+      ["declined", "cancelled", "finished"].includes(booking.status)
     )
       return error("Booking request changed or already has a package", 409);
 

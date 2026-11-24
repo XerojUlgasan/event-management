@@ -158,6 +158,7 @@ before(async () => {
     root: webRoot,
     cacheDir,
     configFile: false,
+    define: { "import.meta.env.PUBLIC_API_URL": JSON.stringify("/v1") },
     appType: "custom",
     server: { middlewareMode: true },
     esbuild: { jsx: "automatic" },

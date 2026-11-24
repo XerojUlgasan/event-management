@@ -1,9 +1,9 @@
 import "dotenv/config";
-import { env } from "../utils/env.js";
+import { config } from "../env.js";
 import { db } from "./client.js";
 import { getFirebaseAuth } from "../utils/firebase-admin.js";
 
-const email = process.argv[2] ?? env.ADMIN_EMAIL;
+const email = process.argv[2] || config.ADMIN_EMAIL;
 
 if (!email) {
   console.error("Usage: pnpm db:seed-admin <email>");
@@ -26,7 +26,7 @@ try {
     throw error;
   }
 
-  const password = env.ADMIN_PASSWORD;
+  const password = config.ADMIN_PASSWORD;
 
   if (!password) {
     console.error(

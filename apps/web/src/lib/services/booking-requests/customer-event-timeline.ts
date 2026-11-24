@@ -7,9 +7,7 @@ export function latestCustomerEvent(
   updated: BookingRequest,
 ) {
   return current.updatedAt > updated.updatedAt ||
-    (current.eventCompletion?.status === "finished" &&
-      updated.eventCompletion?.status !== "finished") ||
-    (["declined", "cancelled"].includes(current.status) &&
+    (["declined", "cancelled", "finished"].includes(current.status) &&
       current.status !== updated.status)
     ? current
     : updated;
@@ -35,7 +33,7 @@ export const customerEventGroups = [
   {
     key: "finished",
     label: "Finished events",
-    description: "Dates show when the team marked each event finished.",
+    description: "Your finished events and their requested dates.",
   },
   {
     key: "closed",
@@ -48,16 +46,6 @@ type CustomerEventGroup = (typeof customerEventGroups)[number]["key"];
 
 // Requested dates stay separate from operational schedules, which can move.
 export function customerEventPosition(item: BookingRequest, now = new Date()) {
-  if (item.eventCompletion?.status === "finished")
-    return {
-      group: "finished" as const,
-      date: calendarDateInTimeZone(
-        new Date(item.eventCompletion.finishedAt),
-        item.timeZone,
-      ),
-      dayCount: 0,
-    };
-
   const today = calendarDateInTimeZone(now, item.timeZone);
 
   const dates = (
@@ -69,15 +57,17 @@ export function customerEventPosition(item: BookingRequest, now = new Date()) {
 
   const date = nextDate ?? dates.at(-1) ?? null;
   const group: CustomerEventGroup =
-    item.status === "declined" || item.status === "cancelled"
-      ? "closed"
-      : !date
-        ? "undated"
-        : date === today
-          ? "today"
-          : date > today
-            ? "upcoming"
-            : "past";
+    item.status === "finished"
+      ? "finished"
+      : item.status === "declined" || item.status === "cancelled"
+        ? "closed"
+        : !date
+          ? "undated"
+          : date === today
+            ? "today"
+            : date > today
+              ? "upcoming"
+              : "past";
 
   return { group, date, dayCount: dates.length };
 }

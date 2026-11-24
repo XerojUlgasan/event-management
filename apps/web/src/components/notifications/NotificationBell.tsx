@@ -19,7 +19,7 @@ import {
   markNotificationRead,
 } from "../../lib/data/notifications/notifications";
 import { ApiError } from "../../lib/http/request";
-import { env } from "../../lib/env/env";
+import { config } from "../../env";
 import {
   customerBookingRequestPath,
   customerConversationPath,
@@ -37,6 +37,7 @@ const statusTitles: Record<BookingStatus, string> = {
   under_review: "Booking request under review",
   needs_details: "More booking details requested",
   accepted: "Booking request accepted for processing",
+  finished: "Event finished",
   declined: "Booking request declined",
   cancelled: "Booking request cancelled",
 };
@@ -49,7 +50,10 @@ type NotificationPresentation = {
   path: string;
 };
 
-function presentation(content: Notification): NotificationPresentation {
+function presentation(
+  content: Notification,
+  admin: boolean,
+): NotificationPresentation {
   const booking = "booking" in content ? content.booking : undefined;
   const eventType = booking?.eventType.trim();
   const requestedDate = booking?.preferredDate
@@ -76,7 +80,7 @@ function presentation(content: Notification): NotificationPresentation {
       };
     case "event_ready_to_finish":
       return {
-        title: "Event ready to finish",
+        title: "Event update",
         details: eventDetails.join(" · "),
         icon: "calendar",
         action: "View event",
@@ -84,11 +88,13 @@ function presentation(content: Notification): NotificationPresentation {
       };
     case "event_finished":
       return {
-        title: "Your event was marked finished",
+        title: "Event finished",
         details: eventDetails.join(" · "),
         icon: "check",
         action: "View event",
-        path: customerBookingRequestPath(content.payload.bookingRequestId),
+        path: admin
+          ? adminBookingRequestPath(content.payload.bookingRequestId)
+          : customerBookingRequestPath(content.payload.bookingRequestId),
       };
     case "quotation_sent":
       return {
@@ -194,7 +200,13 @@ function NotificationSummary({
   );
 }
 
-export function NotificationBell({ profileId }: { profileId: string }) {
+export function NotificationBell({
+  profileId,
+  admin = false,
+}: {
+  profileId: string;
+  admin?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -319,15 +331,15 @@ export function NotificationBell({ profileId }: { profileId: string }) {
     };
   }, [load, profileId]);
   useEffect(() => {
-    if (!env.PUBLIC_SUPABASE_URL || !env.PUBLIC_SUPABASE_PUBLISHABLE_KEY)
+    if (!config.PUBLIC_SUPABASE_URL || !config.PUBLIC_SUPABASE_PUBLISHABLE_KEY)
       return;
 
     let client: ReturnType<typeof createClient>;
 
     try {
       client = createClient(
-        env.PUBLIC_SUPABASE_URL,
-        env.PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+        config.PUBLIC_SUPABASE_URL,
+        config.PUBLIC_SUPABASE_PUBLISHABLE_KEY,
         {
           auth: {
             persistSession: false,
@@ -461,7 +473,15 @@ export function NotificationBell({ profileId }: { profileId: string }) {
       }
 
       setDrawerOpen(false);
-      navigateWorkspace(presentation(item).path);
+      const path = presentation(item, admin).path;
+
+      if (item.type === "event_finished") {
+        window.location.assign(path);
+
+        return;
+      }
+
+      navigateWorkspace(path);
       void load();
     } catch {
       if (mounted.current)
@@ -475,8 +495,10 @@ export function NotificationBell({ profileId }: { profileId: string }) {
     }
   };
 
-  const arrivalContent = arrival ? presentation(arrival) : null;
-  const announcementContent = announcement ? presentation(announcement) : null;
+  const arrivalContent = arrival ? presentation(arrival, admin) : null;
+  const announcementContent = announcement
+    ? presentation(announcement, admin)
+    : null;
 
   return (
     <div className="notification-bell">
@@ -578,7 +600,7 @@ export function NotificationBell({ profileId }: { profileId: string }) {
                       onClick={() => void select(item)}
                     >
                       <NotificationSummary
-                        content={presentation(item)}
+                        content={presentation(item, admin)}
                         unread={!item.readAt}
                       />
                       <span className="notification-item-meta">

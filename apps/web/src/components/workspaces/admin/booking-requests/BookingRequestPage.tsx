@@ -10,7 +10,6 @@ import {
   useNotifications,
 } from "@event-management/ui";
 import {
-  finishEvent,
   getAdminBookingRequest,
   type BookingRequest,
   type BookingStatus,
@@ -24,7 +23,6 @@ import {
   bookingDate,
   bookingDateTime,
   BookingStatusBadge,
-  EventCompletionBadge,
 } from "../../../booking-requests/BookingRequestDisplay";
 import { BookingPackage } from "../../../booking-requests/BookingPackage";
 import { Quotations } from "../../../quotations/Quotations";
@@ -36,16 +34,10 @@ function latestBooking(
 ) {
   if (current?.id !== incoming.id) return incoming;
 
-  const latest = current.updatedAt > incoming.updatedAt ? current : incoming;
-  const completion =
-    current.eventCompletion?.status === "finished"
-      ? current.eventCompletion
-      : incoming.eventCompletion;
-
-  return completion?.status === "finished" &&
-    latest.eventCompletion !== completion
-    ? { ...latest, eventCompletion: completion }
-    : latest;
+  return current.updatedAt > incoming.updatedAt ||
+    (current.status === "finished" && incoming.status !== "finished")
+    ? current
+    : incoming;
 }
 
 function BookingQuotations({
@@ -108,7 +100,7 @@ export function BookingRequestPage({
 }: {
   bookingRequestId: string;
 }) {
-  const { notify, notifyError } = useNotifications();
+  const { notifyError } = useNotifications();
   const [item, setItem] = useState<BookingRequest | null>(null);
   const [refreshing, setRefreshing] = useState(true);
   const [error, setError] = useState("");
@@ -116,8 +108,6 @@ export function BookingRequestPage({
   const [editStatus, setEditStatus] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [savingDay, setSavingDay] = useState(false);
-  const [savingAddons, setSavingAddons] = useState(false);
-  const [finishing, setFinishing] = useState(false);
   const [proposalRevision, setProposalRevision] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -131,7 +121,7 @@ export function BookingRequestPage({
   const canChangeStatus =
     pageTab === "details" &&
     item &&
-    item.eventCompletion?.status !== "finished" &&
+    item.status !== "finished" &&
     item.status !== "declined" &&
     item.status !== "cancelled";
 
@@ -178,32 +168,6 @@ export function BookingRequestPage({
     });
   };
 
-  const markFinished = async (booking: BookingRequest) => {
-    const current = generation.bump();
-    setFinishing(true);
-
-    try {
-      const { bookingRequest } = await finishEvent(
-        booking.id,
-        booking.updatedAt,
-      );
-
-      if (generation.isCurrent(current)) {
-        setItem((item) => latestBooking(item, bookingRequest));
-        notify("Event marked as finished.");
-      }
-    } catch (cause) {
-      if (!generation.isCurrent(current)) return;
-
-      notifyError(cause, "Unable to finish the event.");
-
-      if (cause instanceof ApiError && cause.status === 409)
-        refreshWithNotice("Unable to refresh this booking request.");
-    } finally {
-      setFinishing(false);
-    }
-  };
-
   useEffect(() => {
     setItem(null);
     setHistoryOpen(false);
@@ -230,7 +194,7 @@ export function BookingRequestPage({
         </a>
         <Button
           variant="link"
-          disabled={refreshing || savingStatus || savingDay || finishing}
+          disabled={refreshing || savingStatus || savingDay}
           onClick={() => {
             setEditStatus(false);
             refreshWithNotice("Unable to refresh this booking request.");
@@ -272,31 +236,12 @@ export function BookingRequestPage({
             />
             <div className="booking-request-status-row">
               <BookingStatusBadge status={item.status} />
-              {item.eventCompletion && (
-                <EventCompletionBadge status={item.eventCompletion.status} />
-              )}
-              {pageTab === "details" &&
-                item.eventCompletion?.status === "ready" &&
-                !editStatus && (
-                  <Button
-                    size="small"
-                    pending={finishing}
-                    disabled={
-                      refreshing || savingStatus || savingDay || savingAddons
-                    }
-                    onClick={() => void markFinished(item)}
-                  >
-                    Mark as finished
-                  </Button>
-                )}
               {canChangeStatus && !editStatus && (
                 <Button
                   ref={changeStatusButton}
                   variant="secondary"
                   size="small"
-                  disabled={
-                    savingStatus || refreshing || savingDay || finishing
-                  }
+                  disabled={savingStatus || refreshing || savingDay}
                   onClick={() => setEditStatus(true)}
                 >
                   Change status
@@ -362,18 +307,14 @@ export function BookingRequestPage({
                 label: "Details",
                 id: "booking-tab-details",
                 panelId: detailsPanelId,
-                disabled:
-                  (savingDay || savingStatus || finishing) &&
-                  pageTab !== "details",
+                disabled: (savingDay || savingStatus) && pageTab !== "details",
               },
               {
                 value: "package",
                 label: "Package",
                 id: "booking-tab-package",
                 panelId: packagePanelId,
-                disabled:
-                  (savingDay || savingStatus || finishing) &&
-                  pageTab !== "package",
+                disabled: (savingDay || savingStatus) && pageTab !== "package",
               },
               {
                 value: "quotation",
@@ -381,8 +322,7 @@ export function BookingRequestPage({
                 id: "booking-tab-quotation",
                 panelId: quotationPanelId,
                 disabled:
-                  (savingDay || savingStatus || finishing) &&
-                  pageTab !== "quotation",
+                  (savingDay || savingStatus) && pageTab !== "quotation",
               },
             ]}
           />
@@ -497,10 +437,7 @@ export function BookingRequestPage({
                 </div>
                 <BookingOfferAddons
                   booking={item}
-                  disabled={
-                    refreshing || savingStatus || savingDay || finishing
-                  }
-                  onBusyChange={setSavingAddons}
+                  disabled={refreshing || savingStatus || savingDay}
                   onChanged={(updated) =>
                     setItem((current) =>
                       current?.id === updated.id
@@ -515,8 +452,8 @@ export function BookingRequestPage({
                 </p>
               </section>
               <div
-                inert={savingStatus || refreshing || finishing || undefined}
-                aria-busy={savingStatus || refreshing || finishing}
+                inert={savingStatus || refreshing || undefined}
+                aria-busy={savingStatus || refreshing}
               >
                 <AdminEventDays
                   key={item.id}
@@ -539,7 +476,9 @@ export function BookingRequestPage({
                 id={item.id}
                 admin
                 refreshBooking={refresh}
-                editable={!["declined", "cancelled"].includes(item.status)}
+                editable={
+                  !["declined", "cancelled", "finished"].includes(item.status)
+                }
                 onChanged={() => {
                   setProposalRevision((value) => value + 1);
                   refreshWithNotice("Unable to refresh the booking.");
