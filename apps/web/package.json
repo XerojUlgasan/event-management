@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "build:workers": "cross-env ASTRO_ADAPTER=cloudflare PUBLIC_API_URL=/v1 CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false astro build",
     "preview": "astro preview",
     "check": "astro check",
     "test:catalog": "node --test tests/catalog/catalog-ssr.test.mjs tests/catalog/package-service-dom.test.mjs tests/catalog/details-validation.test.ts tests/catalog/canvas-validation.test.ts",
@@ -30,10 +31,12 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.11",
+    "@astrojs/cloudflare": "14.4.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "happy-dom": "^21.0.4",
     "typescript": "^6.0.3",
-    "vite": "8.3.5"
+    "vite": "8.3.5",
+    "wrangler": "4.164.0"
   }
 }

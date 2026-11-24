@@ -1,5 +1,6 @@
 type ServerEnv = {
   API_PROXY_TARGET?: string;
+  ASTRO_ADAPTER?: string;
   PUBLIC_API_URL?: string;
 };
 
@@ -11,6 +12,9 @@ export function createServerEnv(source: ServerEnv) {
   return {
     get API_PROXY_TARGET() {
       return source.API_PROXY_TARGET;
+    },
+    get ASTRO_ADAPTER() {
+      return source.ASTRO_ADAPTER;
     },
     get SERVER_API_URL() {
       const proxy = source.API_PROXY_TARGET?.replace(/\/$/, "");
