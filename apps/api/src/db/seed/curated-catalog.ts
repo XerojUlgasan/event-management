@@ -73,13 +73,17 @@ type StoredWidget = ReturnType<
   typeof storedSectionsSchema.parse
 >[number]["widgets"][number];
 
-const openingLayouts = [
+const openingLayouts: ReadonlyArray<{
+  photoWidth: number;
+  photoFirst: boolean;
+  introOffset?: number;
+}> = [
   { photoWidth: 11, photoFirst: true },
   { photoWidth: 10, photoFirst: false },
   { photoWidth: CATALOG_COLUMNS, photoFirst: true },
-  { photoWidth: CATALOG_COLUMNS, photoFirst: false },
+  { photoWidth: 13, photoFirst: true, introOffset: 1 },
   { photoWidth: 9, photoFirst: true },
-] as const;
+];
 
 export function buildCatalogCanvas(
   copy: CatalogCopy,
@@ -136,8 +140,11 @@ export function buildCatalogCanvas(
     widgets,
   });
 
-  const { photoWidth, photoFirst } =
-    openingLayouts[options.index % openingLayouts.length];
+  const {
+    photoWidth,
+    photoFirst,
+    introOffset = 0,
+  } = openingLayouts[options.index % openingLayouts.length];
   const stacked = photoWidth === CATALOG_COLUMNS;
   const introWidth = stacked ? CATALOG_COLUMNS : CATALOG_COLUMNS - photoWidth;
   const intro = text(
@@ -151,10 +158,7 @@ export function buildCatalogCanvas(
     caption: "Illustrative photo",
   };
 
-  if (stacked) {
-    if (photoFirst) intro.y = lead.h;
-    else lead.y = intro.h;
-  }
+  intro.y = stacked ? lead.h : introOffset;
 
   const sections = [
     section(
