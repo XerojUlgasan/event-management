@@ -62,6 +62,7 @@ export function CatalogPicker<T extends CatalogServicePreview>({
   plural,
   searchRef,
   selectedId,
+  isItemSelected,
   loadPage,
   onSelect,
   firstOption,
@@ -69,6 +70,7 @@ export function CatalogPicker<T extends CatalogServicePreview>({
   plural: "packages" | "services";
   searchRef: RefObject<HTMLInputElement | null>;
   selectedId?: string | null;
+  isItemSelected?: (item: T) => boolean;
   loadPage: (
     search: string,
     cursor?: string,
@@ -164,7 +166,11 @@ export function CatalogPicker<T extends CatalogServicePreview>({
             name={item.name}
             description={item.description}
             imageUrl={item.imageUrl}
-            selected={item.id === selectedId}
+            selected={
+              isItemSelected
+                ? isItemSelected(item)
+                : item.id === selectedId
+            }
             onSelect={() => onSelect(item)}
           />
         ))}

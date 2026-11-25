@@ -10,13 +10,13 @@ import {
 } from "react";
 import {
   getService,
-  getServices,
   type PublicService,
 } from "../../lib/data/catalog/services";
 import type { PublicPackage } from "../../lib/data/catalog/packages";
 import { servicePricingLabels } from "../../lib/utils/formatting/money";
 
 import type { BookingAddon } from "../../lib/services/booking-requests/booking-draft";
+import { BookingAddonServicePickerDialog } from "./BookingAddonServicePickerDialog";
 
 export function includedServiceIds(item: PublicPackage | null) {
   return new Set(
@@ -57,35 +57,12 @@ export function BookingAddons({
   onChange: Dispatch<SetStateAction<BookingAddon[]>>;
   readOnly?: boolean;
 }) {
-  const [services, setServices] = useState<PublicService[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [opened, setOpened] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const addService = useRef<HTMLButtonElement>(null);
   const inputPrefix = useId();
   const included = includedServiceIds(item);
-
-  const load = async (next?: string) => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const result = await getServices({
-        limit: 20,
-        ...(next ? { cursor: next } : {}),
-      });
-      setServices((current) =>
-        next ? [...current, ...result.services] : result.services,
-      );
-      setCursor(result.nextCursor);
-      setOpened(true);
-    } catch {
-      setError("Unable to load services. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const update = (
     serviceId: string,
@@ -123,6 +100,32 @@ export function BookingAddons({
       setLoading(false);
     }
   };
+
+  const addSelectedService = (service: PublicService) => {
+    if (included.has(service.id.toLowerCase())) return;
+
+    if (
+      rows.some(
+        (row) => row.service.id.toLowerCase() === service.id.toLowerCase(),
+      )
+    ) {
+      return;
+    }
+
+    if (service.hourlyRatePesos == null) return;
+
+    if (rows.length >= MAX_BOOKING_ADDON_SERVICES) return;
+
+    onChange((current) => [...current, { service, hours: "1" }]);
+    requestAnimationFrame(() =>
+      document.getElementById(`${inputPrefix}-${service.id}`)?.focus(),
+    );
+  };
+
+  const isAddonSelected = (service: PublicService) =>
+    rows.some(
+      (row) => row.service.id.toLowerCase() === service.id.toLowerCase(),
+    );
 
   return (
     <section className="pe-addons booking-addons">
@@ -275,83 +278,25 @@ export function BookingAddons({
         <p className="pe-addon-empty">No add-on services selected.</p>
       )}
       {!readOnly && (
-        <>
-          <Button
-            ref={addService}
-            type="button"
-            variant="secondary"
-            disabled={loading || rows.length >= MAX_BOOKING_ADDON_SERVICES}
-            onClick={() => (opened ? setOpened(false) : void load())}
-          >
-            {opened ? "Close services" : "Add service"}
-          </Button>
-          {opened && (
-            <div className="booking-addon-picker">
-              <ul>
-                {services.map((service) => {
-                  const selected = rows.some(
-                    (row) =>
-                      row.service.id.toLowerCase() === service.id.toLowerCase(),
-                  );
-
-                  const inPackage = included.has(service.id.toLowerCase());
-                  const unavailable = service.hourlyRatePesos == null;
-
-                  return (
-                    <li key={service.id}>
-                      {service.name}{" "}
-                      {inPackage
-                        ? "(included in package)"
-                        : selected
-                          ? "(selected)"
-                          : unavailable
-                            ? "(rate on request; use special requests)"
-                            : ""}{" "}
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="small"
-                        aria-label={`Add ${service.name}`}
-                        disabled={
-                          inPackage ||
-                          selected ||
-                          unavailable ||
-                          rows.length >= MAX_BOOKING_ADDON_SERVICES
-                        }
-                        onClick={() => {
-                          onChange((current) => [
-                            ...current,
-                            {
-                              service,
-                              hours: "1",
-                            },
-                          ]);
-                          requestAnimationFrame(() =>
-                            document
-                              .getElementById(`${inputPrefix}-${service.id}`)
-                              ?.focus(),
-                          );
-                        }}
-                      >
-                        Add
-                      </Button>
-                    </li>
-                  );
-                })}
-              </ul>
-              {cursor && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={loading}
-                  onClick={() => void load(cursor)}
-                >
-                  Load more services
-                </Button>
-              )}
-            </div>
-          )}
-        </>
+        <Button
+          ref={addService}
+          type="button"
+          variant="secondary"
+          disabled={rows.length >= MAX_BOOKING_ADDON_SERVICES}
+          onClick={() => setPickerOpen(true)}
+        >
+          Add service
+        </Button>
+      )}
+      {pickerOpen && (
+        <BookingAddonServicePickerDialog
+          onClose={() => {
+            setPickerOpen(false);
+            requestAnimationFrame(() => addService.current?.focus());
+          }}
+          onSelect={addSelectedService}
+          isItemSelected={isAddonSelected}
+        />
       )}
       {error && <p role="alert">{error}</p>}
     </section>
