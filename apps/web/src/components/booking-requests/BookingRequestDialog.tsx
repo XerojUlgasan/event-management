@@ -14,6 +14,7 @@ import {
   MAX_PHONE_NUMBER_LENGTH,
   MAX_SPECIAL_REQUESTS_LENGTH,
 } from "@event-management/contracts/limits/booking-requests";
+import { isValidPhoneNumber } from "@event-management/contracts/booking-draft";
 import { useEffect, useId, useRef, useState, type SubmitEvent } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -82,6 +83,8 @@ function validate(fields: Fields, zone: string, requireName = true): Errors {
     errors.contactName = "Enter a contact person.";
 
   if (!fields.phoneNumber.trim()) errors.phoneNumber = "Enter a phone number.";
+  else if (!isValidPhoneNumber(fields.phoneNumber))
+    errors.phoneNumber = "Enter a valid phone number.";
 
   for (const [key, limit] of [
     ["contactName", MAX_CONTACT_NAME_LENGTH],

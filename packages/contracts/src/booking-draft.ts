@@ -41,6 +41,25 @@ const timeZone = text(MAX_TIME_ZONE_LENGTH).refine((zone) => {
   }
 }, "Invalid event time zone");
 
+const phoneNumberCharacters = /^\+?[\d\s().-]+$/;
+
+/** Accept local or international formats with 7 to 15 digits. */
+export function isValidPhoneNumber(value: string) {
+  const trimmed = value.trim();
+  const digits = trimmed.replace(/\D/g, "");
+
+  return (
+    phoneNumberCharacters.test(trimmed) &&
+    digits.length >= 7 &&
+    digits.length <= 15
+  );
+}
+
+export const phoneNumberSchema = text(MAX_PHONE_NUMBER_LENGTH).refine(
+  isValidPhoneNumber,
+  "Enter a valid phone number.",
+);
+
 const serviceFields = {
   serviceId: id.optional(),
   customName: text(MAX_EVENT_TYPE_LENGTH).optional(),
@@ -98,7 +117,7 @@ export const bookingDraftPatchSchema = z
     timeZone: timeZone.nullable(),
     guestCount: guestCount.nullable(),
     contactName: scalarFields.contactName.nullable(),
-    phoneNumber: scalarFields.phoneNumber.nullable(),
+    phoneNumber: phoneNumberSchema.nullable(),
     preferredVenueLocation: scalarFields.preferredVenueLocation.nullable(),
     specialRequests: scalarFields.specialRequests.nullable(),
     packageId: id.nullable(),
