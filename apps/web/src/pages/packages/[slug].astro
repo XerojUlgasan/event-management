@@ -32,21 +32,25 @@ const description = item?.description || "This package is not available.";
 ---
 
 <PublicDocument title={title} description={description}>
-  <p class="section-back">
-    <a href="/packages">All packages</a>
-  </p>
-  {unavailable && (
-    <Toast tone="danger" placement="inline">
-      <span>The catalog is unavailable right now.</span>
-      <a href={`${Astro.url.pathname}${Astro.url.search}`}>Try again</a>
-    </Toast>
-  )}
-  {!unavailable && !item && (
-    <p class="catalog-status">This package is not available.</p>
-  )}
-  {item && (
-    <PublicPackageDetail item={item}>
-      <PublicPackageBooking item={item} client:load />
-    </PublicPackageDetail>
-  )}
+  <div class="public-package-detail">
+    <div class="public-package-detail-shell">
+      <nav class="section-back" aria-label="Package catalog">
+        <a href="/packages">All packages</a>
+      </nav>
+      {unavailable && (
+        <Toast tone="danger" placement="inline">
+          <span>The catalog is unavailable right now.</span>
+          <a href={`${Astro.url.pathname}${Astro.url.search}`}>Try again</a>
+        </Toast>
+      )}
+      {!unavailable && !item && (
+        <p class="catalog-status">This package is not available.</p>
+      )}
+      {item && (
+        <PublicPackageDetail item={item}>
+          <PublicPackageBooking item={item} client:load />
+        </PublicPackageDetail>
+      )}
+    </div>
+  </div>
 </PublicDocument>
