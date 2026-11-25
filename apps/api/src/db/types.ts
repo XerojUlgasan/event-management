@@ -148,6 +148,11 @@ export interface Conversations {
   updated_at: Generated<Timestamp>;
 }
 
+export interface DeploymentWorkflowTest {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+}
+
 export interface EventsDay {
   booking_request_id: string;
   created_at: Generated<Timestamp>;
@@ -352,6 +357,7 @@ export interface DB {
   business_information: BusinessInformation;
   catalog_knowledge: CatalogKnowledge;
   conversations: Conversations;
+  deployment_workflow_test: DeploymentWorkflowTest;
   events_day: EventsDay;
   guest_chat_identities: GuestChatIdentities;
   guest_message_requests: GuestMessageRequests;

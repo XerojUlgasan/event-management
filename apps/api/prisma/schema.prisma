@@ -479,3 +479,10 @@ model ShowcaseRecord {
   @@index([coverMediaId])
   @@map("showcase_records")
 }
+
+model DeploymentWorkflowTest {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("deployment_workflow_test")
+}

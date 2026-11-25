@@ -98,10 +98,21 @@ Use the checked-in [API environment example](../../../../apps/api/.env.example) 
 
 ### Production Supabase deployment
 
+The [Deploy production Supabase workflow](../../../../.github/workflows/deploy-supabase.yml) runs on `main` when API, Supabase, shared contract, bundled image, or workspace dependency files change. It builds the `api` Edge Function, applies pending Prisma migrations, then syncs runtime secrets and deploys the built function.
+
+| GitHub environment | Settings |
+| --- | --- |
+| `Database Migration` | Allow `main` and set `PROD_SUPABASE_DB_URL` to the production Session pooler URI on port 5432. Percent-encode reserved characters in the password. |
+| `Edge Functions` | Allow `main` and set `PROD_SUPABASE_REF` to the same project. Set `SUPABASE_ACCESS_TOKEN` with permission to read and deploy Edge Functions and write their secrets. Add the runtime secrets listed in the workflow. |
+
+Review [pending migration impact](#migration-impact) before the first run. To deploy after editing only GitHub secrets, run **Deploy production Supabase** from the Actions tab on `main`. The workflow uploads configured runtime values. Remove retired values in Supabase when needed.
+
+#### Manual production deployment
+
 From the workspace root, `pnpm prod:supabase:deploy` builds the `api` Edge Function, applies pending Prisma migrations, uploads runtime secrets, and deploys the function to the selected project. Review [migration impact](#migration-impact) before deploying to a populated database.
 
 1. Set `SUPABASE_ACCESS_TOKEN`, `PROD_SUPABASE_REF`, and `PROD_SUPABASE_DB_URL` in `apps/api/.env`. The token needs permission to write functions and secrets. In the target project's **Connect** dialog, choose **Direct connection** or **Session pooler** on port 5432. Percent-encode reserved characters in the password before placing the URI in the env file.
-2. Copy [the production function example](../../../../apps/supabase/prod/.env.functions.example) to `apps/supabase/prod/.env.functions` and set `WEB_ORIGIN` to the production frontend's HTTPS origin. Add feature settings that need to be uploaded. Supabase injects `SUPABASE_DB_URL` into the function. Use `apps/supabase/.env.functions` for local development.
+2. Confirm `apps/supabase/.env.functions` contains the intended production runtime values before running the script. Set `WEB_ORIGIN` to the production frontend's HTTPS origin. Supabase injects `SUPABASE_DB_URL` into the function.
 3. Start Docker and run `pnpm prod:supabase:deploy`. The Supabase CLI bundles the function locally to fit the deployment size limit. A failed step stops the command. Earlier successful steps take effect immediately. After correcting the failure, rerun the command to finish the release.
 
 ### Cloudflare Workers frontend

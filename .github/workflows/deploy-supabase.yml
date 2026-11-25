@@ -1,0 +1,120 @@
+name: Deploy production Supabase
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - "apps/supabase/**"
+      - "apps/web/public/images/**"
+      - "packages/contracts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-supabase
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Build API and apply migrations
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: Database Migration
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "24"
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:edge
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: supabase-api-bundle
+          path: apps/supabase/functions/api/_generated/
+          if-no-files-found: error
+          overwrite: true
+      - name: Apply pending Prisma migrations
+        env:
+          PROD_SUPABASE_DB_URL: ${{ secrets.PROD_SUPABASE_DB_URL }}
+        run: |
+          : "${PROD_SUPABASE_DB_URL:?Missing Database Migration secret PROD_SUPABASE_DB_URL}"
+          pnpm --filter @event-management/api run db:deploy --config prisma.prod.config.ts
+
+  deploy:
+    name: Deploy API Edge Function
+    needs: migrate
+    runs-on: ubuntu-latest
+    environment: Edge Functions
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "24"
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: supabase-api-bundle
+          path: apps/supabase/functions/api/_generated/
+      - name: Sync Edge Function secrets
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          DECISION_MODEL: ${{ secrets.DECISION_MODEL }}
+          EMBEDDING_MODEL: ${{ secrets.EMBEDDING_MODEL }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          PROD_SUPABASE_REF: ${{ secrets.PROD_SUPABASE_REF }}
+          SEED_RANDOM_SEED: ${{ secrets.SEED_RANDOM_SEED }}
+          SESSION_TTL_DAYS: ${{ secrets.SESSION_TTL_DAYS }}
+          STORAGE_BUCKET: ${{ secrets.STORAGE_BUCKET }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUP_JWT_KEY: ${{ secrets.SUP_JWT_KEY }}
+          TEXT_MODEL: ${{ secrets.TEXT_MODEL }}
+          VISION_MODEL: ${{ secrets.VISION_MODEL }}
+          WEB_ORIGIN: ${{ secrets.WEB_ORIGIN }}
+        run: |
+          : "${PROD_SUPABASE_REF:?Missing Edge Functions secret PROD_SUPABASE_REF}"
+          : "${SUPABASE_ACCESS_TOKEN:?Missing Edge Functions secret SUPABASE_ACCESS_TOKEN}"
+
+          # Let the CLI read the values from the environment, including multiline keys.
+          workdir=$(mktemp -d "$RUNNER_TEMP/supabase-secrets.XXXXXXXX")
+          trap 'rm -rf -- "$workdir"' EXIT
+          mkdir "$workdir/supabase"
+          cat > "$workdir/supabase/config.toml" <<'TOML'
+          [edge_runtime.secrets]
+          AI_GATEWAY_API_KEY = "env(AI_GATEWAY_API_KEY)"
+          DECISION_MODEL = "env(DECISION_MODEL)"
+          EMBEDDING_MODEL = "env(EMBEDDING_MODEL)"
+          FIREBASE_CLIENT_EMAIL = "env(FIREBASE_CLIENT_EMAIL)"
+          FIREBASE_PRIVATE_KEY = "env(FIREBASE_PRIVATE_KEY)"
+          FIREBASE_PROJECT_ID = "env(FIREBASE_PROJECT_ID)"
+          SEED_RANDOM_SEED = "env(SEED_RANDOM_SEED)"
+          SESSION_TTL_DAYS = "env(SESSION_TTL_DAYS)"
+          STORAGE_BUCKET = "env(STORAGE_BUCKET)"
+          SUP_JWT_KEY = "env(SUP_JWT_KEY)"
+          TEXT_MODEL = "env(TEXT_MODEL)"
+          VISION_MODEL = "env(VISION_MODEL)"
+          WEB_ORIGIN = "env(WEB_ORIGIN)"
+          TOML
+
+          pnpm --filter @event-management/supabase exec -- supabase secrets set \
+            --remote="$PROD_SUPABASE_REF" --workdir "$workdir" --yes
+      - name: Deploy the api function
+        env:
+          PROD_SUPABASE_REF: ${{ secrets.PROD_SUPABASE_REF }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          pnpm --filter @event-management/supabase exec -- supabase functions deploy api \
+            --remote="$PROD_SUPABASE_REF" --workdir "$GITHUB_WORKSPACE/apps" --use-docker --yes
