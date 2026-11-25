@@ -28,6 +28,24 @@ async function matchesStoredAsset(key: string, bytes: Buffer) {
   return bytes.equals(existing);
 }
 
+async function ensureSeedAssetStored(
+  key: string,
+  bytes: Buffer,
+  mimeType: string,
+  file: string,
+) {
+  if (await matchesStoredAsset(key, bytes).catch(() => false)) return;
+
+  try {
+    await putCatalogMedia(key, bytes, mimeType);
+  } catch (error) {
+    // DB reset clears rows while R2 objects remain from earlier seeds.
+    if (await matchesStoredAsset(key, bytes).catch(() => false)) return;
+
+    throw new Error(`Could not upload seed asset: ${file}`, { cause: error });
+  }
+}
+
 /** Attach the returned ID in the same seed transaction. */
 export async function seedAssetUpload(
   db: SeedDb,
@@ -70,17 +88,9 @@ export async function seedAssetUpload(
   });
 
   if (inserted) {
-    try {
-      await putCatalogMedia(key, bytes, mimeType);
+    await ensureSeedAssetStored(key, bytes, mimeType, file);
 
-      return id;
-    } catch (error) {
-      // An earlier transaction may have rolled back after writing this object.
-      // Reuse only the same bytes, and leave any conflicting object untouched.
-      if (await matchesStoredAsset(key, bytes).catch(() => false)) return id;
-
-      throw new Error(`Could not upload seed asset: ${file}`, { cause: error });
-    }
+    return id;
   }
 
   const existing = await db

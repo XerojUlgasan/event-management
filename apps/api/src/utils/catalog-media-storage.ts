@@ -73,8 +73,14 @@ export async function putCatalogMedia(
     ]),
   });
 
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(
+      `Media storage write failed (${response.status}${errorBody ? `: ${errorBody.slice(0, 200)}` : ""})`,
+    );
+  }
+
   await response.body?.cancel();
-  if (!response.ok) throw new Error("Media storage write failed");
 }
 
 export async function deleteCatalogMedia(key: string) {
