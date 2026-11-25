@@ -31,6 +31,10 @@ import {
   getAdminConversationRouteHandler,
 } from "./get-admin-conversation.js";
 import {
+  getAdminConversationMemoryRoute,
+  getAdminConversationMemoryRouteHandler,
+} from "./get-admin-conversation-memory.js";
+import {
   sendAdminMessageRoute,
   sendAdminMessageRouteHandler,
 } from "./send-admin-message.js";
@@ -109,6 +113,10 @@ routes.openapi(
 routes.openapi(sendCustomerMessageRoute, sendCustomerMessageRouteHandler);
 routes.openapi(listAdminConversationsRoute, listAdminConversationsRouteHandler);
 routes.openapi(getAdminConversationRoute, getAdminConversationRouteHandler);
+routes.openapi(
+  getAdminConversationMemoryRoute,
+  getAdminConversationMemoryRouteHandler,
+);
 routes.openapi(sendAdminMessageRoute, sendAdminMessageRouteHandler);
 routes.openapi(updateConversationAiRoute, updateConversationAiRouteHandler);
 

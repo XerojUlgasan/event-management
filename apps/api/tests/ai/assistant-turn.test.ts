@@ -5478,10 +5478,27 @@ test("the assistant can answer directly without calling a tool", async () => {
 });
 
 test("conversation memory is optional, scoped, private, and can be corrected on a later turn", async () => {
-  const id = await conversation();
-  const otherId = await conversation();
+  const { id } = await bookingFactsConversation();
+  const { id: otherId } = await bookingFactsConversation();
+  const generalId = await conversation();
   const original = `Private memory ${randomUUID()}: prefers a garden`;
   const corrected = `Private memory ${randomUUID()}: prefers indoors`;
+
+  const memoryPath = (id: string) => `/admin/conversations/${id}/memory`;
+
+  const adminMemory = async (id: string) => {
+    const response = await call(memoryPath(id), team.cookie);
+    assert.equal(response.status, 200);
+
+    return response.json();
+  };
+
+  assert.deepEqual(await adminMemory(id), { markdown: null });
+  assert.equal((await call(memoryPath(id), "")).status, 401);
+  assert.equal((await call(memoryPath(id), customer.cookie)).status, 403);
+  assert.equal((await call(memoryPath(generalId), team.cookie)).status, 404);
+  assert.equal((await call(memoryPath(randomUUID()), team.cookie)).status, 404);
+  assert.equal((await call(memoryPath("invalid"), team.cookie)).status, 400);
 
   const memory = async (conversationId: string) =>
     (
@@ -5504,6 +5521,8 @@ test("conversation memory is optional, scoped, private, and can be corrected on 
   const first = await send(id, "I prefer a garden");
   assert.equal(await memory(id), original);
   assert.equal(await memory(otherId), null);
+  assert.deepEqual(await adminMemory(id), { markdown: original });
+  assert.deepEqual(await adminMemory(otherId), { markdown: null });
   const audit = await db
     .selectFrom("ai_tool_calls")
     .selectAll()
@@ -5524,6 +5543,7 @@ test("conversation memory is optional, scoped, private, and can be corrected on 
   assert.ok("conversationMemory" in correctionContext);
   assert.equal(correctionContext.conversationMemory, original);
   assert.equal(await memory(id), corrected);
+  assert.deepEqual(await adminMemory(id), { markdown: corrected });
 
   useReply("Understood");
   const result = await send(id, "Thanks");

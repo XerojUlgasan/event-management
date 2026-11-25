@@ -133,6 +133,11 @@ export const getAdminConversation = (id: string, cursor?: string) =>
     `/admin/conversations/${encodeURIComponent(id)}${cursorQuery(cursor)}`,
   );
 
+export const getAdminConversationMemory = (id: string) =>
+  request<{ markdown: string | null }>(
+    `/admin/conversations/${encodeURIComponent(id)}/memory`,
+  );
+
 export const sendAdminMessage = (
   id: string,
   body: string,

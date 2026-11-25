@@ -16,6 +16,19 @@ export type ConversationMemoryScope = {
   jobLease?: ImageMessageJobLease;
 };
 
+export function readBookingConversationMemoryData(
+  db: Kysely<DB>,
+  conversationId: string,
+) {
+  return db
+    .selectFrom("conversations as c")
+    .innerJoin("booking_requests as br", "br.id", "c.booking_request_id")
+    .select("c.conversation_memory as markdown")
+    .where("c.id", "=", conversationId)
+    .where("br.submitted_at", "is not", null)
+    .executeTakeFirst();
+}
+
 export function readConversationMemoryData(
   db: Kysely<DB>,
   scope: ConversationMemoryScope,
