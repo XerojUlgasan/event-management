@@ -1,6 +1,6 @@
 ---
 import { Toast } from "@event-management/ui";
-import PublicDocument from "../../layouts/PublicDocument.astro";
+import PublicCatalogDetailLayout from "../../layouts/PublicCatalogDetailLayout.astro";
 import { PublicServiceDetail } from "../../components/public/catalog/PublicCatalogDetail";
 import type { PublicService } from "../../lib/data/catalog/services";
 import { loadService } from "../../lib/server/catalog/load-catalog";
@@ -30,10 +30,11 @@ const title = item
 const description = item?.description || "This service is not available.";
 ---
 
-<PublicDocument title={title} description={description}>
-  <p class="section-back">
-    <a href="/services">All services</a>
-  </p>
+<PublicCatalogDetailLayout
+  title={title}
+  description={description}
+  catalog="services"
+>
   {unavailable && (
     <Toast tone="danger" placement="inline">
       <span>The catalog is unavailable right now.</span>
@@ -44,4 +45,4 @@ const description = item?.description || "This service is not available.";
     <p class="catalog-status">This service is not available.</p>
   )}
   {item && <PublicServiceDetail item={item} />}
-</PublicDocument>
+</PublicCatalogDetailLayout>
