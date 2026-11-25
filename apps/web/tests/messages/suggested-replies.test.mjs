@@ -218,7 +218,6 @@ test("catalog browse and suggested replies coexist in both customer chats", asyn
               NotificationProvider,
               null,
               createElement(MessagesWorkspace, {
-                title: "Messages",
                 viewerRole,
                 conversations: [activeConversation],
                 activeId: conversation.id,

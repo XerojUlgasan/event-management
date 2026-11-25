@@ -237,7 +237,6 @@ for (const viewerRole of ["customer", "admin"]) {
         ui.NotificationProvider,
         null,
         createElement(MessagesWorkspace, {
-          title: "Messages",
           viewerRole,
           conversations: [conversation],
           activeId: conversation.id,
@@ -272,7 +271,6 @@ for (const viewerRole of ["customer", "admin"]) {
         ui.NotificationProvider,
         null,
         createElement(MessagesWorkspace, {
-          title: "Messages",
           viewerRole,
           conversations: [conversation],
           activeId: conversation.id,
@@ -319,7 +317,6 @@ for (const viewerRole of ["customer", "admin"]) {
           ui.NotificationProvider,
           null,
           createElement(MessagesWorkspace, {
-            title: "Messages",
             viewerRole,
             conversations: [active],
             activeConversation: active,
@@ -363,7 +360,6 @@ for (const viewerRole of ["customer", "admin"]) {
         ui.NotificationProvider,
         null,
         createElement(MessagesWorkspace, {
-          title: "Messages",
           viewerRole,
           conversations: [bookingConversation],
           activeConversation: bookingConversation,
@@ -406,7 +402,6 @@ test("booking chat uses event and requested date instead of its reference", () =
       ui.NotificationProvider,
       null,
       createElement(MessagesWorkspace, {
-        title: "Messages",
         viewerRole: "customer",
         conversations: [linked],
         activeId: linked.id,

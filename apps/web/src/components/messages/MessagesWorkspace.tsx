@@ -87,7 +87,6 @@ const handoffReason = {
 } as const;
 
 export function MessagesWorkspace({
-  title,
   viewerRole,
   conversations,
   activeConversation,
@@ -126,7 +125,6 @@ export function MessagesWorkspace({
   requestedQuotationId?: string | null;
   onBookingSubmitted?: () => void;
   onBookingClosed?: () => void;
-  title: string;
   viewerRole: "admin" | "customer";
   conversations: ChatConversation[];
   activeConversation?: ChatConversation | null;
@@ -499,9 +497,8 @@ export function MessagesWorkspace({
       className={`customer-messages messages-workspace ${conversationOpen ? "conversation-open" : ""}`}
     >
       <aside ref={inbox} tabIndex={0} aria-label="Conversations">
-        <div className="messages-sidebar-head">
-          <h1>{title}</h1>
-          {isTeam && onNewChat && (
+        {isTeam && onNewChat && (
+          <div className="messages-sidebar-head">
             <Button
               variant="secondary"
               type="button"
@@ -512,8 +509,8 @@ export function MessagesWorkspace({
             >
               {newChatBusy ? "Starting…" : "New chat"}
             </Button>
-          )}
-        </div>
+          </div>
+        )}
         {conversations.map((conversation) => {
           const name = isTeam
             ? conversation.eventType || "General questions"

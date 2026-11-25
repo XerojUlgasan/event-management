@@ -76,7 +76,6 @@ test("a customer can return to a single conversation in the inbox and reopen its
           NotificationProvider,
           null,
           createElement(MessagesWorkspace, {
-            title: "Messages",
             viewerRole: "customer",
             conversations: [conversation],
             activeId: conversation.id,

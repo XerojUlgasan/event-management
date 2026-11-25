@@ -485,7 +485,6 @@ export function MessagesPage({
   return (
     <div className="admin-messages">
       <MessagesWorkspace
-        title="Messages"
         viewerRole="admin"
         onRetryProcessing={async (messageId) => {
           if (!activeId) return;
