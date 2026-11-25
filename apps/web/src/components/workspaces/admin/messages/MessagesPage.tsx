@@ -483,9 +483,8 @@ export function MessagesPage({
   };
 
   return (
-    <div className="content-stack admin-messages">
+    <div className="admin-messages">
       <MessagesWorkspace
-        title="Messages"
         viewerRole="admin"
         onRetryProcessing={async (messageId) => {
           if (!activeId) return;

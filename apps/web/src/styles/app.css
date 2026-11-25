@@ -964,6 +964,32 @@ html:has(.public-site) {
   background: var(--brand-paper);
   border-bottom: 1px solid var(--line);
 }
+.app-header-leading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.app-header-title {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.customer-messages-heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .app-header-actions {
   margin-left: auto;
   display: flex;
@@ -4351,14 +4377,9 @@ html:has(.public-site) {
 }
 .customer-messages {
   width: 100%;
-  height: calc(100dvh - 72px);
-  min-height: 520px;
-  padding: 0 !important;
   overflow: hidden;
   display: grid;
-  grid-template-columns: clamp(280px, 25vw, 360px) minmax(0, 1fr);
-  border: 0;
-  border-radius: 0;
+  grid-template-columns: clamp(280px, 24vw, 332px) minmax(0, 1fr);
 }
 .customer-messages > aside {
   min-height: 0;
@@ -4679,16 +4700,6 @@ html:has(.public-site) {
 .customer-message .message-meta {
   color: color-mix(in srgb, var(--surface-base) 78%, var(--transparent));
 }
-.admin-messages {
-  max-width: none;
-}
-.admin-messages .customer-messages {
-  height: calc(100dvh - 147px);
-  min-height: 460px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-}
-
 @media (max-width: 1100px) {
   .public-nav {
     display: none;
@@ -4875,11 +4886,7 @@ html:has(.public-site) {
     min-height: 260px;
   }
   .customer-messages {
-    height: calc(100dvh - 115px);
     grid-template-columns: 250px minmax(0, 1fr);
-  }
-  .admin-messages .customer-messages {
-    height: calc(100dvh - 131px);
   }
   .calendar-side {
     grid-template-columns: 1fr;
@@ -5152,13 +5159,7 @@ html:has(.public-site) {
     flex-direction: column;
   }
   .customer-messages {
-    height: calc(100dvh - 115px);
-    min-height: 460px;
     grid-template-columns: 1fr;
-  }
-  .admin-messages .customer-messages {
-    height: calc(100dvh - 122px);
-    min-height: 420px;
   }
   .customer-messages > section {
     display: none;

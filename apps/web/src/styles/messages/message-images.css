@@ -74,6 +74,26 @@
   font-size: 12px;
   text-align: center;
 }
+.messages-workspace .message-image-list {
+  max-width: 100%;
+}
+.messages-workspace .message-image-button,
+.messages-workspace .message-image-placeholder {
+  max-width: 100%;
+}
+.messages-workspace .message-composer .message-image-list {
+  gap: 10px;
+  margin-block: 6px 2px;
+}
+@media (max-width: 360px) {
+  .messages-workspace .message-composer .message-image-draft {
+    width: 58px;
+    height: 58px;
+  }
+}
+.messages-workspace .message-processing {
+  color: var(--text-secondary);
+}
 .message-processing {
   margin-top: 4px;
   font-size: 12px;
@@ -96,5 +116,5 @@
 .chat-messages .message.message-typing {
   padding: 0;
   border: 0;
-  background: transparent;
+  background: var(--transparent);
 }

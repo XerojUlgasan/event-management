@@ -736,6 +736,9 @@ export function CustomerDashboard({
         >
           <Brand />
         </Button>
+        {tab === "Messages" && (
+          <h1 className="customer-messages-heading">Messages</h1>
+        )}
         <nav className="customer-nav" aria-label="Customer workspace">
           {customerTabs.map((item) => (
             <Button
@@ -857,7 +860,6 @@ export function CustomerDashboard({
                   ? requestedQuotation
                   : null
               }
-              title="Messages"
               viewerRole="customer"
               localAiReplyPending={
                 !!messageThread &&

@@ -214,14 +214,19 @@ export function AdminShell({
       }
       header={
         <header className="app-header">
-          <Button
-            variant="plain"
-            className="icon-button app-menu"
-            aria-label="Open sidebar"
-            onClick={() => setSidebarOpen(true)}
-          >
-            <Icon name="menu" />
-          </Button>
+          <div className="app-header-leading">
+            <Button
+              variant="plain"
+              className="icon-button app-menu"
+              aria-label="Open sidebar"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Icon name="menu" />
+            </Button>
+            {active === "Messages" && (
+              <h1 className="app-header-title">Messages</h1>
+            )}
+          </div>
           <div className="app-header-actions">
             <NotificationBell key={profile.id} profileId={profile.id} />
             <AccountMenu

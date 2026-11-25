@@ -14,3 +14,14 @@
   overflow-wrap: anywhere;
   text-align: left;
 }
+
+.messages-workspace .message-suggested-replies {
+  gap: 8px;
+  margin: 2px 0 8px;
+}
+
+.messages-workspace .message-suggested-replies > .button {
+  min-height: var(--message-touch-size);
+  padding: 8px 12px;
+  line-height: 1.35;
+}
