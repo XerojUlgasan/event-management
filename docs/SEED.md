@@ -7,7 +7,7 @@ pnpm db:up
 pnpm supabase:start
 ```
 
-Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env` or the command environment using the local values from `pnpm supabase:status`. The seed uses the private `event-management` bucket by default. Set `SUPABASE_STORAGE_BUCKET` if your development setup uses a different bucket. Verify both targets before seeding. Isolated `pnpm room` environments supply these settings automatically.
+Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env` or the command environment using the local values from `pnpm supabase:status`. The seed uses the private `event-management` bucket by default. Set `SUPABASE_STORAGE_BUCKET` if your development setup uses a different Supabase bucket. Isolated `pnpm room` environments supply those Supabase settings automatically. To seed directly into R2, set the [Cloudflare R2 settings](../context-factory/workflows/implement/references/development.md#cloudflare-r2-storage) for the seed process and verify the database and object storage targets before seeding. Existing catalog listings keep their stored references during reruns.
 
 ```sh
 pnpm db:deploy

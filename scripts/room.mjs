@@ -25,13 +25,46 @@ const runner = fileURLToPath(import.meta.url);
 const blockSize = 16;
 const firstPort = 20000;
 
+const r2OverrideNames = [
+  "S3_API_URL",
+  "R2_ACCESS_KEY_ID",
+  "R2_SECRET_ACCESS_KEY",
+  "R2_BUCKET_NAME",
+  "R2_SUPPORTING_DOCUMENTS_BUCKET_NAME",
+  "R2_OBJECT_PREFIX",
+];
+
 const overrideNames = new Set([
   "AI_GATEWAY_API_KEY",
   "TEXT_MODEL",
   "VISION_MODEL",
   "DECISION_MODEL",
   "EMBEDDING_MODEL",
+  ...r2OverrideNames,
 ]);
+
+function validateOverrides(overrides, roomName) {
+  for (const name of Object.keys(overrides)) {
+    if (!overrideNames.has(name))
+      throw new Error(`Unsupported room override: ${name}.`);
+  }
+
+  if (!r2OverrideNames.some((name) => overrides[name]?.trim())) return;
+
+  for (const name of r2OverrideNames.slice(0, 4)) {
+    if (!overrides[name]?.trim())
+      throw new Error(`Missing R2 room override: ${name}.`);
+  }
+
+  const prefix = overrides.R2_OBJECT_PREFIX?.trim() ?? "";
+  if (
+    !prefix.startsWith(`test-rooms/${roomName}/`) ||
+    !/^[\w-]+(?:\/[\w-]+)*$/.test(prefix)
+  )
+    throw new Error(
+      "R2 room overrides require R2_OBJECT_PREFIX=test-rooms/<room>/<unique-id>.",
+    );
+}
 
 export function validateName(name) {
   if (
@@ -137,12 +170,7 @@ export function runtimeEnvironment(
   status,
   os = process.env,
 ) {
-  for (const name of Object.keys(overrides)) {
-    if (!overrideNames.has(name))
-      throw new Error(
-        `Unsupported room override: ${name}. Only AI provider keys and models are supported.`,
-      );
-  }
+  validateOverrides(overrides, plan.name);
 
   const db = new URL(status.DB_URL);
   const api = new URL(status.API_URL);
@@ -779,20 +807,46 @@ async function seedSmoke(plan, env, require) {
       "Seeded admin login did not pass the room readiness check.",
     );
 
-  for (const path of ["me", "packages", "services"]) {
-    const result = await fetch(`${plan.apiUrl}/${path}`, {
+  try {
+    for (const path of ["me", "packages", "services"]) {
+      const result = await fetch(`${plan.apiUrl}/${path}`, {
+        headers: { cookie, origin: plan.webUrl },
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!result.ok)
+        throw new Error(`Room readiness check failed for ${path}.`);
+
+      if (path !== "packages") {
+        await result.body?.cancel();
+        continue;
+      }
+
+      const page = await result.json();
+      const packages = Array.isArray(page) ? page : (page.packages ?? []);
+      const mediaUrl = packages.find(({ imageUrl }) =>
+        /^\/v1\/catalog-media\/[\w-]+$/.test(imageUrl ?? ""),
+      )?.imageUrl;
+
+      if (mediaUrl) {
+        const image = await fetch(new URL(mediaUrl, plan.apiUrl), {
+          signal: AbortSignal.timeout(15000),
+          redirect: "error",
+        });
+
+        if (!image.ok || !(await image.arrayBuffer()).byteLength)
+          throw new Error(
+            "Room readiness could not read a stored package image. Check the storage bucket and object prefix.",
+          );
+      }
+    }
+  } finally {
+    await fetch(`${plan.apiUrl}/auth/logout`, {
+      method: "POST",
       headers: { cookie, origin: plan.webUrl },
       signal: AbortSignal.timeout(15000),
     });
-
-    if (!result.ok) throw new Error(`Room readiness check failed for ${path}.`);
   }
-
-  await fetch(`${plan.apiUrl}/auth/logout`, {
-    method: "POST",
-    headers: { cookie, origin: plan.webUrl },
-    signal: AbortSignal.timeout(15000),
-  });
 }
 
 export async function serviceCommands(
@@ -950,9 +1004,7 @@ async function supervise(plan, token) {
     }
 
     // Reject unsafe overrides before any database work.
-    for (const name of Object.keys(overrides))
-      if (!overrideNames.has(name))
-        throw new Error(`Unsupported room override: ${name}.`);
+    validateOverrides(overrides, plan.name);
 
     await ensureDirectory(join(plan.stateDir, "project"));
     await ensureDirectory(join(plan.stateDir, "project/supabase"));
@@ -977,9 +1029,11 @@ async function supervise(plan, token) {
       ),
     );
     const env = runtimeEnvironment(plan, defaults, overrides, status);
+    const baseRuntimeEnv = { ...env };
+    for (const name of r2OverrideNames) delete baseRuntimeEnv[name];
     await privateWrite(
       env.DOTENV_CONFIG_PATH,
-      Object.entries(env)
+      Object.entries(baseRuntimeEnv)
         .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
         .join("\n") + "\n",
     );
@@ -987,7 +1041,7 @@ async function supervise(plan, token) {
       stage: "deploying migrations",
       ai: Boolean(env.AI_GATEWAY_API_KEY),
     });
-    await run(["db:deploy"], env, "migrations");
+    await run(["db:deploy"], baseRuntimeEnv, "migrations");
     await update({ stage: "seeding isolated database" });
     await run(["db:seed"], env, "seed");
     const config = join(plan.stateDir, "astro.config.mjs");
@@ -1003,7 +1057,7 @@ async function supervise(plan, token) {
       const log = await appendLog(plan, label);
       const child = spawn(process.execPath, [runner, "_service", ...args], {
         cwd: plan.path,
-        env,
+        env: label === "web" ? baseRuntimeEnv : env,
         detached: true,
         stdio: ["ignore", log.fd, log.fd],
       });

@@ -31,8 +31,14 @@ export function localWorkerEnvironment(functionEnv, status, parentEnv = {}) {
     );
   }
 
+  const inherited = Object.fromEntries(
+    Object.entries(parentEnv).filter(
+      ([name]) => !name.startsWith("R2_") && name !== "S3_API_URL",
+    ),
+  );
+
   return {
-    ...parentEnv,
+    ...inherited,
     ...functionEnv,
     SUPABASE_DB_URL: status.DB_URL,
     SUPABASE_URL: status.API_URL,

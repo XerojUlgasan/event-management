@@ -2,7 +2,7 @@
 
 ## Shared catalog canvas media
 
-Packages and services store their canvas as ordered section/widget arrays in the owner's `canvas` JSONB column. A widget stores its `mediaId`; `media_assets` remains the authoritative media record for source, kind, optional URL, MIME type, and storage metadata. Uploaded bytes are stored in the private Supabase Storage bucket `event-management`, using the owner paths below. Migration `20261116072801_embed_catalog_canvas` does not copy or delete media records or Storage objects. The shared editor uploads one file at a time to `POST /v1/admin/catalog-media`. An upload remains pending until a catalog save references its media ID. The owning administrator can discard an unreferenced upload through `DELETE /v1/admin/catalog-media/{id}`. Saved uploads stream through `GET /v1/catalog-media/{id}`.
+Packages and services store their canvas as ordered section/widget arrays in the owner's `canvas` JSONB column. A widget stores its `mediaId`; `media_assets` remains the authoritative media record for source, kind, optional URL, MIME type, and storage metadata. Uploaded bytes use the owner paths below in the private `event-management` bucket by default. The API supports [Cloudflare R2 configuration](../../../workflows/implement/references/development.md#cloudflare-r2-storage). Migration `20261116072801_embed_catalog_canvas` does not copy or delete media records or Storage objects. The shared editor uploads one file at a time to `POST /v1/admin/catalog-media`. An upload remains pending until a catalog save references its media ID. The owning administrator can discard an unreferenced upload through `DELETE /v1/admin/catalog-media/{id}`. Saved uploads stream through `GET /v1/catalog-media/{id}`.
 
 ## Storage filing and recovery
 

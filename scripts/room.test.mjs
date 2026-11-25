@@ -142,6 +142,42 @@ test("runtime targets use only CLI credentials at assigned room ports and explic
   );
 });
 
+test("R2 room overrides require complete settings and a room-specific prefix", () => {
+  const plan = roomPlan("/repo", "test", 0);
+  const overrides = {
+    S3_API_URL: "https://example.r2.cloudflarestorage.com",
+    R2_ACCESS_KEY_ID: "room-test-key",
+    R2_SECRET_ACCESS_KEY: "room-test-secret",
+    R2_BUCKET_NAME: "test-media",
+    R2_OBJECT_PREFIX: "test-rooms/test/fixture",
+  };
+  const status = localStatus(plan);
+  assert.equal(
+    runtimeEnvironment(plan, {}, overrides, status).R2_OBJECT_PREFIX,
+    overrides.R2_OBJECT_PREFIX,
+  );
+  assert.throws(
+    () =>
+      runtimeEnvironment(
+        plan,
+        {},
+        { ...overrides, R2_OBJECT_PREFIX: "test-rooms/other/fixture" },
+        status,
+      ),
+    /require R2_OBJECT_PREFIX/,
+  );
+  assert.throws(
+    () =>
+      runtimeEnvironment(
+        plan,
+        {},
+        { ...overrides, R2_ACCESS_KEY_ID: "" },
+        status,
+      ),
+    /Missing R2 room override: R2_ACCESS_KEY_ID/,
+  );
+});
+
 test("unsafe override names and CLI targets outside the room fail before deployment", () => {
   const plan = roomPlan("/repo", "test", 0);
 

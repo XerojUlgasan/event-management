@@ -83,7 +83,7 @@ Use the flask icon beside **Refresh** to test a search across indexed PDF passag
 
 AMAC can search the entire supporting-document collection, including previously uploaded PDFs, in guest and signed-in chats. Each semantic search returns up to five indexed passages with their filenames, headings, and pages. AMAC uses a passage when it helps answer the question and can combine it with the business profile, catalog, or the signed-in customer's booking and quotation records.
 
-Original PDFs are stored in the private `supporting-documents` bucket. The Node worker extracts text in page order, saves page and heading information with each chunk, and queues one `embed_document_chunk` job per chunk in the same transaction. Configure the existing Storage and embedding settings for the API and worker. For hosted deployments, provision a private `supporting-documents` bucket that accepts `application/pdf` up to 25 MiB. The local Supabase config and seed define this bucket.
+Original PDFs are stored in a private bucket. The Node worker extracts text in page order, saves page and heading information with each chunk, and queues one `embed_document_chunk` job per chunk in the same transaction. The local Supabase config and seed define `supporting-documents` with an `application/pdf` limit of 25 MiB. Deployments can configure a separate private R2 bucket for PDFs. See [storage setup](../workflows/implement/references/development.md#cloudflare-r2-storage) for API and worker settings.
 
 ### Booking requests and messages
 
@@ -236,7 +236,7 @@ The editor offers Photo, Markdown, Video, and Service widgets. Adding new Packag
 
 Service widgets in packages indicate inclusions covered by the package base price. Package widgets and service-page references link to catalog listings. In edit mode, clicking the widget body opens active choices of that kind directly, with search, photos, descriptions, pagination, an optional caption, and keyboard dismissal/focus restoration. Private custom packages are excluded. In public pages and previews, the whole card links to the selected listing's detail page. Inside `/app`, the whole card instead opens a detail preview overlay while preserving the current route and underlying preview or editor. Following another service or package replaces the overlay content; closing it returns focus to the original card. Workspace navigation closes the overlay and restores page scrolling. Saved widgets store a service or package ID; reads resolve its current name, description, photo, and public link without pricing or nested canvases. Archived targets show an unavailable placeholder; existing references remain editable, but new unavailable references cannot be saved. A listing referenced by a package or service canvas cannot be deleted. Knowledge ingestion indexes the widget caption only, so renames do not leave copied listing details in another listing. No database migration is needed; deploy the matching shared contracts, API, and frontend together.
 
-The private bucket uses this filing structure (IDs remain stable when names change):
+The private media bucket uses this filing structure. IDs remain stable when names change. The bucket runs on Supabase Storage by default and supports [Cloudflare R2 configuration](../workflows/implement/references/development.md#cloudflare-r2-storage).
 
 ```text
 event-management/
