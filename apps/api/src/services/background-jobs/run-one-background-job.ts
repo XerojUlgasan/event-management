@@ -31,6 +31,7 @@ export type WorkerOptions = {
   leaseMs?: number;
   heartbeatMs?: number;
   timeoutMs?: number;
+  jobTypes?: readonly BackgroundJobType[];
 };
 
 export async function runOneBackgroundJob(
@@ -41,7 +42,17 @@ export async function runOneBackgroundJob(
 
   const leaseMs = options.leaseMs ?? backgroundJobSettings.leaseMs;
   const heartbeatMs = options.heartbeatMs ?? backgroundJobSettings.heartbeatMs;
-  const job = await claimJobData(db, leaseMs, backgroundJobPolicies);
+
+  const policies = options.jobTypes
+    ? Object.fromEntries(
+        options.jobTypes.map((type) => [
+          type,
+          jobDefinitions[type].retryDelaysMs,
+        ]),
+      )
+    : backgroundJobPolicies;
+
+  const job = await claimJobData(db, leaseMs, policies);
 
   if (!job || !isBackgroundJobType(job.type)) return false;
 

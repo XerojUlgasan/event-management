@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - ".github/workflows/deploy-supabase.yml"
       - "apps/api/**"
       - "apps/supabase/**"
       - "apps/web/public/images/**"
@@ -128,3 +129,22 @@ jobs:
         run: |
           pnpm --filter @event-management/supabase exec -- supabase functions deploy api \
             --remote="$PROD_SUPABASE_REF" --workdir "$GITHUB_WORKSPACE/apps" --use-docker --yes
+
+  schedule-catalog-indexing:
+    name: Configure catalog indexing schedule
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: Database Migration
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "24"
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - run: pnpm install --frozen-lockfile
+      - name: Schedule Supabase catalog indexing
+        env:
+          PROD_SUPABASE_DB_URL: ${{ secrets.PROD_SUPABASE_DB_URL }}
+        run: pnpm --filter @event-management/api exec tsx scripts/schedule-catalog-indexing.ts

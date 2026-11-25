@@ -1,5 +1,7 @@
 export const config = {
   SUPABASE_DB_URL: process.env.SUPABASE_DB_URL,
+  PROD_SUPABASE_DB_URL: process.env.PROD_SUPABASE_DB_URL,
+  PROD_SUPABASE_REF: process.env.PROD_SUPABASE_REF,
   API_PORT: process.env.API_PORT,
   WEB_ORIGIN: process.env.WEB_ORIGIN,
   SESSION_TTL_DAYS: process.env.SESSION_TTL_DAYS,

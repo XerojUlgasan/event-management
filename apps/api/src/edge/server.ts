@@ -3,6 +3,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { MAX_VIDEO_SIZE_BYTES } from "@event-management/contracts/limits/videos";
+import { catalogIndexWorkerPath } from "../constants/catalog-index-worker.js";
 import {
   CATALOG_JSON_BODY_LIMIT_BYTES,
   getAllowedWebOrigins,
@@ -241,6 +242,12 @@ app.use("/v1/*", async (c, next) => {
 
 app.all("/openapi.json", (c) =>
   loadDocumentation().then((docs) => docs.fetch(c.req.raw)),
+);
+
+app.post(catalogIndexWorkerPath, (c) =>
+  import("./run-catalog-index.js").then(({ runCatalogIndexRequest }) =>
+    runCatalogIndexRequest(c.req.raw),
+  ),
 );
 
 app.all("/v1/*", async (c) => {

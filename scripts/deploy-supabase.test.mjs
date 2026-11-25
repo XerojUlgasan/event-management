@@ -21,7 +21,7 @@ function deploy(context, url) {
   context.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, "scripts"));
   mkdirSync(join(root, "apps/api"), { recursive: true });
-  mkdirSync(join(root, "apps/supabase/prod"), { recursive: true });
+  mkdirSync(join(root, "apps/supabase"), { recursive: true });
   copyFileSync(
     new URL("./deploy-supabase.mjs", import.meta.url),
     join(root, "scripts/deploy-supabase.mjs"),
@@ -37,10 +37,6 @@ function deploy(context, url) {
   );
   writeFileSync(
     join(root, "apps/supabase/.env.functions"),
-    "SUPABASE_DB_URL=local-only",
-  );
-  writeFileSync(
-    join(root, "apps/supabase/prod/.env.functions"),
     "WEB_ORIGIN=https://frontend.example.test",
   );
 
@@ -101,10 +97,10 @@ test("rejects the transaction pooler before starting deployment", (context) => {
   assert.deepEqual(commands, []);
 });
 
-test("builds, migrates the selected database and deploys with the production secrets file", (context) => {
+test("activates the catalog schedule after deploying to the selected project", (context) => {
   const { result, commands, root } = deploy(context, migrationUrl);
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(commands.length, 4);
+  assert.equal(commands.length, 5);
   assert.deepEqual(commands[0].args, ["build:edge"]);
   assert.deepEqual(commands[1], {
     args: [
@@ -117,9 +113,19 @@ test("builds, migrates the selected database and deploys with the production sec
     url: migrationUrl,
   });
   assert.ok(
-    commands[2].args.includes(join(root, "apps/supabase/prod/.env.functions")),
+    commands[2].args.includes(join(root, "apps/supabase/.env.functions")),
   );
   assert.ok(commands[2].args.includes(`--remote=${projectRef}`));
   assert.ok(commands[3].args.includes(`--remote=${projectRef}`));
   assert.ok(commands[3].args.includes("--use-docker"));
+  assert.deepEqual(commands[4], {
+    args: [
+      "--filter",
+      "@event-management/api",
+      "exec",
+      "tsx",
+      "scripts/schedule-catalog-indexing.ts",
+    ],
+    url: migrationUrl,
+  });
 });

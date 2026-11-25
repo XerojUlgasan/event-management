@@ -20,6 +20,7 @@ import {
 } from "../src/services/background-jobs/job-definitions.js";
 import { runOneBackgroundJob } from "../src/services/background-jobs/run-one-background-job.js";
 import { runBackgroundJobsWorker } from "../src/services/background-jobs/run-worker.js";
+import { catalogIndexJobTypes } from "../src/constants/catalog-index-worker.js";
 
 const database = `em_jobs_${randomUUID().replaceAll("-", "")}`;
 
@@ -123,6 +124,34 @@ test("defaults, validation, deduplication, and transaction rollback", async () =
     }),
   );
   assert.equal((await rows()).length, 1);
+  await clear();
+});
+
+test("a hosted catalog invocation claims one catalog job and leaves other jobs queued", async () => {
+  await db
+    .insertInto("background_jobs")
+    .values({ type: "process_image_message", payload: {} })
+    .execute();
+  const catalogJob = await enqueue(pkg());
+
+  const options = {
+    signal,
+    jobTypes: catalogIndexJobTypes,
+    execute: async () => {},
+  };
+
+  assert.equal(await runOneBackgroundJob(db, options), true);
+  assert.equal(await runOneBackgroundJob(db, options), false);
+  const records = await rows();
+  assert.equal(
+    records.find(({ id }) => id === catalogJob)?.status,
+    "completed",
+  );
+
+  const other = records.find(({ id }) => id !== catalogJob);
+
+  assert.equal(other?.status, "pending");
+  assert.equal(other?.attempts, 0);
   await clear();
 });
 

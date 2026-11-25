@@ -53,30 +53,30 @@ function deploy() {
 
   const db = URL.parse(PROD_SUPABASE_DB_URL ?? "");
 
-  // if (
-  //   !db ||
-  //   !["postgres:", "postgresql:"].includes(db.protocol) ||
-  //   !db.username ||
-  //   !db.password ||
-  //   db.pathname.length <= 1 ||
-  //   db.hash ||
-  //   /%(?![0-9a-f]{2})/i.test(db.password)
-  // ) {
-  //   throw new Error(
-  //     "Set PROD_SUPABASE_DB_URL in apps/api/.env to a PostgreSQL URI. Percent-encode reserved characters in the database password.",
-  //   );
-  // }
+  if (
+    !db ||
+    !["postgres:", "postgresql:"].includes(db.protocol) ||
+    !db.username ||
+    !db.password ||
+    db.pathname.length <= 1 ||
+    db.hash ||
+    /%(?![0-9a-f]{2})/i.test(db.password)
+  ) {
+    throw new Error(
+      "Set PROD_SUPABASE_DB_URL in apps/api/.env to a PostgreSQL URI. Percent-encode reserved characters in the database password.",
+    );
+  }
 
-  // const direct = db.hostname === `db.${PROD_SUPABASE_REF}.supabase.co`;
-  // const pooled =
-  //   db.hostname.endsWith(".pooler.supabase.com") &&
-  //   db.username.endsWith(`.${PROD_SUPABASE_REF}`);
+  const direct = db.hostname === `db.${PROD_SUPABASE_REF}.supabase.co`;
+  const pooled =
+    db.hostname.endsWith(".pooler.supabase.com") &&
+    db.username === `postgres.${PROD_SUPABASE_REF}`;
 
-  // if (!(direct || pooled) || (db.port && db.port !== "5432")) {
-  //   throw new Error(
-  //     "Use the direct or session pooler URI on port 5432 for PROD_SUPABASE_REF.",
-  //   );
-  // }
+  if (!(direct || pooled) || (db.port && db.port !== "5432")) {
+    throw new Error(
+      "Use the direct or session pooler URI on port 5432 for PROD_SUPABASE_REF.",
+    );
+  }
 
   const secrets = readSettings(functionsEnv);
   const names = Object.keys(secrets);
@@ -138,6 +138,17 @@ function deploy() {
     "Deploying the api function",
     [...cli, "functions", "deploy", "api", "--use-docker", ...target],
     { SUPABASE_ACCESS_TOKEN },
+  );
+  run(
+    "Configuring the catalog indexing schedule",
+    [
+      "--filter",
+      "@event-management/api",
+      "exec",
+      "tsx",
+      "scripts/schedule-catalog-indexing.ts",
+    ],
+    { PROD_SUPABASE_DB_URL, PROD_SUPABASE_REF },
   );
 }
 
