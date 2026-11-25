@@ -39,8 +39,8 @@ export function createUpdateConversationMemoryTool({
     description:
       "Save durable details from the saved chat: event type, target guest count (pax), budget, preferred dates, times or venue, style, and service requirements. " +
       "Include relevant options discussed, customer or AMAC team decisions, and open questions. Attribute important statements and mark tentative plans or uncertain image observations. " +
-      `Supply the complete concise Markdown replacement, up to ${maxConversationMemoryCharacters} characters. Replace corrected details and preserve still-relevant information. ` +
-      "Use the saved transcript as evidence. Omit fresh tool results, the unsent reply, unsupported claims, and unnecessary personal details. Keep the note private.",
+      `Supply the complete replacement as a few short Markdown bullets, up to ${maxConversationMemoryCharacters} characters. Put customer preferences first. Replace corrected details and preserve still-relevant information. ` +
+      "Use the saved transcript as evidence. Omit fresh tool results, the unsent reply, unsupported claims, contact details, and unnecessary personal details. Keep the note private.",
     inputSchema: updateConversationMemoryInputSchema,
     execute: async ({ markdown }, { toolCallId, abortSignal }) => {
       if (!canRecord()) {

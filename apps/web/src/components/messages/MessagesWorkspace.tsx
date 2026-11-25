@@ -1061,6 +1061,7 @@ export function MessagesWorkspace({
         <ConversationContext
           key={`${active.id}:${context.view}`}
           bookingId={active.bookingRequestId}
+          conversationId={active.id}
           admin={!isTeam}
           view={context.view}
           onClose={() => setContext(null)}

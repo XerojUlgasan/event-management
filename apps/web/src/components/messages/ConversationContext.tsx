@@ -6,6 +6,7 @@ import {
   Dialog,
   Drawer,
   Icon,
+  Markdown,
   useNotifications,
 } from "@event-management/ui";
 import type { CatalogPackage } from "@event-management/contracts/catalog";
@@ -16,6 +17,7 @@ import {
   type BookingRequest,
 } from "../../lib/data/booking-requests/requests";
 import { getBookingPackage } from "../../lib/data/booking-requests/packages";
+import { getAdminConversationMemory } from "../../lib/data/messages/conversations";
 import { getLatestSentQuotation } from "../../lib/services/quotations/latest-sent-quotation";
 import {
   bookingDate,
@@ -33,12 +35,57 @@ type Content =
   | { kind: "package"; package: CatalogPackage | null }
   | { kind: "quotation"; quotation: Quotation | null };
 
+function ConversationAiNotes({ conversationId }: { conversationId: string }) {
+  const [notes, setNotes] = useState<
+    | { status: "loading" | "failed" }
+    | { status: "loaded"; markdown: string | null }
+  >({ status: "loading" });
+
+  useEffect(() => {
+    let active = true;
+    void getAdminConversationMemory(conversationId).then(
+      ({ markdown }) => {
+        if (active) setNotes({ status: "loaded", markdown });
+      },
+      () => {
+        if (active) setNotes({ status: "failed" });
+      },
+    );
+
+    return () => {
+      active = false;
+    };
+  }, [conversationId]);
+
+  return (
+    <section className="conversation-ai-notes">
+      <h4>
+        <Icon name="spark" size={15} />
+        AI notes
+      </h4>
+      {notes.status === "loaded" && notes.markdown?.trim() ? (
+        <Markdown source={notes.markdown} variant="message" />
+      ) : (
+        <p className="conversation-details-note" role="status">
+          {notes.status === "loading"
+            ? "Loading AI notes…"
+            : notes.status === "failed"
+              ? "AI notes are unavailable."
+              : "No AI notes yet."}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function EventDetails({
   booking,
   admin,
+  conversationId,
 }: {
   booking: BookingRequest;
   admin: boolean;
+  conversationId: string;
 }) {
   return (
     <div className="conversation-details">
@@ -73,6 +120,7 @@ function EventDetails({
           <dd>{booking.specialRequests || "None provided"}</dd>
         </div>
       </dl>
+      {admin && <ConversationAiNotes conversationId={conversationId} />}
       <BookingIntake
         requestedServices={booking.requestedServices}
         budget={booking.budget}
@@ -135,11 +183,13 @@ function EventDetails({
 
 export function ConversationContext({
   bookingId,
+  conversationId,
   admin,
   view,
   onClose,
 }: {
   bookingId: string;
+  conversationId: string;
   admin: boolean;
   view: ConversationContextView;
   onClose: () => void;
@@ -231,7 +281,11 @@ export function ConversationContext({
         </div>
       )}
       {content?.kind === "details" && (
-        <EventDetails booking={content.booking} admin={admin} />
+        <EventDetails
+          booking={content.booking}
+          admin={admin}
+          conversationId={conversationId}
+        />
       )}
       {content?.kind === "quotation" &&
         (content.quotation ? (
