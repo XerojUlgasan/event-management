@@ -1,9 +1,9 @@
-import { MAX_PASSWORD_LENGTH } from "@event-management/contracts/limits/auth";
 import { openapiJson } from "../../utils/openapi.js";
 import { jsonError } from "../../utils/service-result.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppRouteHandler } from "../../types/hono.js";
 import { errorSchema, profileSchema, toProfile } from "./profile.js";
+import { currentPasswordSchema } from "./http.js";
 import { linkFirebaseService } from "../../services/auth/link-firebase.js";
 import { startSessionService } from "../../services/auth/start-session.js";
 
@@ -17,7 +17,7 @@ export const linkFirebaseRoute = createRoute({
       required: true,
       content: openapiJson(
         z.object({
-          currentPassword: z.string().min(1).max(MAX_PASSWORD_LENGTH),
+          currentPassword: currentPasswordSchema,
         }),
       ),
     },

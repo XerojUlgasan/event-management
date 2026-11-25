@@ -331,9 +331,9 @@ It currently provides customer totals and joined-this-month figures. It is read-
 
 The admin shell displays a generic demo banner on this screen, but the customer list and its implemented population statistics come from the API.
 
-**Account settings**, available from either account menu, shows the person's name/email and sign-in methods. It supports eligible sign-in-method linking, rather than general system administration or business-policy configuration.
+**Account settings**, available from either account menu, shows the person's name, email address, and sign-in methods. Customers and administrators can change their own password, add a password after verifying their connected account, or connect a Google account.
 
-Source: [Customers screen](../apps/web/src/components/workspaces/admin/users/CustomersPage.tsx), [admin account settings](../apps/web/src/components/workspaces/admin/AdminShell.tsx), [customer account settings](../apps/web/src/components/workspaces/customer/CustomerDashboard.tsx), and [sign-in methods](../apps/web/src/components/auth/SignInMethods.tsx).
+Source: [Customers screen](../apps/web/src/components/workspaces/admin/users/CustomersPage.tsx), [shared account settings](../apps/web/src/components/auth/AccountSettings.tsx), and [sign-in methods](../apps/web/src/components/auth/SignInMethods.tsx).
 
 ## 13. Demo screens, removed modules, and unfinished workflows
 

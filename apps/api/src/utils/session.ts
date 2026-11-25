@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { Context } from "hono";
 import { deleteCookie, setCookie } from "hono/cookie";
 import { config } from "../env.js";
@@ -19,6 +19,13 @@ export const SESSION_TTL_MS =
 
 export function hashSessionToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
+}
+
+export function createSessionCredentials() {
+  const token = randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+
+  return { token, tokenHash: hashSessionToken(token), expiresAt };
 }
 
 export function setSessionCookie(

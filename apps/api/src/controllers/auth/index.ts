@@ -14,6 +14,10 @@ import {
 import { loginUserRoute, loginUserRouteHandler } from "./login-user.js";
 import { addPasswordRoute, addPasswordRouteHandler } from "./add-password.js";
 import {
+  changePasswordRoute,
+  changePasswordRouteHandler,
+} from "./change-password.js";
+import {
   linkFirebaseRoute,
   linkFirebaseRouteHandler,
 } from "./link-firebase.js";
@@ -28,6 +32,7 @@ authRoutes.use("/auth/sync", requireFirebaseAuth);
 authRoutes.use("/me", requireSession);
 authRoutes.use("/auth/link/firebase", requireSession, requireFirebaseAuth);
 authRoutes.use("/auth/password", requireSession, requireFirebaseAuth);
+authRoutes.use("/auth/password/change", requireSession);
 authRoutes.use("/auth/realtime-token", requireSession);
 
 authRoutes.openapi(syncFirebaseProfileRoute, syncFirebaseProfileRouteHandler);
@@ -37,6 +42,7 @@ authRoutes.openapi(registerUserRoute, registerUserRouteHandler);
 authRoutes.openapi(loginUserRoute, loginUserRouteHandler);
 authRoutes.openapi(linkFirebaseRoute, linkFirebaseRouteHandler);
 authRoutes.openapi(addPasswordRoute, addPasswordRouteHandler);
+authRoutes.openapi(changePasswordRoute, changePasswordRouteHandler);
 authRoutes.openapi(
   issueRealtimeTokenRoute,
   issueRealtimeTokenRouteHandler,

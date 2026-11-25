@@ -1,12 +1,6 @@
 import { navigateWorkspace } from "../../../lib/navigation/workspace-navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Button,
-  Avatar,
-  Icon,
-  Panel,
-  WorkspaceLayout,
-} from "@event-management/ui";
+import { Button, Avatar, Icon, WorkspaceLayout } from "@event-management/ui";
 
 import type { NavKey } from "../../app/navigation-types";
 import type { AdminAiSection } from "../../app/routes";
@@ -29,7 +23,7 @@ import { ReportsPage } from "./reports/ReportsPage";
 import { CustomersPage } from "./users/CustomersPage";
 import { BusinessInformationPage } from "./business-information/BusinessInformationPage";
 import { AdminSidebar } from "./AdminSidebar";
-import { SignInMethods } from "../../auth/SignInMethods";
+import { AccountSettings } from "../../auth/AccountSettings";
 import { NotificationBell } from "../../notifications/NotificationBell";
 import { adminPaths } from "../../app/routes";
 
@@ -182,25 +176,7 @@ export function AdminShell({
     if (active === "Reports") return <ReportsPage />;
 
     if (active === "Administration")
-      return (
-        <section className="account-settings">
-          <h1 className="page-title">Account settings</h1>
-          <Panel className="account-summary">
-            <h2>Profile</h2>
-            <dl>
-              <div>
-                <dt>Name</dt>
-                <dd>{name}</dd>
-              </div>
-              <div>
-                <dt>Email address</dt>
-                <dd>{profile.email}</dd>
-              </div>
-            </dl>
-          </Panel>
-          <SignInMethods />
-        </section>
-      );
+      return <AccountSettings name={name} email={profile.email} />;
 
     return <GenericPage page={active} />;
   }, [active, aiSection, name, profile.email, bookingRequestId, search]);

@@ -18,6 +18,7 @@ import {
   login,
   register,
   syncSession,
+  updatePassword,
 } from "../data/auth/session";
 import type { Profile } from "../data/auth/session";
 
@@ -27,8 +28,8 @@ type FirebaseMethod = "google" | "password";
 
 export const firebaseConfigured = Boolean(
   config.PUBLIC_FIREBASE_API_KEY &&
-    config.PUBLIC_FIREBASE_AUTH_DOMAIN &&
-    config.PUBLIC_FIREBASE_PROJECT_ID,
+  config.PUBLIC_FIREBASE_AUTH_DOMAIN &&
+  config.PUBLIC_FIREBASE_PROJECT_ID,
 );
 
 type AuthContextValue = {
@@ -39,18 +40,14 @@ type AuthContextValue = {
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithFirebase: (email: string, password: string) => Promise<void>;
-  connectFirebase: (
-    currentPassword: string,
-    method: FirebaseMethod,
-    email?: string,
-    password?: string,
-  ) => Promise<void>;
+  connectGoogle: (currentPassword: string) => Promise<void>;
   createPassword: (
     password: string,
     method: FirebaseMethod,
     email?: string,
     firebasePassword?: string,
   ) => Promise<void>;
+  changePassword: (currentPassword: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
 };
@@ -117,6 +114,7 @@ async function withFirebase<T>(
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { notify, notifyError } = useNotifications();
+  const pendingPasswordChange = useRef<Promise<void> | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState("");
@@ -286,19 +284,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithFirebase = (email: string, password: string) =>
     run(() => withFirebase("password", syncSession, email, password), "signin");
 
-  const connectFirebase: AuthContextValue["connectFirebase"] = (
-    currentPassword,
-    method,
-    email,
-    password,
-  ) =>
+  const connectGoogle: AuthContextValue["connectGoogle"] = (currentPassword) =>
     run(() =>
-      withFirebase(
-        method,
-        (token) => linkFirebase(token, currentPassword),
-        email,
-        password,
-      ),
+      withFirebase("google", (token) => linkFirebase(token, currentPassword)),
     );
 
   const createPassword: AuthContextValue["createPassword"] = (
@@ -316,12 +304,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ),
     );
 
-  const signOut = () =>
-    run(async () => {
+  const changePassword: AuthContextValue["changePassword"] = async (
+    currentPassword,
+    password,
+  ) => {
+    const pending = run(() => updatePassword(currentPassword, password));
+
+    pendingPasswordChange.current = pending;
+
+    try {
+      await pending;
+    } finally {
+      if (pendingPasswordChange.current === pending)
+        pendingPasswordChange.current = null;
+    }
+  };
+
+  const signOut = async () => {
+    // Logout needs the new cookie if a password change is rotating the session.
+    await pendingPasswordChange.current?.catch(() => {});
+
+    return run(async () => {
       await endSession();
 
       return null;
     }, "signout");
+  };
 
   const clearError = useCallback(() => setError(""), []);
 
@@ -335,8 +343,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         signInWithGoogle,
         signInWithFirebase,
-        connectFirebase,
+        connectGoogle,
         createPassword,
+        changePassword,
         signOut,
         clearError,
       }}

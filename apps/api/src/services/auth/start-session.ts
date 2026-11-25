@@ -1,11 +1,10 @@
-import { randomBytes } from "node:crypto";
 import { getCookie } from "hono/cookie";
 import type { Context } from "hono";
 
 import {
+  createSessionCredentials,
   hashSessionToken,
   SESSION_COOKIE,
-  SESSION_TTL_MS,
   setSessionCookie,
 } from "../../utils/session.js";
 import type { HonoEnv } from "../../types/hono.js";
@@ -27,9 +26,8 @@ export async function startSessionService(c: AuthContext, userId: string) {
           hashSessionToken(previousToken),
         );
 
-      const token = randomBytes(32).toString("base64url");
-      const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-      await insertSessionData(trx, userId, hashSessionToken(token), expiresAt);
+      const { token, tokenHash, expiresAt } = createSessionCredentials();
+      await insertSessionData(trx, userId, tokenHash, expiresAt);
 
       return { token, expiresAt };
     });

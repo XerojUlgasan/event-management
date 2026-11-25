@@ -10,6 +10,7 @@
 @import "./public/site.css";
 @import "./business-information/business-information.css";
 @import "./notifications/notifications.css";
+@import "./auth/account-settings.css";
 @import "./workspaces/customer/home.css";
 
 html:has(.public-site) {
@@ -4342,71 +4343,6 @@ html:has(.public-site) {
 .auth-status-error button {
   margin-left: auto;
 }
-.sign-in-methods {
-  max-width: 720px;
-  padding: 28px;
-  margin-top: 20px;
-}
-.sign-in-methods h2 {
-  margin-top: 0;
-  font-size: 20px;
-}
-.sign-in-methods p,
-.sign-in-methods li {
-  font-size: 13px;
-  line-height: 1.6;
-}
-.sign-in-methods fieldset {
-  display: grid;
-  gap: 16px;
-  padding: 0;
-  border: 0;
-}
-.sign-in-methods input,
-.sign-in-methods select {
-  width: 100%;
-  min-height: 42px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface-base);
-}
-.account-settings {
-  max-width: 720px;
-}
-.account-settings > h1 {
-  margin: 0 0 20px;
-}
-.customer-content > .page-head h1 {
-  margin: 0;
-}
-.account-summary {
-  width: 100%;
-  max-width: 720px;
-  padding: 26px !important;
-}
-.account-summary h2 {
-  margin: 0 0 20px;
-  font-size: 20px;
-  font-weight: 600;
-}
-.account-summary dl {
-  margin: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-.account-summary dt {
-  margin-bottom: 5px;
-  color: var(--muted);
-  font-size: 11px;
-}
-.account-summary dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: 14px;
-  font-weight: 600;
-}
 .customer-main:has(.customer-messages-view) {
   padding: 0;
 }
@@ -5223,9 +5159,6 @@ html:has(.public-site) {
   .admin-messages .customer-messages {
     height: calc(100dvh - 122px);
     min-height: 420px;
-  }
-  .account-summary dl {
-    grid-template-columns: 1fr;
   }
   .customer-messages > section {
     display: none;

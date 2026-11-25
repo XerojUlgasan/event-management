@@ -56,8 +56,8 @@ export const requireSession = createMiddleware<HonoEnv>(async (c, next) => {
   const result = await resolveSessionService(c.get("db"), token);
 
   if (result.kind === "not-found") {
-    clearSessionCookie(c);
-
+    // An in-flight request may still carry the token just replaced by rotation.
+    // A late 401 must not clear the replacement cookie in that browser.
     return c.json({ error: "Session not found" }, 401);
   }
 

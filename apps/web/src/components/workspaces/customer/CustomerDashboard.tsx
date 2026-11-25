@@ -11,8 +11,6 @@ import {
   Button,
   Icon,
   type IconName,
-  PageHeader,
-  Panel,
   useNotifications,
 } from "@event-management/ui";
 
@@ -23,7 +21,7 @@ import { CustomerCatalogPage } from "./catalog/CustomerCatalogPage";
 import { CustomerHomeNextStep } from "./home/CustomerHomeNextStep";
 import { BookingRequestDialog } from "../../booking-requests/BookingRequestDialog";
 import { initialsFromName } from "../../../lib/utils/formatting/name";
-import { SignInMethods } from "../../auth/SignInMethods";
+import { AccountSettings } from "../../auth/AccountSettings";
 import { useConversationList } from "../../../lib/services/messages/use-conversation-list";
 import {
   hasLocalReplyPending,
@@ -847,24 +845,7 @@ export function CustomerDashboard({
 
         {tab === "Profile" && (
           <div className="customer-content">
-            <PageHeader
-              title="Account settings"
-              description="View your account and manage sign-in methods."
-            />
-            <Panel className="account-summary">
-              <h2>Profile</h2>
-              <dl>
-                <div>
-                  <dt>Name</dt>
-                  <dd>{userName}</dd>
-                </div>
-                <div>
-                  <dt>Email address</dt>
-                  <dd>{userEmail}</dd>
-                </div>
-              </dl>
-            </Panel>
-            <SignInMethods />
+            <AccountSettings name={userName} email={userEmail} />
           </div>
         )}
 

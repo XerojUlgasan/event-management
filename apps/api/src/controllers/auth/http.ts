@@ -19,9 +19,11 @@ export const newPasswordSchema = z
   .min(MIN_PASSWORD_LENGTH, "Use a password with at least 8 characters.")
   .max(MAX_PASSWORD_LENGTH);
 
+export const currentPasswordSchema = z.string().min(1).max(MAX_PASSWORD_LENGTH);
+
 export const credentialsSchema = z.object({
   email: emailSchema,
-  password: z.string().min(1).max(MAX_PASSWORD_LENGTH),
+  password: currentPasswordSchema,
 });
 
 export const errors = {

@@ -32,3 +32,6 @@ export const linkFirebase = (idToken: string, currentPassword: string) =>
 
 export const addPassword = (idToken: string, password: string) =>
   request<Profile>("/auth/password", { password }, idToken);
+
+export const updatePassword = (currentPassword: string, password: string) =>
+  request<Profile>("/auth/password/change", { currentPassword, password });
