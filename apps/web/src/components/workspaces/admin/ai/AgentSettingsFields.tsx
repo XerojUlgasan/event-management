@@ -14,21 +14,22 @@ export const agentPersonalityLabels = {
 export function AgentSettingsFields({
   settings,
   onChange,
+  displayNameError,
 }: {
   settings: AgentSettings;
   onChange: <K extends keyof AgentSettings>(
     key: K,
     value: AgentSettings[K],
   ) => void;
+  displayNameError?: string;
 }) {
   return (
     <>
-      <FormField label="Display name">
+      <FormField label="Display name" error={displayNameError}>
         {(props) => (
           <Input
             {...props}
             required
-            pattern={".*\\S.*"}
             maxLength={agentSettingsLimits.displayName}
             value={settings.displayName}
             onChange={(event) => onChange("displayName", event.target.value)}

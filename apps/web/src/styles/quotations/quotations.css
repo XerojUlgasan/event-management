@@ -80,7 +80,7 @@
 .quotation-adjustment-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 10rem auto;
-  align-items: end;
+  align-items: start;
   gap: 10px;
 }
 .quotation-adjustment-fields .ui-control {

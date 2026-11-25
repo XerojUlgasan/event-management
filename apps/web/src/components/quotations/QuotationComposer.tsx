@@ -113,9 +113,11 @@ const adjustmentOptions = [
 function QuotationAdjustmentFields({
   line,
   onChange,
+  descriptionError,
 }: {
   line: ManualQuotationItem;
   onChange: (patch: Partial<ManualQuotationItem>) => void;
+  descriptionError?: string;
 }) {
   const directionGroup = useId();
 
@@ -124,6 +126,7 @@ function QuotationAdjustmentFields({
       <FormField
         label="Description"
         className="quotation-adjustment-description"
+        error={descriptionError}
       >
         {(props) => (
           <Input
@@ -201,6 +204,7 @@ export function QuotationComposer({
   const [localManualItems, setLocalManualItems] =
     useState<ManualQuotationItem[]>();
   const [editing, setEditing] = useState<ManualQuotationItem | null>(null);
+  const [applyAttempted, setApplyAttempted] = useState(false);
   const [reason, setReason] = useState("");
   const [operation, setOperation] = useState<Operation | null>(null);
   const [needsReview, setNeedsReview] = useState(false);
@@ -312,6 +316,7 @@ export function QuotationComposer({
 
   function closeEditor() {
     setEditing(null);
+    setApplyAttempted(false);
     editorOpener.current?.focus();
   }
 
@@ -405,7 +410,15 @@ export function QuotationComposer({
       </h3>
       <QuotationAdjustmentFields
         line={editing}
-        onChange={(patch) => setEditing({ ...editing, ...patch })}
+        onChange={(patch) => {
+          setEditing({ ...editing, ...patch });
+          if (patch.description !== undefined) setApplyAttempted(false);
+        }}
+        descriptionError={
+          applyAttempted && !editing.description.trim()
+            ? "A description is required."
+            : undefined
+        }
       />
       <div className="quotation-actions quotation-actions-start">
         <Button variant="secondary" size="small" onClick={closeEditor}>
@@ -413,13 +426,16 @@ export function QuotationComposer({
         </Button>
         <Button
           size="small"
-          disabled={
-            !editing.description.trim() ||
-            !Number.isSafeInteger(editing.amountMinor) ||
-            editing.amountMinor <= 0 ||
-            editing.amountMinor > MAX_QUOTATION_AMOUNT_MINOR
-          }
           onClick={() => {
+            if (
+              !editing.description.trim() ||
+              !Number.isSafeInteger(editing.amountMinor) ||
+              editing.amountMinor <= 0 ||
+              editing.amountMinor > MAX_QUOTATION_AMOUNT_MINOR
+            ) {
+              setApplyAttempted(true);
+              return;
+            }
             setLocalManualItems(
               addingManual
                 ? [...manualItems, editing]
@@ -470,7 +486,14 @@ export function QuotationComposer({
       {preparation ? (
         <fieldset className="quotation-stack" disabled={!!operation}>
           {preparation.currentOffer && (
-            <FormField label="Reason for the revision">
+            <FormField
+              label="Reason for the revision"
+              error={
+                !reason.trim()
+                  ? "A reason is required before sending a revised quotation."
+                  : undefined
+              }
+            >
               {(props) => (
                 <Textarea
                   {...props}
@@ -494,28 +517,28 @@ export function QuotationComposer({
               </strong>
             </div>
             {addonItems.map((line) => (
-                <div
-                  key={`${line.addon.source.packageId}:${line.id}`}
-                  className="quotation-charge-row"
-                >
-                  <div className="quotation-charge-label">
-                    <strong>{line.description}</strong>
+              <div
+                key={`${line.addon.source.packageId}:${line.id}`}
+                className="quotation-charge-row"
+              >
+                <div className="quotation-charge-label">
+                  <strong>{line.description}</strong>
+                  <span>
+                    {line.addon.totalHours == null
+                      ? "Hours open"
+                      : `${line.addon.totalHours} ${line.addon.totalHours === 1 ? "hour" : "hours"}`}
+                  </span>
+                  {line.addon.requiresRemoval && (
                     <span>
-                      {line.addon.totalHours == null
-                        ? "Hours open"
-                        : `${line.addon.totalHours} ${line.addon.totalHours === 1 ? "hour" : "hours"}`}
+                      {line.addon.requiresRemoval === "archived"
+                        ? "Service archived. Remove it from the booking to continue."
+                        : "Now included in the package. Remove the add-on from the booking to continue."}
                     </span>
-                    {line.addon.requiresRemoval && (
-                      <span>
-                        {line.addon.requiresRemoval === "archived"
-                          ? "Service archived. Remove it from the booking to continue."
-                          : "Now included in the package. Remove the add-on from the booking to continue."}
-                      </span>
-                    )}
-                  </div>
-                  <strong>{chargeAmount(line)}</strong>
+                  )}
                 </div>
-              ))}
+                <strong>{chargeAmount(line)}</strong>
+              </div>
+            ))}
             {manualItems.map((line) => {
               const isEditing = editing?.id === line.id;
 
@@ -545,6 +568,7 @@ export function QuotationComposer({
                           if (isEditing) closeEditor();
                           else {
                             editorOpener.current = event.currentTarget;
+                            setApplyAttempted(false);
                             setEditing(line);
                           }
                         }}
@@ -585,6 +609,7 @@ export function QuotationComposer({
                 if (addingManual) closeEditor();
                 else {
                   editorOpener.current = event.currentTarget;
+                  setApplyAttempted(false);
                   setEditing({
                     id: crypto.randomUUID(),
                     direction: "add",
@@ -629,9 +654,7 @@ export function QuotationComposer({
       <div className="quotation-actions">
         <Button
           variant="secondary"
-          disabled={
-            operation === "package" || operation === "send"
-          }
+          disabled={operation === "package" || operation === "send"}
           onClick={() => {
             if (inFlight.current !== "send" && inFlight.current !== "package")
               onCancel();

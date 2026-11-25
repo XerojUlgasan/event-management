@@ -30,6 +30,7 @@ export function AgentSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
+  const [displayNameError, setDisplayNameError] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -54,7 +55,10 @@ export function AgentSettingsPage() {
   const update = <K extends keyof AgentSettings>(
     key: K,
     value: AgentSettings[K],
-  ) => setSettings((current) => ({ ...current, [key]: value }));
+  ) => {
+    setSettings((current) => ({ ...current, [key]: value }));
+    if (key === "displayName") setDisplayNameError("");
+  };
 
   const dirty =
     published &&
@@ -64,6 +68,13 @@ export function AgentSettingsPage() {
     event.preventDefault();
 
     if (!published) return;
+
+    if (!settings.displayName.trim()) {
+      setDisplayNameError("A display name is required.");
+      return;
+    }
+
+    setDisplayNameError("");
 
     setSaving(true);
     setSaveError("");
@@ -141,7 +152,11 @@ export function AgentSettingsPage() {
             disabled={saving}
             aria-label="Agent settings"
           >
-            <AgentSettingsFields settings={settings} onChange={update} />
+            <AgentSettingsFields
+              settings={settings}
+              onChange={update}
+              displayNameError={displayNameError}
+            />
             {saveError && <p role="alert">{saveError}</p>}
             {conflict && (
               <details>

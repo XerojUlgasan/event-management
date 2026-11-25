@@ -115,6 +115,11 @@ export function BookingStatusEditor({
           <FormField
             label={`Reason (${reasonRequired ? "required" : "optional"})`}
             description="Visible to the customer in status history."
+            error={
+              reasonRequired && !reason.trim()
+                ? "A reason is required for this status change."
+                : undefined
+            }
           >
             {(props) => (
               <Textarea
