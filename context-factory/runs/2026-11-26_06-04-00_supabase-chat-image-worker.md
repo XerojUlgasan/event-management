@@ -1,8 +1,8 @@
 # Supabase chat image worker
 
 Started: 2026-11-26T06:04:00+08:00
-Updated: 2026-11-26T06:31:00+08:00
-Status: complete (local release verification)
+Updated: 2026-11-26T06:35:00+08:00
+Status: complete
 Scope: Repair hosted image-message processing. Test locally with the Node worker disabled before publishing to production.
 Checkout: `codex/supabase-catalog-rollout` from production `dcc66411`, in the existing `production-worker` room.
 Continues: [AMAC reference-photo search](2026-11-24_15-04-19_amac-reference-photo-search.md)
@@ -19,6 +19,10 @@ A four-photo test with a 16-megapixel WebP exposed repeated decoding and an Edge
 
 The combined queue, image, catalog and assistant suites passed 153 tests with five opt-in skips. Thirteen Edge checks and four rollout script checks passed. The guidance link checker reported two missing historical proposal-tool paths.
 
+## Production
+
+The [production rollout](https://github.com/XerojUlgasan/event-management/actions/runs/45714006787) deployed `bdf86a11`. All three pending production photo jobs completed on their first attempt. Each had a successful vision audit, a saved interpretation and one linked assistant reply. The originally reported message also had a successful photo catalog search and two recommendation cards. A final database read showed zero pending or running image jobs. The isolated room's original Node worker was resumed after testing.
+
 ## Resume here
 
-Check the production workflow, named Cron schedules, original queue row, saved image interpretation and linked assistant reply together. See [production worker verification](../workflows/implement/references/development.md#production-supabase-deployment).
+For a future incident, check the named Cron schedule, queue attempts, image observations and linked replies together. See [production worker verification](../workflows/implement/references/development.md#production-supabase-deployment).
