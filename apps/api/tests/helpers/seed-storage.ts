@@ -1,5 +1,6 @@
 import { once } from "node:events";
 import { createServer } from "node:http";
+import { localR2Fetch, r2Fixture } from "./r2-fixture.js";
 
 export async function startSeedStorage() {
   const bucket = "seed-test";
@@ -7,7 +8,7 @@ export async function startSeedStorage() {
   let writes = 0;
 
   const server = createServer(async (req, res) => {
-    const prefix = `/storage/v1/object/${bucket}/`;
+    const prefix = `/${bucket}/`;
 
     if (!req.url?.startsWith(prefix)) {
       res.writeHead(404).end();
@@ -17,15 +18,15 @@ export async function startSeedStorage() {
 
     const key = decodeURIComponent(req.url.slice(prefix.length));
 
-    if (req.method === "POST") {
+    if (req.method === "PUT") {
       const chunks: Buffer[] = [];
 
       for await (const chunk of req) chunks.push(chunk);
 
       writes++;
 
-      if (objects.has(key) && req.headers["x-upsert"] !== "true") {
-        res.writeHead(409).end();
+      if (objects.has(key) && req.headers["if-none-match"] === "*") {
+        res.writeHead(412).end();
 
         return;
       }
@@ -57,19 +58,22 @@ export async function startSeedStorage() {
   if (!address || typeof address === "string")
     throw new Error("Storage test server requires a TCP port");
 
+  const origin = `http://127.0.0.1:${address.port}`;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = localR2Fetch(origin);
+
   return {
+    origin,
     objects,
     get writes() {
       return writes;
     },
-    env: {
-      SUPABASE_URL: `http://127.0.0.1:${address.port}`,
-      SUPABASE_SERVICE_ROLE_KEY: "local-seed-test",
-      SUPABASE_STORAGE_BUCKET: bucket,
-    },
-    close: () =>
-      new Promise<void>((resolve, reject) =>
+    env: { ...r2Fixture, R2_BUCKET_NAME: bucket },
+    close: () => {
+      globalThis.fetch = originalFetch;
+      return new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),
-      ),
+      );
+    },
   };
 }

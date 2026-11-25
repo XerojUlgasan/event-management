@@ -1,13 +1,6 @@
 # Database seed
 
-Start the local PostgreSQL database and Supabase Storage:
-
-```sh
-pnpm db:up
-pnpm supabase:start
-```
-
-Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env` or the command environment using the local values from `pnpm supabase:status`. The seed uses the private `event-management` bucket by default. Set `SUPABASE_STORAGE_BUCKET` if your development setup uses a different Supabase bucket. Isolated `pnpm room` environments supply those Supabase settings automatically. To seed directly into R2, set the [Cloudflare R2 settings](../context-factory/workflows/implement/references/development.md#cloudflare-r2-storage) for the seed process and verify the database and object storage targets before seeding. Existing catalog listings keep their stored references during reruns.
+Start local PostgreSQL with `pnpm db:up` and configure the [Cloudflare R2 media bucket](../context-factory/workflows/implement/references/development.md#cloudflare-r2-storage) in `apps/api/.env` or the command environment. Verify both targets before seeding. Use a dedicated bucket or prefix for disposable databases. Existing catalog listings keep their stored references during reruns.
 
 ```sh
 pnpm db:deploy
@@ -75,13 +68,13 @@ Migration `20261102130000_package_canvas` intentionally removes existing package
 
 ## Verify with a disposable database
 
-The focused integration suite creates a disposable local PostgreSQL database and a loopback Storage fake. It verifies public 10/10 counts, uploaded photo bytes and thumbnails, catalog details and filters, connected booking and quotation records, rerun preservation, and Storage retry after a rolled-back transaction. The separate migration test covers legacy sample media paths. Run both with:
+The focused integration suite creates a disposable local PostgreSQL database and a local test double for signed R2 requests. It verifies public 10/10 counts, uploaded photo bytes and thumbnails, catalog details and filters, connected booking and quotation records, rerun preservation, and Storage retry after a rolled-back transaction. The separate migration test covers legacy sample media paths. Run both with:
 
 ```sh
 pnpm --filter @event-management/api exec tsx --test tests/seed.test.ts tests/seed-showcases.test.ts tests/catalog-sample-photos-migration.test.ts
 ```
 
-For a real Storage check, set `SUPABASE_DB_URL` to a fresh disposable database and configure its isolated local Supabase Storage endpoint. Run the migration, then run the seed twice to check reruns.
+For a real Storage check, set `SUPABASE_DB_URL` to a fresh disposable database and configure an isolated R2 bucket or prefix. Run the migration, then run the seed twice to check reruns.
 
 ```sh
 pnpm db:deploy

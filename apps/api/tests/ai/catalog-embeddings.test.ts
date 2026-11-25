@@ -37,6 +37,7 @@ import {
 import type { ServiceContent } from "../../src/controllers/services/schemas.js";
 import type { Selectable } from "kysely";
 import type { MediaAssets } from "../../src/db/types.js";
+import { localR2Fetch, r2Fixture } from "../helpers/r2-fixture.js";
 import { setTestConfig } from "../helpers/set-test-config.js";
 
 const database = `em_catalog_embeddings_${randomUUID().replaceAll("-", "")}`;
@@ -53,11 +54,7 @@ const originalFetch = globalThis.fetch;
 const environmentNames = [
   "AI_GATEWAY_API_KEY",
   "EMBEDDING_MODEL",
-  "SUPABASE_URL",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "SUPABASE_SECRET_KEY",
-  "SUPABASE_SECRET_KEYS",
-  "SUPABASE_STORAGE_BUCKET",
+  ...(Object.keys(r2Fixture) as (keyof typeof r2Fixture)[]),
 ] as const;
 
 const originalEnvironment = new Map(
@@ -109,12 +106,12 @@ function requestUrl(input: RequestInfo | URL) {
   return new URL(input);
 }
 
-async function installGatewayInterceptor() {
+async function installGatewayInterceptor(storageFetch: typeof fetch) {
   globalThis.fetch = async (input, init) => {
     const url = requestUrl(input);
 
     if (url.hostname !== "ai-gateway.vercel.sh")
-      return originalFetch(input, init);
+      return storageFetch(input, init);
 
     if (!url.pathname.toLowerCase().includes("embedding"))
       throw new Error(
@@ -464,9 +461,7 @@ before(async () => {
   storageServer = createServer((request, response) => {
     if (
       request.method !== "GET" ||
-      !request.url?.startsWith(
-        "/storage/v1/object/event-management/catalog-media/",
-      )
+      !request.url?.startsWith("/test/catalog-media/")
     ) {
       response.writeHead(404).end();
 
@@ -483,12 +478,12 @@ before(async () => {
   );
   const address = storageServer.address();
   assert.ok(address && typeof address !== "string");
-  setTestConfig({ SUPABASE_URL: `http://127.0.0.1:${address.port}` });
-  setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: "fixture-storage-key" });
-  setTestConfig({ SUPABASE_STORAGE_BUCKET: "event-management" });
+  setTestConfig(r2Fixture);
   setTestConfig({ AI_GATEWAY_API_KEY: "fixture-gateway-key" });
   setTestConfig({ EMBEDDING_MODEL: embeddingModel });
-  await installGatewayInterceptor();
+  await installGatewayInterceptor(
+    localR2Fetch(`http://127.0.0.1:${address.port}`),
+  );
 });
 
 after(async () => {
@@ -702,9 +697,9 @@ test("admin submits all pending owners without provider configuration and worker
     section("Photos", [mediaWidget(randomUUID(), media, { alt: "Fixture" })]),
   ]);
   const apiKey = process.env.AI_GATEWAY_API_KEY;
-  const storageKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const storageKey = process.env.R2_SECRET_ACCESS_KEY;
   setTestConfig({ AI_GATEWAY_API_KEY: undefined });
-  setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: undefined });
+  setTestConfig({ R2_SECRET_ACCESS_KEY: undefined });
   setGatewayHandler();
   storageRequests = 0;
 
@@ -737,7 +732,7 @@ test("admin submits all pending owners without provider configuration and worker
       2,
     );
     setTestConfig({ AI_GATEWAY_API_KEY: apiKey });
-    setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: storageKey });
+    setTestConfig({ R2_SECRET_ACCESS_KEY: storageKey });
 
     let releaseProvider = () => {};
 
@@ -804,8 +799,9 @@ test("admin submits all pending owners without provider configuration and worker
     if (apiKey === undefined) setTestConfig({ AI_GATEWAY_API_KEY: undefined });
     else setTestConfig({ AI_GATEWAY_API_KEY: apiKey });
 
-    if (storageKey === undefined) setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: undefined });
-    else setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: storageKey });
+    if (storageKey === undefined)
+      setTestConfig({ R2_SECRET_ACCESS_KEY: undefined });
+    else setTestConfig({ R2_SECRET_ACCESS_KEY: storageKey });
 
     await getDb()
       .deleteFrom("services")
@@ -2070,7 +2066,8 @@ test("automatic save stays successful with missing embedding config and manual r
       ),
     );
   } finally {
-    if (previousApiKey === undefined) setTestConfig({ AI_GATEWAY_API_KEY: undefined });
+    if (previousApiKey === undefined)
+      setTestConfig({ AI_GATEWAY_API_KEY: undefined });
     else setTestConfig({ AI_GATEWAY_API_KEY: previousApiKey });
   }
 });

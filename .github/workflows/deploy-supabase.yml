@@ -78,7 +78,6 @@ jobs:
           PROD_SUPABASE_REF: ${{ secrets.PROD_SUPABASE_REF }}
           SEED_RANDOM_SEED: ${{ secrets.SEED_RANDOM_SEED }}
           SESSION_TTL_DAYS: ${{ secrets.SESSION_TTL_DAYS }}
-          STORAGE_BUCKET: ${{ secrets.STORAGE_BUCKET }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUP_JWT_KEY: ${{ secrets.SUP_JWT_KEY }}
           TEXT_MODEL: ${{ secrets.TEXT_MODEL }}
@@ -102,7 +101,6 @@ jobs:
           FIREBASE_PROJECT_ID = "env(FIREBASE_PROJECT_ID)"
           SEED_RANDOM_SEED = "env(SEED_RANDOM_SEED)"
           SESSION_TTL_DAYS = "env(SESSION_TTL_DAYS)"
-          STORAGE_BUCKET = "env(STORAGE_BUCKET)"
           SUP_JWT_KEY = "env(SUP_JWT_KEY)"
           TEXT_MODEL = "env(TEXT_MODEL)"
           VISION_MODEL = "env(VISION_MODEL)"
