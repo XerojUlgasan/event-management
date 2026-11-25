@@ -1,6 +1,6 @@
 ---
 import { Toast } from "@event-management/ui";
-import PublicDocument from "../../layouts/PublicDocument.astro";
+import PublicCatalogDetailLayout from "../../layouts/PublicCatalogDetailLayout.astro";
 import { PublicPackageBooking } from "../../components/public/catalog/PublicPackageBooking";
 import { PublicPackageDetail } from "../../components/public/catalog/PublicPackageDetail";
 import type { PublicPackage } from "../../lib/data/catalog/packages";
@@ -31,26 +31,23 @@ const title = item
 const description = item?.description || "This package is not available.";
 ---
 
-<PublicDocument title={title} description={description}>
-  <div class="public-package-detail">
-    <div class="public-package-detail-shell">
-      <nav class="section-back" aria-label="Package catalog">
-        <a href="/packages">All packages</a>
-      </nav>
-      {unavailable && (
-        <Toast tone="danger" placement="inline">
-          <span>The catalog is unavailable right now.</span>
-          <a href={`${Astro.url.pathname}${Astro.url.search}`}>Try again</a>
-        </Toast>
-      )}
-      {!unavailable && !item && (
-        <p class="catalog-status">This package is not available.</p>
-      )}
-      {item && (
-        <PublicPackageDetail item={item}>
-          <PublicPackageBooking item={item} client:load />
-        </PublicPackageDetail>
-      )}
-    </div>
-  </div>
-</PublicDocument>
+<PublicCatalogDetailLayout
+  title={title}
+  description={description}
+  catalog="packages"
+>
+  {unavailable && (
+    <Toast tone="danger" placement="inline">
+      <span>The catalog is unavailable right now.</span>
+      <a href={`${Astro.url.pathname}${Astro.url.search}`}>Try again</a>
+    </Toast>
+  )}
+  {!unavailable && !item && (
+    <p class="catalog-status">This package is not available.</p>
+  )}
+  {item && (
+    <PublicPackageDetail item={item}>
+      <PublicPackageBooking item={item} client:load />
+    </PublicPackageDetail>
+  )}
+</PublicCatalogDetailLayout>
