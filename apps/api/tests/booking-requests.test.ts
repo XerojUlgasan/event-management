@@ -363,7 +363,7 @@ test("requests enforce roles, published package availability, current package de
     timeZone: "Asia/Manila",
     guestCount: 120,
     contactName: "Customer",
-    phoneNumber: "123",
+    phoneNumber: "09123456789",
     specialRequests: "Music",
   };
   await read(await call("/booking-requests", "POST", input), 401);
@@ -1373,7 +1373,7 @@ async function createDatesBooking(
           requestedDays: dates.map((date) => ({ date })),
           timeZone,
           contactName: "Customer",
-          phoneNumber: "123",
+          phoneNumber: "09123456789",
         },
         customerCookie,
       ),
@@ -2062,7 +2062,7 @@ test("general conversation can become one package-less request atomically", asyn
     requestedDays: [{ date: "2099-04-01" }],
     timeZone: "Asia/Manila",
     contactName: "Customer",
-    phoneNumber: "123",
+    phoneNumber: "09123456789",
   };
   const thread = await db
     .insertInto("conversations")
@@ -2425,7 +2425,7 @@ test("manual add-ons validate current catalog terms and persist an atomic snapsh
     requestedDays: [{ date: "2099-04-01" }],
     timeZone: "Asia/Manila",
     contactName: "Customer",
-    phoneNumber: "123",
+    phoneNumber: "09123456789",
   };
 
   const selection = (service: typeof fixed, hours: number) => ({

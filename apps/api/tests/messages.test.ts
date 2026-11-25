@@ -974,7 +974,7 @@ test("old booking conversations remain available", async () => {
             timeZone: "Asia/Manila",
             guestCount: 80,
             contactName: "Customer",
-            phoneNumber: "123",
+            phoneNumber: "09123456789",
           },
           chatCustomerCookie,
         ),

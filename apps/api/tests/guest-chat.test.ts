@@ -1550,7 +1550,7 @@ test("claimed guest conversation retains its history when a catalog request bind
       requestedDays: [{ date: "2099-07-01" }],
       timeZone: "Asia/Manila",
       contactName: "Customer",
-      phoneNumber: "123",
+      phoneNumber: "09123456789",
     }),
     201,
   );

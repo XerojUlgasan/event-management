@@ -910,7 +910,7 @@ async function quotationAddonsFixture() {
         requestedDays: [{ date: "2099-04-01" }],
         timeZone: "Asia/Manila",
         contactName: "Customer",
-        phoneNumber: "123",
+        phoneNumber: "09123456789",
         requestedAddons: [
           {
             serviceId: fixed.id,

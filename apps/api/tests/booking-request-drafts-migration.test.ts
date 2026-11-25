@@ -103,7 +103,7 @@ test("forward migration preserves submitted requests, active drafts and historic
       timeZone: "Asia/Manila",
       guestCount: 75,
       contactName: "Customer",
-      phoneNumber: "123",
+      phoneNumber: "09123456789",
       preferredVenueLocation: "Venue",
       specialRequests: "Quiet room",
       preferences: "Blue decor",

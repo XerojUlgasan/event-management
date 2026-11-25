@@ -1,4 +1,7 @@
-import { reviewedServiceSchema } from "@event-management/contracts/booking-draft";
+import {
+  reviewedServiceSchema,
+  phoneNumberSchema,
+} from "@event-management/contracts/booking-draft";
 import { bookingStatusSchema } from "@event-management/contracts/booking-requests";
 import {
   BOOKING_ESTIMATED_DURATIONS,
@@ -7,7 +10,6 @@ import {
   MAX_EVENT_TYPE_LENGTH,
   MAX_TIME_ZONE_LENGTH,
   MAX_CONTACT_NAME_LENGTH,
-  MAX_PHONE_NUMBER_LENGTH,
   MAX_PREFERRED_VENUE_LOCATION_LENGTH,
   MAX_SPECIAL_REQUESTS_LENGTH,
   MAX_BOOKING_REASON_LENGTH,
@@ -94,7 +96,7 @@ export const createSchema = z
       .nullable()
       .optional(),
     contactName: text(MAX_CONTACT_NAME_LENGTH),
-    phoneNumber: text(MAX_PHONE_NUMBER_LENGTH),
+    phoneNumber: phoneNumberSchema,
     preferredVenueLocation: text(MAX_PREFERRED_VENUE_LOCATION_LENGTH)
       .nullable()
       .optional(),

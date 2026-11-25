@@ -2786,7 +2786,7 @@ test("booking-owned packages retain the inquiry and isolate copied media", async
     timeZone: "Asia/Manila",
     guestCount: 50,
     contactName: "Customer",
-    phoneNumber: "123",
+    phoneNumber: "09123456789",
   };
   const booking = (
     await read(
@@ -3117,7 +3117,7 @@ test("quotations do not retain removed package media or grant historical media a
           requestedDays: [{ date: "2099-01-02" }],
           timeZone: "Asia/Manila",
           contactName: "Customer",
-          phoneNumber: "123",
+          phoneNumber: "09123456789",
         },
         customerCookie,
       ),
@@ -3898,7 +3898,7 @@ test("package inclusions retain local terms and legacy add-ons are absent from l
           timeZone: "Asia/Manila",
           guestCount: 50,
           contactName: "Customer",
-          phoneNumber: "123",
+          phoneNumber: "09123456789",
         },
         customerCookie,
       ),

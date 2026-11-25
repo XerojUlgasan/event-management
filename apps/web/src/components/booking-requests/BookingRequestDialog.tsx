@@ -14,6 +14,7 @@ import {
   MAX_PHONE_NUMBER_LENGTH,
   MAX_SPECIAL_REQUESTS_LENGTH,
 } from "@event-management/contracts/limits/booking-requests";
+import { isValidPhoneNumber } from "@event-management/contracts/booking-draft";
 import { useEffect, useId, useRef, useState, type SubmitEvent } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -49,6 +50,16 @@ const COMMON_EVENT_TYPES: readonly string[] = [
   "Corporate",
 ];
 
+const disallowedPhoneCharacters = /[^\d\s().-]/g;
+
+/** Keep a leading + and drop characters a phone number cannot contain. */
+function phoneInputValue(value: string) {
+  const leadingPlus = value.trimStart().startsWith("+");
+  const cleaned = value.replace(disallowedPhoneCharacters, "");
+
+  return leadingPlus ? `+${cleaned}` : cleaned;
+}
+
 type Fields = BookingDraftFields;
 
 type Errors = Partial<Record<keyof Fields, string>>;
@@ -82,6 +93,8 @@ function validate(fields: Fields, zone: string, requireName = true): Errors {
     errors.contactName = "Enter a contact person.";
 
   if (!fields.phoneNumber.trim()) errors.phoneNumber = "Enter a phone number.";
+  else if (!isValidPhoneNumber(fields.phoneNumber))
+    errors.phoneNumber = "Enter a valid phone number.";
 
   for (const [key, limit] of [
     ["contactName", MAX_CONTACT_NAME_LENGTH],
@@ -239,7 +252,10 @@ export function BookingRequestDialog({
   const change = (key: keyof Fields, value: string) => {
     if (key === "contactName") nameEdited.current = true;
 
-    setFields((current) => ({ ...current, [key]: value }));
+    setFields((current) => ({
+      ...current,
+      [key]: key === "phoneNumber" ? phoneInputValue(value) : value,
+    }));
   };
 
   const cancel = () => {
@@ -772,6 +788,8 @@ export function BookingRequestDialog({
                     {...fieldProps}
                     {...props("phoneNumber")}
                     type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     maxLength={MAX_PHONE_NUMBER_LENGTH}
                   />
                 ))}

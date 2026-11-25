@@ -35,7 +35,7 @@ const fields = {
   timeZone: "Asia/Manila",
   guestCount: 75,
   contactName: "Test Customer",
-  phoneNumber: "123",
+  phoneNumber: "09123456789",
   specialRequests: "Quiet room",
   upsertServices: [{ customName: "Acoustic duo", hours: 2 }],
 } satisfies BookingDraftPatch;
@@ -380,7 +380,7 @@ test("a partial request stays private, then an assessed chat confirmation promot
 
   for (const value of [
     "Test Customer",
-    "123",
+    "09123456789",
     "2099",
     "Asia/Manila",
     "PHP 45,000",
