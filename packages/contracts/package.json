@@ -25,6 +25,8 @@
     "./showcase": "./src/showcase.ts",
     "./money": "./src/money.ts",
     "./calendar-date": "./src/calendar-date.ts",
+    "./person-name": "./src/person-name.ts",
+    "./philippine-mobile": "./src/philippine-mobile.ts",
     "./limits/images": "./src/limits/images.ts",
     "./limits/videos": "./src/limits/videos.ts",
     "./limits/messages": "./src/limits/messages.ts",

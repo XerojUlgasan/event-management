@@ -8,10 +8,9 @@
 .booking-addons .pe-addon-table .ui-data-table th:last-child {
   width: 72px;
 }
-.booking-addon-hours {
-  display: grid;
-  gap: 4px;
-  width: 7.25rem;
+.booking-addon-hours-input {
+  width: 5.5rem;
+  min-height: 2.25rem;
 }
 .booking-addon-picker ul {
   max-height: 14rem;
