@@ -100,7 +100,7 @@ Use the checked-in [API environment example](../../../../apps/api/.env.example) 
 
 Set `S3_API_URL` to the account-level S3 endpoint, such as `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`. Set `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` from an R2 token with Object Read & Write permission scoped to the private buckets. Set `R2_BUCKET_NAME` for catalog and showcase uploads, custom package media, and chat images. Set `R2_SUPPORTING_DOCUMENTS_BUCKET_NAME` for supporting PDFs.
 
-Apply the same settings to the API and worker. For local Edge development use `apps/supabase/.env.functions`. A standalone Node API, worker, or seed process uses `apps/api/.env` or the process environment. Configure hosted Edge in Supabase function secrets before deploying. The API continues to serve files under its own URLs and checks access. Keep both R2 buckets private.
+Apply the same settings to the API and worker. For local Edge development use `apps/supabase/.env.functions`. A standalone Node API, worker, or seed process uses `apps/api/.env` or the process environment. The deploy workflow syncs the endpoint, access keys, and media bucket from GitHub’s `Edge Functions` environment to Supabase. Set `R2_SUPPORTING_DOCUMENTS_BUCKET_NAME` in hosted Supabase function secrets for PDF storage. The API continues to serve files under its own URLs and checks access. Keep both R2 buckets private.
 
 Before deploying to a database with existing Supabase Storage uploads, copy any files that must remain accessible to their respective R2 buckets. Preserve object keys and content types. Pause writes while making the final copy and switching the API and worker together. `R2_OBJECT_PREFIX`, when set, prepends the same directory to every R2 key for that environment.
 
