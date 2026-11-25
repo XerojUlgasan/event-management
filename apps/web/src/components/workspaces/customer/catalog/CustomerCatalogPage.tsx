@@ -45,7 +45,13 @@ export function CustomerCatalogPage({ search }: { search: string }) {
           tabIndex={0}
         >
           {item.value === kind && (
-            <PublicCatalog key={kind} kind={kind} mode="overview" showFilters />
+            <PublicCatalog
+              key={kind}
+              kind={kind}
+              mode="overview"
+              showFilters
+              publicDetailLayout
+            />
           )}
         </div>
       ))}

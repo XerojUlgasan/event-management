@@ -5949,7 +5949,7 @@ html:has(.public-site) {
     padding: 0 21px;
   }
 }
-.section-back a {
+.section-back :is(a, .catalog-detail-back) {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
@@ -5957,11 +5957,11 @@ html:has(.public-site) {
   font-size: 14px;
   font-weight: 600;
 }
-.section-back a:hover {
+.section-back :is(a, .catalog-detail-back):hover {
   text-decoration: underline;
   text-underline-offset: 4px;
 }
-.section-back a:focus-visible {
+.section-back :is(a, .catalog-detail-back):focus-visible {
   outline: 3px solid var(--wine);
   outline-offset: 2px;
 }

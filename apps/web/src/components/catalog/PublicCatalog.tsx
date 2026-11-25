@@ -36,7 +36,15 @@ type Kind = CatalogKind;
 
 type Preview = { kind: Kind; id: string } | null;
 
-function ServicePreview({ id, onClose }: { id: string; onClose: () => void }) {
+function ServicePreview({
+  id,
+  onClose,
+  publicDetailLayout,
+}: {
+  id: string;
+  onClose: () => void;
+  publicDetailLayout: boolean;
+}) {
   const { notifyError } = useNotifications();
   const [service, setService] = useState<PublicService | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,7 +70,11 @@ function ServicePreview({ id, onClose }: { id: string; onClose: () => void }) {
   }, [id, notifyError]);
 
   return (
-    <CatalogDetailPreview entity="service" onClose={onClose}>
+    <CatalogDetailPreview
+      entity="service"
+      onClose={onClose}
+      publicDetailLayout={publicDetailLayout ? "catalog" : undefined}
+    >
       {loading && (
         <p className="package-preview-state" role="status">
           Loading service…
@@ -82,10 +94,12 @@ function CatalogPreview({
   selected,
   onClose,
   allowBooking,
+  publicDetailLayout,
 }: {
   selected: Preview;
   onClose: () => void;
   allowBooking: boolean;
+  publicDetailLayout: boolean;
 }) {
   const { notifyError } = useNotifications();
   const [packageDetail, setPackageDetail] = useState<PublicPackage | null>(
@@ -119,7 +133,13 @@ function CatalogPreview({
   }, [selected, notifyError]);
 
   if (selected?.kind === "services")
-    return <ServicePreview id={selected.id} onClose={onClose} />;
+    return (
+      <ServicePreview
+        id={selected.id}
+        onClose={onClose}
+        publicDetailLayout={publicDetailLayout}
+      />
+    );
 
   if (selected?.kind === "packages")
     return (
@@ -129,6 +149,7 @@ function CatalogPreview({
         loading={loading}
         error={error}
         onClose={onClose}
+        publicDetailLayout={publicDetailLayout}
       />
     );
 
@@ -142,12 +163,14 @@ export function PublicCatalog({
   onViewMore,
   showFilters = false,
   onOpenDetail,
+  publicDetailLayout = false,
 }: {
   kind: Kind;
   mode?: "featured" | "overview";
   allowBooking?: boolean;
   onViewMore?: () => void;
   showFilters?: boolean;
+  publicDetailLayout?: boolean;
   onOpenDetail?: (
     selection: CatalogSelection,
     trigger: HTMLButtonElement,
@@ -376,6 +399,7 @@ export function PublicCatalog({
         allowBooking={allowBooking}
         selected={selected}
         onClose={closePreview}
+        publicDetailLayout={publicDetailLayout}
       />
     </div>
   );

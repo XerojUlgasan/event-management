@@ -9,6 +9,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { PublicPackage } from "../../lib/data/catalog/packages";
 import { PackageCanvas } from "./CatalogContent";
+import { CatalogDetailSurface } from "./CatalogDetailSurface";
 import { BookingRequestDialog } from "../booking-requests/BookingRequestDialog";
 
 export function PackagePreview({
@@ -19,6 +20,7 @@ export function PackagePreview({
   allowBooking = true,
   showBookingAction = true,
   onRetry,
+  publicDetailLayout = false,
 }: {
   item: PublicPackage | null;
   loading?: boolean;
@@ -27,6 +29,7 @@ export function PackagePreview({
   showBookingAction?: boolean;
   onRetry?: () => void;
   onClose: () => void;
+  publicDetailLayout?: boolean;
 }) {
   const { notify } = useNotifications();
   const [booking, setBooking] = useState(false);
@@ -60,6 +63,32 @@ export function PackagePreview({
     setBooking(true);
   };
 
+  const content = (
+    <>
+      {loading && <p role="status">Loading package…</p>}
+      {error && (
+        <div className="package-preview-state" role="alert">
+          <p>{error}</p>
+          {onRetry && (
+            <Button variant="secondary" onClick={onRetry}>
+              Try again
+            </Button>
+          )}
+        </div>
+      )}
+      {item && (
+        <PackageCanvas
+          item={item}
+          bookingAction={
+            showBookingAction ? (
+              <Button onClick={book}>Book now</Button>
+            ) : undefined
+          }
+        />
+      )}
+    </>
+  );
+
   return createPortal(
     <>
       <NativeDialog
@@ -90,26 +119,12 @@ export function PackagePreview({
           )}
         </header>
         <div className="package-preview-scroll">
-          {loading && <p role="status">Loading package…</p>}
-          {error && (
-            <div className="package-preview-state" role="alert">
-              <p>{error}</p>
-              {onRetry && (
-                <Button variant="secondary" onClick={onRetry}>
-                  Try again
-                </Button>
-              )}
-            </div>
-          )}
-          {item && (
-            <PackageCanvas
-              item={item}
-              bookingAction={
-                showBookingAction ? (
-                  <Button onClick={book}>Book now</Button>
-                ) : undefined
-              }
-            />
+          {publicDetailLayout ? (
+            <CatalogDetailSurface catalog="packages" onBack={onClose}>
+              {content}
+            </CatalogDetailSurface>
+          ) : (
+            content
           )}
         </div>
       </NativeDialog>

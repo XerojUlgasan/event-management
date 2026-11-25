@@ -3,15 +3,18 @@ import { Button, NativeDialog } from "@event-management/ui";
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { CatalogDetailSurface } from "./CatalogDetailSurface";
 
 export function CatalogDetailPreview({
   entity,
   children,
   onClose,
+  publicDetailLayout,
 }: {
   entity: "service" | "package";
   children: ReactNode;
   onClose: () => void;
+  publicDetailLayout?: "catalog" | "reference";
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const title = `${entity[0].toUpperCase()}${entity.slice(1)} preview`;
@@ -54,7 +57,19 @@ export function CatalogDetailPreview({
         <span className="package-preview-divider" />
         <span className="package-preview-label">{title}</span>
       </header>
-      <div className="package-preview-scroll">{children}</div>
+      <div className="package-preview-scroll">
+        {publicDetailLayout ? (
+          <CatalogDetailSurface
+            catalog={entity === "package" ? "packages" : "services"}
+            backLabel={publicDetailLayout === "reference" ? "Back" : undefined}
+            onBack={onClose}
+          >
+            {children}
+          </CatalogDetailSurface>
+        ) : (
+          children
+        )}
+      </div>
     </NativeDialog>,
     document.body,
   );

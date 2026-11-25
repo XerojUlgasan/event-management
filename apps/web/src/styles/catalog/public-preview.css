@@ -98,6 +98,9 @@
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
 }
+.package-preview-scroll:has(> .public-catalog-detail) {
+  background: var(--surface-base);
+}
 .package-preview-state {
   max-width: 1200px;
   margin: 70px auto;

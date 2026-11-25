@@ -1,5 +1,6 @@
 ---
 import PublicDocument from "./PublicDocument.astro";
+import { CatalogDetailSurface } from "../components/catalog/CatalogDetailSurface";
 
 interface Props {
   title: string;
@@ -8,16 +9,10 @@ interface Props {
 }
 
 const { title, description, catalog } = Astro.props;
-const navLabel = catalog === "packages" ? "Package catalog" : "Service catalog";
 ---
 
 <PublicDocument title={title} description={description}>
-  <div class="public-catalog-detail">
-    <div class="public-catalog-detail-shell">
-      <nav class="section-back" aria-label={navLabel}>
-        <a href={`/${catalog}`}>All {catalog}</a>
-      </nav>
-      <slot />
-    </div>
-  </div>
+  <CatalogDetailSurface catalog={catalog}>
+    <slot />
+  </CatalogDetailSurface>
 </PublicDocument>

@@ -18,6 +18,7 @@ import {
   adminKey,
   allowedWorkspacePath,
   appHome,
+  customerTab,
   isSystemAdmin,
   normalizePath,
   workspaceReturnPath,
@@ -275,6 +276,7 @@ function Workspace({
     <CatalogNavigationProvider
       key={`${profile.id}:${profile.role}`}
       route={`${path}${search}`}
+      publicDetailLayout={customerTab(path) === "Catalogs"}
     >
       <CustomerDashboard
         path={path}

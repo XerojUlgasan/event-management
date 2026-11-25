@@ -9,9 +9,11 @@ import {
 export function CatalogNavigationProvider({
   children,
   route,
+  publicDetailLayout = false,
 }: {
   children: ReactNode;
   route: string;
+  publicDetailLayout?: boolean;
 }) {
   const [selected, setSelected] = useState<CatalogSelection | null>(null);
   useEffect(() => {
@@ -25,6 +27,7 @@ export function CatalogNavigationProvider({
         <CatalogDetailPreview
           entity={selected.entity}
           onClose={() => setSelected(null)}
+          publicDetailLayout={publicDetailLayout ? "reference" : undefined}
         >
           <CatalogPreviewContent
             key={`${selected.entity}:${selected.id}`}
