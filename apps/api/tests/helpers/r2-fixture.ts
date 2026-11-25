@@ -3,7 +3,6 @@ export const r2Fixture = {
   R2_ACCESS_KEY_ID: "fixture-key",
   R2_SECRET_ACCESS_KEY: "fixture-secret",
   R2_BUCKET_NAME: "test",
-  R2_SUPPORTING_DOCUMENTS_BUCKET_NAME: "test-documents",
   R2_OBJECT_PREFIX: undefined,
 };
 

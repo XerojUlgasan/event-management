@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
 import { config } from "../src/env.js";
 import {
+  deleteSupportingDocument,
+  putSupportingDocument,
+  readSupportingDocument,
+} from "../src/services/supporting-documents/document-storage.js";
+import {
   CatalogMediaNotFound,
   deleteCatalogMedia,
   getCatalogMedia,
@@ -15,7 +20,6 @@ function configure(t: TestContext, overrides: Partial<typeof config> = {}) {
     R2_ACCESS_KEY_ID: "test-key-id",
     R2_SECRET_ACCESS_KEY: "test-secret",
     R2_BUCKET_NAME: "room-media",
-    R2_SUPPORTING_DOCUMENTS_BUCKET_NAME: undefined,
     R2_OBJECT_PREFIX: "test-rooms/catalog/fixture",
     ...overrides,
   });
@@ -63,28 +67,35 @@ test("R2 object requests keep key paths, write preconditions and read ranges", a
   assert.deepEqual(methods, ["PUT", "PUT", "GET", "DELETE"]);
 });
 
-test("supporting documents require their own R2 bucket", async (t) => {
+test("supporting documents use the same R2 bucket as media", async (t) => {
   configure(t);
-  const bucket = "supporting-documents";
   const key = "document.pdf";
-  const fetch = t.mock.method(globalThis, "fetch", async (request: Request) => {
+  const bytes = Buffer.from("%PDF-fixture");
+  const methods: string[] = [];
+  t.mock.method(globalThis, "fetch", async (request: Request) => {
     assert.equal(
       request.url,
-      "https://test.r2.cloudflarestorage.com/room-documents/test-rooms/catalog/fixture/document.pdf",
+      "https://test.r2.cloudflarestorage.com/room-media/test-rooms/catalog/fixture/document.pdf",
     );
-    return new Response("pdf");
+    methods.push(request.method);
+
+    if (request.method === "PUT") {
+      assert.equal(request.headers.get("Content-Type"), "application/pdf");
+      assert.deepEqual(Buffer.from(await request.arrayBuffer()), bytes);
+    } else if (request.method === "GET") {
+      return new Response(bytes);
+    }
+
+    return new Response(null, { status: 204 });
   });
 
-  await assert.rejects(
-    getCatalogMedia(key, undefined, undefined, bucket),
-    /R2_SUPPORTING_DOCUMENTS_BUCKET_NAME/,
+  await putSupportingDocument(key, bytes);
+  assert.deepEqual(
+    Buffer.from(await readSupportingDocument(key, AbortSignal.timeout(1000))),
+    bytes,
   );
-  assert.equal(fetch.mock.callCount(), 0);
-
-  config.R2_SUPPORTING_DOCUMENTS_BUCKET_NAME = "room-documents";
-  const body = await getCatalogMedia(key, undefined, undefined, bucket);
-  assert.equal(await new Response(body).text(), "pdf");
-  assert.equal(fetch.mock.callCount(), 1);
+  await deleteSupportingDocument(key);
+  assert.deepEqual(methods, ["PUT", "GET", "DELETE"]);
 });
 
 test("file operations do not fall back when R2 is unconfigured", async (t) => {

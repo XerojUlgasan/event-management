@@ -115,7 +115,7 @@ before(async () => {
 
     if (url.origin === r2Fixture.S3_API_URL) {
       assert.ok(input instanceof Request);
-      assert.match(url.pathname, /^\/test-documents\//);
+      assert.match(url.pathname, /^\/test\/[\da-f-]+\.pdf$/);
 
       if (input.method === "DELETE") {
         if (failStorageDelete) return new Response(null, { status: 502 });
