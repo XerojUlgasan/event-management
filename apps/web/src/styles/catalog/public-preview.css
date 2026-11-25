@@ -405,10 +405,12 @@
 }
 .booking-close {
   float: right;
+  background: var(--surface-muted);
 }
 .booking-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
   gap: 16px;
 }
 .booking-contact-row {
@@ -486,6 +488,78 @@
 .booking-intro {
   margin: 0 0 24px;
   color: var(--text-muted);
+}
+.booking-steps {
+  margin: 0 0 20px;
+}
+.booking-steps ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.booking-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.booking-steps li span {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  font-size: 11px;
+  background: var(--surface-muted, var(--line));
+}
+.booking-steps li[data-active="true"] {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--wine) 35%, var(--line));
+  background: color-mix(in srgb, var(--wine) 8%, var(--surface-base));
+}
+.booking-steps li[data-complete="true"] {
+  color: var(--text-primary);
+}
+.booking-date-helper,
+.booking-step-note,
+.booking-step-lead {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.booking-date-row {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.booking-date-row input[type="date"] {
+  cursor: pointer;
+}
+.booking-date-row > button {
+  justify-self: start;
+}
+.booking-step-lead {
+  margin-bottom: 16px;
+}
+.booking-phone-prefix {
+  padding-inline: 12px 4px;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.booking-addon-hours-input {
+  width: 5.5rem;
+  min-height: 2.25rem;
+  padding: 6px 8px;
 }
 .booking-field-error {
   display: block;

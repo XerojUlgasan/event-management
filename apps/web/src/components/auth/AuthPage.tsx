@@ -11,6 +11,11 @@ import {
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
 } from "@event-management/contracts/limits/auth";
+import {
+  isValidPersonName,
+  personNameValidationMessage,
+  sanitizePersonNameInput,
+} from "@event-management/contracts/person-name";
 import { useState } from "react";
 import type { SubmitEvent } from "react";
 import { Brand, Button, FormField, Icon } from "@event-management/ui";
@@ -40,8 +45,13 @@ export function AuthPage({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [nameTouched, setNameTouched] = useState(false);
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const nameError =
+    mode === "register" && nameTouched
+      ? personNameValidationMessage(name)
+      : undefined;
 
   const message = formError || error;
 
@@ -59,6 +69,16 @@ export function AuthPage({
     clearError();
 
     if (mode === "register") {
+      setNameTouched(true);
+
+      if (!isValidPersonName(name)) {
+        setFormError(
+          notifyError(personNameValidationMessage(name) || "Enter a valid name."),
+        );
+
+        return;
+      }
+
       if (password.length < MIN_PASSWORD_LENGTH) {
         setFormError(
           notifyError(
@@ -172,7 +192,11 @@ export function AuthPage({
 
           <form className="login-form" onSubmit={submit}>
             {mode === "register" && (
-              <FormField label="Full name">
+              <FormField
+                label="Full name"
+                error={nameError}
+                description="Letters, spaces, hyphens, and apostrophes only."
+              >
                 <InputGroup>
                   <Icon name="users" size={16} />
                   <Input
@@ -181,11 +205,13 @@ export function AuthPage({
                     maxLength={MAX_DISPLAY_NAME_LENGTH}
                     value={name}
                     onChange={(event) => {
-                      setName(event.target.value);
+                      setName(sanitizePersonNameInput(event.target.value));
                       setFormError("");
                       clearError();
                     }}
+                    onBlur={() => setNameTouched(true)}
                     placeholder="Your name"
+                    aria-invalid={!!nameError}
                     required
                   />
                 </InputGroup>

@@ -39,7 +39,7 @@ export function validAddonHours(row: BookingAddon) {
     Number.isSafeInteger(Number(row.hours)) &&
     Number(row.hours) <= MAX_BOOKING_ADDON_HOURS &&
     (fixed
-      ? Number(row.hours) >= 0 &&
+      ? Number(row.hours) >= 1 &&
         Number(row.hours) + (row.service.includedHours ?? 0) <=
           MAX_BOOKING_ADDON_HOURS
       : Number(row.hours) > 0)
@@ -189,26 +189,25 @@ export function BookingAddons({
                       `${row.hours} requested hours`
                     )
                   ) : (
-                    <label className="booking-addon-hours">
-                      {fixed ? "Excess hours" : "Requested hours"}
-                      <Input
-                        id={`${inputPrefix}-${row.service.id}`}
-                        type="number"
-                        min={fixed ? 0 : 1}
-                        step={1}
-                        max={MAX_BOOKING_ADDON_HOURS}
-                        value={row.hours}
-                        aria-invalid={!validAddonHours(row)}
-                        aria-label={`${fixed ? "Excess" : "Requested"} hours for ${row.service.name}`}
-                        onChange={(event) => {
-                          const hours = event.target.value;
-                          update(row.service.id, (entry) => ({
-                            ...entry,
-                            hours,
-                          }));
-                        }}
-                      />
-                    </label>
+                    <Input
+                      id={`${inputPrefix}-${row.service.id}`}
+                      className="booking-addon-hours-input"
+                      variant="plain"
+                      type="number"
+                      min={1}
+                      step={1}
+                      max={MAX_BOOKING_ADDON_HOURS}
+                      value={row.hours}
+                      aria-invalid={!validAddonHours(row)}
+                      aria-label={`${fixed ? "Excess" : "Requested"} hours for ${row.service.name}`}
+                      onChange={(event) => {
+                        const hours = event.target.value;
+                        update(row.service.id, (entry) => ({
+                          ...entry,
+                          hours,
+                        }));
+                      }}
+                    />
                   );
                 },
               },
@@ -324,11 +323,7 @@ export function BookingAddons({
                             ...current,
                             {
                               service,
-                              hours:
-                                service.fixedPricePesos != null &&
-                                service.includedHours != null
-                                  ? "0"
-                                  : "",
+                              hours: "1",
                             },
                           ]);
                           requestAnimationFrame(() =>
