@@ -9,6 +9,7 @@ import { usePagination } from "../../lib/pagination/use-pagination";
 import { useRequestGeneration } from "../../lib/pagination/use-request-generation";
 import {
   Button,
+  Icon,
   Pagination,
   NativeDialog,
   useNotifications,
@@ -254,47 +255,189 @@ export function PublicCatalog({
 
   const hasFilters = Object.keys(filters).length > 0;
 
+  // ── Floating filter panel ─────────────────────────────────────────────
+  const triggerWrapRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Build active-filter chip list from current filters state
+  function formatPeso(value: number) {
+    return `₱${value.toLocaleString()}`;
+  }
+
+  const filterChips: { label: string; key: keyof CatalogFilters }[] = [];
+
+  if (filters.eventType !== undefined)
+    filterChips.push({ label: filters.eventType, key: "eventType" });
+
+  if (filters.pricingType !== undefined)
+    filterChips.push({
+      label: filters.pricingType === "fixed" ? "Fixed price" : "Hourly",
+      key: "pricingType",
+    });
+
+  const hasMin = filters.minPricePesos !== undefined;
+  const hasMax = filters.maxPricePesos !== undefined;
+
+  if (hasMin && hasMax)
+    filterChips.push({
+      label: `${formatPeso(filters.minPricePesos!)}–${formatPeso(filters.maxPricePesos!)}`,
+      key: "minPricePesos",
+    });
+  else if (hasMin)
+    filterChips.push({
+      label: `From ${formatPeso(filters.minPricePesos!)}`,
+      key: "minPricePesos",
+    });
+  else if (hasMax)
+    filterChips.push({
+      label: `Up to ${formatPeso(filters.maxPricePesos!)}`,
+      key: "maxPricePesos",
+    });
+
+  if (kind !== "services" && filters.guests !== undefined)
+    filterChips.push({ label: `${filters.guests} guests`, key: "guests" });
+
+  const activeCount = filterChips.length;
+
+  const removeChip = (key: keyof CatalogFilters) => {
+    const next = { ...filters };
+
+    if (key === "minPricePesos") {
+      delete next.minPricePesos;
+      delete next.maxPricePesos;
+    } else {
+      delete next[key];
+    }
+
+    setFilters(next);
+    pagination.reset();
+  };
+
+  // Escape key + click-outside close
+  useEffect(() => {
+    if (!filtersOpen) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setFiltersOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+
+    const onPointer = (e: PointerEvent) => {
+      const target = e.target as Node;
+
+      if (
+        !triggerWrapRef.current?.contains(target) &&
+        !panelRef.current?.contains(target)
+      ) {
+        setFiltersOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [filtersOpen]);
+
   return (
     <div className="catalog-browser" ref={topRef} tabIndex={-1}>
       {showFilters && (
-        <>
+        <div className="public-catalog-filters catalog-browser">
           <div className="catalog-toolbar">
-            <p
-              className="catalog-results-summary"
-              role="status"
-              aria-live="polite"
+            {/* Trigger wrap is the CSS anchor for the floating panel */}
+            <div className="catalog-filter-trigger-wrap" ref={triggerWrapRef}>
+              <Button
+                ref={triggerRef}
+                variant="secondary"
+                className={`catalog-filter-toggle${activeCount > 0 ? " catalog-filter-toggle--active" : ""}`}
+                aria-label={
+                  activeCount > 0
+                    ? `Filter ${kind} (${activeCount} active)`
+                    : `Filter ${kind}`
+                }
+                aria-expanded={filtersOpen}
+                aria-controls={filtersId}
+                onClick={() => setFiltersOpen((prev) => !prev)}
+              >
+                <Icon name="filter" size={17} />
+                {activeCount > 0 && (
+                  <span className="catalog-filter-badge" aria-hidden="true">
+                    {activeCount}
+                  </span>
+                )}
+              </Button>
+
+              {/* Floating panel anchored to trigger-wrap */}
+              <div
+                id={filtersId}
+                ref={panelRef}
+                className={`catalog-filter-panel${filtersOpen ? " catalog-filter-panel--open" : ""}`}
+                aria-hidden={!filtersOpen}
+              >
+                <CatalogFiltersForm
+                  key={kind}
+                  kind={kind}
+                  filters={filters}
+                  compact
+                  onApply={(next) => {
+                    setFilters(next);
+                    setFiltersOpen(false);
+                    pagination.reset();
+                  }}
+                />
+                <Button
+                  variant="plain"
+                  className="catalog-filter-panel-close"
+                  aria-label="Close filters"
+                  onClick={() => {
+                    setFiltersOpen(false);
+                    triggerRef.current?.focus();
+                  }}
+                >
+                  <Icon name="close" size={15} />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Active filter chips — shown when panel is closed and filters are active */}
+          {!filtersOpen && filterChips.length > 0 && (
+            <div
+              className="catalog-filter-chips"
+              role="group"
+              aria-label="Active filters"
             >
-              {loading || !initialized
-                ? `Loading ${kind}…`
-                : error
-                  ? `Unable to show ${kind}. Try again below.`
-                  : `Showing ${items.length} ${kind}${hasFilters ? " matching your filters" : ""} · Page ${pagination.page}`}
-            </p>
-            <Button
-              variant="secondary"
-              size="icon"
-              icon="filter"
-              className="catalog-filter-toggle"
-              aria-label={filtersOpen ? "Hide filters" : "Show filters"}
-              title={filtersOpen ? "Hide filters" : "Show filters"}
-              aria-expanded={filtersOpen}
-              aria-controls={filtersId}
-              data-active={hasFilters || undefined}
-              onClick={() => setFiltersOpen((open) => !open)}
-            />
-          </div>
-          <div id={filtersId} hidden={!filtersOpen}>
-            <CatalogFiltersForm
-              key={kind}
-              kind={kind}
-              filters={filters}
-              onApply={(next) => {
-                setFilters(next);
-                pagination.reset();
-              }}
-            />
-          </div>
-        </>
+              {filterChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  className="catalog-filter-chip"
+                  onClick={() => removeChip(chip.key)}
+                  aria-label={`Remove filter: ${chip.label}`}
+                >
+                  {chip.label}
+                  <Icon name="close" size={12} />
+                </button>
+              ))}
+              <button
+                type="button"
+                className="catalog-filter-chip-clear"
+                onClick={() => {
+                  setFilters({});
+                  pagination.reset();
+                }}
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+        </div>
       )}
       {(!initialized || loading) && (
         <p className="catalog-status" role="status">
