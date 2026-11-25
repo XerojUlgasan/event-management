@@ -482,7 +482,7 @@ export function BookingRequestDialog({
         </span>
         <h2 id={titleId} ref={heading} tabIndex={-1}>
           {submitted
-            ? "Request submitted"
+            ? "Your booking request has been submitted"
             : review
               ? "Review your request"
               : "Let’s plan your event"}
@@ -494,7 +494,7 @@ export function BookingRequestDialog({
         </p>
         {submitted ? (
           <>
-            <p>An administrator will review your request.</p>
+            <p>Our team will review your request and follow up in Messages.</p>
             <Button variant="secondary" type="button" onClick={cancel}>
               Close
             </Button>
