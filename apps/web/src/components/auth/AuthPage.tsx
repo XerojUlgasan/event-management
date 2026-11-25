@@ -59,6 +59,12 @@ export function AuthPage({
     clearError();
 
     if (mode === "register") {
+      if (!name.trim()) {
+        setFormError(notifyError("Enter your full name."));
+
+        return;
+      }
+
       if (password.length < MIN_PASSWORD_LENGTH) {
         setFormError(
           notifyError(
