@@ -115,7 +115,7 @@ The [Deploy production Supabase workflow](../../../../.github/workflows/deploy-s
 
 Review [pending migration impact](#migration-impact) before the first run. To deploy after editing only GitHub secrets, run **Deploy production Supabase** from the Actions tab on `main`. The workflow uploads configured runtime values. Remove retired values in Supabase when needed.
 
-The schedule checks for due package/service jobs and expired leases every 10 seconds. When there is work to do, it uses `pg_net` to invoke the Edge API with a dedicated token generated in Vault on first deployment. Each request attempts one catalog job with the same lease and retry rules as the Node worker. Existing pending jobs are eligible for processing immediately. Supporting documents and image-message jobs still use the Node worker.
+The schedule checks for due package/service jobs and expired leases every 10 seconds. When there is work to do, it uses `pg_net` to invoke the Edge API with a signature valid for 30 seconds. The signing key stays in Vault. Each request attempts one catalog job with the same lease and retry rules as the Node worker. Existing pending jobs are eligible for processing immediately. Supporting documents and image-message jobs still use the Node worker.
 
 Verify a rollout in Supabase by checking the `clemora-catalog-indexing` Cron job, its HTTP responses in `net._http_response`, and the persisted state. When indexing succeeds, `embed_package` or `embed_service` jobs complete and current rows in `catalog_knowledge` receive embeddings. A successful Cron SQL run alone confirms the schedule ran. To pause the schedule, deactivate it in **Integrations → Cron**.
 

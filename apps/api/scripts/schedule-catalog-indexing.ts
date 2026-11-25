@@ -18,11 +18,17 @@ export async function scheduleCatalogIndexing(client: Client, url: URL) {
     select net.http_post(
       url := %L,
       headers := jsonb_build_object(
-        '${catalogIndexWorkerTokenHeader}', secret.decrypted_secret
+        '${catalogIndexWorkerTokenHeader}',
+        issued.at || '.' || encode(
+          extensions.hmac(issued.at, secret.decrypted_secret, 'sha256'), 'hex'
+        )
       ),
       timeout_milliseconds := 140000
     )
     from vault.decrypted_secrets as secret
+    cross join (
+      select floor(extract(epoch from statement_timestamp()))::bigint::text as at
+    ) as issued
     where secret.name = '${catalogIndexWorkerSecret}'
       and exists (
         select 1 from public.background_jobs
@@ -65,6 +71,9 @@ export async function scheduleCatalogIndexing(client: Client, url: URL) {
     await client.query(
       `select cron.schedule($1, '10 seconds', format($2::text, $3::text))`,
       [scheduleName, command, url.href],
+    );
+    await client.query(
+      "delete from vault.secrets where name = 'clemora_catalog_index_worker'",
     );
     await client.query("commit");
   } catch (cause) {
