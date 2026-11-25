@@ -7,13 +7,15 @@ import {
 } from "../../utils/catalog-media-storage.js";
 import { MessageProcessingError } from "./message-processing-error.js";
 
-export async function readValidatedMessageImage(
-  image: {
-    storage_key: string;
-    mime_type: string;
-    byte_size: number;
-    content_hash: string;
-  },
+type StoredImage = {
+  storage_key: string;
+  mime_type: string;
+  byte_size: number;
+  content_hash: string;
+};
+
+export async function readVerifiedMessageImageBytes(
+  image: StoredImage,
   signal: AbortSignal,
 ) {
   signal.throwIfAborted();
@@ -57,14 +59,23 @@ export async function readValidatedMessageImage(
   )
     throw new MessageProcessingError("invalid_image");
 
+  return { bytes, mimeType: detected.mimeType };
+}
+
+export async function readValidatedMessageImage(
+  image: StoredImage,
+  signal: AbortSignal,
+) {
+  const original = await readVerifiedMessageImageBytes(image, signal);
+
   try {
     const { Image } = await import("imagescript");
-    await Image.decode(bytes, { maxPixels: MAX_MESSAGE_IMAGE_PIXELS });
+    await Image.decode(original.bytes, { maxPixels: MAX_MESSAGE_IMAGE_PIXELS });
   } catch {
     throw new MessageProcessingError("invalid_image");
   }
 
   signal.throwIfAborted();
 
-  return { bytes, mimeType: detected.mimeType };
+  return original;
 }

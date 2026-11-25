@@ -2,6 +2,7 @@ import { MessageProcessingError } from "../messages/message-processing-error.js"
 import type { BackgroundJobLease } from "../../data/background-jobs/assert-job-lease.js";
 import type { Kysely } from "kysely";
 import type { DB } from "../../db/types.js";
+import type { QueueJob } from "../../data/background-jobs/types.js";
 import { claimJobData } from "../../data/background-jobs/claim-job.js";
 import { finishJobData } from "../../data/background-jobs/finish-job.js";
 import { heartbeatJobData } from "../../data/background-jobs/heartbeat-job.js";
@@ -38,10 +39,22 @@ export async function runOneBackgroundJob(
   db: Kysely<DB>,
   options: WorkerOptions,
 ): Promise<boolean> {
-  if (options.signal.aborted) return false;
+  const started = await startOneBackgroundJob(db, options);
+
+  if (!started) return false;
+
+  await started.completion;
+
+  return true;
+}
+
+export async function startOneBackgroundJob(
+  db: Kysely<DB>,
+  options: WorkerOptions,
+) {
+  if (options.signal.aborted) return undefined;
 
   const leaseMs = options.leaseMs ?? backgroundJobSettings.leaseMs;
-  const heartbeatMs = options.heartbeatMs ?? backgroundJobSettings.heartbeatMs;
 
   const policies = options.jobTypes
     ? Object.fromEntries(
@@ -54,9 +67,19 @@ export async function runOneBackgroundJob(
 
   const job = await claimJobData(db, leaseMs, policies);
 
-  if (!job || !isBackgroundJobType(job.type)) return false;
+  if (!job || !isBackgroundJobType(job.type)) return undefined;
 
-  const type = job.type;
+  return { completion: executeClaimedJob(db, options, job, job.type, leaseMs) };
+}
+
+async function executeClaimedJob(
+  db: Kysely<DB>,
+  options: WorkerOptions,
+  job: QueueJob,
+  type: BackgroundJobType,
+  leaseMs: number,
+) {
+  const heartbeatMs = options.heartbeatMs ?? backgroundJobSettings.heartbeatMs;
   const controller = new AbortController();
 
   const abort = () => controller.abort();
@@ -152,6 +175,4 @@ export async function runOneBackgroundJob(
 
   if (!ownershipLost)
     await finishJobData(db, job, outcome, backgroundJobPolicies, errorCode);
-
-  return true;
 }

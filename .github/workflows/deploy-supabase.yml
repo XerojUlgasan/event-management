@@ -91,6 +91,9 @@ jobs:
         run: |
           : "${PROD_SUPABASE_REF:?Missing Edge Functions secret PROD_SUPABASE_REF}"
           : "${SUPABASE_ACCESS_TOKEN:?Missing Edge Functions secret SUPABASE_ACCESS_TOKEN}"
+          : "${AI_GATEWAY_API_KEY:?Missing Edge Functions secret AI_GATEWAY_API_KEY}"
+          : "${VISION_MODEL:?Missing Edge Functions secret VISION_MODEL}"
+          : "${TEXT_MODEL:?Missing Edge Functions secret TEXT_MODEL}"
           : "${R2_ACCESS_KEY_ID:?Missing Edge Functions secret R2_ACCESS_KEY_ID}"
           : "${R2_BUCKET_NAME:?Missing Edge Functions secret R2_BUCKET_NAME}"
           : "${R2_SECRET_ACCESS_KEY:?Missing Edge Functions secret R2_SECRET_ACCESS_KEY}"
@@ -130,8 +133,8 @@ jobs:
           pnpm --filter @event-management/supabase exec -- supabase functions deploy api \
             --remote="$PROD_SUPABASE_REF" --workdir "$GITHUB_WORKSPACE/apps" --use-docker --yes
 
-  schedule-catalog-indexing:
-    name: Configure catalog indexing schedule
+  schedule-edge-workers:
+    name: Configure catalog and image-message schedules
     needs: deploy
     runs-on: ubuntu-latest
     environment: Database Migration
@@ -144,7 +147,7 @@ jobs:
           node-version: "24"
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
       - run: pnpm install --frozen-lockfile
-      - name: Schedule Supabase catalog indexing
+      - name: Schedule Supabase catalog and image workers
         env:
           PROD_SUPABASE_DB_URL: ${{ secrets.PROD_SUPABASE_DB_URL }}
-        run: pnpm --filter @event-management/api exec tsx scripts/schedule-catalog-indexing.ts
+        run: pnpm --filter @event-management/api exec tsx scripts/schedule-edge-workers.ts

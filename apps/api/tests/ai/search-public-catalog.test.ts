@@ -70,10 +70,12 @@ before(async () => {
 after(async () => {
   globalThis.fetch = originalFetch;
 
-  if (originalKey === undefined) setTestConfig({ AI_GATEWAY_API_KEY: undefined });
+  if (originalKey === undefined)
+    setTestConfig({ AI_GATEWAY_API_KEY: undefined });
   else setTestConfig({ AI_GATEWAY_API_KEY: originalKey });
 
-  if (originalModel === undefined) setTestConfig({ EMBEDDING_MODEL: undefined });
+  if (originalModel === undefined)
+    setTestConfig({ EMBEDDING_MODEL: undefined });
   else setTestConfig({ EMBEDDING_MODEL: originalModel });
 
   await db?.destroy();
@@ -693,9 +695,43 @@ test("photo search embeds original PNG bytes and optional focus once, then selec
   assert.equal(second.nextCursor, null);
   assert.equal(reads, 2);
   assert.equal(calls, priorCalls + 2);
+
+  const webp = await new Image(2, 2).fill(0xff0088ff).encodeWebP();
+
+  const readWebp = async () => ({ bytes: webp, mimeType: "image/webp" });
+
+  const webpFirst = await searchPublicCatalogService({
+    db,
+    input,
+    readPhoto: readWebp,
+  });
+  assert.ok(webpFirst.nextCursor);
+
+  const requestImage = () =>
+    (
+      embeddingRequest as {
+        providerOptions: {
+          google: { content: { inlineData: { mimeType: string } }[][] };
+        };
+      }
+    ).providerOptions.google.content[0]![0]!.inlineData.mimeType;
+
+  await searchPublicCatalogService({
+    db,
+    input: { ...input, cursor: webpFirst.nextCursor },
+    readPhoto: readWebp,
+  });
+  assert.equal(requestImage(), "image/webp");
+  // Before native WebP search, photo cursors stored only the item ID and score.
+  await searchPublicCatalogService({
+    db,
+    input: { ...input, cursor: first.nextCursor },
+    readPhoto: readWebp,
+  });
+  assert.equal(requestImage(), "image/png");
 });
 
-test("photo-only service search preprocesses WebP, retains pricing type and filters, and permits an empty eligible corpus", async () => {
+test("photo-only service search embeds the original WebP, retains pricing type and filters, and permits an empty eligible corpus", async () => {
   const { canvas } = await photoCanvas(["Fixture stage"]);
 
   for (const [slug, fixed] of [
@@ -751,10 +787,8 @@ test("photo-only service search preprocesses WebP, retains pricing type and filt
   assert.deepEqual(request.values, [""]);
   assert.equal(request.dimensions, 768);
   const image = request.providerOptions.google.content[0]![0]!.inlineData;
-  assert.equal(image.mimeType, "image/png");
-  const converted = await Image.decode(Buffer.from(image.data, "base64"));
-  assert.equal(converted.width, 3);
-  assert.equal(converted.height, 2);
+  assert.equal(image.mimeType, "image/webp");
+  assert.equal(image.data, Buffer.from(webp).toString("base64"));
 
   const empty = await searchPublicCatalogService({
     db,

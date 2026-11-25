@@ -25,7 +25,8 @@ export async function embedCatalogContent({
   if (
     image &&
     (!image.bytes.length ||
-      !["image/jpeg", "image/png"].includes(image.mimeType))
+      (!["image/jpeg", "image/png"].includes(image.mimeType) &&
+        !(purpose === "search" && image.mimeType === "image/webp")))
   ) {
     throw new Error("Unsupported embedding image");
   }

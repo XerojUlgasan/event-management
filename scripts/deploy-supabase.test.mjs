@@ -16,7 +16,7 @@ const projectRef = "abcdefghijklmnopqrst";
 
 const migrationUrl = `postgresql://postgres.${projectRef}:fixture%23password@aws-0-test.pooler.supabase.com:5432/postgres`;
 
-function deploy(context, url) {
+function deploy(context, url, visionModel = "fixture-vision") {
   const root = mkdtempSync(join(tmpdir(), "clemora-deploy-"));
   context.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, "scripts"));
@@ -37,7 +37,12 @@ function deploy(context, url) {
   );
   writeFileSync(
     join(root, "apps/supabase/.env.functions"),
-    "WEB_ORIGIN=https://frontend.example.test",
+    [
+      "WEB_ORIGIN=https://frontend.example.test",
+      "AI_GATEWAY_API_KEY=fixture-key",
+      "TEXT_MODEL=fixture-text",
+      `VISION_MODEL=${visionModel}`,
+    ].join("\n"),
   );
 
   // Record deployment subprocesses before the deploy entrypoint imports spawnSync.
@@ -97,7 +102,14 @@ test("rejects the transaction pooler before starting deployment", (context) => {
   assert.deepEqual(commands, []);
 });
 
-test("activates the catalog schedule after deploying to the selected project", (context) => {
+test("rejects a missing vision model before deploying or enabling schedules", (context) => {
+  const { result, commands } = deploy(context, migrationUrl, "");
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Set VISION_MODEL/);
+  assert.deepEqual(commands, []);
+});
+
+test("activates the Edge worker schedules after deploying to the selected project", (context) => {
   const { result, commands, root } = deploy(context, migrationUrl);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(commands.length, 5);
@@ -124,7 +136,7 @@ test("activates the catalog schedule after deploying to the selected project", (
       "@event-management/api",
       "exec",
       "tsx",
-      "scripts/schedule-catalog-indexing.ts",
+      "scripts/schedule-edge-workers.ts",
     ],
     url: migrationUrl,
   });

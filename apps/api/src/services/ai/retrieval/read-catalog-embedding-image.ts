@@ -54,6 +54,7 @@ export async function readCatalogEmbeddingImage(
 export async function prepareCatalogEmbeddingImage(
   bytes: Uint8Array,
   abortSignal?: AbortSignal,
+  webpFormat: "png" | "original" = "png",
 ) {
   abortSignal?.throwIfAborted();
 
@@ -65,7 +66,7 @@ export async function prepareCatalogEmbeddingImage(
   if (!detected || detected.kind !== "image")
     throw new Error("Catalog photo has an unsupported format");
 
-  if (detected.mimeType !== "image/webp")
+  if (detected.mimeType !== "image/webp" || webpFormat === "original")
     return { bytes, mimeType: detected.mimeType };
 
   const { Image } = await import("imagescript");

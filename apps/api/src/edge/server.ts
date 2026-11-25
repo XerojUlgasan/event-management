@@ -3,7 +3,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { MAX_VIDEO_SIZE_BYTES } from "@event-management/contracts/limits/videos";
-import { catalogIndexWorkerPath } from "../constants/catalog-index-worker.js";
+import { edgeJobWorkers } from "../constants/edge-job-workers.js";
 import {
   CATALOG_JSON_BODY_LIMIT_BYTES,
   getAllowedWebOrigins,
@@ -244,11 +244,13 @@ app.all("/openapi.json", (c) =>
   loadDocumentation().then((docs) => docs.fetch(c.req.raw)),
 );
 
-app.post(catalogIndexWorkerPath, (c) =>
-  import("./run-catalog-index.js").then(({ runCatalogIndexRequest }) =>
-    runCatalogIndexRequest(c.req.raw),
-  ),
-);
+for (const worker of Object.values(edgeJobWorkers)) {
+  app.post(worker.path, (c) =>
+    import("./run-edge-job.js").then(({ runEdgeJobRequest }) =>
+      runEdgeJobRequest(c.req.raw, worker),
+    ),
+  );
+}
 
 app.all("/v1/*", async (c) => {
   const family = matchRouteFamily(c.req.path);

@@ -1,24 +1,21 @@
 import { Client } from "pg";
 import {
-  catalogIndexJobTypes,
-  catalogIndexWorkerPath,
-  catalogIndexWorkerSecret,
-  catalogIndexWorkerTokenHeader,
-} from "../src/constants/catalog-index-worker.js";
+  edgeJobWorkers,
+  workerTokenHeader,
+  type EdgeJobWorker,
+} from "../src/constants/edge-job-workers.js";
 import { config } from "../src/env.js";
 
-const scheduleName = "clemora-catalog-indexing";
+async function scheduleWorker(client: Client, worker: EdgeJobWorker, url: URL) {
+  const jobTypes = worker.jobTypes.map((type) => `'${type}'`).join(", ");
 
-const catalogTypes = catalogIndexJobTypes.map((type) => `'${type}'`).join(", ");
-
-export async function scheduleCatalogIndexing(client: Client, url: URL) {
   // The command is stored by pg_cron. Only the URL is instance-specific, and
   // Postgres quotes it before adding it to the command. The token stays in Vault.
   const command = `
     select net.http_post(
-      url := %L,
+      url := %1$L,
       headers := jsonb_build_object(
-        '${catalogIndexWorkerTokenHeader}',
+        '${workerTokenHeader}',
         issued.at || '.' || encode(
           extensions.hmac(issued.at, secret.decrypted_secret, 'sha256'), 'hex'
         )
@@ -29,10 +26,14 @@ export async function scheduleCatalogIndexing(client: Client, url: URL) {
     cross join (
       select floor(extract(epoch from statement_timestamp()))::bigint::text as at
     ) as issued
-    where secret.name = '${catalogIndexWorkerSecret}'
+    where secret.name = '${worker.secret}'
+      and not exists (
+        select 1 from net.http_request_queue
+        where method = 'POST' and url = %1$L
+      )
       and exists (
         select 1 from public.background_jobs
-        where type in (${catalogTypes})
+        where type in (${jobTypes})
           and (
             (status = 'pending' and available_at <= now())
             or (status = 'running' and lease_expires_at <= now())
@@ -41,37 +42,49 @@ export async function scheduleCatalogIndexing(client: Client, url: URL) {
       and (
         select count(*) from (
           select 1 from public.background_jobs
-          where type in (${catalogTypes})
+          where type in (${jobTypes})
             and status = 'running' and lease_expires_at > now()
           limit 3
         ) as active_jobs
       ) < 3
   `;
 
-  await client.query("begin");
-
-  try {
-    await client.query("select pg_advisory_xact_lock(hashtext($1))", [
-      scheduleName,
-    ]);
-    await client.query("create extension if not exists pg_cron");
-    await client.query(
-      "create extension if not exists pg_net with schema extensions",
-    );
-    await client.query(
-      `
+  await client.query(
+    `
         select vault.create_secret(
           replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''),
           $1
         )
         where not exists (select 1 from vault.secrets where name = $1)
       `,
-      [catalogIndexWorkerSecret],
-    );
+    [worker.secret],
+  );
+  await client.query(
+    `select cron.schedule($1, $2, format($3::text, $4::text))`,
+    [worker.scheduleName, worker.interval, command, url.href],
+  );
+}
+
+export async function scheduleEdgeWorkers(client: Client, functionUrl: URL) {
+  await client.query("begin");
+
+  try {
+    await client.query("select pg_advisory_xact_lock(hashtext($1))", [
+      edgeJobWorkers.catalog.scheduleName,
+    ]);
+    await client.query("create extension if not exists pg_cron");
     await client.query(
-      `select cron.schedule($1, '10 seconds', format($2::text, $3::text))`,
-      [scheduleName, command, url.href],
+      "create extension if not exists pg_net with schema extensions",
     );
+
+    for (const worker of Object.values(edgeJobWorkers)) {
+      await scheduleWorker(
+        client,
+        worker,
+        new URL(functionUrl.href + worker.path),
+      );
+    }
+
     await client.query(
       "delete from vault.secrets where name = 'clemora_catalog_index_worker'",
     );
@@ -102,29 +115,32 @@ async function main() {
     );
   }
 
-  const url = new URL(
-    `https://${ref}.supabase.co/functions/v1/api${catalogIndexWorkerPath}`,
-  );
-  const probe = await fetch(url, {
-    method: "POST",
-    redirect: "error",
-    signal: AbortSignal.timeout(15_000),
-  });
+  const functionUrl = new URL(`https://${ref}.supabase.co/functions/v1/api`);
 
-  if (
-    probe.status !== 401 ||
-    (await probe.json()).error !== "Invalid worker token"
-  )
-    throw new Error(
-      "Deploy the catalog indexing route before enabling its schedule.",
-    );
+  for (const worker of Object.values(edgeJobWorkers)) {
+    const probe = await fetch(new URL(functionUrl.href + worker.path), {
+      method: "POST",
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (
+      probe.status !== 401 ||
+      (await probe.json()).error !== "Invalid worker token"
+    )
+      throw new Error(
+        `Deploy the ${worker.scheduleName} route before enabling its schedule.`,
+      );
+  }
 
   const client = new Client({ connectionString });
   await client.connect();
 
   try {
-    await scheduleCatalogIndexing(client, url);
-    console.log("Production catalog indexing schedule is configured.");
+    await scheduleEdgeWorkers(client, functionUrl);
+    console.log(
+      "Production catalog and image-message schedules are configured.",
+    );
   } finally {
     await client.end();
   }
@@ -135,7 +151,7 @@ if (import.meta.main) {
     await main();
   } catch {
     console.error(
-      "Could not configure catalog indexing. Check the production database target, Edge deployment, and Cron, pg_net, and Vault permissions.",
+      "Could not configure background workers. Check the production database target, Edge deployment, and Cron, pg_net, and Vault permissions.",
     );
     process.exitCode = 1;
   }

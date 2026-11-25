@@ -18,9 +18,12 @@ import {
   backgroundJobSettings,
   jobDefinitions,
 } from "../src/services/background-jobs/job-definitions.js";
-import { runOneBackgroundJob } from "../src/services/background-jobs/run-one-background-job.js";
+import {
+  runOneBackgroundJob,
+  startOneBackgroundJob,
+} from "../src/services/background-jobs/run-one-background-job.js";
 import { runBackgroundJobsWorker } from "../src/services/background-jobs/run-worker.js";
-import { catalogIndexJobTypes } from "../src/constants/catalog-index-worker.js";
+import { edgeJobWorkers } from "../src/constants/edge-job-workers.js";
 
 const database = `em_jobs_${randomUUID().replaceAll("-", "")}`;
 
@@ -136,7 +139,7 @@ test("a hosted catalog invocation claims one catalog job and leaves other jobs q
 
   const options = {
     signal,
-    jobTypes: catalogIndexJobTypes,
+    jobTypes: edgeJobWorkers.catalog.jobTypes,
     execute: async () => {},
   };
 
@@ -152,6 +155,63 @@ test("a hosted catalog invocation claims one catalog job and leaves other jobs q
 
   assert.equal(other?.status, "pending");
   assert.equal(other?.attempts, 0);
+  await clear();
+});
+
+test("the hosted image worker claims a photo while catalog and document jobs wait", async () => {
+  const catalogId = await enqueue(pkg());
+
+  const documentId = await db.transaction().execute((trx) =>
+    enqueueBackgroundJobService(trx, "extract_supporting_document", {
+      documentId: randomUUID(),
+    }),
+  );
+
+  const imageId = await db.transaction().execute((trx) =>
+    enqueueBackgroundJobService(trx, "process_image_message", {
+      messageId: randomUUID(),
+      conversationId: randomUUID(),
+      aiVersion: 0,
+    }),
+  );
+
+  let finishHandler: () => void = () => {};
+
+  const handler = new Promise<void>((resolve) => {
+    finishHandler = resolve;
+  });
+
+  const options = {
+    signal,
+    jobTypes: edgeJobWorkers.images.jobTypes,
+    timeoutMs: 5_000,
+    execute: () => handler,
+  };
+
+  const started = await startOneBackgroundJob(db, options);
+  assert.ok(started);
+
+  try {
+    assert.equal(
+      (await rows()).find(({ id }) => id === imageId)?.status,
+      "running",
+    );
+    assert.equal(await startOneBackgroundJob(db, options), undefined);
+  } finally {
+    finishHandler();
+    await started.completion;
+  }
+
+  const records = await rows();
+  assert.equal(records.find(({ id }) => id === imageId)?.status, "completed");
+
+  for (const other of [catalogId, documentId]) {
+    const waiting = records.find(({ id }) => id === other);
+
+    assert.equal(waiting?.status, "pending");
+    assert.equal(waiting?.attempts, 0);
+  }
+
   await clear();
 });
 

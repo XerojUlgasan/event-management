@@ -50,7 +50,7 @@ import { submitReviewedBookingRequestService } from "../booking-requests/submit-
 import { completeBookingConsentAssessment } from "./assess-booking-consent.js";
 import { generatedSuggestedReplies } from "./suggested-replies.js";
 import { localizeBookingReview } from "./localize-booking-chat.js";
-import { readValidatedMessageImage } from "../messages/read-validated-message-image.js";
+import { readVerifiedMessageImageBytes } from "../messages/read-validated-message-image.js";
 import { attachLinkedPhotoRecommendations } from "./attach-linked-photo-recommendations.js";
 import { searchedCatalogPhotoIds } from "./searched-catalog-photo-ids.js";
 
@@ -90,7 +90,10 @@ export async function runAssistantTurnService({
 }) {
   const started = Date.now();
   const turnId = randomUUID();
-  const deadline = AbortSignal.timeout(30_000);
+  // Photo searches can finish several provider calls before the final reply.
+  // Queued turns also inherit the worker deadline and lease cancellation.
+  const turnTimeoutMs = jobLease ? 60_000 : 30_000;
+  const deadline = AbortSignal.timeout(turnTimeoutMs);
   const handoffStop = new AbortController();
   const signal = AbortSignal.any([
     deadline,
@@ -98,7 +101,10 @@ export async function runAssistantTurnService({
     ...(abortSignal ? [abortSignal] : []),
   ]);
 
-  const copyDeadline = AbortSignal.any([signal, AbortSignal.timeout(27_500)]);
+  const copyDeadline = AbortSignal.any([
+    signal,
+    AbortSignal.timeout(turnTimeoutMs - 2_500),
+  ]);
 
   if (jobLease)
     await db
@@ -603,7 +609,9 @@ export async function runAssistantTurnService({
       if (!photo) return null;
 
       try {
-        return await readValidatedMessageImage(photo, toolSignal);
+        // Only interpreted photos enter this map. A matching hash identifies the
+        // same original that passed the worker's full pixel decode.
+        return await readVerifiedMessageImageBytes(photo, toolSignal);
       } catch {
         toolSignal.throwIfAborted();
 

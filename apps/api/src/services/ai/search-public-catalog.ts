@@ -97,6 +97,7 @@ export class CatalogSearchPhotoUnavailable extends Error {}
 const positionSchema = z.strictObject({
   id: z.string().uuid(),
   score: z.number().nullable(),
+  nativeWebp: z.literal(true).optional(),
 });
 
 const short = (text: string, limit: number) =>
@@ -148,7 +149,13 @@ export async function searchPublicCatalogService({
     if (!original) throw new CatalogSearchPhotoUnavailable();
 
     try {
-      image = await prepareCatalogEmbeddingImage(original.bytes, abortSignal);
+      // Older WebP result pages used a converted PNG. Keep their query vector
+      // consistent with the score in their continuation cursor.
+      image = await prepareCatalogEmbeddingImage(
+        original.bytes,
+        abortSignal,
+        position && !position.nativeWebp ? "png" : "original",
+      );
     } catch {
       abortSignal?.throwIfAborted();
       throw new CatalogSearchPhotoUnavailable();
@@ -296,6 +303,9 @@ export async function searchPublicCatalogService({
             ? encodePageCursor(scope, {
                 id: last.listing.id,
                 score: last.score,
+                ...(image?.mimeType === "image/webp"
+                  ? { nativeWebp: true }
+                  : {}),
               })
             : null,
       };

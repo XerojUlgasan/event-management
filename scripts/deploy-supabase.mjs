@@ -79,21 +79,13 @@ function deploy() {
   }
 
   const secrets = readSettings(functionsEnv);
-  const names = Object.keys(secrets);
 
-  // if (
-  //   !names.length ||
-  //   names.some(
-  //     (name) =>
-  //       name.startsWith("SUPABASE_") ||
-  //       name === "PROD_SUPABASE_DB_URL" ||
-  //       name === "PROD_SUPABASE_REF",
-  //   )
-  // ) {
-  //   throw new Error(
-  //     "Use the production function env file for runtime settings only. Supabase reserves SUPABASE_* names.",
-  //   );
-  // }
+  for (const name of ["AI_GATEWAY_API_KEY", "VISION_MODEL", "TEXT_MODEL"]) {
+    if (!secrets[name]?.trim())
+      throw new Error(
+        `Set ${name} in apps/supabase/.env.functions before activating the image worker.`,
+      );
+  }
 
   if ("WEB_ORIGIN" in secrets && !secrets.WEB_ORIGIN.trim()) {
     throw new Error(
@@ -140,13 +132,13 @@ function deploy() {
     { SUPABASE_ACCESS_TOKEN },
   );
   run(
-    "Configuring the catalog indexing schedule",
+    "Configuring catalog and image-message schedules",
     [
       "--filter",
       "@event-management/api",
       "exec",
       "tsx",
-      "scripts/schedule-catalog-indexing.ts",
+      "scripts/schedule-edge-workers.ts",
     ],
     { PROD_SUPABASE_DB_URL, PROD_SUPABASE_REF },
   );
