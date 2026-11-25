@@ -24,7 +24,8 @@
 .messages-workspace > aside {
   min-width: 0;
   padding-block-end: 8px;
-  background: var(--brand-paper);
+  border-right-color: var(--border-default);
+  background: var(--surface-base);
   scroll-padding-block-start: calc(var(--message-header-height) + 2px);
   overscroll-behavior-y: contain;
   scrollbar-width: thin;
@@ -35,7 +36,7 @@
   top: 0;
   min-height: var(--message-header-height);
   padding: 8px 18px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border-default);
   background: inherit;
 }
 .messages-workspace > aside h1 {
@@ -67,44 +68,56 @@
   color: var(--text-primary);
 }
 .messages-workspace > aside .conversation-row:hover {
-  background: var(--surface-raised);
+  background: var(--surface-muted);
 }
 .messages-workspace > aside .conversation-row.active {
-  background: var(--accent-soft);
+  color: var(--surface-base);
+  background: var(--brand-charcoal);
   box-shadow: none;
 }
 .messages-workspace > aside .conversation-row:focus-visible {
-  outline: 2px solid var(--text-muted);
+  outline: 2px solid var(--brand-charcoal);
   outline-offset: -2px;
+}
+.messages-workspace > aside .conversation-row.active:focus-visible {
+  outline-color: var(--surface-base);
+  outline-offset: -4px;
 }
 .messages-workspace .conversation-row-avatar {
   grid-row: span 2;
   width: 32px;
   height: 32px;
 }
+.messages-workspace .conversation-row.active .avatar-accent {
+  color: var(--brand-charcoal);
+  background: var(--surface-base);
+}
 .messages-workspace > aside .conversation-copy {
   gap: 2px;
 }
-.messages-workspace .conversation-copy > strong {
+.messages-workspace .conversation-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.messages-workspace .conversation-identity > strong {
   overflow: hidden;
   font-size: 0.9375rem;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.messages-workspace .conversation-booking {
-  max-width: 100%;
-  width: auto;
-  padding: 0;
+.messages-workspace .conversation-event {
+  display: block;
+  max-width: 45%;
+  flex: none;
+  padding: 2px 6px;
   overflow: hidden;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  color: var(--text-secondary);
-  font-size: 0.8125rem;
+  border: 1px solid var(--border-default);
+  color: inherit;
+  background: var(--transparent);
   line-height: 1.35;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .messages-workspace .conversation-preview {
   color: var(--text-secondary);
@@ -137,6 +150,16 @@
 .messages-workspace .conversation-unread {
   background: var(--brand-charcoal);
   color: var(--surface-base);
+}
+.messages-workspace > aside .conversation-row.active :is(small, time) {
+  color: inherit;
+}
+.messages-workspace .conversation-row.active .conversation-event {
+  border-color: currentColor;
+}
+.messages-workspace .conversation-row.active .conversation-unread {
+  color: var(--brand-charcoal);
+  background: var(--surface-base);
 }
 .messages-workspace > aside .messages-list-footer button,
 .messages-workspace > aside .messages-list-empty button {

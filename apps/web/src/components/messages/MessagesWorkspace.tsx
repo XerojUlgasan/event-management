@@ -537,16 +537,20 @@ export function MessagesWorkspace({
                 initials={conversationAvatar}
               />
               <span className="conversation-copy">
-                <strong title={name}>{name}</strong>
-                {!isTeam && conversation.eventType && (
-                  <em
-                    className="conversation-booking"
-                    title={conversation.eventType}
-                  >
-                    {conversation.eventType}
-                  </em>
-                )}
-                {conversation.bookingRequestId && (
+                <span className="conversation-identity">
+                  <strong title={name}>{name}</strong>
+                  {!isTeam &&
+                    conversation.bookingRequestId &&
+                    conversation.eventType && (
+                      <Badge
+                        className="conversation-event"
+                        title={conversation.eventType}
+                      >
+                        {conversation.eventType}
+                      </Badge>
+                    )}
+                </span>
+                {isTeam && conversation.bookingRequestId && (
                   <small className="conversation-reference">
                     {conversation.eventPreferredDate
                       ? `Requested ${bookingDate(conversation.eventPreferredDate)}`
