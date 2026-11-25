@@ -496,16 +496,17 @@ export function MessagesWorkspace({
 
   return (
     <div
-      className={`customer-messages messages-workspace panel ${conversationOpen ? "conversation-open" : ""}`}
+      className={`customer-messages messages-workspace ${conversationOpen ? "conversation-open" : ""}`}
     >
       <aside ref={inbox} tabIndex={0} aria-label="Conversations">
         <div className="messages-sidebar-head">
           <h1>{title}</h1>
           {isTeam && onNewChat && (
             <Button
-              variant="plain"
+              variant="secondary"
               type="button"
-              className="message-action"
+              className="messages-new-chat"
+              icon="plus"
               onClick={onNewChat}
               disabled={newChatBusy}
             >
@@ -526,18 +527,22 @@ export function MessagesWorkspace({
               variant="plain"
               type="button"
               key={conversation.id}
-              className={conversation.id === activeId ? "active" : ""}
+              className={`conversation-row ${conversation.id === activeId ? "active" : ""}`}
               aria-pressed={conversation.id === activeId}
               onClick={() => onSelect(conversation.id)}
             >
               <Avatar
+                className="conversation-row-avatar"
                 tone={isTeam ? "accent" : "default"}
                 initials={conversationAvatar}
               />
-              <span>
-                <strong>{name}</strong>
+              <span className="conversation-copy">
+                <strong title={name}>{name}</strong>
                 {!isTeam && conversation.eventType && (
-                  <em className="conversation-booking">
+                  <em
+                    className="conversation-booking"
+                    title={conversation.eventType}
+                  >
                     {conversation.eventType}
                   </em>
                 )}
@@ -548,7 +553,9 @@ export function MessagesWorkspace({
                       : "Date to be arranged"}
                   </small>
                 )}
-                <small>{preview(conversation)}</small>
+                <small className="conversation-preview">
+                  {preview(conversation)}
+                </small>
                 {(drafts[conversation.id] ||
                   (fileDrafts[conversation.id]?.length ?? 0) > 0) && (
                   <small className="conversation-draft">Draft</small>
@@ -566,6 +573,7 @@ export function MessagesWorkspace({
                 </time>
                 {conversation.unreadCount > 0 && (
                   <Badge
+                    className="conversation-unread"
                     tone="accent"
                     variant="counter"
                     aria-label={`${conversation.unreadCount} unread messages`}
@@ -590,7 +598,8 @@ export function MessagesWorkspace({
             <p>{error || listEmpty.body}</p>
             {error && onRetry && (
               <Button
-                variant="plain"
+                variant="secondary"
+                size="small"
                 type="button"
                 className="messages-retry"
                 onClick={onRetry}
@@ -628,8 +637,8 @@ export function MessagesWorkspace({
         )}
       </aside>
 
-      <section>
-        <div className="message-thread-head">
+      <section aria-label="Conversation">
+        <header className="message-thread-head">
           <Button
             variant="plain"
             type="button"
@@ -642,16 +651,17 @@ export function MessagesWorkspace({
           </Button>
           <Avatar tone={isTeam ? "accent" : "default"} initials={avatar} />
           <div className="message-thread-title">
-            <span className="message-thread-name">
-              <strong>{activeName}</strong>
-            </span>
-            <small>{activeDetail}</small>
+            <h2 className="message-thread-name" title={activeName}>
+              {activeName}
+            </h2>
+            <small title={activeDetail}>{activeDetail}</small>
           </div>
           {viewerRole === "customer" && active && !active.bookingRequestId && (
             <Button
               variant="secondary"
               className="message-booking-action"
               aria-label="Create booking request"
+              title="Create booking request"
               aria-haspopup="dialog"
               onClick={() => setBookingConversationId(active.id)}
             >
@@ -682,6 +692,7 @@ export function MessagesWorkspace({
                       onToggleAi(active.id, !active.aiEnabled, active.aiVersion)
                     }
                   >
+                    <span aria-hidden="true">AI</span>
                     <span className="message-ai-switch-track">
                       <span className="message-ai-switch-thumb">
                         <Icon
@@ -751,7 +762,7 @@ export function MessagesWorkspace({
                 ))}
             </div>
           )}
-        </div>
+        </header>
         {active?.bookingRequestId && (
           <div className="message-event-context">
             <Icon name="calendar" size={16} />
@@ -791,11 +802,13 @@ export function MessagesWorkspace({
           }}
         >
           {loading && messages.length === 0 && (
-            <p className="messages-empty">Loading messages…</p>
+            <p className="messages-empty" role="status">
+              Loading messages…
+            </p>
           )}
           {!loading && !activeId && (
             <div className="messages-empty">
-              <Icon name="users" size={22} />
+              <Icon name="message" size={22} />
               <strong>
                 {conversations.length
                   ? "Select a conversation"
@@ -803,14 +816,14 @@ export function MessagesWorkspace({
               </strong>
               <p>
                 {conversations.length
-                  ? "Choose a customer to read and reply."
+                  ? "Choose a conversation to read and reply."
                   : listEmpty.body}
               </p>
             </div>
           )}
           {!loading && activeId && messages.length === 0 && (
             <div className="messages-empty">
-              <Icon name="users" size={22} />
+              <Icon name="message" size={22} />
               <strong>{threadEmpty.title}</strong>
               <p>{threadEmpty.body}</p>
             </div>
@@ -997,13 +1010,15 @@ export function MessagesWorkspace({
             />
             <Button
               type="submit"
-              size="icon"
+              className="message-send"
               icon="arrow"
               pending={!isTeam && sending}
               aria-label="Send message"
               title="Send message"
               disabled={composerDisabled || (!draft.trim() && !files.length)}
-            />
+            >
+              <span>Send</span>
+            </Button>
           </MessageAttachments>
         </form>
       </section>

@@ -65,6 +65,26 @@
   font-size: 14px;
 }
 
+.messages-workspace .message-catalog-recommendations {
+  width: min(100%, 420px);
+  margin-block: 2px 6px;
+}
+
+.messages-workspace .message-catalog-recommendation {
+  border-color: var(--border-subtle);
+  border-radius: var(--radius-panel);
+}
+
+.messages-workspace .message-catalog-recommendation:hover {
+  border-color: var(--border-emphasis);
+  background: var(--surface-muted);
+}
+
+.messages-workspace .message-catalog-recommendation-open {
+  align-self: center;
+  color: var(--text-secondary);
+}
+
 .message-catalog-browse {
   display: flex;
   flex-wrap: wrap;
@@ -88,6 +108,15 @@
 
 .message-catalog-browse-action > span {
   color: var(--text-muted);
+}
+
+.messages-workspace
+  .message-catalog-browse
+  > .message-catalog-browse-action.button {
+  min-height: var(--message-touch-size);
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 520px) {
