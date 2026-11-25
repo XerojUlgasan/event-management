@@ -1,4 +1,4 @@
-import { getR2Storage, type StorageBucket } from "./r2-storage.js";
+import { getR2Storage } from "./r2-storage.js";
 
 export class CatalogMediaNotFound extends Error {}
 
@@ -59,10 +59,9 @@ export async function putCatalogMedia(
   options: {
     upsert?: boolean;
     abortSignal?: AbortSignal;
-    bucket?: StorageBucket;
   } = {},
 ) {
-  const r2 = getR2Storage(options.bucket);
+  const r2 = getR2Storage();
   const headers = { "Content-Type": contentType };
   const response = await r2.request(key, {
     method: "PUT",
@@ -78,8 +77,8 @@ export async function putCatalogMedia(
   if (!response.ok) throw new Error("Media storage write failed");
 }
 
-export async function deleteCatalogMedia(key: string, bucket?: StorageBucket) {
-  const response = await getR2Storage(bucket).request(key, {
+export async function deleteCatalogMedia(key: string) {
+  const response = await getR2Storage().request(key, {
     method: "DELETE",
     signal: AbortSignal.timeout(30_000),
   });
@@ -92,9 +91,8 @@ export async function getCatalogMedia(
   key: string,
   range?: string,
   abortSignal?: AbortSignal,
-  bucket?: StorageBucket,
 ) {
-  const response = await getR2Storage(bucket).request(key, {
+  const response = await getR2Storage().request(key, {
     headers: range ? { Range: range } : undefined,
     signal: abortSignal,
   });

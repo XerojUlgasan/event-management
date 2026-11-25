@@ -83,7 +83,7 @@ Use the flask icon beside **Refresh** to test a search across indexed PDF passag
 
 AMAC can search the entire supporting-document collection, including previously uploaded PDFs, in guest and signed-in chats. Each semantic search returns up to five indexed passages with their filenames, headings, and pages. AMAC uses a passage when it helps answer the question and can combine it with the business profile, catalog, or the signed-in customer's booking and quotation records.
 
-Original PDFs are stored in the private Cloudflare R2 bucket set by `R2_SUPPORTING_DOCUMENTS_BUCKET_NAME`. The Node worker extracts text in page order, saves page and heading information with each chunk, and queues one `embed_document_chunk` job per chunk in the same transaction. See [storage setup](../workflows/implement/references/development.md#cloudflare-r2-storage) for API and worker settings.
+Original PDFs share the private Cloudflare R2 bucket set by `R2_BUCKET_NAME` with media uploads. The Node worker extracts text in page order, saves page and heading information with each chunk, and queues one `embed_document_chunk` job per chunk in the same transaction. See [storage setup](../workflows/implement/references/development.md#cloudflare-r2-storage) for API and worker settings.
 
 ### Booking requests and messages
 

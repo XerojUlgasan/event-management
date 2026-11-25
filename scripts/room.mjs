@@ -25,7 +25,7 @@ const runner = fileURLToPath(import.meta.url);
 const blockSize = 16;
 const firstPort = 20000;
 
-const r2MediaSettings = [
+const requiredR2Settings = [
   "S3_API_URL",
   "R2_ACCESS_KEY_ID",
   "R2_SECRET_ACCESS_KEY",
@@ -33,8 +33,7 @@ const r2MediaSettings = [
 ];
 
 const r2OverrideNames = [
-  ...r2MediaSettings,
-  "R2_SUPPORTING_DOCUMENTS_BUCKET_NAME",
+  ...requiredR2Settings,
   "R2_OBJECT_PREFIX",
 ];
 
@@ -53,7 +52,7 @@ function validateOverrides(overrides, roomName) {
       throw new Error(`Unsupported room override: ${name}.`);
   }
 
-  for (const name of r2MediaSettings) {
+  for (const name of requiredR2Settings) {
     if (!overrides[name]?.trim())
       throw new Error(`Missing R2 room override: ${name}.`);
   }

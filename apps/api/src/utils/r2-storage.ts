@@ -1,25 +1,19 @@
 import { AwsClient } from "aws4fetch";
 import { config } from "../env.js";
 
-export type StorageBucket = "media" | "supporting-documents";
-
-export function getR2Storage(target: StorageBucket = "media") {
+export function getR2Storage() {
   const endpoint = config.S3_API_URL?.trim();
   const accessKeyId = config.R2_ACCESS_KEY_ID?.trim();
   const secretAccessKey = config.R2_SECRET_ACCESS_KEY?.trim();
   const prefix = config.R2_OBJECT_PREFIX?.trim();
-  const bucketSetting =
-    target === "media"
-      ? "R2_BUCKET_NAME"
-      : "R2_SUPPORTING_DOCUMENTS_BUCKET_NAME";
-  const bucket = config[bucketSetting]?.trim();
+  const bucket = config.R2_BUCKET_NAME?.trim();
 
   if (!endpoint || !accessKeyId || !secretAccessKey)
     throw new Error(
       "R2 storage requires S3_API_URL, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY",
     );
 
-  if (!bucket) throw new Error(`R2 storage requires ${bucketSetting}`);
+  if (!bucket) throw new Error("R2 storage requires R2_BUCKET_NAME");
 
   const url = URL.parse(endpoint);
 
