@@ -149,10 +149,12 @@ export function CatalogWidgetContent({
           >
             View {entity}
           </span>
+          {widget.caption && (
+            <span className="ui-catalog-caption ui-catalog-reference-footnote">
+              {widget.caption}
+            </span>
+          )}
         </span>
-        {widget.caption && (
-          <span className="ui-catalog-caption">{widget.caption}</span>
-        )}
       </>
     );
 

@@ -89,6 +89,16 @@
 .public-catalog-detail .ui-catalog-photo img + .ui-catalog-caption {
   max-height: none;
 }
+.public-catalog-detail .ui-catalog-reference-service > .ui-catalog-reference-card {
+  border-color: var(--border-subtle);
+  box-shadow: none;
+}
+.public-catalog-detail
+  .ui-catalog-reference-service
+  .ui-catalog-reference-description {
+  text-align: start;
+  hyphens: manual;
+}
 @container catalog-canvas (width < 580px) {
   .public-catalog-detail .catalog-detail-intro h1 {
     font-size: 32px;

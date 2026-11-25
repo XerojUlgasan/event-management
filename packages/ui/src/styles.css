@@ -1594,6 +1594,7 @@ textarea.ui-control {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+  border-radius: var(--radius-panel);
   background: var(--surface-base);
   color: var(--text-primary);
 }
@@ -1621,42 +1622,59 @@ textarea.ui-control {
 .ui-catalog-reference-card > .ui-catalog-thumbnail {
   display: block;
   width: 100%;
-  height: 45%;
+  height: auto;
   min-height: 0;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
+  aspect-ratio: 16 / 10;
+  max-height: min(48%, 220px);
 }
 .ui-catalog-reference-details {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  gap: 8px;
+  gap: 6px;
   min-height: 0;
-  padding: 12px;
+  padding: 16px 18px 18px;
   overflow: hidden;
   overflow-wrap: anywhere;
 }
 .ui-catalog-reference-name {
   flex: none;
   margin: 0;
-  font-size: 18px;
-  line-height: 1.3;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
 }
 .ui-catalog-reference-description {
   margin: 0;
   min-height: 0;
   overflow: hidden;
   color: var(--text-muted);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 .ui-catalog-reference-link {
   flex: none;
   align-self: flex-start;
-  margin-top: auto;
-  color: var(--text-primary);
-  font-size: 14px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  margin-top: 6px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid
+    color-mix(in srgb, currentColor 35%, var(--transparent));
+  color: var(--wine);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.ui-catalog-reference-footnote {
+  flex: none;
+  margin: 6px 0 0;
+  max-height: none;
+  font-size: 11px;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
 }
 .ui-catalog-reference-action:focus-visible {
   outline: 2px solid var(--accent);
@@ -1706,7 +1724,7 @@ textarea.ui-control {
   object-fit: cover;
 }
 .ui-catalog-reference-card > .ui-catalog-thumbnail > img {
-  object-fit: contain;
+  object-fit: cover;
 }
 .ui-catalog-thumbnail:has(> img:not([hidden])) > .ui-catalog-thumbnail-brand {
   display: none;
