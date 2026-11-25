@@ -2,6 +2,7 @@ import {
   Button,
   FormField,
   Input,
+  InputGroup,
   NativeDialog,
   Select,
   Textarea,
@@ -9,16 +10,18 @@ import {
   type FormFieldControlProps,
 } from "@event-management/ui";
 import {
-  MAX_EVENT_TYPE_LENGTH,
+  CONTACT_NAME_REGEX,
   MAX_CONTACT_NAME_LENGTH,
-  MAX_PHONE_NUMBER_LENGTH,
+  MAX_EVENT_TYPE_LENGTH,
   MAX_SPECIAL_REQUESTS_LENGTH,
+  MIN_ADVANCE_BOOKING_DAYS,
+  PH_PHONE_REGEX,
 } from "@event-management/contracts/limits/booking-requests";
 import { useEffect, useId, useRef, useState, type SubmitEvent } from "react";
 import { createPortal } from "react-dom";
 import {
   dateError,
-  todayInZone,
+  minBookingDateInZone,
 } from "../../lib/utils/booking-requests/booking-dates";
 import { ApiError } from "../../lib/http/request";
 import { priceLabel } from "../../lib/utils/formatting/money";
@@ -53,6 +56,12 @@ type Fields = BookingDraftFields;
 
 type Errors = Partial<Record<keyof Fields, string>>;
 
+// Fields validated per step — step 3 uses needsAddonReview, step 4 uses all.
+const STEP_FIELDS: Record<number, (keyof Fields)[]> = {
+  1: ["eventType", "customEventType", "dates"],
+  2: ["contactName", "phoneNumber"],
+};
+
 function validate(fields: Fields, zone: string, requireName = true): Errors {
   const errors: Errors = {};
   const eventType =
@@ -80,12 +89,21 @@ function validate(fields: Fields, zone: string, requireName = true): Errors {
 
   if (requireName && !fields.contactName.trim())
     errors.contactName = "Enter a contact person.";
+  else if (
+    requireName &&
+    fields.contactName.trim() &&
+    !CONTACT_NAME_REGEX.test(fields.contactName.trim())
+  )
+    errors.contactName =
+      "Name may only contain letters, spaces, hyphens, and apostrophes.";
 
   if (!fields.phoneNumber.trim()) errors.phoneNumber = "Enter a phone number.";
+  else if (!PH_PHONE_REGEX.test(`+63${fields.phoneNumber.trim()}`))
+    errors.phoneNumber =
+      "Enter a valid Philippine mobile number (9XX XXX XXXX).";
 
   for (const [key, limit] of [
     ["contactName", MAX_CONTACT_NAME_LENGTH],
-    ["phoneNumber", MAX_PHONE_NUMBER_LENGTH],
     ["specialRequests", MAX_SPECIAL_REQUESTS_LENGTH],
   ] as const)
     if (fields[key].trim().length > limit)
@@ -93,6 +111,8 @@ function validate(fields: Fields, zone: string, requireName = true): Errors {
 
   return errors;
 }
+
+const STEP_LABELS = ["Event details", "Your details", "Add-on services", "Review"];
 
 export function BookingRequestDialog({
   item: initialItem,
@@ -156,7 +176,9 @@ export function BookingRequestDialog({
       row.needsReview ||
       included.has(row.service.id.toLowerCase()),
   );
-  const [review, setReview] = useState(!!saved);
+
+  // step 1–3 = form steps, step 4 = review
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(saved ? 4 : 1);
   const [confirmOneDay, setConfirmOneDay] = useState(false);
   const [touched, setTouched] = useState<
     Partial<Record<keyof Fields, boolean>>
@@ -165,8 +187,6 @@ export function BookingRequestDialog({
     "loading" | "customer" | "signed-out" | "admin" | "error"
   >("loading");
   const [busy, setBusy] = useState(false);
-
-  const [noteOpen, setNoteOpen] = useState(() => !!fields.specialRequests);
 
   const [error, setError] = useState(
     saved && saved.timeZone !== Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -183,6 +203,7 @@ export function BookingRequestDialog({
   currentFields.current = fields;
   const titleId = useId(),
     prefix = useId();
+
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
     dialog.current?.showModal();
@@ -207,7 +228,7 @@ export function BookingRequestDialog({
           setFields((current) => ({ ...current, contactName: name }));
 
         if (profile.role === "customer" && !name && resume) {
-          setReview(false);
+          setStep(2);
           setError(
             "Please add a contact person before submitting your request.",
           );
@@ -231,9 +252,11 @@ export function BookingRequestDialog({
   useEffect(() => {
     checkAuth();
   }, []);
+
   useEffect(() => {
-    if (review) heading.current?.focus();
-  }, [review]);
+    if (step === 4) heading.current?.focus();
+  }, [step]);
+
   const errors = validate(fields, timeZone, auth === "customer");
 
   const change = (key: keyof Fields, value: string) => {
@@ -273,14 +296,14 @@ export function BookingRequestDialog({
       setTouched(
         Object.fromEntries(Object.keys(found).map((key) => [key, true])),
       );
-      setReview(false);
+      setStep(1);
       requestAnimationFrame(() => summary.current?.focus());
 
       return;
     }
 
     if (needsAddonReview) {
-      setReview(false);
+      setStep(3);
       setError(
         "Check the hours, confirm changed services, and remove any services already included in the package.",
       );
@@ -312,7 +335,7 @@ export function BookingRequestDialog({
         requestedDays: [...fields.dates].sort().map((date) => ({ date })),
         timeZone,
         contactName: fields.contactName.trim(),
-        phoneNumber: fields.phoneNumber.trim(),
+        phoneNumber: `+63${fields.phoneNumber.trim()}`,
         ...(fields.specialRequests.trim()
           ? { specialRequests: fields.specialRequests.trim() }
           : {}),
@@ -327,14 +350,14 @@ export function BookingRequestDialog({
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
         setAuth("signed-out");
-        setReview(false);
+        setStep(4);
         setError(notifyError("Your session ended. Sign in to continue."));
       } else if (
         cause instanceof ApiError &&
         cause.code === "booking_package_changed"
       ) {
         setPackageChanged(true);
-        setReview(false);
+        setStep(4);
         setError(
           "This package changed. Refresh it to review the current details.",
         );
@@ -352,7 +375,7 @@ export function BookingRequestDialog({
               : row,
           ),
         );
-        setReview(false);
+        setStep(3);
         setError(
           `${cause.message} Refresh and confirm the affected service, or remove it.`,
         );
@@ -365,27 +388,39 @@ export function BookingRequestDialog({
     }
   };
 
+  // Advance from steps 1–3 to the next step, validating only the current step's fields.
   const next = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const found = validate(fields, timeZone, auth === "customer");
+    if (step === 1 || step === 2) {
+      const stepKeys = STEP_FIELDS[step];
+      const allErrors = validate(fields, timeZone, auth === "customer");
+      const stepErrors = Object.fromEntries(
+        stepKeys
+          .filter((k) => allErrors[k])
+          .map((k) => [k, allErrors[k]]),
+      ) as Errors;
 
-    if (Object.keys(found).length) {
-      notifyError("Please check the highlighted fields before continuing.");
-      setTouched(
-        Object.fromEntries(Object.keys(found).map((key) => [key, true])),
-      );
-      requestAnimationFrame(() => summary.current?.focus());
+      if (Object.keys(stepErrors).length) {
+        notifyError("Please check the highlighted fields before continuing.");
+        setTouched((current) => ({
+          ...current,
+          ...Object.fromEntries(stepKeys.map((k) => [k, true])),
+        }));
+        requestAnimationFrame(() => summary.current?.focus());
 
-      return;
+        return;
+      }
     }
 
-    if (needsAddonReview) {
-      setError(
-        "Check the hours, confirm changed services, and remove any services already included in the package.",
-      );
-      requestAnimationFrame(() => formError.current?.focus());
-      return;
+    if (step === 3) {
+      if (needsAddonReview) {
+        setError(
+          "Check the hours, confirm changed services, and remove any services already included in the package.",
+        );
+        requestAnimationFrame(() => formError.current?.focus());
+        return;
+      }
     }
 
     if (auth === "signed-out") {
@@ -395,7 +430,6 @@ export function BookingRequestDialog({
             "Your session ended. Sign in again and reopen this conversation to submit your request.",
           ),
         );
-
         return;
       }
 
@@ -407,21 +441,31 @@ export function BookingRequestDialog({
       return;
     }
 
-    if (auth === "customer") setReview(true);
+    setStep((current) => (current < 4 ? ((current + 1) as 1 | 2 | 3 | 4) : 4));
+  };
+
+  const back = () => {
+    setStep((current) => (current > 1 ? ((current - 1) as 1 | 2 | 3 | 4) : 1));
   };
 
   const field = (
     key: keyof Fields,
     label: string,
     control: (fieldProps: FormFieldControlProps) => React.ReactNode,
+    opts?: { wide?: boolean; optional?: boolean },
   ) => (
     <FormField
-      label={label}
-      className={
-        key === "specialRequests" || key === "customEventType"
-          ? "booking-wide"
-          : undefined
+      label={
+        opts?.optional ? (
+          <>
+            {label}{" "}
+            <span className="booking-field-optional">(optional)</span>
+          </>
+        ) : (
+          label
+        )
       }
+      className={opts?.wide ? "booking-wide" : undefined}
       htmlFor={`${prefix}-${key}`}
       error={touched[key] ? errors[key] : undefined}
     >
@@ -438,6 +482,79 @@ export function BookingRequestDialog({
     ) => change(key, e.target.value),
     onBlur: () => setTouched((current) => ({ ...current, [key]: true })),
   });
+
+  // Progress indicator — inline, no component extraction needed.
+  const steps = (
+    <ol className="booking-steps" aria-label="Booking progress">
+      {STEP_LABELS.map((label, i) => {
+        const n = i + 1;
+        const done = !submitted && step > n;
+        const active = step === n;
+
+        return (
+          <li
+            key={n}
+            className={
+              done
+                ? "booking-step booking-step-done"
+                : active
+                  ? "booking-step booking-step-active"
+                  : "booking-step"
+            }
+            aria-current={active ? "step" : undefined}
+          >
+            <span className="booking-step-dot" aria-hidden="true">
+              {done ? "✓" : n}
+            </span>
+            <span className="booking-step-label">{label}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+
+  // Shared nav row for steps 1–3.
+  const navRow = (
+    <div className="booking-actions booking-actions-nav">
+      <div className="booking-actions-left">
+        {step > 1 && (
+          <Button variant="secondary" type="button" onClick={back}>
+            ← Back
+          </Button>
+        )}
+      </div>
+      <div className="booking-actions-right">
+        <Button variant="secondary" type="button" onClick={cancel}>
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          type="submit"
+          disabled={
+            busy ||
+            packageChanged ||
+            auth === "loading" ||
+            auth === "admin" ||
+            auth === "error"
+          }
+        >
+          {auth === "loading"
+            ? "Checking session…"
+            : auth === "signed-out"
+              ? "Sign in to continue"
+              : step === 3
+                ? "Review request"
+                : "Continue →"}
+        </Button>
+      </div>
+    </div>
+  );
+
+  const stepTitle = submitted
+    ? "Request submitted"
+    : step === 4
+      ? "Review your request"
+      : "Let's plan your event";
 
   return createPortal(
     <NativeDialog
@@ -465,17 +582,16 @@ export function BookingRequestDialog({
           Styled by AMAC / Booking request
         </span>
         <h2 id={titleId} ref={heading} tabIndex={-1}>
-          {submitted
-            ? "Request submitted"
-            : review
-              ? "Review your request"
-              : "Let’s plan your event"}
+          {stepTitle}
         </h2>
         <p className="booking-intro">
           {item
             ? `${item.name} · ${priceLabel(item.price)}`
             : "Package to be discussed"}
         </p>
+
+        {!submitted && steps}
+
         {submitted ? (
           <>
             <p>An administrator will review your request.</p>
@@ -483,59 +599,113 @@ export function BookingRequestDialog({
               Close
             </Button>
           </>
-        ) : review ? (
+        ) : step === 4 ? (
+          // ── Step 4: Review ──────────────────────────────────────────
           <>
-            <dl className="booking-review">
-              <div>
-                <dt>Event</dt>
-                <dd>
-                  {fields.eventType === OTHER
-                    ? fields.customEventType
-                    : fields.eventType}
-                </dd>
+            <div className="booking-review-section">
+              <div className="booking-review-section-head">
+                <h3>Event details</h3>
+                <Button
+                  variant="secondary"
+                  size="small"
+                  type="button"
+                  onClick={() => setStep(1)}
+                >
+                  Edit
+                </Button>
               </div>
-              <div>
-                <dt>Event duration</dt>
-                <dd>
-                  {fields.durationMode === "one_day"
-                    ? "1 day"
-                    : `Multi-day (${fields.dates.length} date rows)`}
-                </dd>
+              <dl className="booking-review-dl">
+                <div>
+                  <dt>Event type</dt>
+                  <dd>
+                    {fields.eventType === OTHER
+                      ? fields.customEventType
+                      : fields.eventType}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Duration</dt>
+                  <dd>
+                    {fields.durationMode === "one_day"
+                      ? "1 day"
+                      : `Multi-day (${fields.dates.length} dates)`}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Requested dates</dt>
+                  <dd>
+                    {fields.dates
+                      .map((date) => date || "Date not selected")
+                      .join(", ")}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Time zone</dt>
+                  <dd>{timeZone}</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div className="booking-review-section">
+              <div className="booking-review-section-head">
+                <h3>Your details</h3>
+                <Button
+                  variant="secondary"
+                  size="small"
+                  type="button"
+                  onClick={() => setStep(2)}
+                >
+                  Edit
+                </Button>
               </div>
-              <div>
-                <dt>Requested dates</dt>
-                <dd>
-                  {fields.dates
-                    .map((date) => date || "Date not selected")
-                    .join(", ")}
-                </dd>
+              <dl className="booking-review-dl">
+                <div>
+                  <dt>Contact person</dt>
+                  <dd>{fields.contactName || "—"}</dd>
+                </div>
+                <div>
+                  <dt>Phone number</dt>
+                  <dd>
+                    {fields.phoneNumber ? `+63 ${fields.phoneNumber}` : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Special requests</dt>
+                  <dd>{fields.specialRequests || "None"}</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div className="booking-review-section">
+              <div className="booking-review-section-head">
+                <h3>Add-on services</h3>
+                <Button
+                  variant="secondary"
+                  size="small"
+                  type="button"
+                  onClick={() => setStep(3)}
+                >
+                  Edit
+                </Button>
               </div>
-              <div>
-                <dt>Time zone</dt>
-                <dd>{timeZone}</dd>
-              </div>
-              <div>
-                <dt>Contact</dt>
-                <dd>
-                  {fields.contactName} · {fields.phoneNumber}
-                </dd>
-              </div>
-              <div>
-                <dt>Special requests</dt>
-                <dd>{fields.specialRequests || "None"}</dd>
-              </div>
-            </dl>
-            <BookingAddons
-              item={item}
-              rows={addons}
-              onChange={setAddons}
-              readOnly
-            />
-            <p>
+              <BookingAddons
+                item={item}
+                rows={addons}
+                onChange={setAddons}
+                readOnly
+              />
+            </div>
+
+            <p className="booking-review-note">
               Your preferred date is not reserved. An administrator will review
-              availability and the final price.
+              availability and confirm the final price.
             </p>
-            {error && <p role="alert">{error}</p>}
+
+            {error && (
+              <p ref={formError} role="alert" tabIndex={-1}>
+                {error}
+              </p>
+            )}
             {auth === "admin" && (
               <p role="alert">
                 Sign in with a customer account to submit a request.
@@ -549,29 +719,43 @@ export function BookingRequestDialog({
                 </Button>
               </p>
             )}
-            <div className="booking-actions">
+            {packageChanged && (
               <Button
                 variant="secondary"
                 type="button"
-                onClick={() => setReview(false)}
+                disabled={busy}
+                onClick={() => void refreshPackage()}
               >
-                Edit details
+                Refresh package
               </Button>
-              <Button
-                variant="primary"
-                type="button"
-                disabled={busy || auth !== "customer"}
-                onClick={() => void submit()}
-              >
-                {busy
-                  ? "Submitting…"
-                  : auth === "loading"
-                    ? "Checking session…"
-                    : "Submit request"}
-              </Button>
+            )}
+            <div className="booking-actions booking-actions-nav">
+              <div className="booking-actions-left">
+                <Button variant="secondary" type="button" onClick={back}>
+                  ← Back
+                </Button>
+              </div>
+              <div className="booking-actions-right">
+                <Button variant="secondary" type="button" onClick={cancel}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  type="button"
+                  disabled={busy || auth !== "customer"}
+                  onClick={() => void submit()}
+                >
+                  {busy
+                    ? "Submitting…"
+                    : auth === "loading"
+                      ? "Checking session…"
+                      : "Submit request"}
+                </Button>
+              </div>
             </div>
           </>
         ) : (
+          // ── Steps 1–3: Entry form ───────────────────────────────────
           <form onSubmit={next} noValidate>
             {Object.keys(touched).some(
               (key) => errors[key as keyof Fields],
@@ -585,236 +769,332 @@ export function BookingRequestDialog({
                 Please check the highlighted fields below.
               </div>
             )}
-            <div className="booking-fields">
-              {field("eventType", "Event type", (fieldProps) => (
-                <Select {...fieldProps} {...props("eventType")}>
-                  <option value="">Select event type</option>
-                  {COMMON_EVENT_TYPES.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                  <option value={OTHER}>Not on the list</option>
-                </Select>
-              ))}
-              {fields.eventType === OTHER &&
-                field("customEventType", "Your event type", (fieldProps) => (
-                  <Input
-                    {...fieldProps}
-                    {...props("customEventType")}
-                    maxLength={MAX_EVENT_TYPE_LENGTH}
-                  />
-                ))}
-              <FormField label="Event duration" htmlFor={`${prefix}-duration`}>
-                {(fieldProps) => (
-                  <Select
-                    {...fieldProps}
-                    value={fields.durationMode}
-                    onChange={(event) => {
-                      const mode =
-                        event.target.value === "multi_day"
-                          ? "multi_day"
-                          : "one_day";
 
-                      if (mode === "one_day" && fields.dates.length > 1) {
-                        setConfirmOneDay(true);
-
-                        return;
-                      }
-
-                      setConfirmOneDay(false);
-                      setFields((current) => ({
-                        ...current,
-                        durationMode: mode,
-                        dates:
-                          mode === "one_day"
-                            ? current.dates.slice(0, 1)
-                            : current.dates,
-                      }));
-                    }}
-                  >
-                    <option value="one_day">1 day</option>
-                    <option value="multi_day">Multi-day</option>
+            {step === 1 && (
+              // ── Step 1: Event details ─────────────────────────────
+              <div className="booking-fields">
+                {field("eventType", "Event type", (fieldProps) => (
+                  <Select {...fieldProps} {...props("eventType")}>
+                    <option value="">Select event type</option>
+                    {COMMON_EVENT_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                    <option value={OTHER}>Not on the list</option>
                   </Select>
-                )}
-              </FormField>
-              {confirmOneDay && (
-                <div
-                  className="booking-wide"
-                  role="group"
-                  aria-label="Confirm removing extra dates"
+                ))}
+                {fields.eventType === OTHER &&
+                  field(
+                    "customEventType",
+                    "Your event type",
+                    (fieldProps) => (
+                      <Input
+                        {...fieldProps}
+                        {...props("customEventType")}
+                        maxLength={MAX_EVENT_TYPE_LENGTH}
+                      />
+                    ),
+                    { wide: true },
+                  )}
+                <FormField
+                  label="Event duration"
+                  htmlFor={`${prefix}-duration`}
                 >
-                  <p>Keep first date and remove extra dates?</p>
-                  <div className="booking-actions">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => {
+                  {(fieldProps) => (
+                    <Select
+                      {...fieldProps}
+                      value={fields.durationMode}
+                      onChange={(event) => {
+                        const mode =
+                          event.target.value === "multi_day"
+                            ? "multi_day"
+                            : "one_day";
+
+                        if (mode === "one_day" && fields.dates.length > 1) {
+                          setConfirmOneDay(true);
+
+                          return;
+                        }
+
                         setConfirmOneDay(false);
-                        requestAnimationFrame(() =>
-                          document
-                            .getElementById(`${prefix}-duration`)
-                            ?.focus(),
-                        );
-                      }}
-                    >
-                      Keep Multi-day
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={() => {
                         setFields((current) => ({
                           ...current,
-                          durationMode: "one_day",
-                          dates: current.dates.slice(0, 1),
+                          durationMode: mode,
+                          dates:
+                            mode === "one_day"
+                              ? current.dates.slice(0, 1)
+                              : current.dates,
                         }));
-                        setConfirmOneDay(false);
-                        requestAnimationFrame(() =>
-                          document.getElementById(`${prefix}-date-0`)?.focus(),
-                        );
                       }}
                     >
-                      Use 1 day and remove extra dates
-                    </Button>
-                  </div>
-                </div>
-              )}
-              <div className="booking-wide">
-                <strong>Requested dates</strong>
-                {fields.dates.map((date, index) => (
-                  <div key={index}>
-                    <label htmlFor={`${prefix}-date-${index}`}>
-                      Day {index + 1}
-                    </label>
-                    <Input
-                      id={`${prefix}-date-${index}`}
-                      type="date"
-                      min={todayInZone(timeZone)}
-                      value={date}
-                      aria-invalid={
-                        !!(
-                          touched.dates &&
-                          dateError(date, index, fields.dates, timeZone)
-                        )
-                      }
-                      aria-describedby={
-                        touched.dates &&
-                        dateError(date, index, fields.dates, timeZone)
-                          ? `${prefix}-date-error-${index}`
-                          : undefined
-                      }
-                      onChange={(event) =>
-                        setFields((current) => ({
-                          ...current,
-                          dates: current.dates.map((value, i) =>
-                            i === index ? event.target.value : value,
-                          ),
-                        }))
-                      }
-                    />
-                    {touched.dates &&
-                      dateError(date, index, fields.dates, timeZone) && (
-                        <p id={`${prefix}-date-error-${index}`}>
-                          {dateError(date, index, fields.dates, timeZone)}
-                        </p>
-                      )}
-                    {fields.dates.length > 1 && (
+                      <option value="one_day">1 day</option>
+                      <option value="multi_day">Multi-day</option>
+                    </Select>
+                  )}
+                </FormField>
+                {confirmOneDay && (
+                  <div
+                    className="booking-wide"
+                    role="group"
+                    aria-label="Confirm removing extra dates"
+                  >
+                    <p>Keep first date and remove extra dates?</p>
+                    <div className="booking-actions">
                       <Button
                         type="button"
                         variant="secondary"
                         onClick={() => {
-                          setFields((current) => ({
-                            ...current,
-                            dates: current.dates.filter((_, i) => i !== index),
-                          }));
+                          setConfirmOneDay(false);
                           requestAnimationFrame(() =>
                             document
-                              .getElementById(
-                                `${prefix}-date-${Math.max(0, index - 1)}`,
-                              )
+                              .getElementById(`${prefix}-duration`)
                               ?.focus(),
                           );
                         }}
                       >
-                        Remove day {index + 1}
+                        Keep Multi-day
                       </Button>
-                    )}
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setFields((current) => ({
+                            ...current,
+                            durationMode: "one_day",
+                            dates: current.dates.slice(0, 1),
+                          }));
+                          setConfirmOneDay(false);
+                          requestAnimationFrame(() =>
+                            document
+                              .getElementById(`${prefix}-date-0`)
+                              ?.focus(),
+                          );
+                        }}
+                      >
+                        Use 1 day and remove extra dates
+                      </Button>
+                    </div>
                   </div>
-                ))}
-                {fields.durationMode === "multi_day" && (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      setFields((current) => ({
-                        ...current,
-                        dates: [...current.dates, ""],
-                      }));
-                      requestAnimationFrame(() =>
-                        document
-                          .getElementById(
-                            `${prefix}-date-${fields.dates.length}`,
+                )}
+                <div className="booking-wide">
+                  <strong>Requested dates</strong>
+                  <p className="booking-dates-hint">
+                    Requests must be submitted at least{" "}
+                    {MIN_ADVANCE_BOOKING_DAYS} days before the event date.
+                  </p>
+                  {fields.dates.map((date, index) => (
+                    <div key={index} className="booking-date-row">
+                      <label htmlFor={`${prefix}-date-${index}`}>
+                        Day {index + 1}
+                      </label>
+                      <Input
+                        id={`${prefix}-date-${index}`}
+                        type="date"
+                        min={minBookingDateInZone(timeZone)}
+                        value={date}
+                        aria-invalid={
+                          !!(
+                            touched.dates &&
+                            dateError(date, index, fields.dates, timeZone)
                           )
-                          ?.focus(),
-                      );
-                    }}
-                  >
-                    Add day
-                  </Button>
-                )}
-                {touched.dates && errors.dates && (
-                  <p role="alert">{errors.dates}</p>
+                        }
+                        aria-describedby={
+                          touched.dates &&
+                          dateError(date, index, fields.dates, timeZone)
+                            ? `${prefix}-date-error-${index}`
+                            : undefined
+                        }
+                        onChange={(event) =>
+                          setFields((current) => ({
+                            ...current,
+                            dates: current.dates.map((value, i) =>
+                              i === index ? event.target.value : value,
+                            ),
+                          }))
+                        }
+                        onBlur={() =>
+                          setTouched((current) => ({
+                            ...current,
+                            dates: true,
+                          }))
+                        }
+                      />
+                      {touched.dates &&
+                        dateError(date, index, fields.dates, timeZone) && (
+                          <p
+                            id={`${prefix}-date-error-${index}`}
+                            className="booking-date-error"
+                          >
+                            {dateError(date, index, fields.dates, timeZone)}
+                          </p>
+                        )}
+                      {fields.dates.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="small"
+                          onClick={() => {
+                            setFields((current) => ({
+                              ...current,
+                              dates: current.dates.filter(
+                                (_, i) => i !== index,
+                              ),
+                            }));
+                            requestAnimationFrame(() =>
+                              document
+                                .getElementById(
+                                  `${prefix}-date-${Math.max(0, index - 1)}`,
+                                )
+                                ?.focus(),
+                            );
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  {fields.durationMode === "multi_day" && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setFields((current) => ({
+                          ...current,
+                          dates: [...current.dates, ""],
+                        }));
+                        requestAnimationFrame(() =>
+                          document
+                            .getElementById(
+                              `${prefix}-date-${fields.dates.length}`,
+                            )
+                            ?.focus(),
+                        );
+                      }}
+                    >
+                      Add day
+                    </Button>
+                  )}
+                  {touched.dates && errors.dates && (
+                    <p role="alert" className="booking-date-error">
+                      {errors.dates}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              // ── Step 2: Your details ──────────────────────────────
+              <div className="booking-fields">
+                <div className="booking-contact-row">
+                  {field("contactName", "Contact person", (fieldProps) => (
+                    <Input
+                      {...fieldProps}
+                      {...props("contactName")}
+                      maxLength={MAX_CONTACT_NAME_LENGTH}
+                      onKeyDown={(event) => {
+                        if (/\d/.test(event.key)) event.preventDefault();
+                      }}
+                      onPaste={(event) => {
+                        event.preventDefault();
+                        const input = event.currentTarget;
+                        const pasted = event.clipboardData
+                          .getData("text")
+                          .replace(/\d/g, "");
+                        const start =
+                          input.selectionStart ?? input.value.length;
+                        const end = input.selectionEnd ?? input.value.length;
+                        const next = (
+                          input.value.slice(0, start) +
+                          pasted +
+                          input.value.slice(end)
+                        ).slice(0, MAX_CONTACT_NAME_LENGTH);
+                        change("contactName", next);
+                        setTouched((current) => ({
+                          ...current,
+                          contactName: true,
+                        }));
+                      }}
+                    />
+                  ))}
+                  {field("phoneNumber", "Phone number", (fieldProps) => (
+                    <InputGroup>
+                      <span aria-hidden="true">+63</span>
+                      <Input
+                        {...fieldProps}
+                        id={fieldProps.id}
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        placeholder="9XX XXX XXXX"
+                        value={fields.phoneNumber}
+                        onBlur={() =>
+                          setTouched((current) => ({
+                            ...current,
+                            phoneNumber: true,
+                          }))
+                        }
+                        onChange={(event) => {
+                          const digits = event.target.value.replace(/\D/g, "");
+                          change("phoneNumber", digits.slice(0, 10));
+                        }}
+                        onKeyDown={(event) => {
+                          if (
+                            event.key.length === 1 &&
+                            !/\d/.test(event.key)
+                          )
+                            event.preventDefault();
+                        }}
+                        onPaste={(event) => {
+                          event.preventDefault();
+                          const input = event.currentTarget;
+                          const digits = event.clipboardData
+                            .getData("text")
+                            .replace(/\D/g, "");
+                          const start =
+                            input.selectionStart ?? input.value.length;
+                          const end = input.selectionEnd ?? input.value.length;
+                          const next = (
+                            input.value.slice(0, start) +
+                            digits +
+                            input.value.slice(end)
+                          )
+                            .replace(/\D/g, "")
+                            .slice(0, 10);
+                          change("phoneNumber", next);
+                        }}
+                      />
+                    </InputGroup>
+                  ))}
+                </div>
+                {field(
+                  "specialRequests",
+                  "Special requests",
+                  (fieldProps) => (
+                    <Textarea
+                      {...fieldProps}
+                      {...props("specialRequests")}
+                      maxLength={MAX_SPECIAL_REQUESTS_LENGTH}
+                      placeholder="Anything you'd like us to know about your event…"
+                    />
+                  ),
+                  { wide: true, optional: true },
                 )}
               </div>
-              <div className="booking-contact-row">
-                {field("phoneNumber", "Phone number", (fieldProps) => (
-                  <Input
-                    {...fieldProps}
-                    {...props("phoneNumber")}
-                    type="tel"
-                    maxLength={MAX_PHONE_NUMBER_LENGTH}
-                  />
-                ))}
-                {field("contactName", "Contact person", (fieldProps) => (
-                  <Input
-                    {...fieldProps}
-                    {...props("contactName")}
-                    maxLength={MAX_CONTACT_NAME_LENGTH}
-                  />
-                ))}
+            )}
+
+            {step === 3 && (
+              // ── Step 3: Add-on services ───────────────────────────
+              <div className="booking-addons-step">
+                <BookingAddons item={item} rows={addons} onChange={setAddons} />
               </div>
-            </div>
-            <BookingAddons item={item} rows={addons} onChange={setAddons} />
-            <details
-              className="booking-note"
-              open={noteOpen}
-              onToggle={(event) => setNoteOpen(event.currentTarget.open)}
-            >
-              <summary>Add a note (optional)</summary>
-              {field(
-                "specialRequests",
-                "Special requests or services",
-                (fieldProps) => (
-                  <Textarea
-                    {...fieldProps}
-                    {...props("specialRequests")}
-                    maxLength={MAX_SPECIAL_REQUESTS_LENGTH}
-                  />
-                ),
-              )}
-            </details>
-            <p>
-              Enter times for each requested day after submitting. Dates use{" "}
-              {timeZone}.
-            </p>
-            <p>
-              Your preferred date is not reserved. An administrator will review
-              availability and the final price.
-            </p>
-            {auth === "signed-out" && (
-              <p>
+            )}
+
+            {auth === "signed-out" && step < 4 && (
+              <p className="booking-auth-note">
                 Sign in to continue. Your details will be saved for this
-                session, and you’ll review them before submitting.
+                session, and you'll review them before submitting.
               </p>
             )}
             {auth === "admin" && (
@@ -845,30 +1125,8 @@ export function BookingRequestDialog({
                 Refresh package
               </Button>
             )}
-            <div className="booking-actions">
-              <Button variant="secondary" type="button" onClick={cancel}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                type="submit"
-                disabled={
-                  busy ||
-                  packageChanged ||
-                  auth === "loading" ||
-                  auth === "admin" ||
-                  auth === "error"
-                }
-              >
-                {busy
-                  ? "Submitting…"
-                  : auth === "loading"
-                    ? "Checking session…"
-                    : auth === "signed-out"
-                      ? "Sign in to continue"
-                      : "Review request"}
-              </Button>
-            </div>
+
+            {navRow}
           </form>
         )}
       </div>

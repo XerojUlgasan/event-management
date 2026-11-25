@@ -2,15 +2,18 @@ import { reviewedServiceSchema } from "@event-management/contracts/booking-draft
 import { bookingStatusSchema } from "@event-management/contracts/booking-requests";
 import {
   BOOKING_ESTIMATED_DURATIONS,
+  CONTACT_NAME_REGEX,
   MAX_BOOKING_ADDON_HOURS,
   MAX_BOOKING_ADDON_SERVICES,
-  MAX_EVENT_TYPE_LENGTH,
-  MAX_TIME_ZONE_LENGTH,
+  MAX_BOOKING_REASON_LENGTH,
   MAX_CONTACT_NAME_LENGTH,
+  MAX_EVENT_TYPE_LENGTH,
   MAX_PHONE_NUMBER_LENGTH,
   MAX_PREFERRED_VENUE_LOCATION_LENGTH,
   MAX_SPECIAL_REQUESTS_LENGTH,
-  MAX_BOOKING_REASON_LENGTH,
+  MAX_TIME_ZONE_LENGTH,
+  MIN_ADVANCE_BOOKING_DAYS,
+  PH_PHONE_REGEX,
 } from "@event-management/contracts/limits/booking-requests";
 import { z } from "@hono/zod-openapi";
 import { priceSchema } from "../packages/schemas.js";
@@ -93,8 +96,14 @@ export const createSchema = z
       .max(2147483647)
       .nullable()
       .optional(),
-    contactName: text(MAX_CONTACT_NAME_LENGTH),
-    phoneNumber: text(MAX_PHONE_NUMBER_LENGTH),
+    contactName: text(MAX_CONTACT_NAME_LENGTH).regex(
+      CONTACT_NAME_REGEX,
+      "Name may only contain letters, spaces, hyphens, and apostrophes.",
+    ),
+    phoneNumber: text(MAX_PHONE_NUMBER_LENGTH).regex(
+      PH_PHONE_REGEX,
+      "Enter a valid Philippine mobile number (+63 9XX XXX XXXX).",
+    ),
     preferredVenueLocation: text(MAX_PREFERRED_VENUE_LOCATION_LENGTH)
       .nullable()
       .optional(),
@@ -140,6 +149,18 @@ export const createSchema = z
         });
 
       dates.add(day.date);
+    });
+
+    const minDate = new Date();
+    minDate.setUTCDate(minDate.getUTCDate() + MIN_ADVANCE_BOOKING_DAYS);
+    const minDateStr = minDate.toISOString().slice(0, 10);
+    value.requestedDays.forEach((day, index) => {
+      if (day.date < minDateStr)
+        ctx.addIssue({
+          code: "custom",
+          message: `Choose a date at least ${MIN_ADVANCE_BOOKING_DAYS} days from today.`,
+          path: ["requestedDays", index, "date"],
+        });
     });
   });
 

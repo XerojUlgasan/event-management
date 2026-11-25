@@ -176,7 +176,7 @@ export function BookingAddons({
               },
               {
                 key: "hours",
-                header: "Excess hours",
+                header: "Hours",
                 cell: (row) => {
                   const fixed =
                     row.service.fixedPricePesos != null &&
@@ -189,8 +189,25 @@ export function BookingAddons({
                       `${row.hours} requested hours`
                     )
                   ) : (
-                    <label className="booking-addon-hours">
-                      {fixed ? "Excess hours" : "Requested hours"}
+                    <div className="booking-addon-stepper">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        aria-label={`Decrease hours for ${row.service.name}`}
+                        disabled={
+                          Number(row.hours) <= (fixed ? 0 : 1) ||
+                          !validAddonHours(row)
+                        }
+                        onClick={() =>
+                          update(row.service.id, (entry) => ({
+                            ...entry,
+                            hours: String(Number(entry.hours) - 1),
+                          }))
+                        }
+                      >
+                        −
+                      </Button>
                       <Input
                         id={`${inputPrefix}-${row.service.id}`}
                         type="number"
@@ -200,6 +217,7 @@ export function BookingAddons({
                         value={row.hours}
                         aria-invalid={!validAddonHours(row)}
                         aria-label={`${fixed ? "Excess" : "Requested"} hours for ${row.service.name}`}
+                        className="booking-addon-stepper-input"
                         onChange={(event) => {
                           const hours = event.target.value;
                           update(row.service.id, (entry) => ({
@@ -208,7 +226,22 @@ export function BookingAddons({
                           }));
                         }}
                       />
-                    </label>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        aria-label={`Increase hours for ${row.service.name}`}
+                        disabled={Number(row.hours) >= MAX_BOOKING_ADDON_HOURS}
+                        onClick={() =>
+                          update(row.service.id, (entry) => ({
+                            ...entry,
+                            hours: String(Number(entry.hours) + 1),
+                          }))
+                        }
+                      >
+                        +
+                      </Button>
+                    </div>
                   );
                 },
               },
@@ -328,7 +361,7 @@ export function BookingAddons({
                                 service.fixedPricePesos != null &&
                                 service.includedHours != null
                                   ? "0"
-                                  : "",
+                                  : "1",
                             },
                           ]);
                           requestAnimationFrame(() =>

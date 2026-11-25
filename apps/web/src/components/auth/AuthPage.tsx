@@ -6,6 +6,7 @@ import {
 } from "@event-management/ui";
 import { Input } from "@event-management/ui";
 import {
+  DISPLAY_NAME_REGEX,
   MAX_DISPLAY_NAME_LENGTH,
   MAX_EMAIL_LENGTH,
   MAX_PASSWORD_LENGTH,
@@ -36,6 +37,7 @@ export function AuthPage({
   const [useFirebase, setUseFirebase] = useState(false);
   const [mode, setMode] = useState<"signin" | "register">(initialMode);
   const [name, setName] = useState("");
+  const [nameError, setNameError] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -49,6 +51,7 @@ export function AuthPage({
     setMode(next);
     setUseFirebase(false);
     setFormError("");
+    setNameError("");
     setConfirmPassword("");
     clearError();
   };
@@ -59,6 +62,18 @@ export function AuthPage({
     clearError();
 
     if (mode === "register") {
+      if (!name.trim()) {
+        setNameError("Enter your full name.");
+        return;
+      }
+
+      if (!DISPLAY_NAME_REGEX.test(name.trim())) {
+        setNameError(
+          "Name may only contain letters, spaces, hyphens, and apostrophes.",
+        );
+        return;
+      }
+
       if (password.length < MIN_PASSWORD_LENGTH) {
         setFormError(
           notifyError(
@@ -172,7 +187,7 @@ export function AuthPage({
 
           <form className="login-form" onSubmit={submit}>
             {mode === "register" && (
-              <FormField label="Full name">
+              <FormField label="Full name" error={nameError}>
                 <InputGroup>
                   <Icon name="users" size={16} />
                   <Input
@@ -181,9 +196,39 @@ export function AuthPage({
                     maxLength={MAX_DISPLAY_NAME_LENGTH}
                     value={name}
                     onChange={(event) => {
-                      setName(event.target.value);
+                      const value = event.target.value;
+                      setName(value);
+                      setNameError(
+                        value.trim() && !DISPLAY_NAME_REGEX.test(value.trim())
+                          ? "Name may only contain letters, spaces, hyphens, and apostrophes."
+                          : "",
+                      );
                       setFormError("");
                       clearError();
+                    }}
+                    onKeyDown={(event) => {
+                      if (/\d/.test(event.key)) event.preventDefault();
+                    }}
+                    onPaste={(event) => {
+                      event.preventDefault();
+                      const input = event.currentTarget;
+                      const pasted = event.clipboardData
+                        .getData("text")
+                        .replace(/\d/g, "");
+                      const start = input.selectionStart ?? input.value.length;
+                      const end = input.selectionEnd ?? input.value.length;
+                      const next =
+                        input.value.slice(0, start) +
+                        pasted +
+                        input.value.slice(end);
+                      const trimmed = next.slice(0, MAX_DISPLAY_NAME_LENGTH);
+                      setName(trimmed);
+                      setNameError(
+                        trimmed.trim() &&
+                          !DISPLAY_NAME_REGEX.test(trimmed.trim())
+                          ? "Name may only contain letters, spaces, hyphens, and apostrophes."
+                          : "",
+                      );
                     }}
                     placeholder="Your name"
                     required

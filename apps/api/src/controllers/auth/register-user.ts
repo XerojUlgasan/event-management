@@ -1,4 +1,7 @@
-import { MAX_DISPLAY_NAME_LENGTH } from "@event-management/contracts/limits/auth";
+import {
+  DISPLAY_NAME_REGEX,
+  MAX_DISPLAY_NAME_LENGTH,
+} from "@event-management/contracts/limits/auth";
 import { openapiJson } from "../../utils/openapi.js";
 import { jsonError } from "../../utils/service-result.js";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -20,7 +23,15 @@ export const registerUserRoute = createRoute({
         z.object({
           email: emailSchema,
           password: newPasswordSchema,
-          displayName: z.string().trim().min(1).max(MAX_DISPLAY_NAME_LENGTH),
+          displayName: z
+              .string()
+              .trim()
+              .min(1)
+              .max(MAX_DISPLAY_NAME_LENGTH)
+              .regex(
+                DISPLAY_NAME_REGEX,
+                "Name may only contain letters, spaces, hyphens, and apostrophes.",
+              ),
         }),
       ),
     },

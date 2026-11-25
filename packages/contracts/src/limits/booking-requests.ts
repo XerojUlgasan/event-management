@@ -8,6 +8,15 @@ export const MAX_BOOKING_REASON_LENGTH = 1000;
 export const MAX_BOOKING_ADDON_HOURS = 2147483647;
 export const MAX_BOOKING_ADDON_SERVICES = 100;
 
+/** Minimum days in advance a booking request must be submitted. */
+export const MIN_ADVANCE_BOOKING_DAYS = 3;
+
+/** Full stored format including country code: +63 followed by 10 digits starting with 9. */
+export const PH_PHONE_REGEX = /^\+639\d{9}$/;
+
+/** Same rule as DISPLAY_NAME_REGEX — reused for contact person names. */
+export const CONTACT_NAME_REGEX = /^[\p{L}\p{M}'\- ]+$/u;
+
 export const BOOKING_ESTIMATED_DURATIONS = [
   "4_hours",
   "8_hours",
