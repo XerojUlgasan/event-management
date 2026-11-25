@@ -9,6 +9,7 @@ import {
   ownedCatalogMediaKey,
   pendingCatalogMediaKey,
 } from "../../src/utils/catalog-media-paths.js";
+import { r2Fixture } from "../helpers/r2-fixture.js";
 import { setTestConfig } from "../helpers/set-test-config.js";
 
 test("filing preserves uploaded photo freshness across folders", () => {
@@ -47,26 +48,24 @@ test("filing preserves uploaded photo freshness across folders", () => {
   );
 });
 
-test("Storage missing-key detection accepts both response formats without hiding other failures", async () => {
+test("R2 missing keys are distinct from upstream failures", async () => {
   const oldFetch = globalThis.fetch;
-  const oldEnv = {
-    SUPABASE_URL: process.env.SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  };
-  setTestConfig({ SUPABASE_URL: "http://storage.invalid" });
-  setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: "synthetic-fixture" });
+  const oldEnv = Object.fromEntries(
+    Object.keys(r2Fixture).map((name) => [name, process.env[name]]),
+  );
+  setTestConfig(r2Fixture);
 
   try {
     for (const response of [
       new Response(null, { status: 404 }),
-      Response.json({ code: "NoSuchKey", statusCode: "404" }, { status: 400 }),
+      new Response("<Error><Code>NoSuchKey</Code></Error>", { status: 404 }),
     ]) {
       globalThis.fetch = async () => response;
       await assert.rejects(getCatalogMedia("old-key"), CatalogMediaNotFound);
     }
 
     globalThis.fetch = async () =>
-      Response.json({ code: "InvalidJWT" }, { status: 400 });
+      new Response("<Error><Code>AccessDenied</Code></Error>", { status: 403 });
     await assert.rejects(
       getCatalogMedia("old-key"),
       (cause: unknown) =>

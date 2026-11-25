@@ -6,25 +6,18 @@ import { Image } from "imagescript";
 import { MAX_IMAGE_SIZE_BYTES } from "@event-management/contracts/limits/images";
 import type { MediaAssets } from "../../src/db/types.js";
 import { readCatalogEmbeddingImage } from "../../src/services/ai/retrieval/read-catalog-embedding-image.js";
+import { r2Fixture } from "../helpers/r2-fixture.js";
 import { setTestConfig } from "../helpers/set-test-config.js";
 
 const originalFetch = globalThis.fetch;
-const oldUrl = process.env.SUPABASE_URL;
-const oldKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const oldBucket = process.env.SUPABASE_STORAGE_BUCKET;
-
-setTestConfig({ SUPABASE_URL: "https://storage.invalid" });
-setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: "fixture-key" });
-setTestConfig({ SUPABASE_STORAGE_BUCKET: "fixture-bucket" });
+const originalEnvironment = Object.entries(r2Fixture).map(
+  ([key]) => [key, process.env[key]] as const,
+);
+setTestConfig(r2Fixture);
 
 after(() => {
   globalThis.fetch = originalFetch;
-
-  setTestConfig({
-    SUPABASE_URL: oldUrl,
-    SUPABASE_SERVICE_ROLE_KEY: oldKey,
-    SUPABASE_STORAGE_BUCKET: oldBucket,
-  });
+  setTestConfig(Object.fromEntries(originalEnvironment));
 });
 
 function asset(
@@ -48,9 +41,10 @@ function asset(
 
 function serve(bytes: Uint8Array) {
   globalThis.fetch = async (input) => {
+    assert.ok(input instanceof Request);
     assert.equal(
-      String(input),
-      "https://storage.invalid/storage/v1/object/fixture-bucket/catalog-media/fixture-id",
+      input.url,
+      `${r2Fixture.S3_API_URL}/test/catalog-media/fixture-id`,
     );
 
     return new Response(
@@ -137,16 +131,11 @@ test("rejects invalid and oversized bytes and trusts detected MIME", async () =>
 
 test("cancels an upload read and forwards the signal to Storage", async () => {
   const controller = new AbortController();
-  globalThis.fetch = async (_input, init) => {
-    assert.equal(init?.signal, controller.signal);
-
-    return await new Promise<Response>((_resolve, reject) => {
-      init?.signal?.addEventListener(
-        "abort",
-        () => reject(init.signal?.reason),
-        { once: true },
-      );
-    });
+  globalThis.fetch = async (input) => {
+    assert.ok(input instanceof Request);
+    assert.equal(input.signal.aborted, true);
+    input.signal.throwIfAborted();
+    throw new Error("Expected the R2 request to be aborted");
   };
   const pending = readCatalogEmbeddingImage(asset(), controller.signal);
   controller.abort();

@@ -26,6 +26,7 @@ import { humanHandoffAcknowledgement } from "../../src/data/messages/request-hum
 import { runAssistantTurnService } from "../../src/services/ai/run-assistant-turn.js";
 import { getMyPackageService } from "../../src/services/ai/get-my-package.js";
 import { syncCatalogKnowledge } from "../../src/services/ai/workflows/sync-catalog-knowledge.js";
+import { r2Fixture } from "../helpers/r2-fixture.js";
 import { setTestConfig, testDatabaseUrl } from "../helpers/set-test-config.js";
 
 const database = `em_ai_test_${randomUUID().replaceAll("-", "")}`;
@@ -3344,8 +3345,7 @@ function mockPhotoBoundaries(
   } = {},
 ) {
   const settings = {
-    SUPABASE_URL: "http://storage.example.test",
-    SUPABASE_SERVICE_ROLE_KEY: "test-storage-only",
+    ...r2Fixture,
     EMBEDDING_MODEL: "google/gemini-embedding-2",
   };
 
@@ -3366,9 +3366,12 @@ function mockPhotoBoundaries(
     globalThis,
     "fetch",
     async (input: unknown, init: RequestInit) => {
-      if (String(input).startsWith(settings.SUPABASE_URL)) {
+      if (
+        input instanceof Request &&
+        input.url.startsWith(settings.S3_API_URL)
+      ) {
         const photo = photos.find(({ row }) =>
-          String(input).endsWith(row.storage_key),
+          input.url.endsWith(row.storage_key),
         );
 
         assert.ok(photo, "Only known fixture objects may reach Storage");

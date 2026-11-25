@@ -17,8 +17,6 @@ function configure(t: TestContext, overrides: Partial<typeof config> = {}) {
     R2_BUCKET_NAME: "room-media",
     R2_SUPPORTING_DOCUMENTS_BUCKET_NAME: undefined,
     R2_OBJECT_PREFIX: "test-rooms/catalog/fixture",
-    SUPABASE_URL: "https://supabase.invalid",
-    SUPABASE_SERVICE_ROLE_KEY: "test-service-role",
     ...overrides,
   });
   t.after(() => Object.assign(config, original));
@@ -65,24 +63,47 @@ test("R2 object requests keep key paths, write preconditions and read ranges", a
   assert.deepEqual(methods, ["PUT", "PUT", "GET", "DELETE"]);
 });
 
-test("supporting documents switch buckets only when configured", async (t) => {
+test("supporting documents require their own R2 bucket", async (t) => {
   configure(t);
-  const urls: string[] = [];
-  t.mock.method(globalThis, "fetch", async (request: string | Request) => {
-    urls.push(typeof request === "string" ? request : request.url);
+  const bucket = "supporting-documents";
+  const key = "document.pdf";
+  const fetch = t.mock.method(globalThis, "fetch", async (request: Request) => {
+    assert.equal(
+      request.url,
+      "https://test.r2.cloudflarestorage.com/room-documents/test-rooms/catalog/fixture/document.pdf",
+    );
     return new Response("pdf");
   });
 
-  const bucket = "supporting-documents";
-  const key = "document.pdf";
-  await (await getCatalogMedia(key, undefined, undefined, bucket)).cancel();
-  config.R2_SUPPORTING_DOCUMENTS_BUCKET_NAME = "room-documents";
-  await (await getCatalogMedia(key, undefined, undefined, bucket)).cancel();
+  await assert.rejects(
+    getCatalogMedia(key, undefined, undefined, bucket),
+    /R2_SUPPORTING_DOCUMENTS_BUCKET_NAME/,
+  );
+  assert.equal(fetch.mock.callCount(), 0);
 
-  assert.deepEqual(urls, [
-    "https://supabase.invalid/storage/v1/object/supporting-documents/document.pdf",
-    "https://test.r2.cloudflarestorage.com/room-documents/test-rooms/catalog/fixture/document.pdf",
-  ]);
+  config.R2_SUPPORTING_DOCUMENTS_BUCKET_NAME = "room-documents";
+  const body = await getCatalogMedia(key, undefined, undefined, bucket);
+  assert.equal(await new Response(body).text(), "pdf");
+  assert.equal(fetch.mock.callCount(), 1);
+});
+
+test("file operations do not fall back when R2 is unconfigured", async (t) => {
+  configure(t, {
+    S3_API_URL: undefined,
+    R2_ACCESS_KEY_ID: undefined,
+    R2_SECRET_ACCESS_KEY: undefined,
+    R2_BUCKET_NAME: undefined,
+    R2_OBJECT_PREFIX: undefined,
+  });
+  const fetch = t.mock.method(globalThis, "fetch");
+
+  await assert.rejects(getCatalogMedia("image.png"), /R2 storage requires/);
+  await assert.rejects(
+    putCatalogMedia("image.png", Buffer.from("image"), "image/png"),
+    /R2 storage requires/,
+  );
+  await assert.rejects(deleteCatalogMedia("image.png"), /R2 storage requires/);
+  assert.equal(fetch.mock.callCount(), 0);
 });
 
 test("R2 missing keys stay distinguishable from bucket failures", async (t) => {
@@ -108,9 +129,6 @@ test("invalid R2 settings fail before any storage request", async (t) => {
     /endpoint without a bucket path/,
   );
   config.R2_SECRET_ACCESS_KEY = undefined;
-  await assert.rejects(
-    getCatalogMedia("image.png"),
-    /missing endpoint, credentials, or bucket/,
-  );
+  await assert.rejects(getCatalogMedia("image.png"), /R2 storage requires/);
   assert.equal(fetch.mock.callCount(), 0);
 });

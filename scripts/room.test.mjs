@@ -93,9 +93,16 @@ function localStatus(plan) {
   return {
     DB_URL: `postgresql://postgres:local-password@127.0.0.1:${plan.ports.db}/postgres`,
     API_URL: `http://127.0.0.1:${plan.ports.supabase}`,
-    SERVICE_ROLE_KEY: "local-service-key",
   };
 }
+
+const storageOverrides = {
+  S3_API_URL: "https://example.r2.cloudflarestorage.com",
+  R2_ACCESS_KEY_ID: "room-test-key",
+  R2_SECRET_ACCESS_KEY: "room-test-secret",
+  R2_BUCKET_NAME: "test-media",
+  R2_OBJECT_PREFIX: "test-rooms/test/fixture",
+};
 
 test("runtime targets use only CLI credentials at assigned room ports and explicit opt-in AI", () => {
   const plan = roomPlan("/repo", "test", 0);
@@ -106,7 +113,7 @@ test("runtime targets use only CLI credentials at assigned room ports and explic
       AI_GATEWAY_API_KEY: "example-must-not-be-used",
       DB_PASSWORD: "example-password",
     },
-    { AI_GATEWAY_API_KEY: "opt-in-key" },
+    { ...storageOverrides, AI_GATEWAY_API_KEY: "opt-in-key" },
     localStatus(plan),
     { PATH: "/bin", DB_PORT: "5432", FIREBASE_PROJECT_ID: "main" },
   );
@@ -115,17 +122,7 @@ test("runtime targets use only CLI credentials at assigned room ports and explic
   assert.equal(env.DB_PORT, String(plan.ports.db));
   assert.equal(env.DB_PASSWORD, "local-password");
   assert.equal(env.DB_NAME, "postgres");
-  assert.equal(env.SUPABASE_SERVICE_ROLE_KEY, "local-service-key");
-  const modern = runtimeEnvironment(
-    plan,
-    {},
-    {},
-    {
-      ...localStatus(plan),
-      SECRET_KEY: "local-secret-key",
-    },
-  );
-  assert.equal(modern.SUPABASE_SERVICE_ROLE_KEY, "local-secret-key");
+  assert.equal(env.R2_BUCKET_NAME, "test-media");
   assert.equal(env.PUBLIC_API_URL, plan.apiUrl);
   assert.equal(env.WEB_ORIGIN, plan.webUrl);
   assert.equal(env.API_PROXY_TARGET, "");
@@ -135,7 +132,7 @@ test("runtime targets use only CLI credentials at assigned room ports and explic
   assert.equal(env.FIREBASE_PROJECT_ID, "");
   assert.equal(env.PUBLIC_FIREBASE_API_KEY, "");
   assert.equal(
-    runtimeEnvironment(plan, {}, {}, localStatus(plan), {
+    runtimeEnvironment(plan, {}, storageOverrides, localStatus(plan), {
       AI_GATEWAY_API_KEY: "inherited",
     }).AI_GATEWAY_API_KEY,
     undefined,
@@ -144,24 +141,21 @@ test("runtime targets use only CLI credentials at assigned room ports and explic
 
 test("R2 room overrides require complete settings and a room-specific prefix", () => {
   const plan = roomPlan("/repo", "test", 0);
-  const overrides = {
-    S3_API_URL: "https://example.r2.cloudflarestorage.com",
-    R2_ACCESS_KEY_ID: "room-test-key",
-    R2_SECRET_ACCESS_KEY: "room-test-secret",
-    R2_BUCKET_NAME: "test-media",
-    R2_OBJECT_PREFIX: "test-rooms/test/fixture",
-  };
   const status = localStatus(plan);
+  assert.throws(
+    () => runtimeEnvironment(plan, {}, {}, status),
+    /Missing R2 room override: S3_API_URL/,
+  );
   assert.equal(
-    runtimeEnvironment(plan, {}, overrides, status).R2_OBJECT_PREFIX,
-    overrides.R2_OBJECT_PREFIX,
+    runtimeEnvironment(plan, {}, storageOverrides, status).R2_OBJECT_PREFIX,
+    storageOverrides.R2_OBJECT_PREFIX,
   );
   assert.throws(
     () =>
       runtimeEnvironment(
         plan,
         {},
-        { ...overrides, R2_OBJECT_PREFIX: "test-rooms/other/fixture" },
+        { ...storageOverrides, R2_OBJECT_PREFIX: "test-rooms/other/fixture" },
         status,
       ),
     /require R2_OBJECT_PREFIX/,
@@ -171,7 +165,7 @@ test("R2 room overrides require complete settings and a room-specific prefix", (
       runtimeEnvironment(
         plan,
         {},
-        { ...overrides, R2_ACCESS_KEY_ID: "" },
+        { ...storageOverrides, R2_ACCESS_KEY_ID: "" },
         status,
       ),
     /Missing R2 room override: R2_ACCESS_KEY_ID/,
@@ -206,33 +200,33 @@ test("unsafe override names and CLI targets outside the room fail before deploym
     "postgresql://other:password@127.0.0.1:20003/postgres",
   ])
     assert.throws(
-      () => runtimeEnvironment(plan, {}, {}, { ...localStatus(plan), DB_URL }),
+      () =>
+        runtimeEnvironment(plan, {}, storageOverrides, {
+          ...localStatus(plan),
+          DB_URL,
+        }),
       /outside this room/,
     );
 
   assert.throws(
     () =>
-      runtimeEnvironment(
-        plan,
-        {},
-        {},
-        { ...localStatus(plan), API_URL: "http://127.0.0.1:54321" },
-      ),
+      runtimeEnvironment(plan, {}, storageOverrides, {
+        ...localStatus(plan),
+        API_URL: "http://127.0.0.1:54321",
+      }),
     /outside this room/,
   );
   assert.throws(
     () =>
-      runtimeEnvironment(
-        plan,
-        {},
-        {},
-        { ...localStatus(plan), SERVICE_ROLE_KEY: "" },
-      ),
+      runtimeEnvironment(plan, {}, storageOverrides, {
+        ...localStatus(plan),
+        DB_URL: localStatus(plan).DB_URL.replace(":local-password@", "@"),
+      }),
     /credentials/,
   );
 });
 
-test("generated Supabase config keeps Storage and database features while isolating every configured port", async () => {
+test("generated Supabase config disables Storage and keeps database features while isolating every configured port", async () => {
   const plan = roomPlan("/repo", "test", 0);
   const source = await readFile(
     new URL("../apps/supabase/config.toml", import.meta.url),
@@ -257,8 +251,8 @@ test("generated Supabase config keeps Storage and database features while isolat
       ),
     );
 
-  assert.match(result, /\[storage\]\s*\nenabled = true/);
-  assert.match(result, /\[storage\.buckets\.event-management\]/);
+  assert.match(result, /\[storage\]\s*\nenabled = false/);
+  assert.doesNotMatch(result, /\[storage\.buckets\./);
   assert.match(result, /\[db\.migrations\][\s\S]*?enabled = false/);
   assert.match(result, /\[db\.seed\][\s\S]*?enabled = false/);
   assert.match(result, /sql_paths = \[\]/);

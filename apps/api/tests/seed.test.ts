@@ -118,21 +118,35 @@ after(async () => {
 });
 
 async function runSeed(target = database) {
-  await promisify(execFile)("pnpm", ["db:seed"], {
-    cwd: workspaceDirectory,
-    env: {
-      ...process.env,
-      ...storage.env,
-      SUPABASE_DB_URL: testDatabaseUrl(target),
-      SEED_RANDOM_SEED: "seed-integration",
-      SEED_CLOCK: "2026-10-31T00:00:00Z",
-      FIREBASE_PROJECT_ID: "",
-      FIREBASE_CLIENT_EMAIL: "",
-      FIREBASE_PRIVATE_KEY: "",
-      GOOGLE_APPLICATION_CREDENTIALS: "",
-      FIREBASE_AUTH_EMULATOR_HOST: "",
+  const preload = new URL("./helpers/seed-r2-preload.ts", import.meta.url);
+  await promisify(execFile)(
+    "pnpm",
+    [
+      "--filter",
+      "@event-management/api",
+      "exec",
+      "tsx",
+      "--import",
+      preload.href,
+      "src/db/seed.ts",
+    ],
+    {
+      cwd: workspaceDirectory,
+      env: {
+        ...process.env,
+        ...storage.env,
+        SEED_TEST_R2_ORIGIN: storage.origin,
+        SUPABASE_DB_URL: testDatabaseUrl(target),
+        SEED_RANDOM_SEED: "seed-integration",
+        SEED_CLOCK: "2026-10-31T00:00:00Z",
+        FIREBASE_PROJECT_ID: "",
+        FIREBASE_CLIENT_EMAIL: "",
+        FIREBASE_PRIVATE_KEY: "",
+        GOOGLE_APPLICATION_CREDENTIALS: "",
+        FIREBASE_AUTH_EMULATOR_HOST: "",
+      },
     },
-  });
+  );
 }
 
 const tables = [

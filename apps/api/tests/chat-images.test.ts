@@ -11,6 +11,7 @@ import { Pool } from "pg";
 import { MockLanguageModelV4, MockProviderV4 } from "ai/test";
 import { hashSessionToken } from "../src/utils/session.js";
 import { messageImageInterpretationSchema } from "@event-management/contracts/message-images";
+import { r2Fixture } from "./helpers/r2-fixture.js";
 import { setTestConfig, testDatabaseUrl } from "./helpers/set-test-config.js";
 
 const database = `em_chat_images_test_${randomUUID().replaceAll("-", "")}`;
@@ -70,9 +71,7 @@ before(async () => {
   setTestConfig({ AI_GATEWAY_API_KEY: "fixture-key" });
   setTestConfig({ TEXT_MODEL: "fixture/text" });
   setTestConfig({ VISION_MODEL: "fixture/vision" });
-  setTestConfig({ SUPABASE_URL: "https://storage.invalid" });
-  setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: "fixture-key" });
-  setTestConfig({ SUPABASE_STORAGE_BUCKET: "test" });
+  setTestConfig(r2Fixture);
   const { Image } = await import("imagescript");
   bytes = await new Image(1, 1).fill(0x0000ffff).encodePNG();
   alternate = await new Image(1, 1).fill(0xff0000ff).encodePNG();
@@ -119,17 +118,21 @@ before(async () => {
       }),
     },
   });
-  globalThis.fetch = async (input, init) => {
-    const url = new URL(String(input));
-    assert.equal(url.hostname, "storage.invalid", "No external calls in tests");
-    const key = decodeURIComponent(
-      url.pathname.replace("/storage/v1/object/test/", ""),
+  globalThis.fetch = async (input) => {
+    assert.ok(input instanceof Request);
+    const url = new URL(input.url);
+    assert.equal(
+      url.origin,
+      r2Fixture.S3_API_URL,
+      "No external calls in tests",
     );
+    assert.ok(url.pathname.startsWith("/test/"));
+    const key = decodeURIComponent(url.pathname.slice("/test/".length));
 
-    if (init?.method === "POST") {
+    if (input.method === "PUT") {
       if (storageFailure) return new Response("unavailable", { status: 503 });
 
-      objects.set(key, new Uint8Array(init.body as Buffer));
+      objects.set(key, new Uint8Array(await input.arrayBuffer()));
 
       if (afterStorage) {
         const callback = afterStorage;
@@ -140,11 +143,10 @@ before(async () => {
       return new Response("{}", { status: 200 });
     }
 
-    if (init?.method === "DELETE") {
-      for (const prefix of JSON.parse(String(init.body)).prefixes)
-        objects.delete(prefix);
+    if (input.method === "DELETE") {
+      objects.delete(key);
 
-      return new Response("{}", { status: 200 });
+      return new Response(null, { status: 204 });
     }
 
     const value = objects.get(key);

@@ -8,6 +8,7 @@ import { Pool } from "pg";
 import { CATALOG_COLUMNS } from "@event-management/contracts/catalog";
 import { MAX_CATALOG_SEARCH_LENGTH } from "@event-management/contracts/limits/catalog";
 import { hashSessionToken } from "../src/utils/session.js";
+import { localR2Fetch, r2Fixture } from "./helpers/r2-fixture.js";
 import { setTestConfig, testDatabaseUrl } from "./helpers/set-test-config.js";
 
 const database = `em_packages_test_${randomUUID().replaceAll("-", "")}`;
@@ -20,9 +21,10 @@ let adminCookie: string;
 let otherCustomerCookie: string;
 let customerCookie: string;
 let storageServer: Server;
+const originalFetch = globalThis.fetch;
 let failStorageDeletes = false;
 let failStorageWrites = false;
-let missingStorageGetAs400 = false;
+let missingStorageGetWithCode = false;
 
 let beforeStorageGet:
   { path: string; callback: () => Promise<void> } | undefined;
@@ -60,7 +62,7 @@ before(async () => {
   storageServer = createServer(async (req, res) => {
     const path = req.url!.split("?")[0]!;
 
-    if (req.method === "POST" || req.method === "PUT") {
+    if (req.method === "PUT") {
       const chunks: Buffer[] = [];
 
       for await (const chunk of req) chunks.push(Buffer.from(chunk));
@@ -72,11 +74,8 @@ before(async () => {
         return;
       }
 
-      if (
-        storedImages.has(path) &&
-        String(req.headers["x-upsert"]).toLowerCase() !== "true"
-      ) {
-        res.statusCode = 409;
+      if (storedImages.has(path) && req.headers["if-none-match"] === "*") {
+        res.statusCode = 412;
         res.end();
 
         return;
@@ -92,25 +91,7 @@ before(async () => {
         res.statusCode = 403;
         res.end();
       } else {
-        const chunks: Buffer[] = [];
-
-        for await (const chunk of req) chunks.push(Buffer.from(chunk));
-
-        const payload = Buffer.concat(chunks).toString();
-
-        if (payload) {
-          const prefixes =
-            (JSON.parse(payload) as { prefixes?: string[] }).prefixes ?? [];
-
-          for (const prefix of prefixes) {
-            const encoded = prefix
-              .split("/")
-              .map((segment) => encodeURIComponent(segment))
-              .join("/");
-
-            storedImages.delete(`${path}/${encoded}`);
-          }
-        } else storedImages.delete(path);
+        storedImages.delete(path);
 
         res.statusCode = 204;
         res.end();
@@ -125,10 +106,10 @@ before(async () => {
       const image = storedImages.get(path);
 
       if (!image) {
-        if (missingStorageGetAs400) {
-          res.statusCode = 400;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ code: "NoSuchKey", statusCode: "404" }));
+        if (missingStorageGetWithCode) {
+          res.statusCode = 404;
+          res.setHeader("Content-Type", "application/xml");
+          res.end("<Error><Code>NoSuchKey</Code></Error>");
         } else {
           res.statusCode = 404;
           res.end();
@@ -159,9 +140,8 @@ before(async () => {
   );
   const address = storageServer.address();
   assert.ok(address && typeof address !== "string");
-  setTestConfig({ SUPABASE_URL: `http://127.0.0.1:${address.port}` });
-  setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: "test" });
-  setTestConfig({ SUPABASE_STORAGE_BUCKET: "test" });
+  setTestConfig(r2Fixture);
+  globalThis.fetch = localR2Fetch(`http://127.0.0.1:${address.port}`);
   setTestConfig({ SUPABASE_DB_URL: testDatabaseUrl(database) });
   ({ app } = await import("../src/app.js"));
   ({ db } = await import("../src/db/client.js"));
@@ -192,6 +172,7 @@ before(async () => {
   customerCookie = await session("customer");
 });
 after(async () => {
+  globalThis.fetch = originalFetch;
   if (storageServer)
     await new Promise<void>((resolve, reject) =>
       storageServer.close((err) => (err ? reject(err) : resolve())),
@@ -1558,7 +1539,7 @@ async function uploadCanvas(
 }
 
 function storageObjectPath(key: string) {
-  return `/storage/v1/object/test/${key
+  return `/test/${key
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/")}`;
@@ -2171,12 +2152,12 @@ test("catalog media promotion retries failed copies and reads through relocation
       }).then(() => undefined),
   };
   let noSuchKeyRead: Response;
-  missingStorageGetAs400 = true;
+  missingStorageGetWithCode = true;
 
   try {
     noSuchKeyRead = await app.request(noSuchKeyMedia.url);
   } finally {
-    missingStorageGetAs400 = false;
+    missingStorageGetWithCode = false;
   }
 
   assert.equal(beforeStorageGet, undefined);

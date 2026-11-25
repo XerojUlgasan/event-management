@@ -25,11 +25,15 @@ const runner = fileURLToPath(import.meta.url);
 const blockSize = 16;
 const firstPort = 20000;
 
-const r2OverrideNames = [
+const r2MediaSettings = [
   "S3_API_URL",
   "R2_ACCESS_KEY_ID",
   "R2_SECRET_ACCESS_KEY",
   "R2_BUCKET_NAME",
+];
+
+const r2OverrideNames = [
+  ...r2MediaSettings,
   "R2_SUPPORTING_DOCUMENTS_BUCKET_NAME",
   "R2_OBJECT_PREFIX",
 ];
@@ -49,9 +53,7 @@ function validateOverrides(overrides, roomName) {
       throw new Error(`Unsupported room override: ${name}.`);
   }
 
-  if (!r2OverrideNames.some((name) => overrides[name]?.trim())) return;
-
-  for (const name of r2OverrideNames.slice(0, 4)) {
+  for (const name of r2MediaSettings) {
     if (!overrides[name]?.trim())
       throw new Error(`Missing R2 room override: ${name}.`);
   }
@@ -190,10 +192,8 @@ export function runtimeEnvironment(
   )
     throw new Error("Supabase reported an API outside this room.");
 
-  const key = status.SECRET_KEY || status.SERVICE_ROLE_KEY;
-
-  if (!key || !db.password)
-    throw new Error("Supabase did not report local runtime credentials.");
+  if (!db.password)
+    throw new Error("Supabase did not report local database credentials.");
 
   const values = {};
 
@@ -223,9 +223,6 @@ export function runtimeEnvironment(
     PUBLIC_API_URL: plan.apiUrl,
     API_PROXY_TARGET: "",
     NODE_ENV: "development",
-    SUPABASE_URL: api.origin,
-    SUPABASE_SERVICE_ROLE_KEY: key,
-    SUPABASE_STORAGE_BUCKET: "event-management",
     FIREBASE_PROJECT_ID: "",
     FIREBASE_CLIENT_EMAIL: "",
     FIREBASE_PRIVATE_KEY: "",
@@ -266,8 +263,7 @@ export function supabaseConfig(source, plan) {
       smtp_port: plan.ports.smtp,
       pop3_port: plan.ports.pop3,
     },
-    "storage.vector": { enabled: false },
-    // GoTrue is also required for the CLI to report this local stack's Storage credentials.
+    storage: { enabled: false },
     auth: {
       enabled: true,
       site_url: JSON.stringify(plan.webUrl),

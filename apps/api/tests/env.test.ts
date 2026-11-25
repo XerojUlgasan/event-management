@@ -10,7 +10,6 @@ import {
 } from "../src/services/ai/models.js";
 import type { SessionContext } from "../src/types/hono.js";
 import { signRealtimeToken } from "../src/utils/auth/sign-realtime-token.js";
-import { getCatalogStorage } from "../src/utils/catalog-media-storage.js";
 
 function useConfig(context: TestContext, settings: Partial<typeof config>) {
   const original = { ...config };
@@ -39,33 +38,6 @@ test("API config is a plain snapshot of raw environment values", (context) => {
   }
 });
 
-test("storage selects supported keys when used", (context) => {
-  useConfig(context, {
-    SUPABASE_URL: " https://storage.example/ ",
-    SUPABASE_STORAGE_BUCKET: undefined,
-    SUPABASE_SERVICE_ROLE_KEY: undefined,
-    SUPABASE_SECRET_KEY: undefined,
-    SUPABASE_SECRET_KEYS: '{"default":" json ","other":"other"}',
-  });
-  assert.deepEqual(getCatalogStorage(), {
-    url: "https://storage.example",
-    apiKey: "json",
-    bucket: "event-management",
-  });
-  config.SUPABASE_SECRET_KEY = " fallback ";
-  config.SUPABASE_SERVICE_ROLE_KEY = " direct ";
-  config.SUPABASE_STORAGE_BUCKET = " bucket ";
-  assert.equal(getCatalogStorage().apiKey, "direct");
-  assert.equal(getCatalogStorage().bucket, "bucket");
-  config.SUPABASE_SERVICE_ROLE_KEY = " ";
-  assert.equal(getCatalogStorage().apiKey, "fallback");
-  config.SUPABASE_SECRET_KEY = "";
-  config.SUPABASE_SECRET_KEYS = '{"other":" first ","second":"second"}';
-  assert.equal(getCatalogStorage().apiKey, "first");
-  config.SUPABASE_SECRET_KEYS = "invalid";
-  assert.throws(getCatalogStorage, /Media storage is not configured/);
-});
-
 test("Realtime signs with SUP_JWT_KEY on local and hosted Edge", async (context) => {
   const secret = "1234567890-fixture-only-1234567890";
   useConfig(context, { SUP_JWT_KEY: secret });
@@ -80,16 +52,17 @@ test("Realtime signs with SUP_JWT_KEY on local and hosted Edge", async (context)
       expiresAt: 60,
     });
 
-  for (const settings of [
-    { NODE_ENV: "development", SUPABASE_URL: "http://kong:8000" },
-    { NODE_ENV: "production", SUPABASE_URL: "https://project.supabase.co" },
-  ]) {
-    Object.assign(config, settings);
-    const { payload } = await jwtVerify(await sign(), new TextEncoder().encode(secret), {
-      algorithms: ["HS256"],
-      audience: "authenticated",
-      currentDate: new Date(30_000),
-    });
+  for (const environment of ["development", "production"]) {
+    config.NODE_ENV = environment;
+    const { payload } = await jwtVerify(
+      await sign(),
+      new TextEncoder().encode(secret),
+      {
+        algorithms: ["HS256"],
+        audience: "authenticated",
+        currentDate: new Date(30_000),
+      },
+    );
     assert.equal(payload.clemora_scope, "user_notifications");
   }
 

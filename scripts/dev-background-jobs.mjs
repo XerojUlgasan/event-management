@@ -15,16 +15,11 @@ const functionEnvPath = join(root, "apps/supabase/.env.functions");
 // the same local project's host addresses and credentials from CLI status.
 export function localWorkerEnvironment(functionEnv, status, parentEnv = {}) {
   const database = new URL(status.DB_URL);
-  const api = new URL(status.API_URL);
-  const storageKey = status.SECRET_KEY || status.SERVICE_ROLE_KEY;
   const localHosts = ["localhost", "127.0.0.1", "[::1]"];
 
   if (
     !["postgres:", "postgresql:"].includes(database.protocol) ||
-    !localHosts.includes(database.hostname) ||
-    !["http:", "https:"].includes(api.protocol) ||
-    !localHosts.includes(api.hostname) ||
-    !storageKey
+    !localHosts.includes(database.hostname)
   ) {
     throw new Error(
       "Background development worker requires local Supabase status.",
@@ -41,8 +36,6 @@ export function localWorkerEnvironment(functionEnv, status, parentEnv = {}) {
     ...inherited,
     ...functionEnv,
     SUPABASE_DB_URL: status.DB_URL,
-    SUPABASE_URL: status.API_URL,
-    SUPABASE_SERVICE_ROLE_KEY: storageKey,
     DOTENV_CONFIG_PATH: functionEnvPath,
   };
 }

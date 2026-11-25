@@ -76,9 +76,12 @@ jobs:
           FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           PROD_SUPABASE_REF: ${{ secrets.PROD_SUPABASE_REF }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          S3_API_URL: ${{ secrets.S3_API_URL }}
           SEED_RANDOM_SEED: ${{ secrets.SEED_RANDOM_SEED }}
           SESSION_TTL_DAYS: ${{ secrets.SESSION_TTL_DAYS }}
-          STORAGE_BUCKET: ${{ secrets.STORAGE_BUCKET }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUP_JWT_KEY: ${{ secrets.SUP_JWT_KEY }}
           TEXT_MODEL: ${{ secrets.TEXT_MODEL }}
@@ -87,6 +90,10 @@ jobs:
         run: |
           : "${PROD_SUPABASE_REF:?Missing Edge Functions secret PROD_SUPABASE_REF}"
           : "${SUPABASE_ACCESS_TOKEN:?Missing Edge Functions secret SUPABASE_ACCESS_TOKEN}"
+          : "${R2_ACCESS_KEY_ID:?Missing Edge Functions secret R2_ACCESS_KEY_ID}"
+          : "${R2_BUCKET_NAME:?Missing Edge Functions secret R2_BUCKET_NAME}"
+          : "${R2_SECRET_ACCESS_KEY:?Missing Edge Functions secret R2_SECRET_ACCESS_KEY}"
+          : "${S3_API_URL:?Missing Edge Functions secret S3_API_URL}"
 
           # Let the CLI read the values from the environment, including multiline keys.
           workdir=$(mktemp -d "$RUNNER_TEMP/supabase-secrets.XXXXXXXX")
@@ -100,9 +107,12 @@ jobs:
           FIREBASE_CLIENT_EMAIL = "env(FIREBASE_CLIENT_EMAIL)"
           FIREBASE_PRIVATE_KEY = "env(FIREBASE_PRIVATE_KEY)"
           FIREBASE_PROJECT_ID = "env(FIREBASE_PROJECT_ID)"
+          R2_ACCESS_KEY_ID = "env(R2_ACCESS_KEY_ID)"
+          R2_BUCKET_NAME = "env(R2_BUCKET_NAME)"
+          R2_SECRET_ACCESS_KEY = "env(R2_SECRET_ACCESS_KEY)"
+          S3_API_URL = "env(S3_API_URL)"
           SEED_RANDOM_SEED = "env(SEED_RANDOM_SEED)"
           SESSION_TTL_DAYS = "env(SESSION_TTL_DAYS)"
-          STORAGE_BUCKET = "env(STORAGE_BUCKET)"
           SUP_JWT_KEY = "env(SUP_JWT_KEY)"
           TEXT_MODEL = "env(TEXT_MODEL)"
           VISION_MODEL = "env(VISION_MODEL)"

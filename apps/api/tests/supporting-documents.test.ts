@@ -21,6 +21,7 @@ import { runOneBackgroundJob } from "../src/services/background-jobs/run-one-bac
 import type { HonoEnv } from "../src/types/hono.js";
 import { hashSessionToken } from "../src/utils/session.js";
 import { buildPdf, textPage } from "./fixtures/supporting-pdf.js";
+import { r2Fixture } from "./helpers/r2-fixture.js";
 import { setTestConfig } from "./helpers/set-test-config.js";
 
 const database = `supporting_docs_${randomUUID().replaceAll("-", "")}`;
@@ -104,8 +105,7 @@ before(async () => {
       ),
     );
 
-  setTestConfig({ SUPABASE_URL: "http://storage.test" });
-  setTestConfig({ SUPABASE_SERVICE_ROLE_KEY: "fixture-storage" });
+  setTestConfig(r2Fixture);
   setTestConfig({ AI_GATEWAY_API_KEY: "fixture-embedding" });
   setTestConfig({ EMBEDDING_MODEL: "google/gemini-embedding-2" });
   globalThis.fetch = async (input, init) => {
@@ -113,33 +113,28 @@ before(async () => {
       input instanceof Request ? input.url : input.toString(),
     );
 
-    if (url.hostname === "storage.test") {
-      if (init?.method === "DELETE") {
-        assert.equal(url.pathname, "/storage/v1/object/supporting-documents");
+    if (url.origin === r2Fixture.S3_API_URL) {
+      assert.ok(input instanceof Request);
+      assert.match(url.pathname, /^\/test-documents\//);
 
+      if (input.method === "DELETE") {
         if (failStorageDelete) return new Response(null, { status: 502 });
 
-        const { prefixes } = JSON.parse(String(init.body)) as {
-          prefixes: string[];
-        };
+        objects.delete(url.pathname);
 
-        for (const key of prefixes) objects.delete(`${url.pathname}/${key}`);
-
-        return Response.json([]);
+        return new Response(null, { status: 204 });
       }
 
-      assert.match(
-        url.pathname,
-        /^\/storage\/v1\/object\/supporting-documents\//,
-      );
+      if (input.method === "PUT") {
+        objects.set(url.pathname, new Uint8Array(await input.arrayBuffer()));
 
-      if (init?.method === "POST") {
-        objects.set(url.pathname, Uint8Array.from(init.body as Uint8Array));
-
-        return new Response(null, { status: 201 });
+        return new Response(null, { status: 200 });
       }
 
-      return new Response(objects.get(url.pathname) ?? null);
+      const object = objects.get(url.pathname);
+      return object
+        ? new Response(object)
+        : new Response(null, { status: 404 });
     }
 
     assert.equal(url.hostname, "ai-gateway.vercel.sh");
