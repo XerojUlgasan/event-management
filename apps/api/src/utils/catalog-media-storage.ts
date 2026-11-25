@@ -1,4 +1,5 @@
 import { config } from "../env.js";
+import { getR2Storage } from "./r2-storage.js";
 
 function storageKey() {
   const direct =
@@ -114,6 +115,27 @@ export async function putCatalogMedia(
     bucket?: string;
   } = {},
 ) {
+  const r2 = getR2Storage(options.bucket);
+  const body = Buffer.from(bytes);
+  const signal = AbortSignal.any([
+    AbortSignal.timeout(30_000),
+    ...(options.abortSignal ? [options.abortSignal] : []),
+  ]);
+  const headers = { "Content-Type": contentType };
+
+  if (r2) {
+    const response = await r2.request(key, {
+      method: "PUT",
+      headers: options.upsert ? headers : { ...headers, "If-None-Match": "*" },
+      body,
+      signal,
+    });
+
+    await response.body?.cancel();
+    if (!response.ok) throw new Error("Media storage write failed");
+    return;
+  }
+
   const { url, apiKey, bucket: defaultBucket } = getCatalogStorage();
   const bucket = options.bucket ?? defaultBucket;
   const response = await fetch(
@@ -121,14 +143,11 @@ export async function putCatalogMedia(
     {
       method: "POST",
       headers: authHeaders(apiKey, {
-        "Content-Type": contentType,
+        ...headers,
         "x-upsert": options.upsert ? "true" : "false",
       }),
-      body: Buffer.from(bytes),
-      signal: AbortSignal.any([
-        AbortSignal.timeout(30_000),
-        ...(options.abortSignal ? [options.abortSignal] : []),
-      ]),
+      body,
+      signal,
     },
   );
 
@@ -136,13 +155,24 @@ export async function putCatalogMedia(
 }
 
 export async function deleteCatalogMedia(key: string, bucketOverride?: string) {
+  const r2 = getR2Storage(bucketOverride);
+  const signal = AbortSignal.timeout(30_000);
+
+  if (r2) {
+    const response = await r2.request(key, { method: "DELETE", signal });
+
+    await response.body?.cancel();
+    if (!response.ok) throw new Error("Media storage delete failed");
+    return;
+  }
+
   const { url, apiKey, bucket: defaultBucket } = getCatalogStorage();
   const bucket = bucketOverride ?? defaultBucket;
   const response = await fetch(`${url}/storage/v1/object/${bucket}`, {
     method: "DELETE",
     headers: authHeaders(apiKey, { "Content-Type": "application/json" }),
     body: JSON.stringify({ prefixes: [key] }),
-    signal: AbortSignal.timeout(30_000),
+    signal,
   });
 
   if (response.status === 404) return;
@@ -156,17 +186,29 @@ export async function getCatalogMedia(
   abortSignal?: AbortSignal,
   bucketOverride?: string,
 ) {
-  const { url, apiKey, bucket: defaultBucket } = getCatalogStorage();
-  const bucket = bucketOverride ?? defaultBucket;
-  const response = await fetch(
-    `${url}/storage/v1/object/${objectPath(bucket, key)}`,
-    {
-      headers: authHeaders(apiKey, range ? { Range: range } : {}),
-      signal: abortSignal,
-    },
-  );
+  const r2 = getR2Storage(bucketOverride);
+  const headers = range ? { Range: range } : undefined;
+  let response: Response;
 
-  if (response.status === 400) {
+  if (r2) {
+    response = await r2.request(key, {
+      headers,
+      signal: abortSignal,
+    });
+  } else {
+    const { url, apiKey, bucket: defaultBucket } = getCatalogStorage();
+    const bucket = bucketOverride ?? defaultBucket;
+
+    response = await fetch(
+      `${url}/storage/v1/object/${objectPath(bucket, key)}`,
+      {
+        headers: authHeaders(apiKey, headers),
+        signal: abortSignal,
+      },
+    );
+  }
+
+  if (!r2 && response.status === 400) {
     const error: unknown = await response.json().catch(() => null);
 
     // Some Storage versions wrap NoSuchKey (404) in an HTTP 400 response.
@@ -180,12 +222,17 @@ export async function getCatalogMedia(
   }
 
   if (response.status === 404) {
-    await response.body?.cancel();
+    if (r2 && /<Code>NoSuchBucket<\/Code>/.test(await response.text()))
+      throw new Error("Media storage bucket not found");
+
+    if (!r2) await response.body?.cancel();
     throw new CatalogMediaNotFound("Media object not found");
   }
 
-  if (!response.ok || !response.body)
+  if (!response.ok || !response.body) {
+    if (r2) await response.body?.cancel();
     throw new Error("Media storage read failed");
+  }
 
   return response.body;
 }
