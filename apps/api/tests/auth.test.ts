@@ -1040,7 +1040,7 @@ test("db:seed inserts fixtures without changing existing accounts or sessions", 
   const plausible = await db
     .insertInto("users")
     .values({
-      email: "marcos.reyes@clemora.com",
+      email: "marcos.reyes@example.test",
       display_name: "Real person",
       role: "customer",
       password_hash: "other-hash",

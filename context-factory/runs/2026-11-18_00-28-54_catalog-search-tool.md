@@ -28,7 +28,7 @@ See [accepted design](../history/decisions/2026-11-18_catalog-search-and-tool-ca
 
 ## Verification
 
-All migrations replayed in a disposable local database; generated DB types came from that database, which was dropped. The combined serial suite passed 54/54 checks: 25 assistant, 15 guest, six storage, four search, and four Edge route checks, using synthetic providers and disposable databases. API type check, Prisma validation, Edge build, centralized environment check, scoped formatting, whitespace, guidance structure, and nine guidance tests pass. The confirmed local Clemora target had exactly one pending migration; applying it succeeded, and readback verified the empty audit table, RLS, and recorded migration. No live provider, served Edge/browser, or hosted proof.
+All migrations replayed in a disposable local database; generated DB types came from that database, which was dropped. The combined serial suite passed 54/54 checks: 25 assistant, 15 guest, six storage, four search, and four Edge route checks, using synthetic providers and disposable databases. API type check, Prisma validation, Edge build, centralized environment check, scoped formatting, whitespace, guidance structure, and nine guidance tests pass. The confirmed local target had exactly one pending migration; applying it succeeded, and readback verified the empty audit table, RLS, and recorded migration. No live provider, served Edge/browser, or hosted proof.
 
 ## Remaining work
 

@@ -106,10 +106,10 @@ export function workspaceReturnPath(
   if (!value?.startsWith("/app/") || value.includes("\\")) return null;
 
   try {
-    const url = new URL(value, "https://clemora.invalid");
+    const url = new URL(value, "https://amac.invalid");
 
     if (
-      url.origin !== "https://clemora.invalid" ||
+      url.origin !== "https://amac.invalid" ||
       !allowedWorkspacePath(profile, normalizePath(url.pathname))
     )
       return null;

@@ -1,6 +1,6 @@
 # Curated service photo credits
 
-These stock photographs illustrate the service descriptions in Clemora's demo catalog. The included copies are resized and re-encoded as progressive JPEGs.
+These stock photographs illustrate the service descriptions in the demo catalog. The included copies are resized and re-encoded as progressive JPEGs.
 
 The source links identify each photographer. Pexels permits use in websites and apps as part of a creative work, subject to its restrictions on standalone distribution and endorsement. The Unsplash photo uses the standard Unsplash License. [Pexels Terms of Use](https://www.pexels.com/terms-of-service/), [Unsplash License](https://unsplash.com/license).
 

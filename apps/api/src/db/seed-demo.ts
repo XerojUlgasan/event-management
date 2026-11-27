@@ -5,10 +5,13 @@ import type { DB } from "./types.js";
 
 type SeedDb = Transaction<DB>;
 
+// Preserve the original namespace so reruns keep the same fixture IDs.
+const LEGACY_DEMO_ID_NAMESPACE = "clemora-demo-v1";
+
 // These keys are reserved for this seed. Existing rows are never updated.
 function seedId(key: string) {
   const bytes = createHash("sha256")
-    .update(`clemora-demo-v1:${key}`)
+    .update(`${LEGACY_DEMO_ID_NAMESPACE}:${key}`)
     .digest()
     .subarray(0, 16);
   bytes[6] = (bytes[6] & 0x0f) | 0x50;
@@ -40,37 +43,37 @@ function seedClock() {
 const users = [
   {
     key: "admin",
-    email: "demo.admin@clemora.example.test",
+    email: "demo.admin@amac.example.test",
     name: "Mara Santos",
     role: "admin",
   },
   {
     key: "ana",
-    email: "demo.ana@clemora.example.test",
+    email: "demo.ana@amac.example.test",
     name: "Ana Reyes",
     role: "customer",
   },
   {
     key: "ben",
-    email: "demo.ben@clemora.example.test",
+    email: "demo.ben@amac.example.test",
     name: "Ben Cruz",
     role: "customer",
   },
   {
     key: "camille",
-    email: "demo.camille@clemora.example.test",
+    email: "demo.camille@amac.example.test",
     name: "Camille Lim",
     role: "customer",
   },
   {
     key: "daniel",
-    email: "demo.daniel@clemora.example.test",
+    email: "demo.daniel@amac.example.test",
     name: "Daniel Flores",
     role: "customer",
   },
   {
     key: "ella",
-    email: "demo.ella@clemora.example.test",
+    email: "demo.ella@amac.example.test",
     name: "Ella Navarro",
     role: "customer",
   },

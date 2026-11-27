@@ -14,8 +14,7 @@ packages/
   ui/                  Shared React components and Storybook
 scripts/               Development startup
 context-factory/       Contributor guides, agent workflows and QA helpers
-docs/                  Seed guide and interview summary
-transcriptions/        Individual and combined interview transcripts
+docs/                  Seed guide and feature specifications
 ```
 
 Astro renders public pages under `apps/web/src/pages` on each request. The standard build targets Node, and `build:workers` targets Cloudflare Workers. `/login` and `/app/*` mount `components/app/App.tsx` with `client:only="react"`. The app keeps its React and authentication providers mounted while same-origin `/app` navigation updates the URL with the History API; public and login routes remain document navigations. `GET /me` chooses the admin or customer shell, and each role keeps only its own `/app` paths. Shared UI uses atomic layers and exports from `packages/ui/src/index.ts`. Theme tokens live in `packages/theme/src/theme.css`; app styles live in `apps/web/src/styles/`. Web files follow the [frontend structure contract](../../../areas/frontend/references/project-structure.md), organized by layer, domain, and responsibility.
@@ -106,7 +105,7 @@ Before switching the API and worker, copy any existing uploads from Supabase Sto
 
 ### Production Supabase deployment
 
-The [Deploy production Supabase workflow](../../../../.github/workflows/deploy-supabase.yml) runs on `main` when API, Supabase, shared contract, bundled image, workflow, or workspace dependency files change. It builds the `api` Edge Function, applies pending Prisma migrations, syncs runtime secrets, and deploys the function. After deployment it configures two Supabase Cron jobs, `clemora-image-messages` and `clemora-catalog-indexing`.
+The [Deploy production Supabase workflow](../../../../.github/workflows/deploy-supabase.yml) runs on `main` when API, Supabase, shared contract, bundled image, workflow, or workspace dependency files change. It builds the `api` Edge Function, applies pending Prisma migrations, syncs runtime secrets, and deploys the function. After deployment it configures two Supabase Cron jobs, `amac-image-messages` and `amac-catalog-indexing`.
 
 | GitHub environment | Settings |
 | --- | --- |
@@ -142,7 +141,7 @@ Connect Workers Builds to the `event-management` Worker named in [Wrangler confi
 
 The Workers build sets the browser's API URL to `/v1`. Set `API_PROXY_TARGET` in the Worker's runtime variables to the hosted Supabase gateway origin, such as `https://<project-ref>.supabase.co`. The Worker forwards `/v1/health` to `/functions/v1/api/v1/health` on that gateway and uses the same API for server-rendered catalog pages.
 
-The target needs the Clemora `api` Edge Function and matching database schema. Include the frontend's exact HTTPS origin in the function's `WEB_ORIGIN` and set `NODE_ENV=production` for secure session cookies. For Realtime, add `PUBLIC_SUPABASE_URL` and `PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the build variables. Optional Firebase sign-in also needs its `PUBLIC_FIREBASE_*` build variables and the Worker hostname authorized in Firebase.
+The target needs the AMAC `api` Edge Function and matching database schema. Include the frontend's exact HTTPS origin in the function's `WEB_ORIGIN` and set `NODE_ENV=production` for secure session cookies. For Realtime, add `PUBLIC_SUPABASE_URL` and `PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the build variables. Optional Firebase sign-in also needs its `PUBLIC_FIREBASE_*` build variables and the Worker hostname authorized in Firebase.
 
 From `apps/web`, verify the build and deployment bundle with `pnpm run deploy:workers --dry-run`. With the local Edge API running, use this command to serve the bundle.
 
@@ -191,7 +190,7 @@ pnpm check
 
 The type generator includes application tables in `public` only, excluding Supabase's internal schemas. Migration `20261110141853_event_day_staffing` is historical: it introduced operational event days along with availability and assignment tables. Later additive migrations remove those tables and response fields while keeping admin event-day scheduling.
 
-Migration `20261109140000_enable_application_rls` enables row-level security on application tables and Prisma's migration history. It removes table grants from `PUBLIC` and, when present, Supabase's `anon` and `authenticated` roles. Clients access records through Clemora's session-aware API; there are no direct-client RLS policies. The server database role must own the tables or have `BYPASSRLS`. Future table-creation migrations must explicitly enable RLS and remove unused client grants too; this migration does not install an automatic trigger. These SQL-only access settings do not change Prisma models or generated Kysely types.
+Migration `20261109140000_enable_application_rls` enables row-level security on application tables and Prisma's migration history. It removes table grants from `PUBLIC` and, when present, Supabase's `anon` and `authenticated` roles. Clients access records through AMAC's session-aware API; there are no direct-client RLS policies. The server database role must own the tables or have `BYPASSRLS`. Future table-creation migrations must explicitly enable RLS and remove unused client grants too; this migration does not install an automatic trigger. These SQL-only access settings do not change Prisma models or generated Kysely types.
 
 Migration `20261111150000_simplify_quotation_offers` deliberately discards quotation package timestamps and full package/event-term snapshots. It preserves quotation IDs, package references, amounts/items, status and acceptance timestamps, revision links, audit events, and quotation messages. It does not delete Storage objects; normal cleanup can remove uploads that no current widget references. Deploy the matching API and web changes together with this migration.
 
@@ -219,9 +218,15 @@ Migration `20261116155140_anonymous_guest_chat` adds server-only guest identitie
 
 Migration `20261116061207_add_ai_message_replies` makes the message sender nullable only for the new `assistant` role; human sender IDs remain required. It preserves existing messages and conversation lifecycle. Deploy the matching API and browser contracts together.
 
-**`pnpm db:reset` deletes data without a confirmation prompt.** It removes Clemora's Realtime helpers and policies, resets the `public` schema, replays committed migrations, and seeds the configured database. Check the target and use it only for a database whose contents may be discarded.
+**`pnpm db:reset` deletes data without a confirmation prompt.** It removes AMAC's Realtime helpers and policies, resets the `public` schema, replays committed migrations, and seeds the configured database. Check the target and use it only for a database whose contents may be discarded.
 
 ### Migration impact
+
+Deploy `20261127000000_amac_runtime_namespace` with the matching API, Edge bundle, and worker schedule update. It renames the quotation validators and private Realtime helpers. During the switch, open tabs can reconcile over HTTP until they refresh their Realtime token. The scheduler replaces the previous jobs and signing secrets in one transaction.
+
+The local Supabase project ID is `amac`. The CLI uses this ID to select Docker volumes. On a workstation with the previous stack, stop that project with backups enabled before starting AMAC on the same ports. To retain its data, copy its stopped database and storage volumes to the AMAC project volumes before first startup. Check the application database, apply the pending migrations there, and verify the saved records before retiring the backup.
+
+`20261127000100_amac_demo_identity` updates the known demo fixture email addresses when the original address still matches and the destination is free. Existing account IDs, credentials, and relationships are preserved.
 
 Migration `20261121100500_business_information` adds one empty business-profile record in `business_information`, with a singleton constraint, JSONB content, and an update timestamp. It enables RLS and revokes direct client table access; public reads and admin writes go through the API. Apply this additive migration before deploying the matching API and web builds. This task verifies disposable local databases; application and hosted database rollout is separate.
 
@@ -241,7 +246,7 @@ Review all pending migrations before upgrading a populated database:
 - `20261114000000_drop_venues` removes venue listings, package/venue links, and the venue catalog-page owner column. Any ownerless pages are deleted by the follow-up cleanup migration.
 - `20261114010000_drop_staff_tables` removes event availability and assignment tables and the event-day response fields.
 - `20261114151517_complete_catalog_staff_removal` revokes sessions and converts staff and non-designated admin accounts to customers, leaving designated System Administrators as admins. It drops the remaining staff-role and coordinator/checklist-delivery fields, deletes ownerless catalog pages, restores the temporary package/service owner check, and preserves media assets and Storage objects; the later embed migration drops the remaining page hierarchy.
-- `20261114154206_remove_event_checklists` drops `event_checklists` and `clemora_checklist_content_valid(jsonb)`, removing saved checklist tasks and progress. Earlier migration files remain unchanged as historical evidence.
+- `20261114154206_remove_event_checklists` drops `event_checklists` and its checklist content validator, removing saved checklist tasks and progress. Earlier migration files remain unchanged as historical evidence.
 - `20261116072801_embed_catalog_canvas` moves package/service canvas content into owner JSONB arrays, preserving section/widget IDs, order, content, and media IDs before dropping the former page/section/widget tables. It does not change media assets or uploaded objects.
 - `20261116090000_service_fixed_pricing` adds paired nullable fixed-price and included-hours fields to services, requiring both to be positive together and requiring an hourly rate when fixed pricing is set. Existing hourly rates remain unchanged.
 - `20261117000000_optional_booking_package` permits a null catalog package on booking requests and updates the existing catalog-only trigger to accept that state. Existing package associations, requests, messages, permissions, and private proposals remain intact. Deploy the matching API and browser code together: package fields are nullable, and a missing proposal is a valid read state.

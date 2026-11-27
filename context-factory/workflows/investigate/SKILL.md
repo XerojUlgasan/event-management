@@ -1,6 +1,6 @@
 ---
-name: clemora-investigate
-description: Investigate or explain current behavior, diagnose a failure, plan a design, recover context, or examine rationale before changing Clemora.
+name: amac-investigate
+description: Investigate or explain current behavior, diagnose a failure, plan a design, recover context, or examine rationale before changing AMAC.
 ---
 
 # Investigate

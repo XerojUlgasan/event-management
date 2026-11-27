@@ -69,7 +69,7 @@ export function messageDto(row: MessageWithSender): ChatMessage {
         ? "AMAC AI"
         : (row.sender_display_name ??
           row.sender_email ??
-          (role === "customer" ? "Guest" : "Clemora team")),
+          (role === "customer" ? "Guest" : "AMAC team")),
     createdAt: row.created_at.toISOString(),
     readAt: row.read_at?.toISOString() ?? null,
   };

@@ -17,7 +17,7 @@ const projectRef = "abcdefghijklmnopqrst";
 const migrationUrl = `postgresql://postgres.${projectRef}:fixture%23password@aws-0-test.pooler.supabase.com:5432/postgres`;
 
 function deploy(context, url, visionModel = "fixture-vision") {
-  const root = mkdtempSync(join(tmpdir(), "clemora-deploy-"));
+  const root = mkdtempSync(join(tmpdir(), "amac-deploy-"));
   context.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, "scripts"));
   mkdirSync(join(root, "apps/api"), { recursive: true });

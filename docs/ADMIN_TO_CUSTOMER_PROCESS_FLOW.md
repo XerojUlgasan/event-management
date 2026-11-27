@@ -1,6 +1,6 @@
 # Admin to Customer Process Flow
 
-Styled by AMAC, still named Clemora internally, supports this overall journey:
+AMAC supports this overall journey:
 
 **Admin prepares packages and services → customer browses and submits an inquiry → admin reviews and discusses requirements → admin prepares quotations and schedules event days → customer follows everything through My events and Messages.**
 

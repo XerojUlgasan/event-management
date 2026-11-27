@@ -13,7 +13,7 @@ Retire quotation `accepted` and `accepted_at`/`acceptedAt` while preserving admi
 
 ## Result
 
-Current quotation states are `draft`, `sent`, and `superseded`. The forward migration is applied to the configured local database and generated Kysely types match it. The rebuilt, restarted Clemora Edge runtime serves the new contract.
+Current quotation states are `draft`, `sent`, and `superseded`. The forward migration is applied to the configured local database and generated Kysely types match it. The rebuilt, restarted Edge runtime serves the new contract.
 
 ## Changes or findings
 

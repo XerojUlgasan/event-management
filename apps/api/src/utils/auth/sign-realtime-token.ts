@@ -21,14 +21,14 @@ export async function signRealtimeToken(
   const scopeClaims =
     "conversationId" in target
       ? {
-          clemora_scope: "conversation_messages",
+          amac_scope: "conversation_messages",
           conversation_id: target.conversationId,
         }
-      : { clemora_scope: "user_notifications" };
+      : { amac_scope: "user_notifications" };
 
   return new SignJWT({
     role: "authenticated",
-    clemora_session_id: session.sessionId,
+    amac_session_id: session.sessionId,
     ...scopeClaims,
   })
     .setSubject(session.user.id)

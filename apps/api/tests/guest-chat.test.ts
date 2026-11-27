@@ -498,7 +498,7 @@ test("guests can use current public business information in a reply", async () =
     "UPDATE business_information SET information = $1 WHERE id = 1",
     [
       JSON.stringify({
-        about: { name: "Clemora Events" },
+        about: { name: "Styled by AMAC" },
         contact: { phone: "12345" },
       }),
     ],
@@ -539,7 +539,7 @@ test("guests can use current public business information in a reply", async () =
     );
     assert.deepEqual(part.output.value, {
       status: "found",
-      information: { name: "Clemora Events", phone: "12345" },
+      information: { name: "Styled by AMAC", phone: "12345" },
     });
     const value = part.output.value as {
       information: { name: string; phone: string };
@@ -560,7 +560,7 @@ test("guests can use current public business information in a reply", async () =
   };
   const thread = await guest();
   const sent = await read(await send(thread, "How can I contact you?"), 201);
-  assert.equal(sent.assistantMessage?.body, "Clemora Events: 12345");
+  assert.equal(sent.assistantMessage?.body, "Styled by AMAC: 12345");
   const audit = await db
     .selectFrom("ai_tool_calls")
     .selectAll()

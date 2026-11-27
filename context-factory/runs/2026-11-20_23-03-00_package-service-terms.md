@@ -29,7 +29,7 @@ Implemented package-owned included terms and custom-only add-ons, with copied de
 
 API package/migration suites passed 38/38, booking requests 11/11, quotation regressions 19/19, AI source/projection suites 12/12, web catalog SSR/DOM 30/30, and guidance tests 9/9 (119 focused checks). API suites use distinct disposable local PostgreSQL databases, replay migrations and verify persisted HTTP save/refetch, copied terms, unchanged base/global prices, stale writes, ownership, archive/delete protection and old audit reads.
 
-Desktop and 390px browser checks used actual components with synthetic fetch/in-memory saves: explicit defaults, local included/add-on overrides, save/reopen, unchanged base, failed reset feedback and Escape/focus restoration passed. These are UI interaction proof, separate from API/database persistence proof. Screenshots: `/tmp/clemora-package-service-terms.png` and `/tmp/clemora-service-terms-mobile.png`. No live provider calls.
+Desktop and 390px browser checks used actual components with synthetic fetch/in-memory saves: explicit defaults, local included/add-on overrides, save/reopen, unchanged base, failed reset feedback and Escape/focus restoration passed. These are UI interaction proof, separate from API/database persistence proof. No live provider calls.
 
 Web/UI type checks, Prisma validation, web/Edge/Storybook builds, lint, environment, guidance navigation and whitespace checks passed. API types stop only at unchanged `tests/guest-chat.test.ts:231` (`PoolClient.processID`). Structure reports two unchanged `use-thumbnail.ts` boundary violations; design reports five unchanged thumbnail/CSS issues. Their files match HEAD. These prevent claiming the aggregate workspace gate passes.
 

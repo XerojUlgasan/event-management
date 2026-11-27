@@ -134,7 +134,7 @@ before(async () => {
   };
   ({ act, createElement, useState } = await import("react"));
   ({ createRoot } = await import("react-dom/client"));
-  cache = await mkdtemp(join(tmpdir(), "clemora-package-dom-"));
+  cache = await mkdtemp(join(tmpdir(), "amac-package-dom-"));
   server = await createServer({
     root: rootDir,
     cacheDir: cache,
@@ -389,10 +389,12 @@ test("private thumbnail replacement keeps the old image through cancellation and
   const original = "https://example.test/original.png";
   const replacement = "https://example.test/replacement.png";
   const mediaId = "55555555-5555-4555-8555-555555555555";
+
   const imageUrl = () =>
     document
       .querySelector(".thumbnail-field [data-catalog-thumbnail-image]")
       ?.getAttribute("src");
+
   const saves = [];
   await render(PackageEditor, {
     initial: { ...packageItem, imageUrl: original },

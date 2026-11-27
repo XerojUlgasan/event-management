@@ -10,7 +10,7 @@ Use the [documentation agent](../../../agents/documentation.md). Identify whethe
 - For new ideas, favor immediate net convenience and voluntary adoption. Prefer systems that can deliver value without payments, network effects, private partnerships, institutional approval, or business-document-dependent publishing. For an approved project with such dependencies, assess actual access and fallbacks rather than silently changing its scope.
 - Research existing products, research, and capstones before claiming differentiation. Use primary or official evidence for current capabilities and access requirements; distinguish absence of discovered evidence from proof that no alternative exists.
 - Define a coherent workflow with useful technical depth. CRUD screens, a generic chatbot, or an integration label alone do not explain the engineering contribution. Connect each proposed technical component to a concrete user task and constraint.
-- Match the scope to the team's time, skills, budget, available data, deployment context, and maintainable dependencies. Preserve the approved client, topic, and boundaries when refining Clemora.
+- Match the scope to the team's time, skills, budget, available data, deployment context, and maintainable dependencies. Preserve the approved client, topic, and boundaries when refining AMAC.
 
 ## Develop the proposal
 

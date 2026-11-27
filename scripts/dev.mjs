@@ -24,7 +24,7 @@ const lock = createSocket("udp4");
 lock.once("error", (error) => {
   console.error(
     error.code === "EADDRINUSE"
-      ? "[dev] Clemora Edge is already managed by another dev session. Stop that session before starting a new one."
+      ? "[dev] AMAC Edge is already managed by another dev session. Stop that session before starting a new one."
       : `[dev] Could not claim the local Edge runtime: ${error.message}`,
   );
   process.exitCode = 1;

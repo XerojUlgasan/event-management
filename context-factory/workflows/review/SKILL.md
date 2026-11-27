@@ -1,6 +1,6 @@
 ---
-name: clemora-review
-description: Review a Clemora diff, branch, PR, working tree, or design with source-grounded findings and read-only verification.
+name: amac-review
+description: Review a AMAC diff, branch, PR, working tree, or design with source-grounded findings and read-only verification.
 ---
 
 # Review

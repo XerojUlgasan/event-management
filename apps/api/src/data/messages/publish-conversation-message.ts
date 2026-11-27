@@ -22,7 +22,7 @@ export async function publishConversationMessageData(
     .where("m.id", "=", messageId)
     .where(
       sql<boolean>`
-      to_regprocedure('clemora_conversation_events.broadcast_message_added(uuid,jsonb)') is not null
+      to_regprocedure('amac_conversation_events.broadcast_message_added(uuid,jsonb)') is not null
       and to_regprocedure('realtime.send(jsonb,text,text,boolean)') is not null
     `,
     )
@@ -44,7 +44,7 @@ export async function publishConversationMessageData(
   }
 
   // Database Broadcast becomes visible only once the message transaction commits.
-  await sql`select clemora_conversation_events.broadcast_message_added(
+  await sql`select amac_conversation_events.broadcast_message_added(
     ${conversationId}::uuid,
     ${JSON.stringify(parsed.data)}::jsonb
   )`.execute(trx);

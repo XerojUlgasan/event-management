@@ -18,7 +18,7 @@ let server,
   CatalogRecommendations;
 
 before(async () => {
-  cacheDir = await mkdtemp(join(tmpdir(), "clemora-message-markdown-"));
+  cacheDir = await mkdtemp(join(tmpdir(), "amac-message-markdown-"));
   server = await createServer({
     root: fileURLToPath(new URL("../../", import.meta.url)),
     cacheDir,

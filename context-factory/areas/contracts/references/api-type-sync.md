@@ -1,6 +1,6 @@
 # API and type synchronization
 
-Clemora has no generated browser API client or `gen:data` command. The HTTP wrapper lives in [apps/web/src/lib/http/request.ts](../../../../apps/web/src/lib/http/request.ts). Endpoint calls and several handwritten DTOs live under `apps/web/src/lib/data/`. [Client layers](../../frontend/references/client-layers.md) is the placement rule for those calls. Reusable catalog and pagination types and shared limits live in [packages/contracts](../../../../packages/contracts/package.json). OpenAPI route schemas and handlers in `apps/api/src/controllers/` own the HTTP contract.
+AMAC has no generated browser API client or `gen:data` command. The HTTP wrapper lives in [apps/web/src/lib/http/request.ts](../../../../apps/web/src/lib/http/request.ts). Endpoint calls and several handwritten DTOs live under `apps/web/src/lib/data/`. [Client layers](../../frontend/references/client-layers.md) is the placement rule for those calls. Reusable catalog and pagination types and shared limits live in [packages/contracts](../../../../packages/contracts/package.json). OpenAPI route schemas and handlers in `apps/api/src/controllers/` own the HTTP contract.
 
 When a route, payload, status, nullability, pagination field, or shared limit changes:
 

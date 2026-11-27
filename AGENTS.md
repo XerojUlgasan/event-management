@@ -1,6 +1,6 @@
 # Repository guidance
 
-Clemora is a pnpm event-management workspace. Start with the [task router](context-factory/README.md); read the selected role, affected areas, workflow, and references whose conditions match the task. Re-evaluate when scope changes. Guidance is readable directly; automatic skill discovery is optional.
+AMAC is a pnpm event-management workspace. Start with the [task router](context-factory/README.md); read the selected role, affected areas, workflow, and references whose conditions match the task. Re-evaluate when scope changes. Guidance is readable directly; automatic skill discovery is optional.
 
 ## Standing rules
 

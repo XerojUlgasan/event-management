@@ -19,7 +19,7 @@ export default defineConfig({
   adapter: useCloudflare
     ? cloudflare({ imageService: "passthrough" })
     : node({ mode: "standalone" }),
-  // Clemora's API manages its own sessions.
+  // AMAC's API manages its own sessions.
   ...(useCloudflare ? { session: false } : {}),
   integrations: [react()],
   vite: {

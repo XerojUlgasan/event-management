@@ -1,6 +1,6 @@
 ---
 name: pull-requests
-description: Prepare, split, stack, open, or land authorized Clemora PR work with coherent contracts and verified scope.
+description: Prepare, split, stack, open, or land authorized AMAC PR work with coherent contracts and verified scope.
 ---
 
 # Pull requests

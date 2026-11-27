@@ -286,8 +286,8 @@ test("Realtime tokens are limited to the live session and requested receive scop
 
     assert.equal(payload.sub, session.user_id);
     assert.equal(payload.role, "authenticated");
-    assert.equal(payload.clemora_scope, "conversation_messages");
-    assert.equal(payload.clemora_session_id, session.id);
+    assert.equal(payload.amac_scope, "conversation_messages");
+    assert.equal(payload.amac_session_id, session.id);
     assert.equal(payload.conversation_id, id);
     assert.ok(payload.exp && payload.iat);
     assert.equal(payload.exp - payload.iat, 300);
@@ -303,8 +303,8 @@ test("Realtime tokens are limited to the live session and requested receive scop
     );
     assert.equal(notificationPayload.sub, session.user_id);
     assert.equal(notificationPayload.role, "authenticated");
-    assert.equal(notificationPayload.clemora_scope, "user_notifications");
-    assert.equal(notificationPayload.clemora_session_id, session.id);
+    assert.equal(notificationPayload.amac_scope, "user_notifications");
+    assert.equal(notificationPayload.amac_session_id, session.id);
     assert.equal(notificationPayload.conversation_id, undefined);
     assert.ok(notificationPayload.exp && notificationPayload.iat);
     assert.equal(notificationPayload.exp - notificationPayload.iat, 300);

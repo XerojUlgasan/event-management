@@ -1,6 +1,6 @@
 ---
 name: qa
-description: Authenticate local Clemora API checks, inspect PostgreSQL read-only, verify behavior, extend one-table seeds, or benchmark a measured claim.
+description: Authenticate local AMAC API checks, inspect PostgreSQL read-only, verify behavior, extend one-table seeds, or benchmark a measured claim.
 ---
 
 # QA

@@ -17,7 +17,7 @@ New uploads use pending paths with MIME-based extensions. After a successful own
 
 ## Decisions
 
-The user clarified that Clemora has not reached production and existing development documents need no migration/preservation. The final change has no move-tracking table or schema migration. See the [decision](../history/decisions/2026-11-18_catalog-media-folders.md) and current [media reference](../areas/api/references/external-image-urls.md).
+The user clarified that the project was in development at the time and existing development documents need no migration/preservation. The final change has no move-tracking table or schema migration. See the [decision](../history/decisions/2026-11-18_catalog-media-folders.md) and current [media reference](../areas/api/references/external-image-urls.md).
 
 ## Verification
 

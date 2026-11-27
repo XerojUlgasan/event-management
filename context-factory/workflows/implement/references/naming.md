@@ -1,4 +1,4 @@
-# Naming in Clemora
+# Naming in AMAC
 
 | Element | Current convention |
 | --- | --- |

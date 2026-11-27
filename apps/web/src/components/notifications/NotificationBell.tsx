@@ -392,7 +392,7 @@ export function NotificationBell({ profileId }: { profileId: string }) {
           isPermanentTokenFailure(cause.status)
         ) {
           if (cause.status === 401 && !stopped)
-            window.dispatchEvent(new Event("clemora:session-check"));
+            window.dispatchEvent(new Event("amac:session-check"));
         } else schedule(10_000);
       } finally {
         connecting = false;

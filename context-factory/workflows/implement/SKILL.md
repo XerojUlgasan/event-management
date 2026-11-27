@@ -1,6 +1,6 @@
 ---
-name: clemora-implement
-description: Implement, debug, or refactor Clemora code or configuration with coherent contracts, scoped changes, and verifiable outcomes.
+name: amac-implement
+description: Implement, debug, or refactor AMAC code or configuration with coherent contracts, scoped changes, and verifiable outcomes.
 ---
 
 # Implement

@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
 
 test("showcase previews cap visible graphemes and thumbnails without limiting detail", async (t) => {
-  const cacheDir = await mkdtemp(join(tmpdir(), "clemora-showcase-ssr-"));
+  const cacheDir = await mkdtemp(join(tmpdir(), "amac-showcase-ssr-"));
   const server = await createServer({
     root: fileURLToPath(new URL("../../", import.meta.url)),
     cacheDir,

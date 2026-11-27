@@ -28,6 +28,5 @@ sketches/
 # Keep historical documents and contributor guidance out of source-format sweeps.
 context-factory/
 docs/
-transcriptions/
 **/*.md
 !/README.md

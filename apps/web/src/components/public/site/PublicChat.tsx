@@ -150,6 +150,7 @@ function PublicChatPanel() {
       setAdmin(false);
       // Tabs on this origin serialize the first bootstrap, allowing the next
       // request to use the HttpOnly cookie set by the first response.
+      // Keep the legacy lock name so already-open tabs share the same lock.
       const result = navigator.locks
         ? await navigator.locks.request(
             "clemora-guest-bootstrap",

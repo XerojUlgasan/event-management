@@ -13,7 +13,7 @@ Return the current conversation's proposal as structured JSON, preserving sectio
 
 ## Result
 
-Implemented the [proposal service](../../apps/api/src/services/ai/get-my-proposal.ts) and [SDK adapter](../../apps/api/src/services/ai/tools/get-my-proposal.ts), registered only for customer turns. The existing owned booking-package service resolves custom proposals before the original catalog choice. Results distinguish found, no linked request, and package not prepared; failures remain errors.
+Implemented the [proposal service](../../apps/api/src/services/ai/get-my-package.ts) and [SDK adapter](../../apps/api/src/services/ai/tools/get-my-package.ts), registered only for customer turns. The existing owned booking-package service resolves custom proposals before the original catalog choice. Results distinguish found, no linked request, and package not prepared; failures remain errors.
 
 ## Changes or findings
 

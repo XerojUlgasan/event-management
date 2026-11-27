@@ -339,7 +339,7 @@ test("Astro resolves the planned relative config and the API command fails with 
 });
 
 test("rooms start a worker only when the selected revision provides its command", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "clemora-room-revision-"));
+  const directory = await mkdtemp(join(tmpdir(), "amac-room-revision-"));
   const plan = { ...roomPlan("/repo", "test", 0), path: directory };
 
   try {
@@ -368,7 +368,7 @@ test(
   "listener ownership rejects unrelated HTTP on a planned port",
   { timeout: 10000 },
   async () => {
-    const directory = await mkdtemp(join(tmpdir(), "clemora-room-listener-"));
+    const directory = await mkdtemp(join(tmpdir(), "amac-room-listener-"));
     const portFile = join(directory, "listener.port");
     await writeFile(
       join(directory, "pnpm"),
@@ -433,7 +433,7 @@ test(
   "service supervisor kills descendants after the package runner exits",
   { timeout: 10000 },
   async () => {
-    const directory = await mkdtemp(join(tmpdir(), "clemora-room-test-"));
+    const directory = await mkdtemp(join(tmpdir(), "amac-room-test-"));
     const pidFile = join(directory, "descendant.pid");
     const executable = join(directory, "pnpm");
     await writeFile(

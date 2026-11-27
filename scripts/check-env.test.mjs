@@ -8,7 +8,7 @@ import { test } from "node:test";
 const checker = new URL("./check-env.mjs", import.meta.url);
 
 async function checkFixture(files) {
-  const root = await mkdtemp(join(tmpdir(), "clemora-env-check-"));
+  const root = await mkdtemp(join(tmpdir(), "amac-env-check-"));
 
   try {
     for (const [path, source] of Object.entries(files)) {

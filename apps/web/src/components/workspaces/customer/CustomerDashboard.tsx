@@ -101,7 +101,11 @@ export function CustomerDashboard({
   }, []);
   useEffect(() => {
     try {
-      if (sessionStorage.getItem("clemora-message-sent") === "1") {
+      if (
+        (sessionStorage.getItem("amac-message-sent") ??
+          sessionStorage.getItem("clemora-message-sent")) === "1"
+      ) {
+        sessionStorage.removeItem("amac-message-sent");
         sessionStorage.removeItem("clemora-message-sent");
         notify("Message sent.");
       }

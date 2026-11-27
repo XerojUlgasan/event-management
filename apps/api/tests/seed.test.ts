@@ -332,8 +332,8 @@ test("seed creates demo users and conversations while preserving unrelated data 
   );
   const coverage = await pool.query(`SELECT
     (SELECT count(*)::int FROM booking_requests WHERE reference LIKE 'DEMO-%') AS requests,
-    (SELECT count(*)::int FROM conversations c JOIN users u ON u.id = c.customer_id WHERE u.email LIKE 'demo.%@clemora.example.test') AS conversations,
-    (SELECT count(*)::int FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN users u ON u.id = c.customer_id WHERE u.email LIKE 'demo.%@clemora.example.test') AS messages,
+    (SELECT count(*)::int FROM conversations c JOIN users u ON u.id = c.customer_id WHERE u.email LIKE 'demo.%@amac.example.test') AS conversations,
+    (SELECT count(*)::int FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN users u ON u.id = c.customer_id WHERE u.email LIKE 'demo.%@amac.example.test') AS messages,
     (SELECT count(*)::int FROM packages WHERE published_at IS NOT NULL AND archived_at IS NULL) AS package_published`);
   assert.deepEqual(coverage.rows[0], {
     requests: 0,
@@ -343,11 +343,11 @@ test("seed creates demo users and conversations while preserving unrelated data 
   });
   const scenario = await pool.query(
     `SELECT
-    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test') AS users,
-    (SELECT count(DISTINCT password_hash)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test') AS password_hashes,
-    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test' AND role = 'admin') AS admins,
-    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@clemora.example.test' AND role = 'customer') AS customers,
-    (SELECT count(*)::int FROM sessions s JOIN users u ON u.id = s.user_id WHERE u.email LIKE 'scenario.user%@clemora.example.test') AS sessions,
+    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@amac.example.test') AS users,
+    (SELECT count(DISTINCT password_hash)::int FROM users WHERE email LIKE 'scenario.user%@amac.example.test') AS password_hashes,
+    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@amac.example.test' AND role = 'admin') AS admins,
+    (SELECT count(*)::int FROM users WHERE email LIKE 'scenario.user%@amac.example.test' AND role = 'customer') AS customers,
+    (SELECT count(*)::int FROM sessions s JOIN users u ON u.id = s.user_id WHERE u.email LIKE 'scenario.user%@amac.example.test') AS sessions,
     (SELECT count(*)::int FROM packages WHERE id = ANY($1::uuid[])) AS packages,
     (SELECT count(*)::int FROM services WHERE id = ANY($2::uuid[])) AS services,
     (SELECT count(*)::int FROM media_assets WHERE id = ANY($3::uuid[])) AS media,
@@ -763,8 +763,8 @@ test("seed creates demo users and conversations while preserving unrelated data 
       creator.role <> 'admin'
       OR b.status IN ('declined', 'cancelled') OR p.id IS NULL
       OR p.id <> b.package_id OR q.base_amount_minor <> p.price * 100 OR q.currency <> 'PHP'
-      OR NOT clemora_quotation_items_valid(q.items)
-      OR q.total_amount_minor <> clemora_quotation_total(q.base_amount_minor, q.items)
+      OR NOT amac_quotation_items_valid(q.items)
+      OR q.total_amount_minor <> amac_quotation_total(q.base_amount_minor, q.items)
       OR q.total_amount_minor < 0 OR q.created_at > q.updated_at
       OR q.sent_at IS NULL OR NOT q.adjustments_reviewed OR q.status = 'draft'
       OR (q.status = 'superseded') IS DISTINCT FROM (q.superseded_at IS NOT NULL)
@@ -889,7 +889,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
     array_agg(m.sender_role ORDER BY m.created_at) AS message_roles
     FROM conversations c JOIN users customer ON customer.id = c.customer_id
     JOIN messages m ON m.conversation_id = c.id JOIN users u ON u.id = m.sender_id
-    WHERE customer.email = 'demo.camille@clemora.example.test' GROUP BY c.id`);
+    WHERE customer.email = 'demo.camille@amac.example.test' GROUP BY c.id`);
   assert.equal(conversation.rowCount, 1);
   assert.equal(conversation.rows[0].message_count, 2);
   assert.deepEqual(conversation.rows[0].sender_roles, ["customer", "admin"]);
@@ -1015,8 +1015,8 @@ test("seed creates demo users and conversations while preserving unrelated data 
         service.hourlyRatePesos > 0 && typeof service.imageUrl === "string",
     ),
   );
-  const customerCookie = await login("demo.camille@clemora.example.test");
-  const adminCookie = await login("demo.admin@clemora.example.test");
+  const customerCookie = await login("demo.camille@amac.example.test");
+  const adminCookie = await login("demo.admin@amac.example.test");
   assert.equal(
     (await read("/booking-requests/mine", customerCookie)).bookingRequests
       .length,
@@ -1030,7 +1030,7 @@ test("seed creates demo users and conversations while preserving unrelated data 
       .length,
     100,
   );
-  const scenarioAdmin = await login("scenario.user001@clemora.example.test");
+  const scenarioAdmin = await login("scenario.user001@amac.example.test");
   assert.equal((await read("/me", scenarioAdmin)).role, "admin");
   assert.equal("staffRole" in (await read("/me", scenarioAdmin)), false);
   assert.ok(

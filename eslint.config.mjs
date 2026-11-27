@@ -44,7 +44,6 @@ export default [
       "sketches/**",
       "context-factory/**",
       "docs/**",
-      "transcriptions/**",
     ],
   },
   ...astro.configs["flat/base"],

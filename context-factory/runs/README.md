@@ -14,6 +14,7 @@ Keep a compact index of recent/unfinished runs with topic, branch, status, and n
 
 | Run | Topic / branch | Status | Next action |
 | --- | --- | --- | --- |
+| [AMAC system identity](2026-11-27_10-27-48_amac-system-identity.md) | System rebrand / main | complete | Review the local upgrade and verify the application before a hosted rollout. |
 | [Supabase chat image worker](2026-11-26_06-04-00_supabase-chat-image-worker.md) | Hosted chat image processing | complete | All three pending production photos received replies. |
 | [Edge Realtime delivery and token renewal](2026-11-25_02-04-00_edge-realtime-token-renewal.md) | Local Edge chat and notifications | complete | Verified two-way delivery and renewal in Chromium. Hosted rollout remains unverified. |
 | [AMAC reference-photo search](2026-11-24_15-04-19_amac-reference-photo-search.md) | Guest and signed-in chat / feat/catalog-search-chat-photo | complete | Await explicit instruction to integrate and verify on main. |

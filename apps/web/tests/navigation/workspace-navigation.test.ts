@@ -6,7 +6,7 @@ import {
 } from "../../src/lib/navigation/workspace-navigation";
 
 class FakeWindow extends EventTarget {
-  current = new URL("https://clemora.test/app/overview");
+  current = new URL("https://amac.test/app/overview");
   entries = [this.current.href];
   index = 0;
   location = {
@@ -55,7 +55,7 @@ Object.assign(globalThis, { window: browser });
 
 test("workspace navigation pushes URLs, replaces redirects, and leaves history available for back", () => {
   let changes = 0;
-  browser.addEventListener("clemora:navigation", () => changes++);
+  browser.addEventListener("amac:navigation", () => changes++);
   navigateWorkspace("/app/messages?request=ABC#thread");
   assert.equal(
     browser.current.pathname + browser.current.search + browser.current.hash,
@@ -118,17 +118,17 @@ function click(anchor: FakeAnchor, options: Partial<MouseEvent> = {}) {
 
 test("only ordinary internal workspace links are intercepted", () => {
   assert.equal(
-    click(new FakeAnchor("https://clemora.test/app/events"), { ctrlKey: true }),
+    click(new FakeAnchor("https://amac.test/app/events"), { ctrlKey: true }),
     false,
   );
   assert.equal(
-    click(new FakeAnchor("https://clemora.test/app/events", true)),
+    click(new FakeAnchor("https://amac.test/app/events", true)),
     false,
   );
   assert.equal(click(new FakeAnchor("https://example.test/app/events")), false);
-  assert.equal(click(new FakeAnchor("https://clemora.test/packages")), false);
+  assert.equal(click(new FakeAnchor("https://amac.test/packages")), false);
   assert.equal(
-    click(new FakeAnchor("https://clemora.test/app/events?day=1")),
+    click(new FakeAnchor("https://amac.test/app/events?day=1")),
     true,
   );
   assert.equal(
@@ -136,7 +136,7 @@ test("only ordinary internal workspace links are intercepted", () => {
     "/app/events?day=1",
   );
   assert.equal(
-    click(new FakeAnchor("https://clemora.test/app/events?day=1#details")),
+    click(new FakeAnchor("https://amac.test/app/events?day=1#details")),
     false,
   );
 });

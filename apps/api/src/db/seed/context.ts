@@ -8,10 +8,13 @@ export const LOCAL_PASSWORD = "p@ssword01";
 
 export type SeedDb = Transaction<DB>;
 
+// Preserve the original namespace so reruns keep the same fixture IDs.
+const LEGACY_SCENARIO_ID_NAMESPACE = "clemora-scenario-v1";
+
 /** Stable UUID for a seed key. Existing rows are never updated. */
 export function scenarioId(key: string) {
   const bytes = createHash("sha256")
-    .update(`clemora-scenario-v1:${key}`)
+    .update(`${LEGACY_SCENARIO_ID_NAMESPACE}:${key}`)
     .digest()
     .subarray(0, 16);
   bytes[6] = (bytes[6] & 0x0f) | 0x50;
@@ -45,7 +48,7 @@ export function seedClock() {
 }
 
 /** Deterministic unit interval. SEED_RANDOM_SEED changes the shuffle only. */
-const { SEED_RANDOM_SEED = "clemora-scenario-v1" } = config;
+const { SEED_RANDOM_SEED = LEGACY_SCENARIO_ID_NAMESPACE } = config;
 
 export function seedRandom(seedText = SEED_RANDOM_SEED) {
   let hash = 2166136261;

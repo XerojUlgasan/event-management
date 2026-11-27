@@ -14,7 +14,7 @@ The customer and admin use the conversation to communicate and create transactio
 ## Main workflow and handoffs
 
 1. The customer submits a [booking request](booking-requests.md).
-2. When submitting from an active general conversation, Clemora binds the request to that same customer-owned thread, preserving its messages and AI preference. Otherwise it automatically creates a linked conversation. The customer does not need to start a separate chat for the request.
+2. When submitting from an active general conversation, AMAC binds the request to that same customer-owned thread, preserving its messages and AI preference. Otherwise it automatically creates a linked conversation. The customer does not need to start a separate chat for the request.
 3. The customer and admin exchange messages there as the admin reviews the request and follows up on the customer's needs.
 4. They use that same conversation for booking-related transactions. Sent quotations are delivered there as exact-version messages that customers can open and view. Customers respond or request a new quotation through chat; only the admin changes quotations. See [quotations](quotations.md). Other transaction types remain undefined.
 

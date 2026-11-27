@@ -1,6 +1,6 @@
 ---
 name: background-jobs
-description: Implement, investigate, or review Clemora's durable background queue, worker, job types, and retry behavior.
+description: Implement, investigate, or review AMAC's durable background queue, worker, job types, and retry behavior.
 ---
 
 # Background jobs

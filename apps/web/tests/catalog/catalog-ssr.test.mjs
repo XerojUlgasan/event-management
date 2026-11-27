@@ -24,7 +24,7 @@ let server,
 let CatalogFiltersForm, readCatalogFilters, catalogPageLinks;
 
 before(async () => {
-  cacheDir = await mkdtemp(join(tmpdir(), "clemora-catalog-ssr-"));
+  cacheDir = await mkdtemp(join(tmpdir(), "amac-catalog-ssr-"));
   server = await createServer({
     root,
     cacheDir,

@@ -5270,7 +5270,7 @@ test("an implicit proposal follow-up can read current state after an earlier den
 
 test("business information reads current public fields and records only field names", async () => {
   const information = {
-    name: "Clemora Events",
+    name: "Styled by AMAC",
     introduction: "We plan celebrations.",
     phone: "+63 900 123 4567",
     email: "hello@example.test",

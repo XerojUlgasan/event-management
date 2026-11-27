@@ -153,7 +153,7 @@ before(async () => {
   ({ act, createElement } = await import("react"));
   ({ createRoot } = await import("react-dom/client"));
 
-  cacheDir = await mkdtemp(join(tmpdir(), "clemora-bi-editor-"));
+  cacheDir = await mkdtemp(join(tmpdir(), "amac-bi-editor-"));
   server = await createServer({
     root: webRoot,
     cacheDir,

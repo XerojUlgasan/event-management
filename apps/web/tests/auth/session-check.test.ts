@@ -9,7 +9,7 @@ Object.assign(globalThis, { window: browser });
 test("401 on a data request requests session confirmation, while credential and /me failures do not", async () => {
   const originalFetch = globalThis.fetch;
   let checks = 0;
-  browser.addEventListener("clemora:session-check", () => checks++);
+  browser.addEventListener("amac:session-check", () => checks++);
   globalThis.fetch = async () =>
     new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
 

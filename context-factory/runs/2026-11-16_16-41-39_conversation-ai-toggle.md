@@ -17,7 +17,7 @@ Admin Messages has an AI on / AI off (Human) button in general and booking conve
 
 ## Changes or findings
 
-- Additive Prisma migration adds `ai_enabled` and `ai_version`. Applied to the confirmed local Clemora PostgreSQL; generated Kysely types refreshed.
+- Additive Prisma migration adds `ai_enabled` and `ai_version`. Applied to the confirmed local PostgreSQL; generated Kysely types refreshed.
 - Customer insertion snapshots AI state under the conversation lock. Admin messages and quotation delivery atomically switch AI off. Final assistant persistence checks the captured version, so off/on cannot revive an old reply.
 - Admin-only PATCH validates expected version; stale requests return 409. Updated API schemas, DTOs, browser calls, and polling merges preserve newer confirmed preferences.
 - Current product and AI documentation describe the accepted behavior. Other dirty work is untouched.

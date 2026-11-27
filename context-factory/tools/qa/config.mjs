@@ -11,7 +11,7 @@ export function createClient() {
   const { Client } = require("pg");
   return new Client({
     connectionString,
-    application_name: "clemora-qa",
+    application_name: "amac-qa",
     connectionTimeoutMillis: 5000,
     statement_timeout: 10000,
   });

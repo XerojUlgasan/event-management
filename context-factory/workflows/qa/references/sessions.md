@@ -11,7 +11,7 @@ The helper loads the API environment privately, logs in through `/v1/auth/login`
 Use the returned file without printing it:
 
 ```sh
-curl --fail-with-body --header @/tmp/clemora-qa-EXAMPLE/cookie-header http://localhost:3000/v1/me
+curl --fail-with-body --header @/tmp/amac-qa-EXAMPLE/cookie-header http://localhost:3000/v1/me
 ```
 
 Replace the example path/base with the helper's actual output. The cookie is `em_session`, not a Firebase bearer token. Reuse it for the authorized checks. When finished, POST to the same base's `/auth/logout` with that header, then remove the generated temporary directory.

@@ -13,7 +13,7 @@ Remove `package_name`, `package_price`, and `package_max_guests` from booking re
 
 ## Result
 
-Migration `20261116063852_derive_booking_package_details` drops only those columns and their dependent checks. It was applied to the configured local Clemora database after all earlier migrations were confirmed complete. SQL verified column absence and successful referenced-package reads. No hosted database was changed.
+Migration `20261116063852_derive_booking_package_details` drops only those columns and their dependent checks. It was applied to the configured local database after all earlier migrations were confirmed complete. SQL verified column absence and successful referenced-package reads. No hosted database was changed.
 
 ## Changes or findings
 

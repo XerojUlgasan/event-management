@@ -4,16 +4,16 @@ export type SiteLink = { label: string; href: string };
 
 export function SiteHeader({ links }: { links: SiteLink[] }) {
   return (
-    <header className="cl-site-header">
+    <header className="amac-site-header">
       <Wordmark />
-      <nav className="cl-site-header__nav" aria-label="Main navigation">
+      <nav className="amac-site-header__nav" aria-label="Main navigation">
         {links.map((link) => (
           <a key={link.href} href={link.href}>
             {link.label}
           </a>
         ))}
       </nav>
-      <details className="cl-site-header__mobile">
+      <details className="amac-site-header__mobile">
         <summary aria-label="Open navigation">
           <span></span>
           <span></span>

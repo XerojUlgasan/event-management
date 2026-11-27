@@ -1,6 +1,6 @@
 # Identity and responsibilities
 
-Clemora has two account roles: customer and admin. Registration creates a customer account. Admin accounts are reserved for designated System Administrators.
+AMAC has two account roles: customer and admin. Registration creates a customer account. Admin accounts are reserved for designated System Administrators.
 
 This reference describes how the roles should work. Some workflows are still planned; the [current implementation](product.md#current-implementation) records what is available today.
 

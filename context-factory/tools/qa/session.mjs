@@ -32,7 +32,7 @@ async function main() {
     headers: { Cookie: cookie }, redirect: "error", signal: AbortSignal.timeout(10000),
   });
   if (!me.ok || (await me.json()).id !== profile.id) throw new Error("The new cookie did not restore the expected account.");
-  const directory = await mkdtemp(join(tmpdir(), "clemora-qa-"));
+  const directory = await mkdtemp(join(tmpdir(), "amac-qa-"));
   const cookieFile = join(directory, "cookie-header");
   await writeFile(cookieFile, `Cookie: ${cookie}\n`, { mode: 0o600 });
   console.log(JSON.stringify({ email: profile.email, role: profile.role, apiUrl: baseUrl, cookieFile }, null, 2));

@@ -188,7 +188,7 @@ export function useRealtimeThread({
           isPermanentTokenFailure(cause.status)
         ) {
           if (cause.status === 401 && isCurrent())
-            window.dispatchEvent(new Event("clemora:session-check"));
+            window.dispatchEvent(new Event("amac:session-check"));
 
           return;
         }
