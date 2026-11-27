@@ -1,6 +1,6 @@
 ---
 name: event-management-frontend
-description: Change or investigate the Clemora Astro and React frontend, client data, authentication, styling, or UI.
+description: Change or investigate the AMAC Astro and React frontend, client data, authentication, styling, or UI.
 ---
 
 # Frontend
@@ -15,6 +15,6 @@ Load references for the affected work:
 - Login, session restoration, or role-based UI: [client data and auth](references/data-and-auth.md) and [API auth](../api/references/auth-and-sessions.md).
 - Public pages or workspace navigation: [pages and application structure](references/pages-and-structure.md).
 - Visual design, styling, or catalog canvas: [design](references/design.md) and [styling and verification](references/styling-and-verification.md).
-- Selecting or extending shared controls: [Clemora UI usage](references/clemora-ui.md).
+- Selecting or extending shared controls: [AMAC UI usage](references/amac-ui.md).
 - Mirrored form or upload constraints: [contracts](../contracts/SKILL.md).
 - Business behavior: [business domain router](../../business/README.md); confirm implemented behavior in source.

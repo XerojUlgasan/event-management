@@ -20,7 +20,7 @@ let server,
   applyRealtimeMessage;
 
 before(async () => {
-  cacheDir = await mkdtemp(join(tmpdir(), "clemora-booking-review-"));
+  cacheDir = await mkdtemp(join(tmpdir(), "amac-booking-review-"));
   server = await createServer({
     root: fileURLToPath(new URL("../../", import.meta.url)),
     cacheDir,

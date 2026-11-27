@@ -7,7 +7,7 @@ export function SectionCounter({
 }) {
   return (
     <span
-      className="cl-section-counter"
+      className="amac-section-counter"
       aria-label={`Section ${current} of ${total}`}
     >
       <span>{String(current).padStart(2, "0")}</span>

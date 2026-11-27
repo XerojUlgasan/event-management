@@ -38,7 +38,7 @@
     "test:catalog-staff-removal": "tsx --test tests/catalog-staff-removal-migration.test.ts",
     "test:checklist-removal": "tsx --test tests/checklist-removal-migration.test.ts",
     "worker:background-jobs": "tsx src/workers/background-jobs.ts",
-    "test:background-jobs": "tsx --test tests/background-jobs.test.ts tests/background-jobs-worker.test.ts",
+    "test:background-jobs": "tsx --test tests/background-jobs.test.ts tests/background-jobs-worker.test.ts tests/edge-worker-cutover.test.ts",
     "test:business-information": "tsx --test tests/business-information.test.ts",
     "test:supporting-documents": "tsx --test tests/supporting-document-preparation.test.ts tests/supporting-documents.test.ts"
   },

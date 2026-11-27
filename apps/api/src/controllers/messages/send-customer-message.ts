@@ -16,7 +16,7 @@ export const sendCustomerMessageRoute = createRoute({
   method: "post",
   path: "/messages/conversation/messages",
   tags: ["Messages"],
-  summary: "Send a message to the Clemora team",
+  summary: "Send a message to the AMAC team",
   request: { body: messageRequestBody(customerMessageBodySchema) },
   responses: {
     201: {

@@ -3,7 +3,7 @@
 Started: 2026-11-14T12:42:00+08:00
 Updated: 2026-11-14T12:42:00+08:00
 Status: complete
-Scope: Implement the approved warm Clemora Messages revision for customer and admin; separate Details, Current package, and latest sent Quotation. Preserve exact quotation-message versions and existing permissions.
+Scope: Implement the approved warm Messages revision for customer and admin; separate Details, Current package, and latest sent Quotation. Preserve exact quotation-message versions and existing permissions.
 Checkout: main, edb7775; clean before this task, scoped changes uncommitted
 Continues: none
 

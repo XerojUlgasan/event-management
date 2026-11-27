@@ -3,7 +3,7 @@
 Started: 2026-11-14T11:37:51+08:00
 Updated: 2026-11-14T11:50:00+08:00
 Status: complete
-Scope: Improve customer My events using the supplied grouped timeline reference, preserve Clemora's design and request semantics, delegate investigation, and inspect/refine usability. No deployment, migrations, resets, or shared-data writes.
+Scope: Improve customer My events using the supplied grouped timeline reference, preserve the existing design and request semantics, delegate investigation, and inspect/refine usability. No deployment, migrations, resets, or shared-data writes.
 Checkout: main, baseline 5fb0b9c; existing catalog/guidance changes preserved; work remains uncommitted.
 Continues: none
 

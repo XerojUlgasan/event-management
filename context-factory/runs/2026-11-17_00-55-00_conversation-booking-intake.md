@@ -13,7 +13,7 @@ Preserve the existing chat when submitting a booking request, allow no initial p
 
 ## Result
 
-Implementation, integrated checks, cleanup, and final audit are complete. The single new migration was applied to the confirmed local Clemora database at port 54322; schema readback confirms nullable package ownership. No application records were modified there. Browser fixtures use a separate disposable migrated database.
+Implementation, integrated checks, cleanup, and final audit are complete. The single new migration was applied to the confirmed local database at port 54322; schema readback confirms nullable package ownership. No application records were modified there. Browser fixtures use a separate disposable migrated database.
 
 ## Changes or findings
 

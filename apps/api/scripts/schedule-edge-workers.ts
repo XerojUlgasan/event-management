@@ -2,6 +2,8 @@ import { Client } from "pg";
 import {
   edgeJobWorkers,
   workerTokenHeader,
+  workerVersion,
+  workerVersionHeader,
   type EdgeJobWorker,
 } from "../src/constants/edge-job-workers.js";
 import { config } from "../src/env.js";
@@ -77,6 +79,15 @@ export async function scheduleEdgeWorkers(client: Client, functionUrl: URL) {
       "create extension if not exists pg_net with schema extensions",
     );
 
+    // Serialize with older schedulers and remove the old jobs before adding new ones.
+    await client.query("select pg_advisory_xact_lock(hashtext($1))", [
+      "clemora-catalog-indexing",
+    ]);
+    await client.query(
+      "select cron.unschedule(jobid) from cron.job where jobname = any($1::text[])",
+      [["clemora-catalog-indexing", "clemora-image-messages"]],
+    );
+
     for (const worker of Object.values(edgeJobWorkers)) {
       await scheduleWorker(
         client,
@@ -86,12 +97,38 @@ export async function scheduleEdgeWorkers(client: Client, functionUrl: URL) {
     }
 
     await client.query(
-      "delete from vault.secrets where name = 'clemora_catalog_index_worker'",
+      "delete from vault.secrets where name = any($1::text[])",
+      [
+        [
+          "clemora_catalog_index_worker",
+          "clemora_catalog_index_worker_signing",
+          "clemora_image_message_worker_signing",
+        ],
+      ],
     );
     await client.query("commit");
   } catch (cause) {
     await client.query("rollback");
     throw cause;
+  }
+}
+
+export async function verifyWorkerReadiness(functionUrl: URL) {
+  for (const worker of Object.values(edgeJobWorkers)) {
+    const probe = await fetch(new URL(functionUrl.href + worker.path), {
+      method: "POST",
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (
+      probe.status !== 401 ||
+      probe.headers.get(workerVersionHeader) !== workerVersion ||
+      (await probe.json()).error !== "Invalid worker token"
+    )
+      throw new Error(
+        `Deploy the ${worker.scheduleName} route before enabling its schedule.`,
+      );
   }
 }
 
@@ -117,21 +154,7 @@ async function main() {
 
   const functionUrl = new URL(`https://${ref}.supabase.co/functions/v1/api`);
 
-  for (const worker of Object.values(edgeJobWorkers)) {
-    const probe = await fetch(new URL(functionUrl.href + worker.path), {
-      method: "POST",
-      redirect: "error",
-      signal: AbortSignal.timeout(15_000),
-    });
-
-    if (
-      probe.status !== 401 ||
-      (await probe.json()).error !== "Invalid worker token"
-    )
-      throw new Error(
-        `Deploy the ${worker.scheduleName} route before enabling its schedule.`,
-      );
-  }
+  await verifyWorkerReadiness(functionUrl);
 
   const client = new Client({ connectionString });
   await client.connect();

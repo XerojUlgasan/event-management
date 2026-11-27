@@ -28,7 +28,7 @@ The earlier disposable/synthetic checks proved the implementation in isolation b
 
 ## Verification
 
-- Reproduction command: `pnpm --filter @event-management/api exec tsx /tmp/clemora-local-message-check.ts`. It resolves the actual local Supabase target and executes the real `selectMessageColumnsData` query with no returned message data. Before: `42P01`. After: pass on two executions.
+- The local reproduction resolved the actual local Supabase target and executed the real `selectMessageColumnsData` query with no returned message data. Before: `42P01`. After: pass on two executions.
 - Authenticated with a documented local customer fixture through `http://localhost:4321/v1`; `/messages/conversations` and `/messages/conversation` each returned HTTP 200 with object responses. Logged out successfully (204) and removed the task-created cookie file/session directory.
 - No real vision/text provider calls, image send, browser journey or hosted runtime checks were performed. Existing isolated test results remain recorded in the predecessor.
 

@@ -13,7 +13,7 @@ A flat `catalog-media/<id>` folder hides which listing or booking owns each uplo
 
 Keep one private bucket. New uploads start under `pending/<admin-id>/<media-id>.<ext>`. Saving an owner promotes its uploads into `packages/<package-id>/`, `services/<service-id>/`, or `bookings/<booking-id>/custom-package/`, with `images/` and `videos/` subfolders. File extensions follow the validated MIME type. Stable IDs prevent renames from changing paths. Custom packages copy uploads and dedicated thumbnails independently.
 
-Clemora remains in development and has not reached production. The user explicitly excluded existing-document migration and preservation from this task. Do not add a storage backfill or move-tracking table. This does not authorize deleting or resetting existing data.
+The project was in development at the time. The user explicitly excluded existing-document migration and preservation from this task. Do not add a storage backfill or move-tracking table. This does not authorize deleting or resetting existing data.
 
 ## Alternatives considered
 

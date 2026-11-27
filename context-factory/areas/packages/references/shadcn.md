@@ -1,10 +1,10 @@
 # shadcn skill integration
 
-The official [shadcn skill](../../../../.agents/skills/shadcn/SKILL.md) is installed for this project in `.agents/skills/shadcn/`, alongside the existing design skills. It supplies component composition rules, CLI references, theming, registry guidance, and design-system examples. The [packages skill](../SKILL.md) routes relevant work here; Clemora's [package reuse workflow](reuse.md) continues to own placement and verification.
+The official [shadcn skill](../../../../.agents/skills/shadcn/SKILL.md) is installed for this project in `.agents/skills/shadcn/`, alongside the existing design skills. It supplies component composition rules, CLI references, theming, registry guidance, and design-system examples. The [packages skill](../SKILL.md) routes relevant work here; AMAC's [package reuse workflow](reuse.md) continues to own placement and verification.
 
 ## Current setup and prerequisites
 
-Checked on 2026-11-06: [UI exports](../../../../packages/ui/src/index.ts) expose Clemora's custom React components. The [UI manifest](../../../../packages/ui/package.json) exports the root entry and stylesheet. Neither `apps/web` nor `packages/ui` has a `components.json`; installing this skill does not initialize shadcn or migrate those components.
+Checked on 2026-11-06: [UI exports](../../../../packages/ui/src/index.ts) expose AMAC's custom React components. The [UI manifest](../../../../packages/ui/package.json) exports the root entry and stylesheet. Neither `apps/web` nor `packages/ui` has a `components.json`; installing this skill does not initialize shadcn or migrate those components.
 
 Before implementing shadcn setup:
 
@@ -20,9 +20,9 @@ pnpm dlx shadcn@latest info --json --cwd apps/web
 pnpm dlx shadcn@latest info --json --cwd packages/ui
 ```
 
-Inspect the matching local implementation before applying shadcn APIs: Clemora's current `Button`, `Select`, `Tabs`, `FormField`, and dialogs have different contracts. Apply new-app scaffolding and `add --all` recipes only when the requested work actually calls for a new app or all components. Skill installation alone does not authorize those operations or MCP configuration changes.
+Inspect the matching local implementation before applying shadcn APIs: AMAC's current `Button`, `Select`, `Tabs`, `FormField`, and dialogs have different contracts. Apply new-app scaffolding and `add --all` recipes only when the requested work actually calls for a new app or all components. Skill installation alone does not authorize those operations or MCP configuration changes.
 
-The bundled showcase coverage script assumes a flat UI folder and `/ui/<component>` imports. Clemora uses atomic folders and root package exports, so that script is not a coverage check for the current library. Existing Storybook remains the component reference.
+The bundled showcase coverage script assumes a flat UI folder and `/ui/<component>` imports. AMAC uses atomic folders and root package exports, so that script is not a coverage check for the current library. Existing Storybook remains the component reference.
 
 ## Source and review
 

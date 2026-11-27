@@ -127,7 +127,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      const notice = sessionStorage.getItem("clemora-auth-notice");
+      const notice =
+        sessionStorage.getItem("amac-auth-notice") ??
+        sessionStorage.getItem("clemora-auth-notice");
+      sessionStorage.removeItem("amac-auth-notice");
       sessionStorage.removeItem("clemora-auth-notice");
 
       if (notice === "signin") notify("Signed in successfully.");
@@ -212,13 +215,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (document.visibilityState === "visible") revalidate();
     };
 
-    window.addEventListener("clemora:session-check", revalidate);
+    window.addEventListener("amac:session-check", revalidate);
     window.addEventListener("focus", onVisible);
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
       active = false;
-      window.removeEventListener("clemora:session-check", revalidate);
+      window.removeEventListener("amac:session-check", revalidate);
       window.removeEventListener("focus", onVisible);
       document.removeEventListener("visibilitychange", onVisible);
     };
@@ -242,7 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (notice) {
           try {
-            sessionStorage.setItem("clemora-auth-notice", notice);
+            sessionStorage.setItem("amac-auth-notice", notice);
           } catch {
             /* The destination page itself still confirms the new session. */
           }
@@ -265,7 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           authBusy.current = false;
 
           if (checkSession)
-            window.dispatchEvent(new Event("clemora:session-check"));
+            window.dispatchEvent(new Event("amac:session-check"));
         }
       }
     },

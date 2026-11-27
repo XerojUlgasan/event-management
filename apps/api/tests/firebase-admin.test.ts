@@ -28,7 +28,7 @@ let credentials: string;
 before(async () => {
   for (const name of variables) setTestConfig({ [name]: undefined });
 
-  directory = await mkdtemp(join(tmpdir(), "clemora-firebase-test-"));
+  directory = await mkdtemp(join(tmpdir(), "amac-firebase-test-"));
   credentialsFile = join(directory, "service-account.json");
   setTestConfig({ GOOGLE_APPLICATION_CREDENTIALS: credentialsFile });
   const { privateKey } = await promisify(generateKeyPair)("rsa", {

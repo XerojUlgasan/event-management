@@ -1,4 +1,6 @@
-# Styled by AMAC
+# AMAC
+
+Event management for Styled by AMAC.
 
 <!-- Named anchors keep links to former README sections working. -->
 

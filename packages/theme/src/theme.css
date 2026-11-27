@@ -1,12 +1,12 @@
 @theme {
   /* Tailwind aliases for the same brand palette used by the CSS variables. */
-  --color-clemora-surface: #f4f4f4;
-  --color-clemora-ink: #3a3937;
-  --color-clemora-slate: #71645a;
-  --color-clemora-coral: #71645a;
-  --color-clemora-panel: #3a3937;
-  --color-clemora-line: #d7d1cd;
-  --font-clemora: "DM Sans", sans-serif;
+  --color-amac-surface: #f4f4f4;
+  --color-amac-ink: #3a3937;
+  --color-amac-slate: #71645a;
+  --color-amac-coral: #71645a;
+  --color-amac-panel: #3a3937;
+  --color-amac-line: #d7d1cd;
+  --font-amac: "DM Sans", sans-serif;
 
   --color-wine: #3a3937;
   --color-wine-dark: #272624;
@@ -26,14 +26,14 @@
   --brand-taupe: #a89c95;
   --brand-taupe-text: #71645a;
 
-  /* Older token names remain available to every current consumer. */
-  --cl-surface: var(--brand-paper);
-  --cl-ink: var(--brand-charcoal);
-  --cl-slate: var(--brand-taupe-text);
-  --cl-coral: var(--brand-taupe-text);
-  --cl-panel: var(--brand-charcoal);
-  --cl-line: #d7d1cd;
-  --cl-font: "DM Sans", sans-serif;
+  /* AMAC theme aliases for public pages and shared components. */
+  --amac-surface: var(--brand-paper);
+  --amac-ink: var(--brand-charcoal);
+  --amac-slate: var(--brand-taupe-text);
+  --amac-coral: var(--brand-taupe-text);
+  --amac-panel: var(--brand-charcoal);
+  --amac-line: #d7d1cd;
+  --amac-font: "DM Sans", sans-serif;
 
   --wine: var(--brand-charcoal);
   --wine-dark: #272624;
@@ -105,7 +105,7 @@
   --accent-violet-muted: var(--brand-taupe-text);
   --accent-violet-surface: #f1eeec;
   --accent-violet-border: #d8d2ce;
-  --accent-coral: var(--cl-coral);
+  --accent-coral: var(--amac-coral);
   --accent-coral-dark: #514d49;
   --accent-coral-surface: #f3f0ee;
   --accent-coral-border: #d8cec7;

@@ -4,7 +4,7 @@ The [post-refactor functional QA report](2026-11-06_ui-refactor.md) records the 
 
 ## Goal and boundary
 
-Centralize reusable web presentation in `packages/ui` and authored colors in `packages/theme`. Reuse shared controls across the web while preserving existing interaction, accessibility, responsive layout, and application behavior. Keep specialized layout and business logic in the app. The starting checkout was branch `staff-page` at `5c0c8b4`; the pre-refactor web stylesheet snapshot is under `/tmp/clemora-whole-web-baseline-5c0c8b4/` when available. This temporary snapshot is not a repository dependency.
+Centralize reusable web presentation in `packages/ui` and authored colors in `packages/theme`. Reuse shared controls across the web while preserving existing interaction, accessibility, responsive layout, and application behavior. Keep specialized layout and business logic in the app. The starting checkout was branch `staff-page` at `5c0c8b4`.
 
 Preserve unrelated working-tree changes, including the existing `BookingList.tsx` changes and their semantics. Do not treat a component migration or build as proof of a persisted workflow.
 
@@ -28,7 +28,7 @@ Preserve unrelated working-tree changes, including the existing `BookingList.tsx
 
 ## Component contracts follow-up (2026-11-06)
 
-The component-by-component improvement follows the [Clemora UI skill](../../areas/frontend/references/clemora-ui.md). It strengthens the existing React/CSS library and its consumers; it does not introduce a shadcn dependency migration. Earlier evidence above belongs to the original migration and is not a claim about this follow-up.
+The component-by-component improvement follows the [AMAC UI skill](../../areas/frontend/references/amac-ui.md). It strengthens the existing React/CSS library and its consumers; it does not introduce a shadcn dependency migration. Earlier evidence above belongs to the original migration and is not a claim about this follow-up.
 
 | Component | Change and consumer evidence |
 | --- | --- |

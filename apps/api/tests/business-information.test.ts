@@ -147,7 +147,7 @@ function sampleInformation(): BusinessInformation {
     ...emptyBusinessInformation(),
     about: {
       ...emptyBusinessInformation().about,
-      name: "Clemora Events",
+      name: "Styled by AMAC",
       tagline: "Celebrations planned with care",
       introduction: "We plan weddings and corporate events.",
     },
@@ -319,7 +319,7 @@ test("admin save persists and public read reflects content", async () => {
       adminCookie,
     ),
   );
-  assert.equal(saved.information.about.name, "Clemora Events");
+  assert.equal(saved.information.about.name, "Styled by AMAC");
   assert.equal(saved.information.contact.email, "hello@example.test");
   assert.notEqual(saved.updatedAt, current.updatedAt);
 

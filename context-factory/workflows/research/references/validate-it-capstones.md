@@ -8,7 +8,7 @@ Use the [documentation agent](../../../agents/documentation.md). Assess the idea
 
 Read the proposal, approved constraints, client evidence, and evaluation plan. Verify current external claims and existing alternatives with primary or official sources. Use [research-desk](research-desk.md) for source checks. Distinguish direct client evidence, broader research, team assumptions, and unverified claims.
 
-For an approved Clemora project, assess the current scope and evidence; do not discard the client or invent a replacement project. Separate a weakness in the paper's explanation from a flaw in the system's viability.
+For an approved AMAC project, assess the current scope and evidence; do not discard the client or invent a replacement project. Separate a weakness in the paper's explanation from a flaw in the system's viability.
 
 ## Stress-test the proposal
 

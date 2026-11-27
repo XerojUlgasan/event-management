@@ -23,12 +23,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--cl-line);
+  border: 1px solid var(--amac-line);
   border-radius: 50%;
   width: 17px;
   height: 17px;
   font-size: 11px;
-  color: var(--cl-slate);
+  color: var(--amac-slate);
   cursor: help;
 }
 .knowledge-tooltip {
@@ -36,8 +36,8 @@
   z-index: 1000;
   padding: 10px;
   border-radius: 6px;
-  background: var(--cl-panel);
-  color: var(--cl-surface);
+  background: var(--amac-panel);
+  color: var(--amac-surface);
   font-size: 12px;
   line-height: 1.4;
   font-weight: 400;
@@ -46,7 +46,7 @@
   overflow: auto;
 }
 .knowledge-help:focus-visible {
-  outline: 2px solid var(--cl-ink);
+  outline: 2px solid var(--amac-ink);
   outline-offset: 2px;
 }
 .knowledge-overview-heading {
@@ -54,7 +54,7 @@
   align-items: center;
   gap: 7px;
   margin-bottom: 10px;
-  color: var(--cl-slate);
+  color: var(--amac-slate);
   font-size: 13px;
 }
 .knowledge-metrics {
@@ -76,7 +76,7 @@
   outline-offset: 2px;
 }
 .knowledge-metric-label {
-  color: var(--cl-slate);
+  color: var(--amac-slate);
   font-size: 13px;
   display: flex;
   align-items: center;
@@ -99,7 +99,7 @@
 .knowledge-metric-value span,
 .knowledge-metric-button span,
 .knowledge-target {
-  color: var(--cl-slate);
+  color: var(--amac-slate);
   font-size: 13px;
 }
 .knowledge-metric-button {
@@ -111,7 +111,7 @@
   text-align: left;
 }
 .knowledge-metric-button:focus-visible {
-  outline: 2px solid var(--cl-ink);
+  outline: 2px solid var(--amac-ink);
   outline-offset: 4px;
 }
 .knowledge-target {
@@ -119,14 +119,14 @@
 }
 .knowledge-track {
   height: 5px;
-  background: var(--cl-line);
+  background: var(--amac-line);
   border-radius: 5px;
   overflow: hidden;
 }
 .knowledge-track span {
   display: block;
   height: 100%;
-  background: var(--cl-slate);
+  background: var(--amac-slate);
 }
 .knowledge-metric-alert .knowledge-track span {
   background: var(--status-warning-strong);
@@ -164,7 +164,7 @@
   border: 0;
   border-radius: 8px;
   background: var(--transparent);
-  color: var(--cl-ink);
+  color: var(--amac-ink);
   font: inherit;
   font-size: 14px;
   font-weight: 400;
@@ -197,7 +197,7 @@
 }
 .knowledge-table-heading span,
 .knowledge-detail-meta {
-  color: var(--cl-slate);
+  color: var(--amac-slate);
   font-size: 13px;
 }
 .knowledge-filters {
@@ -216,7 +216,7 @@
 }
 .knowledge-scroll-hint {
   display: none;
-  color: var(--cl-slate);
+  color: var(--amac-slate);
   font-size: 12px;
   margin-bottom: 8px;
 }
@@ -251,7 +251,7 @@
 .knowledge-skeleton span {
   min-height: 150px;
   border-radius: 8px;
-  background: var(--cl-line);
+  background: var(--amac-line);
   opacity: 0.5;
 }
 .knowledge-skeleton span:last-child {
@@ -262,7 +262,7 @@
   overflow-wrap: anywhere;
 }
 .knowledge-chunk {
-  border-top: 1px solid var(--cl-line);
+  border-top: 1px solid var(--amac-line);
   padding: 18px 0;
 }
 .knowledge-chunk-head {
@@ -278,7 +278,7 @@
 }
 .knowledge-chunk small {
   display: block;
-  color: var(--cl-slate);
+  color: var(--amac-slate);
   margin-top: 10px;
 }
 @media (max-width: 700px) {
@@ -328,6 +328,6 @@
 .knowledge-detail-skeleton span {
   height: 64px;
   border-radius: 8px;
-  background: var(--cl-line);
+  background: var(--amac-line);
   opacity: 0.5;
 }

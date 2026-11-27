@@ -14,7 +14,7 @@ let display;
 let contracts;
 
 before(async () => {
-  cacheDir = await mkdtemp(join(tmpdir(), "clemora-bi-display-"));
+  cacheDir = await mkdtemp(join(tmpdir(), "amac-bi-display-"));
   server = await createServer({
     root,
     cacheDir,

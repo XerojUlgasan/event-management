@@ -13,7 +13,7 @@ Make booking-linked and signed-in general conversations available regardless of 
 
 ## Result
 
-Migration removes conversation status, closed timestamp, and guest deadline while preserving remaining state. The configured local Clemora database is migrated, Edge bundle/runtime refreshed, and the local background worker restarted. SCN-001 shows its existing draft and enabled Save and send in the browser. No quotation was sent in shared data.
+Migration removes conversation status, closed timestamp, and guest deadline while preserving remaining state. The configured local database is migrated, Edge bundle/runtime refreshed, and the local background worker restarted. SCN-001 shows its existing draft and enabled Save and send in the browser. No quotation was sent in shared data.
 
 ## Changes or findings
 
@@ -36,4 +36,4 @@ No local implementation work remains. Hosted rollout remains separate; API, fron
 
 ## Resume here
 
-Review this scoped diff; browser evidence is /tmp/clemora-conversation-availability.png. Preserve the local quotation as draft.
+Review this scoped diff. Preserve the local quotation as draft.

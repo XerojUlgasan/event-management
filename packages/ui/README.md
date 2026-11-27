@@ -1,6 +1,6 @@
 # @event-management/ui
 
-Shared React presentation components for Clemora. Import public components from `src/index.ts` through `@event-management/ui`; shared component styles are exported as `@event-management/ui/styles.css`.
+Shared React presentation components for AMAC. Import public components from `src/index.ts` through `@event-management/ui`; shared component styles are exported as `@event-management/ui/styles.css`.
 
 ## Layers
 
@@ -18,7 +18,7 @@ import "@event-management/ui/styles.css";
 
 Use shared primitives for controls and presentation; application content, routing, data, and business logic stay in `apps/web/`. `Button`, `Input`, `Textarea`, and `Select` accept native element props and refs. The plain variants support controls embedded in specialized layouts. `NativeDialog` renders a native dialog and forwards its props and ref; the caller owns opening, closing, focus, and lifecycle behavior.
 
-Shared component styles live in `src/styles.css`. Color choices and semantic surface, text, border, status, accent, and overlay tokens belong to `@event-management/theme`, including the existing Clemora and wine/cream tokens. App styles own page-specific layout.
+Shared component styles live in `src/styles.css`. Color choices and semantic surface, text, border, status, accent, and overlay tokens belong to `@event-management/theme`, including the existing AMAC and wine/cream tokens. App styles own page-specific layout.
 
 `Button.pending` disables the action, exposes `aria-busy`, and displays the spinner; callers supply pending text and state. `variant="danger"` styles destructive confirmations. `IconName`, `BadgeTone`, and `ToastTone` describe supported values. `Toast` defaults to success/status feedback; danger feedback uses an alert and matching icon/color. `Toast` also supports informational status feedback. For app notifications, mount `NotificationProvider` once and call `useNotifications().notify(message, tone)`; the default tone is `success`. Use `notifyError(cause, fallback)` for failures: it formats an unknown error, emits the danger notice, and returns the same message for optional contextual text, such as `setError(notifyError(cause, "Unable to save."))`. Polling can use `notificationErrorMessage` to compare errors before notifying. The provider stacks messages, suppresses identical visible messages, and owns timers and cleanup. Success/info notices dismiss after six seconds, with timing paused during hover or keyboard focus; danger notices stay until dismissed. The shared host follows the active native dialog so notices remain visible and dismissible in modal flows. Standalone `Toast` callers still own its lifetime. `placement="inline"` renders a persistent notice in document flow, including server-rendered catalog errors and their retry links.
 
@@ -26,7 +26,7 @@ Mount `Dialog` and `Drawer` conditionally. Their native modal lifecycle handles 
 
 `Tabs` defaults to filter-group buttons. For a true tablist, each item requires `id` and `panelId`; render matching labelled tab panels and hide inactive content. `PageHeader` supplies an `h1`, or `h2`/`h3` through `titleAs`; pass content rather than a heading element. Shared component dimension tokens retain the current appearance while centralizing control, radius, and field spacing values.
 
-For fields with help or error feedback, `FormField` accepts `description`, `error`, and a render-function child that supplies the control's ID and accessibility attributes. Spread these props on the actual `Input`, `Select`, or `Textarea`; validation and state stay in the app. Existing node children retain their label-wrapper behavior. See the [Clemora UI reference](../../context-factory/areas/frontend/references/clemora-ui.md) for composition examples.
+For fields with help or error feedback, `FormField` accepts `description`, `error`, and a render-function child that supplies the control's ID and accessibility attributes. Spread these props on the actual `Input`, `Select`, or `Textarea`; validation and state stay in the app. Existing node children retain their label-wrapper behavior. See the [AMAC UI reference](../../context-factory/areas/frontend/references/amac-ui.md) for composition examples.
 
 ## Storybook
 

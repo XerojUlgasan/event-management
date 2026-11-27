@@ -7,9 +7,13 @@ const api =
   process.env.EDGE_API_URL ?? "http://127.0.0.1:54321/functions/v1/api";
 
 test("hosted worker routes require a signed request", async () => {
-  for (const path of ["/_internal/image-messages", "/_internal/catalog-index"]) {
+  for (const path of [
+    "/_internal/image-messages",
+    "/_internal/catalog-index",
+  ]) {
     const response = await fetch(api + path, { method: "POST" });
     assert.equal(response.status, 401);
+    assert.equal(response.headers.get("x-amac-worker-version"), "1");
     assert.deepEqual(await response.json(), { error: "Invalid worker token" });
   }
 });

@@ -60,7 +60,7 @@ const handedOffConversation = {
 
 test("catalog browse and suggested replies coexist in both customer chats", async (t) => {
   const window = new Window();
-  const cacheDir = await mkdtemp(join(tmpdir(), "clemora-suggested-replies-"));
+  const cacheDir = await mkdtemp(join(tmpdir(), "amac-suggested-replies-"));
   const server = await createServer({
     root: fileURLToPath(new URL("../../", import.meta.url)),
     cacheDir,

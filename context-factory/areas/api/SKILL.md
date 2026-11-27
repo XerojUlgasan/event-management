@@ -1,6 +1,6 @@
 ---
 name: event-management-api
-description: Change or investigate Clemora API routes, auth, database, migrations, media, or API tests.
+description: Change or investigate AMAC API routes, auth, database, migrations, media, or API tests.
 ---
 
 # API

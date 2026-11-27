@@ -1,10 +1,10 @@
 # Product scope and implementation
 
-**Styled by AMAC** is the website's visible brand, replacing the previous Clemora identity. The supplied AMAC logo guides its charcoal, off-white, and taupe theme across public pages, login, and workspaces. This pnpm event-management workspace contains an Astro/React frontend, Hono OpenAPI backend, and shared UI, theme, and contract packages. PostgreSQL stores application records; Prisma owns schema changes and migrations, and Kysely handles runtime SQL. Original client research for **Prevail Events Management** is preserved in the interview records; the visual rebrand does not change product scope or establish a legal ownership change.
+**AMAC** is the event-management system. The website uses the **Styled by AMAC** brand. The supplied AMAC logo guides its charcoal, off-white, and taupe theme across public pages, login, and workspaces. This pnpm event-management workspace contains an Astro/React frontend, Hono OpenAPI backend, and shared UI, theme, and contract packages. PostgreSQL stores application records; Prisma owns schema changes and migrations, and Kysely handles runtime SQL.
 
 The supplied transparent logo is owned by `packages/ui/src/assets/`. Shared colors and typography live in `packages/theme/src/theme.css`. Existing package names, API routes, and browser storage keys retain their technical identifiers.
 
-Use the [development guide](../workflows/implement/references/development.md) for setup. The [interview summary](../../docs/PREVAIL_INTERVIEW_SUMMARY.md) records client evidence and distinguishes it from later scope decisions.
+Use the [development guide](../workflows/implement/references/development.md) for setup.
 
 ## Product scope
 
@@ -253,12 +253,6 @@ event-management/
 
 Saving a listing promotes its new pending uploads by copying bytes into the owner folder, switching the stored key, then removing the pending copy. A failed copy leaves the saved listing using its readable pending file; a later save retries promotion. Dedicated thumbnails use the same owner folders. API media URLs and access checks remain unchanged; folder names do not grant access. Original filenames are not retained.
 
-**Development scope:** Clemora has not reached production. Existing documents and uploaded files do not need migration or preservation for this redesign. There is no storage backfill command or move-tracking table, and this change does not delete existing bucket objects. The folder structure applies to new uploads and their subsequent saves. Interrupted promotion can leave an unreferenced object; this development implementation does not add a durable recovery queue. See [catalog media](../areas/api/references/external-image-urls.md) for lifecycle details.
+**Development scope:** Existing documents and uploaded files do not need migration or preservation for this redesign. There is no storage backfill command or move-tracking table, and this change does not delete existing bucket objects. The folder structure applies to new uploads and their subsequent saves. Interrupted promotion can leave an unreferenced object; this development implementation does not add a durable recovery queue. See [catalog media](../areas/api/references/external-image-urls.md) for lifecycle details.
 
 Public media streaming requires a reference from a published, non-archived catalog record. System Administrators can preview pending uploads and saved private media under the API access rules. Owners can preview media currently referenced by their private package; private responses use no-store caching. Quotations do not retain historical media or grant media access. Removing uploaded media triggers cleanup only when no current canvas or thumbnail references it; storage failures can leave unreferenced assets for retry. See [catalog media](../areas/api/references/external-image-urls.md) for storage, cleanup, and migration details, and [shared limits](../areas/contracts/SKILL.md) for validation ownership.
-
-## Interview sources
-
-- [Full transcription](../../transcriptions/full-transcription.md)
-- [Video 1 transcription](../../transcriptions/video-1.md)
-- [Video 2 transcription](../../transcriptions/video-2.md)

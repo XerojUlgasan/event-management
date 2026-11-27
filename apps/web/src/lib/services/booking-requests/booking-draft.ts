@@ -6,9 +6,11 @@ export type BookingAddon = {
   needsReview?: boolean;
   refreshed?: boolean;
 };
+
 import type { PublicPackage } from "../../data/catalog/packages";
 
-const KEY = "clemora-booking-draft";
+const KEY = "amac-booking-draft";
+const LEGACY_KEY = "clemora-booking-draft";
 
 export type BookingDraftFields = {
   eventType: string;
@@ -29,7 +31,18 @@ export type BookingDraft = {
 
 export function readBookingDraft(): BookingDraft | null {
   try {
-    const draft = JSON.parse(sessionStorage.getItem(KEY) || "null");
+    const current = sessionStorage.getItem(KEY);
+    const legacy = current === null ? sessionStorage.getItem(LEGACY_KEY) : null;
+    const draft = JSON.parse(current ?? legacy ?? "null");
+
+    if (legacy !== null) {
+      try {
+        sessionStorage.setItem(KEY, legacy);
+        sessionStorage.removeItem(LEGACY_KEY);
+      } catch {
+        // Continue using the old draft if storage cannot be updated.
+      }
+    }
 
     return draft &&
       typeof draft.item?.id === "string" &&
@@ -46,8 +59,10 @@ export function readBookingDraft(): BookingDraft | null {
 
 export function clearBookingDraft() {
   sessionStorage.removeItem(KEY);
+  sessionStorage.removeItem(LEGACY_KEY);
 }
 
 export function saveBookingDraft(draft: BookingDraft) {
   sessionStorage.setItem(KEY, JSON.stringify(draft));
+  sessionStorage.removeItem(LEGACY_KEY);
 }

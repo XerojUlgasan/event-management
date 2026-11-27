@@ -63,7 +63,7 @@ test("Realtime signs with SUP_JWT_KEY on local and hosted Edge", async (context)
         currentDate: new Date(30_000),
       },
     );
-    assert.equal(payload.clemora_scope, "user_notifications");
+    assert.equal(payload.amac_scope, "user_notifications");
   }
 
   for (const invalid of [undefined, " ".repeat(32), "x".repeat(31)]) {

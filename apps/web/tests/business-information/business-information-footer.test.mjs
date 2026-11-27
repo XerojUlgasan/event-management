@@ -16,7 +16,7 @@ let BusinessInformationFooter;
 let emptyBusinessInformation;
 
 before(async () => {
-  cacheDir = await mkdtemp(join(tmpdir(), "clemora-bi-footer-ssr-"));
+  cacheDir = await mkdtemp(join(tmpdir(), "amac-bi-footer-ssr-"));
   server = await createServer({
     root,
     cacheDir,

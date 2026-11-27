@@ -76,7 +76,7 @@ export function planScenarioUsers(): ScenarioUser[] {
 
       return {
         id: scenarioId(`user:${index}`),
-        email: `scenario.user${scenarioIndex(index)}@clemora.example.test`,
+        email: `scenario.user${scenarioIndex(index)}@amac.example.test`,
         displayName: `${given} ${family}`,
         role: role.role,
       };

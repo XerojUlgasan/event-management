@@ -1,6 +1,6 @@
 # Client Interview Summary — 14 November 2026
 
-**Source:** [TRANSCRIPTION.md](TRANSCRIPTION.md), recording `2026-11-14 15-31-06.mp4`, duration 45 minutes 44 seconds. This summary covers that meeting only, rather than the earlier Prevail interviews.
+**Source:** [TRANSCRIPTION.md](TRANSCRIPTION.md), recording `2026-11-14 15-31-06.mp4`, duration 45 minutes 44 seconds. This summary covers that meeting only.
 
 **How to read the evidence:** Quoted phrases preserve the transcript's wording. Timestamps identify approximate paragraph starts, not exact quote positions. Speakers are not formally identified in the source; references to the client or students follow the question-and-answer context. Unclear passages are not treated as settled facts. The recording does not explicitly name a currency; ₱ notation below assumes Philippine pesos from the Philippine business context and needs client confirmation.
 

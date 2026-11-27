@@ -3,7 +3,7 @@ import { BRAND_LOGO_URL, brandLogoSize } from "../assets/brand";
 export function Wordmark({ href = "/" }: { href?: string }) {
   return (
     <a
-      className="brand cl-wordmark"
+      className="brand amac-wordmark"
       href={href}
       aria-label="Styled by AMAC home"
     >

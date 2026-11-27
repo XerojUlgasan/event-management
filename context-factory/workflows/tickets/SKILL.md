@@ -1,5 +1,5 @@
 ---
-name: clemora-tickets
+name: amac-tickets
 description: Create or rewrite implementation, bug, spike, and Epic tickets with deterministic rules, source evidence, and observable completion criteria.
 ---
 

@@ -44,7 +44,7 @@ test("admin status history appends, retries, and resets on a new revision", asyn
 
   const { act, createElement } = await import("react");
   const { createRoot } = await import("react-dom/client");
-  const cacheDir = await mkdtemp(join(tmpdir(), "clemora-admin-status-"));
+  const cacheDir = await mkdtemp(join(tmpdir(), "amac-admin-status-"));
   const vite = await createServer({
     root: fileURLToPath(new URL("../../", import.meta.url)),
     cacheDir,

@@ -32,4 +32,3 @@ The visible website brand is **Styled by AMAC**. Use the supplied, unmodified lo
 
 - Supplied logo asset: `packages/ui/src/assets/styled-by-amac.png`.
 - Product scope, implementation status, constraints, and unresolved decisions: [product reference](../../context-factory/business/product.md).
-- Original client research for Prevail Events Management remains in the interview records; it is research evidence, not a claim about the current brand.

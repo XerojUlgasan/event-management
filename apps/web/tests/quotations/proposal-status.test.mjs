@@ -271,7 +271,7 @@ before(async () => {
   globalThis.fetch = fakeFetch;
   ({ createElement, act } = await import("react"));
   ({ createRoot } = await import("react-dom/client"));
-  cacheDir = await mkdtemp(join(tmpdir(), "clemora-proposal-ui-"));
+  cacheDir = await mkdtemp(join(tmpdir(), "amac-proposal-ui-"));
   server = await createServer({
     root: webRoot,
     cacheDir,

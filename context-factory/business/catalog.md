@@ -1,6 +1,6 @@
 # Catalog
 
-The catalog presents the packages and services available from Clemora. It helps customers explore their options, start a booking request for a package, and discuss requirements that call for a custom package.
+The catalog presents the packages and services available from AMAC. It helps customers explore their options, start a booking request for a package, and discuss requirements that call for a custom package.
 
 This reference describes intended business behavior. The [current implementation](product.md#current-implementation) records what is available today; describing a workflow here does not mean it is already implemented.
 

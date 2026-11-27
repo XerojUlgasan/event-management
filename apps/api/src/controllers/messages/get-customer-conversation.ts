@@ -9,7 +9,7 @@ export const getCustomerConversationRoute = createRoute({
   method: "get",
   path: "/messages/conversation",
   tags: ["Messages"],
-  summary: "Read the signed-in customer's conversation with the Clemora team",
+  summary: "Read the signed-in customer's conversation with the AMAC team",
   request: { query: paginationQuerySchema },
   responses: {
     400: errors[400],

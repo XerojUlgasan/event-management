@@ -48,7 +48,7 @@ The booking's `package_id`, `package_name`, `package_price`, and `package_max_gu
 
 ## 2026-11-11 — Seed scenario is insert-only and separate from required fixtures
 
-`pnpm db:seed` keeps the named local accounts, three canvas packages, archived venue samples, and `demo.*` conversations, then runs `apps/api/src/db/seed/scenario/`. That module adds 100 interconnected rows to each of the original 16 scenario tables inside the same transaction, then adds 100 quotations across 50 stored scenario bookings with delivery messages and lifecycle audits. Private packages and package-service links are not seeded. Scenario IDs come from `clemora-scenario-v1` keys. Reruns do not update existing rows. `SEED_RANDOM_SEED` only changes the status shuffle for rows that have not been inserted yet. [Database seed](../../../docs/SEED.md) owns the account bands, counts, and rerun rules.
+`pnpm db:seed` keeps the named local accounts, three canvas packages, archived venue samples, and `demo.*` conversations, then runs `apps/api/src/db/seed/scenario/`. That module adds 100 interconnected rows to each of the original 16 scenario tables inside the same transaction, then adds 100 quotations across 50 stored scenario bookings with delivery messages and lifecycle audits. Private packages and package-service links are not seeded. Scenario IDs come from stable versioned keys. Reruns do not update existing rows. `SEED_RANDOM_SEED` only changes the status shuffle for rows that have not been inserted yet. [Database seed](../../../docs/SEED.md) owns the account bands, counts, and rerun rules.
 
 **Evidence:** `pnpm --filter @event-management/api exec tsx --test tests/seed.test.ts` passed on 2026-11-11 against a disposable migrated database. It checked scenario counts, booking/event-day relationships, quotation centavo totals and revision links, delivery/audit actors, customer draft visibility, public catalog reads, password login, and preservation of edited quotations/prices and closed parents on rerun. The quotation module reads persisted parent state so a replanned status shuffle cannot select closed requests.
 
@@ -64,7 +64,7 @@ The booking's `package_id`, `package_name`, `package_price`, and `package_max_gu
 
 ## 2026-11-09 — Catalog media uses Supabase Storage
 
-`putCatalogMedia`, `deleteCatalogMedia`, and `getCatalogMedia` call the Supabase Storage REST API. The private bucket is `event-management`. Object keys remain `catalog-media/<id>`, which is the value stored in `media_assets.storage_key`. The hosted Prevail project has that empty bucket. Local `config.toml` declares the same bucket; a running stack needs a restart before Storage creates it. Existing R2 objects are not copied. The package tests fake the Storage API and do not prove a live bucket.
+`putCatalogMedia`, `deleteCatalogMedia`, and `getCatalogMedia` call the Supabase Storage REST API. The private bucket is `event-management`. Object keys remain `catalog-media/<id>`, which is the value stored in `media_assets.storage_key`. Local `config.toml` declares the same bucket; a running stack needs a restart before Storage creates it. Existing R2 objects are not copied. The package tests fake the Storage API and do not prove a live bucket.
 
 **Evidence:** `apps/api/src/utils/catalog-media-storage.ts`, `apps/api/src/services/catalog-media/catalog-media.ts`, and `apps/supabase/config.toml`. The [catalog media reference](../../areas/api/references/external-image-urls.md) owns the current route and cleanup behavior.
 
@@ -82,21 +82,21 @@ The booking's `package_id`, `package_name`, `package_price`, and `package_max_gu
 
 `pnpm build:edge` writes an ESM entry and shared chunks to `apps/supabase/functions/api/_generated`. The function entry strips the Supabase prefix and forwards to that app. The app chooses a route family from the path, dynamically imports only that family, and keeps a loading promise that is dropped if loading throws. `/openapi.json` loads every family. The Node server in `apps/api/src/app.ts` is unchanged and still mounts every router at startup.
 
-**Evidence:** `apps/api/scripts/build-edge.ts`, `apps/api/src/edge/server.ts`, and local `supabase functions serve` on the already running `clemora` stack. Health and the public package list returned 200 from the Supabase database. `GET /v1/admin/packages` and `GET /v1/admin/users` returned 401 without a session. An unknown `/v1` path returned 404. `GET /v1/me` and `/openapi.json` returned 500 because the auth family evaluates `@node-rs/argon2`, which has no Deno binding. The [README local Supabase section](../../../README.md#local-supabase) owns the serve command.
+**Evidence:** `apps/api/scripts/build-edge.ts`, `apps/api/src/edge/server.ts`, and local `supabase functions serve` on the running local stack. Health and the public package list returned 200 from the Supabase database. `GET /v1/admin/packages` and `GET /v1/admin/users` returned 401 without a session. An unknown `/v1` path returned 404. `GET /v1/me` and `/openapi.json` returned 500 because the auth family evaluates `@node-rs/argon2`, which has no Deno binding. The [README local Supabase section](../../../README.md#local-supabase) owns the serve command.
 
 **Why it matters:** Do not mount every controller in the function entry. Leave Argon2, Firebase credential verification, and catalog video bytes for the deferred follow-up. Do not point the Compose API, tests, or seeds at the Supabase database. The local edge runtime stays on `oneshot` in `apps/supabase/config.toml`; `per_worker` hot reload killed the container with exit 137 while the generated bundle changed.
 
 ## 2026-11-09 — Local Supabase CLI is not the API database
 
-`apps/supabase` is the local Supabase CLI project (`project_id = "clemora"`, CLI 3.0.0). `pnpm supabase:start` runs Postgres 17, Studio, and Storage on ports 54322, 54323, and 54321. The API, Prisma, seeds, and integration tests still use Compose PostgreSQL from `apps/api/compose.yaml` on port 5432.
+`apps/supabase` is the local Supabase CLI project (CLI 3.0.0). `pnpm supabase:start` runs Postgres 17, Studio, and Storage on ports 54322, 54323, and 54321. The API, Prisma, seeds, and integration tests still use Compose PostgreSQL from `apps/api/compose.yaml` on port 5432.
 
-**Evidence:** `config.toml`, root scripts, and a running `supabase_db_clemora` reporting Postgres 17.11. The [README local Supabase section](../../../README.md#local-supabase) owns the setup. This start did not apply Prisma migrations or switch `DB_HOST`.
+**Evidence:** `config.toml`, root scripts, and the local database container reporting Postgres 17.11. The [README local Supabase section](../../../README.md#local-supabase) owns the setup. This start did not apply Prisma migrations or switch `DB_HOST`.
 
 **Why it matters:** A hosted cutover can use this stack for local proof later. Until that change, do not point the API, tests, or seeds at port 54322.
 
 ## 2026-11-03 — Engineering and shared toolkit ownership
 
-The [engineering index](../../README.md) and [Clemora adapters](../../workflows/implement/references/local-tools.md) own the local adaptation of the inspected Upskwela engineering/shared toolkit. Root guidance and this role's entry point require the operating contract, principle digest, and engineering index on every task, full applicable skills, and a completion audit. Implementation detail remains with the existing area skills.
+The [engineering index](../../README.md) and [AMAC adapters](../../workflows/implement/references/local-tools.md) own the local adaptation of the inspected Upskwela engineering/shared toolkit. Root guidance and this role's entry point require the operating contract, principle digest, and engineering index on every task, full applicable skills, and a completion audit. Implementation detail remains with the existing area skills.
 
 **Evidence:** All 41 source skill paths and 8 shared guide paths matched local counterparts; all skill metadata passed the skill-creator validator. `pnpm check:guidance` passed, and isolated fixtures proved that valid navigation passes while missing targets/anchors, unregistered entries, invalid metadata, and missing standing-guide links fail. Manual routing checks covered limits, explanation-only work, review, TypeScript fixes, shared UI, and PR preparation against current source. This establishes guidance coverage and routing, not future compliance or application runtime behavior.
 
@@ -112,7 +112,7 @@ Moving task workflows into the agent's `reference/` folder changed the relative 
 
 ## 2026-11-06 — Shared UI modal and selection contracts
 
-The [Clemora UI skill](../../areas/frontend/references/clemora-ui.md) owns current component-selection guidance. Mounted `Dialog`/`Drawer` use native modal behavior and request dismissal through app callbacks; specialized `NativeDialog` callers retain their own lifecycle. Use `Dialog.initialFocus` for an initially focused field: React's `autoFocus` ran while the native surface was still hidden. A catalog menu must focus its visible summary before opening a modal so closing can restore a usable target. Catalog switches are filter groups; true tablists require linked item/panel IDs.
+The [AMAC UI skill](../../areas/frontend/references/amac-ui.md) owns current component-selection guidance. Mounted `Dialog`/`Drawer` use native modal behavior and request dismissal through app callbacks; specialized `NativeDialog` callers retain their own lifecycle. Use `Dialog.initialFocus` for an initially focused field: React's `autoFocus` ran while the native surface was still hidden. A catalog menu must focus its visible summary before opening a modal so closing can restore a usable target. Catalog switches are filter groups; true tablists require linked item/panel IDs.
 
 **Evidence:** The [component follow-up ledger](../verification/2026-11-06_web-ui-refactor-ledger.md#component-contracts-follow-up-2026-11-06) records source review, checks, and Chromium/Storybook consumer journeys. Local response fixtures rejected writes; these results do not prove live authentication, persistence, or provider behavior.
 

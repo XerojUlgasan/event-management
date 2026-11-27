@@ -1,6 +1,6 @@
 ---
 name: event-management-ai
-description: Design, implement, investigate, or review AI agents, tools, prompts, decisions, retrieval, or AI Gateway integration in Clemora.
+description: Design, implement, investigate, or review AI agents, tools, prompts, decisions, retrieval, or AI Gateway integration in AMAC.
 ---
 
 # AI

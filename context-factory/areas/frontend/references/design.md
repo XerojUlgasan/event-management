@@ -1,8 +1,8 @@
-# Clemora frontend design
+# AMAC frontend design
 
 **Important: every UI change follows the [mandatory package reuse workflow](../../packages/references/reuse.md#required-workflow-for-every-ui-change).** Load the frontend and packages skills and the required project structure and reuse references before editing, including for CSS-only, page-only, and mock UI changes.
 
-Use the current [theme source](../../../../packages/theme/src/theme.css), [shared UI exports](../../../../packages/ui/src/index.ts), [web design record](../../../../apps/web/DESIGN.md), and the touched screen as the design baseline. The visible brand is Styled by AMAC. Both `--cl-*` and older wine/cream token names now resolve to its charcoal, paper, and taupe palette; retain current consumers when changing aliases. Preserve the supplied logo artwork and its proportions.
+Use the current [theme source](../../../../packages/theme/src/theme.css), [shared UI exports](../../../../packages/ui/src/index.ts), [web design record](../../../../apps/web/DESIGN.md), and the touched screen as the design baseline. The visible brand is Styled by AMAC. Both `--amac-*` and older wine/cream token names now resolve to its charcoal, paper, and taupe palette; retain current consumers when changing aliases. Preserve the supplied logo artwork and its proportions.
 
 - Reuse existing presentation components from `@event-management/ui` and tokens from `@event-management/theme/theme.css`. Page-specific styles remain in `apps/web/src/styles/`; shared component classes remain in `packages/ui/src/styles.css`.
 - Keep business decisions, fetching, authentication, and app navigation in `apps/web`. The current component library uses atomic layers and CSS classes. A design-skill suggestion does not establish a shadcn migration or a new token system.

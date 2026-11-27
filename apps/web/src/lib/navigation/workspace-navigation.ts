@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-const change = "clemora:navigation";
+const change = "amac:navigation";
 
 export function customerConversationPath(id: string, quotationId?: string) {
   const path = `/app/messages?conversation=${encodeURIComponent(id)}`;
@@ -55,7 +55,7 @@ function subscribe(listener: () => void) {
 export function useWorkspaceLocation(initial: string) {
   const value = useSyncExternalStore(subscribe, snapshot, () => initial);
 
-  const url = new URL(value, "https://clemora.invalid");
+  const url = new URL(value, "https://amac.invalid");
 
   return { path: url.pathname, search: url.search, hash: url.hash };
 }

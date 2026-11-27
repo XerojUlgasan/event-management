@@ -1,4 +1,4 @@
-# Use the shared Clemora UI
+# Use the shared AMAC UI
 
 This usage guide supplements the [frontend](../SKILL.md) and [packages](../../packages/SKILL.md) skills and their required references. The [package reuse workflow](../../packages/references/reuse.md) owns placement and the completion audit for every UI change.
 
@@ -54,13 +54,13 @@ Use `DataTable` for tabular records that need horizontal scrolling with the firs
 
 Reusable presentation belongs in `packages/ui/src/atoms`, `molecules`, `organisms`, or `templates` according to its responsibility. Export public components from `packages/ui/src/index.ts`, keep shared component styles in `packages/ui/src/styles.css`, and add meaningful colocated stories using the [Storybook guide](../../../../packages/ui/STORYBOOK.md). Keep routing, data fetching, authentication, business rules, and page-specific composition in `apps/web`. Use shared types and limits from their existing `@event-management/contracts` exports.
 
-Use existing component variants and CSS variables from [theme.css](../../../../packages/theme/src/theme.css); place shared tokens in `packages/theme`. Page styles own local layout. The theme contains both `--cl-*` values for the newer public design and wine/cream values used by existing workspace screens. The web app imports theme and UI styles in [app.css](../../../../apps/web/src/styles/app.css); its base fonts are DM Sans and Playfair Display, while the newer public styling also defines the Clemora font stack. Inspect the touched screen before changing its typography or colors.
+Use existing component variants and CSS variables from [theme.css](../../../../packages/theme/src/theme.css); place shared tokens in `packages/theme`. Page styles own local layout. The theme contains both `--amac-*` values for the newer public design and wine/cream values used by existing workspace screens. The web app imports theme and UI styles in [app.css](../../../../apps/web/src/styles/app.css); its base fonts are DM Sans and Playfair Display, while the newer public styling also defines the AMAC font stack. Inspect the touched screen before changing its typography or colors.
 
 Shared radius, control height/padding/type size, and field-gap variables capture the current workspace dimensions. Reuse them when extending a matching control; a token extraction does not establish a new visual direction. Native disabled/read-only controls and invalid controls, including plain controls inside `InputGroup`, have shared state styles.
 
 Prefer a component's existing variant and size to a local visual override. Use shared semantic variables such as `--surface-base`, `--text-primary`, `--border-default`, and `--status-danger-text`. The `plain` controls support established specialized compositions; inspect their callers before choosing them. Inside the UI implementation, follow the current relative-import and class-composition patterns. Only the root and stylesheet are public exports; there are no component subpaths or exported `cn()` helper.
 
-For actual shadcn setup or registry work, read [Clemora's integration notes](../../packages/references/shadcn.md), then the installed [shadcn skill](../../../../.agents/skills/shadcn/SKILL.md). The current Clemora components have their own APIs; do not assume upstream component contracts or initialized configuration.
+For actual shadcn setup or registry work, read [AMAC's integration notes](../../packages/references/shadcn.md), then the installed [shadcn skill](../../../../.agents/skills/shadcn/SKILL.md). The current AMAC components have their own APIs; do not assume upstream component contracts or initialized configuration.
 
 ## Verify
 

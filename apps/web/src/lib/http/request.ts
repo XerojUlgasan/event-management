@@ -57,7 +57,7 @@ export async function request<T>(
       path !== "/me" &&
       typeof window !== "undefined"
     ) {
-      window.dispatchEvent(new Event("clemora:session-check"));
+      window.dispatchEvent(new Event("amac:session-check"));
     }
 
     const result = (await response.json().catch(() => ({}))) as {

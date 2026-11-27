@@ -9,7 +9,7 @@ import { createServer } from "vite";
 
 test("a customer can return to a single conversation in the inbox and reopen its draft", async (t) => {
   const window = new Window();
-  const cacheDir = await mkdtemp(join(tmpdir(), "clemora-conversation-draft-"));
+  const cacheDir = await mkdtemp(join(tmpdir(), "amac-conversation-draft-"));
   const server = await createServer({
     root: fileURLToPath(new URL("../../", import.meta.url)),
     cacheDir,

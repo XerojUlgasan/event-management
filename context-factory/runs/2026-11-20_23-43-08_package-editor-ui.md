@@ -29,7 +29,7 @@ Details edit the existing draft immediately; Done dismisses the modal. Saving th
 
 - `pnpm --filter @event-management/web test:catalog`: 35/35, independently rerun. Web/UI `check`, focused ESLint, web `build`, `pnpm build:storybook`, and `git diff --check` pass. `pnpm check:guidance` and `pnpm test:guidance` also pass (9/9).
 - Browser used actual components with synthetic fetch/in-memory saves: desktop and narrow widths (325–390 CSS pixels), named icons, readable scrollable table, stacked cards, local overrides, add/remove, undo/redo, nested settings/thumbnail Escape and focus return, blank-name correction, pending/save failure, save/reopen, unchanged base total, and service overlay/route/focus return. No console errors observed. This establishes UI behavior, not API/database persistence or deployment proof.
-- Screenshots: `/tmp/clemora-package-editor-details.jpg`, `/tmp/clemora-package-editor-preview.jpg`, `/tmp/clemora-package-editor-mobile.jpg`.
+-
 - Structure still reports two unchanged imports in `use-thumbnail.ts`. Design still reports existing raw thumbnail controls and color declarations in package-editor/message-images CSS. Impeccable detector reports existing typography/radius advisories; these are not a green aggregate gate.
 
 ## Remaining work
